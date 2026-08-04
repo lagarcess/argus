@@ -30,7 +30,7 @@ Before making code changes, agents must review these source-of-truth docs in thi
 # 🎯 Alpha Product Truth
 
 **Argus Alpha Priorities:**
-- Chat-first UX & AI-first onboarding
+- Chat-first UX; activation is the first successful backtest
 - Strategy drafting through conversation
 - Simple, trustworthy backtests
 - Recents/history retrieval
@@ -42,13 +42,15 @@ Before making code changes, agents must review these source-of-truth docs in thi
 - Brokerage integrations & real money trading
 - Social feeds & institutional tools
 - Advanced portfolio analytics
-- Mixed-asset backtests (Equity + Crypto in one run)
+- Mixed-asset backtests (Equity, Crypto, and Currency Pair in one run)
 - Native mobile apps (PWA/Mobile-web only)
 
 # ⚙️ Canonical Current Constraints
 
-- **Same-Asset Simulations Only**: Runs must be either 100% Equity or 100% Crypto.
-- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`.
+- **Same-Asset Simulations Only**: Runs must be 100% Equity, 100% Crypto, or
+  100% Currency Pair.
+- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`, Currency Pair ->
+  the tested pair.
 - **Logic**: Long-only, equal-weight multi-symbol runs.
 - **Limits**: Max 5 symbols per run.
 - **Localization**: Static UI must support English (`en`) and Spanish (`es-419`).
@@ -130,6 +132,87 @@ Integration guardrails:
 
 - Worker branches start from `codex/private-alpha-next`, not directly from
   `main`, unless the task is an urgent hotfix.
+- At lane start, record the fetched `origin/codex/private-alpha-next` SHA as the
+  lane's integration base. Before a READY claim, fetch integration again and
+  record both the original base and current remote integration SHA.
+- Reconciliation is one-way: merge current
+  `origin/codex/private-alpha-next` into the worker branch. Never merge a worker
+  branch into the canonical integration checkout by hand; worker delivery goes
+  through its GitHub PR targeting `codex/private-alpha-next`.
+- Once a worker branch is published or has browser, live-eval, or other
+  exact-head evidence, do not rebase it. Use a normal integration merge so the
+  reviewed/evidenced lineage remains inspectable. Do not merge `main` into an
+  ordinary Private Alpha Next worker.
+- When integration advanced after the worker's recorded base, compare the
+  worker diff with the intervening integration diff and report semantic
+  overlap by shared runtime owner, API/data contract, UI state owner, migration,
+  environment variable, and directly affected tests—not merely Git conflict
+  status. No textual conflict is not proof of behavioral independence.
+- If there is no semantic overlap, preserve the lane's accepted evidence and
+  rerun the normal exact-head deterministic/CI gates after reconciliation. If
+  overlap exists, audit the overlap and rerun only the affected acceptance
+  surface. Do not repeat paid evals, provider turns, real backtests, or broad
+  browser matrices unless the overlap invalidates that specific evidence.
+- Every final READY report must include the original integration base, current
+  integration SHA, reconciliation merge SHA if any, overlap disposition,
+  evidence retained or invalidated, exact PR head, and terminal CI state.
+- Visual and browser acceptance evidence must be durable. Commit the
+  artifacts under `docs/reports/evidence/<issue-or-pr>/` in the lane's PR, or
+  upload the images as GitHub attachments on the issue/PR comment that cites
+  them. Local worktree paths or SHA-256 hashes alone are not durable
+  evidence: a claim whose images exist only in a local folder is not closed.
+  Evidence must be captured at the exact head it vouches for; if the head
+  moves afterward, re-capture or explicitly re-validate.
+- Before a READY claim, run `scripts/check_modularity_budget.py` against the
+  would-be merged tree (after the one-way reconciliation merge, or via
+  `git merge-tree` with current integration), not only against the worker
+  branch. Modularity budgets are a shared pool: two individually green
+  branches can exceed a watched file's limit when combined, and the violation
+  only exists on the merged result.
+- Write the terminal audit only after the final Codex review has returned,
+  and record that review's outcome in it. An audit that races an in-flight
+  review request can be truthful for minutes and stale on arrival; review
+  responses may arrive as inline threads without a summary comment, so check
+  the PR's unresolved-thread count, not just for a bot comment.
+- A review loop terminates when one review pass scoped to the latest fix's
+  delta returns clean and the PR's unresolved-thread count is zero. Do not
+  re-request review on an unchanged head, and do not let unchanged code
+  become a new source of findings to keep a loop alive. Findings that arrive
+  after the terminal state are either new scope — spin them out to an owned
+  issue — or declined with one line of rationale; neither reopens the loop.
+- Behavioral acceptance evidence for strategy-surface changes must span the
+  supported strategy-shape space, not one canonical shape. Include at least
+  one non-buy-and-hold strategy (for example DCA with an explicit
+  `recurring_contribution`, or an indicator-driven template) unless the
+  surface is provably strategy-agnostic. This is a macro rule: as new
+  strategy shapes ship, acceptance evidence diversifies with them instead of
+  standardizing on the oldest, fastest-to-drive shape. Facts most likely to
+  be dropped by a defect (contribution cadence, indicator parameters,
+  modeled costs) deserve evidence before facts that rarely break (dates,
+  capital).
+- Test suites must scale by construction, not duplication. Prefer shared
+  fixtures, factories, and pytest parametrization over copy-pasted cases
+  with hardcoded values; derive expected values from the same canonical
+  constants and builders the code under test uses instead of repeating magic
+  literals; use Faker for incidental data. Hardcoded fixture values that
+  encode convenient fictions — weekend trading days, always-present
+  fractional seconds, a single strategy shape — are how green suites hide
+  real breakage: fixture realism is part of test correctness. Style details
+  live in `.agent/rules/testing.md`; this bullet governs when suites grow.
+- After the founder merges a worker PR, the active agent should run
+  `.agent/workflows/integration-landing.md` if its checkout and GitHub authority
+  permit it. A cloud agent may perform that workflow; the local
+  `argus-integration-landing` skill is helpful but not required. If the agent
+  cannot complete the landing workflow, it must post the following conspicuous
+  handoff once in both its final response and the merged PR when PR commenting
+  is available:
+
+  ```text
+  🚨🚨🚨 FOUNDER ACTION REQUIRED — INTEGRATION LANDING NOT RUN 🚨🚨🚨
+  PR #<number> merged as <sha>, but roadmap/issues/env parity and exact-head
+  integration verification are still pending. Run the Argus integration
+  landing workflow from the canonical codex/private-alpha-next checkout.
+  ```
 - `codex/private-alpha-next` is the clean integration gate. Quarantine branches
   such as `codex/private-alpha-next-quarantine-fc231e8` and
   `codex/private-alpha-next-p2.1-quarantine` are read-only reference material
@@ -140,11 +223,27 @@ Integration guardrails:
 - Jules work is decommissioned for the near term. Do not create or maintain
   `jules/**` branches, `codex/private-alpha-next-jules-intake`, or Jules intake
   PRs unless the founder explicitly reactivates that workflow.
-- External async agents, if reintroduced later, must work from a fresh
-  founder-approved delegation model and must not push directly to `main` or
-  `codex/private-alpha-next`.
+- External async implementation agents, if reintroduced later, must work from
+  a fresh founder-approved delegation model and must not push product code
+  directly to `main` or `codex/private-alpha-next`. After a founder-confirmed
+  merge, an agent explicitly assigned the repository-owned integration-landing
+  workflow may push only its bounded documentation/configuration housekeeping
+  directly to `codex/private-alpha-next`.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
+- Apply review proportionality to local, cloud, subagent, acceptance, and
+  pre-merge review. Before changing code, confirm that the finding is real,
+  reachable, and relevant to the active lane; weigh its severity, likelihood,
+  affected users or artifacts, and risk to correctness, security, privacy,
+  evidence integrity, or durable state against the complexity the fix adds.
+  Choose the smallest safe fix. After implementation, reassess the actual diff
+  and remove or simplify machinery the validated finding does not justify.
+  Discard speculative or disproportionate scope, and revisit only risk surfaces
+  materially changed by the latest fix; unchanged code must not become a new
+  source of requirements merely to continue a review loop. If the smallest safe
+  fix for a confirmed correctness, security, privacy, evidence-integrity, or
+  durable-state requirement exceeds the lane, escalate instead of weakening or
+  waiving the requirement because the fix is difficult.
 - For Argus multi-agent work, the main Codex thread is the release captain and
   owns subagent cleanup. Every spawned agent must have a bounded goal, expected
   output, and cleanup expectation. After the run, the parent agent must
@@ -299,6 +398,7 @@ These principles come from the recent modular monolith / LangGraph migration pla
 | `apple-hig-expert/`                  | Premium UI/UX aesthetics, Argus/Apple-grade physics                         |
 | `skill-security-auditor/`           | Automated security gating for agent skills and external plugins               |
 | `playwright-pro/`                   | Advanced E2E testing framework, target 63% coverage                          |
+| `argus-experience-audit/`           | Guest/signed-in checkpoint audits, cloud QA, and locked evidence packs       |
 | `senior-architect/`                 | Principal-level system guidance and Institutional-grade reliability         |
 | `saas-metrics-coach/`               | Fintech quota throughput and monetization logic                              |
 
@@ -322,6 +422,7 @@ These principles come from the recent modular monolith / LangGraph migration pla
 | `/verify` | Full suite: pytest + Bun lint + coverage check (63%+) + backtest perf (<3s)  |
 | `/pr`     | Create PR: include API contract link if schema changed, mark scope (api/web) |
 | `/perf`   | Benchmark: Numba analysis, backtest latency, Bun build time                  |
+| `/integration-landing` | Reconcile a confirmed integration merge, docs, issues, env templates, and exact-head CI |
 
 ### Discovery & Ops
 
@@ -366,6 +467,48 @@ manually juggle backend mode flags for normal work.
   `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` and no live provider
   keys. A clean mocked sweep should be seconds-scale; a run stretching into
   minutes means stop and check for leaked credentials or live provider paths.
+- Local compute rule: local and dev-agent backtests run in-process on the
+  developer machine. Never set `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`
+  or dispatch paid Render workflow tasks (`workflow_proof`,
+  `run_backtest_job`) from local work without explicit founder authorization.
+  Paid Render dispatch belongs to the hosted product, the scheduled canary,
+  and promotion ceremonies; the mode scripts pin it off (dev hard-off, QA
+  default-off with explicit pre-export opt-in).
+
+### Worktree Environment Contract
+
+The worktree checked out on `codex/private-alpha-next` owns the canonical local
+`.env` and `web/.env.local`. Codex worktree setup automatically runs
+`.github/setup.sh`, which delegates to `.github/setup-worktree-env.sh` and links
+missing worker environment files to that canonical source. Existing regular
+files and links to another source are preserved because they may be intentional
+lane-local configuration.
+
+At every worktree Phase 0, run the idempotent setup and read-only topology
+check:
+
+```bash
+bash .github/setup-worktree-env.sh "$PWD"
+bash .github/setup-worktree-env.sh --check "$PWD"
+```
+
+The check reports topology only and never prints values:
+
+- `canonical-linked`: the worker uses the shared integration file.
+- `canonical-source`: this is the integration worktree's regular source file.
+- `worktree-local`: the lane intentionally owns a regular local file.
+- `missing` or `conflicting-link`: stop and correct the environment topology
+  before running services, tests, or provider-backed QA.
+
+Shared links are not safe write targets. Never rewrite a linked `.env` or
+`web/.env.local` with `cat >`, shell redirection, `sed -i`, or similar in-place
+writes. If every lane needs a new value, update the canonical integration file
+once. If only one launched process needs an override, inject it at runtime. If
+a disposable local-Supabase lane needs generated files, use
+`scripts/qa/write-local-env.sh`; it atomically detaches that lane's links before
+writing regular worktree-local files. Never print, inspect, or persist secret
+values in task output. See [`.github/WORKTREE_CLEANUP.md`](.github/WORKTREE_CLEANUP.md)
+for the detailed lifecycle and recovery rules.
 
 ### Fast Iteration (Dev Mode)
 **Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
@@ -478,12 +621,19 @@ the same provider-backed resolution path production will use.
 ### Feature Flags (All Private-Alpha)
 Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
 by default and should only be disabled for a targeted regression check:
+
+- Once the founder accepts and merges a feature as part of the normal Argus
+  product shape, its runtime default is **on**. Retain its flag as an emergency
+  kill switch, not as an opt-in gate.
+- Local/runtime defaults and Render activation are separate concerns. A merged
+  default-on feature still requires its documented Render configuration and
+  exact-SHA canary before tester exposure.
+
 ```bash
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
-NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
 ```
 
 ### Frontend Environment (web/.env.local)
@@ -675,7 +825,11 @@ Never do this:
 8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh`.
 9. **Critical Findings Only**: Only PR/Journal critical improvements (security bugs, >20% perf gain).
 10. **Postgres Performance**: All SQL/RLS must be audited against `postgres-best-practices`.
-11. **Branch Sync & Goal Realignment**: Every agent session must fetch/rebase `main` and re-verify original mission against any architectural drift before completion.
+11. **Branch Sync & Goal Realignment**: Private Alpha Next workers must fetch
+    `origin/codex/private-alpha-next`, reconcile it one-way into the worker, and
+    re-verify the mission and affected evidence before completion. Do not rebase
+    a published or evidenced lane, and do not use `main` as the ordinary worker
+    base.
 
 ---
 

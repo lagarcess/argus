@@ -22,6 +22,7 @@ class FakeBacktestJobGateway:
         self.row = dict(row)
         self.transitions: list[str] = []
         self.failed_updates: list[dict[str, object]] = []
+        self.failure_expected_statuses: list[str | None] = []
         self.route_receipts: list[dict[str, object]] = []
         self.cost_ledger_entries: list[dict[str, object]] = []
         self.finalization_store = AlphaStore()
@@ -29,6 +30,7 @@ class FakeBacktestJobGateway:
         self.fail_finalization_after_commit_once = False
         self.fail_result_link_once = False
         self.fail_result_link_after_commit_once = False
+        self.running_started_at_arguments: list[str | None] = []
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
         if self.row["id"] != job_id:
@@ -46,8 +48,9 @@ class FakeBacktestJobGateway:
         assert self.row["user_id"] == user_id
         assert self.row["id"] == job_id
         self.transitions.append("running")
+        self.running_started_at_arguments.append(started_at)
         self.row["status"] = "running"
-        self.row["started_at"] = started_at
+        self.row["started_at"] = started_at or datetime.now(timezone.utc).isoformat()
         self.row["attempts"] = int(self.row.get("attempts") or 0) + 1
         self.row["result_run_id"] = None
         self.row["finished_at"] = None
@@ -124,9 +127,13 @@ class FakeBacktestJobGateway:
         retryable: bool,
         execution_metadata: dict[str, object] | None = None,
         finished_at: str | None = None,
+        expected_status: str | None = None,
     ) -> dict[str, object]:
         assert self.row["user_id"] == user_id
         assert self.row["id"] == job_id
+        self.failure_expected_statuses.append(expected_status)
+        if expected_status is not None:
+            assert self.row["status"] == expected_status
         self.transitions.append("failed")
         metadata = dict(self.row.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
@@ -193,7 +200,10 @@ def _job_row(*, launch_payload: dict[str, object]) -> dict[str, object]:
         "status": "queued",
         "attempts": 0,
         "launch_payload": launch_payload,
-        "execution_metadata": {"existing": "kept"},
+        "execution_metadata": {
+            "existing": "kept",
+            "openrouter_traffic_class": "registered",
+        },
         "result_run_id": None,
     }
 
@@ -291,6 +301,51 @@ def test_run_backtest_job_rejects_proof_payloads() -> None:
     assert gateway.transitions == []
 
 
+@pytest.mark.parametrize(
+    "execution_metadata",
+    [
+        pytest.param({}, id="legacy-missing"),
+        pytest.param(
+            {"openrouter_traffic_class": "unexpected"},
+            id="malformed-literal",
+        ),
+    ],
+)
+def test_run_backtest_job_terminalizes_invalid_traffic_class_metadata(
+    execution_metadata: dict[str, object],
+) -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job["execution_metadata"] = execution_metadata
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="invalid-envelope-run",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_code"] == "invalid_job_contract"
+    assert result["failure_detail"] == "execution_failed"
+    assert result["retryable"] is False
+    assert gateway.transitions == ["failed"]
+    assert tool.calls == []
+    workflow_metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    assert workflow_metadata["failure_category"] == "invalid_job_contract"
+    assert "source_error_type" not in workflow_metadata
+    assert "source_traceback" not in workflow_metadata
+
+
 def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -347,15 +402,38 @@ def test_postgres_backtest_job_gateway_reuses_connection_in_context(
     assert connect_calls == 1
 
 
-def test_postgres_backtest_job_gateway_rejects_running_job_claim(
+def test_postgres_backtest_job_gateway_disables_pooled_prepared_statements(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from workflows.backtest_job import (
-        PostgresBacktestJobGateway,
-        WorkflowBacktestJobError,
-    )
+    import psycopg
 
-    captured: dict[str, str] = {}
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
+    sentinel = object()
+
+    def fake_connect(database_url: str, **kwargs: object) -> object:
+        captured["database_url"] = database_url
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr(psycopg, "connect", fake_connect)
+    gateway = PostgresBacktestJobGateway("postgres://pooled-example")
+
+    connection = gateway._connect()
+
+    assert connection is sentinel
+    assert captured["database_url"] == "postgres://pooled-example"
+    assert captured["autocommit"] is True
+    assert captured["prepare_threshold"] is None
+
+
+def test_postgres_failed_update_types_nullable_expected_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    captured: dict[str, object] = {}
 
     class FakeCursor:
         def __enter__(self) -> FakeCursor:
@@ -365,13 +443,11 @@ def test_postgres_backtest_job_gateway_rejects_running_job_claim(
             return None
 
         def execute(self, query: str, params: object = None) -> None:
-            del params
             captured["query"] = " ".join(query.split())
+            captured["params"] = params
 
-        def fetchone(self) -> dict[str, object] | None:
-            if "status in ('queued', 'running')" in captured["query"]:
-                return {"id": "job-1", "status": "running"}
-            return None
+        def fetchone(self) -> dict[str, object]:
+            return {"id": "job-1", "status": "failed"}
 
     class FakeConnection:
         def __enter__(self) -> FakeConnection:
@@ -390,6 +466,105 @@ def test_postgres_backtest_job_gateway_rejects_running_job_claim(
     )
     gateway = PostgresBacktestJobGateway("postgres://example")
 
+    row = gateway.mark_backtest_job_failed(
+        user_id="user-1",
+        job_id="job-1",
+        failure_code="invalid_job_contract",
+        failure_detail="execution_failed",
+        retryable=False,
+        expected_status=None,
+    )
+
+    assert row["status"] == "failed"
+    assert "%(expected_status)s::text is null" in str(captured["query"])
+
+
+def test_postgres_backtest_job_gateway_waits_for_capacity_before_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import workflows.backtest_job as workflow_module
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    gateway = PostgresBacktestJobGateway(
+        "postgres://example",
+        capacity_wait_seconds=10.0,
+        capacity_poll_seconds=0.25,
+    )
+    attempts = iter(
+        [
+            None,
+            {"id": "job-1", "user_id": "user-1", "status": "running"},
+        ]
+    )
+    sleeps: list[float] = []
+    monotonic = iter([100.0, 100.1])
+    monkeypatch.setattr(
+        gateway,
+        "_try_mark_backtest_job_running",
+        lambda **_kwargs: next(attempts),
+    )
+    monkeypatch.setattr(workflow_module.time, "monotonic", lambda: next(monotonic))
+    monkeypatch.setattr(workflow_module.time, "sleep", sleeps.append)
+
+    row = gateway.mark_backtest_job_running(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_run_id": "run-1"},
+    )
+
+    assert row["status"] == "running"
+    assert sleeps == [0.25]
+
+
+def test_postgres_backtest_job_gateway_rejects_running_job_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import (
+        PostgresBacktestJobGateway,
+        WorkflowBacktestJobError,
+    )
+
+    queries: list[str] = []
+
+    class FakeCursor:
+        query = ""
+
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            del params
+            self.query = " ".join(query.split())
+            queries.append(self.query)
+
+        def fetchone(self) -> dict[str, object] | None:
+            if self.query.startswith("select status, failure_code"):
+                return {"id": "job-1", "status": "running"}
+            return None
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def transaction(self) -> FakeConnection:
+            return self
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
     with pytest.raises(WorkflowBacktestJobError, match="cannot be started or retried"):
         gateway.mark_backtest_job_running(
             user_id="user-1",
@@ -397,10 +572,102 @@ def test_postgres_backtest_job_gateway_rejects_running_job_claim(
             execution_metadata={"workflow_run_id": "overlap"},
         )
 
-    assert "status = 'queued'" in captured["query"]
-    assert "status in ('queued', 'running')" not in captured["query"]
-    assert "status = 'failed'" in captured["query"]
-    assert "failure_code = 'finalization_failed'" in captured["query"]
+    assert "pg_advisory_xact_lock(hashtext('backtest_admission'))" in queries[0]
+    assert "for update" in queries[1]
+    assert not any(query.startswith("update public.backtest_jobs") for query in queries)
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        {
+            "status": "queued",
+            "failure_code": None,
+            "retryable": False,
+            "attempts": 0,
+            "execution_metadata": {},
+        },
+        {
+            "status": "failed",
+            "failure_code": "finalization_failed",
+            "retryable": True,
+            "attempts": 1,
+            "execution_metadata": {},
+        },
+    ],
+)
+def test_postgres_backtest_job_gateway_leaves_candidate_at_user_capacity(
+    monkeypatch: pytest.MonkeyPatch,
+    candidate: dict[str, object],
+) -> None:
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    queries: list[str] = []
+    transaction_events: list[str] = []
+
+    class FakeCursor:
+        query = ""
+
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            del params
+            self.query = " ".join(query.split())
+            queries.append(self.query)
+
+        def fetchone(self) -> dict[str, object] | None:
+            if self.query.startswith("select status, failure_code"):
+                return candidate
+            if "as user_running" in self.query:
+                return {"user_running": 1, "global_running": 1}
+            raise AssertionError(f"unexpected fetch for query: {self.query}")
+
+    class FakeTransaction:
+        def __enter__(self) -> FakeTransaction:
+            transaction_events.append("begin")
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            transaction_events.append("commit")
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def transaction(self) -> FakeTransaction:
+            return FakeTransaction()
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT", "1")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT", "5")
+    monkeypatch.setattr(
+        PostgresBacktestJobGateway,
+        "_connect",
+        lambda _self: FakeConnection(),
+    )
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
+    row = gateway._try_mark_backtest_job_running(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_run_id": "waiting-run"},
+    )
+
+    assert row is None
+    assert transaction_events == ["begin", "commit"]
+    assert "pg_advisory_xact_lock(hashtext('backtest_admission'))" in queries[0]
+    assert "for update" in queries[1]
+    assert "as user_running" in queries[2]
+    assert not any(query.startswith("update public.backtest_jobs") for query in queries)
 
 
 def test_postgres_backtest_job_gateway_appends_cost_ledger_entry(
@@ -603,6 +870,7 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
     assert result["status"] == "succeeded"
     assert result["result_run_id"] == "run-workflow"
     assert gateway.transitions == ["running", "finalize", "succeeded"]
+    assert gateway.running_started_at_arguments == [None]
     assert tool.calls == [request]
     created_run = gateway.finalization_store.backtest_runs["run-workflow"]
     assert created_run.id == "run-workflow"
@@ -624,6 +892,85 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
         gateway.row["execution_metadata"]["workflow_backtest"]["workflow_run_id"]
         == "local-run"
     )
+
+
+def test_run_backtest_job_persists_terminal_capacity_wait_timeout() -> None:
+    from workflows.backtest_job import (
+        REAL_BACKTEST_JOB_KIND,
+        WorkflowCapacityTimeout,
+        run_backtest_job,
+    )
+
+    class CapacityTimedOutGateway(FakeBacktestJobGateway):
+        def mark_backtest_job_running(self, **_kwargs: object) -> dict[str, object]:
+            raise WorkflowCapacityTimeout("running slot wait expired")
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = CapacityTimedOutGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="capacity-timeout-run",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_code"] == "capacity_timeout"
+    assert result["retryable"] is False
+    assert gateway.row["status"] == "failed"
+    assert gateway.transitions == ["failed"]
+    assert gateway.failure_expected_statuses == ["queued"]
+    assert tool.calls == []
+
+
+def test_capacity_wait_timeout_preserves_finalization_retry_state() -> None:
+    from workflows.backtest_job import (
+        REAL_BACKTEST_JOB_KIND,
+        WorkflowCapacityTimeout,
+        run_backtest_job,
+    )
+
+    class CapacityTimedOutGateway(FakeBacktestJobGateway):
+        def mark_backtest_job_running(self, **_kwargs: object) -> dict[str, object]:
+            raise WorkflowCapacityTimeout("running slot wait expired")
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job.update(
+        status="failed",
+        failure_code="finalization_failed",
+        failure_detail="execution_failed",
+        retryable=True,
+        attempts=1,
+    )
+    gateway = CapacityTimedOutGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="finalization-capacity-timeout",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_code"] == "finalization_failed"
+    assert result["retryable"] is True
+    assert gateway.row["failure_code"] == "finalization_failed"
+    assert gateway.row["retryable"] is True
+    assert gateway.failure_expected_statuses == ["failed"]
 
 
 def test_run_backtest_job_persists_workflow_internal_timings_on_success() -> None:
@@ -873,6 +1220,58 @@ def test_run_backtest_job_persists_backend_result_readout(
     assert metadata["result_readout_fallback_used"] is False
 
 
+def test_run_backtest_job_restores_guest_openrouter_scope_for_result_readout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.result_readout import ResultReadout
+    from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
+
+    from workflows import backtest_job as workflow_module
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    observed_keys: list[str] = []
+
+    def scoped_result_readout(**_: object) -> ResultReadout:
+        observed_keys.append(resolve_openrouter_api_key())
+        return ResultReadout(
+            text="Scoped guest readout.",
+            source="llm_explain_stage",
+            fallback_used=False,
+        )
+
+    monkeypatch.setattr(
+        workflow_module,
+        "result_readout_with_metadata_from_backtest_payload",
+        scoped_result_readout,
+    )
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dev-only")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-key")
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job["execution_metadata"]["openrouter_traffic_class"] = "guest"
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["result_readout"] == "Scoped guest readout."
+    assert observed_keys == ["guest-key"]
+    with pytest.raises(RuntimeError, match="traffic class"):
+        resolve_openrouter_api_key()
+
+
 def test_run_backtest_job_persists_result_summary_route_receipts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -963,6 +1362,94 @@ def test_run_backtest_job_persists_result_summary_route_receipts(
     assert ledger_entry["correlation_id"] == f"workflow:local-run:{job['id']}:run-workflow"
     assert ledger_entry["total_tokens"] == 30
     assert ledger_entry["cost_amount"] == 0.0009
+
+
+def test_run_backtest_job_succeeds_when_cost_ledger_table_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.result_readout import ResultReadout
+    from argus.llm.openrouter import (
+        clear_openrouter_route_receipts,
+        record_openrouter_route_receipt,
+    )
+    from argus.observability import cost_ledger as cost_ledger_module
+
+    from workflows import backtest_job as workflow_module
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    class UnavailableCostLedgerGateway(FakeBacktestJobGateway):
+        def create_cost_ledger_entry(
+            self,
+            *,
+            entry: dict[str, object],
+        ) -> dict[str, object]:
+            del entry
+            raise RuntimeError("PGRST205: cost_ledger_entries is unavailable")
+
+    class WarningCapture:
+        def __init__(self) -> None:
+            self.records: list[tuple[str, dict[str, object]]] = []
+
+        def warning(self, message: str, **context: object) -> None:
+            self.records.append((message, context))
+
+    clear_openrouter_route_receipts()
+
+    def fake_result_readout(**_: object) -> ResultReadout:
+        record_openrouter_route_receipt(
+            task="result_summary",
+            model_name="unit-test-model",
+            mode="json_schema",
+            schema_name="QuickTakeDraft",
+            latency_ms=42,
+            outcome="succeeded",
+            token_usage={
+                "prompt_tokens": 21,
+                "completion_tokens": 9,
+                "total_tokens": 30,
+            },
+            usage_cost_usd=0.0009,
+        )
+        return ResultReadout(
+            text="**Quick take**\n\nAAPL beat SPY in this test.",
+            source="llm_explain_stage",
+            fallback_used=False,
+        )
+
+    warning_capture = WarningCapture()
+    monkeypatch.setattr(cost_ledger_module, "logger", warning_capture)
+    monkeypatch.setattr(
+        workflow_module,
+        "result_readout_with_metadata_from_backtest_payload",
+        fake_result_readout,
+    )
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = UnavailableCostLedgerGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["result_run_id"] == "run-workflow"
+    assert gateway.transitions == ["running", "finalize", "succeeded"]
+    assert len(gateway.route_receipts) == 1
+    assert gateway.cost_ledger_entries == []
+    assert len(warning_capture.records) == 1
+    message, context = warning_capture.records[0]
+    assert message == "Cost ledger persistence failed; continuing without spend row"
+    assert context["failure_classification"] == "telemetry_only"
+    assert context["source"] == "render_workflow"
 
 
 def test_run_backtest_job_uses_mainline_llm_quick_take_path(
@@ -1121,6 +1608,91 @@ def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
     assert timings["backtest_tool_run_total"] >= 0.0
 
 
+def test_run_backtest_job_preserves_safe_coverage_drift_failure_code() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(
+        {
+            "success": False,
+            "payload": None,
+            "error_type": "parameter_validation_error",
+            "error_message": "Review the refreshed dates and approve again.",
+            "retryable": False,
+            "capability_context": {
+                "failure_code": "approved_data_window_unavailable",
+                "failure_detail": "approved_data_window_unavailable",
+            },
+        }
+    )
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="local-run",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_code"] == "approved_data_window_unavailable"
+    assert gateway.row["failure_code"] == "approved_data_window_unavailable"
+    assert gateway.row["result_run_id"] is None
+    assert gateway.finalization_calls == []
+    assert (
+        gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
+        == "parameter_validation_error"
+    )
+
+
+def test_run_backtest_job_rejects_untrusted_nested_failure_code() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(
+        {
+            "success": False,
+            "payload": None,
+            "error_type": "upstream_dependency_error",
+            "error_message": "Market data is temporarily unavailable.",
+            "retryable": True,
+            "capability_context": {
+                "failure_code": "internal_provider_secret_code",
+                "failure_detail": "alpaca_provider_internal_timeout_bucket_17",
+            },
+        }
+    )
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="local-run",
+    )
+
+    assert result["failure_code"] == "upstream_dependency_error"
+    assert result["failure_detail"] == "temporary_dependency_issue"
+    assert gateway.row["failure_code"] == "upstream_dependency_error"
+    assert gateway.row["failure_detail"] == "temporary_dependency_issue"
+    assert (
+        gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
+        == "upstream_dependency_error"
+    )
+
+
 def test_run_backtest_job_tool_failure_preserves_collected_timings() -> None:
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 
@@ -1188,7 +1760,15 @@ def test_backtest_workflow_json_safe_normalizes_postgres_scalars() -> None:
 def test_workflow_task_registration_includes_proof_and_real_backtest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.llm import openrouter_key_policy
+
     tasks: dict[str, dict[str, object]] = {}
+    boot_events: list[str] = []
+    monkeypatch.setattr(
+        openrouter_key_policy,
+        "validate_hosted_openrouter_configuration",
+        lambda: boot_events.append("validate"),
+    )
 
     class FakeRetry:
         def __init__(self, **kwargs: object) -> None:
@@ -1197,6 +1777,7 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
     class FakeWorkflows:
         def __init__(self, **kwargs: object) -> None:
             self.kwargs = kwargs
+            boot_events.append("construct")
 
         def task(self, fn: object | None = None, **kwargs: object):
             def decorate(inner: object) -> object:
@@ -1217,8 +1798,159 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
     monkeypatch.setitem(sys.modules, "render_sdk", fake_render_sdk)
     sys.modules.pop("workflows.main", None)
 
-    importlib.import_module("workflows.main")
+    module = importlib.import_module("workflows.main")
 
+    assert boot_events[:2] == ["validate", "construct"]
     assert {"workflow_proof", "run_backtest_job"}.issubset(tasks)
     assert tasks["workflow_proof"]["kwargs"]["timeout_seconds"] == 60
     assert tasks["run_backtest_job"]["kwargs"]["timeout_seconds"] >= 300
+    assert tasks["run_backtest_job"]["kwargs"]["plan"] == "standard"
+    retry = tasks["run_backtest_job"]["kwargs"]["retry"]
+    assert isinstance(retry, FakeRetry)
+    assert retry.kwargs == {"max_retries": 1, "wait_duration_ms": 1000}
+
+    class FakeGatewayContext:
+        def __enter__(self) -> FakeGatewayContext:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        @classmethod
+        def from_env(cls) -> FakeGatewayContext:
+            return cls()
+
+    monkeypatch.setattr(module, "PostgresBacktestJobGateway", FakeGatewayContext)
+    monkeypatch.setattr(
+        module,
+        "run_backtest_job_workflow",
+        lambda *_args, **_kwargs: {
+            "status": "failed",
+            "execution_metadata": {
+                "source": "public_alpha_capacity_load",
+                "ops_authority": "service_role",
+                "capacity_probe": {"mode": "invalid_envelope"},
+            },
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Controlled public-alpha capacity probe"):
+        module.run_backtest_job("opaque-job")
+
+
+def test_capacity_probe_marker_is_never_read_from_public_launch_payload() -> None:
+    from workflows.backtest_job import capacity_probe_mode
+
+    assert (
+        capacity_probe_mode(
+            {
+                "launch_payload": {
+                    "source": "public_alpha_capacity_load",
+                    "capacity_probe": {"mode": "upstream_transient_once"},
+                },
+                "execution_metadata": {
+                    "source": "api_chat",
+                    "ops_authority": "service_role",
+                },
+            }
+        )
+        is None
+    )
+
+
+def test_controlled_upstream_probe_fails_once_then_runs_normally() -> None:
+    from workflows.backtest_job import (
+        REAL_BACKTEST_JOB_KIND,
+        capacity_probe_should_raise,
+        run_backtest_job,
+    )
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    job["execution_metadata"] = {
+        "source": "public_alpha_capacity_load",
+        "ops_authority": "service_role",
+        "openrouter_traffic_class": "registered",
+        "capacity_probe": {"mode": "upstream_transient_once"},
+    }
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-1",
+    )
+
+    assert first["status"] == "failed"
+    assert first["failure_code"] == "failed_upstream"
+    assert first["retryable"] is True
+    assert gateway.row["attempts"] == 1
+    assert capacity_probe_should_raise(first) is True
+    assert tool.calls == []
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-2",
+    )
+
+    assert second["status"] == "succeeded"
+    assert gateway.row["attempts"] == 2
+    assert capacity_probe_should_raise(second) is False
+    assert tool.calls == [_request_payload()]
+
+
+def test_invalid_capacity_probe_records_two_attempts_and_terminal_failure() -> None:
+    from workflows.backtest_job import (
+        REAL_BACKTEST_JOB_KIND,
+        capacity_probe_should_raise,
+        run_backtest_job,
+    )
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": "not-an-object",
+        }
+    )
+    job["execution_metadata"] = {
+        "source": "public_alpha_capacity_load",
+        "ops_authority": "service_role",
+        "openrouter_traffic_class": "registered",
+        "capacity_probe": {"mode": "invalid_envelope"},
+    }
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    first = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-1",
+    )
+
+    assert first["failure_code"] == "invalid_job_contract"
+    assert first["retryable"] is True
+    assert capacity_probe_should_raise(first) is True
+
+    second = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="attempt-2",
+    )
+
+    assert second["failure_code"] == "invalid_job_contract"
+    assert second["retryable"] is False
+    assert gateway.row["attempts"] == 2
+    assert capacity_probe_should_raise(second) is True
+    assert tool.calls == []

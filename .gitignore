@@ -1,6 +1,7 @@
 # Environment files with secrets
 # Root: Backend secrets (Alpaca, Supabase service role, JWT)
 .env
+.qa-identities.env
 # Frontend: Next.js frontend secrets
 web/.env.local
 web/.env.*.local
@@ -54,7 +55,6 @@ temp/*
 
 # Supabase temp (contains live project ref, org ID, pooler URL — never commit)
 supabase/.temp/
-archive-v0.1/supabase/.temp/
 
 # OS files
 .DS_Store
@@ -69,6 +69,7 @@ node_modules/
 tsconfig.tsbuildinfo
 web/out/
 web/temp-next-build*/
+web/cache/config.json
 
 # Playwright / Testing
 playwright-report/

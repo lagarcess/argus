@@ -11,11 +11,9 @@ from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_fr
 from argus.agent_runtime.interpreter.shared import (
     _RECURRING_CAPITAL_SOURCES,
     _TOTAL_CAPITAL_SOURCES,
-    _bounded_date_evidence_candidates,
     _capital_source,
     _field_path_base,
     _has_complete_date_range_payload,
-    _natural_time_language_candidates_from_hints,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
 )
@@ -46,6 +44,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
+    executable_strategy_template_from_typed_rules,
     executable_strategy_type,
     normalize_date_range_candidate,
 )
@@ -54,14 +53,17 @@ from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
-from argus.nlp.natural_time import (
-    resolve_date_range_intent,
-    resolve_rolling_window_intent_text,
-)
+from argus.nlp.natural_time import resolve_date_range_intent
 
 
-def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
+def _strategy_from_llm(
+    draft: LLMStrategyDraft,
+    current_user_message: str | None = None,
+) -> StrategySummary:
     payload = draft.model_dump(mode="python")
+    validated_execution_cost_evidence = dict(
+        draft._validated_execution_cost_evidence
+    )
     field_provenance = payload.pop("field_provenance", {}) or {}
     language = _clean_optional_text(payload.pop("language", None))
     date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
@@ -69,6 +71,14 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.pop("date_range_intent", None)
     )
     evidence_spans = _clean_evidence_spans(payload.pop("evidence_spans", {}) or {})
+    if current_user_message is not None:
+        evidence_spans = _ground_execution_cost_evidence_spans(
+            evidence_spans,
+            current_user_message=current_user_message,
+            validated_execution_cost_evidence=validated_execution_cost_evidence,
+        )
+        for field_name in ("fee_rate", "slippage"):
+            field_provenance.pop(field_name, None)
     asset_universe_operation = normalized_asset_universe_operation(
         payload.pop("asset_universe_operation", None)
     )
@@ -76,8 +86,10 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.setdefault("extra_parameters", {})["asset_universe_operation"] = (
             asset_universe_operation
         )
-    if not date_range_intent:
-        date_range_intent = _date_range_intent_from_bounded_evidence(draft)
+    # Directionless bounded evidence never becomes a typed window here: only the
+    # primary interpretation or the focused date-window extraction may establish
+    # temporal direction. Untyped evidence stays provenance and fails closed to a
+    # date clarification.
     initial_capital = payload.pop("initial_capital", None)
     total_capital = payload.pop("total_capital", None)
     recurring_contribution = payload.pop("recurring_contribution", None)
@@ -133,10 +145,6 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
             if starting_capital is not None:
                 payload["capital_amount"] = starting_capital
                 field_provenance["capital_amount"] = "starting_capital"
-    if field_provenance:
-        payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
-            field_provenance
-        )
     if language:
         payload.setdefault("extra_parameters", {})["language"] = language
     if date_range_raw_text:
@@ -154,6 +162,13 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload=payload,
         field_provenance=field_provenance,
         evidence_spans=evidence_spans,
+    )
+    field_provenance = _owned_execution_cost_provenance(
+        payload=payload,
+        field_provenance=field_provenance,
+        evidence_spans=evidence_spans,
+        validated_execution_cost_evidence=validated_execution_cost_evidence,
+        require_validated_evidence=current_user_message is not None,
     )
     if field_provenance:
         payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
@@ -194,14 +209,62 @@ def _evidence_backed_field_provenance(
         "comparison_baseline": "explicit_user",
         "timeframe": "explicit_user",
     }
+    extra_parameters = payload.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        extra_parameters = {}
     for field_name, source in evidence_backed_fields.items():
         if field_name in updated:
             continue
         if field_name not in evidence_spans:
             continue
-        if payload.get(field_name) in (None, "", [], {}):
+        field_value = (
+            extra_parameters.get(field_name)
+            if field_name in {"fee_rate", "slippage"}
+            else payload.get(field_name)
+        )
+        if field_value in (None, "", [], {}):
             continue
         updated[field_name] = source
+    return updated
+
+
+def _owned_execution_cost_provenance(
+    *,
+    payload: dict[str, Any],
+    field_provenance: dict[str, Any],
+    evidence_spans: dict[str, str],
+    validated_execution_cost_evidence: dict[str, tuple[float, str | None]],
+    require_validated_evidence: bool,
+) -> dict[str, Any]:
+    updated = dict(field_provenance or {})
+    extra_parameters = payload.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        for field_name in ("fee_rate", "slippage"):
+            updated.pop(field_name, None)
+        return updated
+    for field_name in ("fee_rate", "slippage"):
+        if require_validated_evidence:
+            validated = validated_execution_cost_evidence.get(field_name)
+            span = evidence_spans.get(field_name)
+            value = extra_parameters.get(field_name)
+            if (
+                validated is not None
+                and len(validated) == 2
+                and value == validated[0]
+                and span == validated[1]
+            ):
+                updated[field_name] = "explicit_user"
+                continue
+            extra_parameters.pop(field_name, None)
+            updated.pop(field_name, None)
+            continue
+        if (
+            field_name in extra_parameters
+            and updated.get(field_name) == "explicit_user"
+        ):
+            continue
+        extra_parameters.pop(field_name, None)
+        updated.pop(field_name, None)
     return updated
 
 
@@ -242,6 +305,28 @@ def _clean_evidence_spans(value: Any) -> dict[str, str]:
     return cleaned
 
 
+def _ground_execution_cost_evidence_spans(
+    evidence_spans: dict[str, str],
+    *,
+    current_user_message: str,
+    validated_execution_cost_evidence: dict[str, tuple[float, str | None]],
+) -> dict[str, str]:
+    grounded = dict(evidence_spans)
+    source_text = str(current_user_message)
+    for field_name in ("fee_rate", "slippage"):
+        span = grounded.get(field_name)
+        validated = validated_execution_cost_evidence.get(field_name)
+        if (
+            not span
+            or span not in source_text
+            or validated is None
+            or len(validated) != 2
+            or span != validated[1]
+        ):
+            grounded.pop(field_name, None)
+    return grounded
+
+
 def _clean_date_range_intent_payload(value: Any) -> dict[str, Any]:
     if value in (None, "", [], {}):
         return {}
@@ -251,29 +336,6 @@ def _clean_date_range_intent_payload(value: Any) -> dict[str, Any]:
     if callable(model_dump):
         dumped = model_dump(mode="python")
         return dict(dumped) if isinstance(dumped, dict) else {}
-    return {}
-
-
-def _date_range_intent_from_bounded_evidence(
-    draft: LLMStrategyDraft,
-    *,
-    language: str | None = None,
-) -> dict[str, Any]:
-    evidence_candidates = _bounded_date_evidence_candidates(draft)
-    if not evidence_candidates:
-        return {}
-    language_candidates = _natural_time_language_candidates_from_hints(
-        draft.language,
-        language,
-    )
-    for candidate in evidence_candidates:
-        for languages in language_candidates:
-            intent = resolve_rolling_window_intent_text(
-                candidate,
-                languages=languages,
-            )
-            if intent is not None:
-                return intent
     return {}
 
 
@@ -451,9 +513,7 @@ def _current_turn_names_foreign_ticker(
     except Exception:
         return False
     return any(
-        _compact_asset_evidence_token(
-            getattr(mention.asset, "canonical_symbol", None)
-        )
+        _compact_asset_evidence_token(getattr(mention.asset, "canonical_symbol", None))
         not in prior_symbols
         for mention in mentions
     )
@@ -761,6 +821,8 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
     rule_spec = executable_rule_spec_from_strategy(strategy)
     if entry_rule is None and rule_spec is None:
         return
+    if strategy.rule_spec is None:
+        strategy.rule_spec = rule_spec
     if strategy.entry_rule is None:
         strategy.entry_rule = entry_rule
     if strategy.exit_rule is None:
@@ -783,6 +845,10 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
         exit_text
         or moving_average_crossover_text(strategy.exit_rule)
         or strategy.exit_logic
+    )
+    strategy.requested_strategy_template = (
+        strategy.requested_strategy_template
+        or executable_strategy_template_from_typed_rules(strategy)
     )
 
 

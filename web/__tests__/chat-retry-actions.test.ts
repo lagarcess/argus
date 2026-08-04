@@ -9,8 +9,11 @@ import {
   retryLastTurnChatActionFromAction,
   retryLoadConversationIdFromAction,
   retryLastTurnMessageFromAction,
+  retryLastTurnRequestMessageIdFromAction,
   isRetryAction,
+  normalizeDurableRetryActionHistory,
 } from "../lib/chat-retry-actions";
+import type { Message } from "../components/chat/types";
 
 describe("failed-action retry UI contract", () => {
   test("hydrates a retry action from retryable failed-action metadata", () => {
@@ -159,24 +162,35 @@ describe("failed-action retry UI contract", () => {
   test("hydrates a retry-last-turn action from persisted failure metadata", () => {
     const action = retryLastTurnActionFromMetadata(
       {
+        agent_runtime_turn: {
+          turn_id: "request-message-1",
+        },
         retry_last_turn: {
-          message: "what if I bought $125 of BTC every two weeks in 2022?",
+          request_message_id: "request-message-1",
+          message: "tampered browser copy",
         },
       },
-      { assistantMessageId: "assistant-failed-persisted" },
+      {
+        owningMessageId: "request-message-1",
+        persistedMessage: "what if I bought $125 of BTC every two weeks in 2022?",
+        messageRole: "user",
+      },
     );
 
     expect(action).toEqual({
-      id: "retry-last-turn",
+      id: "retry-last-turn-request-message-1",
       label: "Retry",
       labelKey: "common.retry",
       value: "Retry",
       type: "retry_last_turn",
       payload: {
         message: "what if I bought $125 of BTC every two weeks in 2022?",
-        failed_assistant_id: "assistant-failed-persisted",
+        request_message_id: "request-message-1",
       },
     });
+    expect(retryLastTurnRequestMessageIdFromAction(action)).toBe(
+      "request-message-1",
+    );
   });
 
   test("preserves a typed chat action for finalization retry", () => {
@@ -203,12 +217,80 @@ describe("failed-action retry UI contract", () => {
     });
   });
 
+  test("retries a failed response option with only its durable request identity", () => {
+    const action = retryLastTurnActionFromMetadata(
+      {
+        agent_runtime_turn: {
+          turn_id: "request-message-1",
+        },
+        retry_last_turn: {
+          request_message_id: "request-message-1",
+          message: "Use daily bars",
+          action: {
+            type: "select_response_option",
+            label: "Use daily bars",
+            payload: {
+              option_id: "daily",
+              replacement_values: { timeframe: "1D" },
+            },
+          },
+        },
+      },
+      {
+        owningMessageId: "request-message-1",
+        persistedMessage: "Use daily bars",
+        messageRole: "user",
+      },
+    );
+
+    expect(retryLastTurnChatActionFromAction(action)).toEqual({
+      type: "select_response_option",
+      label: "Retry",
+      labelKey: "common.retry",
+      payload: {
+        request_message_id: "request-message-1",
+      },
+    });
+  });
+
   test("does not hydrate retry-last-turn from malformed persisted metadata", () => {
     expect(retryLastTurnActionFromMetadata({ retry_last_turn: {} })).toBeNull();
     expect(
       retryLastTurnActionFromMetadata({
         retry_last_turn: { message: "   " },
       }),
+    ).toBeNull();
+    expect(
+      retryLastTurnActionFromMetadata(
+        {
+          agent_runtime_turn: { turn_id: "different-message" },
+          retry_last_turn: {
+            request_message_id: "request-message-1",
+            message: "Test AAPL",
+          },
+        },
+        {
+          owningMessageId: "request-message-1",
+          persistedMessage: "Test AAPL",
+          messageRole: "user",
+        },
+      ),
+    ).toBeNull();
+    expect(
+      retryLastTurnActionFromMetadata(
+        {
+          agent_runtime_turn: { turn_id: "request-message-1" },
+          retry_last_turn: {
+            request_message_id: "request-message-1",
+            message: "Test AAPL",
+          },
+        },
+        {
+          owningMessageId: "request-message-1",
+          persistedMessage: "Test AAPL",
+          messageRole: "assistant",
+        },
+      ),
     ).toBeNull();
   });
 
@@ -238,5 +320,94 @@ describe("failed-action retry UI contract", () => {
   test("does not hydrate a conversation-load retry without a conversation id", () => {
     expect(conversationLoadRetryActionFromConversationId("  ")).toBeNull();
     expect(retryLoadConversationIdFromAction(undefined)).toBeNull();
+  });
+
+  test("later work removes the assistant retry but preserves historical recovery", () => {
+    const recoveryOwner: Message = {
+      id: "assistant-failed-1",
+      role: "ai",
+      kind: "text",
+      content: "Something went wrong.",
+      recoveryDisplay: { kind: "recovery_code", code: "runtime_failure" },
+      actions: [
+        {
+          id: "retry-last-turn-request-message-1",
+          label: "Retry",
+          type: "retry_last_turn",
+          payload: {
+            request_message_id: "request-message-1",
+            message: "Test AAPL",
+          },
+        },
+      ],
+    };
+
+    const [historical, later] = normalizeDurableRetryActionHistory([
+      recoveryOwner,
+      {
+        id: "later-user-message",
+        role: "user",
+        kind: "text",
+        content: "Test MSFT instead",
+      },
+    ]);
+
+    expect(historical.actions).toBeUndefined();
+    expect(historical.recoveryDisplay).toEqual(recoveryOwner.recoveryDisplay);
+    expect(later.id).toBe("later-user-message");
+  });
+
+  test("keeps linked accepted-turn recovery on the assistant message", () => {
+    const owners: Message[] = [
+      {
+        id: "request-message-1",
+        role: "user",
+        kind: "text",
+        content: "Test AAPL",
+      },
+      {
+        id: "request-message-1",
+        role: "user",
+        kind: "action",
+        content: "Use daily bars",
+        selectedAction: {
+          type: "select_response_option",
+          label: "Use daily bars",
+          payload: { option_id: "daily" },
+        },
+      },
+    ];
+
+    for (const owner of owners) {
+      const retryAction = {
+        id: "retry-last-turn-request-message-1",
+        label: "Retry",
+        type: "retry_last_turn" as const,
+        payload: {
+          request_message_id: "request-message-1",
+          message: owner.content,
+        },
+      };
+      const recoveryDisplay = {
+        kind: "recovery_code" as const,
+        code: "runtime_failure",
+      };
+
+      const assistantFailure: Message = {
+        id: "assistant-failed-1",
+        role: "ai",
+        kind: "text",
+        content: "Something went wrong.",
+        recoveryDisplay,
+        assistantRecoveryCode: "runtime_failure",
+        actions: [retryAction],
+      };
+      const normalized = normalizeDurableRetryActionHistory([
+        owner,
+        assistantFailure,
+      ]);
+
+      expect(normalized).toEqual([owner, assistantFailure]);
+    }
   });
 });

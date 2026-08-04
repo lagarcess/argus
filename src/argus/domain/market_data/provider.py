@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time as time_module
@@ -159,7 +160,11 @@ def _fetch_kraken_ohlcv(
         raise ValueError("market_data_unavailable")
     pair_key = next((key for key in result if key != "last"), None)
     rows = result.get(pair_key) if pair_key else None
-    if not isinstance(rows, list) or not rows:
+    if rows is None or rows == []:
+        # Kraken answered without data for the pair — a statement about the
+        # symbol, not a transport failure.
+        raise ValueError("market_data_empty")
+    if not isinstance(rows, list):
         raise ValueError("market_data_unavailable")
 
     frame = pd.DataFrame(
@@ -194,8 +199,12 @@ def _crypto_client() -> CryptoHistoricalDataClient:
 
 
 def _normalize_df(df: pd.DataFrame, *, symbol: str) -> pd.DataFrame:
-    if df is None or df.empty:
+    if df is None:
         raise ValueError("market_data_unavailable")
+    if df.empty:
+        # The provider answered with zero bars — distinct from transport
+        # failure so callers can trust it as a statement about the symbol.
+        raise ValueError("market_data_empty")
 
     if isinstance(df.index, pd.MultiIndex):
         df = df.reset_index(level=0, drop=True)
@@ -210,7 +219,9 @@ def _normalize_df(df: pd.DataFrame, *, symbol: str) -> pd.DataFrame:
 
     normalized = df.loc[:, ["open", "high", "low", "close", "volume"]].dropna()
     if normalized.empty:
-        raise ValueError("market_data_unavailable")
+        # The provider answered with zero bars — distinct from transport
+        # failure so callers can trust it as a statement about the symbol.
+        raise ValueError("market_data_empty")
     return normalized.astype(float)
 
 
@@ -302,12 +313,65 @@ def fetch_ohlcv(
     end_date: date,
     timeframe: str,
 ) -> pd.DataFrame:
+    if os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "").strip().lower() == (
+        "synthetic_unit_fixture"
+    ):
+        return _synthetic_ohlcv(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            timeframe=timeframe,
+        )
     return _fetch_bars_with_ttl(
         symbol=symbol,
         asset_class=asset_class,
         start_date=start_date,
         end_date=end_date,
         timeframe=timeframe,
+    )
+
+
+def _synthetic_ohlcv(
+    *,
+    symbol: str,
+    start_date: date,
+    end_date: date,
+    timeframe: str,
+) -> pd.DataFrame:
+    frequency = {
+        "1D": "1D",
+        "1d": "1D",
+        "1h": "1h",
+        "2h": "2h",
+        "4h": "4h",
+        "6h": "6h",
+        "12h": "12h",
+    }.get(timeframe)
+    if frequency is None:
+        raise ValueError("unsupported_timeframe")
+    index = pd.date_range(
+        start=_to_utc_datetime(start_date),
+        end=_to_utc_datetime(end_date, end_of_day=frequency != "1D"),
+        freq=frequency,
+    )
+    if len(index) < 2:
+        raise ValueError("market_data_unavailable")
+    seed = int.from_bytes(
+        hashlib.sha256(symbol.strip().upper().encode("utf-8")).digest()[:4],
+        "big",
+    )
+    base = 50.0 + float(seed % 20_000) / 100.0
+    offsets = pd.Series(range(len(index)), index=index, dtype=float)
+    close = base + offsets * 0.1
+    return pd.DataFrame(
+        {
+            "open": close - 0.05,
+            "high": close + 0.1,
+            "low": close - 0.1,
+            "close": close,
+            "volume": 1_000.0 + offsets,
+        },
+        index=index,
     )
 
 

@@ -7,7 +7,7 @@ file.
 ## Language vs. Locale
 
 - **Language** controls user-facing prose: static UI copy, assistant responses,
-  onboarding text, and explanatory result language.
+  starter prompts, and explanatory result language.
 - **Locale** controls formatting: dates, numbers, currency, compact ranges, and
   culturally appropriate display labels.
 - Persist both. Current Alpha values are `language: en | es-419` and
@@ -104,7 +104,7 @@ rather than disabling Spanish by default.
 Before enabling a language flag in Render:
 
 - Locale JSON is valid and has key/placeholder parity with `en`.
-- Static UI smoke covers onboarding, chat, settings/profile, confirmation cards,
+- Static UI smoke covers landing/auth, chat, settings/profile, confirmation cards,
   queued/running cards, result cards, feedback/retry/more-menu actions, and
   archived/deleted chat surfaces.
 - Profile update QA confirms language and locale persist through `/me`.

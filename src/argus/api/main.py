@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
-from argus.api import app_setup, pagination, search_utils
+from argus.api import app_setup, openapi_compat, pagination, search_utils
 from argus.api import state as api_state
 from argus.api.routers import (
     agent,
+    analytics,
     auth,
     backtest,
     collections,
+    conversation_activity,
     conversations,
     dev,
     discovery,
@@ -37,8 +40,10 @@ def health() -> dict[str, str]:
 
 for api_router in (
     auth.router,
+    analytics.router,
     profile.router,
     conversations.router,
+    conversation_activity.router,
     strategies.router,
     collections.router,
     backtest.router,
@@ -52,6 +57,21 @@ for api_router in (
     dev.router,
 ):
     app.include_router(api_router)
+
+
+def _custom_openapi() -> dict:
+    if app.openapi_schema:
+        return app.openapi_schema
+    document = get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+    )
+    app.openapi_schema = openapi_compat.customize_openapi_document(document)
+    return app.openapi_schema
+
+
+app.openapi = _custom_openapi  # type: ignore[method-assign]
 
 
 store = api_state.store

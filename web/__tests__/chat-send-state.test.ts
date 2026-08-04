@@ -46,6 +46,7 @@ describe("chat send state", () => {
       { id: "user-1", role: "user", kind: "text", content: "test AAPL" },
       { id: "assistant-failed-1", role: "ai", kind: "text", content: "" },
     ]);
+    expect(messages.filter((message) => message.role === "user")).toHaveLength(1);
   });
 
   test("appends final assistant artifact when route hydration removed the pending placeholder", () => {

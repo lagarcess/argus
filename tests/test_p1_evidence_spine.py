@@ -164,6 +164,42 @@ def test_completed_backtest_auto_captures_idea_version_and_evidence() -> None:
     assert run.conversation_result_card["idea_version_id"] == captured.idea_version.id
 
 
+def test_evidence_provenance_preserves_requested_and_effective_data_windows() -> None:
+    run = _run().model_copy(
+        update={
+            "config_snapshot": {
+                **_run().config_snapshot,
+                "requested_date_range": {
+                    "start": "2023-01-01",
+                    "end": "2026-06-19",
+                },
+                "effective_date_range": {
+                    "start": "2023-03-15",
+                    "end": "2026-06-18",
+                },
+                "data_coverage": {
+                    "schema_version": "market_data_coverage_v1",
+                    "dataset_id": "sha256:fixture",
+                },
+            }
+        }
+    )
+
+    captured = build_backtest_evidence_capture(
+        run=run,
+        idea_id="idea-window",
+        idea_version_id="version-window",
+        evidence_artifact_id="evidence-window",
+        now=utcnow(),
+    )
+
+    assert captured.evidence_artifact.payload["provenance"]["data_window"] == {
+        "requested": {"start": "2023-01-01", "end": "2026-06-19"},
+        "effective": {"start": "2023-03-15", "end": "2026-06-18"},
+        "dataset_id": "sha256:fixture",
+    }
+
+
 def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> None:
     from argus.api.search_assembly import scored_memory_search_items
 
@@ -178,6 +214,9 @@ def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> 
 
     store = AlphaStore()
     store.evidence_artifacts = PausingArtifactDict()
+    conversation = _conversation()
+    store.conversations[conversation.id] = conversation
+    store.conversation_owners[conversation.id] = _user().id
     monkeypatch.setattr(api_state, "store", store)
     run = _run()
     finalization = BacktestFinalizationInput(
@@ -222,8 +261,14 @@ def test_memory_search_waits_for_complete_backtest_finalization(monkeypatch) -> 
 
     assert not finalization_errors
     assert search_finished.is_set()
-    result_types = {item.type for _, item in search_results}
-    assert {"backtest", "idea", "evidence"}.issubset(result_types)
+    assert len(search_results) == 1
+    item = search_results[0][1]
+    assert item.type == "conversation"
+    assert item.id == conversation.id
+    assert item.total_runs == 1
+    assert item.decided_runs == 0
+    assert item.dossier is not None
+    assert item.dossier.run_id == run.id
 
 
 def test_completed_backtest_capture_emits_product_event(monkeypatch) -> None:

@@ -1,4 +1,5 @@
 import type { ChatActionOption } from "@/components/chat/types";
+import type { Message } from "@/components/chat/types";
 
 function recordOrNull(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -21,6 +22,7 @@ const STRUCTURED_CHAT_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"
   "save_strategy",
   "retry_failed_action",
   "select_response_option",
+  "retest_run",
 ]);
 
 function structuredChatActionOrNull(value: unknown): ChatActionOption | null {
@@ -123,25 +125,44 @@ export function failedActionRetryActionFromMetadata(
 type RetryLastTurnOptions = {
   assistantMessageId?: string;
   chatAction?: ChatActionOption | null;
+  owningMessageId?: string;
+  persistedMessage?: string;
+  messageRole?: "user" | "assistant";
+  requestMessageId?: string;
 };
+
+// Retired onboarding rows persist in old conversations; they must never
+// resurface as retryable turns.
+function isLegacyOnboardingMarker(content: string): boolean {
+  return (
+    content === "__ONBOARDING_SKIP__" ||
+    content.startsWith("__ONBOARDING_GOAL__:")
+  );
+}
 
 export function retryLastTurnActionFromMessage(
   message: string,
   options?: RetryLastTurnOptions,
 ): ChatActionOption | null {
   const trimmed = message.trim();
-  if (!trimmed) {
+  if (!trimmed || isLegacyOnboardingMarker(trimmed)) {
     return null;
   }
   const failedAssistantId = options?.assistantMessageId?.trim();
+  const requestMessageId = options?.requestMessageId?.trim();
   return {
-    id: "retry-last-turn",
+    id: requestMessageId
+      ? `retry-last-turn-${requestMessageId}`
+      : "retry-last-turn",
     label: "Retry",
     labelKey: "common.retry",
     value: "Retry",
     type: "retry_last_turn",
     payload: {
       message: trimmed,
+      ...(requestMessageId
+        ? { request_message_id: requestMessageId }
+        : {}),
       ...(failedAssistantId ? { failed_assistant_id: failedAssistantId } : {}),
       ...(options?.chatAction ? { chat_action: options.chatAction } : {}),
     },
@@ -153,14 +174,84 @@ export function retryLastTurnActionFromMetadata(
   options?: RetryLastTurnOptions,
 ): ChatActionOption | null {
   const retryLastTurn = recordOrNull(metadata.retry_last_turn);
-  const message = stringOrNull(retryLastTurn?.message);
-  if (!message) {
+  const requestMessageId = stringOrNull(
+    retryLastTurn?.request_message_id,
+  )?.trim();
+  if (requestMessageId) {
+    const runtimeTurn = recordOrNull(metadata.agent_runtime_turn);
+    const turnId = stringOrNull(runtimeTurn?.turn_id)?.trim();
+    const owningMessageId = options?.owningMessageId?.trim();
+    const linkedRequestMessageId = options?.requestMessageId?.trim();
+    const persistedMessage = options?.persistedMessage?.trim();
+    const ownsAbandonedUserProjection =
+      options?.messageRole === "user" &&
+      requestMessageId === owningMessageId &&
+      turnId === owningMessageId;
+    const ownsLinkedAssistantProjection =
+      options?.messageRole === "assistant" &&
+      requestMessageId === linkedRequestMessageId &&
+      turnId === linkedRequestMessageId;
+    if (
+      (!ownsAbandonedUserProjection && !ownsLinkedAssistantProjection) ||
+      !owningMessageId ||
+      !persistedMessage
+    ) {
+      return null;
+    }
+    return retryLastTurnActionFromMessage(persistedMessage, {
+      ...options,
+      requestMessageId,
+      chatAction: structuredChatActionOrNull(retryLastTurn?.action),
+    });
+  }
+  const legacyMessage = stringOrNull(retryLastTurn?.message);
+  if (!legacyMessage || options?.messageRole === "user") {
     return null;
   }
-  return retryLastTurnActionFromMessage(message, {
+  return retryLastTurnActionFromMessage(legacyMessage, {
     ...options,
     chatAction: structuredChatActionOrNull(retryLastTurn?.action),
   });
+}
+
+export function durableRetryLastTurnFromStreamError(
+  metadata: Record<string, unknown>,
+): {
+  action: ChatActionOption;
+  persistedMessage: string;
+  requestMessageId: string;
+} | null {
+  const retryLastTurn = recordOrNull(metadata.retry_last_turn);
+  const requestMessageId = stringOrNull(
+    retryLastTurn?.request_message_id,
+  )?.trim();
+  const persistedMessage = stringOrNull(retryLastTurn?.message)?.trim();
+  if (!requestMessageId || !persistedMessage) {
+    return null;
+  }
+  const action = retryLastTurnActionFromMetadata(
+    {
+      ...metadata,
+      agent_runtime_turn: {
+        turn_id: requestMessageId,
+      },
+    },
+    {
+      owningMessageId: requestMessageId,
+      persistedMessage,
+      messageRole: "user",
+    },
+  );
+  return action ? { action, persistedMessage, requestMessageId } : null;
+}
+
+export function retryLastTurnRequestMessageIdFromAction(
+  action: ChatActionOption | null | undefined,
+): string | null {
+  if (action?.type !== "retry_last_turn") {
+    return null;
+  }
+  return stringOrNull(action.payload?.request_message_id)?.trim() || null;
 }
 
 export function retryLastTurnMessageFromAction(
@@ -188,7 +279,22 @@ export function retryLastTurnChatActionFromAction(
   if (action?.type !== "retry_last_turn") {
     return null;
   }
-  return structuredChatActionOrNull(action.payload?.chat_action);
+  const chatAction = structuredChatActionOrNull(action.payload?.chat_action);
+  if (chatAction?.type !== "select_response_option") {
+    return chatAction;
+  }
+  const requestMessageId = retryLastTurnRequestMessageIdFromAction(action);
+  if (!requestMessageId) {
+    return null;
+  }
+  return {
+    type: "select_response_option",
+    label: "Retry",
+    labelKey: "common.retry",
+    payload: {
+      request_message_id: requestMessageId,
+    },
+  };
 }
 
 export function conversationLoadRetryActionFromConversationId(
@@ -229,4 +335,52 @@ export function isRetryAction(action: ChatActionOption | null | undefined): bool
     action.type === "retry_load_conversation" ||
     action.artifactType === "failed_action"
   );
+}
+
+export function normalizeDurableRetryActionHistory(
+  messages: Message[],
+): Message[] {
+  // Accepted user input and an Argus-side failure are separate transcript
+  // events. The retry payload links them without moving presentation ownership.
+  return messages.flatMap((message, index) => {
+    if (
+      message.role === "ai" &&
+      message.kind === "text" &&
+      message.contentPresentation === "superseded_runtime_failure"
+    ) {
+      return [];
+    }
+    if (!message.actions?.some(isRetryAction)) {
+      return [message];
+    }
+    const laterWork = messages.slice(index + 1).some((later) => {
+      if (later.role === "user") {
+        return true;
+      }
+      if (
+        later.kind === "strategy_result" ||
+        later.kind === "strategy_confirmation" ||
+        later.kind === "backtest_job"
+      ) {
+        return true;
+      }
+      return (
+        later.role === "ai" &&
+        later.kind === "text" &&
+        !later.recoveryDisplay
+      );
+    });
+    if (!laterWork) {
+      return [message];
+    }
+    const actions = message.actions.filter(
+      (action) => !isRetryAction(action),
+    );
+    return [
+      {
+        ...message,
+        actions: actions.length > 0 ? actions : undefined,
+      },
+    ];
+  });
 }

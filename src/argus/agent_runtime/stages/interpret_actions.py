@@ -4,10 +4,16 @@ import asyncio
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
+    no_progress_response_if_equivalent,
     resolve_artifact_anchor,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.clarification_contract import offline_clarification_fallback
+from argus.agent_runtime.coverage_recovery import (
+    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
+    optional_parameter_status_without_coverage_recovery,
+    preserved_optional_parameter_status_from_response_intent,
+)
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
@@ -39,10 +45,13 @@ from argus.agent_runtime.stages.artifact_context import (
     prior_stage_was_await_approval,
     semantic_need_for_action,
     stale_confirmation_action_response,
-    strategy_from_failed_launch_payload,
+    strategy_from_failed_action_snapshot,
     strategy_from_result_action_snapshot,
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
+)
+from argus.agent_runtime.stages.interpret_internal.result_action_routing import (
+    typed_result_action_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_internal.result_artifact_patch import (
     _deterministic_result_artifact_patch_stage_result_if_applicable,
@@ -64,15 +73,77 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
+from argus.agent_runtime.turn_execution import claim_turn_terminal
+from argus.domain.backtesting.config import normalize_timeframe
 
 CONFIRMATION_EDIT_ACTION_FIELDS = {
     "change_asset": "asset_universe",
     "change_dates": "date_range",
     "adjust_assumptions": "assumption",
 }
-TRANSPORT_RESULT_ACTION_TYPES = {"show_breakdown", "save_strategy"}
+COVERAGE_RECOVERY_ACTION_FIELDS = {
+    "change_dates": "date_range",
+    "change_asset": "asset_universe",
+    "change_benchmark": "comparison_baseline",
+}
 
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
+
+
+def final_interpret_stage_result(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    optional_parameter_stage_patch: dict[str, Any],
+    assistant_response: str | None,
+    language: str,
+) -> StageResult:
+    prior_intent = selected_thread_metadata.get("response_intent")
+    no_progress = (
+        no_progress_response_if_equivalent(
+            snapshot=snapshot,
+            prior_strategy=snapshot.pending_strategy_summary,
+            candidate_strategy=decision.candidate_strategy_draft,
+            prior_response_intent=prior_intent,
+            missing_fields=decision.missing_required_fields,
+            semantic_turn_act=decision.semantic_turn_act,
+            optional_parameter_status=decision.to_patch()["optional_parameter_status"],
+            assistant_response=assistant_response,
+            language=language,
+        )
+        if decision.requires_clarification
+        and snapshot is not None
+        and snapshot.pending_strategy_summary is not None
+        and selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
+        and isinstance(prior_intent, dict)
+        else None
+    )
+    if no_progress is not None:
+        claim_turn_terminal("no_progress", "unchanged_typed_state")
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={
+                "candidate_strategy_draft": decision.candidate_strategy_draft.model_dump(
+                    mode="python"
+                ),
+                "assistant_response": no_progress.assistant_response,
+                "response_intent": no_progress.response_intent,
+                "requested_field": decision.missing_required_fields[0],
+                "missing_required_fields": list(decision.missing_required_fields),
+            },
+        )
+    stage_patch = dict(optional_parameter_stage_patch)
+    if assistant_response:
+        stage_patch["assistant_response"] = assistant_response
+    return StageResult(
+        outcome="needs_clarification"
+        if decision.requires_clarification
+        else "ready_to_respond",
+        decision=decision,
+        stage_patch=stage_patch,
+    )
 
 
 def _result_followup_decision(
@@ -110,6 +181,29 @@ def structured_action_stage_result_if_applicable(
     action = state.structured_action
     if action is None:
         return None
+    if action.type == "select_response_option" and not (
+        _response_option_source_is_server_validated(
+            action_payload=action.payload,
+            selected_thread_metadata=selected_thread_metadata,
+        )
+    ):
+        pending = snapshot.pending_strategy_summary if snapshot is not None else None
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "candidate_strategy_draft": (
+                    pending.model_dump(mode="python")
+                    if pending is not None
+                    else StrategySummary().model_dump(mode="python")
+                ),
+                "assistant_response": recovery_message(
+                    "artifact_action_invalid_state",
+                    language=language,
+                ),
+                "requested_field": None,
+                "missing_required_fields": [],
+            },
+        )
     if action.type == "retry_failed_action":
         return _retry_failed_action_stage_result(
             decision=_retry_failed_action_decision(state=state),
@@ -118,6 +212,21 @@ def structured_action_stage_result_if_applicable(
             require_requested_failed_action_id=True,
             language=language,
         )
+    coverage_recovery_result = _coverage_recovery_action_result(
+        state=state,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        language=language,
+    )
+    if coverage_recovery_result is not None:
+        return coverage_recovery_result
+    unsupported_timeframe_result = _unsupported_timeframe_action_result(
+        state=state,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if unsupported_timeframe_result is not None:
+        return unsupported_timeframe_result
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
             state=state,
@@ -211,6 +320,190 @@ def structured_action_stage_result_if_applicable(
     return None
 
 
+def _response_option_source_is_server_validated(
+    *,
+    action_payload: dict[str, Any],
+    selected_thread_metadata: dict[str, Any],
+) -> bool:
+    source_assistant_id = action_payload.get("source_assistant_id")
+    validated_action_source_id = action_payload.get("validated_source_assistant_id")
+    validated_metadata_source_id = selected_thread_metadata.get(
+        "validated_source_assistant_id"
+    )
+    return (
+        isinstance(source_assistant_id, str)
+        and bool(source_assistant_id)
+        and source_assistant_id == validated_action_source_id
+        and source_assistant_id == validated_metadata_source_id
+    )
+
+
+def _coverage_recovery_action_result(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    language: str,
+) -> StageResult | None:
+    action = state.structured_action
+    if action is None or action.type != "select_response_option":
+        return None
+    response_intent = selected_thread_metadata.get("response_intent")
+    if not isinstance(response_intent, dict) or response_intent.get("kind") != (
+        "coverage_recovery"
+    ):
+        return None
+    option_id = action.payload.get("option_id")
+    replacement_values = action.payload.get("replacement_values")
+    if not isinstance(option_id, str) or not isinstance(replacement_values, dict):
+        return None
+    requested_field = replacement_values.get("requested_field")
+    expected_field = COVERAGE_RECOVERY_ACTION_FIELDS.get(option_id)
+    if requested_field != expected_field:
+        return None
+    options = response_intent.get("options")
+    if not isinstance(options, list) or not any(
+        isinstance(option, dict)
+        and option.get("id") == option_id
+        and option.get("replacement_values") == replacement_values
+        for option in options
+    ):
+        return None
+    pending = snapshot.pending_strategy_summary if snapshot is not None else None
+    if pending is None:
+        return None
+    preserved_optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(response_intent) or {}
+    )
+    preserved_optional_parameter_status.update(
+        optional_parameter_status_without_coverage_recovery(
+            state.optional_parameter_status
+        )
+    )
+    semantic_need = {
+        "date_range": "period",
+        "asset_universe": "asset_target",
+        "comparison_baseline": "assumption",
+    }[requested_field]
+    return StageResult(
+        outcome="needs_clarification",
+        stage_patch={
+            "candidate_strategy_draft": pending.model_dump(mode="python"),
+            "assistant_prompt": None,
+            "requested_field": requested_field,
+            "missing_required_fields": [requested_field],
+            "optional_parameter_status": preserved_optional_parameter_status,
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": [semantic_need],
+                "requested_fields": [requested_field],
+                "facts": {
+                    "strategy": pending.model_dump(mode="python"),
+                    "current_user_message": state.current_user_message,
+                    "structured_action": {
+                        "type": action.type,
+                        "payload": {
+                            "option_id": option_id,
+                            "replacement_values": replacement_values,
+                        },
+                    },
+                    "language": language,
+                    PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT: (
+                        preserved_optional_parameter_status
+                    ),
+                },
+                "options": [],
+            },
+        },
+    )
+
+
+def _unsupported_timeframe_action_result(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    action = state.structured_action
+    if action is None or action.type != "select_response_option":
+        return None
+    response_intent = selected_thread_metadata.get("response_intent")
+    if not isinstance(response_intent, dict) or response_intent.get("kind") != (
+        "unsupported_recovery"
+    ):
+        return None
+    facts = response_intent.get("facts")
+    constraints = (
+        facts.get("unsupported_constraints") if isinstance(facts, dict) else None
+    )
+    if not isinstance(constraints, list) or not any(
+        isinstance(constraint, dict)
+        and constraint.get("category") == "unsupported_time_granularity"
+        for constraint in constraints
+    ):
+        return None
+    option_id = action.payload.get("option_id")
+    replacement_values = action.payload.get("replacement_values")
+    if not isinstance(option_id, str) or not isinstance(replacement_values, dict):
+        return None
+    if set(replacement_values) != {"timeframe"}:
+        return None
+    raw_timeframe = replacement_values.get("timeframe")
+    if not isinstance(raw_timeframe, str):
+        return None
+    try:
+        timeframe = normalize_timeframe(raw_timeframe)
+    except ValueError:
+        return None
+    options = response_intent.get("options")
+    if not isinstance(options, list) or not any(
+        isinstance(option, dict)
+        and option.get("id") == option_id
+        and option.get("replacement_values") == replacement_values
+        for option in options
+    ):
+        return None
+    pending = snapshot.pending_strategy_summary if snapshot is not None else None
+    if pending is None:
+        return None
+
+    optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(response_intent) or {}
+    )
+    optional_parameter_status.update(state.optional_parameter_status)
+    raw_constraints = optional_parameter_status.pop(
+        "unsupported_constraints",
+        constraints,
+    )
+    remaining_constraints = [
+        constraint
+        for constraint in raw_constraints
+        if not (
+            isinstance(constraint, dict)
+            and constraint.get("category") == "unsupported_time_granularity"
+        )
+    ]
+    if remaining_constraints:
+        optional_parameter_status["unsupported_constraints"] = remaining_constraints
+    optional_parameter_status["timeframe"] = timeframe
+    corrected_pending = pending.model_copy(
+        update={"timeframe": timeframe},
+        deep=True,
+    )
+    return StageResult(
+        outcome=(
+            "needs_clarification" if remaining_constraints else "ready_for_confirmation"
+        ),
+        stage_patch={
+            "candidate_strategy_draft": corrected_pending.model_dump(mode="python"),
+            "assistant_prompt": None,
+            "requested_field": None,
+            "missing_required_fields": [],
+            "optional_parameter_status": optional_parameter_status,
+        },
+    )
+
+
 def _run_backtest_action_result(
     *,
     state: RunState,
@@ -265,25 +558,13 @@ def result_action_stage_result_if_applicable(
     action = state.structured_action
     if action is None:
         return None
-    if action.type in TRANSPORT_RESULT_ACTION_TYPES:
-        reference = (
-            snapshot.latest_backtest_result_reference if snapshot is not None else None
-        )
-        return StageResult(
-            outcome="ready_to_respond",
-            stage_patch={
-                "assistant_response": None,
-                "result_action_request": {
-                    "type": action.type,
-                    "action": action.model_dump(mode="python"),
-                    "latest_result_reference": (
-                        reference.model_dump(mode="python")
-                        if reference is not None
-                        else None
-                    ),
-                },
-            },
-        )
+    typed_result = typed_result_action_stage_result_if_applicable(
+        state=state,
+        snapshot=snapshot,
+        language=language,
+    )
+    if typed_result is not None:
+        return typed_result
     if action.type != "refine_strategy":
         return None
     reference = (
@@ -651,7 +932,7 @@ def _retry_failed_action_stage_result(
                 )
             },
         )
-    strategy = strategy_from_failed_launch_payload(launch_payload)
+    strategy = strategy_from_failed_action_snapshot(launch_payload, snapshot)
     return StageResult(
         outcome="ready_for_confirmation",
         decision=decision.model_copy(
@@ -673,8 +954,6 @@ def _retry_failed_action_stage_result(
             ),
         },
     )
-
-
 def _retry_failed_action_response_intent(
     *,
     status: ArtifactActionRecoveryStatus,
@@ -805,7 +1084,9 @@ async def artifact_followup_stage_result_if_applicable(
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": response,
-            "response_intent": result_followup_response_intent(focus),
+            **({} if used_recovery else {
+                "response_intent": result_followup_response_intent(focus)
+            }),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",

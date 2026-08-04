@@ -61,11 +61,17 @@ private_alpha_allowlist
 profiles
 conversations
 messages
+chat_turn_lifecycles
 strategies
 collections
 collection_strategies
 backtest_jobs
 backtest_runs
+ideas
+idea_versions
+evidence_artifacts
+decision_notes
+cost_ledger_entries
 feedback
 usage_counters
 ```
@@ -87,8 +93,14 @@ auth.users
 profiles
    ├── conversations
    │      ├── messages
+   │      ├── chat_turn_lifecycles
    │      ├── backtest_jobs
    │      └── backtest_runs
+   │
+   ├── ideas
+   │      ├── idea_versions
+   │      │      └── evidence_artifacts
+   │      └── decision_notes
    │
    ├── strategies
    │      ├── backtest_runs
@@ -96,6 +108,8 @@ profiles
    │
    ├── collections
    │      └── collection_strategies
+   │
+   ├── cost_ledger_entries
    │
    ├── usage_counters
    └── feedback
@@ -109,18 +123,26 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 
 ### Fields
 - `id`: `uuid` (Primary Key, references `auth.users.id`)
-- `email`: `text`
+- `email`: `text` (Nullable only for a verified anonymous Auth user)
 - `username`: `text` (Unique, Nullable)
 - `display_name`: `text` (Nullable)
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
+- `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
+  `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
 - `is_admin`: `boolean` (Default: `false`)
-- `onboarding`: `jsonb` (Default: `{}`)
+- `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
+  to the historical shape below)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
-### Onboarding Shape
+### Legacy Onboarding Shape (inert compatibility state)
+
+The explicit onboarding flow is removed. This column persists only because
+existing rows carry it and removing it would be a destructive migration. No
+product behavior reads it, and no API path writes it.
+
 ```json
 {
   "completed": false,
@@ -138,8 +160,97 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
   authentication this row is authoritative and no frontend repair update is
   required.
 - `display_name` is used for personalization.
-- `email` is for authentication, not primary UX identity.
-- `username` is optional for Alpha.
+- `profiles.email` is null only for a verified anonymous Auth user. Permanent
+  profiles require the verified provider email. Fake or placeholder guest
+  addresses are forbidden.
+- `username` is optional for Alpha. When supplied at signup, it is trimmed and
+  case-folded before the case-insensitive uniqueness check and profile write.
+  Same-email and same-username signup attempts are serialized across API
+  instances so only the request that owns the available username may create an
+  Auth user. An already-existing Auth email follows the provider's obfuscated
+  duplicate path without a profile write or a username-dependent public error.
+---
+
+## 5.1 guest_workspaces
+
+Server-owned policy record for one temporary anonymous identity.
+
+### Fields
+- `user_id`: `uuid` (Primary Key, references `profiles.id`)
+- `conversation_id`: `uuid` (Unique, nullable, references `conversations.id`)
+- `status`: `active`, `claiming`, `claimed`, or `expired`
+- `created_at`: `timestamptz`
+- `expires_at`: `timestamptz`
+- `claimed_by`: `uuid` (Nullable, references `profiles.id`)
+- `claimed_at`: `timestamptz` (Nullable)
+- `updated_at`: `timestamptz`
+
+### Invariants
+- The owner must be a verified anonymous Supabase Auth user when the workspace
+  is created.
+- Exactly one workspace exists per anonymous owner and at most one
+  conversation may bind to it.
+- Expiry uses a fixed seven-day window after creation. Message, simulation, feedback, and
+  conversation activity cannot extend it.
+- Browser roles may read only their own active workspace and cannot mutate
+  expiry, claim, or cleanup state.
+- Cleanup locks `auth.users` and the workspace, re-verifies anonymous identity
+  truth, removes the eligible graph, and deletes the Auth row in the same
+  database transaction. A converted or permanent account is never eligible.
+- Cleanup deletes conversation messages/jobs, guest feedback text, and the
+  checkpoint rows whose `thread_id` matches the guest conversation before the
+  transactional Auth deletion removes the remaining owner-scoped product rows.
+  It also removes safely transferred source identities after a fifteen-minute
+  reconciliation grace and abandoned bootstrap identities after five minutes.
+  Privacy-safe append-only cost and route/security evidence may retain nullable
+  attribution; transcript-bearing state may not.
+- Guest Start over is one service-owned transaction. It locks the workspace,
+  validates the complete conversation-owned graph, removes that graph and its
+  checkpoint thread, and binds one new empty conversation to the same
+  workspace. It does not replace the Auth identity, move `expires_at`, or reset
+  any lifetime allowance or feedback counter. Append-only cost, route, security,
+  and audit evidence is not rewritten.
+
+---
+
+## 5.2 guest_workspace_handoffs
+
+Server-owned, short-lived claim record for moving one anonymous workspace into
+one existing permanent account.
+
+### Fields
+- `id`: `uuid` (Primary Key)
+- `secret_hash`: `text` (SHA-256 hex digest; the opaque secret is never stored)
+- `source_user_id`: `uuid` (References the anonymous `profiles.id`)
+- `destination_email_hash`: `text` (SHA-256 of the normalized destination
+  email; required)
+- `destination_user_id`: `uuid` (Nullable until verified login resolves the
+  permanent `profiles.id`; cleared if that account is deleted)
+- `source_conversation_id`: `uuid` (References the one guest conversation)
+- `pending_action`: `jsonb` (Nullable typed reason, conversation, action id, and
+  decision artifact id when applicable)
+- `status`: `pending`, `consumed`, or `revoked`
+- `created_at`: `timestamptz`
+- `expires_at`: `timestamptz` (Exactly ten minutes after creation)
+- `consumed_at`: `timestamptz` (Nullable)
+
+### Invariants
+- Browser roles cannot read or execute against this table. Only the service
+  role may create or claim a handoff.
+- A pending source workspace has at most one handoff.
+- Claim locks the handoff and complete source product graph, resolves the
+  destination only from verified Auth email truth, verifies every foreign
+  owner, and transfers all mutable product rows in one transaction.
+- Conversation, message, strategy, job/run, Idea/IdeaVersion, evidence,
+  decision, and context ids do not change. Checkpoint rows keep
+  `thread_id == conversation_id`.
+- Guest counters and feedback are not merged into registered allowances.
+  Immutable cost, provider, security, and audit evidence is not rewritten.
+- Source anonymous Auth deletion occurs in bounded cleanup only after a
+  fifteen-minute claim-reconciliation grace, and in the same transaction that
+  re-verifies the source owns no transferred product row. Any claim or cleanup
+  failure changes zero owners.
+
 ---
 
 # 6. private_alpha_allowlist
@@ -150,17 +261,24 @@ and login; it should not be exposed as a frontend product surface.
 ### Fields
 - `email`: `text` (Primary Key, lowercased)
 - `role`: `text` (Default: `user`)
+- `language`: `text` (Default: `en`)
 - `disabled_at`: `timestamptz` (Nullable)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
 ### Enums
-- **role**: `admin`, `developer`, `user`
+- **role**: `admin`, `developer`, `user`, `requested`
+- **language**: `en`, `es-419`
 
 ### Notes
-- Rows are managed directly in Supabase during private alpha. No invite
-  dashboard, waitlist, referral system, or public invite-code flow is part of
-  this pass.
+- The public access-request endpoint may insert a missing `requested` row. It
+  never updates an existing requested, approved, privileged, or disabled row.
+- `requested` and unknown roles never grant permanent account access.
+- The ops approval action loads an active requested row and stored language,
+  sends the localized approval email first, and only then compare-and-sets
+  `requested` to `user` while `disabled_at` remains null.
+- There is no invite dashboard, referral system, public invite-code flow,
+  pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
 - If an email is missing or `disabled_at` is set, `/auth/signup` and
@@ -216,14 +334,46 @@ Represents individual messages within a conversation.
 - **role**: `user`, `assistant`, `system`, `tool`
 
 ### Notes
-- Messages are immutable in Alpha.
+- Message identity, owner, conversation, role, content, and ordering are
+  immutable in Alpha. Narrow artifact metadata enrichments may update
+  `metadata`, but they must not change message identity or ordering.
+- Every durable message append uses the service-role-only
+  `append_conversation_message` RPC. The function locks the owned conversation
+  row, inserts the message, and updates `last_message_preview` in one
+  transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
+  function or mutate `messages` directly.
+- Conversation message order is deterministic by `(created_at DESC, id DESC)`.
+  Under the conversation lock, a new append receives `created_at` at least one
+  microsecond newer than the current maximum. Metadata-only updates do not
+  change `created_at` or `id`, so they cannot promote an older message into the
+  latest response-option source.
+- A response-option request uses the same RPC as an atomic admission boundary.
+  It matches the owner, conversation, exact latest assistant id, canonical
+  metadata snapshot, option id, and replacement values before inserting the
+  preallocated request id. An exact replay returns the existing request and the
+  source immediately preceding it without inserting a duplicate; a stale or
+  mismatched claim returns no row.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
+- Every terminal assistant message for an ordinary non-backtest chat turn stores
+  immutable `metadata.agent_runtime_turn.turn_id`, `request_id`, `terminal`, and
+  terminal `status`. These values match its `chat_turn_lifecycles` row and make
+  terminal evidence discoverable if the lifecycle CAS does not complete.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
   `result_card`, result identifiers, `chat_action`, `failed_action`,
-  `retry_last_turn`, `recovery`, and `clarification`. These fields hydrate the
+  `retry_last_turn`, `recovery`, `clarification`, and the additive
+  `discovery` sidecar (`argus_discovery/v1`: bounded sources, provider-resolved
+  candidates, and unverified names for grounded asset discovery; the Search
+  provider id is excluded by contract). These fields hydrate the
   transcript, action affordances, and localized degraded-fallback UI; they do
   not make free-form transcript text the source of truth for strategy state.
+  A typed `clarification.prompt_source` distinguishes exact LLM-authored prose
+  (`llm_generated`) from frontend-localized deterministic fallback
+  (`degraded_fallback`); structured options remain reloadable in both cases.
+  Degraded fallback `content` remains stored only as compatibility transport;
+  it is not projected into later model history or `last_message_preview`, so
+  Recents and conversation search do not expose the fallback language. Exact
+  `llm_generated` prose remains eligible for those continuity surfaces.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
@@ -234,6 +384,144 @@ Represents individual messages within a conversation.
   references. Later turns that create a new draft, active confirmation,
   completed result, or explicit cancellation should supersede stale retry
   affordances during hydration.
+- Omnisearch may recall only `role = 'user'` message content. The partial
+  `idx_messages_user_content_norm_trgm` GIN index uses the same checked-in
+  Python 3.10-compatible normalized-content SQL expression as the bounded
+  search reader and `extensions.gin_trgm_ops`. The index adds no function,
+  view, grant, or RLS change; owner, active-conversation, guest-workspace, and
+  exact-token rechecks remain query predicates before ranking and limits.
+- A transcript jump reuses the owner-scoped message page read with
+  `anchor_message_id`. The anchor is resolved inside the requested
+  conversation, and the response remains capped at the requested page limit;
+  it is not a transcript scan or a new durable memory record.
+---
+
+## 8.1 chat_turn_lifecycles
+
+Represents one mutable current-state recovery record for each accepted ordinary
+chat turn: any `POST /api/v1/chat/stream` request not admitted as
+`chat.run_backtest`. Run actions use `backtest_jobs` instead. This table is not a
+second job queue, transcript, event ledger, or LangGraph state store. Messages
+remain immutable; message reads project the current lifecycle row into
+`metadata.agent_runtime_turn` without rewriting the message.
+
+### Fields
+- `turn_id`: `uuid` (Primary Key and reference to the accepted user
+  `messages.id`; this is also the `request_message_id`)
+- `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `conversation_id`: `uuid` (References `conversations.id` ON DELETE CASCADE)
+- `assistant_message_id`: `uuid` (Nullable, unique, references `messages.id` ON
+  DELETE SET NULL)
+- `request_id`: `text` (The request correlation id used by responses, logs, and
+  route-receipt metadata)
+- `status`: `text`
+- `reconciled_outcome`: `text` (Nullable)
+- `failure_code`: `text` (Nullable, stable and user-safe)
+- `retryable`: `boolean` (Default: `false`)
+- `accepted_at`: `timestamptz`
+- `running_at`: `timestamptz` (Nullable)
+- `terminal_at`: `timestamptz` (Nullable)
+- `reconciled_at`: `timestamptz` (Nullable)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Enums and constraints
+- **status**: `accepted`, `running`, `completed`, `recoverable_failed`,
+  `abandoned`, `reconciled`.
+- **reconciled_outcome**: `completed` or `recoverable_failed`; required only
+  when `status = reconciled` and null otherwise. No-proof recovery uses
+  `status = abandoned` directly.
+- `turn_id` makes lifecycle creation idempotent for the accepted user message.
+- `assistant_message_id` is unique when present so one terminal assistant
+  message cannot settle two turns.
+- `abandoned` requires `assistant_message_id = null`; by definition no
+  qualifying terminal assistant message settled that turn.
+- Terminal statuses are `completed`, `recoverable_failed`, `abandoned`, and
+  `reconciled`.
+
+### Transition ownership and idempotency
+- The user message and `accepted` row are created in one database-owned
+  transaction after request admission succeeds.
+- One database compare-and-set function locks the lifecycle row and permits only
+  the transitions named in `docs/API_CONTRACT.md` under
+  `contract-chat-turn-lifecycle`.
+- Repeating the same target status, assistant-message link, failure code, and
+  reconciliation outcome returns the current row as a no-op. A different
+  terminal target is rejected.
+- Route receipts correlate through the same `user_id`, `conversation_id`,
+  `request_id`, and message ids; the lifecycle row does not duplicate receipt
+  payloads.
+- Owner-scoped RLS uses `auth.uid() = user_id`, and `authenticated` receives `SELECT` only. `INSERT`, `UPDATE`, and `DELETE` are revoked from `anon` and
+  `authenticated`; lifecycle creation and transitions use the server-side
+  transaction/CAS boundary only. Any database function used for that boundary
+  also revokes execution from `PUBLIC`, `anon`, and `authenticated`. The
+  frontend cannot mutate lifecycle state directly.
+
+### Reconciliation boundary
+- `accepted`/`running` rows become stale after 15 minutes according to database
+  time and `stale_since = COALESCE(running_at, accepted_at)`.
+- The next chat POST and conversation-message read reconcile at most 20 stale
+  rows for that conversation in `stale_since ASC, turn_id ASC` order. Private
+  alpha does not add a background sweeper.
+- Qualifying terminal evidence is an immutable assistant message whose
+  `user_id`, `conversation_id`, `metadata.agent_runtime_turn.turn_id`, and
+  `metadata.agent_runtime_turn.request_id` match the lifecycle row, whose
+  terminal flag is true, and whose terminal status is `completed` or
+  `recoverable_failed`.
+- Candidates use `created_at ASC, outcome_precedence ASC, id ASC`, with failure
+  precedence 0 and completed precedence 1. The first candidate wins and becomes
+  `assistant_message_id`; its status becomes `reconciled_outcome`. Checkpointer
+  state may corroborate that message but cannot prove a terminal user-visible
+  outcome alone. With no qualifying message, the row becomes `abandoned` with
+  `failure_code = turn_abandoned`.
+- For `abandoned`, the read-time projection belongs to the accepted user message
+  whose `id = turn_id`. It overlays terminal lifecycle, `turn_abandoned`
+  recovery, and typed `retry_last_turn` metadata without changing the immutable
+  message row. The frontend places the presentation-only recovery row directly
+  after that user message; the API does not create or persist an assistant
+message for this projection.
+
+---
+
+## 8.2 conversation_read_states
+
+Stores one durable read boundary and optional manual-unread flag for an owned
+conversation. It is not an event log and does not duplicate lifecycle, job,
+message, or result content.
+
+### Fields
+
+- `user_id`: `uuid` (Part of the primary key; references `profiles.id` with
+  update/delete cascade)
+- `conversation_id`: `uuid` (Part of the primary key)
+- `read_through_occurred_at`: `timestamptz` (Nullable)
+- `read_through_source_kind`: `text` (`chat_turn` or `backtest_job`, nullable)
+- `read_through_source_id`: `uuid` (Nullable)
+- `manual_unread_at`: `timestamptz` (Nullable and independent of read-through)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+The three read-through fields are either all null or all non-null. Boundaries
+compare as `(occurred_at, source_kind_rank, source_id)`, with `chat_turn = 1`
+and `backtest_job = 2`, and advance monotonically. The primary key is
+`(user_id, conversation_id)`. A composite foreign key to
+`conversations(id, user_id)` uses `ON UPDATE CASCADE` and `ON DELETE CASCADE`,
+so guest claim transfers the state and conversation cleanup removes it in the
+same transaction.
+
+Authenticated owners may select their row through RLS but cannot insert,
+update, or delete it directly. Server-only RPCs own mutation, lock the
+conversation/read/source rows, and revalidate terminal eligibility before
+advancing a cursor. Read RPCs accept at most 100 owned conversation ids and the
+activity reconciler settles at most 20 stale turns across that batch using the
+existing lifecycle evidence predicate.
+
+The migration baseline is idempotent and keyset-batched at 500 conversations.
+It marks only the newest eligible terminal boundary at or before the captured
+migration-start cutoff as read. Activity completing after that cutoff remains
+unread. The baseline and later activity reads do not update conversation,
+message, job, Run, artifact, or sort timestamps.
+
 ---
 
 # 9. strategies
@@ -290,7 +578,8 @@ Collections grouping related strategies. These serve as lightweight organization
 ### Notes
 - Collections do **not** perform aggregate portfolio simulations in Alpha.
 - They help users organize strategies by theme (e.g., "Tech Growth", "Crypto Dips").
-- **Asset Mixing**: Collections may contain both Equity and Crypto strategies, but they cannot be executed as a mixed-asset batch.
+- **Asset Mixing**: Collections may contain Equity, Crypto, and Currency Pair
+  strategies, but they cannot be executed as a mixed-asset batch.
 ---
 
 # 11. collection_strategies
@@ -340,6 +629,14 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 - `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
 - `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- New chart writers also persist two optional additive objects inside the same
+  immutable `chart` JSON: `exploration_policy` (generic range-eligibility hints
+  resolved from the strategy capability: `minimum_visible_observations`,
+  optional `minimum_meaningful_duration`) and `marker_summary` (exact
+  `total_groups`/`included_groups`/`sampled` marker-cap evidence). Legacy rows
+  omit both fields and remain valid; readers degrade to observation-only range
+  behavior and make no marker-completeness claim. No migration is required, and
+  these fields never change execution, metrics, or the effective window.
 - Direct run rows store the normalized engine config directly in
   `config_snapshot`; chat-launched rows may include
   `config_snapshot.engine_config` with the exact normalized engine config
@@ -414,7 +711,19 @@ not leave orphaned evidence records.
 
 ### idea_versions
 
-Immutable snapshot of an idea at the point evidence was created.
+Immutable material experiment definition that evidence can reference.
+
+Version boundary:
+- One `IdeaVersion` represents one material experiment definition.
+- Material changes to the traded assets, date range, benchmark, strategy or
+  executable rules, cadence, capital, or modeled fees/slippage create a new
+  version linked to the same `Idea`.
+- Multiple edits before one confirmed run collapse into one new version.
+- Wording changes, explanations, retries, and abandoned edits do not create
+  versions.
+- An updated date range is a material change. Its new run/evidence belongs to a
+  new version so Argus can compare performance and assumptions with the prior
+  version.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -483,6 +792,17 @@ Payload rules:
 - Evidence search and recall require the source run's finalized identity. An
   incomplete finalization is not eligible for conversation reload, history, or
   Omnisearch, even if metric computation already finished.
+- A rerun on fresher provider data may create a new immutable
+  `EvidenceArtifact` on the same `IdeaVersion` only when the canonical experiment
+  definition is unchanged. The artifact must retain its own run identity,
+  data-through/freshness provenance, metrics, and timestamps.
+- Freshness comparison may use multiple evidence artifacts from the same
+  version or evidence from successive material versions. It must not overwrite
+  historical evidence.
+- Research/news context is not part of the implemented P1 table contract.
+  A later freshness/research slice may attach sanitized, source-backed context
+  only after its artifact type, source, timestamp, and ownership contract are
+  explicitly specified.
 
 ### decision_notes
 
@@ -507,6 +827,25 @@ Constraints:
   user-owned evidence artifact.
 - Duplicate POST/retry semantics update the existing decision row and return the
   canonical current decision.
+- The public decision write contract accepts at most 500 note characters. The
+  durable column remains nullable `text` so previously accepted longer notes
+  stay readable; no migration or destructive truncation is introduced.
+
+### Run dossier read projection
+
+Run dossier history is not a table or durable summary. The
+`GET /api/v1/conversations/{conversation_id}/run-dossiers` endpoint projects
+existing owner-scoped records in this order:
+
+`Conversation -> completed BacktestRun -> EvidenceArtifact -> current
+DecisionNote (optional) -> assistant result message anchor (optional)`.
+
+Only completed evidence-backed runs are eligible. Ordering and pagination use
+the run's effective completion activity, `coalesce(updated_at, created_at)`,
+then run id, newest first. `total_runs` and `decided_runs` are scalar
+server-owned counts over the complete eligible set; clients never accumulate
+them from pages. This projection creates no record, migration, revision log,
+embedding, or generated recap.
 
 Durable decision capture:
 - The API uses the service-role-only `upsert_current_decision_note` RPC so the
@@ -514,6 +853,18 @@ Durable decision capture:
   idea-version lifecycle move to `decided` together.
 - The RPC is not a public/client surface. Frontend code only calls
   `POST /evidence-artifacts/{id}/decision`.
+- Omnisearch recall uses the same bounded normalized-text pattern over the
+  existing canonical `decision_state` and `note` fields. The
+  `idx_decision_notes_recall_norm_trgm` GIN index adds no new durable memory
+  record, function, view, grant, or RLS change; owner and conversation checks
+  remain in the recall query before ranking and limits.
+- Asset rollups use the existing maximum-five-symbol BacktestRun contract as
+  an index boundary. `argus_search_symbol_casefold(text)` is a pure immutable
+  SQL helper with Python 3.10 raw-casefold parity, and
+  `idx_backtest_runs_owner_symbol_{1..5}_prefix` are owner-first partial
+  B-tree expression indexes for completed non-null symbol slots. They add no
+  table, recall record, view, grant, or RLS change. The reader resolves an
+  exact or unique indexed prefix before evidence/decision lineage hydration.
 
 ### RLS
 
@@ -607,6 +958,9 @@ Append-only rules:
 
 Current write hooks:
 - API chat turns append OpenRouter cost rows from persisted route receipts.
+- Grounded-discovery turns append one `source = "research"` row per attempted
+  Search call with `feature_area = "discovery"`, provider identity, latency,
+  and provider-reported or documented cost.
 - Render workflow result-readout LLM calls append rows correlated to
   `backtest_job_id` and `backtest_run_id`.
 - Eval harness judge calls can append rows with `source = "eval_harness"` and a
@@ -626,9 +980,9 @@ Cost model notes:
 
 ## 12.2 backtest_jobs
 
-Represents durable lifecycle state for an asynchronous backtest execution job.
-Jobs are the bridge between the chat/API control plane and the Render Workflow
-execution plane.
+Represents durable lifecycle state for a backtest execution job. Jobs bridge
+the chat/API control plane to asynchronous Render Workflow execution and also
+own the admitted synchronous direct compatibility path.
 
 `backtest_jobs` is not the canonical result record. Successful jobs write a
 canonical immutable `backtest_runs` row and reference it through
@@ -637,17 +991,24 @@ canonical immutable `backtest_runs` row and reference it through
 ### Fields
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
-- `conversation_id`: `uuid` (References `conversations.id`)
+- `conversation_id`: `uuid` (Nullable only for direct `backtests.run` admission;
+  otherwise references `conversations.id`)
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
-- `confirmation_message_id`: `uuid` (Nullable, references `messages.id`)
-- `idempotency_key`: `text` (Nullable)
-- `payload_hash`: `text`
+- `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
+  `backtests.run`; references the retained immutable confirmation `messages.id`)
+- `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
+- `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
+- `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
+  operation's canonical identity object)
+- `payload_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
+  full normalized `LaunchBacktestRequest` payload)
 - `launch_payload`: `jsonb`
 - `status`: `text`
 - `priority`: `text` (Default: `'normal'`)
 - `attempts`: `integer` (Default: `0`)
 - `max_attempts`: `integer` (Default: `1`)
-- `queued_at`: `timestamptz`
+- `queued_at`: `timestamptz` (Required for chat jobs; null for conforming direct
+  jobs that never enter `queued`)
 - `started_at`: `timestamptz` (Nullable)
 - `finished_at`: `timestamptz` (Nullable)
 - `result_run_id`: `uuid` (Nullable, references `backtest_runs.id`)
@@ -660,8 +1021,15 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
+- **operation_scope**: `chat.run_backtest`, `backtests.run`
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
+- A new `chat.run_backtest` row starts `queued` with `queued_at` set and
+  `started_at` null. Its `confirmation_message_id` is non-null and the linked
+  message owns the confirmed `confirmation_id` and full `launch_payload_hash`
+  for the job record's lifetime. A new `backtests.run` row starts `running` with
+  `queued_at` and `confirmation_message_id` null and `started_at` set to the
+  admission transaction timestamp.
 
 ### Failure Semantics
 Job lifecycle status is separate from engine/runtime failure semantics.
@@ -687,8 +1055,35 @@ Unknown failures default to `failed`, `failed_internal` semantics,
 `retryable=false`, and a safe generic user message until a new stable
 `failure_code` is intentionally added.
 
+A direct `backtests.run` row becomes stale when it remains `running` through
+`started_at + interval '15 minutes'`. Before new direct admission and before an
+owner-scoped direct-job read, the database-owned recovery path checks the stable
+job-derived identity for a fully finalized Run/evidence tuple. A complete tuple
+reconciles the job to `succeeded`. With no complete tuple, the same transaction
+sets `status = failed`, `failure_code = direct_execution_abandoned`,
+`failure_detail = execution_interrupted`, and `retryable = true`. Both terminal
+transitions release running capacity immediately. The finalizer and stale
+reconciler serialize on the same locked job row; after the stale failure wins,
+late finalization cannot create or attach a public Run or replace the terminal
+outcome.
+
 ### Notes
-- Jobs are idempotent by user and payload/idempotency key.
+- Jobs are idempotent at
+  `UNIQUE(user_id, operation_scope, idempotency_key)`. Exact retries return the
+  current row before capacity/usage checks; a different `identity_hash` is a
+  collision and never returns the old row.
+- The reservation lasts for the durable job record's lifetime. A caller does
+  not reuse the same key for a new execution after an elapsed retention window.
+- Chat Run actions use `confirmation_id` as `idempotency_key`. Direct jobs may
+  omit `conversation_id` so the existing direct request shape remains
+  compatible, but they remain owner-scoped by `user_id`.
+- `confirmation_message_id` is required for `chat.run_backtest` and the linked
+  immutable confirmation artifact is retained for the job record's lifetime;
+  direct `backtests.run` jobs keep this field null.
+- For chat jobs, the confirmation artifact's `launch_payload_hash` is exactly
+  the persisted `payload_hash`, not a shortened confirmation fingerprint.
+- Direct admissions atomically start in `running` after both queued and running
+  ceilings pass; new conforming direct jobs never enter `queued`.
 - The UI must hydrate queued/running/succeeded/failed/canceled/expired state
   from durable rows, not frontend-invented state.
 - The current private-alpha UI hydrates status through the API polling endpoint;
@@ -737,7 +1132,7 @@ Tracks resource consumption for quotas and limits.
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
 - `resource`: `text` (e.g., `backtest_runs`, `backtest_jobs`, `chat_messages`)
-- `period`: `text` (e.g., `hour`, `day`)
+- `period`: `text` (e.g., `hour`, `day`, `guest_session`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
 - `used_count`: `integer` (Default: `0`)
@@ -751,11 +1146,68 @@ Tracks resource consumption for quotas and limits.
 - **Cleanup Index**: `(period_end)`
 
 ### Alpha Enums
-- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`
-- **Period**: `hour`, `day`
+- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`,
+  `discovery_searches`
+- **Period**: `hour`, `day`, `guest_session`
+
+### Discovery Search Accounting
+- For registered accounts, `discovery_searches` counts grounded-discovery
+  Search attempts in `usage_counters` (10/hour, 25/day defaults from
+  `ARGUS_DISCOVERY_HOURLY_LIMIT` / `ARGUS_DISCOVERY_DAILY_LIMIT`).
+- Guest discovery uses `visitor_usage_counters` instead. A guest workspace
+  receives a fresh `user_id` when renewed, so an account-owned counter would
+  incorrectly reset the allowance.
+- Availability is read before the turn runs; the charge settles best-effort
+  after the terminal assistant message commits, only when a Search call was
+  actually attempted. This is an operational abuse guard with truthful attempt
+  accounting, not billing truth; failed settlement never breaks the user turn.
 
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.
+- For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
+  `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
+  assistant terminals, two unique simulation admissions, and five feedback
+  submissions over the identity lifetime.
+- Registered users continue to use the existing UTC hour/day accounting.
+
+---
+
+## 14.1 visitor_usage_counters
+
+Tracks discovery allowances for callers who do not have a durable account.
+This is intentionally separate from `usage_counters`, whose `user_id` is a
+foreign key to `profiles.id`.
+
+### Fields
+- `visitor_key`: `text` (opaque keyed digest; never a raw address)
+- `resource`: `text` (`discovery_searches`)
+- `period`: `text` (`day`)
+- `period_start`: `timestamptz`
+- `period_end`: `timestamptz`
+- `used_count`: `integer` (Default: `0`)
+- `limit_count`: `integer`
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Constraints, access, and retention
+- **Primary key**:
+  `(visitor_key, resource, period, period_start)`
+- **Window lookup index**:
+  `(visitor_key, resource, period_end)`
+- RLS is enabled with no policies. Only `service_role` has table access and may
+  execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
+- Expired rows are disposable operational data and must be removed through the
+  bounded purge function.
+
+### Discovery policy
+- A guest receives two grounded searches per visitor per day. Renewing the
+  temporary workspace does not reset that allowance.
+- The same table holds the global attempted-search bucket. Its daily ceiling is
+  configured by `ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING` and defaults to `500`
+  when the value is blank or invalid.
+- If counter truth cannot be read, admission currently fails closed into the
+  existing `discovery_limit_reached` recovery. Issue #244 retains that
+  user-facing truth limitation for follow-up.
 
 ---
 
@@ -803,9 +1255,16 @@ Recents is a mixed-type feed displaying activity across the platform.
   "title": "Tesla dip thread",
   "subtitle": "Last message or metric preview",
   "pinned": false,
-  "created_at": "timestamp"
+  "created_at": "timestamp",
+  "activity": {
+    "operation": {"status": "idle", "kind": null, "updated_at": null},
+    "attention": {"status": "none", "cursor": null}
+  }
 }
 ```
+
+`activity` is projected on `chat` rows only and omitted from all other History
+types. It is not stored on the conversation and does not affect History order.
 ---
 
 # 18. Search Model
@@ -828,14 +1287,45 @@ Semantic search using embeddings is deferred until post-Alpha.
 Every user-owned table must enforce strict Row Level Security (RLS).
 
 ### Primary Rule
-- Users may only `SELECT`, `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`.
+- Unless a table-specific rule below is stricter, users may only `SELECT`,
+  `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`. Server-owned or
+  immutable tables may revoke some of those operations; this default never
+  grants a client write that a table-specific rule forbids.
+
+### Chat-turn lifecycle
+- `chat_turn_lifecycles` grants authenticated owners `SELECT` only. No client
+  role may insert, update, delete, or execute its server transition function;
+  the server-side persistence boundary owns every write.
+
+### Conversation read state
+- `conversation_read_states` grants authenticated owners `SELECT` only.
+  `PUBLIC`, `anon`, and `authenticated` cannot write or execute its mutation,
+  read-source, reconciliation, or baseline functions; service-role persistence
+  owns those operations.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`, `usage_counters`.
+- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
+  `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
+  `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
+  `usage_counters`, `guest_workspaces`.
+
+### Guest ownership
+- Supabase anonymous identities use the `authenticated` role, so every guest
+  policy keeps `(select auth.uid()) = user_id`; role membership alone is never
+  authorization.
+- Expired guest identities cannot read or write product rows.
+- Another guest and a permanent user see zero guest workspace rows.
+- `profiles.avatar_theme` is a registered-account preference. The database
+  default keeps every row valid, but restrictive profile RLS policies use the
+  trusted `is_anonymous` JWT claim so a guest cannot read or write it through
+  the client role. The API omits the field from guest responses.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
-- Backend service-role access checks the table before auth signup/login.
+- All privileges remain revoked from `public`, `anon`, and `authenticated`;
+  no client policy permits direct requested-row access.
+- Backend service-role access owns request capture, approval transition, and
+  access checks before auth signup/login.
 
 ---
 
@@ -846,13 +1336,26 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **profiles**: `(id)`, `(username)`
 - **conversations**: `(user_id, updated_at DESC)`, `(user_id, archived, deleted_at)`, `(user_id, pinned)`
 - **messages**: `(conversation_id, created_at DESC)`
+- **chat_turn_lifecycles**: `(conversation_id, status, updated_at)`,
+  `(user_id, status, updated_at)`, unique `(assistant_message_id)` where not null
+- **chat_turn_lifecycles activity reads**:
+  `(user_id, conversation_id, status, updated_at DESC, turn_id DESC)` for active
+  rows and `(user_id, conversation_id, status, terminal_at DESC, turn_id DESC)`
+  for terminal rows
 - **strategies**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **strategies (gin)**: `USING gin(symbols)`
 - **collections**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **collection_strategies**: `(collection_id)`, `(strategy_id)`
 - **backtest_jobs**: `(user_id, status, queued_at DESC)`, `(conversation_id, created_at DESC)`, `(result_run_id)`
-- **backtest_jobs unique/idempotency**: `(user_id, idempotency_key)` where `idempotency_key is not null`
+- **backtest_jobs activity reads**:
+  `(user_id, conversation_id, status, updated_at DESC, id DESC)` for active or
+  checking rows and `(user_id, conversation_id, status, finished_at DESC, id DESC)`
+  for terminal rows
+- **backtest_jobs unique/idempotency**:
+  `UNIQUE(user_id, operation_scope, idempotency_key)`
 - **backtest_jobs payload lookup**: `(user_id, payload_hash, created_at DESC)`
+- **backtest_jobs identity lookup**:
+  `(user_id, operation_scope, identity_hash, created_at DESC)`
 - **backtest_runs**: `(user_id, created_at DESC)`, `(conversation_id)`, `(strategy_id)`
 - **backtest_runs (gin)**: `USING gin(symbols)`
 - **feedback**: `(user_id, created_at DESC)`
@@ -898,8 +1401,13 @@ Short-window protection against abuse or runaway UI loops.
 Durable job backpressure protects the chat API from compute spikes.
 - **Per user**: 1 running backtest, 2 queued backtests.
 - **Global**: 5 running backtests, 10 queued backtests.
-- **Mechanism**: Enforced against `backtest_jobs` before creating or starting a
-  new workflow job.
+- **Mechanism**: The database-owned admission operation resolves idempotency,
+  checks both scopes, charges one unique admission, and inserts the job
+  atomically. Chat admission inserts `queued`; the synchronous direct path
+  checks both queued and running ceilings and inserts `running`. Per-user
+  exhaustion is evaluated before global exhaustion and returns
+  `429 backtest_capacity_exceeded`; global exhaustion returns
+  `503 backtest_capacity_exceeded`; both include `Retry-After: 15`.
 
 ### Layer 3: Daily / Rolling Quotas
 Generous usage boundaries tracked via the `usage_counters` table.
@@ -914,17 +1422,24 @@ Generous usage boundaries tracked via the `usage_counters` table.
 ### Enforcement Flow
 1. **Authenticate**: Resolve `user_id` from session.
 2. **Hard Constraints**: Validate `backtest_run` inputs against Engine Constraints.
-3. **Check Counters**: Query `usage_counters` for applicable resource/period.
-4. **Check Job Backpressure**: Query `backtest_jobs` for per-user and global
-   queued/running limits before creating a workflow job.
-5. **Exceedance Policy**:
+3. **Atomic Admission**: In one database operation, resolve exact replay versus
+   identity collision, check the applicable usage period plus per-user/global
+   queued/running capacity, charge one unique simulation, and insert the job.
+   Chat admission starts `queued`; direct admission starts `running`. The exact
+   order is replay/collision, usage allowance, per-user capacity, global
+   capacity, then insert plus charge.
+4. **Exceedance Policy**:
    - If rate limit exceeded: Return `429 Too Many Requests`.
    - If daily quota exhausted: Return `429` (Alpha policy).
-   - If job backpressure limit is hit: return a product-safe queued/try-later
-     response instead of starting unbounded compute.
-6. **Execute**: Create a durable job and trigger workflow execution.
-7. **Increment**: Update/Insert the `usage_counters` row.
-8. **Response**: Return result or job state. Include rate-limit headers only
+   - If per-user capacity is exhausted: return
+     `429 backtest_capacity_exceeded` with `Retry-After: 15`.
+   - If global capacity is exhausted: return
+     `503 backtest_capacity_exceeded` with `Retry-After: 15`.
+   - If the same reservation key carries a different identity: return
+     `409 idempotency_conflict` without returning the old job.
+5. **Execute**: Dispatch workflow execution, or run the admitted direct
+   compatibility path synchronously, against the durable job.
+6. **Response**: Return result or job state. Include rate-limit headers only
    when they are backed by an active limiter; do not emit placeholder quota
    values.
 

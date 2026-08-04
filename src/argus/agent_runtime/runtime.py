@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
@@ -7,6 +8,10 @@ from loguru import logger
 
 from argus.agent_runtime.artifact_action_recovery import (
     artifact_action_recovery_message,
+)
+from argus.agent_runtime.next_experiments import (
+    detect_next_experiment_acceptance,
+    offered_kinds_from_thread_metadata,
 )
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -19,10 +24,19 @@ from argus.agent_runtime.state.models import (
     UserState,
     dedupe_resolution_provenance_items,
 )
+from argus.agent_runtime.substage_events import (
+    bind_substage_channel,
+    close_substage_channel,
+)
+from argus.agent_runtime.turn_execution import (
+    record_exit_progress,
+    turn_progress_evidence,
+)
 from argus.agent_runtime.workflow_contract import (
     TOKEN_STREAM_NODES,
     WORKFLOW_NODE_NAMES,
 )
+from argus.observability.product_events import capture_product_event
 
 MAX_RECENT_THREAD_HISTORY = 6
 WorkflowState = dict[str, Any]
@@ -40,6 +54,7 @@ def build_workflow_input(
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
     | None = None,
     fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
+    discovery_allowance_available: bool = True,
 ) -> WorkflowState:
     normalized_message = " ".join(message.strip().split())
     run_state = RunState.new(
@@ -49,6 +64,10 @@ def build_workflow_input(
         ),
         context_hints=list(context_hints or []),
         action_context=action_context,
+    )
+    run_state.discovery_allowance_available = discovery_allowance_available
+    run_state.prior_next_experiment_kinds = offered_kinds_from_thread_metadata(
+        fallback_selected_thread_metadata
     )
     if fallback_confirmation_payload is not None:
         run_state.confirmation_payload = ConfirmationPayload.model_validate(
@@ -79,6 +98,7 @@ async def stream_agent_turn_events(
     user: UserState,
     thread_id: str,
     message: str,
+    workflow_input: WorkflowState | None = None,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
     action_context: dict[str, Any] | None = None,
@@ -88,60 +108,138 @@ async def stream_agent_turn_events(
     | None = None,
     fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    initial_state = build_workflow_input(
-        user=user,
-        message=message,
-        recent_thread_history=recent_thread_history,
-        context_hints=context_hints,
-        action_context=action_context,
-        fallback_latest_task_snapshot=fallback_latest_task_snapshot,
-        fallback_selected_thread_metadata=fallback_selected_thread_metadata,
-        fallback_artifact_references=fallback_artifact_references,
-        fallback_confirmation_payload=fallback_confirmation_payload,
+    initial_state = (
+        workflow_input
+        if workflow_input is not None
+        else build_workflow_input(
+            user=user,
+            message=message,
+            recent_thread_history=recent_thread_history,
+            context_hints=context_hints,
+            action_context=action_context,
+            fallback_latest_task_snapshot=fallback_latest_task_snapshot,
+            fallback_selected_thread_metadata=fallback_selected_thread_metadata,
+            fallback_artifact_references=fallback_artifact_references,
+            fallback_confirmation_payload=fallback_confirmation_payload,
+        )
     )
+    acceptance = detect_next_experiment_acceptance(
+        message,
+        fallback_selected_thread_metadata,
+    )
+    if acceptance is not None:
+        # Typed acceptance for Stage-1 ordering; the offered impression
+        # rides the previous result's metadata.
+        try:
+            capture_product_event(
+                "next_experiment_selected",
+                user_id=user.user_id,
+                conversation_id=thread_id,
+                attributes=acceptance,
+            )
+        except Exception:
+            logger.debug("next_experiment_selected emission failed")
     config = {"configurable": {"thread_id": thread_id}}
     seen_stage_starts: set[str] = set()
     seen_stage_outcomes: set[str] = set()
     logger.debug("Agent runtime stream started", thread_id=thread_id)
 
-    async for event in workflow.astream_events(
-        initial_state,
-        config=config,
-        version="v2",
-    ):
-        kind = event.get("event")
-        node_name = _event_node_name(event)
-        if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
-            if node_name not in seen_stage_starts:
-                seen_stage_starts.add(node_name)
+    # Sub-stage events (work inside a node) merge with LangGraph's stream
+    # through one queue, so they reach the client while the node still runs.
+    queue: asyncio.Queue[Any] = asyncio.Queue()
+
+    async def _pump_workflow_events() -> None:
+        # Bound inside this task: stages run in its context tree, and the
+        # binding cannot outlive the turn.
+        channel_token = bind_substage_channel(queue)
+        try:
+            async for event in workflow.astream_events(
+                initial_state,
+                config=config,
+                version="v2",
+            ):
+                queue.put_nowait(("langgraph", event))
+        except BaseException as exc:
+            queue.put_nowait(("error", exc))
+            return
+        finally:
+            close_substage_channel(channel_token)
+        queue.put_nowait(("done", None))
+
+    pump = asyncio.create_task(_pump_workflow_events())
+    try:
+        while True:
+            item_kind, item = await queue.get()
+            if item_kind == "done":
+                break
+            if item_kind == "error":
+                raise item
+            if item_kind == "substage":
                 logger.debug(
-                    "Agent runtime stage started",
+                    "Agent runtime sub-stage started",
                     thread_id=thread_id,
-                    stage=node_name,
+                    stage=item.get("stage"),
                 )
-                yield {"type": "stage_start", "stage": node_name}
-            continue
-        if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
-            content = _chunk_content(event.get("data", {}).get("chunk"))
-            if content:
-                yield {"type": "token", "content": content}
-            continue
-        if kind == "on_chain_end" and node_name in WORKFLOW_NODE_NAMES:
-            outcome = _stage_outcome_from_event(event)
-            if outcome is not None and outcome not in seen_stage_outcomes:
-                seen_stage_outcomes.add(outcome)
-                logger.debug(
-                    "Agent runtime stage outcome",
-                    thread_id=thread_id,
-                    stage=node_name,
-                    outcome=outcome,
-                )
-                yield {"type": "stage_outcome", "outcome": outcome}
+                yield {"type": "stage_start", **item}
+                continue
+            event = item
+            kind = event.get("event")
+            node_name = _event_node_name(event)
+            if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
+                if node_name not in seen_stage_starts:
+                    seen_stage_starts.add(node_name)
+                    logger.debug(
+                        "Agent runtime stage started",
+                        thread_id=thread_id,
+                        stage=node_name,
+                    )
+                    yield {"type": "stage_start", "stage": node_name}
+                continue
+            if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
+                content = _chunk_content(event.get("data", {}).get("chunk"))
+                if content:
+                    yield {"type": "token", "content": content}
+                continue
+            if kind == "on_chain_end" and node_name in WORKFLOW_NODE_NAMES:
+                outcome = _stage_outcome_from_event(event)
+                if outcome is not None and outcome not in seen_stage_outcomes:
+                    seen_stage_outcomes.add(outcome)
+                    logger.debug(
+                        "Agent runtime stage outcome",
+                        thread_id=thread_id,
+                        stage=node_name,
+                        outcome=outcome,
+                    )
+                    yield {"type": "stage_outcome", "outcome": outcome}
+    finally:
+        pump.cancel()
 
     logger.debug("Agent runtime final state fetch started", thread_id=thread_id)
     final_state = await _final_workflow_state(workflow=workflow, config=config)
     logger.debug("Agent runtime final state fetch completed", thread_id=thread_id)
-    yield {"type": "final", "payload": _public_result(final_state)}
+    record_exit_progress(
+        final_state,
+        terminal=_progress_terminal(final_state.get("stage_outcome")),
+    )
+    yield {
+        "type": "final",
+        "payload": _public_result(final_state),
+        "_turn_progress": turn_progress_evidence(),
+        "_discovery_usage": final_state.get("discovery_usage"),
+    }
+
+
+def _progress_terminal(stage_outcome: Any) -> str | None:
+    normalized = str(getattr(stage_outcome, "value", stage_outcome) or "")
+    if normalized in {"await_user_reply", "needs_clarification"}:
+        return "clarification"
+    if normalized == "execution_failed_recoverably":
+        return "recoverable_failed"
+    if normalized == "execution_failed_terminally":
+        return "terminal_failed"
+    if normalized == "end_run":
+        return "finished"
+    return None
 
 
 async def run_agent_turn(
@@ -277,6 +375,8 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "artifact_references",
         "latest_failed_action_reference",
         "latest_run_id",
+        "source_result_run_id",
+        "strategy_path_id",
         "result_run_id",
         "result_strategy_id",
         "result_conversation_id",
@@ -284,18 +384,30 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "result_action_request",
         "retry_last_turn",
         "recovery",
+        "discovery",
+        "next_experiments",
     }
     serialized = {
         key: _serialize_public_value(key, value)
         for key, value in result.items()
         if key in allowed_keys and value is not None
     }
+    selected_thread_metadata = result.get("selected_thread_metadata")
+    if isinstance(selected_thread_metadata, dict):
+        for key in ("source_result_run_id", "strategy_path_id"):
+            value = selected_thread_metadata.get(key)
+            if key not in serialized and isinstance(value, str) and value:
+                serialized[key] = value
     run_state = result.get("run_state")
     if run_state is not None:
         if (
             "confirmation_payload" not in serialized
+            and "discovery" not in serialized
+            and getattr(run_state, "semantic_turn_act", None) != "asset_discovery"
             and getattr(run_state, "confirmation_payload", None) is not None
         ):
+            # A discovery turn answers who exists — recovery paths included;
+            # carried confirmation state never rides its public payload.
             serialized["confirmation_payload"] = _serialize_public_value(
                 "confirmation_payload",
                 run_state.confirmation_payload,

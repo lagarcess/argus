@@ -1,563 +1,3775 @@
+# Checked OpenAPI compatibility artifact. Generated from the canonical
+# FastAPI app.openapi() document by scripts/generate_openapi_artifact.py.
+# Structural gate: tests/test_openapi_compatibility.py (#234).
 openapi: 3.1.0
 info:
   title: Argus Alpha API
   version: 1.0.0-alpha
-  description: Contract-first Alpha API for chat-first investing idea validation.
-servers:
-  - url: /api/v1
+  description: Contract-first Alpha API for chat-first investing idea validation. Durable
+    results persist as backtest_runs; result cards render as conversation_result_card artifacts.
 paths:
-  /api/v1/auth/signup:
+  /api/v1/analytics/guest-events:
     post:
+      tags:
+      - analytics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestFunnelClientEventRequest'
+        required: true
       responses:
-        "200":
-          description: Account created or mocked in development.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/access-requests:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestCreate'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Untrusted browser origin rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many access request attempts. Please wait before trying again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Argus could not record this access request. Please try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/guest:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestBootstrapRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Guest access is disabled, or the browser origin is untrusted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: This browser already has a permanent account session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many guest session attempts. Please wait before trying again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Supabase persistence is required for guest authentication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Argus could not start a guest session. Please try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/guest/handoffs:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestHandoffCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestHandoffCreateResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/guest/handoffs/{handoff_id}/claim:
+    post:
+      tags:
+      - auth
+      parameters:
+      - name: handoff_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuestHandoffClaimResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/guest/link:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuestIdentityLinkRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/login:
     post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
       responses:
-        "200":
-          description: Session created.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/logout:
     post:
+      tags:
+      - auth
       responses:
-        "200":
-          description: Session cleared.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '403':
+          description: Untrusted browser origin rejected.
   /api/v1/auth/session:
     get:
+      tags:
+      - auth
       responses:
-        "200":
-          description: Current authentication state and user.
-  /api/v1/me:
-    get:
-      responses:
-        "200":
-          description: Current user profile and preferences.
-    patch:
-      responses:
-        "200":
-          description: Updated user profile and preferences.
-  /api/v1/conversations:
-    get:
-      responses:
-        "200":
-          description: Cursor-paginated conversations.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/signup:
     post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+        required: true
       responses:
-        "200":
-          description: Created conversation.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted all non-deleted conversations for the user.
-  /api/v1/conversations/{id}:
-    patch:
-      responses:
-        "200":
-          description: Updated conversation title, pin, or archive state.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted conversation.
-  /api/v1/conversations/{id}/messages:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/backtest-jobs/by-action/{confirmation_id}:
     get:
+      tags:
+      - backtests
+      parameters:
+      - name: confirmation_id
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
-          description: Cursor-paginated messages.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No owner-scoped reservation exists for this action identity.
+        '409':
+          description: The action identity is linked to different immutable inputs.
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+  /api/v1/backtest-jobs/{job_id}:
+    get:
+      tags:
+      - backtests
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/backtests/run:
+    post:
+      tags:
+      - backtests
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BacktestRunRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestRunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Missing required Idempotency-Key header.
+        '409':
+          description: The data window changed after approval and must be reviewed again.
+        '503':
+          description: 'Problem Details when bounded auth-session verification is temporarily
+            unavailable (`auth_session_verification_unavailable`) or market data is temporarily
+            unavailable (`market_data_unavailable`).
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/backtests/{run_id}:
+    get:
+      tags:
+      - backtests
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestRunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/chat/starter-prompts:
+    get:
+      tags:
+      - agent
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StarterPromptsResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/chat/stream:
     post:
+      tags:
+      - agent
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatStreamRequest'
       responses:
-        "200":
-          description: >
-            Server-sent token, status, title, result, and done events. Final
-            payloads and persisted assistant metadata may include typed
-            `recovery` and `clarification` objects so clients render localized
-            degraded-fallback UI from static i18n keys instead of assistant
-            prose.
+        '200':
+          description: 'Canonical data-only SSE stream: stage_start, token, stage_outcome,
+            final, then [DONE].'
           content:
             text/event-stream:
               schema:
                 type: string
-  /api/v1/strategies:
-    get:
-      responses:
-        "200":
-          description: Cursor-paginated strategies with strategy_surface_metrics.
-    post:
-      responses:
-        "200":
-          description: Created executable strategy.
-  /api/v1/strategies/{id}:
-    patch:
-      responses:
-        "200":
-          description: Updated strategy metadata or metric preferences.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted strategy.
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The selected response option is missing, mismatched, foreign to the
+            owner or conversation, or no longer attached to the latest active assistant message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: The chat request body exceeded the 65,536-byte ingress limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/collections:
     get:
-      responses:
-        "200":
-          description: Cursor-paginated collections.
-    post:
-      responses:
-        "200":
-          description: Created organizational collection.
-  /api/v1/collections/{id}:
-    patch:
-      responses:
-        "200":
-          description: Updated collection name or pin state.
-    delete:
-      responses:
-        "200":
-          description: Soft-deleted collection.
-  /api/v1/collections/{id}/strategies:
-    post:
-      responses:
-        "200":
-          description: Attached strategies to a collection.
-  /api/v1/collections/{id}/strategies/{strategy_id}:
-    delete:
-      responses:
-        "200":
-          description: Detached strategy from collection.
-  /api/v1/backtests/run:
-    post:
+      tags:
+      - collections
       parameters:
-        - name: Idempotency-Key
-          in: header
-          required: true
-          description: Stable client key for deduplicating direct backtest runs.
-          schema:
-            type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
       responses:
-        "200":
-          description: Completed Alpha backtest run.
-        "400":
-          description: Missing required Idempotency-Key header.
-        "422":
-          description: Problem Details for unsupported Alpha requests.
-  /api/v1/backtest-jobs/{id}:
-    get:
-      responses:
-        "200":
-          description: Durable async backtest job state, with linked run when available.
-        "404":
-          description: Job not found or inaccessible.
-  /api/v1/backtests/{id}:
-    get:
-      responses:
-        "200":
-          description: Backtest run detail including chart and trades.
-  /api/v1/history:
-    get:
-      responses:
-        "200":
-          description: Mixed recent activity feed.
-  /api/v1/search:
-    get:
-      responses:
-        "200":
-          description: Global keyword search across chats, strategies, collections, runs, and typed P1 recall objects.
-  /api/v1/evidence-artifacts/{id}/decision:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCollections'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
-      description: Create or update the one current decision for a user-owned evidence artifact.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      tags:
+      - collections
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DecisionNoteCreate"
+              $ref: '#/components/schemas/CollectionCreate'
       responses:
-        "200":
-          description: Canonical current decision note and updated evidence/idea lifecycle.
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DecisionNoteResponse"
-        "404":
-          description: Evidence artifact not found or inaccessible.
+                $ref: '#/components/schemas/CollectionResponse'
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-        "422":
-          description: Malformed decision payload or unsupported decision state.
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                type: https://api.argus.app/problems/validation-error
-                title: Validation Error
-                status: 422
-                detail: Request validation failed.
-                code: validation_error
-                request_id: req_123
-                context:
-                  errors: []
-        "500":
-          description: Decision capture failed after request validation.
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections/{collection_id}:
+    patch:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionPatch'
+      responses:
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
-              example:
-                type: https://api.argus.app/problems/decision-capture-failed
-                title: Decision Capture Failed
-                status: 500
-                detail: Argus could not safely record that decision. Please retry in a moment.
-                code: decision_capture_failed
-                request_id: req_123
+                $ref: '#/components/schemas/CollectionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections/{collection_id}/strategies:
+    post:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectionAttach'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/collections/{collection_id}/strategies/{strategy_id}:
+    delete:
+      tags:
+      - collections
+      parameters:
+      - name: collection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: strategy_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: archived
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      - name: deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedConversations'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - conversations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - conversations
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkConversationDeleteResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/guest/replace:
+    post:
+      tags:
+      - conversations
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}:
+    patch:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/activity:
+    get:
+      tags:
+      - conversation-activity
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationActivity'
+        '404':
+          description: The conversation was not found or visible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - conversation-activity
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/ConversationActivityMarkUnread'
+              - $ref: '#/components/schemas/ConversationActivityMarkRead'
+              discriminator:
+                propertyName: action
+                mapping:
+                  mark_unread: '#/components/schemas/ConversationActivityMarkUnread'
+                  mark_read: '#/components/schemas/ConversationActivityMarkRead'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationActivity'
+        '403':
+          description: A guest cannot manually mark a task unread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found or visible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The supplied terminal source is no longer eligible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/messages:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: anchor_message_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessages'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/run-dossiers:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRunDossiers'
+        '400':
+          description: The pagination cursor is invalid or stale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/discovery/assets:
+    get:
+      tags:
+      - discovery
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 80
+          default: ''
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 12
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/discovery/indicators:
+    get:
+      tags:
+      - discovery
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 80
+          default: ''
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 25
+          minimum: 1
+          default: 12
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/evidence-artifacts/{artifact_id}/decision:
+    post:
+      tags:
+      - evidence
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionNoteCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionNoteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/feedback:
     post:
+      tags:
+      - feedback
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/history:
+    get:
+      tags:
+      - history
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: archived
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedHistory'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me:
+    get:
+      tags:
+      - profile
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatch'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/usage:
+    get:
+      tags:
+      - profile
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAllowanceResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/search:
+    get:
+      tags:
+      - search
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 512
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: decision_state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+            type: string
+          - type: 'null'
+      - name: include_ledger_groups
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: conversation_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+              format: uuid
+            minItems: 1
+            maxItems: 50
+          - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSearch'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Search temporarily unavailable because exact bounded recall could not
+            be completed, or authentication-session verification is temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/strategies:
+    get:
+      tags:
+      - strategies
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStrategies'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - strategies
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - type
-                - message
-              properties:
-                type:
-                  type: string
-                  enum:
-                    - bug
-                    - feature
-                    - general
-                    - account_deletion_request
-                message:
-                  type: string
-                  minLength: 1
-                context:
-                  type: object
-                  additionalProperties: true
+              $ref: '#/components/schemas/StrategyCreate'
       responses:
-        "200":
-          description: Feedback accepted.
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/strategies/{strategy_id}:
+    patch:
+      tags:
+      - strategies
+      parameters:
+      - name: strategy_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategyPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - strategies
+      parameters:
+      - name: strategy_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
-    ChatClarification:
-      type: object
-      description: Typed degraded clarification or unsupported-recovery sidecar for chat final payloads and assistant metadata.
-      required:
-        - kind
-        - reason_code
-        - semantic_needs
-        - payload
-        - options
+    AccessApprovalResponse:
       properties:
-        kind:
-          enum: [clarification, unsupported_recovery]
-        reason_code:
-          type: string
-          examples: [missing_period, unsupported_strategy_logic]
-        requested_field:
-          type:
-            - string
-            - "null"
-        requested_fields:
-          type: array
-          items:
-            type: string
-        semantic_needs:
-          type: array
-          items:
-            type: string
-        payload:
-          type: object
-          additionalProperties: true
-          description: Typed strategy context and optional raw unsupported value.
-        options:
-          type: array
-          items:
-            $ref: "#/components/schemas/ChatClarificationOption"
-    ChatClarificationOption:
+        approved:
+          type: boolean
+          const: true
+          default: true
+      additionalProperties: false
       type: object
-      description: Button/action option identified by typed payload, not display text.
+    AccessRequestAccepted:
+      properties:
+        accepted:
+          type: boolean
+          const: true
+      additionalProperties: false
+      type: object
       required:
-        - id
-        - replacement_values
+      - accepted
+    AccessRequestCreate:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - language
+    AccountCapabilities:
+      properties:
+        can_create_additional_conversation:
+          type: boolean
+        can_manage_conversation:
+          type: boolean
+        can_save_decision:
+          type: boolean
+        can_manage_account:
+          type: boolean
+        can_use_omnisearch:
+          type: boolean
+        can_search_current_workspace:
+          type: boolean
+        can_use_grounded_discovery:
+          type: boolean
+        can_submit_feedback:
+          type: boolean
+      type: object
+      required:
+      - can_create_additional_conversation
+      - can_manage_conversation
+      - can_save_decision
+      - can_manage_account
+      - can_use_omnisearch
+      - can_search_current_workspace
+      - can_use_grounded_discovery
+      - can_submit_feedback
+    BacktestJob:
       properties:
         id:
           type: string
-          examples: [rsi_threshold, buy_and_hold, moving_average_crossover]
-        replacement_values:
-          type: object
-          additionalProperties: true
-    BacktestRun:
-      type: object
-      required:
-        - id
-        - status
-        - asset_class
-        - symbols
-        - benchmark_symbol
-        - metrics
-        - config_snapshot
-        - conversation_result_card
-      properties:
-        id:
-          type: string
-          format: uuid
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        request_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        confirmation_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
         status:
-          enum: [queued, running, completed, failed]
+          type: string
+          enum:
+          - queued
+          - running
+          - succeeded
+          - failed
+          - canceled
+          - expired
+        result_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        failure_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        failure_detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+        retryable:
+          type: boolean
+          default: false
+        queued_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - status
+    BacktestJobResponse:
+      properties:
+        job:
+          $ref: '#/components/schemas/BacktestJob'
+        run:
+          anyOf:
+          - $ref: '#/components/schemas/BacktestRun'
+          - type: 'null'
+        result_readout:
+          anyOf:
+          - type: string
+          - type: 'null'
+        result_readout_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+        result_readout_fallback_used:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        result_readout_failure_mode:
+          anyOf:
+          - type: string
+          - type: 'null'
+        next_experiments:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+      type: object
+      required:
+      - job
+    BacktestRun:
+      properties:
+        id:
+          type: string
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        strategy_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - completed
+          - failed
         asset_class:
-          enum: [equity, crypto]
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
         symbols:
-          type: array
-          maxItems: 5
           items:
             type: string
+          type: array
         allocation_method:
+          type: string
           const: equal_weight
         benchmark_symbol:
           type: string
-          description: Equity defaults to SPY; crypto defaults to BTC.
         metrics:
+          additionalProperties: true
           type: object
-          description: Canonical aggregate and by-symbol backtest metrics.
         config_snapshot:
+          additionalProperties: true
           type: object
-          description: Reproducible normalized runtime configuration.
         conversation_result_card:
+          additionalProperties: true
           type: object
-          description: Beginner-friendly inline chat result card. Completed chat runs may include P1 sidecar ids, decision state, and optional structured execution_costs evidence when the engine modeled fees/slippage.
-    ArtifactLifecycle:
-      type: string
-      enum: [captured, reviewed, saved, decided, archived, discarded]
-    DecisionState:
-      type: string
-      enum: [watching, promising, rejected, revisit_later]
-    EvidenceArtifact:
+        created_at:
+          type: string
+          format: date-time
+        chart:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        trades:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
       type: object
       required:
-        - id
-        - idea_id
-        - idea_version_id
-        - artifact_type
-        - lifecycle
-        - title
-        - digest
-        - payload
-        - created_at
-        - updated_at
+      - id
+      - status
+      - asset_class
+      - symbols
+      - allocation_method
+      - benchmark_symbol
+      - metrics
+      - config_snapshot
+      - conversation_result_card
+      - created_at
+    BacktestRunRequest:
+      properties:
+        strategy_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        template:
+          anyOf:
+          - type: string
+            enum:
+            - buy_and_hold
+            - buy_the_dip
+            - dca_accumulation
+            - moving_average_crossover
+            - rsi_mean_reversion
+          - type: 'null'
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+        symbols:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+        timeframe:
+          anyOf:
+          - type: string
+          - type: 'null'
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        side:
+          anyOf:
+          - type: string
+            enum:
+            - long
+            - short
+            - long_short
+            - market_neutral
+          - type: 'null'
+        starting_capital:
+          anyOf:
+          - type: number
+          - type: 'null'
+        allocation_method:
+          anyOf:
+          - type: string
+            const: equal_weight
+          - type: 'null'
+        parameters:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+    BacktestRunResponse:
+      properties:
+        run:
+          $ref: '#/components/schemas/BacktestRun'
+      type: object
+      required:
+      - run
+    BulkConversationDeleteResponse:
+      properties:
+        success:
+          type: boolean
+        deleted_count:
+          type: integer
+      type: object
+      required:
+      - success
+      - deleted_count
+    ChatActionPayload:
+      properties:
+        type:
+          type: string
+          enum:
+          - run_backtest
+          - change_dates
+          - change_asset
+          - adjust_assumptions
+          - cancel_confirmation
+          - show_breakdown
+          - refine_strategy
+          - save_strategy
+          - retry_failed_action
+          - select_response_option
+          - select_discovery_candidate
+          - retest_run
+        label:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+        labelKey:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+        payload:
+          additionalProperties: true
+          type: object
+        presentation:
+          anyOf:
+          - type: string
+            enum:
+            - confirmation
+            - result
+          - type: 'null'
+      type: object
+      required:
+      - type
+    ChatMentionPayload:
       properties:
         id:
           type: string
-          format: uuid
+          maxLength: 128
+        type:
+          type: string
+          enum:
+          - asset
+          - indicator
+        label:
+          type: string
+          maxLength: 120
+        symbol:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+        description:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+        insert_text:
+          type: string
+          maxLength: 64
+        provider:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+        support_status:
+          type: string
+          enum:
+          - supported
+          - draft_only
+          - unavailable
+          default: supported
+      type: object
+      required:
+      - id
+      - type
+      - label
+      - insert_text
+    ChatStreamRequest:
+      properties:
+        conversation_id:
+          type: string
+          maxLength: 128
+        message:
+          anyOf:
+          - type: string
+            maxLength: 16000
+          - type: 'null'
+        action:
+          anyOf:
+          - $ref: '#/components/schemas/ChatActionPayload'
+          - type: 'null'
+        mentions:
+          items:
+            $ref: '#/components/schemas/ChatMentionPayload'
+          type: array
+          maxItems: 10
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+      type: object
+      required:
+      - conversation_id
+    Collection:
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        name_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+        pinned:
+          type: boolean
+          default: false
+        strategy_count:
+          type: integer
+          default: 0
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - name
+      - name_source
+      - created_at
+      - updated_at
+    CollectionAttach:
+      properties:
+        strategy_ids:
+          items:
+            type: string
+          type: array
+      type: object
+      required:
+      - strategy_ids
+    CollectionCreate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+    CollectionPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        pinned:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      type: object
+    CollectionResponse:
+      properties:
+        collection:
+          $ref: '#/components/schemas/Collection'
+      type: object
+      required:
+      - collection
+    Conversation:
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        title_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+          default: system_default
+        pinned:
+          type: boolean
+          default: false
+        archived:
+          type: boolean
+          default: false
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_message_preview:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+        activity:
+          anyOf:
+          - $ref: '#/components/schemas/ConversationActivity'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - title
+      - created_at
+      - updated_at
+    ConversationActivity:
+      properties:
+        operation:
+          $ref: '#/components/schemas/ConversationOperation'
+        attention:
+          $ref: '#/components/schemas/ConversationAttention'
+      type: object
+      required:
+      - operation
+      - attention
+    ConversationActivityMarkRead:
+      properties:
+        action:
+          type: string
+          const: mark_read
+        through_attention_cursor:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - action
+    ConversationActivityMarkUnread:
+      properties:
+        action:
+          type: string
+          const: mark_unread
+      additionalProperties: false
+      type: object
+      required:
+      - action
+    ConversationAttention:
+      properties:
+        status:
+          type: string
+          enum:
+          - none
+          - new_activity
+          - manual_unread
+          - needs_input
+          - needs_attention
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - status
+    ConversationCreate:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+      type: object
+    ConversationOperation:
+      properties:
+        status:
+          type: string
+          enum:
+          - idle
+          - queued
+          - running
+          - checking
+        kind:
+          anyOf:
+          - type: string
+            enum:
+            - chat_turn
+            - backtest_job
+          - type: 'null'
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - status
+    ConversationPatch:
+      properties:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+        pinned:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+    ConversationResponse:
+      properties:
+        conversation:
+          $ref: '#/components/schemas/Conversation'
+      type: object
+      required:
+      - conversation
+    DecisionNote:
+      properties:
+        id:
+          type: string
         idea_id:
           type: string
-          format: uuid
         idea_version_id:
           type: string
-          format: uuid
+        evidence_artifact_id:
+          type: string
         source_conversation_id:
-          type:
-            - string
-            - "null"
-          format: uuid
+          anyOf:
+          - type: string
+          - type: 'null'
+        decision_state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - idea_id
+      - idea_version_id
+      - evidence_artifact_id
+      - decision_state
+      - created_at
+      - updated_at
+    DecisionNoteCreate:
+      properties:
+        decision_state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        note:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+      type: object
+      required:
+      - decision_state
+    DecisionNoteResponse:
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionNote'
+        evidence_artifact:
+          $ref: '#/components/schemas/EvidenceArtifact'
+      type: object
+      required:
+      - decision
+      - evidence_artifact
+    DiscoveryItem:
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+          - asset
+          - indicator
+        label:
+          type: string
+        symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+        insert_text:
+          type: string
+        provider:
+          type: string
+        support_status:
+          type: string
+          enum:
+          - supported
+          - draft_only
+          - unavailable
+          default: supported
+      type: object
+      required:
+      - id
+      - type
+      - label
+      - insert_text
+      - provider
+    DiscoveryResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DiscoveryItem'
+          type: array
+      type: object
+      required:
+      - items
+    Error:
+      type: object
+      description: RFC 9457 Problem Details with code and request_id.
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - code
+      - request_id
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        request_id:
+          type: string
+        context:
+          type: object
+    EvidenceArtifact:
+      properties:
+        id:
+          type: string
+        idea_id:
+          type: string
+        idea_version_id:
+          type: string
+        source_conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
         source_run_id:
-          type:
-            - string
-            - "null"
-          format: uuid
+          anyOf:
+          - type: string
+          - type: 'null'
         artifact_type:
+          type: string
           const: backtest
+          default: backtest
         lifecycle:
-          $ref: "#/components/schemas/ArtifactLifecycle"
+          type: string
+          enum:
+          - captured
+          - reviewed
+          - saved
+          - decided
+          - archived
+          - discarded
+          default: captured
         title:
           type: string
         digest:
           type: string
         payload:
-          type: object
           additionalProperties: true
+          type: object
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-    DecisionNote:
       type: object
       required:
-        - id
-        - idea_id
-        - idea_version_id
-        - evidence_artifact_id
-        - decision_state
-        - created_at
-        - updated_at
+      - id
+      - idea_id
+      - idea_version_id
+      - title
+      - digest
+      - payload
+      - created_at
+      - updated_at
+    FeedbackRequest:
       properties:
-        id:
+        type:
           type: string
-          format: uuid
-        idea_id:
+          enum:
+          - bug
+          - feature
+          - general
+          - account_deletion_request
+        message:
           type: string
-          format: uuid
-        idea_version_id:
-          type: string
-          format: uuid
-        evidence_artifact_id:
-          type: string
-          format: uuid
-        source_conversation_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        decision_state:
-          $ref: "#/components/schemas/DecisionState"
-        note:
-          type:
-            - string
-            - "null"
-        created_at:
+          maxLength: 5000
+          minLength: 1
+        context:
+          additionalProperties: true
+          type: object
+      type: object
+      required:
+      - type
+      - message
+    GuestAccountSummary:
+      properties:
+        expires_at:
           type: string
           format: date-time
-        updated_at:
+        conversation_limit:
+          type: integer
+          maximum: 2147483647.0
+          minimum: 1.0
+        message_limit:
+          type: integer
+          maximum: 2147483647.0
+          minimum: 1.0
+        simulation_limit:
+          type: integer
+          maximum: 2147483647.0
+          minimum: 1.0
+        feedback_limit:
+          type: integer
+          maximum: 2147483647.0
+          minimum: 1.0
+      type: object
+      required:
+      - expires_at
+      - conversation_limit
+      - message_limit
+      - simulation_limit
+      - feedback_limit
+    GuestBootstrapRequest:
+      properties:
+        captcha_token:
           type: string
-          format: date-time
-    DecisionNoteCreate:
-      type: object
-      required:
-        - decision_state
-      properties:
-        decision_state:
-          $ref: "#/components/schemas/DecisionState"
-        note:
-          type:
-            - string
-            - "null"
-          maxLength: 2000
-    DecisionNoteResponse:
-      type: object
-      required:
-        - decision
-        - evidence_artifact
-      properties:
-        decision:
-          $ref: "#/components/schemas/DecisionNote"
-        evidence_artifact:
-          $ref: "#/components/schemas/EvidenceArtifact"
-    BacktestJob:
-      type: object
-      required:
-        - id
-        - conversation_id
-        - status
-        - retryable
-      properties:
-        id:
+          maxLength: 4096
+          minLength: 1
+        language:
           type: string
-          format: uuid
+          enum:
+          - en
+          - es-419
+          default: en
+      type: object
+      required:
+      - captcha_token
+    GuestFunnelClientEventRequest:
+      properties:
+        event:
+          type: string
+          enum:
+          - starter_action_selected
+          - conversion_prompt_shown
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+        surface:
+          type: string
+          enum:
+          - starter_actions
+          - conversion_modal
+        strategy_category:
+          anyOf:
+          - type: string
+            enum:
+            - buy_and_hold
+            - dca_accumulation
+          - type: 'null'
+        conversion_reason:
+          anyOf:
+          - type: string
+            enum:
+            - second_simulation
+            - simulation_limit
+            - message_limit
+            - save_decision
+            - new_conversation
+            - keep_history
+            - discovery_searches
+          - type: 'null'
+        terminal_outcome:
+          type: string
+          enum:
+          - selected
+          - shown
+      additionalProperties: false
+      type: object
+      required:
+      - event
+      - language
+      - surface
+      - terminal_outcome
+    GuestHandoffClaimResponse:
+      properties:
         conversation_id:
           type: string
-          format: uuid
-        request_message_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        confirmation_message_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        status:
-          enum: [queued, running, succeeded, failed, canceled, expired]
-        result_run_id:
-          type:
-            - string
-            - "null"
-          format: uuid
-        failure_code:
-          type:
-            - string
-            - "null"
-        failure_detail:
-          type:
-            - string
-            - "null"
-        retryable:
-          type: boolean
-        queued_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-        started_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-        finished_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-        created_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-        updated_at:
-          type:
-            - string
-            - "null"
-          format: date-time
-    BacktestJobResponse:
+        pending_action:
+          anyOf:
+          - $ref: '#/components/schemas/GuestPendingAction'
+          - type: 'null'
       type: object
       required:
-        - job
-        - run
+      - conversation_id
+    GuestHandoffCreateRequest:
       properties:
-        job:
-          $ref: "#/components/schemas/BacktestJob"
-        run:
-          oneOf:
-            - $ref: "#/components/schemas/BacktestRun"
-            - type: "null"
-        result_readout:
-          description: Backend-generated Quick take markdown for completed workflow jobs.
-          type:
-            - string
-            - "null"
-        result_readout_source:
-          description: Provenance for the backend-generated Quick take markdown.
-          type:
-            - string
-            - "null"
-        result_readout_fallback_used:
-          description: Whether the deterministic fallback renderer produced the readout.
-          type:
-            - boolean
-            - "null"
-        result_readout_failure_mode:
-          description: Optional reason the normal result readout path could not complete.
-          type:
-            - string
-            - "null"
-    Collection:
+        destination_email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        source_conversation_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+        pending_action:
+          anyOf:
+          - $ref: '#/components/schemas/GuestPendingAction'
+          - type: 'null'
+      additionalProperties: false
       type: object
-      description: Lightweight organizational grouping of strategies.
+      required:
+      - destination_email
+      - source_conversation_id
+    GuestHandoffCreateResponse:
+      properties:
+        handoff_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - handoff_id
+      - expires_at
+    GuestIdentityLinkRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        password:
+          type: string
+          maxLength: 128
+          minLength: 8
+        refresh_token:
+          anyOf:
+          - type: string
+            maxLength: 4096
+            minLength: 1
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+    GuestPendingAction:
+      properties:
+        reason:
+          type: string
+          enum:
+          - second_simulation
+          - simulation_limit
+          - message_limit
+          - save_decision
+          - new_conversation
+          - keep_history
+          - discovery_searches
+        conversation_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+        action_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+        artifact_id:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      - conversation_id
+      - action_id
+    GuestUser:
+      properties:
+        id:
+          type: string
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        locale:
+          type: string
+          enum:
+          - en-US
+          - es-419
+          default: en-US
+        theme:
+          type: string
+          enum:
+          - dark
+          - light
+          - system
+          default: dark
+        is_admin:
+          type: boolean
+          default: false
+        onboarding:
+          $ref: '#/components/schemas/OnboardingState'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - email
+      - created_at
+      - updated_at
+      description: Guest-safe profile projection without registered-only preferences.
+    HistoryItem:
+      $ref: '#/components/schemas/HistoryItemWire'
+    HistoryItemWire:
+      properties:
+        type:
+          type: string
+          enum:
+          - chat
+          - strategy
+          - collection
+          - run
+        id:
+          type: string
+        title:
+          type: string
+        title_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+        subtitle:
+          type: string
+        pinned:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        activity:
+          $ref: '#/components/schemas/ConversationActivity'
+      type: object
+      required:
+      - type
+      - id
+      - title
+      - subtitle
+      - pinned
+      - created_at
+      - conversation_id
+      - expires_at
+    LoginRequest:
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
+      type: object
+      required:
+      - email
+      - password
+      - captcha_token
+    Message:
+      properties:
+        id:
+          type: string
+        conversation_id:
+          type: string
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+          - system
+          - tool
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - conversation_id
+      - role
+      - content
+      - created_at
+    OnboardingState:
+      properties:
+        completed:
+          type: boolean
+          default: false
+        stage:
+          type: string
+          enum:
+          - language_selection
+          - primary_goal_selection
+          - ready
+          - completed
+          default: language_selection
+        language_confirmed:
+          type: boolean
+          default: false
+        primary_goal:
+          anyOf:
+          - type: string
+            enum:
+            - learn_basics
+            - build_passive_strategy
+            - test_stock_idea
+            - explore_crypto
+            - surprise_me
+          - type: 'null'
+      type: object
+      description: 'Legacy/inert compatibility state; no product behavior reads or writes
+        it.
+
+
+        The explicit onboarding flow is removed. The field survives only because
+
+        old profile rows carry it and deployed clients may still read the `/me`
+
+        shape during a rollout.'
+    PaginatedCollections:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Collection'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+    PaginatedConversations:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Conversation'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+    PaginatedHistory:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/HistoryItem'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+    PaginatedMessages:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Message'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+    PaginatedRunDossiers:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/RunDossier'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        total_runs:
+          type: integer
+          minimum: 0.0
+        decided_runs:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - items
+      - total_runs
+      - decided_runs
+    PaginatedSearch:
+      properties:
+        items:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/SearchItem'
+            - $ref: '#/components/schemas/SearchAssetRollup'
+            discriminator:
+              propertyName: type
+              mapping:
+                asset_rollup: '#/components/schemas/SearchAssetRollup'
+                conversation: '#/components/schemas/SearchItem'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        ledger_groups:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/SearchLedgerGroup'
+            type: array
+          - type: 'null'
+      type: object
+      required:
+      - items
+    PaginatedStrategies:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Strategy'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+    ProfilePatch:
+      properties:
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+        locale:
+          anyOf:
+          - type: string
+            enum:
+            - en-US
+            - es-419
+          - type: 'null'
+        theme:
+          anyOf:
+          - type: string
+            enum:
+            - dark
+            - light
+            - system
+          - type: 'null'
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
+      type: object
+    RunDossier:
+      properties:
+        run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        result_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        tested:
+          $ref: '#/components/schemas/RunDossierTested'
+        outcome:
+          $ref: '#/components/schemas/SearchDossierOutcome'
+        decision:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierDecision'
+          - type: 'null'
+        actions:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/SearchRetestAction'
+            - $ref: '#/components/schemas/SearchDecisionAction'
+            discriminator:
+              propertyName: type
+              mapping:
+                decision: '#/components/schemas/SearchDecisionAction'
+                retest_run: '#/components/schemas/SearchRetestAction'
+          type: array
+          maxItems: 2
+      type: object
+      required:
+      - run_id
+      - run_label
+      - completed_at
+      - tested
+      - outcome
+    RunDossierTested:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        strategy_family:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        timeframe:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+      type: object
+    SearchAssetDecisionCounts:
+      properties:
+        promising:
+          type: integer
+          minimum: 0.0
+        watching:
+          type: integer
+          minimum: 0.0
+        rejected:
+          type: integer
+          minimum: 0.0
+        revisit_later:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - promising
+      - watching
+      - rejected
+      - revisit_later
+    SearchAssetRollup:
+      properties:
+        type:
+          type: string
+          const: asset_rollup
+          default: asset_rollup
+        symbol:
+          type: string
+          maxLength: 24
+          minLength: 1
+        run_count:
+          type: integer
+          minimum: 1.0
+        decision_counts:
+          $ref: '#/components/schemas/SearchAssetDecisionCounts'
+        last_touched_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - symbol
+      - run_count
+      - decision_counts
+      - last_touched_at
+    SearchDecisionAction:
+      properties:
+        type:
+          type: string
+          const: decision
+          default: decision
+        availability:
+          type: string
+          enum:
+          - available
+          - account_conversion_required
+        evidence_artifact_id:
+          type: string
+        decision_state:
+          anyOf:
+          - type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          - type: 'null'
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+        run_label:
+          type: string
+          maxLength: 160
+      type: object
+      required:
+      - availability
+      - evidence_artifact_id
+      - run_label
+    SearchDossierDecision:
+      properties:
+        state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+        run_label:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+      type: object
+      required:
+      - state
+    SearchDossierMetric:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        value:
+          anyOf:
+          - type: string
+          - type: integer
+          - type: number
+      type: object
+      required:
+      - name
+      - value
+    SearchDossierOutcome:
+      properties:
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        benchmark_symbol:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        quick_take:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        metrics:
+          items:
+            $ref: '#/components/schemas/SearchDossierMetric'
+          type: array
+          maxItems: 4
+      type: object
+      required:
+      - run_label
+      - completed_at
+    SearchItem:
+      properties:
+        type:
+          type: string
+          const: conversation
+        id:
+          type: string
+        title:
+          type: string
+        archived:
+          type: boolean
+        matched_text:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        conversation_id:
+          type: string
+        match:
+          $ref: '#/components/schemas/SearchMatch'
+        dossier:
+          anyOf:
+          - $ref: '#/components/schemas/RunDossier'
+          - type: 'null'
+        total_runs:
+          type: integer
+          minimum: 0.0
+        decided_runs:
+          type: integer
+          minimum: 0.0
+        decision_states:
+          items:
+            type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          type: array
+          default: []
+      type: object
+      required:
+      - type
+      - id
+      - title
+      - archived
+      - matched_text
+      - updated_at
+      - conversation_id
+      - match
+      - dossier
+      - total_runs
+      - decided_runs
+    SearchLedgerGroup:
+      properties:
+        decision_state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        count:
+          type: integer
+      type: object
+      required:
+      - decision_state
+      - count
+    SearchMatch:
+      properties:
+        layer:
+          type: string
+          enum:
+          - conversation
+          - message
+          - run
+          - idea
+          - evidence
+          - decision
+        fragment:
+          type: string
+          maxLength: 500
+        count:
+          type: integer
+          minimum: 1.0
+        message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - layer
+      - fragment
+      - count
+    SearchRetestAction:
+      properties:
+        type:
+          type: string
+          const: retest_run
+          default: retest_run
+        source_run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        window_policy:
+          type: string
+          const: same_duration_ending_today
+          default: same_duration_ending_today
+        contract_version:
+          type: string
+          const: argus_retest_run/v1
+          default: argus_retest_run/v1
+      type: object
+      required:
+      - source_run_id
+      - run_label
+      description: 'Bounded typed retest envelope (spec 2.2).
+
+
+        Carries identity and policy only. The executable setup is reloaded
+
+        server-side from the owner-scoped source run, so no client value can
+
+        reach canonical state.'
+    SignupRequest:
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - email
+      - password
+      - captcha_token
+    StarterPromptsResponse:
+      properties:
+        prompts:
+          items:
+            type: string
+          type: array
+      type: object
+      required:
+      - prompts
     Strategy:
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        name_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+        template:
+          type: string
+          enum:
+          - buy_and_hold
+          - buy_the_dip
+          - dca_accumulation
+          - moving_average_crossover
+          - rsi_mean_reversion
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+        symbols:
+          items:
+            type: string
+          type: array
+        parameters:
+          additionalProperties: true
+          type: object
+        metrics_preferences:
+          items:
+            type: string
+          type: array
+        benchmark_symbol:
+          type: string
+        pinned:
+          type: boolean
+          default: false
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        strategy_surface_metrics:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
       type: object
-      description: Saved executable idea backed by a supported Alpha template.
-    Error:
+      required:
+      - id
+      - name
+      - name_source
+      - template
+      - asset_class
+      - symbols
+      - parameters
+      - metrics_preferences
+      - benchmark_symbol
+      - created_at
+      - updated_at
+    StrategyCreate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        template:
+          type: string
+          enum:
+          - buy_and_hold
+          - buy_the_dip
+          - dca_accumulation
+          - moving_average_crossover
+          - rsi_mean_reversion
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+        parameters:
+          additionalProperties: true
+          type: object
+        metrics_preferences:
+          items:
+            type: string
+          type: array
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
       type: object
-      description: RFC 9457 Problem Details with code and request_id.
+      required:
+      - template
+      - asset_class
+      - symbols
+    StrategyPatch:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        pinned:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        metrics_preferences:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+        parameters:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        deleted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+    StrategyResponse:
+      properties:
+        strategy:
+          $ref: '#/components/schemas/Strategy'
+      type: object
+      required:
+      - strategy
+    SuccessResponse:
+      properties:
+        success:
+          type: boolean
+      type: object
+      required:
+      - success
+    UsageAllowance:
+      properties:
+        hour:
+          anyOf:
+          - $ref: '#/components/schemas/UsageWindow'
+          - type: 'null'
+        day:
+          anyOf:
+          - $ref: '#/components/schemas/UsageWindow'
+          - type: 'null'
+        guest_session:
+          anyOf:
+          - $ref: '#/components/schemas/UsageWindow'
+          - type: 'null'
+        available_now:
+          type: boolean
+        limiting_window:
+          type: string
+          enum:
+          - hour
+          - day
+          - guest_session
+      type: object
+      required:
+      - hour
+      - day
+      - guest_session
+      - available_now
+      - limiting_window
+      description: Backend-derived allowance truth for the account's active windows.
+    UsageAllowanceResponse:
+      properties:
+        allowances:
+          $ref: '#/components/schemas/UsageAllowances'
+      type: object
+      required:
+      - allowances
+    UsageAllowances:
+      properties:
+        messages:
+          $ref: '#/components/schemas/UsageAllowance'
+        backtests:
+          $ref: '#/components/schemas/UsageAllowance'
+      type: object
+      required:
+      - messages
+      - backtests
+    UsageWindow:
+      properties:
+        limit:
+          type: integer
+          minimum: 0.0
+        used:
+          type: integer
+          minimum: 0.0
+        remaining:
+          type: integer
+          minimum: 0.0
+        period_end:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - limit
+      - used
+      - remaining
+      - period_end
+    User:
+      properties:
+        id:
+          type: string
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        locale:
+          type: string
+          enum:
+          - en-US
+          - es-419
+          default: en-US
+        theme:
+          type: string
+          enum:
+          - dark
+          - light
+          - system
+          default: dark
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
+        is_admin:
+          type: boolean
+          default: false
+        onboarding:
+          $ref: '#/components/schemas/OnboardingState'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - email
+      - created_at
+      - updated_at
+    UserResponse:
+      properties:
+        user:
+          anyOf:
+          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/GuestUser'
+        account_kind:
+          type: string
+          enum:
+          - guest
+          - registered
+        guest:
+          anyOf:
+          - $ref: '#/components/schemas/GuestAccountSummary'
+          - type: 'null'
+        capabilities:
+          $ref: '#/components/schemas/AccountCapabilities'
+        public_account_access_enabled:
+          type: boolean
+          description: Server-authoritative permission to expose ordinary account creation.
+      type: object
+      required:
+      - user
+      - account_kind
+      - guest
+      - capabilities
+      - public_account_access_enabled
+  responses:
+    AuthSessionVerificationUnavailable:
+      description: Bounded Supabase session verification is temporarily unavailable; retry
+        without redirecting to login.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            type: https://api.argus.app/problems/auth-session-verification-unavailable
+            status: 503
+            detail: Argus could not verify this session. Please try again.
+            code: auth_session_verification_unavailable
+            request_id: req_123
 tags:
-  - name: backtest_runs
-    description: Immutable Alpha simulation results.
+- name: backtest_runs
+  description: Immutable Alpha simulation results.

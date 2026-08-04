@@ -12,6 +12,7 @@ export type ConfirmationActionEffect = {
   confirmationId?: string;
   status?: StrategyConfirmationStatus;
   statusLabel: string;
+  settlesRejectedStaleAction?: boolean;
 };
 
 export type ConsumedResultAction = {
@@ -43,6 +44,7 @@ const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "not_completed",
   "run_complete",
 ]);
+const STALE_CONFIRMATION_RECOVERY_CODE = "confirmation_action_stale_card";
 
 export function confirmationActionStatusLabel(
   actionOrType: ChatActionOption | NonNullable<ChatActionOption["type"]> | undefined,
@@ -54,6 +56,8 @@ function completedRunConfirmationStatus(
   message: Message,
   index: number,
   lastResultIndex: number,
+  latestConfirmationArtifactIndex: number,
+  owningActiveJobStatus: StrategyConfirmationStatus | null,
 ): StrategyConfirmationStatus {
   const status = message.confirmation
     ? confirmationStatusFromPayload(message.confirmation)
@@ -66,13 +70,18 @@ function completedRunConfirmationStatus(
   ) {
     return "run_complete";
   }
+  if (owningActiveJobStatus) {
+    return owningActiveJobStatus;
+  }
+  if (
+    index < latestConfirmationArtifactIndex &&
+    message.confirmation?.confirmation_state === "superseded" &&
+    status &&
+    IN_PROGRESS_RUN_STATUSES.has(status)
+  ) {
+    return "updated";
+  }
   return status ?? (index < lastResultIndex ? "run_complete" : "updated");
-}
-
-function completedRunConfirmationStatusLabel(message: Message, index: number, lastResultIndex: number) {
-  return confirmationStatusLabel(
-    completedRunConfirmationStatus(message, index, lastResultIndex),
-  );
 }
 
 export function confirmationActionEffectFromAction(
@@ -94,15 +103,30 @@ export function confirmationActionEffectsFromApi(items: ApiMessage[]) {
   const hiddenMessageIds = new Set<string>();
   for (const item of items) {
     const metadata = item.metadata ?? {};
-    if (metadata.recovery_reason) {
-      continue;
-    }
     const action = chatActionFromMetadata(metadata);
     const effect = confirmationActionEffectFromAction(action);
     if (!effect) {
       continue;
     }
-    effects.push(effect);
+    const staleRecoveryEffect =
+      item.role === "assistant" &&
+      recoveryCodeFromMetadata(metadata) === STALE_CONFIRMATION_RECOVERY_CODE
+        ? rejectedStaleActionEffect(effect)
+        : null;
+    if (metadata.recovery_reason && !staleRecoveryEffect) {
+      continue;
+    }
+    const failedAction = recordOrNull(metadata.failed_action);
+    const authoritativeEffect =
+      staleRecoveryEffect ??
+      (item.role === "assistant" && failedAction?.action_type === action?.type
+        ? {
+            ...effect,
+            status: "could_not_run" as const,
+            statusLabel: confirmationStatusLabel("could_not_run"),
+          }
+        : effect);
+    effects.push(authoritativeEffect);
     if (effect.type === "cancel_confirmation") {
       hiddenMessageIds.add(item.id);
     }
@@ -224,14 +248,23 @@ export function applyConfirmationActionEffects(
       return message;
     }
     const confirmationId = message.confirmation.confirmation_id;
+    const effect = strongestEffectForConfirmation(confirmationId, effects);
+    if (!effect) {
+      return message;
+    }
     if (
-      message.confirmation.confirmation_state &&
-      message.confirmation.confirmation_state !== "active"
+      effect.settlesRejectedStaleAction &&
+      (!confirmationId ||
+        !effect.confirmationId ||
+        confirmationId !== effect.confirmationId)
     ) {
       return message;
     }
-    const effect = strongestEffectForConfirmation(confirmationId, effects);
-    if (!effect) {
+    if (
+      message.confirmation.confirmation_state &&
+      message.confirmation.confirmation_state !== "active" &&
+      !effect.settlesRejectedStaleAction
+    ) {
       return message;
     }
     return closeConfirmationForAction(message, effect);
@@ -293,6 +326,21 @@ export function consumeResultActionOnMessages(
 }
 
 export function normalizeConfirmationHistory(messages: Message[]): Message[] {
+  const activeJobConfirmationMessageIds = new Set<string>();
+  for (const message of messages) {
+    const job = message.backtestJob;
+    if (
+      message.kind !== "backtest_job" ||
+      !job ||
+      (job.status !== "queued" && job.status !== "running")
+    ) {
+      continue;
+    }
+    const confirmationMessageId = job.confirmation_message_id?.trim();
+    if (confirmationMessageId) {
+      activeJobConfirmationMessageIds.add(confirmationMessageId);
+    }
+  }
   const lastResultIndex = messages.reduce(
     (latest, message, index) =>
       message.kind === "strategy_result" ? index : latest,
@@ -307,12 +355,29 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
         : latest,
     -1,
   );
+  const latestConfirmationArtifactIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_confirmation" && index > lastResultIndex
+        ? index
+        : latest,
+    -1,
+  );
   return messages.map((message, index) => {
     if (message.kind !== "strategy_confirmation" || !message.confirmation) {
       return message;
     }
+    const owningActiveJobStatus = activeJobConfirmationStatus(
+      message,
+      activeJobConfirmationMessageIds,
+    );
     if (isTerminalConfirmation(message)) {
-      const status = completedRunConfirmationStatus(message, index, lastResultIndex);
+      const status = completedRunConfirmationStatus(
+        message,
+        index,
+        lastResultIndex,
+        latestConfirmationArtifactIndex,
+        owningActiveJobStatus,
+      );
       return {
         ...message,
         confirmation: {
@@ -340,9 +405,31 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
     }
     return supersedePriorConfirmations(
       message,
-      index < lastResultIndex ? "run_complete" : "updated",
+      index < lastResultIndex
+        ? "run_complete"
+        : owningActiveJobStatus ?? "updated",
     );
   });
+}
+
+function activeJobConfirmationStatus(
+  message: Message,
+  activeJobConfirmationMessageIds: Set<string>,
+): StrategyConfirmationStatus | null {
+  if (
+    !message.confirmation ||
+    !activeJobConfirmationMessageIds.has(message.id)
+  ) {
+    return null;
+  }
+  const status = confirmationStatusFromPayload(message.confirmation);
+  if (IN_PROGRESS_RUN_STATUSES.has(status)) {
+    return status;
+  }
+  if (status === "ready_to_run" || status === "updated") {
+    return "request_sent";
+  }
+  return null;
 }
 
 export function supersedePriorConfirmations(
@@ -388,13 +475,26 @@ export function settleOpenConfirmationsAfterTextFinal(
     action,
     finalActions = [],
     hasFailedAction = false,
+    recoveryCode,
   }: {
     action?: ChatActionOption;
     finalActions?: ChatActionOption[];
     hasFailedAction?: boolean;
     stageOutcome?: unknown;
+    recoveryCode?: string | null;
   },
 ): Message[] {
+  if (recoveryCode === STALE_CONFIRMATION_RECOVERY_CODE) {
+    const effect = confirmationActionEffectFromAction(action);
+    if (!effect) {
+      return messages;
+    }
+    return normalizeConfirmationHistory(
+      applyConfirmationActionEffects(messages, [
+        rejectedStaleActionEffect(effect),
+      ]),
+    );
+  }
   const hasConfirmationAction = Boolean(confirmationActionEffectFromAction(action));
   const hasFailedActionFinal =
     hasFailedAction || finalActions.some(isFailedActionRetry);
@@ -422,9 +522,23 @@ export function settleOpenConfirmationsAfterStreamError(
 export function settleConfirmationAfterActionTransportError(
   messages: Message[],
   action: ChatActionOption | undefined,
+  options: {
+    durableStateUnknown?: boolean;
+    rejectionCode?: string | null;
+  } = {},
 ): Message[] {
   const effect = confirmationActionEffectFromAction(action);
   if (!effect) {
+    return messages;
+  }
+  if (isStaleConfirmationActionRejectionCode(options.rejectionCode)) {
+    return normalizeConfirmationHistory(
+      applyConfirmationActionEffects(messages, [
+        rejectedStaleActionEffect(effect),
+      ]),
+    );
+  }
+  if (effect.type === "run_backtest" && options.durableStateUnknown) {
     return messages;
   }
   const failedEffect: ConfirmationActionEffect = {
@@ -528,6 +642,29 @@ function confirmationTextFinalStatus(
     return "could_not_run";
   }
   return confirmationActionStatus(action);
+}
+
+function rejectedStaleActionEffect(
+  effect: ConfirmationActionEffect,
+): ConfirmationActionEffect {
+  return {
+    ...effect,
+    status: "updated",
+    statusLabel: confirmationStatusLabel("updated"),
+    settlesRejectedStaleAction: true,
+  };
+}
+
+export function isStaleConfirmationActionRejectionCode(
+  value: unknown,
+): value is typeof STALE_CONFIRMATION_RECOVERY_CODE {
+  return value === STALE_CONFIRMATION_RECOVERY_CODE;
+}
+
+function recoveryCodeFromMetadata(
+  metadata: Record<string, unknown>,
+): string | null {
+  return stringOrNull(recordOrNull(metadata.recovery)?.code);
 }
 
 function isFailedActionRetry(action: ChatActionOption | undefined) {

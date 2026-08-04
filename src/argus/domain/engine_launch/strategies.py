@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from argus.domain.backtesting.config import normalize_timeframe
 from argus.domain.backtesting.rules import (
     required_warmup_bars,
     rule_spec_from_moving_average_crossover_rules,
@@ -30,6 +31,8 @@ def normalize_template_name(request: LaunchBacktestRequest) -> str:
 
 
 def validate_launch_supported(request: LaunchBacktestRequest) -> None:
+    normalize_timeframe(request.timeframe)
+
     if request.risk_rules:
         raise ValueError("unsupported_risk_rules")
 
@@ -177,4 +180,3 @@ def _indicator_threshold_parameters(
         },
     }
     return parameters
-

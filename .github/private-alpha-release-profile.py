@@ -119,12 +119,41 @@ def validate_profile(profile: dict[str, Any]) -> None:
         raise ProfileValidationError("canary language and locale must be es-419")
     if not isinstance(canary.get("prompt"), str) or not canary["prompt"].strip():
         raise ProfileValidationError("canary.prompt must be a non-empty string")
-    if canary.get("decision_state") not in {"watching", "promising", "rejected", "revisit_later"}:
+    if (
+        not isinstance(canary.get("decision_note"), str)
+        or not canary["decision_note"].strip()
+    ):
+        raise ProfileValidationError("canary.decision_note must be a non-empty string")
+    if (
+        not isinstance(canary.get("search_query"), str)
+        or not canary["search_query"].strip()
+    ):
+        raise ProfileValidationError("canary.search_query must be a non-empty string")
+    if canary.get("decision_state") not in {
+        "watching",
+        "promising",
+        "rejected",
+        "revisit_later",
+    }:
         raise ProfileValidationError("canary decision_state is invalid")
-    required_steps = _require_strings(canary.get("required_steps"), "canary.required_steps")
-    for required_step in ("finalized_identity", "decision_note", "reload_hydration", "omnisearch_source_identity"):
+    required_steps = _require_strings(
+        canary.get("required_steps"), "canary.required_steps"
+    )
+    for required_step in (
+        "browser_owned_golden_path",
+        "single_run_admission",
+        "finalized_identity",
+        "decision_note",
+        "reload_hydration",
+        "omnisearch_source_identity",
+        "private_identity_handoff",
+        "deterministic_intercepted_recovery",
+        "clean_browser_console",
+    ):
         if required_step not in required_steps:
-            raise ProfileValidationError(f"canary.required_steps must include {required_step}")
+            raise ProfileValidationError(
+                f"canary.required_steps must include {required_step}"
+            )
 
 
 def _walk_keys(value: object) -> list[str]:
@@ -218,7 +247,15 @@ def main() -> int:
     static_parser.add_argument("language")
     canary_parser = subparsers.add_parser("canary-value")
     canary_parser.add_argument(
-        "field", choices=("language", "locale", "prompt", "decision_state")
+        "field",
+        choices=(
+            "language",
+            "locale",
+            "prompt",
+            "decision_state",
+            "decision_note",
+            "search_query",
+        ),
     )
     args = parser.parse_args()
 

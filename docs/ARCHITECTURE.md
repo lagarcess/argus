@@ -90,16 +90,18 @@ Contains:
 Mixed chronological feed of:
 
 - chats
-- strategies
-- collections
+- completed backtests
+- durable idea/evidence activity
 
 ### Strategies
 
-Saved executable ideas with at-a-glance metrics.
+Flagged saved-executable-idea surface. Hidden under private-alpha defaults;
+durable idea/evidence recall currently lives in Omnisearch.
 
 ### Collections
 
-Grouped strategies by user theme/topic.
+Flagged organizational model. Hidden and indefinitely deferred from the
+private-alpha UI.
 
 ### Settings
 
@@ -266,9 +268,10 @@ Canonical state store.
 - Users
 - Profiles
 - Preferences
-- Onboarding state
+- Legacy onboarding state (inert compatibility JSON on old profile rows)
 - Conversations
 - Messages
+- Durable chat-turn lifecycle records
 - Strategies
 - Collections
 - Backtest jobs
@@ -338,7 +341,6 @@ byte-identical, so evidence artifacts stay reproducible across the flag boundary
 **Use for:**
 
 - Chat intelligence
-- Onboarding guidance
 - Strategy extraction
 - Explanations
 
@@ -500,6 +502,43 @@ is proven by the eval harness, not hardcoded. See `docs/CONVERSATIONAL_RUNTIME.m
 
 Derived state (missing fields, pending needs, field provenance) is computed fresh each turn from `pending_strategy_summary`. It is never persisted.
 
+### Durable Chat-Turn Lifecycle Ownership
+
+Supabase owns the current durable lifecycle of every accepted non-backtest chat
+turn; LangGraph continues to own semantic runtime state through the checkpointer.
+The lifecycle record answers whether accepted work is still running or reached
+a durable terminal outcome. Chat turns admitted under `chat.run_backtest` use
+the durable `backtest_jobs` lifecycle instead, so the two records do not compete
+to own one execution. The chat-turn lifecycle does not store conversation
+meaning, route the graph, queue work, or replace messages.
+
+The chat request boundary durably creates `accepted` with the user message. The
+runtime worker moves it to `running`. Terminal assistant persistence owns
+`completed`, while the existing terminal-runtime-failure guard owns
+`recoverable_failed`. A server-side reconciler, invoked on the next chat POST
+and conversation-message read, owns stale `abandoned` or `reconciled` outcomes.
+SSE delivery and the frontend never own these transitions: a lost response is
+transport ambiguity until durable state proves otherwise. Exact transition and
+read semantics live in `docs/API_CONTRACT.md` under
+`contract-chat-turn-lifecycle`; the current-state persistence shape lives in
+`docs/DATA_MODEL.md` section 8.1.
+
+### Conversation Activity and Read Projection
+
+The API combines `chat_turn_lifecycles`, conversation-scoped `backtest_jobs`,
+fully finalized Run/evidence truth, and `conversation_read_states` into one
+activity projection. Operation state and attention state are independent: a
+task can be working while an older completion is still unseen. The frontend
+renders this typed projection; it does not scan prose or infer completion from
+transport events.
+
+Conversation and History pages project activity only after pagination, in one
+owner-scoped batch of at most 100 task ids. Reads may reconcile at most 20 stale
+turns using the existing lifecycle evidence predicate, but never advance read
+state. Mark-read mutations lock and revalidate the referenced terminal source
+before advancing the monotonic boundary. Activity reads and mutations do not
+change `conversations.updated_at`, previews, ordering, or list cursors.
+
 ### Conversation Artifact Continuity
 
 Conversation text is input, not state truth. Once a confirmation card, result
@@ -597,6 +636,12 @@ Long-only runs must ignore exit signals while flat and duplicate full-position
 entries while already long. Chart markers, trade counts, win-rate inputs, and
 user-facing trade explanations consume fills, not raw triggers.
 
+For the current Alpha architecture, `domain/engine_launch` is the sufficient
+engine adapter boundary. Product surfaces consume canonical run and evidence
+contracts rather than engine-native output. Do not add a formal multi-engine
+plugin interface until a second validated engine or workflow creates a concrete
+need; that abstraction belongs to the later engine-leverage experiment.
+
 # 14. Search Architecture
 
 ## Surface Search
@@ -624,7 +669,18 @@ Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency 
 Semantic retrieval (Vector embeddings) is deferred from Alpha.
 - Use SQL/Text search first.
 - Re-evaluate semantic search for Beta.
-- Do not add pgvector or embedding tables for the launch chat/backtest branch. Structured Supabase state, run metadata, and saved strategies are sufficient until Argus needs semantic recall across large histories.
+- Do not add pgvector or embedding tables for the launch chat/backtest branch.
+  Structured Supabase product records and run metadata are sufficient until
+  Argus needs semantic recall across large histories.
+
+## Structured Recall Versus Personalization Memory
+
+P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
+`EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
+That structured recall is not personalization memory. A future `MemoryRecord`
+or equivalent cross-conversation preference layer remains post-PMF and requires
+earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?"
+controls before activation.
 
 # 15. Deletion / Archival Model
 
@@ -703,6 +759,46 @@ The release manifest records the profile hash, environment fingerprints,
 deployed service SHAs, and full real-user Spanish signup-to-evidence-to-decision-
 to-recall canary evidence for that same candidate.
 
+## Guest Identity and Policy Boundary
+
+Supabase Auth owns both permanent and anonymous identities. Anonymous users
+receive the ordinary `authenticated` Postgres role; verified Auth truth
+(`is_anonymous`) plus an active `guest_workspaces` row determines guest status.
+Editable profile metadata, browser state, and the frontend flag never determine
+authorization.
+
+One request-scoped typed account context is the server policy owner for guest
+capabilities, fixed expiry, and lifetime allowances. The existing conversation,
+LangGraph, message settlement, and backtest-admission paths remain the only
+runtime and accounting owners.
+
+Two server flags own separate policy boundaries:
+
+- `ARGUS_GUEST_ACCESS_ENABLED` defaults on; explicit `false` is the emergency
+  bootstrap kill switch.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` defaults off and separately controls
+  ordinary permanent-account access.
+
+`NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also defaults on and selects presentation
+only; explicit `false` restores the preserved auth-first landing. An explicit
+client/server disagreement fails closed. With public permanent accounts
+disabled, the current private-alpha allowlist continues to own signup/login and
+role elevation.
+Turning the server guest flag off stops bootstrap only: active verified guests
+drain through their fixed expiry or conversion instead of being abruptly
+deauthorized.
+
+Cleanup is a bounded privileged database operation. It locks the Auth identity
+and workspace, removes an eligible conversation graph, guest feedback text,
+and matching LangGraph checkpoint thread, then deletes the anonymous Auth row
+inside that same transaction. Claimed source identities receive a
+reconciliation grace and are deleted only after the transferred graph has zero
+remaining source owners. This closes the cross-system check/delete race and
+cannot delete a converted or permanent account.
+Append-only cost and route/security evidence may remain only with privacy-safe
+nullable attribution. No hosted Supabase setting is changed by the feature
+branch.
+
 # 19. Failure Handling Standards
 
 ## AI Failure
@@ -736,7 +832,7 @@ Never leave user confused.
 - Persistence
 
 ### Layer 3: Intelligence Layer
-- Onboarding prompts
+- Starter prompts
 - Extraction prompts
 - Response streaming
 

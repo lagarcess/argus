@@ -2,7 +2,26 @@ from __future__ import annotations
 
 from typing import Any
 
-from argus.api.schemas import ChatStreamRequest
+from argus.api.schemas import ChatStreamRequest, Message
+
+
+def durable_retry_last_turn_metadata(
+    request_message: Message,
+    *,
+    include_structured_action: bool = True,
+) -> dict[str, Any]:
+    retry_payload: dict[str, Any] = {
+        "request_message_id": request_message.id,
+        "message": request_message.content,
+    }
+    action = (
+        request_message.metadata.get("chat_action")
+        if isinstance(request_message.metadata, dict)
+        else None
+    )
+    if include_structured_action and isinstance(action, dict):
+        retry_payload["action"] = action
+    return {"retry_last_turn": retry_payload}
 
 
 def retryable_finalization_execution_identity(

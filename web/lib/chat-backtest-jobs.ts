@@ -7,12 +7,17 @@ import {
   type BacktestRun,
 } from "./argus-api";
 import { hydrateResultActionsForRun } from "./chat-result-actions";
+import {
+  nextExperimentRowsFromMetadata,
+  type NextExperimentRow,
+} from "./chat-next-experiments";
 import type { Message } from "@/components/chat/types";
 import {
   confirmationStatusFromPayload,
   confirmationStatusLabel,
 } from "@/components/chat/confirmation-display";
 import type { StrategyConfirmationStatus } from "@/components/chat/types";
+import { retainCanonicalResultOwnersForJobUpdate } from "./chat-result-projection-ownership";
 
 const ACTIVE_JOB_STATUSES = new Set<BacktestJobStatus>([
   "queued",
@@ -25,15 +30,14 @@ const TERMINAL_UNSUCCESSFUL_JOB_STATUSES = new Set<BacktestJobStatus>([
   "canceled",
   "expired",
 ]);
-const IN_PROGRESS_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+const JOB_SETTLEABLE_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "ready_to_run",
   "running",
   "request_sent",
+  "updated",
 ]);
 
 export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
-  if (message.role === "user") {
-    return null;
-  }
   const job = backtestJobFromMetadata(message.metadata ?? {});
   if (!job) {
     return null;
@@ -80,13 +84,28 @@ export function applyBacktestJobUpdate(
   messages: Message[],
   response: BacktestJobResponse,
 ): Message[] {
-  const updatedMessages = messages.map((message) => {
+  const ownerSafeMessages =
+    response.job.status === "succeeded" && response.run
+      ? retainCanonicalResultOwnersForJobUpdate(
+          messages,
+          response.job,
+          response.run.id,
+        )
+      : messages;
+  const updatedMessages = ownerSafeMessages.map((message) => {
     if (
       message.kind === "backtest_job" &&
       message.backtestJob?.id === response.job.id
     ) {
       if (response.job.status === "succeeded" && response.run) {
-        return resultMessageFromRun(message, response.run, response.result_readout);
+        return resultMessageFromRun(
+          message,
+          response.run,
+          response.result_readout,
+          nextExperimentRowsFromMetadata({
+            next_experiments: response.next_experiments,
+          }),
+        );
       }
       return {
         ...message,
@@ -99,10 +118,20 @@ export function applyBacktestJobUpdate(
   return settleConfirmationLabelsForJob(updatedMessages, response.job);
 }
 
+export function applyHydratedBacktestJobTruth(messages: Message[]): Message[] {
+  return messages.reduce((projected, message) => {
+    if (message.kind !== "backtest_job" || !message.backtestJob) {
+      return projected;
+    }
+    return settleConfirmationLabelsForJob(projected, message.backtestJob);
+  }, messages);
+}
+
 function resultMessageFromRun(
   message: Message,
   run: BacktestRun,
   resultReadout: string | null | undefined,
+  nextExperiments?: NextExperimentRow[] | null,
 ): Message {
   const baseCard = resultCardFromRun(run);
   const actions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
@@ -116,6 +145,7 @@ function resultMessageFromRun(
       actions,
     },
     actions,
+    nextExperiments: nextExperiments ?? undefined,
     artifactId: run.id,
     artifactType: "backtest_run",
     artifactStatus: run.status,
@@ -135,16 +165,21 @@ function settleConfirmationLabelsForJob(
   job: BacktestJob,
 ): Message[] {
   const status = confirmationStatusForJob(job.status);
-  if (!status) {
+  const confirmationMessageId = job.confirmation_message_id?.trim();
+  if (!status || !confirmationMessageId) {
     return messages;
   }
   return messages.map((message) => {
-    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+    if (
+      message.kind !== "strategy_confirmation" ||
+      !message.confirmation ||
+      message.id !== confirmationMessageId
+    ) {
       return message;
     }
     if (
       message.confirmation.confirmation_state !== "superseded" ||
-      !IN_PROGRESS_CONFIRMATION_STATUSES.has(
+      !JOB_SETTLEABLE_CONFIRMATION_STATUSES.has(
         confirmationStatusFromPayload(message.confirmation),
       )
     ) {
@@ -168,7 +203,9 @@ function confirmationStatusForJob(
     return "request_sent";
   }
   if (status === "failed") {
-    return "could_not_run";
+    // The job card owns the red failure signal; the settled confirmation
+    // reads quietly so one failure never paints two alarming pills.
+    return "not_completed";
   }
   if (status === "canceled" || status === "expired") {
     return "not_completed";

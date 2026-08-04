@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -35,20 +36,71 @@ def test_chat_action_display_message_resolves_label_key_by_language() -> None:
     assert chat_display_message(payload, language="en") == "Explain result"
 
 
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [("en", "Change benchmark"), ("es-419", "Cambiar referencia")],
+)
+def test_coverage_recovery_action_uses_localized_typed_label(
+    language: str,
+    expected: str,
+) -> None:
+    from argus.api.chat.actions import chat_display_message, chat_request_message
+    from argus.api.schemas import ChatStreamRequest
+
+    payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": "conversation-1",
+            "language": language,
+            "action": {
+                "type": "select_response_option",
+                "label": "Change benchmark",
+                "labelKey": "chat.coverage_recovery.actions.change_benchmark",
+                "payload": {
+                    "option_id": "change_benchmark",
+                    "replacement_values": {"requested_field": "comparison_baseline"},
+                },
+            },
+        }
+    )
+
+    assert chat_request_message(payload, language=language) == expected
+    assert chat_display_message(payload, language=language) == expected
+
+
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [("en", "Retry with daily bars"), ("es-419", "Usar barras diarias")],
+)
+def test_timeframe_recovery_action_uses_localized_typed_label(
+    language: str,
+    expected: str,
+) -> None:
+    from argus.api.chat.actions import chat_display_message, chat_request_message
+    from argus.api.schemas import ChatStreamRequest
+
+    payload = ChatStreamRequest.model_validate(
+        {
+            "conversation_id": "conversation-1",
+            "language": language,
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "labelKey": "chat.clarification.timeframe_actions.daily",
+                "payload": {
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+        }
+    )
+
+    assert chat_request_message(payload, language=language) == expected
+    assert chat_display_message(payload, language=language) == expected
+
+
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": "test_stock_idea",
-                "completed": False,
-            }
-        },
-    )
     return client
 
 
@@ -99,6 +151,96 @@ def _stream_payloads(stream: str, event_name: str) -> list[dict[str, Any]]:
 
 def _conversation(client: TestClient) -> dict[str, Any]:
     return client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+
+@pytest.mark.parametrize(
+    ("headers", "action_payload", "expected_status", "expected_code"),
+    [
+        ({}, {"confirmation_id": "confirmation-1"}, 400, "idempotency_key_required"),
+        (
+            {"X-Idempotency-Key": "confirmation-1"},
+            {"confirmation_id": "confirmation-1"},
+            400,
+            "idempotency_key_required",
+        ),
+        (
+            {"X-Request-Id": "confirmation-1"},
+            {"confirmation_id": "confirmation-1"},
+            400,
+            "idempotency_key_required",
+        ),
+        (
+            {"Idempotency-Key": "   "},
+            {"confirmation_id": "confirmation-1"},
+            400,
+            "idempotency_key_required",
+        ),
+        (
+            {"Idempotency-Key": "confirmation-1"},
+            {},
+            422,
+            "validation_error",
+        ),
+        (
+            {"Idempotency-Key": "confirmation-other"},
+            {"confirmation_id": "confirmation-1"},
+            409,
+            "idempotency_conflict",
+        ),
+    ],
+)
+def test_run_action_identity_is_rejected_before_route_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+    headers: dict[str, str],
+    action_payload: dict[str, str],
+    expected_status: int,
+    expected_code: str,
+) -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user = api_state.store.get_or_create_dev_user()
+
+    class _RouteBoundaryGateway:
+        def __init__(self) -> None:
+            self.profile_reads = 0
+
+        def get_or_create_mock_user(self) -> object:
+            return user
+
+        def get_user(self, *, user_id: str) -> object:
+            self.profile_reads += 1
+            raise AssertionError(f"profile read reached for {user_id}")
+
+    gateway = _RouteBoundaryGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    before_messages = sum(len(items) for items in api_state.store.messages.values())
+    before_jobs = len(api_state.store.backtest_jobs)
+    before_allowance = len(api_state.store.backtest_job_reservations)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers=headers,
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": action_payload,
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == expected_status
+    assert response.json()["code"] == expected_code
+    assert gateway.profile_reads == 0
+    assert sum(len(items) for items in api_state.store.messages.values()) == before_messages
+    assert len(api_state.store.backtest_jobs) == before_jobs
+    assert len(api_state.store.backtest_job_reservations) == before_allowance
 
 
 def _confirmation_runtime_result() -> dict[str, Any]:
@@ -628,6 +770,11 @@ def test_chat_stream_emits_structured_confirmation_actions(
 def test_chat_stream_persists_confirmation_metadata_and_preview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        validate_confirmation_execution_payload,
+    )
+    from argus.api import state as api_state
+    from argus.api.chat.backtest_jobs import payload_hash
     from argus.api.routers import agent as agent_router
 
     monkeypatch.setattr(
@@ -648,12 +795,36 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     )
 
     assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    raw_assistant = api_state.store.messages[conversation["id"]][-1]
+    validation = validate_confirmation_execution_payload(
+        raw_assistant.metadata["confirmation_payload"]
+    )
+    assert validation.launch_payload is not None
+    canonical_hash = payload_hash(validation.launch_payload)
+    assert (
+        raw_assistant.metadata["confirmation_card"][
+            "canonical_launch_payload_hash"
+        ]
+        == canonical_hash
+    )
+    assert (
+        raw_assistant.metadata["active_confirmation_reference"]["metadata"][
+            "canonical_launch_payload_hash"
+        ]
+        == canonical_hash
+    )
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
     assistant = messages[-1]
     assert assistant["role"] == "assistant"
     assert assistant["metadata"]["confirmation_card"]["title"] == "AAPL buy and hold"
+    assert final["confirmation"]["launch_payload_hash"]
+    assert assistant["metadata"]["confirmation_card"]["launch_payload_hash"]
+    public_payload = json.dumps({"final": final, "messages": messages})
+    assert "canonical_launch_payload_hash" not in public_payload
+    assert re.search(r"sha256:[0-9a-f]{64}", public_payload) is None
     conversations = client.get("/api/v1/conversations").json()["items"]
     assert conversations[0]["id"] == conversation["id"]
     assert conversations[0]["last_message_preview"] == assistant["content"]
@@ -757,6 +928,7 @@ def test_confirmation_action_requires_pending_confirmation(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirmation-1"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -769,8 +941,8 @@ def test_confirmation_action_requires_pending_confirmation(
         },
     )
 
-    assert response.status_code == 409
-    assert response.json()["code"] == "confirmation_required"
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
 
 
@@ -816,6 +988,7 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": run_action["payload"]["confirmation_id"]},
         json={
             "conversation_id": conversation["id"],
             "action": run_action,
@@ -1120,6 +1293,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
     first = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": run_action["payload"]["confirmation_id"]},
         json={
             "conversation_id": conversation["id"],
             "action": run_action,
@@ -1150,7 +1324,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert "**Setup.**" in breakdown
     assert "**How to read it.**" in breakdown
     assert "**Risk and assumptions.**" in breakdown
-    assert "**Useful next check.**" in breakdown
+    # Issue #249: Explain owns grounded comprehension only; the Try next
+    # surface owns next experiments.
+    assert "**Useful next check.**" not in breakdown
     assert "Try next:" not in breakdown
     assert "- Result:" not in breakdown
     assert "- Next step:" not in breakdown
@@ -1553,34 +1729,15 @@ def test_chat_stream_requires_message_or_action() -> None:
     assert response.status_code == 422
 
 
-def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
+def test_bare_symbol_turn_uses_reliable_setup_fallback_without_jargon(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "primary_goal_selection",
-                "language_confirmed": True,
-                "primary_goal": None,
-                "completed": False,
-            }
-        },
-    )
     conversation = _conversation(client)
 
-    first = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "__ONBOARDING_GOAL__:learn_basics",
-            "language": "en",
-        },
-    )
-    second = client.post(
+    response = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
@@ -1589,13 +1746,10 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
         },
     )
 
-    first_text = _stream_payloads(first.text, "token")[0]["text"]
-    second_text = _stream_payloads(second.text, "token")[0]["text"]
-    assert "help you choose a sensible next step" in first_text
-    assert "What should trigger the buy?" not in second_text
-    assert "reliable test setup" in second_text
-    assert "draft" not in second_text.lower()
-    assert "interpreter" not in second_text.lower()
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "reliable test setup" in text
+    assert "draft" not in text.lower()
+    assert "interpreter" not in text.lower()
 
 
 def test_discovery_endpoints_return_assets_and_indicators(

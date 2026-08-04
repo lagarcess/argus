@@ -57,11 +57,26 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.languages.es-419",
     "command_palette.ledger.decision_filters",
     "command_palette.ledger.no_saved_ideas",
-    "onboarding.language.title",
-    "onboarding.language.continue_in",
     "chat.result_followup.headings.general",
     "chat.result_followup.headings.next_experiment",
     "chat.history.pinned",
+    "guest.shell.value_title",
+    "guest.shell.input_placeholder",
+    "guest.shell.sign_in",
+    "guest.shell.settings",
+    "guest.shell.language",
+    "guest.shell.feedback",
+    "guest.shell.temporary_until",
+    "guest.shell.before_message.prefix",
+    "guest.shell.before_message.terms",
+    "guest.shell.before_message.middle",
+    "guest.shell.before_message.privacy",
+    "guest.shell.after_message.safety",
+    "guest.shell.after_message.terms",
+    "guest.shell.after_message.privacy",
+    "guest.hints.confirmation",
+    "guest.hints.result",
+    "guest.hints.dismiss",
   ];
 
   const requiredSpanishStaticValues = {
@@ -73,6 +88,9 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.sidebar.collapsed": "Solo iconos",
     "settings.sidebar.hover": "Al pasar el cursor",
     "settings.sidebar.close": "Cerrar modal de preferencias de la barra lateral",
+    "guest.shell.input_placeholder": "¿Qué quieres probar?",
+    "guest.shell.language": "Idioma",
+    "guest.shell.temporary_until": "Chat temporal · disponible hasta {{date}}",
   };
 
   function readLocale(localePath: string) {
@@ -135,6 +153,31 @@ describe("Spanish UI Smoke Harness", () => {
     expect(json).toBeDefined();
   });
 
+  test("non-retryable discovery copy makes no temporal promise in either locale", () => {
+    const locales = {
+      en: readLocale(enLocalePath),
+      "es-419": readLocale(esLocalePath),
+    };
+    const cases = [
+      {
+        locale: "en" as const,
+        expected:
+          "Current source-backed discovery is not available for this request, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
+      },
+      {
+        locale: "es-419" as const,
+        expected:
+          "La búsqueda actual respaldada por fuentes no está disponible para esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
+      },
+    ];
+
+    for (const { locale, expected } of cases) {
+      expect(valueAtPath(locales[locale], "chat.recovery.discovery_unavailable")).toBe(
+        expected,
+      );
+    }
+  });
+
   test("Spanish smoke keys exist for the private-alpha UI surface", () => {
     const en = readLocale(enLocalePath);
     const es = readLocale(esLocalePath);
@@ -181,6 +224,10 @@ describe("Spanish UI Smoke Harness", () => {
       path.join(webRoot, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
     );
+    const recentsSource = fs.readFileSync(
+      path.join(webRoot, "lib/chat-recents.ts"),
+      "utf-8",
+    );
 
     expect(sidebarPreferenceSource).toContain('aria-label={t("settings.sidebar.close")}');
     for (const key of [
@@ -193,7 +240,7 @@ describe("Spanish UI Smoke Harness", () => {
       expect(sidebarPreferenceSource).toContain(`t("${key}")`);
       expect(sidebarPreferenceSource).not.toContain(`t("${key}",`);
     }
-    expect(sidebarSource).toContain("isPinned: true");
+    expect(recentsSource).toContain('["pinned", true]');
     expect(sidebarSource).toContain("{group.isPinned &&");
     expect(sidebarSource).not.toContain('group.label === t("chat.history.pinned",');
   });

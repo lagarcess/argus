@@ -8,6 +8,7 @@ import pandas as pd
 import vectorbt as vbt
 
 from argus.domain.backtesting.config import _vbt_freq
+from argus.domain.backtesting.coverage import PreparedMarketData
 from argus.domain.backtesting.execution import (
     ExecutionEvent,
     _build_long_only_execution_ledger,
@@ -17,6 +18,7 @@ from argus.domain.backtesting.execution import (
 from argus.domain.backtesting.metrics import portfolio_value_summary
 from argus.domain.backtesting.signals import _build_signals
 from argus.domain.market_data import fetch_ohlcv
+from argus.domain.strategy_capabilities import resolve_result_chart_exploration_policy
 
 
 def build_result_chart(
@@ -24,6 +26,7 @@ def build_result_chart(
     *,
     fetch_ohlcv_func=fetch_ohlcv,
     build_signals_func=_build_signals,
+    prepared_market_data: PreparedMarketData | None = None,
 ) -> dict[str, Any]:
     """Build a compact aggregate equity curve for result-card display."""
 
@@ -36,13 +39,16 @@ def build_result_chart(
     events: dict[str, dict[str, set[str]]] = {}
 
     for symbol in config["symbols"]:
-        bars = fetch_ohlcv_func(
-            symbol=symbol,
-            asset_class=config["asset_class"],
-            start_date=start,
-            end_date=end,
-            timeframe=config["timeframe"],
-        )
+        if prepared_market_data is None:
+            bars = fetch_ohlcv_func(
+                symbol=symbol,
+                asset_class=config["asset_class"],
+                start_date=start,
+                end_date=end,
+                timeframe=config["timeframe"],
+            )
+        else:
+            bars = prepared_market_data.bars_for(symbol)
         close = bars["close"].astype(float)
         entries, exits = build_signals_func(config, bars)
         execution_events = _build_long_only_execution_ledger(
@@ -78,18 +84,26 @@ def build_result_chart(
             events, symbol=symbol, execution_events=execution_events
         )
 
-    aggregate_equity = (
-        pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1).dropna()
+    aligned_equity = (
+        pd.concat(symbol_equity_curves, axis=1).sort_index().ffill().dropna(how="any")
     )
+    aggregate_equity = aligned_equity.sum(axis=1)
     series = [
         {"time": _chart_time_key(ts), "value": round(float(value), 2)}
         for ts, value in aggregate_equity.items()
     ]
-    markers = _thin_chart_markers(_chart_markers_from_events(events), limit=80)
+    all_markers = _chart_markers_from_events(events)
+    markers = _thin_chart_markers(all_markers, limit=80)
     chart = {
         "kind": "portfolio_equity",
         "series": series,
         "markers": markers,
+        "marker_summary": {
+            "total_groups": len(all_markers),
+            "included_groups": len(markers),
+            "sampled": len(markers) < len(all_markers),
+        },
+        "exploration_policy": resolve_result_chart_exploration_policy(config),
         "currency": "USD",
         "base_value": series[0]["value"] if series else None,
         "attribution": "TradingView Lightweight Charts",

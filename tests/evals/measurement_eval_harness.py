@@ -37,6 +37,7 @@ LOCKED_EVAL_CATEGORIES = {
     "capability_honesty",
     "backtest_metric_correctness",
     "graceful_recovery",
+    "asset_discovery_routing",
 }
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
@@ -80,12 +81,26 @@ class TypedExpectations:
     capability_verdict: str
     assets: tuple[str, ...] = ()
     asset_class: str | None = None
+    requested_strategy_template: str | None = None
     strategy_type: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
     date_range: dict[str, str] | str | None = None
+    requested_date_range: dict[str, str] | str | None = None
+    effective_date_range: dict[str, str] | str | None = None
+    adjustment_reason: str | None = None
     benchmark_symbol: str | None = None
     capital_amount: float | None = None
+    fee_rate: float | None = None
+    slippage: float | None = None
+    cost_provenance: dict[str, str] | None = None
+    launch_execution_realism: dict[str, Any] | None = None
     stage_outcomes: tuple[str, ...] = ()
+    requested_field: str | None = None
     clarification: dict[str, Any] | None = None
+    semantic_turn_act: str | None = None
+    asset_discovery: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -278,13 +293,47 @@ def typed_expectation_failures(
         _compare("assets", list(expected.assets), outcome.get("assets"), failures)
     _compare("asset_class", expected.asset_class, outcome.get("asset_class"), failures)
     _compare(
+        "requested_strategy_template",
+        expected.requested_strategy_template,
+        outcome.get("requested_strategy_template"),
+        failures,
+    )
+    _compare(
         "strategy_type",
         expected.strategy_type,
         outcome.get("strategy_type"),
         failures,
     )
+    _compare("entry_rule", expected.entry_rule, outcome.get("entry_rule"), failures)
+    _compare("exit_rule", expected.exit_rule, outcome.get("exit_rule"), failures)
+    _compare("rule_spec", expected.rule_spec, outcome.get("rule_spec"), failures)
     if expected.date_range is not None:
-        _compare_date_range(expected.date_range, outcome.get("date_range"), failures)
+        _compare_date_range(
+            "date_range",
+            expected.date_range,
+            outcome.get("date_range"),
+            failures,
+        )
+    if expected.requested_date_range is not None:
+        _compare_date_range(
+            "requested_date_range",
+            expected.requested_date_range,
+            outcome.get("requested_date_range"),
+            failures,
+        )
+    if expected.effective_date_range is not None:
+        _compare_date_range(
+            "effective_date_range",
+            expected.effective_date_range,
+            outcome.get("effective_date_range"),
+            failures,
+        )
+    _compare(
+        "adjustment_reason",
+        expected.adjustment_reason,
+        outcome.get("adjustment_reason"),
+        failures,
+    )
     _compare(
         "benchmark_symbol",
         expected.benchmark_symbol,
@@ -297,6 +346,22 @@ def typed_expectation_failures(
         outcome.get("capital_amount"),
         failures,
     )
+    _compare("fee_rate", expected.fee_rate, outcome.get("fee_rate"), failures)
+    _compare("slippage", expected.slippage, outcome.get("slippage"), failures)
+    if expected.cost_provenance is not None:
+        _compare_subset(
+            "cost_provenance",
+            expected.cost_provenance,
+            outcome.get("cost_provenance"),
+            failures,
+        )
+    if expected.launch_execution_realism is not None:
+        _compare_subset(
+            "launch_execution_realism",
+            expected.launch_execution_realism,
+            outcome.get("launch_execution_realism"),
+            failures,
+        )
     if expected.stage_outcomes:
         _compare(
             "stage_outcomes",
@@ -304,11 +369,29 @@ def typed_expectation_failures(
             outcome.get("stage_outcomes"),
             failures,
         )
+    _compare(
+        "requested_field",
+        expected.requested_field,
+        outcome.get("requested_field"),
+        failures,
+    )
     if expected.clarification is not None:
         _compare_subset(
             "clarification",
             expected.clarification,
             outcome.get("clarification"),
+            failures,
+        )
+    _compare(
+        "semantic_turn_act",
+        expected.semantic_turn_act,
+        outcome.get("semantic_turn_act"),
+        failures,
+    )
+    if expected.asset_discovery is not None:
+        _compare_asset_discovery(
+            expected.asset_discovery,
+            outcome.get("asset_discovery"),
             failures,
         )
     return failures
@@ -324,6 +407,7 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
                 "passed": 0,
                 "failed": 0,
                 "expected_failed": 0,
+                "unexpected_pass": 0,
                 "skipped": 0,
                 "pass_rate": 0.0,
             },
@@ -334,8 +418,9 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         bucket[status] = int(bucket[status]) + 1
 
     for bucket in by_category.values():
-        denominator = (
-            int(bucket["passed"]) + int(bucket["failed"]) + int(bucket["expected_failed"])
+        denominator = sum(
+            int(bucket[status])
+            for status in ("passed", "failed", "expected_failed", "unexpected_pass")
         )
         bucket["pass_rate"] = (
             0.0 if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
@@ -351,10 +436,33 @@ def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             "expected_failed": sum(
                 int(item["expected_failed"]) for item in by_category.values()
             ),
+            "unexpected_pass": sum(
+                int(item["unexpected_pass"]) for item in by_category.values()
+            ),
             "skipped": sum(int(item["skipped"]) for item in by_category.values()),
         },
         "results": results,
     }
+
+
+def blocking_eval_results(
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return result states that must fail a sanctioned live evaluation gate."""
+    return [
+        result
+        for result in results
+        if result.get("status") in {"failed", "unexpected_pass"}
+    ]
+
+
+def expected_fail_issue_for_result(result: dict[str, Any]) -> str | None:
+    """Return the exact expected-fail owner from a serialized eval result."""
+    expected_fail = result.get("expected_fail")
+    if not isinstance(expected_fail, dict):
+        return None
+    issue = expected_fail.get("issue")
+    return issue if isinstance(issue, str) and issue else None
 
 
 def write_scorecard(
@@ -564,12 +672,26 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             capability_verdict=str(expected["capability_verdict"]),
             assets=tuple(expected.get("assets") or ()),
             asset_class=expected.get("asset_class"),
+            requested_strategy_template=expected.get("requested_strategy_template"),
             strategy_type=expected.get("strategy_type"),
+            entry_rule=expected.get("entry_rule"),
+            exit_rule=expected.get("exit_rule"),
+            rule_spec=expected.get("rule_spec"),
             date_range=expected.get("date_range"),
+            requested_date_range=expected.get("requested_date_range"),
+            effective_date_range=expected.get("effective_date_range"),
+            adjustment_reason=expected.get("adjustment_reason"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             capital_amount=expected.get("capital_amount"),
+            fee_rate=expected.get("fee_rate"),
+            slippage=expected.get("slippage"),
+            cost_provenance=expected.get("cost_provenance"),
+            launch_execution_realism=expected.get("launch_execution_realism"),
             stage_outcomes=tuple(expected.get("stage_outcomes") or ()),
+            requested_field=expected.get("requested_field"),
             clarification=expected.get("clarification"),
+            semantic_turn_act=expected.get("semantic_turn_act"),
+            asset_discovery=expected.get("asset_discovery"),
         ),
         action=(
             None
@@ -743,6 +865,25 @@ def _typed_outcome(
         strategy = {}
     if not isinstance(launch_payload, dict):
         launch_payload = {}
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        extra_parameters = {}
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+    coverage_preflight = launch_payload.get("coverage_preflight")
+    if not isinstance(coverage_preflight, dict):
+        coverage_preflight = {}
+    requested_date_range = (
+        launch_payload.get("requested_date_range")
+        or coverage_preflight.get("requested_date_range")
+        or strategy.get("date_range")
+    )
+    effective_date_range = (
+        coverage_preflight.get("effective_date_range")
+        or launch_payload.get("date_range")
+        or strategy.get("date_range")
+    )
 
     return {
         "intent": _intent(case=case, patch=interpret_patch),
@@ -756,9 +897,16 @@ def _typed_outcome(
         ],
         "assets": _symbols(launch_payload=launch_payload, strategy=strategy),
         "asset_class": launch_payload.get("asset_class") or strategy.get("asset_class"),
+        "requested_strategy_template": strategy.get("requested_strategy_template"),
         "strategy_type": launch_payload.get("strategy_type")
         or strategy.get("strategy_type"),
-        "date_range": launch_payload.get("date_range") or strategy.get("date_range"),
+        "entry_rule": launch_payload.get("entry_rule") or strategy.get("entry_rule"),
+        "exit_rule": launch_payload.get("exit_rule") or strategy.get("exit_rule"),
+        "rule_spec": launch_payload.get("rule_spec") or strategy.get("rule_spec"),
+        "date_range": requested_date_range,
+        "requested_date_range": requested_date_range,
+        "effective_date_range": effective_date_range,
+        "adjustment_reason": coverage_preflight.get("adjustment_reason"),
         "benchmark_symbol": (
             launch_payload.get("benchmark_symbol")
             or strategy.get("benchmark_symbol")
@@ -767,6 +915,14 @@ def _typed_outcome(
         "capital_amount": (
             launch_payload.get("capital_amount") or strategy.get("capital_amount")
         ),
+        "fee_rate": extra_parameters.get("fee_rate"),
+        "slippage": extra_parameters.get("slippage"),
+        "cost_provenance": {
+            key: field_provenance[key]
+            for key in ("fee_rate", "slippage")
+            if key in field_provenance
+        },
+        "launch_execution_realism": launch_payload.get("_execution_realism"),
         "capability_verdict": _capability_verdict(
             outcome=_last_stage_outcome(
                 interpret_result=payload_interpret_result,
@@ -775,7 +931,10 @@ def _typed_outcome(
             ),
             patch=final_patch,
         ),
+        "requested_field": final_patch.get("requested_field"),
         "clarification": final_patch.get("clarification"),
+        "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
+        "asset_discovery": interpret_patch.get("asset_discovery"),
     }
 
 
@@ -859,6 +1018,54 @@ def _compare(name: str, expected: Any, actual: Any, failures: list[str]) -> None
         failures.append(f"{name}: expected {expected!r}, got {actual!r}")
 
 
+def _compare_asset_discovery(
+    expected: dict[str, Any],
+    actual: Any,
+    failures: list[str],
+) -> None:
+    if not isinstance(actual, dict):
+        failures.append(f"asset_discovery: expected payload {expected!r}, got {actual!r}")
+        return
+    _compare(
+        "asset_discovery.relationship",
+        expected.get("relationship"),
+        actual.get("relationship"),
+        failures,
+    )
+    _compare(
+        "asset_discovery.asset_class_hint",
+        expected.get("asset_class_hint"),
+        actual.get("asset_class_hint"),
+        failures,
+    )
+    if "needs_current_facts" in expected:
+        _compare(
+            "asset_discovery.needs_current_facts",
+            expected["needs_current_facts"],
+            actual.get("needs_current_facts"),
+            failures,
+        )
+    expected_anchors = expected.get("anchor_symbols")
+    if expected_anchors is not None:
+        actual_anchors = sorted(
+            str(symbol).upper() for symbol in (actual.get("anchor_symbols") or [])
+        )
+        _compare(
+            "asset_discovery.anchor_symbols",
+            sorted(str(symbol).upper() for symbol in expected_anchors),
+            actual_anchors,
+            failures,
+        )
+    include_terms = expected.get("category_description_includes_any")
+    if include_terms:
+        description = str(actual.get("category_description") or "").lower()
+        if not any(str(term).lower() in description for term in include_terms):
+            failures.append(
+                "asset_discovery.category_description: expected any of "
+                f"{list(include_terms)!r} in {description!r}"
+            )
+
+
 def _compare_subset(
     name: str,
     expected: Any,
@@ -877,14 +1084,19 @@ def _compare_subset(
     _compare(name, expected, actual, failures)
 
 
-def _compare_date_range(expected: Any, actual: Any, failures: list[str]) -> None:
+def _compare_date_range(
+    name: str,
+    expected: Any,
+    actual: Any,
+    failures: list[str],
+) -> None:
     expected_window = _date_range_window(expected)
     actual_window = _date_range_window(actual)
     if expected_window is not None and actual_window is not None:
         if actual_window != expected_window:
-            failures.append(f"date_range: expected {expected!r}, got {actual!r}")
+            failures.append(f"{name}: expected {expected!r}, got {actual!r}")
         return
-    _compare("date_range", expected, actual, failures)
+    _compare(name, expected, actual, failures)
 
 
 def _date_range_window(value: Any) -> tuple[date, date] | None:
@@ -943,6 +1155,8 @@ def _result_status(
         return "expected_failed"
     if failed_checks:
         return "failed"
+    if expected_fail is not None:
+        return "unexpected_pass"
     return "passed"
 
 

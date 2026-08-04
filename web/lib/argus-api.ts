@@ -1,5 +1,7 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
+import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
+import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -10,12 +12,24 @@ import {
   normalizeEnabledLanguage,
   type ArgusLocale,
 } from "./language-features";
+import { runActionIdempotencyKey } from "./usage-allowance";
+import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { AvatarTheme } from "./avatar-theme";
+import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
   displayResultMetricLabel,
   resultMetricDisplayOrder,
 } from "./result-card-display";
+import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
+import {
+  ARGUS_API_BASE_URL,
+  apiFetch,
+  unauthenticatedApiFetch,
+} from "./argus-api-transport";
+
+export { apiFetch, unauthenticatedApiFetch } from "./argus-api-transport";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -30,17 +44,34 @@ export type BacktestJobStatus =
   | "expired";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
-export type OnboardingStage =
-  | "language_selection"
-  | "primary_goal_selection"
-  | "ready"
-  | "completed";
-export type PrimaryGoal =
-  | "learn_basics"
-  | "build_passive_strategy"
-  | "test_stock_idea"
-  | "explore_crypto"
-  | "surprise_me";
+export type ConversationOperationStatus =
+  | "idle"
+  | "queued"
+  | "running"
+  | "checking";
+export type ConversationOperationKind = "chat_turn" | "backtest_job" | null;
+export type ConversationOperation = {
+  status: ConversationOperationStatus;
+  kind?: ConversationOperationKind;
+  updated_at?: string | null;
+};
+export type ConversationAttentionStatus =
+  | "none"
+  | "new_activity"
+  | "manual_unread"
+  | "needs_input"
+  | "needs_attention";
+export type ConversationAttention = {
+  status: ConversationAttentionStatus;
+  cursor?: string | null;
+};
+export type ConversationActivity = {
+  operation: ConversationOperation;
+  attention: ConversationAttention;
+};
+export type ConversationActivityPatch =
+  | { action: "mark_unread" }
+  | { action: "mark_read"; through_attention_cursor?: string | null };
 
 // ─── Metric / result card types ──────────────────────────────────────────────
 
@@ -48,6 +79,17 @@ export type ApiMetricRow = {
   key: string;
   label: string;
   value: string;
+};
+
+export type ResultChartExplorationPolicy = {
+  minimum_visible_observations?: number;
+  minimum_meaningful_duration?: string | null;
+};
+
+export type ResultChartMarkerSummary = {
+  total_groups: number;
+  included_groups: number;
+  sampled: boolean;
 };
 
 export type ResultChartPayload = {
@@ -71,6 +113,8 @@ export type ResultChartPayload = {
     peak?: { time: string; value: number } | null;
     lowest?: { time: string; value: number } | null;
   } | null;
+  exploration_policy?: ResultChartExplorationPolicy | null;
+  marker_summary?: ResultChartMarkerSummary | null;
   attribution?: string;
 };
 
@@ -144,6 +188,7 @@ export type BacktestJobResponse = {
   run: BacktestRun | null;
   result_readout?: string | null;
   result_readout_source?: string | null;
+  next_experiments?: Record<string, unknown> | null;
   result_readout_fallback_used?: boolean | null;
   result_readout_failure_mode?: string | null;
 };
@@ -158,21 +203,7 @@ export type Conversation = {
   updated_at: string;
   last_message_preview?: string | null;
   language?: "en" | "es-419" | null;
-};
-
-export type ApiUser = {
-  id: string;
-  email: string;
-  username: string | null;
-  display_name: string | null;
-  language: "en" | "es-419";
-  locale: "en-US" | "es-419";
-  onboarding: {
-    completed: boolean;
-    stage: OnboardingStage;
-    language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
-  };
+  activity?: ConversationActivity | null;
 };
 
 type AuthSessionPayload = {
@@ -181,9 +212,10 @@ type AuthSessionPayload = {
   expires_in?: number;
 };
 
-type AuthResponsePayload = {
+export type AuthResponsePayload = {
   session?: AuthSessionPayload | null;
   user?: Record<string, unknown> | null;
+  guest_claim?: { conversation_id: string; pending_action: GuestPendingActionSummary | null } | null;
 };
 
 /** Backend message shape (distinct from the frontend chat Message type) */
@@ -238,15 +270,30 @@ export type Collection = {
   updated_at: string;
 };
 
-export type HistoryItem = {
+type HistoryItemBase = {
   type: HistoryItemType;
   id: string;
   title: string;
+  /** Present on chat items; retained as optional for existing history consumers. */
+  title_source?: TitleSource | null;
   subtitle: string;
   pinned: boolean;
   created_at: string;
   conversation_id?: string | null;
+  expires_at?: string | null;
 };
+
+export type ChatHistoryItem = HistoryItemBase & {
+  type: "chat";
+  activity?: ConversationActivity | null;
+};
+
+export type NonChatHistoryItem = HistoryItemBase & {
+  type: Exclude<HistoryItemType, "chat">;
+  activity?: never;
+};
+
+export type HistoryItem = ChatHistoryItem | NonChatHistoryItem;
 
 export type ArtifactLifecycle =
   | "captured"
@@ -256,11 +303,7 @@ export type ArtifactLifecycle =
   | "archived"
   | "discarded";
 
-export type DecisionState =
-  | "watching"
-  | "promising"
-  | "rejected"
-  | "revisit_later";
+export type DecisionState = RunDossierDecisionState;
 
 export type EvidenceArtifact = {
   id: string;
@@ -289,25 +332,17 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchItem = {
-  type:
-    | "chat"
-    | "strategy"
-    | "collection"
-    | "run"
-    | "backtest"
-    | "evidence"
-    | "decision"
-    | "idea";
-  id: string;
-  title: string;
-  matched_text: string;
-  updated_at: string;
-  conversation_id?: string | null;
-  lifecycle?: ArtifactLifecycle | null;
-  decision_state?: DecisionState | null;
-  preview?: Record<string, unknown> | null;
+export type SearchConversationItem = SearchConversationContract;
+
+export type SearchAssetRollupItem = {
+  type: "asset_rollup";
+  symbol: string;
+  run_count: number;
+  decision_counts: Record<DecisionState, number>;
+  last_touched_at: string;
 };
+
+export type SearchItem = SearchConversationItem | SearchAssetRollupItem;
 
 export type SearchLedgerGroup = {
   decision_state: DecisionState;
@@ -326,7 +361,7 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
-  | { event: "stage_start"; data: { stage: string } }
+  | { event: "stage_start"; data: { stage: string; detail?: string } }
   | { event: "stage_outcome"; data: { outcome: string } }
   | { event: "final"; data: ChatFinalPayload }
   | {
@@ -347,6 +382,7 @@ export type ChatStreamEvent =
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
+  code?: string;
   stage_outcome?: string;
   assistant_response?: string | null;
   assistant_prompt?: string | null;
@@ -376,17 +412,16 @@ export type ChatActionRequest = {
 };
 
 export class ChatStreamError extends Error {
-  status: number;
-  code: string;
-
-  constructor(message: string, status: number, code = "unknown") {
+  constructor(
+    message: string,
+    public status: number,
+    public code = "unknown",
+    public requestId: string | null = null,
+  ) {
     super(message);
     this.name = "ChatStreamError";
-    this.status = status;
-    this.code = code;
   }
 }
-
 const CHAT_STREAM_INTERRUPTED_MESSAGE =
   "The connection ended before Argus finished responding. Please try again.";
 
@@ -407,16 +442,6 @@ export type DiscoveryItem = {
 type DiscoveryResponsePayload = { items: DiscoveryItem[] };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-
-const API_BASE = (() => {
-  if (process.env.NEXT_PUBLIC_ARGUS_API_URL) {
-    return process.env.NEXT_PUBLIC_ARGUS_API_URL;
-  }
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:8000/api/v1`;
-  }
-  return "http://127.0.0.1:8000/api/v1";
-})();
 
 export type ApiLanguage = "en" | "es-419";
 
@@ -546,84 +571,7 @@ export function formatRelativeDate(
   });
 }
 
-// ─── Generic fetch helper ─────────────────────────────────────────────────────
-
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  const authHeaders: Record<string, string> = {};
-
-  if (!isMockAuth) {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      throw new Error("Supabase auth client is unavailable in non-mock mode.");
-    }
-    const { data, error } = await supabase.auth.getSession();
-    if (!error && data.session) {
-      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
-    }
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...(options?.headers || {}),
-    },
-    credentials: "include",
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const detail = (body as { detail?: unknown }).detail;
-    const errorMsg =
-      typeof detail === "object" && detail !== null
-        ? ((detail as { title?: unknown }).title as string)
-        : detail;
-
-    const error = new Error(
-      (errorMsg as string) ?? `API error ${response.status}`,
-    ) as Error & { status: number; code: string };
-    (error as Error & { status: number }).status = response.status;
-    (error as Error & { code: string }).code =
-      ((body as Record<string, unknown>).code as string) ?? "unknown";
-    throw error;
-  }
-  return response.json() as Promise<T>;
-}
-
-async function unauthenticatedApiFetch<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers || {}),
-    },
-    credentials: "include",
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const detail = (body as { detail?: unknown }).detail;
-    const message =
-      typeof detail === "object" && detail !== null && "detail" in detail
-        ? String((detail as { detail?: unknown }).detail ?? "")
-        : typeof detail === "string"
-          ? detail
-          : `API error ${response.status}`;
-    const error = new Error(message) as Error & {
-      status: number;
-      code: string;
-    };
-    error.status = response.status;
-    error.code = String((body as Record<string, unknown>).code ?? "unknown");
-    throw error;
-  }
-  return response.json() as Promise<T>;
-}
-
-async function persistBrowserSession(payload: AuthResponsePayload) {
+export async function persistBrowserSession(payload: AuthResponsePayload) {
   const session = payload.session;
   if (!session?.access_token || !session.refresh_token) {
     return;
@@ -632,10 +580,13 @@ async function persistBrowserSession(payload: AuthResponsePayload) {
   if (!supabase) {
     return;
   }
-  await supabase.auth.setSession({
+  const { error } = await supabase.auth.setSession({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
   });
+  if (error) {
+    throw error;
+  }
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -645,20 +596,19 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
-  onboarding?: Partial<{
-    completed: boolean;
-    stage: OnboardingStage;
-    language_confirmed: boolean;
-    primary_goal: PrimaryGoal | null;
-  }>;
+  avatar_theme?: AvatarTheme;
 };
 
 export async function getMe() {
-  return apiFetch<{ user: ApiUser }>("/me");
+  return apiFetch<UserResponse>("/me");
+}
+
+export async function getUsageAllowances() {
+  return apiFetch<UsageAllowanceResponse>("/me/usage");
 }
 
 export async function patchMe(patch: ProfilePatch) {
-  return apiFetch<{ user: ApiUser }>("/me", {
+  return apiFetch<UserResponse>("/me", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
@@ -680,42 +630,71 @@ export async function signupWithEmail(payload: {
   display_name?: string | null;
   username?: string | null;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/signup",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);
-  return response;
+  return { response, needsEmailConfirmation: !response.session };
 }
 
 export async function loginWithEmail(payload: {
   email: string;
   password: string;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/login",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);
   return response;
 }
 
+export async function clearArgusSessionCookies() {
+  return unauthenticatedApiFetch<{ success: boolean }>("/auth/logout", {
+    method: "POST",
+  });
+}
+
+export type CurrentBrowserLogoutResult = {
+  revocation: "complete" | "failed";
+  cookieSync: "cleared" | "failed";
+};
+
+export async function synchronizeCurrentBrowserLogout<T>(
+  revokeCurrentSession: () => Promise<{ error: unknown | null }>,
+  clearCookies: () => Promise<T>,
+): Promise<CurrentBrowserLogoutResult> {
+  const [revocation, cookieSync] = await Promise.allSettled([
+    Promise.resolve().then(revokeCurrentSession),
+    Promise.resolve().then(clearCookies),
+  ]);
+  return {
+    revocation:
+      revocation.status === "fulfilled" && !revocation.value.error
+        ? "complete"
+        : "failed",
+    cookieSync: cookieSync.status === "fulfilled" ? "cleared" : "failed",
+  };
+}
+
 export async function logoutFromApi() {
-  try {
-    return await apiFetch<{ success: boolean }>("/auth/logout", {
-      method: "POST",
-    });
-  } finally {
-    await getSupabaseClient()
-      ?.auth.signOut()
-      .catch(() => null);
-  }
+  return synchronizeCurrentBrowserLogout(
+    async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { error: null };
+      return supabase.auth.signOut({ scope: "local" });
+    },
+    clearArgusSessionCookies,
+  );
 }
 
 export async function createConversation(language?: string | null) {
@@ -755,11 +734,19 @@ export async function getConversationMessages(
   conversationId: string,
   limit = 50,
   cursor?: string,
+  options: Readonly<{
+    signal?: AbortSignal;
+    anchorMessageId?: string;
+  }> = {},
 ) {
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
+  if (options.anchorMessageId) {
+    searchParams.append("anchor_message_id", options.anchorMessageId);
+  }
   return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
+    { signal: options.signal },
   );
 }
 
@@ -775,6 +762,27 @@ export async function patchConversation(
   return apiFetch<{ conversation: Conversation }>(
     `/conversations/${conversationId}`,
     { method: "PATCH", body: JSON.stringify(patch) },
+  );
+}
+
+export async function getConversationActivity(conversationId: string) {
+  return apiFetch<ConversationActivity>(
+    `/conversations/${conversationId}/activity`,
+  );
+}
+
+export async function patchConversationActivity(
+  conversationId: string,
+  patch: ConversationActivityPatch,
+  options: Readonly<{ signal?: AbortSignal }> = {},
+) {
+  return apiFetch<ConversationActivity>(
+    `/conversations/${conversationId}/activity`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+      signal: options.signal,
+    },
   );
 }
 
@@ -880,6 +888,7 @@ export async function searchGlobal(params: {
   cursor?: string;
   decisionState?: DecisionState | null;
   includeLedgerGroups?: boolean;
+  conversationIds?: string[];
 }) {
   const {
     q,
@@ -887,6 +896,7 @@ export async function searchGlobal(params: {
     cursor,
     decisionState,
     includeLedgerGroups = false,
+    conversationIds,
   } = params;
   const searchParams = new URLSearchParams({
     q,
@@ -897,6 +907,8 @@ export async function searchGlobal(params: {
   if (includeLedgerGroups) {
     searchParams.append("include_ledger_groups", "true");
   }
+  for (const id of conversationIds ?? [])
+    searchParams.append("conversation_id", id);
   return apiFetch<SearchResponse>(
     `/search?${searchParams.toString()}`,
   );
@@ -981,16 +993,22 @@ export async function getBacktestJob(jobId: string) {
 
 // ─── Chat stream ──────────────────────────────────────────────────────────────
 
+export type ChatStreamOptions = Readonly<{
+  requestId?: string;
+  signal?: AbortSignal;
+}>;
+
 export async function streamChatMessage(
   conversationId: string,
   input: string | ChatActionRequest,
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
   mentions: ChatMention[] = [],
+  options: ChatStreamOptions = {},
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-
+  const submittedRequestId = options.requestId ?? crypto.randomUUID();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -1002,20 +1020,29 @@ export async function streamChatMessage(
     }
   }
 
-  const response = await fetch(`${API_BASE}/chat/stream`, {
+  const response = await fetch(`${ARGUS_API_BASE_URL}/chat/stream`, {
     method: "POST",
+    credentials: "include",
+    signal: options.signal,
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "X-Request-Id": submittedRequestId,
+      "Idempotency-Key":
+        (typeof input !== "string" && runActionIdempotencyKey(input)) ||
+        crypto.randomUUID(),
       ...authHeaders,
     },
     body: JSON.stringify({
       conversation_id: conversationId,
       ...(typeof input === "string" ? { message: input } : { action: input }),
-      ...(typeof input === "string" && mentions.length > 0 ? { mentions } : {}),
+      // Callers decide which turns carry mentions; this layer only forwards
+      // them. Gating on a string input silently dropped the resolver identity
+      // that a discovery selection attaches to its action turn.
+      ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
     }),
-  });
+  }).catch(() => { throw new ChatStreamError(CHAT_STREAM_INTERRUPTED_MESSAGE, 0, "stream_interrupted", submittedRequestId); });
+  const responseRequestId = response.headers.get("X-Request-Id")?.trim() || submittedRequestId;
   if (!response.ok || !response.body) {
     const body = await response.json().catch(() => ({}));
     const detail = (body as { detail?: unknown }).detail;
@@ -1031,15 +1058,13 @@ export async function streamChatMessage(
     throw new ChatStreamError(
       message,
       response.status,
-      typeof code === "string" ? code : "unknown",
+      typeof code === "string" ? code : "unknown", responseRequestId,
     );
   }
-
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let receivedDone = false;
-
   const dispatchParsedFrame = (part: string) => {
     const parsed = parseChatStreamFrame(part);
     if (!parsed) return;
@@ -1073,6 +1098,7 @@ export async function streamChatMessage(
       CHAT_STREAM_INTERRUPTED_MESSAGE,
       0,
       "stream_interrupted",
+      responseRequestId,
     );
   }
 
@@ -1080,7 +1106,7 @@ export async function streamChatMessage(
     throw new ChatStreamError(
       CHAT_STREAM_INTERRUPTED_MESSAGE,
       0,
-      "stream_interrupted",
+      "stream_interrupted", responseRequestId,
     );
   }
 }
@@ -1108,7 +1134,12 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
   if (type === "stage_start") {
     return {
       event: "stage_start",
-      data: { stage: String(payload.stage ?? "") },
+      data: {
+        stage: String(payload.stage ?? ""),
+        ...(typeof payload.detail === "string" && payload.detail
+          ? { detail: payload.detail }
+          : {}),
+      },
     };
   }
   if (type === "stage_outcome") {
@@ -1204,3 +1235,11 @@ export async function postFeedback(payload: {
     body: JSON.stringify(payload),
   });
 }
+import type { UserResponse } from "./guest-account";
+
+export type {
+  AccountCapabilities,
+  ApiUser,
+  GuestAccountSummary,
+  UserResponse,
+} from "./guest-account";

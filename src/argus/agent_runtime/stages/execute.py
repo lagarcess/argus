@@ -4,8 +4,14 @@ import asyncio
 import hashlib
 import json
 from copy import deepcopy
+from decimal import Decimal
 from typing import Any
 
+from argus.agent_runtime.coverage_recovery import (
+    approved_window_reconfirmation_patch,
+    is_approved_window_drift,
+    safe_capability_context,
+)
 from argus.agent_runtime.recovery.policy import should_retry
 from argus.agent_runtime.recovery_messages import recovery_state
 from argus.agent_runtime.rule_specs import (
@@ -13,6 +19,11 @@ from argus.agent_runtime.rule_specs import (
     indicator_threshold_rule,
     opposite_moving_average_crossover_rule,
     strategy_rule,
+)
+from argus.agent_runtime.stages.execution_failure_transport import (
+    failed_final_response_payload,
+    public_failure_code,
+    runtime_failure_classification,
 )
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
@@ -22,12 +33,13 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
+    requested_date_range_from_strategy,
     resolve_executable_date_range,
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.results import (
     is_user_safe_failure_code,
-    user_safe_failure_detail,
     user_safe_failure_message,
 )
 from argus.domain.market_data import resolve_asset
@@ -86,10 +98,19 @@ def execute_stage(
             )
 
         error_type = _as_optional_str(envelope.get("error_type"))
-        failure_classification = _runtime_failure_classification(error_type)
+        failure_classification = runtime_failure_classification(error_type)
         last_error_type = failure_classification
         retryable = bool(envelope.get("retryable"))
         capability_context = dict(envelope.get("capability_context") or {})
+        conversion_failure_code = public_failure_code(capability_context)
+        if is_approved_window_drift(capability_context):
+            return StageResult(
+                outcome="ready_for_confirmation",
+                stage_patch=approved_window_reconfirmation_patch(
+                    state=state,
+                    tool_call_records=records,
+                ),
+            )
         corrected_payload: dict[str, Any] | None = None
         if error_type == "parameter_validation_error":
             corrected_payload = _corrected_payload(capability_context)
@@ -108,7 +129,9 @@ def execute_stage(
                         "tool_call_records": records,
                         "failure_classification": failure_classification,
                         "assistant_prompt": assistant_prompt,
-                        "final_response_payload": {"error": assistant_prompt},
+                        "final_response_payload": failed_final_response_payload(
+                            assistant_prompt, conversion_failure_code
+                        ),
                         **_failed_action_reference_patch(
                             payload=payload,
                             failure_classification=failure_classification,
@@ -187,7 +210,9 @@ def execute_stage(
                     "tool_call_records": records,
                     "failure_classification": failure_classification,
                     "assistant_prompt": assistant_prompt,
-                    "final_response_payload": {"error": assistant_prompt},
+                    "final_response_payload": failed_final_response_payload(
+                        assistant_prompt, conversion_failure_code
+                    ),
                     **_failed_action_reference_patch(
                         payload=payload,
                         failure_classification=failure_classification,
@@ -336,6 +361,9 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         ),
         "language": language,
     }
+    requested_date_range = requested_date_range_from_strategy(strategy)
+    if requested_date_range is not None:
+        payload["requested_date_range"] = requested_date_range
     execution_realism = _resolve_execution_realism(strategy, optional_parameters)
     if execution_realism is not None:
         payload["_execution_realism"] = execution_realism
@@ -350,7 +378,7 @@ def _build_tool_call_record(
 ) -> dict[str, Any]:
     payload = envelope.get("payload")
     error_type = _as_optional_str(envelope.get("error_type"))
-    capability_context = _safe_capability_context(
+    capability_context = safe_capability_context(
         envelope.get("capability_context"),
         failure_category=error_type,
     )
@@ -452,29 +480,6 @@ def _as_optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
-
-
-def _safe_capability_context(
-    value: Any,
-    *,
-    failure_category: str | None,
-) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        return {}
-    raw_failure_reason = _as_optional_str(
-        value.get("failure_reason") or value.get("failure_code")
-    )
-    safe_context = {
-        str(key): nested
-        for key, nested in value.items()
-        if key not in {"failure_reason", "failure_code"}
-    }
-    if raw_failure_reason is not None and "failure_detail" not in safe_context:
-        safe_context["failure_detail"] = user_safe_failure_detail(
-            failure_reason=raw_failure_reason,
-            failure_category=failure_category,
-        )
-    return safe_context
 
 
 def _safe_error_message(
@@ -775,33 +780,19 @@ def _normalize_scalar_field(value: Any) -> Any:
     return value
 
 
-def _runtime_failure_classification(error_type: str | None) -> str:
-    known_taxonomy = {
-        "parameter_validation_error",
-        "missing_required_input",
-        "unsupported_capability",
-        "tool_execution_error",
-        "upstream_dependency_error",
-        "ambiguous_user_intent",
-        "internal_system_error",
-    }
-    if error_type in known_taxonomy:
-        return str(error_type)
-    if error_type in {"service_overloaded", "rate_limited", "timeout"}:
-        return "upstream_dependency_error"
-    return "tool_execution_error"
-
-
 def _retry_exhausted_message(records: list[dict[str, Any]]) -> str:
     if not records:
         return "Retry limit reached"
     last_record = records[-1]
     error_type = _as_optional_str(last_record.get("error_type"))
     if error_type:
-        return _fallback_prompt(
-            error_type=_runtime_failure_classification(error_type),
-            error_message=None,
-        ) or "Retry limit reached"
+        return (
+            _fallback_prompt(
+                error_type=runtime_failure_classification(error_type),
+                error_message=None,
+            )
+            or "Retry limit reached"
+        )
     return "Retry limit reached"
 
 
@@ -818,14 +809,17 @@ def _is_launch_request_payload(payload: dict[str, Any]) -> bool:
 
 
 def _normalize_launch_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(payload)
+    LaunchBacktestRequest.model_validate(payload)
+    normalized = deepcopy(payload)
     parameters = normalized.get("parameters")
     if isinstance(parameters, dict):
         normalized["parameters"] = _strategy_parameters_from_launch_payload(parameters)
     return normalized
 
 
-def _strategy_parameters_from_launch_payload(parameters: dict[str, Any]) -> dict[str, Any]:
+def _strategy_parameters_from_launch_payload(
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
     normalized = dict(parameters)
     for field_name in ("fees", "slippage"):
         value = normalized.get(field_name)
@@ -876,7 +870,10 @@ def _resolve_strategy_type(
     if explicit_strategy_type in {"buy_and_hold", "dca_accumulation"}:
         return explicit_strategy_type
     entry_rule = strategy_rule(strategy, "entry")
-    if isinstance(entry_rule, dict) and entry_rule.get("type") == "moving_average_crossover":
+    if (
+        isinstance(entry_rule, dict)
+        and entry_rule.get("type") == "moving_average_crossover"
+    ):
         return "signal_strategy"
     if executable_rule_spec_from_strategy(strategy) is not None:
         return "signal_strategy"
@@ -966,6 +963,12 @@ def _resolve_date_range(
     *,
     extra_parameters: Any = None,
 ) -> dict[str, str]:
+    if (
+        isinstance(value, dict)
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    ):
+        return resolve_executable_date_range(value).payload
     return resolve_executable_date_range(
         value,
         extra_parameters=extra_parameters if isinstance(extra_parameters, dict) else None,
@@ -1083,8 +1086,15 @@ def _resolve_execution_realism(
     extra_parameters = strategy.get("extra_parameters")
     if not isinstance(extra_parameters, dict):
         extra_parameters = {}
-    fee_rate = _as_optional_float(extra_parameters.get("fee_rate"))
-    slippage = _as_optional_float(extra_parameters.get("slippage"))
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+    fee_rate, slippage = (
+        _as_optional_float(extra_parameters.get(field_name))
+        if field_provenance.get(field_name) == "explicit_user"
+        else None
+        for field_name in ("fee_rate", "slippage")
+    )
     if isinstance(optional_parameters, dict):
         if fee_rate is None:
             fee_rate = _as_optional_float(
@@ -1112,7 +1122,7 @@ def _resolve_execution_realism(
 def _decimal_rate_to_bps(value: float | None) -> float:
     if value is None:
         return 0.0
-    return value * 10000.0
+    return float(Decimal(str(value)) * Decimal("10000"))
 
 
 def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:

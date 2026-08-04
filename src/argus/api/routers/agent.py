@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import os
-import time
 from collections.abc import AsyncIterator
-from contextlib import suppress
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -14,8 +10,20 @@ from loguru import logger
 
 from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.resolution import mention_to_provenance
-from argus.agent_runtime.runtime import stream_agent_turn_events
+from argus.agent_runtime.runtime import build_workflow_input, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.turn_execution import (
+    RuntimeEventTimeoutError as TurnRuntimeEventTimeoutError,
+)
+from argus.agent_runtime.turn_execution import (
+    apply_turn_progress_evidence,
+    claim_turn_terminal,
+    record_exit_progress,
+    runtime_events_with_keepalive,
+    set_turn_entry_state,
+    turn_execution_scope,
+    turn_execution_summary,
+)
 from argus.api import state as api_state
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
@@ -25,12 +33,20 @@ from argus.api.chat.actions import (
     is_cancel_confirmation_action,
     is_confirmation_action,
     is_result_action,
+    latest_active_confirmation_id,
     missing_run_confirmation_action_id_message,
+    persisted_chat_action,
+    recent_confirmation_messages,
     recent_metadata_invalidates_confirmation,
     run_for_result_action,
     stale_confirmation_action_message,
 )
+from argus.api.chat.allowance import (
+    check_message_allowance,
+    ordinary_turn_settlement,
+)
 from argus.api.chat.artifacts import (
+    confirmation_id_for_runtime_card,
     result_fact_bank,
     result_followup_metadata_from_run,
     saved_strategy_metadata,
@@ -41,25 +57,43 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
+from argus.api.chat.cancellation import (
+    complete_confirmation_cancellation,
+    prepare_confirmation_cancellation,
+)
+from argus.api.chat.discovery_evidence import (
+    discovery_allowance_available,
+    record_discovery_search_evidence,
+)
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
-from argus.api.chat.onboarding import (
-    parse_onboarding_control_message,
-    persist_onboarding_update,
-)
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
-    _recent_messages_for_conversation,
     checkpoint_has_pending_confirmation,
     confirmation_metadata_fallback_context,
     failed_action_metadata_fallback_context,
     latest_result_fallback_context,
     mark_terminal_runtime_failure_checkpoint,
-    pending_strategy_metadata_fallback_context,
+    ordinary_turn_metadata_fallback_context,
     runtime_checkpoint_values,
 )
+from argus.api.chat.request_admission import (
+    prepare_chat_request_admission,
+    reject_invalid_non_run_confirmation_action,
+)
+from argus.api.chat.result_actions import result_action_request_type
+from argus.api.chat.retest import (
+    complete_retest_turn,
+    failed_retest_turn,
+    is_retest_action,
+    prepare_retest_turn,
+)
 from argus.api.chat.route_receipts import persist_route_receipts
+from argus.api.chat.run_action_identity import (
+    require_run_action_identity,
+    validated_optional_idempotency_key,
+)
 from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
@@ -76,29 +110,35 @@ from argus.api.chat.streaming import (
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
+from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
-    create_message,
     latest_unresolved_terminal_runtime_failure_metadata,
     load_runtime_thread_history,
+    reconcile_stale_chat_turns,
 )
-from argus.api.naming import get_starter_prompts, resolve_language
-from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
+from argus.api.naming import get_starter_prompts
+from argus.api.schemas import (
+    BacktestRun,
+    ChatStreamRequest,
+    StarterPromptsResponse,
+    User,
+)
 from argus.domain.backtest_finalization import BacktestFinalizationError
-from argus.domain.supabase_gateway import QuotaExceededError
+from argus.domain.usage_limits import (
+    SIMULATION_USAGE_RESOURCE,
+    allowance_windows,
+)
+from argus.domain.visitor_usage import visitor_key_for
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
 )
+from argus.llm.openrouter_key_policy import openrouter_traffic_class
 
 router = APIRouter(tags=["agent"])
 RUNTIME_EVENT_TIMEOUT_SECONDS = 120.0
 RUNTIME_EVENT_KEEPALIVE_SECONDS = 15.0
-
-
-class RuntimeEventTimeoutError(asyncio.TimeoutError):
-    def __init__(self, diagnostics: dict[str, Any]) -> None:
-        super().__init__("agent_runtime_event_timeout")
-        self.diagnostics = diagnostics
+RuntimeEventTimeoutError = TurnRuntimeEventTimeoutError
 
 
 def _runtime_event_timeout_seconds() -> float:
@@ -132,78 +172,15 @@ def _positive_float_env(name: str, default: float, *, min_value: float) -> float
     return max(value, min_value)
 
 
-async def _cancel_runtime_event_task(
-    runtime_event_task: asyncio.Task[dict[str, Any]],
-) -> None:
-    runtime_event_task.cancel()
-    with suppress(asyncio.CancelledError, StopAsyncIteration):
-        await runtime_event_task
-
-
 async def _runtime_events_with_keepalive(
     runtime_events: AsyncIterator[dict[str, Any]],
 ) -> AsyncIterator[dict[str, Any] | None]:
-    next_runtime_event: asyncio.Task[dict[str, Any]] | None = None
-    next_runtime_event_started = time.monotonic()
-    runtime_timeout_seconds = _runtime_event_timeout_seconds()
-    runtime_keepalive_seconds = _runtime_event_keepalive_seconds()
-    last_event: dict[str, str] | None = None
-    event_count = 0
-
-    try:
-        while True:
-            if next_runtime_event is None:
-                next_runtime_event = asyncio.create_task(anext(runtime_events))
-                next_runtime_event_started = time.monotonic()
-            try:
-                elapsed_seconds = time.monotonic() - next_runtime_event_started
-                remaining_seconds = runtime_timeout_seconds - elapsed_seconds
-                if remaining_seconds <= 0:
-                    raise asyncio.TimeoutError
-                runtime_event = await asyncio.wait_for(
-                    asyncio.shield(next_runtime_event),
-                    timeout=min(runtime_keepalive_seconds, remaining_seconds),
-                )
-                next_runtime_event = None
-            except asyncio.TimeoutError:
-                if (
-                    time.monotonic() - next_runtime_event_started
-                    >= runtime_timeout_seconds
-                ):
-                    elapsed_seconds = time.monotonic() - next_runtime_event_started
-                    await _cancel_runtime_event_task(next_runtime_event)
-                    next_runtime_event = None
-                    raise RuntimeEventTimeoutError(
-                        {
-                            "code": "agent_runtime_event_timeout",
-                            "timeout_seconds": runtime_timeout_seconds,
-                            "elapsed_seconds": round(elapsed_seconds, 3),
-                            "keepalive_seconds": runtime_keepalive_seconds,
-                            "event_count": event_count,
-                            "last_event": last_event,
-                        }
-                    ) from None
-                yield None
-                continue
-            except StopAsyncIteration:
-                break
-            event_count += 1
-            last_event = _runtime_event_boundary(runtime_event)
-            yield runtime_event
-    finally:
-        if next_runtime_event is not None and not next_runtime_event.done():
-            await _cancel_runtime_event_task(next_runtime_event)
-
-
-def _runtime_event_boundary(runtime_event: dict[str, Any]) -> dict[str, str]:
-    boundary = {"type": str(runtime_event.get("type") or "unknown")}
-    stage = runtime_event.get("stage")
-    if stage not in (None, "", [], {}):
-        boundary["stage"] = str(stage)
-    outcome = runtime_event.get("outcome")
-    if outcome not in (None, "", [], {}):
-        boundary["outcome"] = str(outcome)
-    return boundary
+    async for event in runtime_events_with_keepalive(
+        runtime_events,
+        runtime_timeout_seconds=_runtime_event_timeout_seconds(),
+        runtime_keepalive_seconds=_runtime_event_keepalive_seconds(),
+    ):
+        yield event
 
 
 def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
@@ -214,40 +191,6 @@ def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
 def _strategies_enabled() -> bool:
     raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
     return raw in {"1", "true", "yes", "on"}
-
-
-def _clean_optional_header(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    return stripped or None
-
-
-def _confirmation_artifact_id_from_runtime_result(
-    runtime_result: dict[str, Any],
-) -> str | None:
-    references = runtime_result.get("artifact_references")
-    if not isinstance(references, list):
-        return None
-    for reference in references:
-        if not isinstance(reference, dict):
-            continue
-        if reference.get("artifact_kind") != "confirmation":
-            continue
-        artifact_id = reference.get("artifact_id")
-        if isinstance(artifact_id, str) and artifact_id.strip():
-            return artifact_id.strip()
-    return None
-
-
-def _confirmation_id_for_runtime_card(runtime_result: dict[str, Any]) -> str:
-    from argus.agent_runtime.confirmation_artifacts import confirmation_id_from_payload
-
-    payload = runtime_result.get("confirmation_payload")
-    fallback = _confirmation_artifact_id_from_runtime_result(runtime_result)
-    if isinstance(payload, dict):
-        return confirmation_id_from_payload(payload, fallback=fallback)
-    return fallback or api_state.store.new_id()
 
 
 async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
@@ -278,17 +221,7 @@ def result_breakdown_message_with_metadata(
     return _result_breakdown_message_with_metadata(run, language=language)
 
 
-def _result_action_request_type(runtime_result: dict[str, Any]) -> str | None:
-    request = runtime_result.get("result_action_request")
-    if not isinstance(request, dict):
-        return None
-    action_type = request.get("type")
-    if action_type in {"show_breakdown", "save_strategy"}:
-        return str(action_type)
-    return None
-
-
-def _missing_result_action_run_message(
+def missing_result_action_run_message(
     *,
     action_type: str,
     language: str | None,
@@ -319,9 +252,10 @@ def _missing_result_action_run_message(
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
 def list_starter_prompts(
+    request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> StarterPromptsResponse:
-    prompts = get_starter_prompts(user.onboarding.primary_goal, user.language)
+    prompts = get_starter_prompts(user.language)
     return StarterPromptsResponse(prompts=prompts)
 
 
@@ -332,36 +266,27 @@ async def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
-    clean_idempotency_key = _clean_optional_header(idempotency_key)
+    turn_account = account_context(request)
+    clean_idempotency_key = validated_optional_idempotency_key(
+        request,
+        idempotency_key,
+    )
     headers = {
         "X-Request-Id": request.state.request_id,
         "X-Accel-Buffering": "no",
     }
-    if api_state.supabase_gateway is not None:
-        try:
-            api_state.supabase_gateway.check_and_increment_usage_limits(
-                user_id=user.id,
-                resource="chat_messages",
-                limits=[("day", 200), ("hour", 60)],
-            )
-        except QuotaExceededError as exc:
-            raise problem(
-                request,
-                status_code=429,
-                code="too_many_requests",
-                title="Quota Exceeded",
-                detail=str(exc),
-                headers={"Retry-After": "60"},
-            ) from exc
-        except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
-            logger.warning(
-                "Supabase usage counter failed; using dev memory fallback",
-                error=str(exc),
-                user_id=user.id,
-                resource="chat_messages",
-            )
+    is_run_backtest_turn = (
+        payload.action is not None and payload.action.type == "run_backtest"
+    )
+    cancel_confirmation_action = is_cancel_confirmation_action(payload)
+    if is_run_backtest_turn:
+        require_run_action_identity(
+            payload=payload,
+            request=request,
+            idempotency_key=clean_idempotency_key,
+        )
+    if not is_run_backtest_turn and not cancel_confirmation_action:
+        check_message_allowance(request, user)
 
     current_user_profile = None
     if api_state.supabase_gateway is not None:
@@ -383,7 +308,6 @@ async def chat_stream(
     language = payload.language or current_user_profile.language or "en"
     request_message = chat_request_message(payload, language=language)
     display_message = chat_display_message(payload, language=language)
-    onboarding_goal = parse_onboarding_control_message(request_message)
 
     conversation = None
     if api_state.supabase_gateway is not None:
@@ -403,7 +327,12 @@ async def chat_stream(
             conversation = api_state.store.conversations.get(payload.conversation_id)
     else:
         conversation = api_state.store.conversations.get(payload.conversation_id)
-    if not conversation:
+    memory_owner_id = api_state.store.conversation_owners.get(payload.conversation_id)
+    if not conversation or (
+        api_state.supabase_gateway is None
+        and memory_owner_id is not None
+        and memory_owner_id != user.id
+    ):
         raise problem(
             request,
             status_code=404,
@@ -411,7 +340,30 @@ async def chat_stream(
             title="Not Found",
             detail="Conversation not found.",
         )
+    reconcile_stale_chat_turns(
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
     recent_thread_history = load_runtime_thread_history(
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
+    confirmation_action_messages = recent_confirmation_messages(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
+    cancellation_admission = None
+    if cancel_confirmation_action:
+        cancellation_admission, cancellation_response = prepare_confirmation_cancellation(
+            payload=payload,
+            request=request,
+            recent_messages=confirmation_action_messages or [],
+            headers=headers,
+        )
+        if cancellation_response is not None:
+            return cancellation_response
+    terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
         user_id=user.id,
         conversation_id=conversation.id,
     )
@@ -419,7 +371,6 @@ async def chat_stream(
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
     ]
-    cancel_confirmation_action = is_cancel_confirmation_action(payload)
     runtime_user = UserState(
         user_id=user.id,
         display_name=current_user_profile.display_name,
@@ -430,92 +381,119 @@ async def chat_stream(
             or "en"
         ),
     )
-
-    def persist_request_message() -> Any | None:
-        if onboarding_goal is not None or cancel_confirmation_action:
-            return None
-        user_metadata: dict[str, Any] = {
-            "agent_runtime_turn": {
-                "status": "started",
-                "conversation_id": conversation.id,
-                "request_id": request.state.request_id,
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            }
-        }
-        if mention_provenance:
-            user_metadata["mentions"] = [
-                mention.model_dump(mode="python") for mention in payload.mentions
-            ]
-            user_metadata["resolution_provenance"] = [
-                item.model_dump(mode="python") for item in mention_provenance
-            ]
-        if payload.action is not None:
-            user_metadata["chat_action"] = payload.action.model_dump(mode="python")
-        return create_message(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            role="user",
-            content=display_message,
-            metadata=user_metadata,
-        )
+    stale_confirmation_message = stale_confirmation_action_message(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        recent_messages=confirmation_action_messages,
+        language=language,
+    )
+    reject_invalid_non_run_confirmation_action(
+        payload=payload,
+        request=request,
+        active_confirmation_id=(
+            latest_active_confirmation_id(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                recent_messages=confirmation_action_messages,
+            )
+            if confirmation_action_messages is not None
+            else None
+        ),
+        stale_confirmation_message=stale_confirmation_message,
+        language=language,
+    )
+    retest_turn = prepare_retest_turn(
+        payload=payload,
+        request=request,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        language=language,
+    )
+    request_admission = prepare_chat_request_admission(
+        payload=payload,
+        request=request,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        display_message=display_message,
+        mention_provenance=mention_provenance,
+        enabled=True,
+        language=language,
+        owner="message_only" if is_run_backtest_turn else "ordinary_turn",
+        extra_user_metadata=(
+            {"retest_receipt": dict(retest_turn.receipt)}
+            if retest_turn is not None
+            else None
+        ),
+    )
+    runtime_fallback = RuntimeFallbackContext()
+    validated_result_action_run: BacktestRun | None = None
+    validated_option_source = request_admission.admit_response_option()
+    if validated_option_source is not None:
+        runtime_fallback = validated_option_source.runtime_fallback
+        accepted_option_request = request_admission.request_message_record
+        if accepted_option_request is None:
+            raise RuntimeError("Response-option admission returned no request.")
+        request_message = accepted_option_request.content
+        display_message = accepted_option_request.content
+        if (
+            payload.action is not None
+            and payload.action.payload.get("request_message_id")
+        ):
+            mention_provenance = []
+    lifecycle_hooks = (
+        None if is_run_backtest_turn else request_admission.lifecycle_hooks()
+    )
+    deterministic_control_turn = cancel_confirmation_action or is_retest_action(payload)
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
     try:
-        workflow = api_state.get_agent_runtime_workflow(request)
-        terminal_failure_metadata = latest_unresolved_terminal_runtime_failure_metadata(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        retry_finalization_execution_identity = (
-            chat_retry.retryable_finalization_execution_identity(
-                terminal_failure_metadata,
-                request_message=request_message,
+        if lifecycle_hooks is not None and not deterministic_control_turn:
+            lifecycle_hooks.mark_running()
+        if deterministic_control_turn:
+            checkpoint_values = {}
+        else:
+            workflow = api_state.get_agent_runtime_workflow(request)
+            retry_finalization_execution_identity = (
+                chat_retry.retryable_finalization_execution_identity(
+                    terminal_failure_metadata,
+                    request_message=request_message,
+                )
             )
-        )
-        if terminal_failure_metadata is not None:
-            await mark_terminal_runtime_failure_checkpoint(
+            if terminal_failure_metadata is not None:
+                await mark_terminal_runtime_failure_checkpoint(
+                    workflow=workflow,
+                    conversation_id=conversation.id,
+                    user=runtime_user,
+                    message=request_message,
+                    recent_thread_history=recent_thread_history,
+                    failure_metadata=terminal_failure_metadata,
+                )
+            checkpoint_values = await runtime_checkpoint_values(
                 workflow=workflow,
                 conversation_id=conversation.id,
-                user=runtime_user,
-                message=request_message,
-                recent_thread_history=recent_thread_history,
-                failure_metadata=terminal_failure_metadata,
             )
-        checkpoint_values = await runtime_checkpoint_values(
-            workflow=workflow,
-            conversation_id=conversation.id,
-        )
     except Exception:
         logger.exception(
             "Agent runtime initialization failed",
             conversation_id=conversation.id,
         )
-        persist_request_message()
-        language = payload.language or conversation.language or current_user_profile.language
-        assistant_text = recovery_message("runtime_failure", language=language)
-        retry_metadata = chat_retry.retry_last_turn_metadata(
-            payload=payload,
-            request_message=request_message,
+        lifecycle_hooks = request_admission.lifecycle_hooks()
+        language = (
+            payload.language or conversation.language or current_user_profile.language
         )
+        assistant_text = recovery_message("runtime_failure", language=language)
         recovery = recovery_state(
             "runtime_failure",
             language=language,
-            retryable=retry_metadata is not None,
+            retryable=not is_run_backtest_turn,
         )
         failure_metadata: dict[str, Any] = {
             "conversation_mode": "recovery",
             "agent_runtime_stage_outcome": "agent_runtime_failure",
-            "agent_runtime_turn": {
-                "status": "failed",
-                "terminal": True,
-                "conversation_id": conversation.id,
-                "request_id": request.state.request_id,
-            },
             "recovery": recovery,
         }
-        if retry_metadata is not None:
-            failure_metadata.update(retry_metadata)
         if workflow is not None:
             await mark_terminal_runtime_failure_checkpoint(
                 workflow=workflow,
@@ -525,58 +503,46 @@ async def chat_stream(
                 recent_thread_history=recent_thread_history,
                 failure_metadata=failure_metadata,
             )
-        retry_last_turn = (
-            retry_metadata.get("retry_last_turn")
-            if isinstance(retry_metadata, dict)
-            else None
-        )
-        assistant_message = create_message(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            role="assistant",
+        assistant_message = lifecycle_hooks.recoverable_failure(
             content=assistant_text,
             metadata=failure_metadata,
+            failure_code="runtime_initialization_failed",
+            retryable=not is_run_backtest_turn,
+        )
+        retry_last_turn = (
+            assistant_message.metadata.get("retry_last_turn")
+            if isinstance(assistant_message.metadata, dict)
+            else None
         )
 
         async def initialization_failure_events() -> AsyncIterator[str]:
-            yield sse_data(
-                {
-                    "type": "error",
-                    "code": "agent_runtime_failure",
-                    "message": assistant_text,
-                    "message_id": assistant_message.id,
-                    "recovery": recovery,
-                    **(
-                        {"retry_last_turn": retry_last_turn}
-                        if isinstance(retry_last_turn, dict)
-                        else {}
-                    ),
-                }
-            )
-            yield sse_done()
+            with turn_execution_scope(entry_state={}):
+                claim_turn_terminal(
+                    "recoverable_failed",
+                    "runtime_initialization_failed",
+                )
+                record_exit_progress({}, terminal="recoverable_failed")
+                yield sse_data(
+                    {
+                        "type": "error",
+                        "code": "agent_runtime_failure",
+                        "message": assistant_text,
+                        "message_id": assistant_message.id,
+                        "recovery": recovery,
+                        **(
+                            {"retry_last_turn": retry_last_turn}
+                            if isinstance(retry_last_turn, dict)
+                            else {}
+                        ),
+                    }
+                )
+                yield sse_done()
 
         return StreamingResponse(
             initialization_failure_events(),
             media_type="text/event-stream",
             headers=headers,
         )
-    runtime_fallback = RuntimeFallbackContext()
-    confirmation_action_messages = (
-        _recent_messages_for_conversation(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            limit=20,
-        )
-        if is_confirmation_action(payload)
-        else None
-    )
-    stale_confirmation_message = stale_confirmation_action_message(
-        payload=payload,
-        user_id=user.id,
-        conversation_id=conversation.id,
-        recent_messages=confirmation_action_messages,
-        language=language,
-    )
     if stale_confirmation_message is not None:
         runtime_fallback = RuntimeFallbackContext(
             recovery_message=stale_confirmation_message,
@@ -586,7 +552,7 @@ async def chat_stream(
                 retryable=False,
             ),
         )
-    elif is_confirmation_action(payload):
+    elif is_confirmation_action(payload) and not cancel_confirmation_action:
         metadata_fallback = confirmation_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
@@ -638,9 +604,16 @@ async def chat_stream(
         elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
     elif is_result_action(payload):
+        validated_result_action_run = run_for_result_action(
+            payload=payload,
+            user=user,
+            conversation_id=conversation.id,
+            require_run_id=True,
+        )
         result_fallback = latest_result_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
+            action_run=validated_result_action_run,
         )
         if result_fallback is not None:
             runtime_fallback = result_fallback
@@ -652,52 +625,24 @@ async def chat_stream(
         if failed_fallback is not None:
             runtime_fallback = failed_fallback
     elif payload.action is None:
-        failed_fallback = failed_action_metadata_fallback_context(
+        ordinary_fallback = ordinary_turn_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
+            language=language,
         )
-        if failed_fallback is not None:
-            runtime_fallback = failed_fallback
-        else:
-            confirmation_fallback = confirmation_metadata_fallback_context(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                language=language,
-            )
-            if confirmation_fallback is not None:
-                runtime_fallback = confirmation_fallback
-            else:
-                pending_fallback = pending_strategy_metadata_fallback_context(
-                    user_id=user.id,
-                    conversation_id=conversation.id,
-                )
-                if pending_fallback is not None:
-                    runtime_fallback = pending_fallback
-                else:
-                    result_fallback = latest_result_fallback_context(
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                    )
-                    if result_fallback is not None:
-                        runtime_fallback = result_fallback
-    request_message_record = persist_request_message()
+        if ordinary_fallback is not None:
+            runtime_fallback = ordinary_fallback
+    lifecycle_hooks = request_admission.lifecycle_hooks()
+    request_message_record = lifecycle_hooks.request_message
 
-    # Onboarding feature flag on the API service. Default enabled so prod/QA/tests keep the
-    # flow; dev mode sets it false. The deployed API must set this to match the web
-    # service's NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED — enforced by the API release
-    # env audit in .github/render-env-sync.sh — so onboarding-off is honored on the API,
-    # not just the frontend. (Deliberately NOT read from the NEXT_PUBLIC_* var: that frontend
-    # flag is false in .env, which would disable the onboarding flow in dev/QA and tests.)
-    onboarding_enabled = (
-        os.getenv("ARGUS_PRIVATE_ALPHA_ONBOARDING_ENABLED", "true").strip().lower()
-        != "false"
-    )
-    onboarding_required = onboarding_enabled and (
-        current_user_profile.onboarding.stage
-        in {"language_selection", "primary_goal_selection"}
-    )
+    action_context = request_admission.runtime_action_context()
 
-    async def events() -> AsyncIterator[str]:
+    async def accepted_turn_events(
+        workflow_input: dict[str, Any],
+        workflow_input_error: Exception | None = None,
+    ) -> AsyncIterator[str]:
+        if deterministic_control_turn:
+            lifecycle_hooks.mark_running()
         active_finalization_execution_identity: str | None = None
         naming_language = (
             payload.language
@@ -705,10 +650,35 @@ async def chat_stream(
             or current_user_profile.language
             or "en"
         )
+        receipt_run_id: str | None = None
+        receipt_message_id: str | None = request_message_record.id
+        receipt_metadata: dict[str, Any] = {
+            "request_id": request.state.request_id,
+            "source": "api_turn",
+            "turn_id": request_message_record.id,
+        }
+        receipt_token = begin_openrouter_route_receipt_capture()
+
+        def persist_turn_evidence() -> None:
+            receipts = end_openrouter_route_receipt_capture(receipt_token)
+            receipt_metadata["turn_execution"] = turn_execution_summary(receipts)
+            persist_route_receipts(
+                receipts=receipts,
+                user_id=user.id,
+                conversation_id=conversation.id,
+                run_id=receipt_run_id,
+                message_id=receipt_message_id,
+                metadata=receipt_metadata,
+            )
+
+        def record_control_exit(semantic_turn_act: str, terminal: Any) -> None:
+            exit_state = {**workflow_input, "semantic_turn_act": semantic_turn_act}
+            record_exit_progress(exit_state, terminal=terminal)
 
         def schedule_artifact_naming(
             *,
             assistant_message: str | None,
+            assistant_metadata: dict[str, Any] | None = None,
             current_run: BacktestRun | None = None,
             saved_strategy_id: str | None = None,
             message_id: str | None = None,
@@ -722,6 +692,7 @@ async def chat_stream(
                     saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
+                    assistant_metadata=assistant_metadata,
                     message_id=message_id,
                     run_id=current_run.id if current_run is not None else None,
                 )
@@ -733,216 +704,122 @@ async def chat_stream(
                     saved_strategy_id=saved_strategy_id,
                 )
 
-        if onboarding_required and onboarding_goal is None:
-            lang = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            is_es = resolve_language(lang) == "es-419"
-            msg = (
-                "\u00bfCu\u00e1l es tu objetivo principal ahora? No te preocupes, "
-                "podr\u00e1s cambiarlo despu\u00e9s en Settings."
-                if is_es
-                else "What is your current primary goal? Don't worry, "
-                "you can change it later in Settings."
-            )
-            yield sse_data({"type": "stage_start", "stage": "clarify"})
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=msg,
-            )
-            yield sse_data({"type": "token", "content": msg})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "await_user_reply",
-                        "assistant_response": msg,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            return
-
-        if onboarding_goal is not None:
-            persist_onboarding_update(
-                current_user_profile,
-                {
-                    "stage": "ready",
-                    "language_confirmed": True,
-                    "primary_goal": onboarding_goal,
-                    "completed": False,
-                },
-            )
-            lang = (
-                payload.language
-                or conversation.language
-                or current_user_profile.language
-                or "en"
-            )
-            is_es = resolve_language(lang) == "es-419"
-            if is_es:
-                mapping = {
-                    "learn_basics": (
-                        "Perfecto. Te ayudar\u00e9 con ideas simples para empezar. "
-                        "\u00bfQu\u00e9 activo te interesa?"
-                    ),
-                    "test_stock_idea": (
-                        "Perfecto. Cu\u00e9ntame tu idea de acci\u00f3n y la probamos."
-                    ),
-                    "build_passive_strategy": (
-                        "Perfecto. Podemos empezar con una idea pasiva tipo DCA."
-                    ),
-                    "explore_crypto": (
-                        "Perfecto. Empecemos con una idea de cripto que quieras validar."
-                    ),
-                    "surprise_me": (
-                        "Genial. Te propondr\u00e9 una idea inicial guiada para comenzar."
-                    ),
-                }
-            else:
-                mapping = {
-                    "learn_basics": (
-                        "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
-                        "walk through an asset in plain language, or set up a simple historical test. "
-                        "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
-                    ),
-                    "test_stock_idea": (
-                        "Great. Share the stock idea you want to test and I'll run it."
-                    ),
-                    "build_passive_strategy": (
-                        "Great. We can start with a passive DCA-style idea."
-                    ),
-                    "explore_crypto": (
-                        "Great. Let's start with a crypto idea you want to validate."
-                    ),
-                    "surprise_me": "Great. I'll guide you with a starter idea to begin.",
-                }
-            follow_up = mapping.get(onboarding_goal, mapping["surprise_me"])
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=follow_up,
-            )
-            yield sse_data({"type": "stage_start", "stage": "next_step"})
-            yield sse_data({"type": "token", "content": follow_up})
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": follow_up,
-                        "message_id": assistant_message.id,
-                    },
-                }
-            )
-            yield sse_done()
-            return
-
         if runtime_fallback.recovery_message:
             assistant_text = runtime_fallback.recovery_message
-            metadata = {
+            recovery = runtime_fallback.recovery
+            recovery_code = recovery.get("code") if isinstance(recovery, dict) else None
+            stale_card_redirect = recovery_code == "confirmation_action_stale_card"
+            stage_status = (
+                "ready_to_respond" if stale_card_redirect else "await_user_reply"
+            )
+            metadata: dict[str, Any] = {
                 "conversation_mode": "confirm",
-                "agent_runtime_stage_outcome": "await_user_reply",
+                "agent_runtime_stage_outcome": stage_status,
                 "recovery_reason": "missing_confirmation_checkpoint",
             }
             if payload.action is not None:
-                metadata["chat_action"] = payload.action.model_dump(mode="python")
-            if runtime_fallback.recovery is not None:
-                metadata["recovery"] = dict(runtime_fallback.recovery)
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
+                metadata["chat_action"] = persisted_chat_action(payload)
+            if recovery is not None:
+                metadata["recovery"] = dict(recovery)
+            assistant_message = lifecycle_hooks.complete(
                 content=assistant_text,
                 metadata=metadata,
+                settle_usage=ordinary_turn_settlement(
+                    is_run_backtest_turn=is_run_backtest_turn,
+                    account=turn_account,
+                    visitor_key=(
+                        visitor_key_for(client_identity(request))
+                        if turn_account.kind == "guest"
+                        else None
+                    ),
+                ),
             )
+            progress = "redirected" if stale_card_redirect else "clarification"
+            record_control_exit("retry_failed_action", progress)
+            persist_turn_evidence()
             yield sse_data({"type": "stage_start", "stage": "clarify"})
-            if runtime_fallback.recovery is None:
+            if recovery is None:
                 yield sse_data({"type": "token", "content": assistant_text})
+            yield sse_data(
+                {
+                    "type": "stage_outcome",
+                    "outcome": stage_status,
+                }
+            )
             yield sse_data(
                 {
                     "type": "final",
                     "payload": {
-                        "stage_outcome": "await_user_reply",
+                        "stage_outcome": stage_status,
                         "assistant_response": assistant_text,
                         "message_id": assistant_message.id,
-                        **(
-                            {"recovery": runtime_fallback.recovery}
-                            if runtime_fallback.recovery is not None
-                            else {}
-                        ),
+                        **({"recovery": recovery} if recovery is not None else {}),
                     },
                 }
             )
+            yield sse_done()
+            return
+
+        if retest_turn is not None:
+            try:
+                retest_payload = complete_retest_turn(
+                    turn=retest_turn,
+                    lifecycle_hooks=lifecycle_hooks,
+                    conversation_id=conversation.id,
+                    language=runtime_user.language_preference,
+                    settle_usage=ordinary_turn_settlement(
+                        is_run_backtest_turn=False,
+                        account=turn_account,
+                        visitor_key=(
+                            visitor_key_for(client_identity(request))
+                            if turn_account.kind == "guest"
+                            else None
+                        ),
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "Retest confirmation materialization failed",
+                    conversation_id=conversation.id,
+                    source_run_id=retest_turn.source_run_id,
+                )
+                failure_payload = failed_retest_turn(
+                    turn=retest_turn,
+                    lifecycle_hooks=lifecycle_hooks,
+                    request_message=request_message_record,
+                    language=runtime_user.language_preference,
+                )
+                claim_turn_terminal("recoverable_failed", "agent_runtime_failure")
+                record_control_exit("retest_run", "recoverable_failed")
+                persist_turn_evidence()
+                yield sse_data({"type": "final", "payload": failure_payload})
+                yield sse_done()
+                return
+            record_control_exit("retest_run", "finished")
+            persist_turn_evidence()
+            yield sse_data({"type": "final", "payload": retest_payload})
             yield sse_done()
             return
 
         if cancel_confirmation_action and payload.action is not None:
-            action_payload = payload.action.payload
-            raw_confirmation_id = action_payload.get(
-                "confirmation_id"
-            ) or action_payload.get("confirmationId")
-            confirmation_id = (
-                str(raw_confirmation_id).strip()
-                if raw_confirmation_id is not None
-                else ""
+            assert cancellation_admission is not None
+            _, final_payload = complete_confirmation_cancellation(
+                payload=payload,
+                admission=cancellation_admission,
+                lifecycle_hooks=lifecycle_hooks,
             )
-            confirmation_cancelled = {
-                "confirmation_id": confirmation_id,
-            }
-            artifact_event = {
-                "type": "confirmation_cancelled",
-                "confirmation_id": confirmation_id,
-            }
-            metadata = {
-                "conversation_mode": "confirm",
-                "agent_runtime_stage_outcome": "ready_to_respond",
-                "chat_action": payload.action.model_dump(mode="python"),
-                "artifact_event": artifact_event,
-            }
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content="",
-                metadata=metadata,
-            )
-            yield sse_data(
-                {
-                    "type": "final",
-                    "payload": {
-                        "stage_outcome": "ready_to_respond",
-                        "assistant_response": "",
-                        "message_id": assistant_message.id,
-                        "confirmation_cancelled": confirmation_cancelled,
-                    },
-                }
-            )
+            record_control_exit("approval", "finished")
+            persist_turn_evidence()
+            yield sse_data({"type": "final", "payload": final_payload})
             yield sse_done()
             return
 
-        action_context = (
-            payload.action.model_dump(mode="python")
-            if payload.action is not None
-            else None
-        )
         streamed_text_parts: list[str] = []
-        receipt_run_id: str | None = None
-        receipt_message_id: str | None = None
-        receipt_metadata: dict[str, Any] = {}
-
-        receipt_token = begin_openrouter_route_receipt_capture()
         shadow_context_token = set_backtest_job_shadow_context(
             BacktestJobShadowContext(
                 user_id=user.id,
                 conversation_id=conversation.id,
+                account_kind=turn_account.kind,
                 request_message_id=(
                     request_message_record.id if request_message_record else None
                 ),
@@ -950,9 +827,21 @@ async def chat_stream(
                 idempotency_key=clean_idempotency_key,
                 request_id=request.state.request_id,
                 chat_action=action_context,
+                allowance_limits=allowance_windows(
+                    turn_account,
+                    SIMULATION_USAGE_RESOURCE,
+                ),
+                visitor_key=(
+                    visitor_key_for(client_identity(request))
+                    if turn_account.kind == "guest"
+                    else None
+                ),
             )
         )
         try:
+            if workflow_input_error is not None:
+                raise workflow_input_error
+
             def runtime_event_source(
                 active_workflow: Any,
             ) -> AsyncIterator[dict[str, Any]]:
@@ -961,6 +850,7 @@ async def chat_stream(
                     user=runtime_user,
                     thread_id=conversation.id,
                     message=request_message,
+                    workflow_input=workflow_input,
                     recent_thread_history=recent_thread_history,
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
@@ -1003,14 +893,26 @@ async def chat_stream(
                     continue
 
                 final_seen = True
+                apply_turn_progress_evidence(runtime_event.get("_turn_progress"))
+                discovery_usage_evidence = runtime_event.get("_discovery_usage")
                 runtime_result = dict(runtime_event.get("payload") or {})
+                recovery = runtime_result.get("recovery")
+                if (
+                    isinstance(recovery, dict)
+                    and recovery.get("retryable") is True
+                    and isinstance(runtime_result.get("retry_last_turn"), dict)
+                ):
+                    raise RuntimeError("agent_runtime_typed_recovery")
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
                 from argus.api.chat.confirmation import runtime_confirmation_card
 
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
-                    confirmation_id=_confirmation_id_for_runtime_card(runtime_result),
+                    confirmation_id=confirmation_id_for_runtime_card(
+                        runtime_result,
+                        new_id=api_state.store.new_id,
+                    ),
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
                 )
@@ -1034,9 +936,9 @@ async def chat_stream(
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
-                result_action_run = None
+                result_action_run = validated_result_action_run
                 saved_strategy_id_for_naming: str | None = None
-                result_action_type = _result_action_request_type(runtime_result)
+                result_action_type = result_action_request_type(runtime_result)
                 if (
                     result_action_type is None
                     and payload.action is not None
@@ -1049,13 +951,11 @@ async def chat_stream(
                 if result_card is not None:
                     from argus.api.chat.persistence import persist_runtime_backtest_run
 
-                    active_finalization_execution_identity = (
-                        chat_retry.backtest_finalization_execution_identity(
-                            backtest_job=backtest_job,
-                            retry_execution_identity=retry_finalization_execution_identity,
-                            idempotency_key=clean_idempotency_key,
-                            request_id=request.state.request_id,
-                        )
+                    active_finalization_execution_identity = chat_retry.backtest_finalization_execution_identity(
+                        backtest_job=backtest_job,
+                        retry_execution_identity=retry_finalization_execution_identity,
+                        idempotency_key=clean_idempotency_key,
+                        request_id=request.state.request_id,
                     )
                     run = persist_runtime_backtest_run(
                         user=user,
@@ -1065,20 +965,8 @@ async def chat_stream(
                         quick_take=assistant_text,
                         execution_identity=active_finalization_execution_identity,
                     )
-                    persist_onboarding_update(
-                        current_user_profile,
-                        {
-                            "stage": "completed",
-                            "completed": True,
-                            "language_confirmed": True,
-                            "primary_goal": (
-                                current_user_profile.onboarding.primary_goal
-                                or "surprise_me"
-                            ),
-                        },
-                    )
 
-                metadata = {
+                metadata: dict[str, Any] = {
                     "conversation_mode": (
                         "result_review"
                         if result_card is not None or result_action_type is not None
@@ -1089,27 +977,22 @@ async def chat_stream(
                         else "guide"
                     ),
                     "agent_runtime_stage_outcome": stage_status,
-                    "agent_runtime_turn": {
-                        "status": "succeeded",
-                        "terminal": True,
-                        "conversation_id": conversation.id,
-                        "request_id": request.state.request_id,
-                    },
                 }
                 if payload.action is not None:
-                    metadata["chat_action"] = payload.action.model_dump(mode="python")
+                    metadata["chat_action"] = persisted_chat_action(payload)
                 if result_action_type is not None and payload.action is not None:
                     confirmation_card = None
                     confirmation_anchor_text = None
                     runtime_result.pop("confirmation", None)
                     runtime_result.pop("confirmation_payload", None)
                     runtime_result.pop("active_confirmation_reference", None)
-                    result_action_run = run_for_result_action(
-                        payload=payload,
-                        user=user,
-                        conversation_id=conversation.id,
-                        require_run_id=True,
-                    )
+                    if result_action_run is None:
+                        result_action_run = run_for_result_action(
+                            payload=payload,
+                            user=user,
+                            conversation_id=conversation.id,
+                            require_run_id=True,
+                        )
                     if result_action_type == "show_breakdown":
                         yield sse_data({"type": "stage_start", "stage": "explain"})
                         breakdown_message = result_breakdown_message_with_metadata(
@@ -1128,7 +1011,7 @@ async def chat_stream(
                     elif result_action_type == "save_strategy":
                         yield sse_data({"type": "stage_start", "stage": "next_step"})
                         if result_action_run is None:
-                            assistant_text = _missing_result_action_run_message(
+                            assistant_text = missing_result_action_run_message(
                                 action_type=result_action_type,
                                 language=runtime_user.language_preference,
                             )
@@ -1175,12 +1058,16 @@ async def chat_stream(
                             )
                 for key in (
                     "latest_run_id",
+                    "source_result_run_id",
+                    "strategy_path_id",
                     "result_run_id",
                     "result_strategy_id",
                     "result_conversation_id",
                     "result_fact_bank",
                     "response_intent",
                     "clarification",
+                    "discovery",
+                    "next_experiments",
                 ):
                     value = runtime_result.get(key)
                     if value is not None:
@@ -1299,15 +1186,73 @@ async def chat_stream(
                     )
                     raise RuntimeError("agent_runtime_empty_final")
                 assistant_message = None
-                if persisted_text:
-                    assistant_message = create_message(
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                        role="assistant",
-                        content=persisted_text,
-                        metadata=metadata,
+                if persisted_text or lifecycle_hooks.turn_id is not None:
+                    # Discovery codes only; other retryable recoveries keep
+                    # completed-turn settlement.
+                    retryable_recovery_code = (
+                        str(recovery.get("code"))
+                        if isinstance(recovery, dict)
+                        and recovery.get("retryable") is True
+                        and recovery.get("code")
+                        in {
+                            "discovery_search_failed",
+                            "discovery_suggestions_unavailable",
+                        }
+                        else None
                     )
+                    if retryable_recovery_code is not None:
+                        # Retryable discovery recovery: the lifecycle owns the
+                        # durable retry; completed turns strip it by design.
+                        assistant_message = lifecycle_hooks.recoverable_failure(
+                            content=persisted_text or "",
+                            metadata=metadata,
+                            failure_code=retryable_recovery_code,
+                            retryable=True,
+                        )
+                        durable_retry = (
+                            assistant_message.metadata.get("retry_last_turn")
+                            if isinstance(assistant_message.metadata, dict)
+                            else None
+                        )
+                        if isinstance(durable_retry, dict):
+                            # Live final event carries the message-shape retry;
+                            # the anchored shape renders only from hydration.
+                            runtime_result["retry_last_turn"] = {
+                                key: durable_retry[key]
+                                for key in ("message", "action")
+                                if key in durable_retry
+                            }
+                    else:
+                        assistant_message = lifecycle_hooks.complete(
+                            content=persisted_text or "",
+                            metadata=metadata,
+                            settle_usage=ordinary_turn_settlement(
+                                is_run_backtest_turn=is_run_backtest_turn,
+                                account=turn_account,
+                                visitor_key=(
+                                    visitor_key_for(client_identity(request))
+                                    if turn_account.kind == "guest"
+                                    else None
+                                ),
+                            ),
+                        )
+                    if (
+                        lifecycle_hooks.turn_id is not None
+                        and retryable_recovery_code is None
+                    ):
+                        runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
+                record_discovery_search_evidence(
+                    usage=discovery_usage_evidence,
+                    user_id=user.id,
+                    is_guest=turn_account.kind == "guest",
+                    client_identity=client_identity(request),
+                    conversation_id=conversation.id,
+                    message_id=(
+                        assistant_message.id if assistant_message is not None else None
+                    ),
+                    request_id=request.state.request_id,
+                )
                 receipt_metadata = {
                     "request_id": request.state.request_id,
                     "source": "api_turn",
@@ -1329,7 +1274,14 @@ async def chat_stream(
                     and assistant_text
                 ):
                     yield sse_data({"type": "token", "content": assistant_text})
-                yield sse_data({"type": "final", "payload": runtime_result})
+                from argus.api.chat.confirmation import public_confirmation_projection
+
+                yield sse_data(
+                    {
+                        "type": "final",
+                        "payload": public_confirmation_projection(runtime_result),
+                    }
+                )
                 yield sse_done()
                 schedule_runtime_measurement_events_after_stream(
                     user_id=user.id,
@@ -1339,6 +1291,7 @@ async def chat_stream(
                 )
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
+                    assistant_metadata=metadata,
                     current_run=result_action_run or run,
                     saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
@@ -1351,9 +1304,7 @@ async def chat_stream(
         except Exception as exc:
             finalization_failed = isinstance(exc, BacktestFinalizationError)
             failure_code = (
-                "finalization_failed"
-                if finalization_failed
-                else "agent_runtime_failure"
+                "finalization_failed" if finalization_failed else "agent_runtime_failure"
             )
             runtime_diagnostics = _runtime_failure_diagnostics(exc)
             logger.exception(
@@ -1369,33 +1320,25 @@ async def chat_stream(
                 "conversation_mode": "recovery",
                 "agent_runtime_stage_outcome": "agent_runtime_failure",
                 "failure_code": failure_code,
-                "retryable": finalization_failed,
-                "agent_runtime_turn": {
-                    "status": "failed",
-                    "terminal": True,
-                    "conversation_id": conversation.id,
-                    "request_id": request.state.request_id,
-                },
+                "retryable": finalization_failed or not is_run_backtest_turn,
             }
-            if runtime_diagnostics is not None:
-                failure_metadata["runtime_diagnostics"] = runtime_diagnostics
             if finalization_failed and active_finalization_execution_identity:
                 failure_metadata["backtest_finalization"] = {
                     "execution_identity": active_finalization_execution_identity,
                 }
-            retry_metadata = chat_retry.retry_last_turn_metadata(
-                payload=payload,
-                request_message=request_message,
-                include_structured_action=finalization_failed,
-            )
+            durable_retryable = finalization_failed or not is_run_backtest_turn
             recovery = recovery_state(
                 "runtime_failure",
                 language=runtime_user.language_preference,
-                retryable=finalization_failed or retry_metadata is not None,
+                retryable=durable_retryable,
             )
             failure_metadata["recovery"] = recovery
-            if retry_metadata is not None:
-                failure_metadata.update(retry_metadata)
+            if durable_retryable:
+                failure_metadata.update(
+                    chat_retry.durable_retry_last_turn_metadata(
+                        request_message_record,
+                    )
+                )
             await mark_terminal_runtime_failure_checkpoint(
                 workflow=workflow,
                 conversation_id=conversation.id,
@@ -1404,17 +1347,16 @@ async def chat_stream(
                 recent_thread_history=recent_thread_history,
                 failure_metadata=failure_metadata,
             )
-            retry_last_turn = (
-                retry_metadata.get("retry_last_turn")
-                if isinstance(retry_metadata, dict)
-                else None
-            )
-            assistant_message = create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
+            assistant_message = lifecycle_hooks.recoverable_failure(
                 content=assistant_text,
                 metadata=failure_metadata,
+                failure_code=failure_code,
+                retryable=durable_retryable,
+            )
+            retry_last_turn = (
+                assistant_message.metadata.get("retry_last_turn")
+                if isinstance(assistant_message.metadata, dict)
+                else None
             )
             receipt_message_id = assistant_message.id
             receipt_metadata = {
@@ -1425,6 +1367,15 @@ async def chat_stream(
             }
             if runtime_diagnostics is not None:
                 receipt_metadata["runtime_diagnostics"] = runtime_diagnostics
+            claim_turn_terminal(
+                "recoverable_failed",
+                (
+                    str(runtime_diagnostics.get("code"))
+                    if runtime_diagnostics is not None and runtime_diagnostics.get("code")
+                    else failure_code
+                ),
+            )
+            record_exit_progress(workflow_input, terminal="recoverable_failed")
             yield sse_data(
                 {
                     "type": "error",
@@ -1443,14 +1394,46 @@ async def chat_stream(
             return
         finally:
             reset_backtest_job_shadow_context(shadow_context_token)
-            persist_route_receipts(
-                receipts=end_openrouter_route_receipt_capture(receipt_token),
-                user_id=user.id,
-                conversation_id=conversation.id,
-                run_id=receipt_run_id,
-                message_id=receipt_message_id,
-                metadata=receipt_metadata,
-            )
+            claim_turn_terminal("recoverable_failed", "stream_severed")
+            persist_turn_evidence()
+
+    async def events() -> AsyncIterator[str]:
+        with (
+            openrouter_traffic_class(turn_account.kind),
+            turn_execution_scope(entry_state=checkpoint_values or {}),
+        ):
+            workflow_input_error: Exception | None = None
+            try:
+                workflow_input = build_workflow_input(
+                    user=runtime_user,
+                    message=request_message,
+                    recent_thread_history=recent_thread_history,
+                    discovery_allowance_available=discovery_allowance_available(
+                        user.id,
+                        is_guest=turn_account.kind == "guest",
+                        client_identity=client_identity(request),
+                    ),
+                    context_hints=[
+                        item.model_dump(mode="python") for item in mention_provenance
+                    ],
+                    action_context=action_context,
+                    fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
+                    fallback_selected_thread_metadata=(
+                        runtime_fallback.selected_thread_metadata
+                    ),
+                    fallback_artifact_references=runtime_fallback.artifact_references,
+                    fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+                )
+                set_turn_entry_state(workflow_input)
+            except Exception as exc:
+                workflow_input = {}
+                workflow_input_error = exc
+            accepted_events = accepted_turn_events(workflow_input, workflow_input_error)
+            try:
+                async for event in accepted_events:
+                    yield event
+            finally:
+                await accepted_events.aclose()
 
     return StreamingResponse(
         events(),

@@ -14,11 +14,18 @@ import {
 import { useTranslation } from "react-i18next";
 import { createEvidenceDecision, type DecisionState } from "@/lib/argus-api";
 import {
+  DECISION_NOTE_MAX_LENGTH,
+  decisionNoteCharacterCount,
+  decisionNoteCountIsVisible,
+  nextDecisionNoteValue,
+} from "@/lib/decision-note";
+import {
   type ResultCardDisplayCopy,
   displayResultActionLabel,
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { degradedValueClass, inlineFailureTextClass } from "@/lib/failure-treatment";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
@@ -35,6 +42,11 @@ type StrategyResultCardProps = {
   result: StrategyResultPayload;
   onAction?: (action: ChatActionOption) => void;
   appearance?: "light" | "dark";
+  canSaveDecision?: boolean;
+  onDecisionUnavailable?: (artifactId: string) => void;
+  onDecisionSaved?: (decisionState: DecisionState) => void;
+  resumeDecisionArtifactId?: string | null;
+  onDecisionResumeHandled?: () => void;
 };
 
 const actionClassName =
@@ -49,6 +61,11 @@ const decisionOptions: DecisionState[] = [
 
 export default function StrategyResultCard({
   appearance,
+  canSaveDecision = true,
+  onDecisionUnavailable,
+  onDecisionSaved,
+  resumeDecisionArtifactId,
+  onDecisionResumeHandled,
   onAction,
   result,
 }: StrategyResultCardProps) {
@@ -61,6 +78,7 @@ export default function StrategyResultCard({
   const [decisionNote, setDecisionNote] = useState("");
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [decisionSaveFailed, setDecisionSaveFailed] = useState(false);
+  const decisionNoteCount = decisionNoteCharacterCount(decisionNote);
   useEffect(() => {
     setSavedDecisionState(result.decisionState ?? null);
     if (result.decisionState) {
@@ -97,6 +115,25 @@ export default function StrategyResultCard({
     savedDecisionState ?? result.decisionState ?? null;
   const canAddDecision =
     Boolean(result.evidenceArtifactId) && !visibleDecisionState;
+  useEffect(() => {
+    if (
+      !canSaveDecision ||
+      !canAddDecision ||
+      !result.evidenceArtifactId ||
+      resumeDecisionArtifactId !== result.evidenceArtifactId
+    ) {
+      return;
+    }
+    setDecisionSaveFailed(false);
+    setIsDecisionOpen(true);
+    onDecisionResumeHandled?.();
+  }, [
+    canAddDecision,
+    canSaveDecision,
+    onDecisionResumeHandled,
+    result.evidenceArtifactId,
+    resumeDecisionArtifactId,
+  ]);
   const showActionRail =
     renderedActions.length > 0 ||
     Boolean(showSavedState) ||
@@ -144,9 +181,9 @@ export default function StrategyResultCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName("neutral")}`}
-          >
+          {/* Passive status, not an action: plain muted text so it cannot be
+              mistaken for another clickable pill (kept readable at 4.5:1). */}
+          <span className="text-[11px] font-medium tracking-[0.16px] text-[#505a63] dark:text-white/65">
             {t(
               "chat.simulation_complete",
               result.statusLabel || "Simulation Complete",
@@ -168,11 +205,18 @@ export default function StrategyResultCard({
           <p className="text-[14px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
             {view.hero.label}
           </p>
-          <p
-            className={`mt-1 font-display text-[38px] font-medium leading-none tracking-[-0.38px] sm:text-[46px] ${toneClassName}`}
-          >
-            {view.hero.value}
-          </p>
+          {view.hero.unavailable ? (
+            // Degraded data steps down: never a hero numeral, never a tone.
+            <p className={`mt-1 text-[20px] leading-snug ${degradedValueClass}`}>
+              {view.hero.value}
+            </p>
+          ) : (
+            <p
+              className={`mt-1 font-display text-[38px] font-medium leading-none tracking-[-0.38px] sm:text-[46px] ${toneClassName}`}
+            >
+              {view.hero.value}
+            </p>
+          )}
           <p className="mt-1.5 text-[15px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
             {view.hero.detail}
           </p>
@@ -226,6 +270,10 @@ export default function StrategyResultCard({
             <button
               type="button"
               onClick={() => {
+                if (!canSaveDecision) {
+                  onDecisionUnavailable?.(result.evidenceArtifactId!);
+                  return;
+                }
                 setDecisionSaveFailed(false);
                 setIsDecisionOpen((current) => !current);
               }}
@@ -261,15 +309,28 @@ export default function StrategyResultCard({
           </div>
           <textarea
             value={decisionNote}
-            onChange={(event) => setDecisionNote(event.target.value)}
+            onChange={(event) =>
+              setDecisionNote(
+                nextDecisionNoteValue(decisionNote, event.target.value),
+              )
+            }
             placeholder={t(
               "chat.result_card.decision_note_placeholder",
               "Optional note for future you",
             )}
             className="mt-3 min-h-20 w-full resize-y rounded-[14px] border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-[#191c1f] outline-none transition-colors placeholder:text-[#8d969e] focus:border-black/24 focus:ring-2 focus:ring-black/8 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:focus:border-white/20 dark:focus:ring-white/10"
           />
+          {decisionNoteCountIsVisible(decisionNote) ? (
+            <p className="mt-1 text-right text-[11px] text-[#8d969e]">
+              {t("command_palette.decision_note_count", {
+                count: decisionNoteCount,
+                max: DECISION_NOTE_MAX_LENGTH,
+                defaultValue: `${decisionNoteCount} / ${DECISION_NOTE_MAX_LENGTH}`,
+              })}
+            </p>
+          ) : null}
           {decisionSaveFailed && (
-            <p className="mt-2 text-[12px] text-[#d66d75]">
+            <p role="alert" className={`mt-2 text-[12px] ${inlineFailureTextClass}`}>
               {t(
                 "chat.error_generic",
                 "Something went wrong. Please try again.",
@@ -291,6 +352,10 @@ export default function StrategyResultCard({
               type="button"
               disabled={isSavingDecision}
               onClick={async () => {
+                if (!canSaveDecision) {
+                  onDecisionUnavailable?.(result.evidenceArtifactId!);
+                  return;
+                }
                 if (!result.evidenceArtifactId || isSavingDecision) return;
                 setIsSavingDecision(true);
                 setDecisionSaveFailed(false);
@@ -303,6 +368,7 @@ export default function StrategyResultCard({
                     },
                   );
                   setSavedDecisionState(response.decision.decision_state);
+                  onDecisionSaved?.(response.decision.decision_state);
                   setDecisionNote("");
                   setIsDecisionOpen(false);
                 } catch {
@@ -394,11 +460,16 @@ function StatItem({
   metric,
   variant = "default",
 }: {
-  metric?: { label: string; value: string };
+  metric?: { label: string; value: string; unavailable?: boolean };
   variant?: "default" | "benchmark";
 }) {
   if (!metric) return null;
   const isBenchmark = variant === "benchmark";
+  const valueClass = metric.unavailable
+    ? degradedValueClass
+    : isBenchmark
+      ? "text-[15px] font-normal text-[#505a63] dark:text-[#8d969e] sm:whitespace-nowrap"
+      : "text-[16px] font-medium text-[#191c1f] dark:text-white";
 
   return (
     <div className="min-w-0">
@@ -406,7 +477,7 @@ function StatItem({
         {metric.label}
       </dt>
       <dd
-        className={`mt-1.5 leading-snug tracking-[-0.08px] ${isBenchmark ? "text-[15px] font-normal text-[#505a63] dark:text-[#8d969e] sm:whitespace-nowrap" : "text-[16px] font-medium text-[#191c1f] dark:text-white"}`}
+        className={`mt-1.5 leading-snug tracking-[-0.08px] ${metric.unavailable ? "text-[15px] font-normal" : ""} ${valueClass}`}
       >
         {metric.value}
       </dd>

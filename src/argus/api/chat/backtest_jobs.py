@@ -9,10 +9,23 @@ from contextvars import ContextVar, Token
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from loguru import logger
+
+from argus.agent_runtime.confirmation_artifacts import canonical_launch_identity_payload
+from argus.api.chat.backtest_job_envelopes import (
+    admission_rejection_envelope,
+    async_backtest_job_envelope,
+)
+from argus.domain.backtest_admission import (
+    DEFAULT_GLOBAL_QUEUED_LIMIT,
+    DEFAULT_GLOBAL_RUNNING_LIMIT,
+    DEFAULT_USER_QUEUED_LIMIT,
+    DEFAULT_USER_RUNNING_LIMIT,
+    chat_run_identity_hash,
+)
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 SHADOW_JOB_SCHEMA_VERSION = "backtest_job_launch/v1"
@@ -22,10 +35,6 @@ PROOF_JOB_KIND = "render_workflow_proof"
 REAL_BACKTEST_JOB_KIND = "run_backtest_job"
 RENDER_TASK_RUNS_URL = "https://api.render.com/v1/task-runs"
 WORKFLOW_METADATA_KEY = "workflow_backtest"
-DEFAULT_USER_RUNNING_LIMIT = 1
-DEFAULT_USER_QUEUED_LIMIT = 2
-DEFAULT_GLOBAL_RUNNING_LIMIT = 5
-DEFAULT_GLOBAL_QUEUED_LIMIT = 10
 DEFAULT_STALE_QUEUED_SECONDS = 15 * 60
 DEFAULT_STALE_RUNNING_SECONDS = 15 * 60
 
@@ -34,15 +43,19 @@ DEFAULT_STALE_RUNNING_SECONDS = 15 * 60
 class BacktestJobShadowContext:
     user_id: str
     conversation_id: str
+    account_kind: Literal["guest", "registered"]
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     idempotency_key: str | None = None
     request_id: str | None = None
     chat_action: dict[str, Any] | None = None
+    allowance_limits: list[dict[str, object]] | None = None
+    visitor_key: str | None = None
     created_job_id: str | None = None
     workflow_dispatch_started: bool = False
     workflow_task_run_id: str | None = None
     workflow_dispatch_error: str | None = None
+    admission_decision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -120,12 +133,7 @@ def reset_backtest_job_shadow_context(
 
 
 def payload_hash(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    )
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -261,8 +269,8 @@ def _reconcile_backpressure_blockers(
             continue
         owner_user_id = str(job.get("user_id") or user_id or fallback_user_id)
         before = str(job.get("status") or "").strip().lower()
-        if _should_fail_stale_proof_job_without_task_run(job):
-            reconciled = _fail_stale_proof_job_without_task_run(
+        if should_fail_stale_job_without_task_run(job):
+            reconciled = fail_job_without_task_run(
                 gateway=gateway,
                 user_id=owner_user_id,
                 job=job,
@@ -387,6 +395,13 @@ def reconcile_terminal_render_task_run(
             failure_code=failure_code,
             reconciled_at=_utcnow_iso(),
         ),
+        expected_status=status,
+        expected_updated_at=str(job.get("updated_at") or "").strip() or None,
+    )
+    reconciled = (
+        reconciled
+        or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or ""))
+        or job
     )
     return dict(reconciled)
 
@@ -425,7 +440,11 @@ def scan_stale_backtest_jobs(
     }
     scan_plan = (
         ("queued", queued_age_seconds, ("queued_at", "created_at", "updated_at")),
-        ("running", running_age_seconds, ("started_at", "updated_at", "queued_at", "created_at")),
+        (
+            "running",
+            running_age_seconds,
+            ("started_at", "updated_at", "queued_at", "created_at"),
+        ),
     )
     max_jobs = max(1, limit)
 
@@ -448,7 +467,9 @@ def scan_stale_backtest_jobs(
             if not isinstance(job, dict):
                 continue
             report["scanned_count"] += 1
-            age_seconds = _job_age_seconds(job, now=now_utc, timestamp_keys=timestamp_keys)
+            age_seconds = _job_age_seconds(
+                job, now=now_utc, timestamp_keys=timestamp_keys
+            )
             if age_seconds is not None and age_seconds < stale_after_seconds:
                 continue
 
@@ -464,8 +485,8 @@ def scan_stale_backtest_jobs(
                 continue
 
             try:
-                if task_run_id is None and _is_workflow_proof_job(job):
-                    reconciled = _fail_stale_proof_job_without_task_run(
+                if _is_undispatched_workflow_job(job):
+                    reconciled = fail_job_without_task_run(
                         gateway=gateway,
                         user_id=user_id,
                         job=job,
@@ -508,22 +529,35 @@ def scan_stale_backtest_jobs(
     return report
 
 
-def _is_workflow_proof_job(job: dict[str, Any]) -> bool:
+def _workflow_job_kind(job: dict[str, Any]) -> str:
     launch_payload = _dict_or_empty(job.get("launch_payload"))
-    return launch_payload.get("kind") == PROOF_JOB_KIND
+    return str(launch_payload.get("kind") or "")
 
 
-def _fail_stale_proof_job_without_task_run(
+def _is_undispatched_workflow_job(job: dict[str, Any]) -> bool:
+    status = str(job.get("status") or "").strip().lower()
+    kind = _workflow_job_kind(job)
+    return _task_run_id_from_job(job) is None and (
+        (kind == PROOF_JOB_KIND and status in {"queued", "running"})
+        or (kind == REAL_BACKTEST_JOB_KIND and status == "queued")
+    )
+
+
+def fail_job_without_task_run(
     *,
     gateway: Any,
     user_id: str,
     job: dict[str, Any],
 ) -> dict[str, Any]:
     failure_code = "workflow_dispatch_missing"
-    failure_detail = "Render workflow proof did not record a task run before the stale threshold."
+    kind = _workflow_job_kind(job)
+    failure_detail = (
+        "Render workflow proof did not record a task run before the stale threshold."
+        if kind == PROOF_JOB_KIND
+        else "Backtest workflow did not record a task run."
+    )
     reconciled_at = _utcnow_iso()
     metadata = _dict_or_empty(job.get("execution_metadata"))
-
     workflow_dispatch = _dict_or_empty(metadata.get("workflow_dispatch"))
     workflow_dispatch.update(
         {
@@ -533,43 +567,48 @@ def _fail_stale_proof_job_without_task_run(
         }
     )
     metadata["workflow_dispatch"] = workflow_dispatch
-
-    workflow_metadata = _dict_or_empty(metadata.get("workflow_proof"))
+    workflow_key = "workflow_proof" if kind == PROOF_JOB_KIND else WORKFLOW_METADATA_KEY
+    workflow_metadata = _dict_or_empty(metadata.get(workflow_key))
     workflow_metadata.update(
         {
-            "kind": PROOF_JOB_KIND,
+            "kind": kind,
             "failure_code": failure_code,
             "finished_at": reconciled_at,
         }
     )
-    metadata["workflow_proof"] = workflow_metadata
+    metadata[workflow_key] = workflow_metadata
 
-    return dict(
-        gateway.mark_backtest_job_failed(
-            user_id=user_id,
-            job_id=str(job.get("id") or ""),
-            failure_code=failure_code,
-            failure_detail=failure_detail,
-            retryable=True,
-            finished_at=reconciled_at,
-            execution_metadata=metadata,
-        )
+    job_id = str(job.get("id") or "")
+    current_status = str(job.get("status") or "").strip().lower()
+    failed = gateway.mark_backtest_job_failed(
+        user_id=user_id,
+        job_id=job_id,
+        failure_code=failure_code,
+        failure_detail=failure_detail,
+        retryable=True,
+        finished_at=reconciled_at,
+        execution_metadata=metadata,
+        expected_status=current_status,
+        expected_updated_at=str(job.get("updated_at") or "").strip() or None,
     )
+    if failed:
+        return dict(failed)
+    get_job = getattr(gateway, "get_backtest_job", None)
+    current = get_job(user_id=user_id, job_id=job_id) if get_job else None
+    return dict(current or job)
 
 
 def _stale_seconds_for_status(status: str) -> int:
-    if status == "queued":
-        return DEFAULT_STALE_QUEUED_SECONDS
-    return DEFAULT_STALE_RUNNING_SECONDS
+    return (
+        DEFAULT_STALE_QUEUED_SECONDS
+        if status == "queued"
+        else DEFAULT_STALE_RUNNING_SECONDS
+    )
 
 
-def _should_fail_stale_proof_job_without_task_run(job: dict[str, Any]) -> bool:
+def should_fail_stale_job_without_task_run(job: dict[str, Any]) -> bool:
     status = str(job.get("status") or "").strip().lower()
-    if status not in {"queued", "running"}:
-        return False
-    if not _is_workflow_proof_job(job):
-        return False
-    if _task_run_id_from_job(job) is not None:
+    if not _is_undispatched_workflow_job(job):
         return False
     age_seconds = _job_age_seconds(
         job,
@@ -765,7 +804,9 @@ class ShadowBacktestJobTool:
         )
 
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
-        job = self._maybe_create_shadow_job(payload)
+        job, rejection = self._maybe_create_shadow_job(payload)
+        if rejection is not None:
+            return rejection
         if self._should_return_async_job(job):
             return async_backtest_job_envelope(job)
         if self._delegate is None:
@@ -775,16 +816,24 @@ class ShadowBacktestJobTool:
             )
         return self._delegate.run(payload)
 
-    def _maybe_create_shadow_job(self, payload: dict[str, Any]) -> dict[str, Any] | None:
-        if not backtest_jobs_shadow_enabled():
-            return None
+    def _maybe_create_shadow_job(
+        self, payload: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        from argus.api.guest_observability import guest_session_allowance_present
 
         context = current_backtest_job_shadow_context()
+        guest_admission_required = (
+            context is not None
+            and guest_session_allowance_present(context.allowance_limits)
+        )
+        if not backtest_jobs_shadow_enabled() and not guest_admission_required:
+            return None, None
+
         if context is None:
             logger.warning(
                 "Backtest job shadow flag enabled without request context; skipping",
             )
-            return None
+            return None, None
 
         try:
             gateway = self._gateway_getter()
@@ -792,51 +841,50 @@ class ShadowBacktestJobTool:
                 raise RuntimeError(
                     "Supabase persistence is required for shadow backtest jobs."
                 )
-            backpressure_reason = _backpressure_reason(
-                gateway=gateway,
-                user_id=context.user_id,
-                limits=backtest_job_backpressure_limits(),
-            )
-            if backpressure_reason is not None:
-                logger.warning(
-                    "Shadow backtest job backpressure hit; skipping durable job",
-                    reason=backpressure_reason,
-                    user_id=context.user_id,
-                    conversation_id=context.conversation_id,
-                )
-                return None
-            payload_digest = payload_hash(payload)
-            job = gateway.create_backtest_job(
-                user_id=context.user_id,
+            payload_digest = payload_hash(canonical_launch_identity_payload(payload))
+            confirmation_id = None
+            if isinstance(context.chat_action, dict):
+                raw_confirmation = context.chat_action.get("confirmation_id")
+                if isinstance(raw_confirmation, str) and raw_confirmation.strip():
+                    confirmation_id = raw_confirmation.strip()
+            identity_hash = chat_run_identity_hash(
                 conversation_id=context.conversation_id,
-                request_message_id=context.request_message_id,
-                confirmation_message_id=context.confirmation_message_id,
-                idempotency_key=context.idempotency_key,
-                payload_hash=payload_digest,
+                confirmation_id=confirmation_id or context.idempotency_key,
+                launch_payload_hash=payload_digest,
+            )
+            admission = self._admit_durable_job(
+                gateway=gateway,
+                context=context,
+                identity_hash=identity_hash,
+                payload_digest=payload_digest,
                 launch_payload=shadow_launch_payload(
                     payload=payload,
                     context=context,
                 ),
-                execution_metadata={
-                    "shadow_mode": True,
-                    "source": "api_chat",
-                    "request_id": context.request_id,
-                    "payload_hash": payload_digest,
-                },
             )
+            if admission.decision not in ("admitted", "replay"):
+                return None, admission_rejection_envelope(admission.decision)
+            job = admission.job
+            if job is None:
+                return None, admission_rejection_envelope("missing_job")
+            context.admission_decision = admission.decision
             job_id = str(job.get("id") or "").strip()
             if job_id:
                 context.created_job_id = job_id
-                self._maybe_dispatch_shadow_job(
-                    gateway=gateway,
-                    context=context,
-                    job_id=job_id,
-                    job=job,
-                    payload_digest=payload_digest,
-                )
-                return dict(job)
+                if admission.decision == "replay":
+                    self._restore_existing_dispatch_context(context=context, job=job)
+                    return dict(job), None
+                if backtest_jobs_shadow_enabled():
+                    job = self._maybe_dispatch_shadow_job(
+                        gateway=gateway,
+                        context=context,
+                        job_id=job_id,
+                        job=job,
+                        payload_digest=payload_digest,
+                    )
+                return dict(job), None
         except Exception as exc:
-            if not self._dev_memory_fallback_getter():
+            if guest_admission_required or not self._dev_memory_fallback_getter():
                 raise
             logger.warning(
                 "Shadow backtest job creation failed; continuing in-process execution",
@@ -844,12 +892,35 @@ class ShadowBacktestJobTool:
                 user_id=context.user_id,
                 conversation_id=context.conversation_id,
             )
-        return None
+        return None, None
+
+    def _admit_durable_job(
+        self,
+        *,
+        gateway: Any,
+        context: BacktestJobShadowContext,
+        identity_hash: str,
+        payload_digest: str,
+        launch_payload: dict[str, Any],
+    ):
+        from argus.api.chat.backtest_admission_flow import admit_durable_chat_job
+
+        return admit_durable_chat_job(
+            gateway=gateway,
+            context=context,
+            identity_hash=identity_hash,
+            payload_digest=payload_digest,
+            launch_payload=launch_payload,
+            reconcile_blockers=_reconcile_backpressure_blockers,
+        )
 
     @staticmethod
     def _should_return_async_job(job: dict[str, Any] | None) -> bool:
         if job is None:
             return False
+        context = current_backtest_job_shadow_context()
+        if context is not None and context.admission_decision == "replay":
+            return True
         if not (
             backtest_jobs_shadow_enabled()
             and backtest_jobs_dispatch_enabled()
@@ -861,13 +932,14 @@ class ShadowBacktestJobTool:
             return False
         if launch_payload.get("kind") != REAL_BACKTEST_JOB_KIND:
             return False
-        context = current_backtest_job_shadow_context()
         if context is None or context.created_job_id is None:
             return False
         status = str(job.get("status") or "").strip().lower()
         if status in {"succeeded", "failed", "canceled", "expired"}:
             return True
-        return context.workflow_dispatch_started
+        return (
+            context.admission_decision == "admitted" or context.workflow_dispatch_started
+        )
 
     def _maybe_dispatch_shadow_job(
         self,
@@ -877,28 +949,41 @@ class ShadowBacktestJobTool:
         job_id: str,
         job: dict[str, Any],
         payload_digest: str,
-    ) -> None:
+    ) -> dict[str, Any]:
         if not backtest_jobs_dispatch_enabled():
-            return
+            return job
         if self._restore_existing_dispatch_context(context=context, job=job):
-            return
+            return job
         if job.get("result_run_id"):
-            return
+            return job
         job_status = str(job.get("status") or "").strip().lower()
         if job_status and job_status != "queued":
-            return
-
+            return job
         try:
             dispatcher = self._dispatcher_getter()
             if dispatcher is None:
                 raise RuntimeError("Backtest job dispatch is not configured.")
             result = dispatcher.dispatch(
-                job_id=job_id,
-                nonce=payload_digest.removeprefix("sha256:"),
+                job_id=job_id, nonce=payload_digest.removeprefix("sha256:")
             )
-            task_run_id = str(result.get("id") or "").strip() or None
-            context.workflow_dispatch_started = True
-            context.workflow_task_run_id = task_run_id
+        except Exception as exc:
+            context.workflow_dispatch_error = str(exc)
+            logger.warning(
+                "Workflow dispatch failed; terminalizing queued job",
+                error=str(exc),
+                user_id=context.user_id,
+                conversation_id=context.conversation_id,
+                job_id=job_id,
+            )
+            return fail_job_without_task_run(
+                gateway=gateway, user_id=context.user_id, job=job
+            )
+        task_run_id = str(result.get("id") or "").strip() or None
+        context.workflow_dispatch_started, context.workflow_task_run_id = (
+            True,
+            task_run_id,
+        )
+        try:
             gateway.merge_backtest_job_execution_metadata(
                 user_id=context.user_id,
                 job_id=job_id,
@@ -912,16 +997,16 @@ class ShadowBacktestJobTool:
                 },
             )
         except Exception as exc:
-            context.workflow_dispatch_error = str(exc)
-            if not self._dev_memory_fallback_getter():
-                raise
             logger.warning(
-                "Shadow backtest job dispatch failed; continuing in-process execution",
+                "Workflow dispatch metadata persistence failed",
                 error=str(exc),
                 user_id=context.user_id,
                 conversation_id=context.conversation_id,
                 job_id=job_id,
+                workflow_task_run_id=task_run_id,
+                workflow_dispatch_started=True,
             )
+        return job
 
     @staticmethod
     def _restore_existing_dispatch_context(
@@ -940,39 +1025,6 @@ class ShadowBacktestJobTool:
         task_run_id = str(workflow_dispatch.get("task_run_id") or "").strip()
         context.workflow_task_run_id = task_run_id or None
         return True
-
-
-def public_backtest_job_payload(job: dict[str, Any]) -> dict[str, Any]:
-    public_keys = (
-        "id",
-        "conversation_id",
-        "request_message_id",
-        "confirmation_message_id",
-        "status",
-        "result_run_id",
-        "failure_code",
-        "failure_detail",
-        "retryable",
-        "queued_at",
-        "started_at",
-        "finished_at",
-        "created_at",
-        "updated_at",
-    )
-    return {key: job.get(key) for key in public_keys if key in job}
-
-
-def async_backtest_job_envelope(job: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "success": True,
-        "payload": {"backtest_job": public_backtest_job_payload(job)},
-        "error_type": None,
-        "error_message": None,
-        "retryable": False,
-        "capability_context": {
-            "execution_status": str(job.get("status") or "queued"),
-        },
-    }
 
 
 def link_shadow_backtest_job_result(

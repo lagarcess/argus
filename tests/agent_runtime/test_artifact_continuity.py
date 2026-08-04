@@ -19,6 +19,8 @@ from argus.agent_runtime.artifacts.strategy_edits import (
     ArtifactPatch,
     apply_artifact_patch,
 )
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret_actions import (
     structured_action_stage_result_if_applicable,
 )
@@ -67,6 +69,12 @@ def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> N
     assert draft.date_range == {"start": "2021-01-01", "end": "2024-01-31"}
     assert draft.capital_amount == 200
     assert draft.cadence == "monthly"
+    assert draft.extra_parameters["recurring_contribution"] == 200
+    assert draft.extra_parameters["field_provenance"] == {
+        "capital_amount": "prior",
+        "recurring_contribution": "prior",
+        "cadence": "prior",
+    }
     assert draft.timeframe == "1D"
     assert draft.comparison_baseline == "SPY"
 
@@ -98,6 +106,12 @@ def test_result_draft_recovers_dca_contribution_from_config_snapshot() -> None:
     assert draft.date_range == {"start": "2020-01-01", "end": "2026-07-03"}
     assert draft.capital_amount == 500
     assert draft.cadence == "monthly"
+    assert draft.extra_parameters["recurring_contribution"] == 500
+    assert draft.extra_parameters["field_provenance"] == {
+        "capital_amount": "prior",
+        "recurring_contribution": "prior",
+        "cadence": "prior",
+    }
     assert draft.comparison_baseline == "SPY"
 
 
@@ -189,6 +203,79 @@ def test_result_draft_preserves_position_sizing_from_config_snapshot() -> None:
 
     assert draft.sizing_mode == "position_size"
     assert draft.position_size == 10
+
+
+def test_result_draft_preserves_modeled_costs_and_explicit_provenance() -> None:
+    draft = draft_from_result_metadata(
+        {
+            "asset_class": "equity",
+            "symbols": ["MSFT"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["MSFT"],
+                "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+                "resolved_strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 12000,
+                    "benchmark_symbol": "SPY",
+                    "engine_config": {
+                        "_execution_realism": {
+                            "enabled": True,
+                            "fee_bps": 10.0,
+                            "slippage_bps": 5.0,
+                        }
+                    },
+                },
+                "engine_config": {
+                    "_execution_realism": {
+                        "enabled": True,
+                        "fee_bps": 10.0,
+                        "slippage_bps": 5.0,
+                    }
+                },
+            },
+        }
+    )
+
+    assert draft.extra_parameters["fee_rate"] == 0.001
+    assert draft.extra_parameters["slippage"] == 0.0005
+    assert draft.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+
+
+def test_failed_launch_draft_preserves_modeled_costs_and_explicit_provenance() -> None:
+    draft = draft_from_failed_launch_payload(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbols": ["MSFT"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 12000,
+            "benchmark_symbol": "SPY",
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0,
+            },
+        }
+    )
+
+    assert draft.extra_parameters["fee_rate"] == 0.001
+    assert draft.extra_parameters["slippage"] == 0.0005
+    assert draft.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
 
 
 def test_confirmation_draft_prefers_visible_strategy_and_fills_launch_defaults() -> None:
@@ -529,6 +616,85 @@ def test_candidate_append_patch_preserves_anchor_setup() -> None:
     assert patched.capital_amount == 100000
     assert patched.timeframe == "1D"
     assert patched.comparison_baseline == "QQQ"
+
+
+def test_absolute_date_patch_discards_stale_date_intent_and_preserves_costs() -> None:
+    anchored = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold MSFT with modeled execution costs.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range={"start": "2022-01-01", "end": "2022-12-31"},
+        capital_amount=12000,
+        timeframe="1D",
+        comparison_baseline="SPY",
+        extra_parameters={
+            "date_range_raw_text": "during 2022",
+            "date_range_intent": {"kind": "calendar_year", "year": 2022},
+            "evidence_spans": {"date_range": "during 2022"},
+            "language": "en",
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "field_provenance": {
+                "date_range": "explicit_user",
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    )
+    anchor = resolve_artifact_anchor(
+        snapshot=TaskSnapshot(
+            active_confirmation_reference=ArtifactReference(
+                artifact_kind="confirmation",
+                artifact_id="confirmation-date-edit",
+                artifact_status="active",
+                metadata={
+                    "confirmation_payload": {
+                        "strategy": anchored.model_dump(mode="python"),
+                    },
+                },
+            )
+        )
+    )
+
+    patched = patched_draft_from_candidate(
+        anchor=anchor,
+        candidate=StrategySummary(
+            date_range={"start": "2023-02-01", "end": "2023-11-30"},
+            extra_parameters={
+                "field_provenance": {"date_range": "explicit_user"},
+            },
+        ),
+    )
+
+    assert patched is not None
+    assert patched.extra_parameters["language"] == "en"
+    assert patched.extra_parameters["fee_rate"] == 0.001
+    assert patched.extra_parameters["slippage"] == 0.0005
+    assert patched.extra_parameters["field_provenance"] == {
+        "date_range": "explicit_user",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert "date_range_raw_text" not in patched.extra_parameters
+    assert "date_range_intent" not in patched.extra_parameters
+    assert "date_range" not in patched.extra_parameters.get("evidence_spans", {})
+
+    state = RunState.new(
+        current_user_message="Use February through November 2023.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = patched
+    confirmation = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert confirmation.outcome == "await_approval"
+    assert confirmation.patch["confirmation_payload"]["strategy"]["date_range"] == {
+        "start": "2023-02-01",
+        "end": "2023-11-30",
+    }
 
 
 def test_patched_draft_rejects_asset_universe_without_operation() -> None:

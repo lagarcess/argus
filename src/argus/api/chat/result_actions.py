@@ -18,6 +18,16 @@ class ResultActionTurn:
     final_payload: dict[str, Any]
 
 
+def result_action_request_type(runtime_result: dict[str, Any]) -> str | None:
+    request = runtime_result.get("result_action_request")
+    if not isinstance(request, dict):
+        return None
+    action_type = request.get("type")
+    if action_type in {"show_breakdown", "save_strategy"}:
+        return str(action_type)
+    return None
+
+
 def refine_strategy_action_turn(
     *,
     run: BacktestRun,

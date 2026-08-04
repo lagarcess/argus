@@ -25,8 +25,16 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.discovery import discovery_stage_result_for
+from argus.agent_runtime.coverage_recovery import (
+    preserved_optional_parameter_status_from_response_intent,
+)
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    strategy_route_admission_result,
+    strategy_route_flags_with_future_precedence,
+)
 from argus.agent_runtime.presentation_i18n import (
     asset_universe_operation_clarification_message,
 )
@@ -73,6 +81,9 @@ from argus.agent_runtime.stages.interpret_actions import (
     artifact_followup_stage_result_if_applicable as _artifact_followup_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_actions import (
+    final_interpret_stage_result as _final_interpret_stage_result,
+)
+from argus.agent_runtime.stages.interpret_actions import (
     pending_artifact_followup_stage_result_if_applicable as _pending_artifact_followup_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_actions import (
@@ -94,7 +105,9 @@ from argus.agent_runtime.stages.interpret_internal.answer_composition import (  
     _format_market_mover_symbol,
     _join_context_symbols,
     _LiveContextCuriosityFacts,
+    _compose_unhandled_conversation_answer,
     _llm_composition_unavailable_recovery_answer,
+    _unhandled_response_recovery_if_needed,
     _market_movers_packet_fact_text,
     _market_movers_packet_symbols,
     _mentioned_packet_symbols,
@@ -119,7 +132,6 @@ from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # 
     _dedupe_ambiguous_fields,
     _dedupe_resolution_provenance,
     _dedupe_unsupported_constraints,
-    _educational_turn_has_strategy_baggage,
     _extra_parameters_for_strategy_family,
     _filter_resolved_strategy_ambiguities,
     _fresh_complete_restatement_started_new_confirmation,
@@ -190,8 +202,12 @@ from argus.agent_runtime.stages.interpret_internal.contextual_merge import (  # 
     _strategy_uses_rule_or_indicator_context,
     _strategy_with_contextual_merge,
 )
+from argus.agent_runtime.stages.interpret_internal.benchmark_coverage import (
+    strategy_with_benchmark_price_coverage as _strategy_with_benchmark_price_coverage,
+)
 from argus.agent_runtime.stages.interpret_internal.benchmark_repairs import (
     default_benchmark_for_asset_class as _default_benchmark_for_asset_class,
+    provenance_without_benchmark_disclosures as _without_benchmark_disclosure_provenance,
     strategy_with_default_benchmark as _strategy_with_default_benchmark,
     strategy_with_separate_benchmark_symbol as _strategy_with_separate_benchmark_symbol,
     strategy_with_unstated_benchmark_guard as _strategy_with_unstated_benchmark_guard,
@@ -226,6 +242,7 @@ from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noq
     _strategy_date_evidence_candidates,
     _strategy_date_range_needs_current_message_repair,
     _strategy_has_non_executable_timeframe_label,
+    _strip_unowned_pending_date_candidate,
 )
 from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # noqa: F401
     _LATEST_RESULT_SAVE_REQUESTED_REASON,
@@ -242,6 +259,7 @@ from argus.agent_runtime.stages.interpret_internal.route_repair import (  # noqa
 )
 from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _field_base,
+    _selected_requested_field,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
     _strategy_supplies_explicit_turn_money,
@@ -440,6 +458,7 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
+    is_new_idea_interpretation = interpretation.semantic_turn_act == "new_idea"
     logger.debug(
         "Interpret stage post-LLM repair started",
         intent=interpretation.intent,
@@ -453,6 +472,11 @@ async def _stage_result_from_interpretation(
     interpretation = _repair_fresh_restatement_route_when_pending_need_is_active(
         interpretation=interpretation,
         snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _strip_unowned_pending_date_candidate(
+        interpretation=interpretation,
+        current_user_message=state.current_user_message,
         selected_thread_metadata=selected_thread_metadata,
     )
     interpretation = _repair_pending_date_answer_route_when_pending_need_is_active(
@@ -479,7 +503,10 @@ async def _stage_result_from_interpretation(
             interpretation.candidate_strategy_draft
         )
     )
-    educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
+    (
+        expects_strategy_route,
+        educational_turn_has_strategy_baggage,
+    ) = strategy_route_flags_with_future_precedence(
         interpretation=interpretation,
         expects_strategy_route=expects_strategy_route,
     )
@@ -739,6 +766,9 @@ async def _stage_result_from_interpretation(
         strategy, validated_benchmark_reason_codes = (
             _strategy_with_validated_benchmark_symbol(strategy)
         )
+        strategy, benchmark_coverage_reason_codes = (
+            _strategy_with_benchmark_price_coverage(strategy)
+        )
         strategy, default_benchmark_reason_codes = _strategy_with_default_benchmark(
             strategy
         )
@@ -746,6 +776,7 @@ async def _stage_result_from_interpretation(
             *benchmark_reason_codes,
             *separate_benchmark_reason_codes,
             *validated_benchmark_reason_codes,
+            *benchmark_coverage_reason_codes,
             *default_benchmark_reason_codes,
         ]
     strategy, optional_parameter_values = (
@@ -894,7 +925,12 @@ async def _stage_result_from_interpretation(
         unsupported_strategy_logic_owns_pending_need
         and "draft_only_indicator_text_preserved" in interpretation.reason_codes
     ):
-        missing_required_fields = []
+        missing_required_fields = (
+            ["asset_universe"]
+            if "provider_context_incomplete_asset_mentions"
+            in interpretation.reason_codes
+            else []
+        )
     pending_date_edit_reason_codes: list[str] = []
     # A planned edit or an explicit money answer may change another field
     # while reusing the prior window; that is not a date-answer noop.
@@ -1005,6 +1041,7 @@ async def _stage_result_from_interpretation(
         capability_question_focus=interpretation.capability_question_focus,
         context_question_focus=interpretation.context_question_focus,
         artifact_target=artifact_target,
+        asset_discovery=interpretation.asset_discovery,
     )
     if interpretation.capability_question_focus is not None:
         decision.normalized_signals["capability_question_focus"] = (
@@ -1018,6 +1055,28 @@ async def _stage_result_from_interpretation(
         decision=decision,
         values=optional_parameter_values,
     )
+    preserved_optional_parameter_status = (
+        preserved_optional_parameter_status_from_response_intent(
+            selected_thread_metadata.get("response_intent")
+        )
+    )
+    if (
+        preserved_optional_parameter_status is not None
+        and not is_new_idea_interpretation
+    ):
+        current_optional_parameter_status = optional_parameter_stage_patch.get(
+            "optional_parameter_status"
+        )
+        optional_parameter_stage_patch = {
+            "optional_parameter_status": {
+                **preserved_optional_parameter_status,
+                **(
+                    current_optional_parameter_status
+                    if isinstance(current_optional_parameter_status, dict)
+                    else {}
+                ),
+            }
+        }
     approval_result = _approval_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -1034,6 +1093,11 @@ async def _stage_result_from_interpretation(
     )
     if retry_result is not None:
         return retry_result
+    discovery_result = await discovery_stage_result_for(
+        interpretation=interpretation, decision=decision, state=state, user=user
+    )
+    if discovery_result is not None:
+        return discovery_result
     pending_artifact_followup_result = (
         _pending_artifact_followup_stage_result_if_applicable(
             decision=decision,
@@ -1055,6 +1119,7 @@ async def _stage_result_from_interpretation(
             snapshot=snapshot,
             capability_contract=capability_contract,
             selected_thread_metadata=selected_thread_metadata,
+            corroborating_strategy=decision.candidate_strategy_draft,
         )
         if declined_edit_result is not None:
             return declined_edit_result
@@ -1189,42 +1254,23 @@ async def _stage_result_from_interpretation(
             decision=decision,
             stage_patch={"assistant_response": interpretation.assistant_response},
         )
-    if requires_clarification:
-        stage_patch = dict(optional_parameter_stage_patch)
-        if interpretation.assistant_response:
-            stage_patch["assistant_response"] = interpretation.assistant_response
-        return StageResult(
-            outcome="needs_clarification",
-            decision=decision,
-            stage_patch=stage_patch,
-        )
-    if expects_strategy_route:
-        stage_patch = dict(optional_parameter_stage_patch)
-        # Preserve the artifact-edit planner's honesty note (a mixed
-        # supported/unsupported edit) alongside the confirmation card, so it is
-        # not silently dropped. Scoped to the edit-planner reason code so spurious
-        # clarifications overridden to a confirmation on other routes stay
-        # suppressed; clean edits leave assistant_response None -> no message.
-        if interpretation.assistant_response and "artifact_assumption_edit_planned" in (
-            interpretation.reason_codes or []
-        ):
-            stage_patch["assistant_response"] = interpretation.assistant_response
-        return StageResult(
-            outcome="ready_for_confirmation",
-            decision=decision,
-            stage_patch=stage_patch,
-        )
-    return StageResult(
-        outcome="ready_to_respond",
+    admission_result = strategy_route_admission_result(
+        expects_strategy_route=expects_strategy_route,
         decision=decision,
-        stage_patch=(
-            {
-                **optional_parameter_stage_patch,
-                "assistant_response": interpretation.assistant_response,
-            }
-            if interpretation.assistant_response
-            else optional_parameter_stage_patch
-        ),
+        stage_patch=optional_parameter_stage_patch,
+        contract=capability_contract,
+        optional_parameter_values=optional_parameter_values,
+        assistant_response=interpretation.assistant_response,
+    )
+    if admission_result is not None:
+        return admission_result
+    return _final_interpret_stage_result(
+        decision=decision,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        optional_parameter_stage_patch=optional_parameter_stage_patch,
+        assistant_response=interpretation.assistant_response,
+        language=user.language_preference,
     )
 
 
@@ -1641,23 +1687,20 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StructuredInterpretation:
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
-    candidate_endpoints = _date_range_endpoints(
-        interpretation.candidate_strategy_draft.date_range
-    )
+    candidate_endpoints = _date_range_endpoints(interpretation.candidate_strategy_draft.date_range)
     if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
         return interpretation
     if candidate_endpoints is not None and any(candidate_endpoints):
         return interpretation
     if (
         interpretation.semantic_turn_act != "answer_pending_need"
+        and "date_range_refinement" not in interpretation.reason_codes
         and not interpretation.requires_clarification
         and _candidate_strategy_has_backtest_shape(
             interpretation.candidate_strategy_draft
@@ -1669,7 +1712,11 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
-        today=date.today(),
+        today=date.today(), allow_result_anchor=True,
+        require_explicit_range=(
+            "pending_date_answer_unowned_candidate_stripped"
+            in interpretation.reason_codes
+        ),
         reason_code=(
             "pending_date_answer_current_message_repaired"
             if interpretation.semantic_turn_act == "answer_pending_need"
@@ -1678,6 +1725,9 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     )
     if repaired is None:
         return interpretation
+    repaired.reason_codes = list(
+        dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
+    )
     return repaired
 
 
@@ -1693,9 +1743,7 @@ def _repair_pending_date_answer_noop_from_current_message(
         return interpretation
     if interpretation.requires_clarification:
         return interpretation
-    requested_field = _field_base(
-        str(selected_thread_metadata.get("requested_field") or "")
-    )
+    requested_field = _selected_requested_field(selected_thread_metadata)
     if requested_field != "date_range":
         return interpretation
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
@@ -2126,27 +2174,6 @@ async def _educational_answer_recovery_if_needed(
     return _llm_composition_unavailable_recovery_answer(language=language)
 
 
-async def _unhandled_response_recovery_if_needed(
-    *,
-    semantic_turn_act: SemanticTurnAct | None,
-    expects_strategy_route: bool,
-    requires_clarification: bool,
-    assistant_response: str | None,
-    current_user_message: str,
-    language: str,
-) -> str | None:
-    if expects_strategy_route or requires_clarification or assistant_response:
-        return None
-    composed = await _compose_unhandled_conversation_answer(
-        semantic_turn_act=semantic_turn_act,
-        current_user_message=current_user_message,
-        language=language,
-    )
-    if composed:
-        return composed
-    return _llm_composition_unavailable_recovery_answer(language=language)
-
-
 async def _compose_general_educational_answer(
     *,
     current_user_message: str,
@@ -2164,54 +2191,6 @@ async def _compose_general_educational_answer(
                 "concise, avoid report tone, do not name data vendors, do not imply "
                 "live news coverage, and do not give investment advice. End with one "
                 "nearby historical experiment or recoverable next step when useful."
-            ),
-        },
-        {"role": "user", "content": current_user_message},
-    ]
-    try:
-        response = await invoke_openrouter_chat_completion(
-            task="chat_composer",
-            messages=messages,
-        )
-    except Exception:
-        return None
-    cleaned = str(response or "").strip()
-    return cleaned or None
-
-
-async def _compose_unhandled_conversation_answer(
-    *,
-    semantic_turn_act: SemanticTurnAct | None,
-    current_user_message: str,
-    language: str = "en",
-) -> str | None:
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are Argus, a chat-first investing experimentation assistant. "
-                "The runtime has no executable strategy, no clarification contract, "
-                "and no user-facing answer for this turn. "
-                f"{response_language_instruction(language)} "
-                "Recover by answering in warm, plain language. Do not use report tone. "
-                "Do not name data "
-                "vendors, imply live market-news coverage, invent current facts, "
-                "or give investment advice. Preserve continuity of exploration by "
-                "offering one nearby historical experiment or recoverable next step "
-                "from the supported experiment paths. Do not suggest live screens, "
-                "feeds, rankings, sector screens, filter pipelines, volume-surge "
-                "tests, event-driven execution, or macro data as direct trading "
-                "signals."
-            ),
-        },
-        {
-            "role": "system",
-            "content": f"Semantic turn act: {semantic_turn_act or 'unspecified'}",
-        },
-        {
-            "role": "system",
-            "content": (
-                "Supported experiment paths: " f"{_supported_experiment_fact_packet()}"
             ),
         },
         {"role": "user", "content": current_user_message},
@@ -2331,14 +2310,18 @@ def _strategy_with_requested_asset_answer_resolution(
     semantic_turn_act: str | None,
     pending_resolution_applied: bool,
 ) -> tuple[StrategySummary, bool]:
-    if pending_resolution_applied:
+    if pending_resolution_applied or semantic_turn_act in {
+        "new_idea",
+        # A typed discovery ask names assets to ask ABOUT them, never to
+        # answer a pending asset slot.
+        "asset_discovery",
+    }:
         return strategy, False
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
     )
     if requested_field != "asset_universe":
         return strategy, False
-    del semantic_turn_act
     prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
     if len(prior_symbols) > 1:
         # This corridor fills a single asset slot; multi-asset universes are
@@ -2543,12 +2526,14 @@ async def _planned_active_confirmation_edit_when_interpreter_unavailable(
     current_user_message: str,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StageResult | None:
     interpretation = await _planned_active_confirmation_edit_interpretation(
         snapshot=snapshot,
         current_user_message=current_user_message,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        corroborating_strategy=corroborating_strategy,
     )
     if interpretation is None:
         return None
@@ -2571,6 +2556,7 @@ async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
     requested_field: str,
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StageResult | None:
     interpretation = await _planned_pending_confirmation_edit_interpretation(
         snapshot=snapshot,
@@ -2578,6 +2564,7 @@ async def _planned_pending_confirmation_edit_from_chip_clarify_answer(
         requested_field=requested_field,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        corroborating_strategy=corroborating_strategy,
     )
     if interpretation is None:
         return None
@@ -2630,6 +2617,7 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
             capability_contract=capability_contract,
             selected_thread_metadata=selected_thread_metadata,
             requested_field=pending_confirmation_requested_field,
+            corroborating_strategy=interpretation.candidate_strategy_draft,
         )
     if _structured_interpretation_has_complete_typed_asset_patch(interpretation):
         return None
@@ -2640,6 +2628,7 @@ async def _planned_active_confirmation_edit_for_typed_llm_assumption_edit(
         current_user_message=state.current_user_message,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_thread_metadata,
+        corroborating_strategy=interpretation.candidate_strategy_draft,
     )
 
 
@@ -2650,6 +2639,7 @@ async def _planned_edit_after_fact_composer_decline(
     snapshot: TaskSnapshot | None,
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
+    corroborating_strategy: StrategySummary | None = None,
 ) -> StageResult | None:
     """Composer refusal on a resolved fact key re-enters the typed edit contract.
 
@@ -2662,6 +2652,7 @@ async def _planned_edit_after_fact_composer_decline(
         selected_thread_metadata=selected_thread_metadata,
         resolve_asset_candidate=_resolve_asset_candidate_safely,
         plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+        corroborating_strategy=corroborating_strategy,
     )
     if interpretation is None and snapshot is not None:
         interpretation = await _planned_active_confirmation_edit_interpretation(
@@ -2669,6 +2660,7 @@ async def _planned_edit_after_fact_composer_decline(
             current_user_message=state.current_user_message,
             resolve_asset_candidate=_resolve_asset_candidate_safely,
             plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+            corroborating_strategy=corroborating_strategy,
         )
     if interpretation is None:
         interpretation = await _planned_latest_result_edit_interpretation(
@@ -2676,6 +2668,7 @@ async def _planned_edit_after_fact_composer_decline(
             current_user_message=state.current_user_message,
             resolve_asset_candidate=_resolve_asset_candidate_safely,
             plan_artifact_assumption_edit_fn=plan_artifact_assumption_edit,
+            corroborating_strategy=corroborating_strategy,
         )
     if interpretation is None:
         return None
@@ -2821,7 +2814,8 @@ async def _latest_result_followup_when_interpreter_unavailable(
         decision=decision,
         stage_patch={
             "assistant_response": response,
-            "response_intent": result_followup_response_intent("general"),
+            # Failure prose never wears result chrome; the recovery patch
+            # owns this message's presentation.
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",
@@ -2829,7 +2823,7 @@ async def _latest_result_followup_when_interpreter_unavailable(
                     retryable=True,
                 )
                 if used_recovery
-                else {}
+                else {"response_intent": result_followup_response_intent("general")}
             ),
         },
     )
@@ -2888,7 +2882,8 @@ async def _latest_result_followup_recovery_if_applicable(
     stage_patch: dict[str, Any] = {
         "assistant_response": response,
     }
-    if not (save_requested and not _strategies_enabled()):
+    # Failure prose never wears result chrome; the recovery patch owns it.
+    if not (save_requested and not _strategies_enabled()) and not used_recovery:
         stage_patch["response_intent"] = result_followup_response_intent(focus)
     if used_recovery:
         stage_patch.update(
@@ -3019,7 +3014,7 @@ def _canonicalized_strategy(
                 invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        asset_classes.update(provider_context_assets.resolved_asset_classes_from_strategy_context(updated, symbol) or {resolution.asset.asset_class})
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
@@ -3116,6 +3111,21 @@ def _strategy_with_validated_benchmark_symbol(
     benchmark = _normalized_symbol(strategy.comparison_baseline)
     if benchmark is None:
         return strategy, []
+    scrub_reason_codes: list[str] = []
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if (
+        isinstance(field_provenance, dict)
+        and field_provenance.get("comparison_baseline") == "explicit_user"
+    ):
+        # A benchmark the user names this turn retires any earlier
+        # reconciliation disclosure; a fresh clearing re-adds its own.
+        scrubbed = _without_benchmark_disclosure_provenance(
+            strategy.resolution_provenance
+        )
+        if len(scrubbed) != len(strategy.resolution_provenance):
+            strategy = strategy.model_copy(deep=True)
+            strategy.resolution_provenance = scrubbed
+            scrub_reason_codes = ["stale_benchmark_disclosure_retired"]
     try:
         resolution = provider_context_assets.resolution_from_strategy_context(
             strategy,
@@ -3138,16 +3148,32 @@ def _strategy_with_validated_benchmark_symbol(
         if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
             updated = strategy.model_copy(deep=True)
             updated.comparison_baseline = None
-            return updated, ["invalid_benchmark_symbol_cleared"]
+            return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
         canonical = resolution.asset.canonical_symbol.strip().upper()
         if canonical == benchmark:
-            return strategy, []
+            return strategy, scrub_reason_codes
         updated = strategy.model_copy(deep=True)
         updated.comparison_baseline = canonical
-        return updated, ["benchmark_symbol_provider_validated"]
+        # The stated name rides along so a later coverage clearing can
+        # disclose the user's words rather than the canonical symbol.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [*updated.resolution_provenance, resolution.provenance]
+        )
+        return updated, [*scrub_reason_codes, "benchmark_symbol_provider_validated"]
     updated = strategy.model_copy(deep=True)
     updated.comparison_baseline = None
-    return updated, ["invalid_benchmark_symbol_cleared"]
+    if resolution is not None and resolution.status in {"unsupported", "ambiguous"}:
+        # The user named this leg and no clarification will run for it; keep
+        # its provenance so the card discloses exactly this reconciliation.
+        updated.resolution_provenance = _dedupe_resolution_provenance(
+            [
+                *_without_benchmark_disclosure_provenance(
+                    updated.resolution_provenance
+                ),
+                resolution.provenance,
+            ]
+        )
+    return updated, [*scrub_reason_codes, "invalid_benchmark_symbol_cleared"]
 
 
 def _resolve_asset_candidate(

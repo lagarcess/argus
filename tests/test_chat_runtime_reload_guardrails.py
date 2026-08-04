@@ -2,31 +2,32 @@ from __future__ import annotations
 
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+from threading import Event
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from argus.api import state as api_state
 from argus.api.main import app
-from argus.api.message_store import create_message
+from argus.api.message_store import (
+    claim_response_option_action,
+    create_message,
+    prepare_message,
+)
 from argus.api.schemas import BacktestRun
 from argus.domain.store import utcnow
+from argus.llm.openrouter import (
+    clear_openrouter_route_receipts,
+    get_openrouter_route_receipts,
+)
 from fastapi.testclient import TestClient
 
 
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": "test_stock_idea",
-                "completed": False,
-            }
-        },
-    )
     return client
 
 
@@ -135,6 +136,78 @@ def _pending_strategy_metadata() -> dict[str, Any]:
     }
 
 
+def _timeframe_recovery_metadata(symbol: str) -> dict[str, Any]:
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "requested_fields": ["timeframe"],
+        "facts": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": [symbol],
+                "asset_class": "equity",
+            },
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_time_granularity",
+                    "raw_value": "5m",
+                }
+            ],
+        },
+        "options": [
+            {"id": "option_0", "replacement_values": {"timeframe": "1D"}},
+            {"id": "option_1", "replacement_values": {"timeframe": "1h"}},
+        ],
+    }
+    clarification = {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_time_granularity",
+        "prompt_source": "llm_generated",
+        "requested_field": "timeframe",
+        "requested_fields": ["timeframe"],
+        "semantic_needs": ["simplification_choice"],
+        "payload": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": [symbol],
+                "asset_class": "equity",
+            },
+            "raw_value": "5m",
+        },
+        "options": [
+            {
+                "id": "option_0",
+                "compatibility_label": "Retry with daily bars",
+                "replacement_values": {"timeframe": "1D"},
+            },
+            {
+                "id": "option_1",
+                "compatibility_label": "Retry with 1-hour bars",
+                "replacement_values": {"timeframe": "1h"},
+            },
+        ],
+    }
+    return {
+        "conversation_mode": "setup",
+        "agent_runtime_stage_outcome": "await_user_reply",
+        "response_intent": response_intent,
+        "clarification": clarification,
+        "pending_strategy": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": f"Buy and hold {symbol}.",
+                "asset_universe": [symbol],
+                "asset_class": "equity",
+                "timeframe": "5m",
+                "date_range": {"start": "2024-01-01", "end": "2024-01-05"},
+            },
+            "requested_field": "timeframe",
+            "missing_required_fields": ["timeframe"],
+            "response_intent": response_intent,
+        },
+    }
+
+
 def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missing(
     monkeypatch,
 ) -> None:
@@ -203,6 +276,7 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -269,6 +343,7 @@ def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -366,6 +441,7 @@ def test_valid_confirmation_action_reuses_recent_messages_for_metadata_fallback(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -454,12 +530,16 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
         assert kwargs["fallback_selected_thread_metadata"]["requested_field"] == (
             "initial_capital"
         )
+        assert kwargs["fallback_selected_thread_metadata"]["strategy_path_id"] == (
+            clarification_message.id
+        )
         yield {"type": "stage_start", "stage": "interpret"}
         yield {
             "type": "final",
             "payload": {
                 "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL buy and hold.",
+                "strategy_path_id": clarification_message.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "buy_and_hold",
@@ -481,7 +561,7 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
-    create_message(
+    clarification_message = create_message(
         user_id=user_id,
         conversation_id=conversation["id"],
         role="assistant",
@@ -501,7 +581,15 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
     assert final["confirmation"]["summary"]
+    assert final["strategy_path_id"] == clarification_message.id
     assert captured["thread_id"] == conversation["id"]
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert persisted[-1]["metadata"]["strategy_path_id"] == clarification_message.id
+    assert persisted[-1]["metadata"]["confirmation_payload"][
+        "optional_parameters"
+    ]["initial_capital"]["value"] == 10000
 
 
 def test_adjust_assumptions_action_round_trips_pending_edit_after_reload(
@@ -937,13 +1025,14 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -990,13 +1079,14 @@ def test_stale_confirmation_card_without_structured_payload_returns_spanish_reco
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Ejecutar backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "es-419",
         },
@@ -1058,6 +1148,7 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1081,6 +1172,1002 @@ def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
     }
     assert "confirmation was updated" in text.lower()
     assert "latest" in text.lower()
+
+
+def test_stale_confirmation_action_redirects_with_canonical_terminal_evidence(
+    monkeypatch,
+) -> None:
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+    persisted_turn_evidence: list[dict[str, Any]] = []
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    def _capture_turn_evidence(
+        *,
+        metadata: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> None:
+        persisted_turn_evidence.append(
+            dict((metadata or {}).get("turn_execution") or {})
+        )
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "persist_route_receipts",
+        _capture_turn_evidence,
+    )
+    client = _client()
+    clear_openrouter_route_receipts()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_metadata = _confirmation_metadata()
+    old_metadata["confirmation_card"]["confirmation_id"] = "confirm-old"
+    old_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-old"
+    }
+    new_metadata = deepcopy(_confirmation_metadata())
+    new_metadata["confirmation_card"]["confirmation_id"] = "confirm-new"
+    new_metadata["confirmation_card"]["title"] = "NVDA buy and hold"
+    new_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-new"
+    }
+    new_metadata["confirmation_payload"]["strategy"]["asset_universe"] = ["NVDA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=old_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as NVDA using a buy and hold approach.",
+        metadata=new_metadata,
+    )
+    usage_before = deepcopy(api_state.store.usage_counters)
+    messages_before = len(api_state.store.messages[conversation["id"]])
+    jobs_before = len(api_state.store.backtest_jobs)
+    runs_before = len(api_state.store.backtest_runs)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-old"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    raw_frames = [
+        part.removeprefix("data: ").strip()
+        for part in response.text.split("\n\n")
+        if part.startswith("data: ")
+    ]
+    assert [
+        "[DONE]" if raw == "[DONE]" else json.loads(raw)["type"]
+        for raw in raw_frames
+    ] == ["stage_start", "stage_outcome", "final", "[DONE]"]
+    [final] = _stream_payloads(response.text, "final")
+    assert final["stage_outcome"] == "ready_to_respond"
+    assert final["recovery"] == {
+        "code": "confirmation_action_stale_card",
+        "retryable": False,
+    }
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_assistant = persisted[-1]
+    assert persisted_assistant["role"] == "assistant"
+    assert persisted_assistant["metadata"]["agent_runtime_stage_outcome"] == (
+        "ready_to_respond"
+    )
+    assert persisted_assistant["metadata"]["recovery"] == final["recovery"]
+    assert persisted_assistant["metadata"]["chat_action"]["payload"] == {
+        "confirmation_id": "confirm-old"
+    }
+    run_action_messages = [
+        message
+        for message in persisted
+        if message["role"] == "user"
+        and message["metadata"].get("chat_action", {}).get("type") == "run_backtest"
+    ]
+    stale_recoveries = [
+        message
+        for message in persisted
+        if message["role"] == "assistant"
+        and message["metadata"].get("recovery", {}).get("code")
+        == "confirmation_action_stale_card"
+    ]
+    assert messages_before == 2
+    assert len(persisted) == messages_before + 2
+    assert len(run_action_messages) == 1
+    assert len(stale_recoveries) == 1
+    assert api_state.store.chat_turn_lifecycles == {}
+    assert api_state.store.usage_counters == usage_before
+    assert get_openrouter_route_receipts() == []
+    assert len(api_state.store.backtest_jobs) == jobs_before == 0
+    assert len(api_state.store.backtest_runs) == runs_before == 0
+    assert len(persisted_turn_evidence) == 1
+    assert persisted_turn_evidence[0]["progress_outcome"] == "redirected"
+    assert persisted_turn_evidence[0]["terminal"] == "redirected"
+    assert (
+        latest_active_confirmation_id(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        == "confirm-new"
+    )
+    reloaded = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["id"] for message in reloaded] == [
+        message["id"] for message in persisted
+    ]
+
+
+def test_response_option_action_rejects_an_older_recovery_message_identity(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "This stale action must not reach the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    message_count_before = len(
+        client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()["items"]
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "labelKey": "chat.clarification.timeframe_actions.daily",
+                "payload": {
+                    "source_assistant_id": old_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.headers["content-type"].startswith("application/json")
+    assert runtime_calls == 0
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert len(persisted_messages) == message_count_before
+
+
+def test_response_option_action_uses_atomic_source_snapshot_before_checkpoint_read(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "The stale action reached the runtime.",
+            },
+        }
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+
+    async def _checkpoint_race(**_: Any) -> dict[str, Any]:
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="NVDA needs a supported timeframe.",
+            metadata=_timeframe_recovery_metadata("NVDA"),
+        )
+        return {}
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint_race)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": old_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 1
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    accepted_request = next(
+        message
+        for message in persisted_messages
+        if message["role"] == "user"
+    )
+    assert accepted_request["metadata"]["chat_action"]["payload"] == {
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+
+
+def test_failed_response_option_retry_uses_canonical_server_owned_input(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _failing_runtime(**_: Any):
+        raise RuntimeError("forced response-option failure")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _failing_runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    first = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": source.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+    assert first.status_code == 200
+    assert _stream_payloads(first.text, "error")
+    first_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    original_request = next(
+        message
+        for message in first_messages
+        if message["role"] == "user"
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "select_response_option"
+    )
+
+    async def _successful_runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The canonical option was retried.",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _successful_runtime,
+    )
+    retried = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "tampered replay label",
+                "payload": {
+                    "request_message_id": original_request["id"],
+                    "source_assistant_id": "tampered-source",
+                    "option_id": "tampered-option",
+                    "replacement_values": {"timeframe": "5m"},
+                },
+            },
+            "mentions": [
+                {
+                    "id": "asset:equity:MSFT",
+                    "type": "asset",
+                    "label": "Microsoft",
+                    "symbol": "MSFT",
+                    "asset_class": "equity",
+                    "insert_text": "MSFT",
+                    "provider": "alpaca",
+                }
+            ],
+            "language": "en",
+        },
+    )
+
+    assert retried.status_code == 200
+    assert captured["message"] == "Retry with daily bars"
+    assert captured["action_context"]["payload"] == {
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+        "source_assistant_id": source.id,
+        "validated_source_assistant_id": source.id,
+    }
+    assert captured["context_hints"] == []
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    retry_requests = [
+        message
+        for message in persisted
+        if message["role"] == "user"
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "select_response_option"
+    ]
+    assert len(retry_requests) == 2
+    assert retry_requests[-1]["content"] == "Retry with daily bars"
+    assert retry_requests[-1]["metadata"]["chat_action"]["payload"] == {
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+    assert "mentions" not in retry_requests[-1]["metadata"]
+    assert "request_message_id" not in (
+        retry_requests[-1]["metadata"]["chat_action"]["payload"]
+    )
+    assert "source_assistant_id" not in (
+        retry_requests[-1]["metadata"]["chat_action"]["payload"]
+    )
+
+
+@pytest.mark.parametrize(
+    "rejection_case",
+    [
+        "foreign_owner",
+        "foreign_conversation",
+        "completed",
+        "nonretryable",
+        "superseded",
+    ],
+)
+def test_rejected_response_option_retry_never_reaches_runtime_or_mutates(
+    monkeypatch,
+    rejection_case: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _failing_runtime(**_: Any):
+        raise RuntimeError("forced response-option failure")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _failing_runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    first = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": source.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+    assert first.status_code == 200
+    original_request = next(
+        message
+        for message in api_state.store.messages[conversation["id"]]
+        if message.role == "user"
+        and message.metadata.get("chat_action", {}).get("type")
+        == "select_response_option"
+    )
+    lifecycle = api_state.store.chat_turn_lifecycles[original_request.id]
+    if rejection_case == "completed":
+        lifecycle.update(status="completed", failure_code=None, retryable=False)
+    elif rejection_case == "nonretryable":
+        lifecycle.update(status="recoverable_failed", retryable=False)
+    elif rejection_case == "foreign_owner":
+        lifecycle["user_id"] = "00000000-0000-0000-0000-000000000099"
+    elif rejection_case == "superseded":
+        api_state.store.messages[conversation["id"]].append(
+            prepare_message(
+                conversation_id=conversation["id"],
+                role="user",
+                content="Later work",
+            )
+        )
+    retry_conversation = conversation
+    if rejection_case == "foreign_conversation":
+        retry_conversation = _conversation(client)
+
+    runtime_calls = 0
+
+    async def _runtime_must_not_run(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        raise AssertionError("rejected retry reached runtime")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _runtime_must_not_run,
+    )
+    messages_before = deepcopy(api_state.store.messages)
+    lifecycles_before = deepcopy(api_state.store.chat_turn_lifecycles)
+    usage_before = deepcopy(api_state.store.usage_counters)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": retry_conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "tampered replay",
+                "payload": {
+                    "request_message_id": original_request.id,
+                    "source_assistant_id": "tampered-source",
+                    "option_id": "tampered-option",
+                    "replacement_values": {"timeframe": "5m"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert runtime_calls == 0
+    assert api_state.store.messages == messages_before
+    assert api_state.store.chat_turn_lifecycles == lifecycles_before
+    assert api_state.store.usage_counters == usage_before
+
+
+def test_concurrent_response_option_clicks_admit_exactly_one_request(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls: list[str] = []
+
+    async def _checkpoint_race(**_: Any) -> dict[str, Any]:
+        return {}
+
+    async def _runtime(**kwargs: Any):
+        runtime_calls.append(kwargs["action_context"]["payload"]["source_assistant_id"])
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The current recovery was selected.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint_race)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    current_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    action_request = {
+        "conversation_id": conversation["id"],
+        "action": {
+            "type": "select_response_option",
+            "label": "Retry with daily bars",
+            "payload": {
+                "source_assistant_id": current_recovery.id,
+                "option_id": "option_0",
+                "replacement_values": {"timeframe": "1D"},
+            },
+        },
+        "language": "en",
+    }
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(
+            executor.map(
+                lambda _: client.post("/api/v1/chat/stream", json=action_request),
+                range(2),
+            )
+        )
+
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    assert len(runtime_calls) == 1
+    rejected = next(response for response in responses if response.status_code == 409)
+    assert rejected.json()["code"] == "artifact_action_invalid_state"
+
+
+def test_memory_newer_message_wins_before_response_option_admission() -> None:
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    request_message = prepare_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Retry with daily bars",
+        metadata={"chat_action": {"type": "select_response_option"}},
+    )
+    claim_started = Event()
+
+    def _claim():
+        claim_started.set()
+        return claim_response_option_action(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            source_assistant_id=source.id,
+            option_id="option_0",
+            replacement_values={"timeframe": "1D"},
+            request_message=request_message,
+            expected_source_metadata=source.metadata,
+        )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    api_state.store.conversation_message_lock.acquire()
+    try:
+        claimed = executor.submit(_claim)
+        assert claim_started.wait(timeout=5)
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="NVDA needs a supported timeframe.",
+            metadata=_timeframe_recovery_metadata("NVDA"),
+        )
+    finally:
+        api_state.store.conversation_message_lock.release()
+
+    assert claimed.result(timeout=5) is None
+    executor.shutdown()
+
+
+def test_memory_response_option_admission_wins_and_exact_replay_survives_later_message() -> (
+    None
+):
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    source = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    request_message = prepare_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Retry with daily bars",
+        metadata={"chat_action": {"type": "select_response_option"}},
+    )
+    append_started = Event()
+
+    def _append_newer():
+        append_started.set()
+        return create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="A later assistant turn.",
+            metadata={},
+        )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    api_state.store.conversation_message_lock.acquire()
+    try:
+        later_message = executor.submit(_append_newer)
+        assert append_started.wait(timeout=5)
+        accepted = claim_response_option_action(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            source_assistant_id=source.id,
+            option_id="option_0",
+            replacement_values={"timeframe": "1D"},
+            request_message=request_message,
+            expected_source_metadata=source.metadata,
+        )
+    finally:
+        api_state.store.conversation_message_lock.release()
+
+    assert accepted is not None
+    assert accepted.request_message.id == request_message.id
+    assert accepted.request_message.created_at > source.created_at
+    assert later_message.result(timeout=5).created_at > accepted.request_message.created_at
+    replay = claim_response_option_action(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        source_assistant_id=source.id,
+        option_id="option_0",
+        replacement_values={"timeframe": "1D"},
+        request_message=request_message,
+        expected_source_metadata=source.metadata,
+    )
+    assert replay is not None
+    assert replay.source_message.id == source.id
+    assert replay.request_message.id == request_message.id
+    assert sum(
+        message.id == request_message.id
+        for message in api_state.store.messages[conversation["id"]]
+    ) == 1
+    executor.shutdown()
+
+
+@pytest.mark.parametrize("invalid_source", ["missing", "option_mismatch"])
+def test_response_option_action_rejects_unowned_or_mismatched_source(
+    monkeypatch,
+    invalid_source: str,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Invalid source reached the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    current_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    action_payload: dict[str, Any] = {
+        "source_assistant_id": current_recovery.id,
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+    if invalid_source == "missing":
+        action_payload.pop("source_assistant_id")
+    else:
+        action_payload["replacement_values"] = {"timeframe": "1h"}
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": action_payload,
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["id"] for message in persisted_messages] == [
+        current_recovery.id
+    ]
+
+
+def test_response_option_action_rejects_malformed_source_without_persisting_request(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Malformed source reached the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    malformed = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Choose a timeframe.",
+        metadata={
+            "clarification": {
+                "options": [
+                    {
+                        "id": "option_0",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ]
+            }
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": malformed.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert [message["id"] for message in persisted_messages] == [malformed.id]
+
+
+def test_response_option_action_rejects_source_from_another_conversation(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Foreign source reached the runtime.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    target_conversation = _conversation(client)
+    other_conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=target_conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+    foreign_recovery = create_message(
+        user_id=user_id,
+        conversation_id=other_conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": target_conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "payload": {
+                    "source_assistant_id": foreign_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert runtime_calls == 0
+    target_messages = client.get(
+        f"/api/v1/conversations/{target_conversation['id']}/messages"
+    ).json()["items"]
+    assert len(target_messages) == 1
+
+
+def test_response_option_action_accepts_the_current_recovery_message_identity(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The current NVDA recovery was selected.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="AAPL needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("AAPL"),
+    )
+    current_recovery = create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="NVDA needs a supported timeframe.",
+        metadata=_timeframe_recovery_metadata("NVDA"),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "select_response_option",
+                "label": "Retry with daily bars",
+                "labelKey": "chat.clarification.timeframe_actions.daily",
+                "payload": {
+                    "source_assistant_id": current_recovery.id,
+                    "option_id": "option_0",
+                    "replacement_values": {"timeframe": "1D"},
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary.asset_universe == ["NVDA"]
+    assert captured["fallback_selected_thread_metadata"] == {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": "await_user_reply",
+            "fallback_source": "validated_response_option_source",
+            "validated_source_assistant_id": current_recovery.id,
+            "strategy_path_id": current_recovery.id,
+            "response_intent": _timeframe_recovery_metadata("NVDA")["response_intent"],
+        "clarification": _timeframe_recovery_metadata("NVDA")["clarification"],
+        "requested_field": "timeframe",
+    }
+    assert captured["action_context"]["payload"] == {
+        "source_assistant_id": current_recovery.id,
+        "validated_source_assistant_id": current_recovery.id,
+        "option_id": "option_0",
+        "replacement_values": {"timeframe": "1D"},
+    }
+    persisted_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_metadata = repr(
+        [message.get("metadata") for message in persisted_messages]
+    )
+    assert "source_assistant_id" not in persisted_metadata
+    assert "validated_source_assistant_id" not in persisted_metadata
+    assert current_recovery.id not in persisted_metadata
 
 
 def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> None:
@@ -1128,6 +2215,7 @@ def test_stale_confirmation_action_id_returns_spanish_recovery(monkeypatch) -> N
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-old"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1177,6 +2265,7 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1189,18 +2278,9 @@ def test_run_confirmation_action_without_confirmation_id_does_not_execute(
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
-    assert _stream_payloads(response.text, "token") == []
-    final = _stream_payloads(response.text, "final")[0]
-    text = final["assistant_response"]
-    assert final["recovery"] == {
-        "code": "confirmation_action_missing_identity",
-        "retryable": False,
-    }
-    lowered = text.lower()
-    assert "confirmation action" in lowered
-    assert "latest card action" in lowered
 
 
 def test_run_confirmation_action_without_confirmation_id_returns_spanish_recovery(
@@ -1229,6 +2309,7 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1241,15 +2322,9 @@ def test_run_confirmation_action_without_confirmation_id_returns_spanish_recover
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
     assert runtime_calls == 0
-    assert _stream_payloads(response.text, "token") == []
-    final = _stream_payloads(response.text, "final")[0]
-    assert final["recovery"] == {
-        "code": "confirmation_action_missing_identity",
-        "retryable": False,
-    }
-    assert "confirmation action" in final["assistant_response"].lower()
 
 
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
@@ -1292,13 +2367,14 @@ def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -1342,17 +2418,33 @@ def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> N
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assert all(
-        not (
-            message["role"] == "user"
-            and message["metadata"]
-            and message["metadata"].get("chat_action", {}).get("type")
-            == "cancel_confirmation"
-        )
+    cancel_messages = [
+        message
         for message in messages
-    )
+        if message["role"] == "user"
+        and message["metadata"]
+        and message["metadata"].get("chat_action", {}).get("type")
+        == "cancel_confirmation"
+    ]
+    assert len(cancel_messages) == 1
+    cancel_message = cancel_messages[0]
+    assert cancel_message["metadata"]["agent_runtime_turn"]["status"] == "started"
+    assert "terminal" not in cancel_message["metadata"]["agent_runtime_turn"]
+    lifecycle = api_state.store.chat_turn_lifecycles[cancel_message["id"]]
+    assert lifecycle["user_id"] == user_id
+    assert lifecycle["conversation_id"] == conversation["id"]
+    assert lifecycle["status"] == "completed"
     assert messages[-1]["role"] == "assistant"
     assert messages[-1]["content"] == ""
+    assert messages[-1]["metadata"]["agent_runtime_turn"] == {
+        "turn_id": cancel_message["id"],
+        "request_id": cancel_message["metadata"]["agent_runtime_turn"]["request_id"],
+        "status": "completed",
+        "terminal": True,
+        "reconciled_outcome": None,
+        "failure_code": None,
+        "retryable": False,
+    }
     assert messages[-1]["metadata"]["chat_action"]["type"] == "cancel_confirmation"
     assert messages[-1]["metadata"]["artifact_event"] == {
         "type": "confirmation_cancelled",
@@ -1415,6 +2507,7 @@ def test_canceled_confirmation_blocks_stale_checkpoint_run_action(monkeypatch) -
 
     stale_run_response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
@@ -1915,9 +3008,128 @@ def test_refine_strategy_action_preserves_completed_dca_fields_after_reload() ->
     assert strategy["comparison_baseline"] == "SPY"
 
 
+def test_issue_345_compare_recommendation_uses_persisted_result_after_reload() -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    realism = {"enabled": True, "fee_bps": 40.0, "slippage_bps": 0.25}
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["WMT", "HD", "TGT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 20.6}}},
+        config_snapshot={
+            "template": "dca_accumulation",
+            "symbols": ["WMT", "HD", "TGT"],
+            "date_range": {"start": "2021-01-04", "end": "2025-12-31"},
+            "resolved_strategy": {
+                "strategy_type": "dca_accumulation",
+                "asset_universe": ["WMT", "HD", "TGT"],
+                "asset_class": "equity",
+                "date_range": {
+                    "start": "2021-01-04",
+                    "end": "2025-12-31",
+                },
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "capital_amount": 1000,
+                "recurring_contribution": 1000,
+                "cadence": "weekly",
+                "benchmark_symbol": "SPY",
+                "engine_config": {"_execution_realism": dict(realism)},
+            },
+            "engine_config": {"_execution_realism": dict(realism)},
+        },
+        conversation_result_card={
+            "title": "WMT, HD, TGT DCA Accumulation",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": ["40 bps fees", "0.25 bps slippage"],
+            "actions": [],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I tested that idea.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+            "next_experiments": {
+                "version": "argus_next_experiments/v1",
+                "rows": [
+                    {
+                        "kind": "compare_buy_and_hold",
+                        "label": "Compare with buy and hold",
+                        "label_key": (
+                            "chat.next_experiments.labels.compare_buy_and_hold"
+                        ),
+                    }
+                ],
+            },
+        },
+    )
+    api_state.reset_agent_runtime_workflow(app)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Compare with buy and hold",
+                "labelKey": "chat.next_experiments.labels.compare_buy_and_hold",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run.id,
+                    "next_experiment_kind": "compare_buy_and_hold",
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["stage_outcome"] == "await_approval"
+    strategy = final["confirmation_payload"]["strategy"]
+    assert strategy["strategy_type"] == "buy_and_hold"
+    assert strategy["asset_universe"] == ["WMT", "HD", "TGT"]
+    assert strategy["date_range"] == {
+        "start": "2021-01-04",
+        "end": "2025-12-31",
+    }
+    assert strategy["capital_amount"] == 1000
+    assert strategy["timeframe"] == "1D"
+    assert strategy["comparison_baseline"] == "SPY"
+    assert strategy["extra_parameters"]["fee_rate"] == 0.004
+    assert strategy["extra_parameters"]["slippage"] == 0.000025
+
+
 def test_review_one_replay_preserves_result_artifact_through_date_patch(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture"
+    )
     from argus.agent_runtime import resolution as resolution_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.stages.interpret_types import (
@@ -2213,8 +3425,9 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
         yield {
             "type": "final",
             "payload": {
-                "stage_outcome": "ready_for_confirmation",
+                "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL recurring buys.",
+                "source_result_run_id": run.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "dca_accumulation",
@@ -2243,6 +3456,18 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
 
     assert response.status_code == 200
     assert captured["message"].startswith("i want to do recurrent biweekly")
+    [final] = _stream_payloads(response.text, "final")
+    assert final["source_result_run_id"] == run.id
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_confirmation = persisted[-1]
+    assert persisted_confirmation["role"] == "assistant"
+    assert persisted_confirmation["metadata"]["source_result_run_id"] == run.id
+    assert persisted_confirmation["metadata"]["confirmation_payload"] == final[
+        "confirmation_payload"
+    ]
 
 
 def test_refine_strategy_action_uses_card_run_before_runtime_memory(
@@ -2859,6 +4084,9 @@ def test_plain_text_after_pending_edit_prompt_passes_requested_field_to_runtime(
 def test_confirmation_action_asset_edit_round_trips_through_api_metadata(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture"
+    )
     from argus.agent_runtime import resolution as resolution_module
     from argus.agent_runtime.graph.workflow import build_workflow
     from argus.agent_runtime.stages.interpret_types import (
@@ -3083,6 +4311,84 @@ def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) 
     assert reference is not None
     assert reference.artifact_kind == "failed_action"
     assert reference.metadata["launch_payload"] == launch_payload
+
+
+def test_failed_action_reload_keeps_explicit_zero_cost_pending_strategy() -> None:
+    from argus.api.chat.recovery import failed_action_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The run failed, but the idea is still available to retry.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold MSFT.",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2025-05-13",
+                        "end": "2026-05-13",
+                    },
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "comparison_baseline": "SPY",
+                    "extra_parameters": {
+                        "fee_rate": 0.0,
+                        "slippage": 0.0,
+                        "field_provenance": {
+                            "fee_rate": "explicit_user",
+                            "slippage": "explicit_user",
+                        },
+                    },
+                }
+            },
+            "failed_action": {
+                "artifact_id": "failed-zero-cost-run",
+                "action_type": "run_backtest",
+                "launch_payload": launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    fallback = failed_action_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.latest_failed_action_reference is not None
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.extra_parameters["fee_rate"] == 0.0
+    assert pending.extra_parameters["slippage"] == 0.0
+    assert pending.extra_parameters["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
 
 
 def test_structured_retry_action_after_reload_carries_failed_action_reference(
@@ -3762,13 +5068,14 @@ def test_terminal_runtime_failure_reconciles_hidden_pending_checkpoint_before_ac
 
     response = client.post(
         "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "confirm-aapl"},
         json={
             "conversation_id": conversation["id"],
             "action": {
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": "confirm-aapl"},
             },
             "language": "en",
         },
@@ -3943,6 +5250,91 @@ def _seed_completed_run(user_id: str, conversation_id: str) -> str:
     return run_id
 
 
+@pytest.mark.parametrize(
+    "next_experiment_kind",
+    ["change_date_range", "compare_buy_and_hold"],
+)
+def test_historical_recommendation_action_loads_card_run_before_runtime(
+    monkeypatch,
+    next_experiment_kind: str,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Captured the historical action context.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+
+    historical_run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Historical AAPL result.",
+        metadata={
+            "result_run_id": historical_run_id,
+            "latest_run_id": historical_run_id,
+            "result_card": {"title": "Historical AAPL result"},
+        },
+    )
+    latest_run_id = _seed_completed_run(user_id, conversation["id"])
+    latest_run = api_state.store.backtest_runs[latest_run_id]
+    latest_run.symbols = ["MSFT"]
+    latest_run.config_snapshot = {"template": "buy_and_hold", "symbols": ["MSFT"]}
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Latest MSFT result.",
+        metadata={
+            "result_run_id": latest_run_id,
+            "latest_run_id": latest_run_id,
+            "result_card": {"title": "Latest MSFT result"},
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Try next",
+                "presentation": "result",
+                "payload": {
+                    "run_id": historical_run_id,
+                    "next_experiment_kind": next_experiment_kind,
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == latest_run_id
+    references = captured["fallback_artifact_references"]
+    assert {reference.artifact_id for reference in references} == {
+        historical_run_id,
+        latest_run_id,
+    }
+
+
 def _fact_answer_metadata(run_id: str) -> dict[str, Any]:
     return {
         "conversation_mode": "confirm",
@@ -4037,6 +5429,752 @@ def test_fact_answer_message_does_not_invalidate_active_confirmation() -> None:
     assert fallback.latest_task_snapshot is not None
     assert fallback.latest_task_snapshot.active_confirmation_reference is not None
     assert fallback.latest_task_snapshot.latest_backtest_result_reference is not None
+
+
+@pytest.mark.parametrize(
+    ("language", "message"),
+    [
+        ("en", "Keep the current NVDA setup and tell me what is ready."),
+        ("es-419", "Conserva la configuracion actual de NVDA y dime que esta listo."),
+    ],
+)
+def test_issue_272_ordinary_turn_composes_owned_facts_after_failed_action(
+    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    message: str,
+) -> None:
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.recovery import (
+        failed_action_metadata_fallback_context,
+        ordinary_turn_metadata_fallback_context,
+    )
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "I kept the active setup.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+
+    run_id = api_state.store.new_id()
+    completed_run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["MSFT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 14.2}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["MSFT"],
+            "timeframe": "1D",
+            "start_date": "2022-01-03",
+            "end_date": "2022-12-30",
+            "starting_capital": 8000,
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "MSFT buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = completed_run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    confirmation_id = "issue-272-confirm-nvda"
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {**entry_rule, "direction": "bearish"}
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_above",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_below",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+    }
+    requested_range = {"start": "2023-01-01", "end": "2024-12-31"}
+    effective_range = {"start": "2023-01-03", "end": "2024-12-31"}
+    strategy = {
+        "requested_strategy_template": "moving_average_crossover",
+        "strategy_type": "signal_strategy",
+        "strategy_thesis": "Trade NVDA with a 50/200 SMA crossover.",
+        "asset_universe": ["NVDA"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": requested_range,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 25000,
+        "comparison_baseline": "SPY",
+        "entry_logic": "50-day SMA crosses above 200-day SMA",
+        "exit_logic": "50-day SMA crosses below 200-day SMA",
+        "entry_rule": entry_rule,
+        "exit_rule": exit_rule,
+        "rule_spec": rule_spec,
+        "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    }
+    launch_payload = {
+        "strategy_type": "signal_strategy",
+        "symbol": "NVDA",
+        "symbols": ["NVDA"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": effective_range,
+        "requested_date_range": requested_range,
+        "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "adjustment_reason": "calendar_alignment",
+            "requested_date_range": requested_range,
+            "effective_date_range": effective_range,
+            "observations_by_symbol": {"NVDA": 501, "SPY": 501},
+        },
+        "entry_rule": entry_rule,
+        "exit_rule": exit_rule,
+        "rule_spec": rule_spec,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 25000,
+        "position_size": None,
+        "cadence": None,
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
+        "language": language,
+    }
+    confirmation_payload = {
+        "confirmation_id": confirmation_id,
+        "artifact_id": confirmation_id,
+        "strategy": strategy,
+        "optional_parameters": {
+            "fees": {"value": 0.001, "source": "user"},
+            "slippage": {"value": 0.0005, "source": "user"},
+        },
+        "launch_payload": launch_payload,
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The NVDA crossover is ready.",
+        metadata={
+            "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
+            "confirmation_payload": confirmation_payload,
+            "confirmation_card": {
+                "confirmation_id": confirmation_id,
+                "confirmation_state": "active",
+                "title": "NVDA moving average crossover",
+                "status": "ready_to_run",
+                "rows": [],
+                "actions": [
+                    {
+                        "type": "run_backtest",
+                        "payload": {"confirmation_id": confirmation_id},
+                    }
+                ],
+            },
+        },
+    )
+
+    failed_action_id = "issue-272-stale-failed-action"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="An older action failed and can be retried.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "artifact_id": failed_action_id,
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2024-01-02",
+                        "end": "2024-12-31",
+                    },
+                    "capital_amount": 1000,
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    clear_openrouter_route_receipts()
+    runs_before_recovery = deepcopy(api_state.store.backtest_runs)
+    message_ids_before_recovery = [
+        stored_message.id
+        for stored_message in api_state.store.messages[conversation["id"]]
+    ]
+    jobs_before_recovery = deepcopy(api_state.store.backtest_jobs)
+    usage_before_recovery = deepcopy(api_state.store.usage_counters)
+    composed_context = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+
+    assert composed_context is not None
+    assert api_state.store.backtest_runs == runs_before_recovery
+    assert [
+        stored_message.id
+        for stored_message in api_state.store.messages[conversation["id"]]
+    ] == message_ids_before_recovery
+    assert api_state.store.backtest_jobs == jobs_before_recovery == {}
+    assert api_state.store.usage_counters == usage_before_recovery
+    assert get_openrouter_route_receipts() == []
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": message,
+            "language": language,
+        },
+    )
+
+    assert response.status_code == 200
+    assert api_state.store.backtest_runs == runs_before_recovery
+    assert len(api_state.store.backtest_runs) - len(runs_before_recovery) == 0
+    assert api_state.store.backtest_jobs == jobs_before_recovery == {}
+    usage_after_recovery = api_state.store.usage_counters
+    assert {
+        key: value
+        for key, value in usage_after_recovery.items()
+        if key[1] != "chat_messages"
+    } == {
+        key: value
+        for key, value in usage_before_recovery.items()
+        if key[1] != "chat_messages"
+    }
+    for window in ("hour", "day"):
+        chat_key = (user_id, "chat_messages", window)
+        chat_before = int(
+            (usage_before_recovery.get(chat_key) or {}).get("used_count") or 0
+        )
+        chat_after = int(
+            (usage_after_recovery.get(chat_key) or {}).get("used_count") or 0
+        )
+        assert chat_after - chat_before == 1
+
+        run_key = (user_id, "backtest_runs", window)
+        runs_before = int(
+            (usage_before_recovery.get(run_key) or {}).get("used_count") or 0
+        )
+        runs_after = int((usage_after_recovery.get(run_key) or {}).get("used_count") or 0)
+        assert runs_after - runs_before == 0
+    assert get_openrouter_route_receipts() == []
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.active_confirmation_reference is not None
+    assert snapshot.active_confirmation_reference.artifact_id == confirmation_id
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.asset_universe == ["NVDA"]
+    assert pending.capital_amount == 25000
+    assert pending.date_range == requested_range
+    assert pending.timeframe == "1D"
+    assert pending.comparison_baseline == "SPY"
+    assert pending.requested_strategy_template == "moving_average_crossover"
+    assert pending.strategy_type == "signal_strategy"
+    assert pending.entry_rule == entry_rule
+    assert pending.exit_rule == exit_rule
+    assert pending.rule_spec == rule_spec
+    assert pending.extra_parameters == strategy["extra_parameters"]
+    assert captured["fallback_confirmation_payload"] == confirmation_payload
+    assert (
+        captured["fallback_confirmation_payload"]["launch_payload"][
+            "requested_date_range"
+        ]
+        == requested_range
+    )
+    assert (
+        captured["fallback_confirmation_payload"]["launch_payload"]["date_range"]
+        == effective_range
+    )
+    result_reference = snapshot.latest_backtest_result_reference
+    assert result_reference is not None
+    assert result_reference.metadata["result_run_id"] == run_id
+    failed_reference = snapshot.latest_failed_action_reference
+    assert failed_reference is not None
+    assert failed_reference.artifact_id == failed_action_id
+    assert captured["fallback_selected_thread_metadata"]["fallback_source"] == (
+        "message_metadata"
+    )
+
+    reloaded_context = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+    assert reloaded_context is not None
+    reloaded_snapshot = reloaded_context.latest_task_snapshot
+    assert reloaded_snapshot is not None
+    assert reloaded_snapshot.active_confirmation_reference is not None
+    assert reloaded_snapshot.active_confirmation_reference.artifact_id == confirmation_id
+    assert reloaded_snapshot.pending_strategy_summary == pending
+    assert reloaded_snapshot.latest_backtest_result_reference is not None
+    assert (
+        reloaded_snapshot.latest_backtest_result_reference.metadata["result_run_id"]
+        == run_id
+    )
+    assert reloaded_snapshot.latest_failed_action_reference is not None
+    assert (
+        reloaded_snapshot.latest_failed_action_reference.artifact_id == failed_action_id
+    )
+    hydrated_messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    hydrated_confirmation = next(
+        hydrated
+        for hydrated in hydrated_messages
+        if hydrated["metadata"].get("confirmation_card", {}).get("confirmation_id")
+        == confirmation_id
+    )
+    assert hydrated_confirmation["metadata"]["confirmation_payload"] == (
+        confirmation_payload
+    )
+
+    edited_confirmation_id = "issue-272-confirm-tsla"
+    edited_payload = deepcopy(confirmation_payload)
+    edited_payload["confirmation_id"] = edited_confirmation_id
+    edited_payload["artifact_id"] = edited_confirmation_id
+    edited_payload["strategy"]["asset_universe"] = ["TSLA"]
+    edited_payload["strategy"]["strategy_thesis"] = (
+        "Trade TSLA with a 50/200 SMA crossover."
+    )
+    edited_payload["launch_payload"]["symbol"] = "TSLA"
+    edited_payload["launch_payload"]["symbols"] = ["TSLA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The explicit TSLA edit is ready.",
+        metadata={
+            "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
+            "confirmation_payload": edited_payload,
+            "confirmation_card": {
+                "confirmation_id": edited_confirmation_id,
+                "confirmation_state": "active",
+                "title": "TSLA moving average crossover",
+                "status": "ready_to_run",
+                "rows": [],
+                "actions": [
+                    {
+                        "type": "run_backtest",
+                        "payload": {"confirmation_id": edited_confirmation_id},
+                    }
+                ],
+            },
+        },
+    )
+
+    assert (
+        failed_action_metadata_fallback_context(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        is None
+    )
+    assert (
+        latest_active_confirmation_id(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        == edited_confirmation_id
+    )
+    superseding_context = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+    assert superseding_context is not None
+    superseding_snapshot = superseding_context.latest_task_snapshot
+    assert superseding_snapshot is not None
+    assert superseding_snapshot.pending_strategy_summary is not None
+    assert superseding_snapshot.pending_strategy_summary.asset_universe == ["TSLA"]
+    assert superseding_snapshot.active_confirmation_reference is not None
+    assert (
+        superseding_snapshot.active_confirmation_reference.artifact_id
+        == edited_confirmation_id
+    )
+    assert superseding_snapshot.latest_failed_action_reference is None
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_issue_272_recovered_draft_clarifies_only_the_missing_field(
+    language: str,
+) -> None:
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.clarify import clarify_stage
+    from argus.agent_runtime.state.models import RunState
+    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    pending_strategy = {
+        "strategy_type": "buy_and_hold",
+        "strategy_thesis": "Buy and hold NVDA.",
+        "asset_universe": ["NVDA"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": {"start": "2023-01-03", "end": "2024-12-31"},
+        "comparison_baseline": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The prior action failed before the amount was supplied.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": pending_strategy,
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["sizing_amount"],
+                    "requested_fields": ["capital_amount"],
+                },
+            },
+            "failed_action": {
+                "artifact_id": "issue-272-incomplete-failed-action",
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["NVDA"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2023-01-03",
+                        "end": "2024-12-31",
+                    },
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "invalid_request",
+                "error": "capital_amount_required",
+                "retryable": True,
+            },
+        },
+    )
+
+    recovered = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language=language,
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    assert (
+        snapshot.pending_strategy_summary.model_dump(
+            exclude_none=True,
+            exclude_defaults=True,
+            exclude={"resolution_provenance"},
+        )
+        == pending_strategy
+    )
+    assert snapshot.latest_failed_action_reference is not None
+    assert recovered.selected_thread_metadata["requested_field"] == "capital_amount"
+
+    state = RunState.new(
+        current_user_message="Continue." if language == "en" else "Continua.",
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.requested_field = recovered.selected_thread_metadata["requested_field"]
+    state.missing_required_fields = ["capital_amount"]
+    state.candidate_strategy_draft = snapshot.pending_strategy_summary
+
+    clarification = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language=language,
+    )
+
+    assert clarification.outcome == "await_user_reply"
+    assert clarification.patch["requested_field"] == "capital_amount"
+    assert clarification.patch["requested_fields"] == ["capital_amount"]
+    assert clarification.patch["response_intent"]["semantic_needs"] == ["sizing_amount"]
+
+
+def test_issue_272_failure_pending_does_not_displace_completed_result() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import ordinary_turn_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    completed_run = api_state.store.backtest_runs[run_id]
+    completed_run.symbols = ["MSFT"]
+    completed_run.config_snapshot = {
+        "template": "buy_and_hold",
+        "symbols": ["MSFT"],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+        },
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The later action failed before the draft was complete.",
+        metadata={
+            "conversation_mode": "recovery",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                },
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount", "date_range"],
+            },
+            "failed_action": {
+                "artifact_id": "issue-272-sparse-failed-action",
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["MSFT"],
+                    "timeframe": "1D",
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "invalid_request",
+                "error": "capital_amount_required",
+                "retryable": True,
+            },
+        },
+    )
+
+    recovered = ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is None
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run_id
+    assert snapshot.latest_failed_action_reference is not None
+    assert (
+        snapshot.latest_failed_action_reference.artifact_id
+        == "issue-272-sparse-failed-action"
+    )
+
+
+def test_issue_272_current_clarification_keeps_pending_primary_without_result_read(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.chat import recovery as recovery_module
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = _seed_completed_run(user_id, conversation["id"])
+    completed_run = api_state.store.backtest_runs[run_id]
+    completed_run.symbols = ["MSFT"]
+    completed_run.config_snapshot = {
+        "template": "buy_and_hold",
+        "symbols": ["MSFT"],
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The MSFT result is complete.",
+        metadata={
+            "conversation_mode": "result_review",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "result_card": completed_run.conversation_result_card,
+            "result_run_id": run_id,
+            "latest_run_id": run_id,
+        },
+    )
+    failed_action_id = "issue-272-retained-aapl-failed-action"
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="How much would you like to invest in NVDA?",
+        metadata={
+            "conversation_mode": "drafting",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold NVDA.",
+                    "asset_universe": ["NVDA"],
+                    "asset_class": "equity",
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2023-01-03",
+                        "end": "2024-12-31",
+                    },
+                    "comparison_baseline": "SPY",
+                },
+                "requested_field": "capital_amount",
+                "missing_required_fields": ["capital_amount"],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["sizing_amount"],
+                    "requested_fields": ["capital_amount"],
+                },
+                "source_result": {
+                    "run_id": run_id,
+                    "strategy_id": None,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "source_result_run_id": run_id,
+            "failed_action": {
+                "artifact_id": failed_action_id,
+                "action_type": "run_backtest",
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {
+                        "start": "2024-01-02",
+                        "end": "2024-12-31",
+                    },
+                    "capital_amount": 1000,
+                    "benchmark_symbol": "SPY",
+                },
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+
+    def _unexpected_result_lookup(**_kwargs: Any) -> None:
+        raise AssertionError(
+            "a current pending clarification must not query the result fallback"
+        )
+
+    monkeypatch.setattr(
+        recovery_module,
+        "latest_result_fallback_context",
+        _unexpected_result_lookup,
+    )
+
+    recovered = recovery_module.ordinary_turn_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+
+    assert recovered is not None
+    snapshot = recovered.latest_task_snapshot
+    assert snapshot is not None
+    pending = snapshot.pending_strategy_summary
+    assert pending is not None
+    assert pending.asset_universe == ["NVDA"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == run_id
+    assert snapshot.latest_failed_action_reference is not None
+    assert snapshot.latest_failed_action_reference.artifact_id == failed_action_id
+    assert recovered.selected_thread_metadata is not None
+    assert recovered.selected_thread_metadata["last_stage_outcome"] == "await_user_reply"
+    assert (
+        recovered.selected_thread_metadata["fallback_source"]
+        == "pending_strategy_metadata"
+    )
+    assert recovered.selected_thread_metadata["requested_field"] == "capital_amount"
 
 
 def test_fact_answer_message_does_not_block_pending_strategy_fallback() -> None:

@@ -2,13 +2,259 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
+Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Current note: for Private Alpha Next P1 product work, use
-`docs/specs/private-alpha-next-roadmap.md` as the active execution board and
-`docs/specs/private-alpha-next-decision-memo.md` as the strategic north star.
-This document remains staging and branch-process context for
+Latest product change: PR #366 at `2b023576`, which makes grounded
+discovery's failures as honest as its successes — typed routing for current
+searches, working Retry for transient failures, non-retryable honesty with a
+forward path for configuration failures, and fail-closed citation evidence
+(issue #344). This completes the #347 checkpoint-gap batch for this cycle;
+the integration head is the promotion-freeze candidate. It follows PR #354
+at `4a6a237a` (truthful guest quota recovery, issue #346) and PR #358 at
+`7b3221a1` (all-or-retry compound edits, issue #339) and PR #359 at
+`a35bb29f` (recommendation continuity through the shared clarify contract,
+issue #345) and PR #373 at `81e7a1ac` (first-login guest
+claims with preserved anti-enumeration, issue #372) and PR #351 at `30af0dca` (immediate Recents refresh on
+claimed conversions, issue #342) and PR #374 at `d8c7070a` (robust activity timestamp parsing and
+exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
+cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
+evidence), and PR #375 at `c334cf3e` (stated-capital preservation on unsupported
+turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
+registry and contextual shortcut legend, issue #334), PR #356 at `48de2f3f`
+(rounded menu highlights, issue #343), PR #357 at
+`9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
+`7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
+at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
+at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
+`38874bae` (self-hosted canonical fonts).
+Later commits may reconcile documentation and issue state without changing
+product behavior. New work must branch from the current remote
+`codex/private-alpha-next` head rather than pinning either product SHA. The
+accepted post-promotion
+vertical slices are graph range switching (PR #264), account recovery/session
+controls (PR #261), truthful Usage allowances/accounting (PR #259), and
+executable capability truth (PR #266), the Always Progresses continuity
+baseline (PR #268), calendar-materiality classification (PR #267), chat-header
+title/owner-menu correction (PR #274), explicit onboarding removal (PR #275),
+truthful stale Run settlement (PR #277), and supported strategy-transition
+preservation (PR #278), plus the default-on grounded-discovery baseline
+(PR #276), modeled-cost preservation (PR #280), and the Guest experience
+(PR #279), followed by chat next-move presentation (PR #281). Provider-free
+backend test isolation landed through PR #282, and PR #286 made the complete
+`tests/` directory the backend CI gate. PR #287 then delivered resolver-owned
+discovery selection identity and candidate/entity corroboration. PR #285 then
+bounded Conversations, Messages, History, and Omnisearch/Idea Ledger reads at
+the Postgres boundary while preserving cursor, ranking, ownership, and artifact
+contracts. This is an integration checkpoint, not a deployed or
+tester-exposed SHA. PR #288 then completed canonical fact-preserving recovery
+after stale or failed actions without changing public artifact contracts.
+Later slices culminated in PR #298's visitor/day Guest settlement, honest
+discovery progress, and per-candidate source ownership, followed by PR #299's
+instant and race-safe browser-session conversation switching. PR #300 then
+completed comparison name grounding, unsupported-target disclosure, and
+discovery-act preservation through pending confirmations. PR #302 completed
+bounded progressive Recents disclosure, and PR #303 reconciled catalog-valid
+benchmarks with explicit zero price bars before confirmation. PR #304 then
+completed distinct Quick take, Explain result, typed Try next, and recoverable
+failure ownership across live turns, durable jobs, reload, English, and
+Spanish. PR #305 then completed issue #253's deterministic decision-first
+recall projection and panel as `88ab906d`. PR #306 completed the Full
+Omnisearch memory-inspector journey as `b71f1eaf`: one ranked conversation row,
+bounded object-first transcript recall, jump-to-match, deterministic dossiers
+and asset rollups, exact decision filtering and mutation refresh, and
+provider-free **Run it fresh** composition. The accepted implementation keeps
+the #232 pagination/cursor boundary and #252 navigation-race guarantees, adds
+no RAG/embeddings or durable recall model, and closes the Omnisearch product
+lane without claiming deployment or tester exposure.
+PR #316 subsequently completed issue #309's bounded run-dossier history and
+effective-decision browser as `9aa209d4`. PR #318 made accepted-turn downstream
+failures remain assistant-owned across reload and Retry as `f6d0981e`, followed
+by the test-isolation checkpoint `1ed8d4f0`; issue #313 is closed. PR #315 added
+the current-conversation activity rail as `6e20328c`. PR #317 then added one
+central keyboard-shortcut registry, localized help overlay, and shared Recents
+and Settings quick-jump behavior as `2ff6f3c6`, without changing Cmd/Ctrl+K
+Omnisearch or the existing F2 rename binding. PR #324 aligned Recents hints with
+that registry as `812c8fef`, and PR #311 then completed the typed, provider-free
+current-data retest action as `51984a42`; issue #310 is closed.
+
+The next integrated group adds bounded product and release-readiness work:
+registered-only avatar themes through PR #312 (`40eba1f6`); public-alpha
+capacity, capped-key, requested-access, approval-email, and hosted-proof
+mechanics through PR #319 (`1c3775aa`); one shared frontend failure vocabulary
+through PR #320 (`53c36d40`); auth copy, localized errors, and consistent card
+containment through PRs #323, #325, and #328 (`c1a13949`, `05fbef06`, and
+`403ea114`); and removal of the unavailable Release Notes row through PR #327
+(`22bec7da`). Public account access remains explicitly disabled and founder
+controlled despite the completed technical-readiness proof.
+
+PR #329 added the durable backend/data conversation-activity and read-state
+foundation as `8a5d621b`; PR #331 completed its chat/Recents frontend consumer
+as `ec3a0a52`. The #329 migration is not claimed as hosted by these integration
+merges. PR #326 closed issue #321 as `8e2a6217` with bounded
+invisible/interactive CAPTCHA deadlines and an accessible localized challenge
+dialog. PR #330 then completed deferred Guest bootstrap as `94476226`, keeping
+anonymous identity and CAPTCHA acquisition behind the first submission while
+preserving #331 activity ownership. Issue #314 remains a separate API evidence
+gap discovered during typed-retest delivery, not unfinished #310 work.
+PR #348 then self-hosted the canonical Inter and Space Grotesk variable fonts
+as `38874bae`, removing the Google Fonts network dependency from build,
+runtime, and provider-free browser QA. It added no environment variable,
+deployment, API, schema, or migration requirement. The separate low-priority
+fallback-order alignment remains issue #350.
+PR #362 then repaired the sanctioned live-eval harness as `b2e8975c`, closing
+issue #361: the explicit `ARGUS_EVAL_ENV_FILE` environment now preloads before
+Argus imports, so calendar-aware live cases exercise real market sessions and
+report `calendar_alignment` truthfully instead of failing 17 of 39 cases under
+the leaked synthetic fixture calendar. The change is confined to
+`tests/evals/` and added no environment variable, deployment, API, schema, or
+migration requirement.
+PR #355 then closed issue #336 as `c01d5730`: provider-resolved assets and
+capital supplied in a terse opening turn survive into clarification and the
+confirmation card, with post-LLM provider-context reconciliation removing only
+stale asset blockers once every extracted traded-asset mention is accounted
+for. Mixed, ambiguous, underfilled, overflow, and cross-class contexts stay
+blocked. Accepted evidence includes the exact-head live-eval gate and a
+founder-witnessed browser reproduction of the original G-01 transcript. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #353 then closed issue #337 as `7e4c58f8`: a rail needs-attention tick for
+a clarification clears only when a later active confirmation is proven, via
+backend-owned typed metadata (`strategy_path_id`, `source_result_run_id`, and
+provenance-checked user values), to continue the same strategy path; unproven
+or unrelated confirmations fail closed. The Guest rail keeps its single
+legitimate completed-run tick visible. The first exact-head verification
+failed and was repaired (e2e seed omitted real workflow metadata) before
+acceptance; the final head passed the real local-Supabase Guest replay
+independently. It added no environment variable, deployment, API, schema, or
+migration requirement.
+PR #357 then closed issue #340 as `9f97f1dc`: guest Omnisearch dossiers keep
+Add/Edit decision actions visible and conversion-gate activation through a
+typed `available | account_conversion_required` availability contract across
+Python, OpenAPI, and TypeScript, then resume the exact run, decision state,
+and note after conversion. The server remains authoritative and no guest
+write path exists; the gated presentation activates only for clients
+declaring the additive `dossier_decision_conversion_v1` capability header, so
+legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
+`docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
+environment variable, deployment, schema, or migration requirement. Issue
+#341 is now unblocked for dispatch from the post-#357 integration head.
+PR #356 then closed issue #343 as `48de2f3f`: menu-row hover/selected
+highlights use one rounded inset-pill geometry across Settings, Profile,
+Recents overflow, and chat-header menus, with destructive-red and neutral
+action colors unchanged. Class-only change; hover evidence is committed
+in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
+overruled the absent on-PR Codex review after personal visual checks. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #352 then closed issue #334 as `0942507b`: Omnisearch and active-chat
+keyboard actions share one OS-aware behavior registry (EN/es-419 labels and
+execution from one source), with a contextual shortcut legend that stays
+quiet at rest, contextual Omnisearch actions, arrow navigation, quick jump,
+keyboard-aware delete confirmation, and a responsive help sheet. Its first
+head was returned for composed-tree modularity violations and re-landed
+after genuine extraction; ChatInterface.tsx now sits exactly at its budget
+limit, so future lanes touching it must extract first. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #375 then closed issue #368 as `c334cf3e`: the stated-starting-capital
+recheck now also runs on `unsupported_or_out_of_scope` turns, so an explicit
+non-DCA capital amount survives capability-honesty recoveries without
+changing the unsupported verdict, dates, assets, or DCA behavior. Accepted
+evidence: red-first mocked regression plus one targeted live rerun of the
+original news-sentiment case, re-captured at the exact final head. The
+founder waived the ceremony reconcile-merge commit after an independently
+verified no-overlap disposition (all intervening landings were docs or
+web-only). This fix upgrades PR #363's pending evidence bar. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #370 then closed issue #341 as `c324f877`: explicit `timestamptz`/`uuid`
+casts on the nullable first-page dossier cursors repair the guest Decision
+history 500 (`AmbiguousParameter` on the untyped null comparison) — not a
+guest-guard or transport failure, and the issue was nearly closed as
+not-reproducible before the mandated real-browser re-evidencing surfaced
+the true failure in the Postgres reader. Evidence: same-session 500→200 at
+the exact head with the screenshot committed in-repo; guest workspace
+isolation re-proven. It added no environment variable, deployment, API,
+schema, or migration requirement.
+PR #360 then closed issue #349 as `42d96da7`: conversation-activity truth is
+now verified with durable in-repo evidence — registered manual-unread
+persists, survives reload, clears, and never reorders Recents; each Guest
+state is individually classified with owner actions account-only. Docs and
+four committed screenshots plus one date-stable Playwright fixture line; no
+product behavior, API, schema, or migration change.
+PR #374 then closed issue #371 as `d8c7070a`: `_as_datetime` normalizes
+Postgres-trimmed fractional seconds and trailing `Z` offsets with explicit
+regex-free string handling before parsing (founder-directed), repairing the
+~1-in-10 broken-Recents failure observed in live QA, and the API middleware
+now retains the exception in its failure log while keeping the HTTP body
+generic. No environment variable, deployment, API, schema, or migration
+requirement was added.
+PR #351 then closed issue #342 as `30af0dca`: the guest-to-account handoff
+awaits the promise-returning Recents refresh after ownership confirmation and
+before a pending action resumes, so the claimed conversation is visible
+immediately; ordinary mutation refreshes remain fire-and-forget. Accepted on
+a founder-witnessed live conversion journey at the exact composed tree plus
+full composed-tree gates. Its first live-proof attempt discovered #371 and
+#372; the integration-side headroom extraction `34782abd` preceded this
+landing. No environment variable, deployment, API, schema, or migration
+requirement was added.
+PR #373 then closed issue #372 as `81e7a1ac`: signup eagerly creates the
+destination profile (guarded against Supabase's obfuscated duplicate
+response) so a brand-new account's first-login claim satisfies the handoff
+foreign key; optional usernames are prevalidated case-insensitively before
+Auth-user creation under transaction-scoped advisory locks, returning typed
+`409 username_taken` for new-account conflicts while existing-email requests
+keep the provider's indistinguishable duplicate path. Three review rounds
+each removed a real regression (FK failure, email oracle, username oracle).
+No environment variable, deployment, schema, or migration requirement was
+added; `docs/API_CONTRACT.md` records the username semantics.
+PR #359 then closed issue #345 as `a35bb29f`: recommendation follow-ups
+inherit every still-applicable owned fact (assets, capital, window,
+timeframe, benchmark, modeled costs) unless the user changes them, with the
+historical result immutable and the new confirmation active — routed through
+the shared clarify contract with model voice and degraded fallback. Accepted
+at the full clean bar: live 40/40 with no waivers, strategy-diverse browser
+proof (weekly DCA with recurring contribution; SMA 50/200 inheritance), and
+full deterministic gates. No environment variable, deployment, API, schema,
+or migration requirement was added.
+PR #358 then closed issue #339 as `7b3221a1`: the artifact-edit planner
+derives required typed targets from the entire turn — any operation count
+over the full edit vocabulary — and only plans that provably materialize
+every target may claim ready_to_confirm, verified against the real
+application path; partial application retries or asks, and unsupported
+content declines to the normal flow. Six adversarial review rounds hardened
+coverage against faked completeness. The lane's 24/41 live report was
+independently diagnosed and lane-confirmed as the known root-.env
+synthetic-calendar misconfiguration, corroborated by #359's adjacent 40/40.
+Issue #335 is unblocked and stacked for the next cycle. No environment
+variable, deployment, API, schema, or migration requirement was added.
+PR #354 then closed issue #346 as `4a6a237a`: the guest quota-exhaustion
+message states the actual reset time and offers conversion; the guest
+allowance rises to two simulations via migration
+`20260802090000_raise_guest_simulation_allowance.sql` (landed in-repo and
+preview-proven; hosted application remains a promotion-runbook step);
+visitor prechecks use the daily reset horizon; first-admission
+classification is atomic; and the authoritative public-launch canary in
+`docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` now expects the two-simulation policy.
+`first_result_completed` idempotency is explicitly deferred to #376. The
+lane also fixed a real guest chat-stream cookie-auth gap its browser matrix
+exposed, and its dead-at-birth Supabase preview branch was deleted and
+recreated to prove the migration on hosted preview infrastructure.
+PR #366 then closed issue #344 as `2b023576`: recent-IPO, trending-crypto,
+multi-category, and escalation requests route through the typed discovery
+path with resolver-validated cited candidates; transient failures retry and
+genuinely recover; configuration failures stop honestly without dead-end
+affordances or wait-promises, redirecting to provider-free symbol testing;
+and citation fallback evidence is bounded and fail-closed. Sixteen per-SHA
+in-repo evidence sets with probe-vs-proof labeling; provider-mode breadth is
+parked as #377. This was the cycle's final landing before the promotion
+freeze.
+
+Current note: while the interim pivot is active, use
+`docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
+slate, `docs/specs/private-alpha-next-roadmap.md` as the parent execution board,
+and `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
+star. This document remains staging and branch-process context for
 `codex/private-alpha-next`.
 For release-gate and canary decisions, the decision memo is later-context only;
 use the CI/CD SOTA spec, launch runbook, and release manifest template instead.
@@ -150,8 +396,10 @@ Do not reopen these as debt unless a new bug is reproduced:
   remain scoped to the durable artifact instead of transcript prose.
 - Result voice cleanup is closed for this batch: Quick take and Explain result
   remain distinct, Explain result uses the deeper fact-grounded breakdown
-  surface, visible Try next result actions are removed, and normal follow-up
-  guidance stays with the LLM chat brain.
+  surface, and the old duplicate result-card Try next action remains removed.
+  PR #304 adds the successor surface: capped typed rows under one localized Try
+  next owner, with ordinary conversational turns still handled by the LLM chat
+  brain.
 - Local live QA proof was captured on 2026-06-11 in QA mode with real Supabase
   auth and API persistence: a GOOG buy-and-hold conversation rendered the
   confirmation card, completed result card, Quick take, and Explain result;
@@ -176,6 +424,182 @@ Do not reopen these as debt unless a new bug is reproduced:
   confirmation card, `run_backtest` action, async job/run result, LLM readout
   voice, and persisted messages.
 - `docs/archive/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is archived historical context.
+- Adaptive result-chart range switching is complete at PR #264: viewport-only
+  presets and Custom/Reset preserve canonical result truth and passed live
+  EN/ES desktop/mobile QA.
+- Account recovery and session controls are complete at PR #261: Settings ->
+  Security is reachable and recovery, password change, and current/other/all
+  session actions passed real-auth QA.
+- Usage allowance truth is complete at PR #259: Settings -> Usage is reachable,
+  hourly/daily message and simulation truth is backend-owned, accounting is
+  durable and replay-safe, and exact-head real-auth/local-persistence QA passed.
+- Executable capability truth is complete at PR #266 / issue #241: supported
+  golden cross reaches the ordinary runnable path; recognized non-executable
+  momentum breakout, news-sentiment rules, and future-performance requests stay
+  non-runnable; compatible facts survive recovery; and only an explicit
+  supported alternative plus a historical period creates a new confirmation.
+  Final candidate `e10bdd2` passed founder-visible browser QA and landed as
+  `bbd1d2b`.
+- The Always Progresses continuity baseline is complete at PR #268: ordinary
+  and action retries are durable, Run admission/reconciliation is exact-once,
+  completed results remain immutable, and the bounded EN/ES browser matrix
+  passed. It landed as `847c413b` and remains a standing quality bar rather
+  than an open-ended repair program.
+- Calendar-materiality classification is complete at PR #267: routine
+  exchange-calendar alignment stays quiet while provider-coverage truncation
+  receives one typed, reload-stable notice. It landed as `d6d1134`.
+- The bounded chat-header and onboarding cleanup is complete through PRs #274
+  and #275: owner controls follow the active chat, and the explicit
+  private-alpha onboarding product has been removed. They landed as
+  `291b58f7` and `88ae8c77`.
+- Stale Run settlement is complete at PR #277 / issue #273: stale actions
+  create no compute, settle to typed Updated truth, preserve the latest
+  actionable confirmation, and remain stable after reload. It landed as
+  `2d5a2b52`.
+- Supported strategy-transition preservation is complete at PR #278 / issue
+  #270: buy-and-hold can transition to a typed 50/200 SMA crossover while
+  preserving assets, capital, dates, daily timeframe, benchmark, and modeled
+  costs through confirmation, launch projection, and reload. It landed as
+  `b80d95a2`.
+- Modeled-cost preservation is integrated from PR #280 at `d16f7496`: asset,
+  date, capital, and strategy edits preserve explicitly owned fee/slippage
+  assumptions; card and natural-language edits share the canonical evidence
+  boundary; explicit zero clears costs; and confirmation, launch, and reload
+  agree. Issue #271 is complete; PR #280's bounded same-chat integration
+  journey is the closure evidence. Any later repetition belongs to promotion
+  qualification, not issue acceptance.
+- Grounded Discovery Search v1 is integrated from PR #276 at `c212107a`.
+  Explicit peer/category discovery has one typed route, bounded source-backed
+  Search, resolver-validated candidates for equity, crypto, and currency-pair
+  assets, persisted EN/ES rendering, honest kill-switch recovery, and
+  operational cost evidence. Search is part of the normal Argus shape and
+  defaults on; explicit `false` is the emergency kill switch. Issue #244 stays
+  open because one comparison phrasing missed the typed route in the sanctioned
+  eval; that gap, Render configuration, and an exact-SHA canary are required
+  before tester exposure.
+- Chat next-move presentation is integrated from PR #281 at `8fde4ac1`, with
+  resolver-owned discovery selection identity added by PR #287 at `ea2b3f35`.
+  Clarify options, supported follow-ups, and discovery candidates render as
+  stacked rows under their owning message; verified candidate reasons remain
+  visible; and persisted discovery evidence opens in a source-safe panel
+  without another provider call. The shared in-flight lock protects the
+  composer and rows in one tab. A selected candidate now carries the identity
+  the resolver already verified as a normal asset mention, including across
+  durable Retry, without becoming a prepared execution action. Remaining work
+  is backend concurrent-turn admission, honest live progress, guest discovery
+  allowance, and any general assumption carry-forward beyond selected identity.
+- Candidate/entity corroboration is integrated from PR #287. A source-named
+  entity must agree with the resolved candidate, preventing unrelated
+  cross-class ticker collisions such as a gold miner for a Tron request.
+  Crypto-exposure vehicles are currently filtered with true collisions; #244
+  owns the deliberate product design needed to surface them safely.
+- Guest access is integrated from PR #279 at `53e812e9`: verified anonymous
+  identity, one temporary owner-scoped workspace, fixed lifetime allowances,
+  exact-once settlement, one simulation, conversion/claim, cleanup, Guest
+  shell, capability gates, and privacy-safe funnel evidence. Guest defaults on
+  with explicit-off rollback; public-account access remains separately off.
+  Issue #293 is closed with no-defect evidence after one real guest session
+  crossed the one-hour JWT boundary without losing its conversation or
+  workspace. Hosted configuration, canary, and public traffic remain later
+  release gates.
+- Backend verification is provider-free by default after PR #282 at
+  `059f8e82`: root test fixtures force synthetic market data and keep provider
+  credentials explicitly empty so dotenv cannot silently restore them. Both
+  alpha API suites are part of `backend-checks`.
+- Backend CI is directory-complete after PR #286 at `75e87206`: the gate runs
+  the full `tests/` tree, the stale pure-approval fixture is corrected, and a
+  guard test prevents the workflow from returning to a curated file list.
+  Issues #283 and #284 are closed. This changes verification coverage, not
+  runtime behavior.
+- Bounded database pagination and search are complete at PR #285 / issue #232:
+  Conversations and Messages use stable keyset reads, completed-result
+  projection uses bounded batches, and History and Omnisearch/Idea Ledger
+  bound their source candidates while preserving public cursor compatibility,
+  ordering, ownership, ranking, exact ledger groups, and canonical artifacts.
+  It landed as `7b7920bb`. The founder-accepted sparse/deep/final History Run
+  scan exception remains documented: returned candidates and normal measured
+  distributions are bounded, while a maintained History read model is deferred
+  scale architecture.
+- Browser-session transcript reuse and navigation race safety are complete at
+  PR #299 / issue #252. Fresh and stale conversations render immediately from
+  the bounded user-and-conversation cache; true cold misses replace the prior
+  transcript with a delayed truthful retrieval state; retired loads cannot
+  commit over the latest destination; and destination-owned failure/Retry,
+  scroll restoration, auth clearing, EN/es-419, keyboard, and reduced-motion
+  behavior passed exact-head browser QA. It landed as `f368febb`. Profiling did
+  not justify prefetch or virtualization, so neither was added.
+- Comparison grounding and discovery-act continuity are complete at PR #300 /
+  issues #292 and #296. Company names reach the provider-backed resolver,
+  unsupported named comparison targets reconcile to the class default with a
+  localized pinned disclosure, and a pending confirmation cannot capture a
+  typed discovery ask. It landed as `c21f842f`.
+- Progressive Recents disclosure is complete at PR #302 / issue #245. Recents
+  uses the bounded chat-only conversation endpoint, caps each loaded unpinned
+  time group at five until explicitly expanded, and loads older pages only
+  after an accessible single-flight action. It landed as `928dcdbb` while
+  preserving PR #299 switching, race, selection, attention, and reload truth.
+- Benchmark price-coverage reconciliation is complete at PR #303 / issue #301.
+  An explicit provider zero-bars response for a catalog-valid benchmark
+  reconciles to the class default at card time with the existing localized
+  disclosure; transport failures remain owned by the run path. It landed as
+  `da9f8500`.
+- Result and recovery surface ownership is complete at PR #304 / issue #249.
+  Quick take owns the glance readout, Explain result owns grounded
+  comprehension, stacked typed rows own Try next, and retryable composition
+  failures render distinctly and resolve in place. Durable job projection,
+  reload, non-repetition, accessibility, and English/Spanish parity were
+  included in the accepted lane evidence. It landed as `59a274c3`.
+- Fact-preserving recovery is complete at PR #288 / issue #272: stale or
+  failed actions restore the latest usable canonical confirmation or result
+  anchor, preserve assets, capital, requested/effective dates, daily timeframe,
+  benchmark, rules, and modeled costs, and ask only for genuinely missing
+  fields. Prior results remain immutable, later explicit edits supersede
+  recovery state, and recovery creates no duplicate job, Run, or usage.
+- Requested/effective period truth is complete and issue #251 is closed. PR
+  #262 established the shared coverage contract, PR #267 classified quiet
+  calendar alignment versus material provider truncation, and PR #268
+  preserved the resulting artifact through continued conversation and reload.
+  PR #297 completed the trajectory-ledger reconciliation as `09044231`,
+  removing stale #241/#251 masks while preserving #239's exact current
+  failures. Issue #243 is closed; promotion evidence remains solely with #233.
+- Hosted cost-ledger visibility is repaired and issue #246 is closed. The
+  existing `20260702000001_add_cost_ledger_entries` migration was applied
+  directly to the hosted Argus Supabase project with matching migration
+  history. RLS and service-role-only append/read privileges were verified; no
+  application commit, deploy, or PR was required. See
+  `docs/reports/issue-246-cost-ledger-closure-evidence.md`.
+- Structural OpenAPI compatibility is complete and issue #234 is closed. PR
+  #289 landed as `8a66f0ba`: generated FastAPI structure remains authoritative,
+  the checked artifact is reproducibly generated, and CI enforces normalized
+  public path/method, parameter, request/response schema, required-field, enum,
+  exclusion, and server-prefix compatibility. Both PR and post-merge CI passed.
+  PR #290 then landed the compatible request-size and correlated RFC 9457
+  failure boundary as `b073b1a0`; issue #235 is closed.
+- Chat request and correlated-failure ownership is complete at PR #290 /
+  `b073b1a0`. Declared and chunked bodies enforce the same early ingress
+  ceiling; typed field/list/depth/serialized-size limits fail before expensive
+  work; unexpected exceptions preserve CORS and return sanitized RFC 9457 JSON
+  with one header/body/log request id. Rejection isolation, exact-boundary
+  acceptance, canonical SSE stability, OpenAPI regeneration, and structural
+  compatibility are directly tested. PR and post-merge CI passed.
+- Guest grounded-discovery metering is integrated from PR #291 at `f1e65dde`.
+  Guests receive two searches per visitor per day, renewing a temporary
+  workspace does not reset the allowance, and a configurable global daily
+  ceiling bounds total attempted Search spend. The additive
+  `visitor_usage_counters` migration is integrated but still requires
+  application to each hosted target during promotion. Issue #244 remains open
+  for the broader discovery activation and accepted follow-up register.
+- Discovery continuity PR #295 is integrated at `8f17a45e`. Resolver-verified
+  candidate rows are now the default path; paid Search is reserved for
+  explicit requests or current-fact needs. Typed retry and fair charging,
+  async provider offload, incomplete-rule copy, and EN/es-419 J1/J2 continuity
+  are proven.
+- Discovery and Guest continuity PR #298 is integrated at `ba0aa2f6`.
+  Search and verification emit truthful live progress, each discovery row owns
+  its citation action, and Guest message/simulation limits settle against a
+  privacy-safe visitor/day identity across temporary-session renewal. This
+  completes the planned second pass, not promotion: hosted migrations,
+  configuration, and exact-SHA canary gates remain open.
 
 ## P0 Reintegration Checkpoint
 
@@ -192,34 +616,36 @@ The clean reintegration strategy is now part of the process model:
 
 Codex should own or closely supervise this:
 
-1. **Controlled alpha readiness slice**
-   - Active worker branch: `codex/private-alpha-readiness`, targeting
-     `codex/private-alpha-next` after review.
-   - Current local checkpoint: the language-agnostic runtime spine has focused
-     backend tests for messy English/Spanish buy-and-hold prompts with shorthand
-     capital (`100k`) and Codex browser QA for the English and Spanish
-     confirmation-card edit paths. The latest browser pass proved the English
-     `Change dates -> calendar 2024` and Spanish
-     `Cambiar fechas -> calendario 2024` flows update the active card instead
-     of silently re-confirming the prior rolling range or leaking macro-context
-     prose. The English `Change asset -> make it google instead` and Spanish
-     `Cambiar activo -> ponlo con google mejor` flows now update the active
-     card to provider-canonical `GOOGL` while preserving the rest of the setup.
-     A Spanish local browser pass also proved the full happy-path action chain:
-     confirmation, run, result card, Quick take, Explain result, Refine idea,
-     messy refinement into a new `GOOGL`/`$50,000`/six-month confirmation, and
-     structured cancellation. The local Spanish transcript matrix now passes
-     for DCA, missing DCA amount clarification, mixed-asset clarification,
-     currency pairs, unsupported valuation recovery, setup edits, approval, and
-     result follow-ups. A Spanish browser recovery pass now proves unsupported
-     valuation (`P/E`) clarifies into supported proxies, then a messy
-     buy-and-hold follow-up re-enters the normal confirmation funnel.
-   - Remaining before merge/release readiness: production-parity Render canary
-     and the rest of the controlled readiness slices recorded in archived
-     readiness context at
-     `docs/archive/private-alpha-controlled-readiness-panel.md`.
+1. **Finish the remaining interim product outcome and activation gates**
+   - Grounded discovery now includes the PR #295 continuity pass at
+     `8f17a45e`, PR #298's second pass at `ba0aa2f6`, PR #300's comparison
+     grounding and discovery-act continuity at `c21f842f`, and PR #303's
+     benchmark coverage reconciliation at `da9f8500`. Do not rebuild the cheap
+     verified rows, Search-exception policy, live progress, citation ownership,
+     visitor/day Guest settlement, or comparison corridor. Keep #244 open only
+     for the accepted exposure-vehicle product decision and the hosted
+     migrations, Render configuration, and exact-SHA canary.
+   - Full Omnisearch may now build against the accepted grounded-discovery
+     contract. Its owner must reconcile onto this checkpoint and must not
+     invent discovery truth or implicitly activate Search.
+   - Always Progresses is delivered and now acts as the quality bar for these
+     slices; it is not the next broad pillar to redispatch.
 
-2. **Evidence-aware idea loop source thesis**
+2. **Advance bounded continuity follow-ups by owner**
+   - #269 landed through Guest PR #279 at `53e812e9` and is closed. Do not open
+     a second runtime lane.
+   - #271 landed through PR #280 at `d16f7496` and is closed. #272 landed
+     through PR #288 at `9f3453a3` and is closed; do not open another modeled
+     cost or canonical recovery lane without a new reproduction.
+   - #273 is closed at `2d5a2b52`. #249 is closed through PR #304 at
+     `59a274c3`; Quick take, Explain result, typed Try next rows, and
+     recoverable failure now have distinct owners while preserving Guest
+     hydration, discovery rows, conversation switching, and bounded Recents.
+     No artifact-presentation follow-up remains without a new reproduction.
+   - The exact handoff table lives in
+     `docs/specs/private-alpha-interim-roadmap.md`.
+
+3. **Evidence-aware idea loop source thesis**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring remain design/reference material until the
      active roadmap starts a bounded slice.
@@ -231,6 +657,81 @@ Codex should own or closely supervise this:
      `docs/specs/private-alpha-next-roadmap.md` for current execution. This
      branch may refine the source thesis, but it must not implement the
      evidence-aware idea loop without explicit approval.
+
+## Integrated Guest Checkpoint And Later Promotion Gates
+
+PR #279 landed on `codex/private-alpha-next` as `53e812e9`. The section below
+preserves its migration, ownership, rollback, and later promotion contract; it
+is not an active worker-branch instruction.
+
+Migration order is fixed:
+
+1. `20260724101324_add_guest_workspaces.sql`
+2. `20260724102309_add_guest_session_allowances.sql`
+3. `20260724102645_guest_conversation_and_cleanup.sql`
+4. `20260724110000_restore_settle_only_usage.sql`
+5. `20260724110100_serialize_guest_feedback.sql`
+6. `20260724110200_align_guest_cleanup_candidates.sql`
+7. `20260724211312_guest_workspace_handoffs.sql`
+8. `20260724223000_replace_guest_conversation.sql`
+9. `20260724230000_harden_guest_public_boundaries.sql`
+10. `20260725220148_fix_expired_guest_complete_graph_cleanup.sql`
+11. `20260726001954_isolate_guest_cleanup_candidates.sql`
+12. `20260726001955_enforce_guest_terminal_message_limit.sql`
+13. `20260726002158_respect_permanent_conversation_ownership.sql`
+14. `20260726014754_isolate_poisoned_guest_orphans.sql`
+15. `20260726185021_harden_guest_lifecycle_ownership.sql`
+16. `20260727230000_add_visitor_usage_counters.sql`
+17. `20260728120000_visitor_keyed_guest_settlement.sql`
+
+The earlier message-settlement and atomic-backtest-admission migrations remain
+prerequisites and must retain their existing order. Integration must reset a
+fresh local database and rerun the zero-skip guest Postgres/Auth matrix before
+promotion. Migration 16 adds an opaque, visitor-owned daily discovery counter
+and global attempted-search bucket. Migration 17 re-keys Guest message and
+simulation settlement to the same privacy-safe visitor/day boundary. Both must
+be present before Guest grounded discovery is exposed.
+
+The conversion contract has two owners:
+
+- provider-native anonymous-to-permanent linking keeps the same Auth UUID;
+- an existing registered account claims the complete guest graph through the
+  short-lived, email-hash-bound, single-use server handoff. Login completes
+  the claim before returning its session and can reconcile one ambiguous
+  same-destination response without repeating transfer.
+
+Neither path copies visible prose in the browser or merges guest lifetime
+counters into registered hour/day counters. Guest server/bootstrap and
+presentation flags default on as emergency kill switches. Rollback is flags
+first: explicitly disable the frontend guest presentation, then server guest
+bootstrap; keep public-account access false. Do not roll back by deleting guest
+rows or reverting already-applied migrations.
+The server guest flag is the creation gate: disabling it stops new anonymous
+sessions while existing verified guests drain to conversion, fixed expiry, or
+transactional cleanup.
+
+Always Progresses, Grounded Discovery, modeled-cost preservation, Guest, and
+visitor-owned Guest discovery metering are reconciled at the integration
+checkpoint. Before promotion to `main` or public traffic, apply migrations
+through `20260728120000`, configure
+`ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`, and complete
+`docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`: branch-deployed exact-SHA canary, hosted
+anonymous Auth and server-validated Turnstile, trusted-origin/rate-limit
+verification, hard provider budget, scheduled cleanup ownership, first-traffic
+monitoring, release manifest, and founder traffic/cost approval.
+
+## Historical Evidence Retention
+
+Completed specs, plans, and browser reports remain in place when GitHub issues,
+PR descriptions, or closure ledgers link to their paths. Their status banners
+mark them as completed execution records or superseded observations. Moving
+those files into `docs/archive/` would break evidence lineage without reducing
+active ambiguity.
+
+The active command sources are only the interim roadmap, the parent roadmap,
+the decision memo, and this integration-process document. Completed
+Always Progresses plans and dated reports are regression evidence, not active
+dispatch instructions.
 
 ## Known Non-Blocking Debt
 
@@ -265,7 +766,7 @@ for bounded scout or janitor work:
 
 - Docs classification proposals: canon, active plan, historical evidence,
   archive candidate.
-- Dead-code candidate inventories outside `archive-v0.1/`.
+- Dead-code candidate inventories for active-tree code.
 - Large-file inventory with proposed extraction seams, without performing broad
   refactors.
 - Small test coverage additions around already-stable behavior.
@@ -282,9 +783,9 @@ External agents must not touch:
 - Backtest engine execution semantics.
 - Frontend state that invents backend facts.
 
-## Documentation Hygiene Backlog
+## Documentation Hygiene
 
-The next docs pass should classify existing docs into:
+Use these classes:
 
 - **Canon**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
   `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`,
@@ -293,8 +794,12 @@ The next docs pass should classify existing docs into:
   future specs.
 - **Historical evidence**: completed launch/milestone closure reports and
   browser/canary evidence.
-- **Archive candidates**: stale plans superseded by merged implementation or
-  newer specs.
+- **Archive**: stale plans superseded by merged implementation or newer specs.
+
+The former interim issue dependency map and Wave 0 plan are archived at
+`docs/archive/private-alpha-interim-issue-roadmap-2026-07-21.md`. The active
+interim roadmap now contains only founder outcomes, retained decisions,
+delivery discipline, and current completion truth.
 
 Do not delete historical docs casually. Prefer adding a short status banner that
 points to the active source of truth, then archive only after review.

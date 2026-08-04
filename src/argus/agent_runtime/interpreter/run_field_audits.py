@@ -20,6 +20,10 @@ from argus.agent_runtime.interpreter.draft_shape import (
 from argus.agent_runtime.interpreter.executable_grounding import (
     _draft_has_non_executable_timeframe_label,
 )
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    EXECUTION_COST_FIDELITY_INSTRUCTIONS,
+    apply_cost_fidelity,
+)
 from argus.agent_runtime.interpreter.shared import (
     _bounded_date_evidence_candidates,
     _date_range_from_bounded_evidence,
@@ -40,22 +44,33 @@ from argus.agent_runtime.interpreter.shared import (
 from argus.agent_runtime.interpreter.signal_rule import (
     _asset_recovery_query_is_explicit_ticker,
 )
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT,
+    inverse_capability_conflict_messages,
+    inverse_promotion_reason_codes,
+    response_has_only_unsupported_strategy_logic_constraints,
+    response_needs_inverse_capability_conflict_audit,
+)
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
 from argus.agent_runtime.result_followups import result_followup_fact_bank
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
+    executable_strategy_type,
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
 )
+from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 from argus.nlp.natural_time import resolve_date_range_intent
 
 
@@ -64,16 +79,19 @@ def _structured_supported_strategy_capability_conflict_fallback(
 ) -> LLMInterpretationResponse | None:
     if not _response_needs_supported_strategy_capability_conflict_audit(response):
         return None
-    if any(
-        item.category != "unsupported_strategy_logic"
-        for item in response.unsupported_constraints
-    ):
+    if not response_has_only_unsupported_strategy_logic_constraints(response):
         return None
     draft = response.candidate_strategy_draft
-    strategy_type = canonical_strategy_type(draft.strategy_type)
-    if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+    strategy_type = executable_strategy_type(draft.model_dump(mode="python"))
+    if strategy_type not in {
+        "buy_and_hold",
+        "dca_accumulation",
+        "signal_strategy",
+    }:
         return None
-    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+    if strategy_type in {"buy_and_hold", "dca_accumulation"} and (
+        _llm_strategy_draft_has_rule_or_indicator_fields(draft)
+    ):
         return None
     if not (draft.asset_universe or draft.asset_class):
         return None
@@ -88,6 +106,12 @@ def _structured_supported_strategy_capability_conflict_fallback(
         or draft.capital_amount is not None
         or draft.total_capital is not None
         or draft.initial_capital is not None
+    ):
+        return None
+    if strategy_type == "signal_strategy" and not (
+        draft.requested_strategy_template in EXECUTABLE_TEMPLATES
+        and executable_rule_spec_from_strategy(draft.model_dump(mode="python"))
+        is not None
     ):
         return None
     repaired = _response_with_supported_strategy_capability_conflict_removed(
@@ -125,11 +149,12 @@ def _response_needs_supported_strategy_capability_conflict_audit(
     ):
         return False
     if not has_unsupported_strategy_logic:
-        return False
+        return response_needs_inverse_capability_conflict_audit(response)
     draft = response.candidate_strategy_draft
-    if canonical_strategy_type(draft.strategy_type) in {
+    if executable_strategy_type(draft.model_dump(mode="python")) in {
         "buy_and_hold",
         "dca_accumulation",
+        "signal_strategy",
     }:
         return True
     if response.semantic_turn_act != "unsupported_request":
@@ -148,6 +173,8 @@ def _supported_strategy_capability_conflict_messages(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> list[dict[str, str]]:
+    if response_needs_inverse_capability_conflict_audit(response):
+        return inverse_capability_conflict_messages(response=response, request=request)
     constraints = [
         item.model_dump(mode="json")
         for item in response.unsupported_constraints
@@ -156,32 +183,7 @@ def _supported_strategy_capability_conflict_messages(
     return [
         {
             "role": "system",
-            "content": (
-                "You are Argus's capability-conflict audit. The primary interpreter "
-                "returned both a supported canonical strategy and an "
-                "unsupported_strategy_logic constraint, or returned a raw natural-"
-                "language strategy phrase as unsupported while preserving executable "
-                "field evidence. Decide whether the current user message semantically "
-                "selects a supported Alpha strategy or asks for real unsupported "
-                "custom logic. Use semantic meaning, not keyword or phrase matching. "
-                "Supported Alpha strategy families include buy_and_hold and "
-                "dca_accumulation when the user is only asking to test holding or "
-                "recurring fixed-dollar buys over a period. A plain performance, "
-                "return, or benchmark comparison between one primary asset and a "
-                "reference asset over a stated window is a supported buy_and_hold "
-                "comparison with comparison_baseline; it is not unsupported custom "
-                "strategy logic unless the user adds a separate unsupported rule. "
-                "Keep the unsupported "
-                "constraint when the current message adds an extra unsupported entry "
-                "condition, exit condition, fundamental rule, sentiment/news/event "
-                "rule, custom script, brokerage action, shorting, or other logic "
-                "beyond the supported strategy family. Drop it only when the message "
-                "semantically asks for the supported strategy itself and no extra "
-                "unsupported rule. Set selected_strategy_type to the canonical "
-                "supported family when dropping the constraint. Reason from the "
-                "current message and structured draft meaning. Return only JSON "
-                "matching the schema."
-            ),
+            "content": CAPABILITY_CONFLICT_KEEP_DIRECTION_PROMPT,
         },
         {
             "role": "system",
@@ -234,6 +236,7 @@ def _response_with_supported_strategy_capability_conflict_removed(
             [
                 *repaired.reason_codes,
                 "supported_strategy_capability_conflict_audit",
+                *inverse_promotion_reason_codes(response),
             ]
         )
     )
@@ -268,6 +271,8 @@ def _clear_rule_or_indicator_fields(draft: LLMStrategyDraft) -> None:
 def _response_with_executable_fields_preferred_over_clarification_prose(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
+    # An unsupported verdict on either typed field is not clarification noise;
+    # only the inverse capability audit may normalize it into a supported run.
     draft = response.candidate_strategy_draft
     if not (
         response.requires_clarification
@@ -276,7 +281,6 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
         in {
             "strategy_drafting",
             "backtest_execution",
-            "unsupported_or_out_of_scope",
         }
         and response.semantic_turn_act
         not in {
@@ -286,6 +290,7 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
             "refine_current_idea",
             "result_followup",
             "retry_failed_action",
+            "unsupported_request",
         }
         and response.capability_question_focus is None
         and response.context_question_focus is None
@@ -335,18 +340,15 @@ def _response_from_current_message_run_field_contract(
     )
     if date_range is None:
         return None
-    if (
-        date_range is not None
-        and (
-            _draft_date_range_needs_stated_run_field_audit(
-                draft,
-                current_message=current_message,
-            )
-            or _response_needs_current_message_date_repair(
-                response=repaired,
-                current_message=current_message,
-                language=request.user.language_preference,
-            )
+    if date_range is not None and (
+        _draft_date_range_needs_stated_run_field_audit(
+            draft,
+            current_message=current_message,
+        )
+        or _response_needs_current_message_date_repair(
+            response=repaired,
+            current_message=current_message,
+            language=request.user.language_preference,
         )
     ):
         draft.date_range = date_range
@@ -418,9 +420,7 @@ def _response_with_resolved_runtime_date_range(
     if date_range is None:
         return response
     draft = response.candidate_strategy_draft
-    if _normalized_stated_field(draft.date_range) == _normalized_stated_field(
-        date_range
-    ):
+    if _normalized_stated_field(draft.date_range) == _normalized_stated_field(date_range):
         return response
     repaired = response.model_copy(deep=True)
     repaired.candidate_strategy_draft.date_range = date_range
@@ -476,11 +476,9 @@ def _resolved_runtime_date_range_from_draft(
                     request=request,
                 )
             )
-            if (
-                current_message_range is not None
-                and _normalized_stated_field(resolved.payload)
-                != _normalized_stated_field(current_message_range)
-            ):
+            if current_message_range is not None and _normalized_stated_field(
+                resolved.payload
+            ) != _normalized_stated_field(current_message_range):
                 return current_message_range
             return resolved.payload
     return _date_range_from_intent_or_bounded_evidence(
@@ -541,9 +539,10 @@ def _pending_dca_assumption_reply_needs_stated_run_field_audit(
     )
     if requested_field != "assumption":
         return False
-    return canonical_strategy_type(
-        response.candidate_strategy_draft.strategy_type
-    ) == "dca_accumulation"
+    return (
+        canonical_strategy_type(response.candidate_strategy_draft.strategy_type)
+        == "dca_accumulation"
+    )
 
 
 def _focused_repair_capital_needs_stated_run_field_audit(
@@ -570,7 +569,9 @@ def _draft_capital_needs_stated_run_field_audit(
         return False
     if _text_contains_capital_audit_signal(current_message, draft=draft):
         return True
-    return draft.capital_amount is None and _draft_contains_structured_capital_context(draft)
+    return draft.capital_amount is None and _draft_contains_structured_capital_context(
+        draft
+    )
 
 
 def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
@@ -582,11 +583,7 @@ def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
         candidate = token.strip().lstrip("$")
         if not candidate:
             continue
-        compact = "".join(
-            character
-            for character in candidate
-            if character.isalnum()
-        )
+        compact = "".join(character for character in candidate if character.isalnum())
         if len(compact) < 2 or not any(character.isalpha() for character in compact):
             continue
         previous = tokens[index - 1].strip().casefold() if index > 0 else ""
@@ -596,8 +593,7 @@ def _explicit_benchmark_ticker_queries(message: str) -> list[str]:
             and len(compact) <= 5
         )
         if not (
-            _asset_recovery_query_is_explicit_ticker(token)
-            or is_cued_lowercase_ticker
+            _asset_recovery_query_is_explicit_ticker(token) or is_cued_lowercase_ticker
         ):
             continue
         normalized = candidate.upper()
@@ -624,8 +620,9 @@ def _response_needs_current_message_date_repair(
         return True
     if _response_has_pending_base_field(response, "date_range"):
         return True
-    return response.requires_clarification and _llm_strategy_draft_has_concrete_execution_target(
-        draft
+    return (
+        response.requires_clarification
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
     )
 
 
@@ -709,9 +706,8 @@ def _draft_date_range_needs_stated_run_field_audit(
         != _normalized_stated_field(current_message_range)
     ):
         return True
-    if (
-        current_message_range is None
-        and _draft_date_range_has_unstated_current_endpoint(draft.date_range)
+    if current_message_range is None and _draft_date_range_has_unstated_current_endpoint(
+        draft.date_range
     ):
         return True
     if has_partial_explicit_date_range(draft.date_range):
@@ -720,7 +716,9 @@ def _draft_date_range_needs_stated_run_field_audit(
         )
     if isinstance(draft.date_range, str) and current_message_range is not None:
         normalized_range = draft.date_range.strip().casefold()
-        return bool(normalized_range and normalized_range not in current_message.casefold())
+        return bool(
+            normalized_range and normalized_range not in current_message.casefold()
+        )
     return False
 
 
@@ -875,10 +873,7 @@ def _response_needs_latest_result_routing_audit(
         return True
     return bool(
         response.capability_question_focus is not None
-        or (
-            response.task_relation == "continue"
-            and response.assistant_response is None
-        )
+        or (response.task_relation == "continue" and response.assistant_response is None)
     )
 
 
@@ -1000,7 +995,7 @@ def _stated_run_field_fidelity_messages(
                 "You are Argus's run-field fidelity audit. Compare the current "
                 "user message with the structured draft and return only run fields "
                 "the user explicitly stated but the draft may have dropped or "
-                "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
+                "reshaped. Do not infer defaults, symbols, or rules. "
                 "If a field is absent from the current user message, return null "
                 "for that field. Normalize starting capital exactly from the "
                 "current message: 10k -> 10000, 100K -> 100000, $10,000 "
@@ -1038,8 +1033,12 @@ def _stated_run_field_fidelity_messages(
                 "comparison target, that asset belongs in comparison_baseline. "
                 "If the draft has a default benchmark but the current "
                 "message states a different comparison asset, return the user-stated "
-                "comparison asset. Return "
-                "only JSON matching the schema."
+                "comparison asset, even a company name with no known symbol — "
+                "'compare AAPL with Samsung' or 'comparar AAPL con Samsung' "
+                "states comparison_baseline='Samsung' — return it verbatim, "
+                "never dropped; validation owns support decisions. "
+                + EXECUTION_COST_FIDELITY_INSTRUCTIONS
+                + "Return only JSON matching the schema."
             ),
         },
         {
@@ -1058,6 +1057,7 @@ def _response_from_stated_run_field_fidelity_audit(
     response: LLMInterpretationResponse,
     audit: StatedRunFieldFidelityAudit,
     current_message: str = "",
+    prior_strategy: StrategySummary | None = None,
 ) -> LLMInterpretationResponse | None:
     repaired = response.model_copy(deep=True)
     draft = repaired.candidate_strategy_draft
@@ -1088,7 +1088,6 @@ def _response_from_stated_run_field_fidelity_audit(
         changed = True
     if audit.date_range not in (None, "", [], {}):
         audited_date_range: Any = audit.date_range
-        del current_message
         expected_date_range = _date_range_from_intent_or_bounded_evidence(draft)
         if (
             isinstance(expected_date_range, dict)
@@ -1118,6 +1117,7 @@ def _response_from_stated_run_field_fidelity_audit(
                     "stated_run_field_fidelity_audit"
                 )
                 changed = True
+    changed |= apply_cost_fidelity(repaired, audit, current_message, prior_strategy)
     if not changed:
         return None
     repaired.reason_codes = list(

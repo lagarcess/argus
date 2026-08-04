@@ -36,6 +36,17 @@ export type ResultChartValuePoint = {
   value: number;
 };
 
+export type ResultChartExplorationPolicy = {
+  minimum_visible_observations?: number;
+  minimum_meaningful_duration?: string | null;
+};
+
+export type ResultChartMarkerSummary = {
+  total_groups: number;
+  included_groups: number;
+  sampled: boolean;
+};
+
 export type ResultChartPayload = {
   kind: "portfolio_equity";
   series: ResultChartPoint[];
@@ -47,6 +58,8 @@ export type ResultChartPayload = {
     peak?: ResultChartValuePoint | null;
     lowest?: ResultChartValuePoint | null;
   } | null;
+  exploration_policy?: ResultChartExplorationPolicy | null;
+  marker_summary?: ResultChartMarkerSummary | null;
   attribution?: string;
 };
 
@@ -75,8 +88,10 @@ export type ChatActionOption = {
     | "save_strategy"
     | "retry_failed_action"
     | "select_response_option"
+    | "select_discovery_candidate"
     | "retry_last_turn"
-    | "retry_load_conversation";
+    | "retry_load_conversation"
+    | "retest_run";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -175,6 +190,18 @@ export type StrategyConfirmationDateRange = {
   display?: string;
 };
 
+export type StrategyConfirmationPeriodAdjustment = {
+  code: string;
+  requested_date_range: StrategyConfirmationDateRange;
+  effective_date_range: StrategyConfirmationDateRange;
+};
+
+export type StrategyConfirmationBenchmarkAdjustment = {
+  code: string;
+  requested_target: string;
+  effective_benchmark: string;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -192,6 +219,8 @@ export type StrategyConfirmationPayload = {
   display_facts?: ConfirmationDisplayFacts;
   capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
+  period_adjustment?: StrategyConfirmationPeriodAdjustment;
+  benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
@@ -201,8 +230,19 @@ export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
 };
 
+export type StrategyPathContext = {
+  kind: "clarification" | "confirmation";
+  requestedField?: string | null;
+  strategy: Record<string, unknown>;
+  sourceResultRunId?: string | null;
+  strategyPathId?: string | null;
+  optionalParameters?: Record<string, unknown> | null;
+};
+
 export type Message = {
   id: string;
+  /** Hidden durable message ids that should focus this projected transcript row. */
+  transcriptAnchorIds?: string[];
   role: "user" | "ai";
   kind?:
     | "text"
@@ -231,4 +271,41 @@ export type Message = {
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
+  /** Existing backend-owned strategy facts used to prove turn continuity. */
+  strategyPathContext?: StrategyPathContext | null;
+  assistantRecoveryCode?: string | null;
+  /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
+  discovery?: DiscoverySidecar | null;
+  /** Backend-owned structured context for a retest receipt turn. */
+  retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
+  nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
+};
+
+export type DiscoverySource = {
+  title: string;
+  domain: string;
+  url: string;
+  source_date?: string | null;
+};
+
+export type DiscoveryCandidate = {
+  symbol: string;
+  name: string;
+  asset_class: AssetClass;
+  reason_text: string;
+  source_indices?: number[];
+};
+
+export type DiscoverySidecar = {
+  schema_version: string;
+  kind: "asset_discovery";
+  relationship: "category" | "peer" | "comparison";
+  query_summary: string;
+  retrieved_at: string;
+  sources: DiscoverySource[];
+  candidates: DiscoveryCandidate[];
+  unverified_names: string[];
+  /** Backend-owned: the "search current results" escalation may render only
+   * when true, so the row can never outlive the allowance. */
+  can_request_search?: boolean;
 };

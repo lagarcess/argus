@@ -11,6 +11,10 @@ import {
   settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "../components/chat/artifact-history";
+import {
+  hydrateMessagesFromApi,
+  settleOpenConfirmationsFromFinalPayload,
+} from "../components/chat/ChatInterface";
 import type { ChatActionOption, Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
 import { hydrateTextMessageFromApi } from "../lib/chat-message-hydration";
@@ -127,6 +131,57 @@ function resultMessageWithResultActions(runId: string): Message {
 }
 
 describe("chat artifact history", () => {
+  test("hydrates backend-owned strategy context on a confirmation card", () => {
+    const confirmation = confirmationMessage().confirmation!;
+    const { messages } = hydrateMessagesFromApi([
+      {
+        id: "assistant-confirmation-linked",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-08-02T00:00:00Z",
+        metadata: {
+          strategy_path_id: "assistant-capital-question",
+          confirmation_card: confirmation,
+          confirmation_payload: {
+            strategy: {
+              strategy_type: "buy_and_hold",
+              asset_universe: ["AAPL"],
+              date_range: { start: "2025-01-02", end: "2025-07-31" },
+              capital_amount: 10_000,
+            },
+            optional_parameters: {
+              initial_capital: {
+                value: 10_000,
+                source: "user",
+                label: "Initial capital",
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(messages[0]?.strategyPathContext).toEqual({
+      kind: "confirmation",
+      strategy: {
+        strategy_type: "buy_and_hold",
+        asset_universe: ["AAPL"],
+        date_range: { start: "2025-01-02", end: "2025-07-31" },
+        capital_amount: 10_000,
+      },
+      sourceResultRunId: null,
+      strategyPathId: "assistant-capital-question",
+      optionalParameters: {
+        initial_capital: {
+          value: 10_000,
+          source: "user",
+          label: "Initial capital",
+        },
+      },
+    });
+  });
+
   test.each([
     ["run_backtest", "Running", "superseded"],
     ["change_dates", "Editing", "superseded"],
@@ -247,6 +302,72 @@ describe("chat artifact history", () => {
     expect(messages[1].actions).toEqual([]);
   });
 
+  test("ambiguous run transport keeps its confirmation nonterminal during lookup", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [checking] = settleConfirmationAfterActionTransportError(
+      [running],
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+      { durableStateUnknown: true },
+    );
+
+    expect(checking.confirmation?.confirmation_state).toBe("superseded");
+    expect(checking.confirmation?.status).toBe("running");
+    expect(checking.confirmation?.status).not.toBe("could_not_run");
+  });
+
+  test("typed stale Run rejection settles only its owning in-flight card", () => {
+    const oldCard: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "running",
+        statusLabel: "Running",
+        actions: [],
+      },
+      actions: [],
+    };
+    const newestCard: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-new",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-nvda",
+        title: "NVDA buy and hold",
+      },
+    };
+
+    const settled = settleConfirmationAfterActionTransportError(
+      [oldCard, newestCard],
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+      { rejectionCode: "confirmation_action_stale_card" },
+    );
+
+    expect(settled[0]?.confirmation?.status).toBe("updated");
+    expect(settled[0]?.confirmation?.statusLabel).toBe("Updated");
+    expect(settled[0]?.confirmation?.actions).toEqual([]);
+    expect(settled[1]?.confirmation?.confirmation_state).toBe("active");
+    expect(settled[1]?.confirmation?.statusLabel).toBe("Ready to run");
+    expect(settled[1]?.confirmation?.actions).toHaveLength(2);
+  });
+
   test("cancel action tombstones hide action transcript noise on reload", () => {
     const items: ApiMessage[] = [
       {
@@ -331,6 +452,254 @@ describe("chat artifact history", () => {
 
     expect(effects.effects).toEqual([]);
     expect([...effects.hiddenMessageIds]).toEqual([]);
+  });
+
+  test("stale old-card recovery preserves the newest active confirmation", () => {
+    const oldCard: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "request_sent",
+        statusLabel: "Request sent",
+        actions: [],
+      },
+      actions: [],
+    };
+    const newestCard: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-new",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-nvda",
+        title: "NVDA buy and hold",
+        actions: [
+          {
+            type: "run_backtest",
+            label: "Run backtest",
+            presentation: "confirmation",
+            payload: { confirmation_id: "confirm-nvda" },
+          },
+        ],
+      },
+      actions: [
+        {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-nvda" },
+        },
+      ],
+    };
+
+    const settled = settleOpenConfirmationsAfterTextFinal(
+      [oldCard, newestCard],
+      {
+        action: {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-aapl" },
+        },
+        stageOutcome: "ready_to_respond",
+        recoveryCode: "confirmation_action_stale_card",
+      },
+    );
+
+    expect(settled[0]?.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled[0]?.confirmation?.status).toBe("updated");
+    expect(settled[0]?.confirmation?.statusLabel).toBe("Updated");
+    expect(settled[0]?.confirmation?.actions).toEqual([]);
+    expect(settled[0]?.actions).toEqual([]);
+    expect(settled[1]?.confirmation?.confirmation_state).toBe("active");
+    expect(settled[1]?.confirmation?.statusLabel).toBe("Ready to run");
+    expect(settled[1]?.actions).toHaveLength(1);
+  });
+
+  test("ChatInterface final payload composition preserves the newest confirmation after stale Run recovery", () => {
+    const oldCard: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "request_sent",
+        statusLabel: "Request sent",
+        actions: [],
+      },
+      actions: [],
+    };
+    const newestCard: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-new",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-nvda",
+        title: "NVDA buy and hold",
+        actions: [
+          {
+            type: "run_backtest",
+            label: "Run backtest",
+            presentation: "confirmation",
+            payload: { confirmation_id: "confirm-nvda" },
+          },
+        ],
+      },
+      actions: [
+        {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-nvda" },
+        },
+      ],
+    };
+
+    const settled = settleOpenConfirmationsFromFinalPayload(
+      [oldCard, newestCard],
+      {
+        stage_outcome: "ready_to_respond",
+        recovery: {
+          code: "confirmation_action_stale_card",
+          retryable: false,
+        },
+      },
+      {
+        action: {
+          type: "run_backtest",
+          label: "Run backtest",
+          presentation: "confirmation",
+          payload: { confirmation_id: "confirm-aapl" },
+        },
+        finalActions: [],
+        hasFailedAction: false,
+      },
+    );
+
+    expect(settled[0]?.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled[0]?.confirmation?.status).toBe("updated");
+    expect(settled[0]?.confirmation?.statusLabel).toBe("Updated");
+    expect(settled[1]?.confirmation?.confirmation_state).toBe("active");
+    expect(settled[1]?.actions).toEqual([
+      {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-nvda" },
+      },
+    ]);
+  });
+
+  test("reload preserves one stale recovery and the latest usable confirmation", () => {
+    const staleRun = {
+      type: "run_backtest",
+      label: "Run backtest",
+      presentation: "confirmation",
+      payload: { confirmation_id: "confirm-aapl" },
+    } satisfies ChatActionOption;
+    const newestConfirmation = {
+      ...confirmationMessage().confirmation!,
+      confirmation_id: "confirm-nvda",
+      title: "NVDA buy and hold",
+      rows: [{ label: "Assets", value: "NVDA" }],
+      actions: [
+        {
+          ...staleRun,
+          payload: { confirmation_id: "confirm-nvda" },
+        },
+      ],
+    } satisfies NonNullable<Message["confirmation"]>;
+    const items: ApiMessage[] = [
+      {
+        id: "assistant-confirmation-old",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-07-26T00:00:00Z",
+        metadata: { confirmation_card: confirmationMessage().confirmation },
+      },
+      {
+        id: "assistant-confirmation-new",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-07-26T00:00:01Z",
+        metadata: { confirmation_card: newestConfirmation },
+      },
+      {
+        id: "user-stale-run",
+        conversation_id: "conversation-1",
+        role: "user",
+        content: "Run backtest",
+        created_at: "2026-07-26T00:00:02Z",
+        metadata: { chat_action: staleRun },
+      },
+      {
+        id: "assistant-stale-recovery",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "That confirmation was updated. Use the latest visible card.",
+        created_at: "2026-07-26T00:00:03Z",
+        metadata: {
+          recovery_reason: "missing_confirmation_checkpoint",
+          recovery: {
+            code: "confirmation_action_stale_card",
+            retryable: false,
+          },
+          chat_action: staleRun,
+        },
+      },
+    ];
+
+    const { effects } = confirmationActionEffectsFromApi(items);
+    const [unownedLegacyCard] = applyConfirmationActionEffects(
+      [
+        {
+          ...confirmationMessage(),
+          confirmation: {
+            ...confirmationMessage().confirmation!,
+            confirmation_id: undefined,
+            confirmation_state: "superseded",
+            status: "running",
+            statusLabel: "Running",
+            actions: [],
+          },
+          actions: [],
+        },
+      ],
+      effects,
+    );
+    const firstReload = hydrateMessagesFromApi(items);
+    const secondReload = hydrateMessagesFromApi(items);
+    const confirmations = firstReload.messages.filter(
+      (message) => message.kind === "strategy_confirmation",
+    );
+    const actionMessages = firstReload.messages.filter(
+      (message) => message.kind === "action",
+    );
+    const recoveries = firstReload.messages.filter(
+      (message) =>
+        message.recoveryDisplay?.kind === "recovery_code" &&
+        message.recoveryDisplay.code === "confirmation_action_stale_card",
+    );
+
+    expect(effects.map((effect) => effect.status)).toEqual([
+      "running",
+      "updated",
+    ]);
+    expect(unownedLegacyCard.confirmation?.status).toBe("running");
+    expect(firstReload.messages).toHaveLength(4);
+    expect(confirmations).toHaveLength(2);
+    expect(actionMessages).toHaveLength(1);
+    expect(recoveries).toHaveLength(1);
+    expect(confirmations[0]?.confirmation?.confirmation_state).toBe(
+      "superseded",
+    );
+    expect(confirmations[0]?.confirmation?.status).toBe("updated");
+    expect(confirmations[1]?.confirmation?.confirmation_state).toBe("active");
+    expect(confirmations[1]?.confirmation?.statusLabel).toBe("Ready to run");
+    expect(confirmations[1]?.confirmation?.actions).toHaveLength(1);
+    expect(firstReload.inputActions).toEqual([]);
+    expect(secondReload).toEqual(firstReload);
   });
 
   test("transient edit actions do not reopen superseded cards during hydration", () => {
@@ -438,6 +807,92 @@ describe("chat artifact history", () => {
     expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
     expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
     expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
+  test("stream normalization marks a superseded running card updated when no active job owns it", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+    const freshConfirmation: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-fresh",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-aapl-fresh",
+        status: "ready_to_run",
+      },
+    };
+
+    const [previousCard, freshCard] = normalizeConfirmationHistory([
+      running,
+      freshConfirmation,
+    ]);
+
+    expect(previousCard.confirmation?.confirmation_state).toBe("superseded");
+    expect(previousCard.confirmation?.status).toBe("updated");
+    expect(previousCard.confirmation?.statusLabel).toBe("Updated");
+    expect(previousCard.confirmation?.actions).toEqual([]);
+    expect(previousCard.actions).toEqual([]);
+    expect(freshCard.confirmation?.confirmation_state).toBe("active");
+    expect(freshCard.confirmation?.status).toBe("ready_to_run");
+    expect(freshCard.confirmation?.statusLabel).toBe("Ready to run");
+    expect(freshCard.confirmation?.actions).toHaveLength(2);
+  });
+
+  test("normalization preserves the latest running confirmation when nothing supersedes it", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [normalized] = normalizeConfirmationHistory([running]);
+
+    expect(normalized.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalized.confirmation?.status).toBe("running");
+    expect(normalized.confirmation?.statusLabel).toBe("Running");
+  });
+
+  test("reload normalization clears an unowned request-sent label before activating a fresh confirmation", () => {
+    const persistedRequest: Message = {
+      ...confirmationMessage(),
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_state: "superseded",
+        status: "request_sent",
+        statusLabel: "Request sent",
+      },
+    };
+    const freshConfirmation: Message = {
+      ...confirmationMessage(),
+      id: "assistant-confirmation-fresh",
+      confirmation: {
+        ...confirmationMessage().confirmation!,
+        confirmation_id: "confirm-aapl-fresh",
+        status: "ready_to_run",
+      },
+    };
+
+    const [previousCard, freshCard] = normalizeConfirmationHistory([
+      persistedRequest,
+      freshConfirmation,
+    ]);
+
+    expect(previousCard.confirmation?.confirmation_state).toBe("superseded");
+    expect(previousCard.confirmation?.status).toBe("updated");
+    expect(previousCard.confirmation?.statusLabel).toBe("Updated");
+    expect(previousCard.confirmation?.actions).toEqual([]);
+    expect(previousCard.actions).toEqual([]);
+    expect(freshCard.confirmation?.confirmation_state).toBe("active");
+    expect(freshCard.confirmation?.status).toBe("ready_to_run");
+    expect(freshCard.confirmation?.statusLabel).toBe("Ready to run");
+    expect(freshCard.confirmation?.actions).toHaveLength(2);
   });
 
   test("normalization closes active run-complete confirmations with stale actions", () => {
@@ -549,6 +1004,57 @@ describe("chat artifact history", () => {
     expect(settled.confirmation?.statusLabel).toBe("Could not run");
     expect(settled.confirmation?.actions).toEqual([]);
     expect(settled.actions).toEqual([]);
+  });
+
+  test("persisted failed run action remains could not run after hydration normalization", () => {
+    const runAction = {
+      type: "run_backtest",
+      label: "Run backtest",
+      presentation: "confirmation",
+      payload: { confirmation_id: "confirm-aapl" },
+    } satisfies ChatActionOption;
+    const items: ApiMessage[] = [
+      {
+        id: "user-run-action",
+        conversation_id: "conversation-1",
+        role: "user",
+        content: "Run backtest",
+        created_at: "2026-07-24T00:00:00Z",
+        metadata: {
+          chat_action: runAction,
+        },
+      },
+      {
+        id: "assistant-run-failed",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "This backtest could not be started right now.",
+        created_at: "2026-07-24T00:00:01Z",
+        metadata: {
+          chat_action: runAction,
+          failed_action: {
+            artifact_id: "failed-run-aapl",
+            action_type: "run_backtest",
+            failure_classification: "capacity",
+            error: "backtest_capacity_exceeded",
+            retryable: false,
+          },
+        },
+      },
+    ];
+
+    const { effects } = confirmationActionEffectsFromApi(items);
+    const hydrated = applyConfirmationActionEffects(
+      normalizeConfirmationHistory([confirmationMessage()]),
+      effects,
+    );
+    const [normalized] = normalizeConfirmationHistory(hydrated);
+
+    expect(normalized.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalized.confirmation?.status).toBe("could_not_run");
+    expect(normalized.confirmation?.statusLabel).toBe("Could not run");
+    expect(normalized.confirmation?.actions).toEqual([]);
+    expect(normalized.actions).toEqual([]);
   });
 
   test("clarification text finals keep active confirmation cards open", () => {

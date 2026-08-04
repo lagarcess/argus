@@ -7,6 +7,7 @@ import os
 import resource
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -287,30 +288,41 @@ def _run_json_child(
     env.update(env_patch)
     command = [sys.executable, str(Path(__file__).resolve()), *args]
     started = time.perf_counter()
-    process = subprocess.Popen(
-        command,
-        cwd=repo_root,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    peak_rss = 0
-    ps_process = psutil.Process(process.pid)
-    deadline = time.perf_counter() + timeout_seconds
-    while process.poll() is None:
-        peak_rss = max(peak_rss, _rss_for_process_tree(ps_process))
-        if time.perf_counter() > deadline:
-            process.kill()
-            stdout, stderr = process.communicate()
-            raise RuntimeError(
-                f"benchmark child timed out after {timeout_seconds:.1f}s: "
-                f"{' '.join(args)}\n{stdout}\n{stderr}"
-            )
-        time.sleep(0.02)
+    with (
+        tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stdout_file,
+        tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stderr_file,
+    ):
+        process = subprocess.Popen(
+            command,
+            cwd=repo_root,
+            env=env,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            text=True,
+        )
+        peak_rss = 0
+        ps_process = psutil.Process(process.pid)
+        deadline = time.perf_counter() + timeout_seconds
+        while process.poll() is None:
+            peak_rss = max(peak_rss, _rss_for_process_tree(ps_process))
+            if time.perf_counter() > deadline:
+                process.kill()
+                process.wait()
+                stdout_file.seek(0)
+                stderr_file.seek(0)
+                stdout = stdout_file.read()
+                stderr = stderr_file.read()
+                raise RuntimeError(
+                    f"benchmark child timed out after {timeout_seconds:.1f}s: "
+                    f"{' '.join(args)}\n{stdout}\n{stderr}"
+                )
+            time.sleep(0.02)
 
-    peak_rss = max(peak_rss, _rss_for_process_tree(ps_process))
-    stdout, stderr = process.communicate()
+        peak_rss = max(peak_rss, _rss_for_process_tree(ps_process))
+        stdout_file.seek(0)
+        stderr_file.seek(0)
+        stdout = stdout_file.read()
+        stderr = stderr_file.read()
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     if process.returncode != 0:
         raise RuntimeError(

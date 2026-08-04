@@ -42,6 +42,7 @@ import {
   type StrategyConfirmationStatus,
 } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
   confirmationRowKey,
@@ -514,7 +515,7 @@ function ExecutionCostEditor({
         {t("chat.confirmation.cost_editor.cancel", "Cancel")}
       </button>
       {!isValid && (
-        <p className="w-full text-[11px] text-[#b3593f] dark:text-[#e08d70]">
+        <p role="alert" className={`w-full text-[11px] ${inlineFailureTextClass}`}>
           {t("chat.confirmation.cost_editor.invalid", {
             defaultValue:
               "Enter percentages of 0 or more (slippage up to {{max}}%).",

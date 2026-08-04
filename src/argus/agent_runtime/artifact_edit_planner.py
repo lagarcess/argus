@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +12,15 @@ from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_universe_operation,
     same_asset_universe,
 )
+from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+    supported_cost_rate_value,
+)
 from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.rule_specs import opposite_moving_average_crossover_rule
+from argus.domain.backtesting.rules import (
+    rule_spec_from_moving_average_crossover_rules,
+)
+from argus.domain.capability_registry import RegisteredStrategyTemplate
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -39,11 +47,15 @@ class EditOperation(BaseModel):
         "indicator_entry_threshold",
         "indicator_exit_threshold",
         "indicator_period",
+        "strategy_family",
     ]
     symbols: list[str] = Field(default_factory=list)
     value: str | None = None
     number: float | None = None
     date_window: LLMDateRangeIntent | None = None
+    strategy_template: RegisteredStrategyTemplate | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
 
 
 class ArtifactAssumptionEditPlan(BaseModel):
@@ -71,17 +83,25 @@ async def plan_artifact_assumption_edit(
     active_confirmation: dict[str, Any] | None,
     preferred_model: str,
     language: str | None = None,
+    required_targets: set[str] | None = None,
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
+    | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
     if prior_strategy is None and active_confirmation is None:
         return None
 
+    required_target_set = set(required_targets or ())
+    supported_targets = set(get_args(EditOperation.model_fields["target"].annotation))
+    if not required_target_set <= supported_targets:
+        return None
     messages = _artifact_assumption_edit_messages(
         current_user_message=current_user_message,
         prior_strategy=prior_strategy,
         active_confirmation=active_confirmation,
         language=language,
+        required_targets=required_target_set,
     )
     for model_name in _unique_models(preferred_model):
         try:
@@ -102,6 +122,12 @@ async def plan_artifact_assumption_edit(
             active_confirmation=active_confirmation,
         ):
             continue
+        if plan.outcome == "ready_to_confirm" and not _covers_required_targets(
+            plan,
+            required_targets=required_target_set,
+            materialized_targets_for_plan=materialized_targets_for_plan,
+        ):
+            continue
         if plan.outcome != "ready_to_confirm" and not plan.assistant_response:
             continue
         return plan
@@ -114,11 +140,19 @@ def _artifact_assumption_edit_messages(
     prior_strategy: dict[str, Any] | None,
     active_confirmation: dict[str, Any] | None,
     language: str | None = None,
+    required_targets: set[str] | None = None,
 ) -> list[dict[str, str]]:
     language_line = (
         f"Write assistant_response in the user's language ({language})."
         if language
         else "Write assistant_response in the user's language."
+    )
+    required_targets_line = (
+        "Required typed targets for this turn: "
+        f"{', '.join(sorted(required_targets))}. "
+        "A ready_to_confirm operation list must cover every required target.\n\n"
+        if required_targets
+        else ""
     )
     return [
         {
@@ -133,6 +167,7 @@ def _artifact_assumption_edit_messages(
                 "(add | remove | replace | set | clear) and target, plus the value "
                 "carrier for that target. Resolve references such as 'that', 'it', "
                 "or 'the second one' against the current card.\n\n"
+                f"{required_targets_line}"
                 "Targets and their value carriers:\n"
                 "- asset (traded tickers, use symbols): add new tickers, remove "
                 "named tickers, replace the whole traded set, or clear. For add and "
@@ -163,23 +198,34 @@ def _artifact_assumption_edit_messages(
                 "- indicator_entry_threshold and indicator_exit_threshold (use "
                 "number): set tunable RSI buy/entry and sell/exit thresholds on "
                 "an existing RSI confirmation. Use indicator_period for a tunable "
-                "RSI lookback period.\n\n"
+                "RSI lookback period.\n"
+                "- strategy_family: replace an active strategy with the already "
+                "supported moving_average_crossover template. Set "
+                "strategy_template=moving_average_crossover and provide typed "
+                "entry_rule and exit_rule objects. Each rule must use "
+                "type=moving_average_crossover, fast_indicator and slow_indicator "
+                "(sma or ema), positive fast_period and slow_period, and direction "
+                "(bullish for entry, bearish for exit). Keep assets, capital, dates, "
+                "daily timeframe, benchmark, fees, and slippage out of operations "
+                "unless the user explicitly changes them in the same turn.\n\n"
                 "Execution limits the system enforces (do not propose operations "
                 "that break them): one asset class per run (equities and crypto "
                 "cannot mix), at most 5 traded symbols, long-only, and the "
                 "benchmark must match the traded asset class. If the user's edit "
                 "would break a limit, return needs_clarification, explain the limit "
                 "plainly, and offer the closest in-limit alternative (for example "
-                "switching the whole run to that asset class). The strategy family "
-                "itself is not editable here except for the explicitly listed "
-                "tunable RSI indicator parameters.\n\n"
+                "switching the whole run to that asset class). Do not invent a new "
+                "strategy family or map unsupported logic into strategy_family. "
+                "Only the explicitly supported moving_average_crossover transition "
+                "and the listed tunable RSI parameters are strategy-definition "
+                "edits here.\n\n"
                 "Return outcome=ready_to_confirm when operations contains at least "
                 "one applicable change. If the user asks what is currently set, "
                 "return needs_clarification with a concise assistant_response "
                 "instead of inventing operations. If the user asks for something "
-                "outside the targets above (for example a strategy or entry/exit "
-                "rule change), return unsupported or needs_clarification and name "
-                "what can be changed; do not invent an operation for it. When a "
+                "outside the targets above, return unsupported or "
+                "needs_clarification and name what can be changed; do not invent "
+                "an operation for it. When a "
                 "single turn mixes a supported change with an unsupported one, apply "
                 "the supported operations with outcome=ready_to_confirm and use "
                 "assistant_response to briefly state, in the user's language, what "
@@ -203,6 +249,72 @@ def _artifact_assumption_edit_messages(
     ]
 
 
+def _covers_required_targets(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    required_targets: set[str],
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
+    | None = None,
+) -> bool:
+    if materialized_targets_for_plan is not None:
+        try:
+            covered_targets = materialized_targets_for_plan(plan)
+        except Exception:
+            return False
+        if covered_targets is None:
+            return False
+    elif required_targets:
+        covered_targets = _materialized_legacy_flat_targets(plan)
+    else:
+        return True
+    return required_targets.issubset(covered_targets)
+
+
+def _materialized_legacy_flat_targets(
+    plan: ArtifactAssumptionEditPlan,
+) -> set[str]:
+    """Name flat fields that the legacy application path really materializes.
+
+    Typed operations need request context (date resolution, asset resolution,
+    active strategy family) to prove applicability, so callers must supply the
+    real materializer for them. Flat fields remain context-free compatibility
+    inputs and can be checked here without pretending a carrier is a mutation.
+    """
+
+    if plan.operations:
+        return set()
+    targets: set[str] = set()
+    if plan.asset_universe:
+        targets.add("asset")
+    if str(plan.comparison_baseline or "").strip():
+        targets.add("benchmark")
+    if plan.initial_capital is not None:
+        targets.add("capital")
+    if plan.recurring_contribution_amount is not None:
+        targets.add("recurring_contribution")
+    if str(plan.cadence or "").strip().casefold() in {
+        "daily",
+        "weekly",
+        "biweekly",
+        "monthly",
+        "quarterly",
+    }:
+        targets.add("cadence")
+    if plan.timeframe is not None:
+        targets.add("timeframe")
+    if (
+        plan.fee_rate is not None
+        and supported_cost_rate_value(plan.fee_rate, field_name="fee_rate") is not None
+    ):
+        targets.add("fees")
+    if (
+        plan.slippage is not None
+        and supported_cost_rate_value(plan.slippage, field_name="slippage") is not None
+    ):
+        targets.add("slippage")
+    return targets
+
+
 def _has_supported_edit(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -218,12 +330,9 @@ def _has_supported_edit(
             ),
         )
         return resolved.has_changes() or any(
-            _operation_has_supported_carrier(operation)
-            for operation in plan.operations
+            _operation_has_supported_carrier(operation) for operation in plan.operations
         )
-    asset_operation = normalized_asset_universe_operation(
-        plan.asset_universe_operation
-    )
+    asset_operation = normalized_asset_universe_operation(plan.asset_universe_operation)
     if plan.asset_universe and asset_operation is None:
         if not same_asset_universe(
             plan.asset_universe,
@@ -235,11 +344,7 @@ def _has_supported_edit(
             return False
         asset_universe_edit = None
     else:
-        asset_universe_edit = (
-            plan.asset_universe
-            if asset_operation is not None
-            else None
-        )
+        asset_universe_edit = plan.asset_universe if asset_operation is not None else None
     return any(
         value is not None
         for value in (
@@ -270,6 +375,11 @@ def _operation_has_supported_carrier(operation: EditOperation) -> bool:
         return op in {"set", "replace"} and bool((operation.value or "").strip())
     if target == "date_window":
         return op in {"set", "replace"} and operation.date_window is not None
+    if target == "strategy_family":
+        return (
+            op in {"set", "replace"}
+            and _resolved_moving_average_crossover(operation) is not None
+        )
     if target in _NUMBER_TARGETS or target in _INDICATOR_PARAMETER_TARGETS:
         return op in {"set", "replace"} and operation.number is not None
     if target in _TEXT_TARGETS:
@@ -333,6 +443,11 @@ class ResolvedArtifactEdit(BaseModel):
     fee_rate: float | None = None
     slippage: float | None = None
     indicator_parameters: dict[str, float | int] = Field(default_factory=dict)
+    requested_strategy_template: RegisteredStrategyTemplate | None = None
+    strategy_type: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
     applied: list[str] = Field(default_factory=list)
     unsupported: list[str] = Field(default_factory=list)
 
@@ -363,7 +478,7 @@ def apply_edit_operations(
         op = operation.op
 
         if target == "asset":
-            patch = _normalized_operation_symbols(
+            patch = resolved_asset_operation_symbols(
                 operation.symbols,
                 asset_symbol_resolver=asset_symbol_resolver,
             )
@@ -410,6 +525,24 @@ def apply_edit_operations(
                 resolved.unsupported.append(f"{op}.{target}")
             continue
 
+        if target == "strategy_family":
+            crossover = (
+                _resolved_moving_average_crossover(operation)
+                if op in {"set", "replace"}
+                else None
+            )
+            if crossover is None:
+                resolved.unsupported.append(f"{op}.{target}")
+                continue
+            entry_rule, exit_rule, rule_spec = crossover
+            resolved.requested_strategy_template = "moving_average_crossover"
+            resolved.strategy_type = "signal_strategy"
+            resolved.entry_rule = entry_rule
+            resolved.exit_rule = exit_rule
+            resolved.rule_spec = rule_spec
+            resolved.applied.append(f"{op}.{target}")
+            continue
+
         if target in _NUMBER_TARGETS:
             if op in {"set", "replace"} and operation.number is not None:
                 amount = float(operation.number)
@@ -418,9 +551,17 @@ def apply_edit_operations(
                 elif target == "recurring_contribution":
                     resolved.recurring_contribution_amount = amount
                 elif target == "fees":
-                    resolved.fee_rate = amount
+                    fee_rate = supported_cost_rate_value(amount, field_name="fee_rate")
+                    if fee_rate is None:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                    resolved.fee_rate = fee_rate
                 elif target == "slippage":
-                    resolved.slippage = amount
+                    slippage = supported_cost_rate_value(amount, field_name="slippage")
+                    if slippage is None:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                    resolved.slippage = slippage
                 resolved.applied.append(f"set.{target}")
             else:
                 resolved.unsupported.append(f"{op}.{target}")
@@ -462,11 +603,92 @@ def apply_edit_operations(
     return resolved
 
 
-def _normalized_operation_symbols(
+def _resolved_moving_average_crossover(
+    operation: EditOperation,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]] | None:
+    if operation.strategy_template != "moving_average_crossover":
+        return None
+    entry_rule = _validated_moving_average_crossover_rule(operation.entry_rule)
+    if entry_rule is None:
+        return None
+    exit_candidate = operation.exit_rule or opposite_moving_average_crossover_rule(
+        entry_rule
+    )
+    exit_rule = _validated_moving_average_crossover_rule(exit_candidate)
+    if exit_rule is None or not _rules_form_opposite_crossover(
+        entry_rule=entry_rule,
+        exit_rule=exit_rule,
+    ):
+        return None
+    try:
+        rule_spec = rule_spec_from_moving_average_crossover_rules(
+            entry_rule=entry_rule,
+            exit_rule=exit_rule,
+        )
+    except (TypeError, ValueError):
+        return None
+    if rule_spec is None:
+        return None
+    return entry_rule, exit_rule, rule_spec
+
+
+def _validated_moving_average_crossover_rule(
+    value: Any,
+) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    if value.get("type") != "moving_average_crossover":
+        return None
+    fast_indicator = str(value.get("fast_indicator") or "").strip().lower()
+    slow_indicator = str(value.get("slow_indicator") or "").strip().lower()
+    direction = str(value.get("direction") or "").strip().lower()
+    if fast_indicator not in {"sma", "ema"} or slow_indicator not in {"sma", "ema"}:
+        return None
+    if direction not in {"bullish", "bearish"}:
+        return None
+    try:
+        fast_period = int(value["fast_period"])
+        slow_period = int(value["slow_period"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if fast_period <= 0 or slow_period <= 0 or fast_period >= slow_period:
+        return None
+    return {
+        "type": "moving_average_crossover",
+        "fast_indicator": fast_indicator,
+        "fast_period": fast_period,
+        "slow_indicator": slow_indicator,
+        "slow_period": slow_period,
+        "direction": direction,
+    }
+
+
+def _rules_form_opposite_crossover(
+    *,
+    entry_rule: dict[str, Any],
+    exit_rule: dict[str, Any],
+) -> bool:
+    shared_fields = {
+        "fast_indicator",
+        "fast_period",
+        "slow_indicator",
+        "slow_period",
+    }
+    if any(entry_rule.get(field) != exit_rule.get(field) for field in shared_fields):
+        return False
+    return (
+        entry_rule.get("direction") == "bullish"
+        and exit_rule.get("direction") == "bearish"
+    )
+
+
+def resolved_asset_operation_symbols(
     symbols: list[str],
     *,
     asset_symbol_resolver: Callable[[str], str | None] | None,
 ) -> list[str]:
+    """Resolve asset-operation values through the materializer's symbol path."""
+
     resolved_symbols: list[str] = []
     for symbol in symbols:
         raw_symbol = str(symbol or "").strip()

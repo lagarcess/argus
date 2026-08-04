@@ -43,6 +43,8 @@ describe("result card playground", () => {
       "benchmark-underperformance-positive",
       "dca-result",
       "trade-based-strategy",
+      "adaptive-intraday-result",
+      "short-series-result",
       "multi-symbol-same-asset",
       "old-persisted-card-shape",
     ]);
@@ -82,6 +84,71 @@ describe("result card playground", () => {
     expect(client).not.toContain("loginWithEmail");
     expect(client).not.toContain("signupWithEmail");
     expect(client).not.toContain("saveStrategy");
+  });
+
+  test("documents the additive chart exploration contract for new and legacy payloads", () => {
+    const adaptive = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "adaptive-intraday-result",
+    )!.result.chart!;
+    expect(adaptive.exploration_policy).toEqual({
+      minimum_visible_observations: 6,
+      minimum_meaningful_duration: "P1M",
+    });
+    expect(adaptive.marker_summary).toEqual({
+      total_groups: 124,
+      included_groups: 80,
+      sampled: true,
+    });
+    expect(adaptive.series).toHaveLength(14 * 24 + 1);
+    expect(adaptive.series[0]).toEqual({ time: "2026-01-01T00:00:00", value: 1000 });
+    expect(adaptive.series.at(-1)).toEqual({
+      time: "2026-01-15T00:00:00",
+      value: 1120,
+    });
+    expect(adaptive.markers).toHaveLength(80);
+    expect(adaptive.markers?.[0]?.time).toBe(adaptive.series[0]?.time);
+    expect(adaptive.markers?.at(-1)?.time).toBe(adaptive.series.at(-1)?.time);
+
+    const dca = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "dca-result",
+    )!.result.chart!;
+    expect(dca.exploration_policy).toEqual({
+      minimum_visible_observations: 6,
+      minimum_meaningful_duration: "P2M",
+    });
+    expect(dca.marker_summary).toEqual({
+      total_groups: 24,
+      included_groups: 24,
+      sampled: false,
+    });
+    expect(dca.series[0]?.time).toBe("2022-01-03");
+    expect(dca.series.at(-1)).toEqual({ time: "2023-12-29", value: 1000 });
+    expect(dca.markers?.every((marker) => marker.type === "entry")).toBe(true);
+
+    const shortSeries = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "short-series-result",
+    )!.result.chart!;
+    expect(shortSeries.series).toHaveLength(5);
+    expect(shortSeries.exploration_policy).toEqual({
+      minimum_visible_observations: 6,
+    });
+    expect(shortSeries.marker_summary).toEqual({
+      total_groups: 1,
+      included_groups: 1,
+      sampled: false,
+    });
+
+    expect(
+      legacyPersistedRunFixture.conversation_result_card.chart,
+    ).not.toHaveProperty("exploration_policy");
+    expect(
+      legacyPersistedRunFixture.conversation_result_card.chart,
+    ).not.toHaveProperty("marker_summary");
+    const tradeBased = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "trade-based-strategy",
+    )!.result.chart!;
+    expect(tradeBased).not.toHaveProperty("exploration_policy");
+    expect(tradeBased).not.toHaveProperty("marker_summary");
   });
 
   test("uses the existing hydration mapper for the old persisted card shape", () => {

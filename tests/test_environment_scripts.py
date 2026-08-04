@@ -65,6 +65,7 @@ def _workflow_env_payload(
     overrides = overrides or {}
     values = {
         "ARGUS_WORKFLOW_DATABASE_URL": "postgres://workflow-db.example/argus",
+        "APP_ENV": "production",
         "ARGUS_RENDER_WORKFLOW_PROOF_TASK": "argus-backtests/workflow_proof",
         "ARGUS_WORKFLOW_PROOF_PLAN": "starter",
         "POETRY_VERSION": "2.1.3",
@@ -74,7 +75,8 @@ def _workflow_env_payload(
         "ALPACA_API_KEY": "fake-alpaca-key",
         "ALPACA_SECRET_KEY": "fake-alpaca-secret",
         "ALPACA_PAPER_TRADING": "true",
-        "OPENROUTER_API_KEY": "fake-openrouter-key",
+        "ARGUS_PROD_OPENROUTER_API_KEY": "fake-registered-openrouter-key",
+        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY": "fake-guest-openrouter-key",
         "ARGUS_UTILITY_MODEL": "google/gemini-2.5-flash-lite",
         "ARGUS_UTILITY_FALLBACK_MODEL": "qwen/qwen3.5-9b",
         "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash",
@@ -155,7 +157,7 @@ esac
         # Mirror the scripts into a root with no .env so argus_load_root_env is a
         # no-op, then scrub workflow secrets from the process env. This reproduces
         # the daily-gate warmup step, which exports neither .env nor the workflow
-        # secrets (ALPACA_*/OPENROUTER_API_KEY) it audits.
+        # secrets (ALPACA_*/segmented OpenRouter keys) it audits.
         github_dir = tmp_path / ".github"
         github_dir.mkdir()
         for name in (
@@ -170,6 +172,8 @@ esac
         for secret in (
             "ALPACA_API_KEY",
             "ALPACA_SECRET_KEY",
+            "ARGUS_PROD_OPENROUTER_API_KEY",
+            "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
             "OPENROUTER_API_KEY",
             "ARGUS_WORKFLOW_DATABASE_URL",
         ):
@@ -365,15 +369,15 @@ def test_render_python_builds_use_managed_poetry() -> None:
     assert "pip install poetry" not in env_contract
     assert (
         'ARGUS_RENDER_API_BUILD_COMMAND="poetry config virtualenvs.create false '
-        "&& poetry install --only main --no-interaction\""
+        '&& poetry install --only main --no-interaction"'
     ) in env_contract
     assert (
         'ARGUS_RENDER_API_START_COMMAND="poetry run uvicorn argus.api.main:app '
-        "--host 0.0.0.0 --port \\$PORT\""
+        '--host 0.0.0.0 --port \\$PORT"'
     ) in env_contract
     assert (
         'ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false '
-        "&& poetry install --only main,workflows --no-interaction\""
+        '&& poetry install --only main,workflows --no-interaction"'
     ) in env_contract
 
 
@@ -387,6 +391,16 @@ def test_env_example_declares_render_api_key_once() -> None:
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
+
+
+def test_render_web_declares_exact_server_only_https_app_origin() -> None:
+    web_env = _render_env("argus-app")
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert web_env["ARGUS_APP_ORIGIN"]["value"] == ("https://argus-app-suz5.onrender.com")
+    assert "ARGUS_APP_ORIGIN" in _contract_array("ARGUS_RENDER_WEB_ENV")
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://' in env_contract
+    assert "NEXT_PUBLIC_ARGUS_APP_ORIGIN" not in env_contract
 
 
 def test_render_blueprint_syncs_public_supabase_coordinates() -> None:
@@ -431,12 +445,15 @@ def test_render_blueprint_keeps_true_secrets_manual() -> None:
         "SUPABASE_SERVICE_ROLE_KEY",
         "SUPABASE_JWT_SECRET",
         "RENDER_API_KEY",
-        "OPENROUTER_API_KEY",
+        "ARGUS_PROD_OPENROUTER_API_KEY",
+        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY",
         "ARGUS_OPS_TOKEN",
+        "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
     ):
         assert api_env[key] == {"key": key, "sync": False}
+    assert "OPENROUTER_API_KEY" not in api_env
 
 
 def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None:
@@ -454,6 +471,7 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300" in env_example
     assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
+    assert "APP_ENV" in env_contract
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
     assert "ARGUS_WORKFLOW_PROOF_PLAN" in env_contract
@@ -464,7 +482,8 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ALPACA_API_KEY" in env_contract
     assert "ALPACA_SECRET_KEY" in env_contract
     assert "ALPACA_PAPER_TRADING" in env_contract
-    assert "OPENROUTER_API_KEY" in env_contract
+    assert "ARGUS_PROD_OPENROUTER_API_KEY" in env_contract
+    assert "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY" in env_contract
     assert "ARGUS_UTILITY_MODEL" in env_contract
     assert "ARGUS_UTILITY_FALLBACK_MODEL" in env_contract
     assert "ARGUS_CHAT_MODEL" in env_contract
@@ -519,7 +538,8 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
     )[0]
 
     for key in (
-        "OPENROUTER_API_KEY",
+        "ARGUS_PROD_OPENROUTER_API_KEY",
+        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
         "ARGUS_UTILITY_MODEL",
         "ARGUS_UTILITY_FALLBACK_MODEL",
         "ARGUS_CHAT_MODEL",
@@ -683,6 +703,32 @@ def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
     assert 'delete_render_env "$API_SERVICE_ID" RENDER_API_KEY' in dispatch_off_block
 
 
+def test_mode_scripts_pin_render_workflow_dispatch_off() -> None:
+    env_contract = ENV_CONTRACT.read_text()
+    dev_block = env_contract.split("argus_export_dev_mode() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+    qa_block = env_contract.split("argus_export_qa_mode() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+
+    # Dev mode: hard-off. Local iteration must never spend on Render.
+    assert "export ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false" in dev_block
+    assert "export ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false" in dev_block
+
+    # QA mode: default-off; ceremony runs opt in by exporting before qa.sh.
+    assert (
+        'ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED='
+        '"${ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED:-false}"' in qa_block
+    )
+    assert (
+        'ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED='
+        '"${ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED:-false}"' in qa_block
+    )
+
+
 def test_render_env_sync_separates_proof_and_real_api_modes() -> None:
     source = _source(".github/render-env-sync.sh")
     proof_block = source.split("sync_api_proof_shadow_on() {", maxsplit=1)[1].split(
@@ -795,6 +841,30 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "postgres://workflow-db.example/argus" not in result.stdout
 
 
+def test_render_env_sync_audit_accepts_required_turnstile_site_key(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="real-workflow",
+        api_env_json=_real_workflow_api_env_payload(),
+        web_env_json=_render_env_payload(
+            "argus-app",
+            extra={
+                "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY": "fake-public-site-key",
+            },
+        ),
+        workflow_env_json=_workflow_env_payload(),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (
+        "ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>"
+        in result.stdout
+    )
+    assert "status=ready" in result.stdout
+
+
 def test_render_env_sync_skips_workflow_env_gate_outside_real_workflow_mode(
     tmp_path: Path,
 ) -> None:
@@ -813,7 +883,10 @@ def test_render_env_sync_skips_workflow_env_gate_outside_real_workflow_mode(
         web_env_json=_render_env_payload("argus-app"),
         workflow_env_json=_workflow_env_payload(
             overrides={"ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture"},
-            omit={"OPENROUTER_API_KEY"},
+            omit={
+                "ARGUS_PROD_OPENROUTER_API_KEY",
+                "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
+            },
         ),
     )
 
@@ -827,7 +900,7 @@ def test_render_env_sync_audit_workflow_secrets_ready_without_local_secrets(
     tmp_path: Path,
 ) -> None:
     # Regression for the daily-gate warmup step: it audits the workflow service
-    # without exporting workflow secrets (ALPACA_*/OPENROUTER_API_KEY) or a .env.
+    # without exporting workflow secrets (Alpaca/segmented OpenRouter) or a .env.
     # The audit must verify those secrets are present on Render, not in the audit
     # runner's local env, so it stays ready even when the runner has none of them.
     result = _run_render_release_audit(
@@ -840,7 +913,12 @@ def test_render_env_sync_audit_workflow_secrets_ready_without_local_secrets(
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    for secret in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY", "OPENROUTER_API_KEY"):
+    for secret in (
+        "ALPACA_API_KEY",
+        "ALPACA_SECRET_KEY",
+        "ARGUS_PROD_OPENROUTER_API_KEY",
+        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
+    ):
         assert f"ok argus-backtests:{secret}=<redacted-present>" in result.stdout
         assert f"drift argus-backtests:{secret}" not in result.stdout
     assert "ok argus-backtests:ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>" in (
@@ -860,13 +938,15 @@ def test_render_env_sync_audit_flags_workflow_secret_missing_on_render(
         expect_mode="real-workflow",
         api_env_json=_real_workflow_api_env_payload(),
         web_env_json=_render_env_payload("argus-app"),
-        workflow_env_json=_workflow_env_payload(omit={"OPENROUTER_API_KEY"}),
+        workflow_env_json=_workflow_env_payload(
+            omit={"ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY"}
+        ),
         isolate=True,
     )
 
     assert result.returncode == 1
     assert (
-        "drift argus-backtests:OPENROUTER_API_KEY "
+        "drift argus-backtests:ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY "
         "expected=<redacted-present> actual=<missing-or-empty>"
     ) in result.stdout
     assert "workflow_env_status=drift" in result.stdout
@@ -1048,9 +1128,9 @@ def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -
 
 def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
-    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[
-        1
-    ].split("## Backtest Workflow Modes", maxsplit=1)[0]
+    before_sessions = runbook.split("## Before Tester Sessions", maxsplit=1)[1].split(
+        "## Backtest Workflow Modes", maxsplit=1
+    )[0]
     normalized_before_sessions = " ".join(before_sessions.split())
 
     assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions

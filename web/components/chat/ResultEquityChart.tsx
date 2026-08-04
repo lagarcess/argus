@@ -11,10 +11,21 @@ import {
   createSeriesMarkers,
   type BaselineData,
   type ISeriesApi,
+  type ITimeScaleApi,
   type LogicalRange,
   type SeriesMarker,
   type Time,
 } from "lightweight-charts";
+import {
+  deriveResultChartRanges,
+  hasIntradayObservations,
+  resolveCustomResultChartRange,
+  summarizeVisibleResultChartRange,
+  type ResultChartCustomError,
+  type ResultChartRangeOption,
+  type ResultChartSelection,
+} from "@/lib/result-chart-range";
+import ResultChartExploration from "./ResultChartExploration";
 import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
 type ResultEquityChartProps = {
@@ -29,6 +40,11 @@ type TooltipState = {
   time: string;
   value: number;
   event?: string;
+};
+
+type VisibleWindow = {
+  from: number;
+  to: number;
 };
 
 export type MarkerLabelSet = {
@@ -72,6 +88,20 @@ export default function ResultEquityChart({
   const { resolvedTheme } = useTheme();
   const { i18n, t } = useTranslation();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [selection, setSelection] = useState<ResultChartSelection>("ALL");
+  const [visibleWindow, setVisibleWindow] = useState<VisibleWindow | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [customError, setCustomError] = useState<ResultChartCustomError | null>(
+    null,
+  );
+  const timeScaleRef = useRef<ITimeScaleApi<Time> | null>(null);
+  // Range notifications also fire for initial layout, autosize, and
+  // programmatic preset moves. Only a change shortly after real chart
+  // manipulation — a pressed drag, wheel zoom, or touch drag — may switch the
+  // selection to Custom. Hover and passive pointer movement never count.
+  const lastChartGestureAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const chartPointerDownRef = useRef(false);
+  const visibleWindowRef = useRef<VisibleWindow | null>(null);
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
     : resolvedTheme === "dark";
@@ -117,6 +147,98 @@ export default function ResultEquityChart({
     });
     return map;
   }, [chart.series]);
+  const rangeOptions = useMemo(
+    () => deriveResultChartRanges(chart.series, chart.exploration_policy),
+    [chart.series, chart.exploration_policy],
+  );
+  const intradayTimes = useMemo(
+    () => hasIntradayObservations(chart.series),
+    [chart.series],
+  );
+  const allWindow = useMemo<VisibleWindow>(() => {
+    const allOption = rangeOptions[rangeOptions.length - 1];
+    if (allOption?.key === "ALL") {
+      return { from: allOption.startIndex, to: allOption.endIndex };
+    }
+    return { from: 0, to: Math.max(0, chart.series.length - 1) };
+  }, [chart.series, rangeOptions]);
+  const effectiveWindow = visibleWindow ?? allWindow;
+  const visibleSummary = useMemo(
+    () =>
+      summarizeVisibleResultChartRange({
+        series: chart.series,
+        markers: chart.markers,
+        markerSummary: chart.marker_summary,
+        startIndex: effectiveWindow.from,
+        endIndex: effectiveWindow.to,
+      }),
+    [chart, effectiveWindow.from, effectiveWindow.to],
+  );
+
+  // A different immutable chart payload is a different result: restart at ALL.
+  useEffect(() => {
+    setSelection("ALL");
+    setVisibleWindow(null);
+    visibleWindowRef.current = null;
+    setDetailsOpen(false);
+    setCustomError(null);
+  }, [chart]);
+
+  const selectRange = (option: ResultChartRangeOption) => {
+    setCustomError(null);
+    if (option.key === "ALL") {
+      resetToAll();
+      return;
+    }
+    timeScaleRef.current?.setVisibleLogicalRange({
+      from: option.startIndex,
+      to: option.endIndex,
+    });
+    setSelection(option.key);
+    const window = { from: option.startIndex, to: option.endIndex };
+    visibleWindowRef.current = window;
+    setVisibleWindow(window);
+  };
+
+  const resetToAll = () => {
+    setCustomError(null);
+    timeScaleRef.current?.fitContent();
+    setSelection("ALL");
+    visibleWindowRef.current = allWindow;
+    setVisibleWindow(allWindow);
+  };
+
+  const toggleDetails = () => {
+    setCustomError(null);
+    setDetailsOpen((open) => !open);
+  };
+
+  const cancelCustom = () => {
+    setCustomError(null);
+    setDetailsOpen(false);
+  };
+
+  const applyCustom = (startDate: string, endDate: string) => {
+    const result = resolveCustomResultChartRange(
+      chart.series,
+      startDate,
+      endDate,
+    );
+    if (!result.ok) {
+      setCustomError(result.error);
+      return;
+    }
+    setCustomError(null);
+    setDetailsOpen(false);
+    timeScaleRef.current?.setVisibleLogicalRange({
+      from: result.range.startIndex,
+      to: result.range.endIndex,
+    });
+    setSelection("CUSTOM");
+    const window = { from: result.range.startIndex, to: result.range.endIndex };
+    visibleWindowRef.current = window;
+    setVisibleWindow(window);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -155,7 +277,9 @@ export default function ResultEquityChart({
         secondsVisible: false,
         rightOffset: 4,
         barSpacing: data.length > 240 ? 4 : 7,
-        minBarSpacing: 3,
+        // ALL/Reset promise the complete effective window, so dense series need
+        // a zoom-out floor below width/points; sparse series keep today's floor.
+        minBarSpacing: data.length > 240 ? 0.1 : 3,
       },
       crosshair: {
         mode: CrosshairMode.Magnet,
@@ -219,7 +343,8 @@ export default function ResultEquityChart({
       series as ISeriesApi<"Baseline", Time>,
       buildVisibleSeriesMarkers(visibleMarkerInput),
     );
-    chartApi.timeScale().fitContent();
+    const timeScale = chartApi.timeScale();
+    timeScaleRef.current = timeScale;
     const updateVisibleMarkers = (visibleRange: LogicalRange | null) => {
       markersApi.setMarkers(
         buildVisibleSeriesMarkers({
@@ -232,7 +357,74 @@ export default function ResultEquityChart({
         }),
       );
     };
-    chartApi.timeScale().subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+    timeScale.subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+    const notifyVisibleWindow = (visibleRange: LogicalRange | null) => {
+      if (!visibleRange || data.length === 0) return;
+      const lastIndex = data.length - 1;
+      const from = Math.min(lastIndex, Math.max(0, Math.floor(visibleRange.from)));
+      const to = Math.min(lastIndex, Math.max(0, Math.ceil(visibleRange.to)));
+      visibleWindowRef.current = { from, to };
+      setVisibleWindow({ from, to });
+      setSelection((previous) => {
+        if (previous === "CUSTOM" || rangeOptions.length === 0) return previous;
+        const expected = rangeOptions.find((option) => option.key === previous);
+        if (expected && expected.startIndex === from && expected.endIndex === to) {
+          return previous;
+        }
+        const manualGesture =
+          performance.now() - lastChartGestureAtRef.current < 1500;
+        return manualGesture ? "CUSTOM" : previous;
+      });
+    };
+    timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
+    const armChartGesture = () => {
+      lastChartGestureAtRef.current = performance.now();
+    };
+    // Explicit gesture state: a press begins a potential drag; only pressed
+    // movement or a wheel zoom is manipulation. Capture phase because the
+    // chart library's own canvas handlers may stop propagation.
+    const gestureListenerOptions = { passive: true, capture: true } as const;
+    const beginChartPress = () => {
+      chartPointerDownRef.current = true;
+    };
+    const trackChartDrag = (event: PointerEvent) => {
+      if (chartPointerDownRef.current || event.buttons !== 0) armChartGesture();
+    };
+    const releaseChartPress = () => {
+      chartPointerDownRef.current = false;
+    };
+    container.addEventListener(
+      "pointerdown",
+      beginChartPress,
+      gestureListenerOptions,
+    );
+    container.addEventListener(
+      "pointermove",
+      trackChartDrag,
+      gestureListenerOptions,
+    );
+    container.addEventListener(
+      "wheel",
+      armChartGesture,
+      gestureListenerOptions,
+    );
+    window.addEventListener("pointerup", releaseChartPress, gestureListenerOptions);
+    window.addEventListener(
+      "pointercancel",
+      releaseChartPress,
+      gestureListenerOptions,
+    );
+    // Recreations for theme/locale/size keep the explored viewport; only a new
+    // immutable chart payload resets it (see the chart-change effect above).
+    const restoredWindow = visibleWindowRef.current;
+    if (restoredWindow) {
+      timeScale.setVisibleLogicalRange({
+        from: restoredWindow.from,
+        to: restoredWindow.to,
+      });
+    } else {
+      timeScale.fitContent();
+    }
 
     chartApi.subscribeCrosshairMove((param) => {
       if (!param.point || param.time == null) {
@@ -248,7 +440,11 @@ export default function ResultEquityChart({
       setTooltip({
         x: param.point.x,
         y: param.point.y,
-        time: formatChartDateLabel(param.time, chartLocale),
+        // Daily series stamped with a session hour must read as dates, not
+        // implementation artifacts like "5:00 AM".
+        time: intradayTimes
+          ? formatChartDateLabel(param.time, chartLocale)
+          : formatChartDateLabel(time.slice(0, 10), chartLocale),
         value: datum.value,
         event: eventByTime.get(time)?.join(", "),
       });
@@ -256,7 +452,34 @@ export default function ResultEquityChart({
 
     return () => {
       setTooltip(null);
-      chartApi.timeScale().unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+      container.removeEventListener(
+        "pointerdown",
+        beginChartPress,
+        gestureListenerOptions,
+      );
+      container.removeEventListener(
+        "pointermove",
+        trackChartDrag,
+        gestureListenerOptions,
+      );
+      container.removeEventListener(
+        "wheel",
+        armChartGesture,
+        gestureListenerOptions,
+      );
+      window.removeEventListener(
+        "pointerup",
+        releaseChartPress,
+        gestureListenerOptions,
+      );
+      window.removeEventListener(
+        "pointercancel",
+        releaseChartPress,
+        gestureListenerOptions,
+      );
+      timeScale.unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+      timeScale.unsubscribeVisibleLogicalRangeChange(notifyVisibleWindow);
+      if (timeScaleRef.current === timeScale) timeScaleRef.current = null;
       chartApi.remove();
     };
   }, [
@@ -267,9 +490,11 @@ export default function ResultEquityChart({
     data,
     dataIndexByTime,
     eventByTime,
+    intradayTimes,
     isDark,
     isHeroDeltaEvidence,
     markerLabels,
+    rangeOptions,
   ]);
 
   if (data.length === 0) return null;
@@ -305,6 +530,21 @@ export default function ResultEquityChart({
           {attributionLabel}
         </a>
       </div>
+      <ResultChartExploration
+        options={rangeOptions}
+        selection={selection}
+        summary={visibleSummary}
+        currency={chart.currency}
+        locale={i18n.language}
+        showTimes={intradayTimes}
+        detailsOpen={detailsOpen}
+        customError={customError}
+        onSelect={selectRange}
+        onToggleDetails={toggleDetails}
+        onApplyCustom={applyCustom}
+        onCancelCustom={cancelCustom}
+        onReset={resetToAll}
+      />
       {tooltip && (
         <div
           className="pointer-events-none absolute z-10 min-w-[148px] rounded-[10px] border border-black/10 bg-white/95 px-3 py-2 text-[11px] leading-snug text-black/70 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white/75"

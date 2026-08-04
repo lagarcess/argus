@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { patchMe } from "@/lib/argus-api";
@@ -12,13 +12,17 @@ import {
 
 type LanguageModalProps = {
   onClose: () => void;
+  persistProfile?: boolean;
 };
 
 /**
  * Centered blur modal with search + language list.
  * Extracted from SettingsView for reuse in ProfileMenu.
  */
-export default function LanguageModal({ onClose }: LanguageModalProps) {
+export default function LanguageModal({
+  onClose,
+  persistProfile = true,
+}: LanguageModalProps) {
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const lang = i18n.language || "en";
@@ -33,31 +37,51 @@ export default function LanguageModal({ onClose }: LanguageModalProps) {
     [searchQuery],
   );
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
   const handleSelect = async (code: string) => {
     const nextLanguage = normalizeEnabledLanguage(code);
     await i18n.changeLanguage(nextLanguage);
     onClose();
-    try {
-      await patchMe({
-        language: nextLanguage,
-        locale: localeForLanguage(nextLanguage),
-      });
-    } catch {
-      // Silently ignore if not logged in
+    if (persistProfile) {
+      try {
+        await patchMe({
+          language: nextLanguage,
+          locale: localeForLanguage(nextLanguage),
+        });
+      } catch {
+        // Keep the immediate browser-language change if profile persistence fails.
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("guest.shell.language", "Language")}
+    >
       <button
         className="absolute inset-0"
-        aria-label="Close language modal"
+        aria-label={t("settings.app.close_language_modal", "Close language modal")}
         onClick={() => {
           onClose();
           setSearchQuery("");
         }}
       />
-      <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#111111]">
         <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
           <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
           <input
@@ -78,6 +102,7 @@ export default function LanguageModal({ onClose }: LanguageModalProps) {
             filteredLanguages.map((entry) => (
               <button
                 key={entry.code}
+                type="button"
                 onClick={() => void handleSelect(entry.code)}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >

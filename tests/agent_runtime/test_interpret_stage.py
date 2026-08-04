@@ -33,6 +33,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.context.providers import build_alpaca_market_movers_packet
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.nlp.natural_time import parse_date_text, shift_months
@@ -305,6 +306,11 @@ def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
     symbol = strategy.asset_universe[0] if strategy.asset_universe else "SPY"
+    date_range = (
+        strategy.date_range
+        if isinstance(strategy.date_range, dict)
+        else {"start": "2025-05-14", "end": "2026-05-14"}
+    )
     return {
         "strategy": strategy.model_dump(mode="python"),
         "optional_parameters": {},
@@ -313,11 +319,14 @@ def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
             "symbol": symbol,
             "symbols": list(strategy.asset_universe),
             "timeframe": "1D",
-            "date_range": (
-                strategy.date_range
-                if isinstance(strategy.date_range, dict)
-                else {"start": "2025-05-14", "end": "2026-05-14"}
-            ),
+            "date_range": date_range,
+            "requested_date_range": date_range,
+            "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": date_range,
+                "effective_date_range": date_range,
+                "preflight_id": "sha256:test-coverage",
+            },
             "entry_rule": None,
             "exit_rule": None,
             "sizing_mode": "capital_amount",
@@ -1581,7 +1590,7 @@ def test_unhandled_broad_turn_recovers_with_chat_tier_instead_of_blank_response(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        "argus.agent_runtime.stages.interpret_internal.answer_composition.invoke_openrouter_chat_completion",
         _fake_chat_completion,
     )
     response = StructuredInterpretation(
@@ -2478,6 +2487,47 @@ def test_structured_confirmation_action_uses_snapshot_payload_when_turn_payload_
     assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
 
 
+def test_structured_confirmation_action_reconfirms_legacy_payload_without_coverage(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=1000,
+    )
+    legacy_payload = validated_confirmation_payload(pending)
+    legacy_payload["launch_payload"].pop("requested_date_range")
+    legacy_payload["launch_payload"].pop("coverage_preflight")
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.structured_action = StructuredActionContext(
+        type="run_backtest",
+        label="Run backtest",
+        presentation="confirmation",
+    )
+    state.confirmation_payload = legacy_payload
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["TSLA"]
+
+
 def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3267,8 +3317,8 @@ def test_empty_non_strategy_turn_after_result_uses_followup_recovery(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert "latest result" in answer_lower
-    assert "could not safely answer that follow-up" in answer_lower
+    assert "couldn’t answer that follow-up" in answer_lower
+    assert "your result is still here" in answer_lower
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
     assert result.decision.artifact_target == "latest_result"
@@ -3332,14 +3382,10 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
     assert not answer.startswith("**")
-    assert result.patch["response_intent"] == {
-        "kind": "result_followup_chrome",
-        "facts": {
-            "focus": "next_experiment",
-            "heading_key": "next_experiment",
-        },
-    }
-    assert "could not safely answer that follow-up" in answer_lower
+    # Issue #249: failure prose never wears result chrome.
+    assert "response_intent" not in result.patch
+    assert "couldn’t answer that follow-up" in answer_lower
+    assert "your result is still here" in answer_lower
     assert result.patch["recovery"] == {
         "code": "latest_result_followup_unavailable",
         "retryable": True,
@@ -3474,8 +3520,8 @@ def test_unanchored_clarification_after_result_uses_followup_recovery(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     answer_lower = answer.lower()
-    assert "latest result" in answer_lower
-    assert "could not safely answer that follow-up" in answer_lower
+    assert "couldn’t answer that follow-up" in answer_lower
+    assert "your result is still here" in answer_lower
     assert "one more detail" not in answer
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.requires_clarification is False
@@ -3550,11 +3596,9 @@ def test_result_followup_timeout_uses_localized_recovery(
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
     assert not answer.startswith("**")
-    assert result.patch["response_intent"] == {
-        "kind": "result_followup_chrome",
-        "facts": {"focus": "general", "heading_key": "general"},
-    }
-    assert "could not safely answer that follow-up" in answer
+    # Issue #249: failure prose never wears result chrome.
+    assert "response_intent" not in result.patch
+    assert answer == "I couldn’t answer that follow-up. Your result is still here."
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].task == "result_summary"
     assert receipts[-1].failure_mode == "result_followup_timeout"
@@ -4952,6 +4996,53 @@ def test_non_executable_signal_rule_requires_rule_before_date(monkeypatch) -> No
     assert result.decision.missing_required_fields == ["entry_logic"]
 
 
+def test_recognized_non_executable_template_cannot_admit_as_buy_and_hold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A typed recognized draft template outranks an erroneous executable route."""
+
+    _stub_equity_asset_resolution(monkeypatch)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary=(
+            "Backtest a momentum breakout strategy on AAPL with $10,000 from "
+            "January 1, 2022 through January 1, 2025."
+        ),
+        candidate_strategy_draft=StrategySummary(
+            requested_strategy_template="momentum_breakout",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Momentum breakout strategy on AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            capital_amount=10_000,
+            date_range={"start": "2022-01-01", "end": "2025-01-01"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message=(
+            "Backtest a momentum breakout strategy on AAPL with $10,000 from "
+            "January 1, 2022 through January 1, 2025."
+        ),
+        response=response,
+    )
+
+    assert result.outcome == "needs_clarification"
+    draft = result.decision.candidate_strategy_draft
+    assert draft.requested_strategy_template == "momentum_breakout"
+    assert draft.strategy_type == "momentum_breakout"
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.capital_amount == 10_000
+    assert draft.date_range == {"start": "2022-01-01", "end": "2025-01-01"}
+    assert "recognized_non_executable_strategy_admission_blocked" in (
+        result.decision.reason_codes
+    )
+    assert result.patch.get("confirmation_payload") is None
+
+
 def test_llm_vague_rule_clarifying_response_is_not_discarded() -> None:
     response = StructuredInterpretation(
         intent="unsupported_or_out_of_scope",
@@ -4999,7 +5090,14 @@ def test_pending_date_answer_uses_structured_interpreter_before_updating_draft(
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary="User answered the pending date question.",
-            candidate_strategy_draft=StrategySummary(date_range="past month"),
+            candidate_strategy_draft=StrategySummary(
+                date_range="last month",
+                extra_parameters={
+                    "date_range_raw_text": "last month",
+                    "evidence_spans": {"date_range": "last month"},
+                    "field_provenance": {"date_range": "explicit_user"},
+                },
+            ),
             semantic_turn_act="answer_pending_need",
         )
     )
@@ -5020,7 +5118,7 @@ def test_pending_date_answer_uses_structured_interpreter_before_updating_draft(
 
     assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
-    assert result.decision.candidate_strategy_draft.date_range == "past month"
+    assert result.decision.candidate_strategy_draft.date_range == "last month"
     assert "typed_pending_date_answer_applied" not in result.decision.reason_codes
 
 
@@ -5070,7 +5168,14 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary="User changed only the date on the pending draft.",
-            candidate_strategy_draft=StrategySummary(date_range="past year"),
+            candidate_strategy_draft=StrategySummary(
+                date_range="past year",
+                extra_parameters={
+                    "date_range_raw_text": "past year",
+                    "evidence_spans": {"date_range": "past year"},
+                    "field_provenance": {"date_range": "explicit_user"},
+                },
+            ),
             semantic_turn_act="answer_pending_need",
         )
     )
@@ -5286,6 +5391,444 @@ def test_pending_spanish_date_answer_repairs_missing_llm_date_range(
         result.decision.reason_codes
     )
     assert "pending_date_edit_noop_rejected" not in result.decision.reason_codes
+
+
+def test_equivalent_pending_need_stops_with_no_progress_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=10_000,
+        comparison_baseline="SPY",
+    )
+    prior_response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": {
+                    "date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-12-31",
+                    }
+                },
+            }
+        ],
+    }
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="The period is still unresolved.",
+            candidate_strategy_draft=pending.model_copy(deep=True),
+            missing_required_fields=["date_range"],
+            assistant_response=(
+                "I still need a historical period. You can give exact dates "
+                "or a window such as the past year."
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+    selected_thread_metadata = {
+        "requested_field": "date_range",
+        "last_stage_outcome": "await_user_reply",
+        "response_intent": prior_response_intent,
+    }
+    workflow_input = {
+        "run_state": RunState.new(
+            current_user_message="Use a reasonable period.",
+            recent_thread_history=[],
+        ),
+        "latest_task_snapshot": TaskSnapshot(pending_strategy_summary=pending),
+        "selected_thread_metadata": selected_thread_metadata,
+    }
+
+    with turn_execution_scope(entry_state=workflow_input) as execution:
+        input_fingerprint = execution.entry_fingerprint
+        result = interpret_stage(
+            state=workflow_input["run_state"],
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=workflow_input["latest_task_snapshot"],
+            selected_thread_metadata=selected_thread_metadata,
+            structured_interpreter=interpreter,
+        )
+
+        assert result.outcome == "ready_to_respond"
+        response_intent = result.patch["response_intent"]
+        assert response_intent["facts"]["progress_outcome"] == "no_progress"
+        assert [option["id"] for option in response_intent["options"]] == [
+            "supply_missing_value",
+            "calendar_year_2024",
+            "keep_unchanged",
+            "cancel",
+        ]
+        assert response_intent["options"][0]["replacement_values"] == {
+            "requested_field": "date_range"
+        }
+        assert input_fingerprint is not None
+        assert execution.entry_fingerprint == input_fingerprint
+        assert execution.terminal == "no_progress"
+
+
+@pytest.mark.parametrize("metadata_shape", ["root", "persisted"])
+@pytest.mark.parametrize(
+    "provenance",
+    [None, "default_assumption", "assistant_suggestion", "explicit_user"],
+)
+def test_pending_date_answer_rejects_unowned_window(
+    monkeypatch: pytest.MonkeyPatch,
+    provenance: str | None,
+    metadata_shape: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="Use a reasonable historical period.",
+            candidate_strategy_draft=pending.model_copy(
+                update={
+                    "date_range": {
+                        "start": "2021-07-25",
+                        "end": "2026-07-25",
+                    },
+                    "extra_parameters": {
+                        "date_range_raw_text": "last five years",
+                        "date_range_intent": {
+                            "kind": "rolling_window",
+                            "count": 5,
+                            "unit": "year",
+                            "anchor": "today",
+                            "confidence": 0.85,
+                            "evidence": "user requested a reasonable period",
+                        },
+                        "evidence_spans": {
+                            "date_range": "last five years",
+                        },
+                        **(
+                            {"field_provenance": {"date_range": provenance}}
+                            if provenance is not None
+                            else {}
+                        ),
+                    },
+                },
+                deep=True,
+            ),
+            assistant_response="I used the last five years.",
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [],
+    }
+    selected_thread_metadata = {
+        "last_stage_outcome": "await_user_reply",
+        "response_intent": response_intent,
+    }
+    if metadata_shape == "root":
+        selected_thread_metadata["requested_field"] = "date_range"
+    else:
+        selected_thread_metadata["pending_strategy"] = {
+            "requested_field": "date_range",
+            "response_intent": response_intent,
+        }
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Use a reasonable period.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata=selected_thread_metadata,
+            structured_interpreter=interpreter,
+        )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.candidate_strategy_draft.date_range is None
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert result.decision.candidate_strategy_draft.capital_amount == 25_000
+    assert result.decision.candidate_strategy_draft.comparison_baseline == "SPY"
+    assert result.decision.candidate_strategy_draft.timeframe == "1D"
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert "date_range" in result.patch["response_intent"]["requested_fields"]
+
+
+def test_pending_date_typed_option_preserves_selected_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    selected_date_range = {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    replacement_values = {"date_range": selected_date_range}
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": replacement_values,
+            }
+        ],
+    }
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use calendar year 2024",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": "Use calendar year 2024",
+                "payload": {
+                    "source_assistant_id": "assistant-date",
+                    "validated_source_assistant_id": "assistant-date",
+                    "replacement_values": replacement_values,
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-date",
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": response_intent,
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="strategy_drafting",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary="The period is unresolved.",
+                candidate_strategy_draft=pending,
+                missing_required_fields=["date_range"],
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == selected_date_range
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 25_000
+    assert strategy.comparison_baseline == "SPY"
+    assert strategy.timeframe == "1D"
+    assert "pending_response_option_selected" in result.decision.reason_codes
+
+
+@pytest.mark.parametrize("metadata_shape", ["root", "persisted"])
+def test_interpreter_unavailable_pending_date_stops_with_no_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_shape: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    response_intent = {
+        "kind": "clarification",
+        "semantic_needs": ["period"],
+        "requested_fields": ["date_range"],
+        "facts": {"strategy": pending.model_dump(mode="python")},
+        "options": [
+            {
+                "id": "calendar_year_2024",
+                "label": "Use calendar year 2024",
+                "replacement_values": {
+                    "date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-12-31",
+                    }
+                },
+            }
+        ],
+    }
+
+    selected_thread_metadata = {
+        "last_stage_outcome": "await_user_reply",
+    }
+    if metadata_shape == "root":
+        selected_thread_metadata.update(
+            {
+                "requested_field": "date_range",
+                "response_intent": response_intent,
+            }
+        )
+    else:
+        selected_thread_metadata["pending_strategy"] = {
+            "requested_field": "date_range",
+            "response_intent": response_intent,
+        }
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Use a reasonable period.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata=selected_thread_metadata,
+            structured_interpreter=RecordingInterpreter(None),
+        )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.candidate_strategy_draft == pending
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert result.patch["response_intent"]["requested_fields"] == ["date_range"]
+    assert result.patch["requested_field"] == "date_range"
+    assert "recovery" not in result.patch
+
+
+def test_answered_fields_survive_no_progress_stop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Compra y conserva Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        capital_amount=25_000,
+        comparison_baseline="SPY",
+        timeframe="1D",
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="The period remains ambiguous.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+            ),
+            missing_required_fields=["date_range"],
+            assistant_response=(
+                "Todavía necesito el período histórico. Puedes darme fechas "
+                "exactas o una ventana como el último año."
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    with turn_execution_scope(entry_state={}):
+        result = interpret_stage(
+            state=RunState.new(
+                current_user_message="Usa un período normal.",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1", language_preference="es-419"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "requested_field": "date_range",
+                "last_stage_outcome": "await_user_reply",
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": ["period"],
+                    "requested_fields": ["date_range"],
+                    "facts": {"strategy": pending.model_dump(mode="python")},
+                    "options": [],
+                },
+            },
+            structured_interpreter=interpreter,
+        )
+
+    assert result.outcome == "ready_to_respond"
+    preserved = result.decision.candidate_strategy_draft
+    assert preserved.asset_universe == ["AAPL"]
+    assert preserved.asset_class == "equity"
+    assert preserved.capital_amount == 25_000
+    assert preserved.comparison_baseline == "SPY"
+    assert preserved.timeframe == "1D"
+    assert result.patch["candidate_strategy_draft"] == preserved.model_dump(
+        mode="python"
+    )
+    assert result.patch["response_intent"]["facts"]["progress_outcome"] == (
+        "no_progress"
+    )
+    assert result.patch["assistant_response"].startswith(
+        "Todavía necesito el período histórico."
+    )
 
 
 def test_pending_spanish_date_answer_repairs_reload_thinned_metadata(
@@ -7343,6 +7886,439 @@ def test_interpreter_unavailable_spanish_pending_strategy_applies_calendar_year_
     )
 
 
+
+@pytest.mark.parametrize(
+    ("option_id", "requested_field"),
+    [
+        ("change_dates", "date_range"),
+        ("change_asset", "asset_universe"),
+        ("change_benchmark", "comparison_baseline"),
+    ],
+)
+def test_coverage_recovery_action_requests_typed_field_without_llm_selection(
+    option_id: str,
+    requested_field: str,
+) -> None:
+    source_assistant_id = "00000000-0000-0000-0000-000000000101"
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=f"Choose {option_id}",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": option_id,
+                "payload": {
+                    "source_assistant_id": source_assistant_id,
+                    "validated_source_assistant_id": source_assistant_id,
+                    "option_id": option_id,
+                    "replacement_values": {"requested_field": requested_field},
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": source_assistant_id,
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "coverage_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": [
+                    "date_range",
+                    "asset_universe",
+                    "comparison_baseline",
+                ],
+                "options": [
+                    {
+                        "id": option_id,
+                        "replacement_values": {"requested_field": requested_field},
+                    }
+                ],
+                "facts": {
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "1h",
+                    }
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.patch["requested_field"] == requested_field
+    assert result.patch["missing_required_fields"] == [requested_field]
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["facts"]["structured_action"] == {
+        "type": "select_response_option",
+        "payload": {
+            "option_id": option_id,
+            "replacement_values": {"requested_field": requested_field},
+        },
+    }
+    assert source_assistant_id not in repr(result.patch["response_intent"])
+    assert result.patch["response_intent"]["facts"][
+        "preserved_optional_parameter_status"
+    ] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1h"])
+def test_unsupported_timeframe_action_preserves_assumptions_and_reconfirms(
+    timeframe: str,
+) -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        capital_amount=5_000,
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    option_id = "option_0" if timeframe == "1D" else "option_1"
+    options = [
+        {"id": "option_0", "replacement_values": {"timeframe": "1D"}},
+        {"id": "option_1", "replacement_values": {"timeframe": "1h"}},
+    ]
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=f"Use {timeframe} bars",
+            recent_thread_history=[],
+            action_context={
+                "type": "select_response_option",
+                "label": f"Use {timeframe} bars",
+                "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
+                    "option_id": option_id,
+                    "replacement_values": {"timeframe": timeframe},
+                },
+            },
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": options,
+            },
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["candidate_strategy_draft"] == pending.model_copy(
+        update={"timeframe": timeframe}
+    ).model_dump(mode="python")
+    assert result.patch["candidate_strategy_draft"]["timeframe"] == timeframe
+    assert result.patch["optional_parameter_status"] == {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": timeframe,
+    }
+    assert result.patch["requested_field"] is None
+    assert result.patch["missing_required_fields"] == []
+
+
+def test_unsupported_timeframe_text_answer_restores_preserved_assumptions() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        capital_amount=5_000,
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use daily bars instead.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "timeframe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": [],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User selected daily bars.",
+                candidate_strategy_draft=StrategySummary(timeframe="1D"),
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.timeframe == "1D"
+    optional_status = result.patch["optional_parameter_status"]
+    assert optional_status["initial_capital"] == 5_000
+    assert optional_status["fees"] == 0.001
+    assert optional_status["slippage"] == 0.0005
+    assert optional_status["timeframe"] == "1D"
+
+
+def test_unsupported_timeframe_recovery_does_not_leak_into_new_idea() -> None:
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        timeframe="5m",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="New idea: buy and hold NVDA during 2025.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={
+            "requested_field": "timeframe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "requested_fields": ["timeframe"],
+                "facts": {
+                    "unsupported_constraints": [
+                        {"category": "unsupported_time_granularity"}
+                    ],
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "5m",
+                    },
+                },
+                "options": [],
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User started a separate investing idea.",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold NVDA during 2025.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    optional_status = result.patch.get("optional_parameter_status", {})
+    assert "initial_capital" not in optional_status
+    assert "fees" not in optional_status
+    assert "slippage" not in optional_status
+    assert "timeframe" not in optional_status
+
+
+@pytest.mark.parametrize("task_relation", ["continue", "new_task"])
+def test_coverage_recovery_answer_restores_preserved_optional_parameters(
+    monkeypatch,
+    task_relation: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+    preserved_status = {
+        "initial_capital": 5_000,
+        "fees": 0.001,
+        "slippage": 0.0005,
+        "timeframe": "1h",
+    }
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use MSFT instead",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "clarification",
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "preserved_optional_parameter_status": preserved_status,
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation=task_relation,
+                requires_clarification=False,
+                user_goal_summary="User selected a replacement asset.",
+                candidate_strategy_draft=StrategySummary(
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["MSFT"]
+    assert result.patch["optional_parameter_status"] == preserved_status
+
+
+@pytest.mark.parametrize("task_relation", ["new_task", "continue"])
+def test_coverage_recovery_does_not_leak_optional_parameters_into_new_idea(
+    monkeypatch,
+    task_relation: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="New idea: buy and hold NVDA during 2025.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=prior),
+        selected_thread_metadata={
+            "requested_field": "asset_universe",
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "clarification",
+                "requested_fields": ["asset_universe"],
+                "facts": {
+                    "preserved_optional_parameter_status": {
+                        "initial_capital": 5_000,
+                        "fees": 0.001,
+                        "slippage": 0.0005,
+                        "timeframe": "1h",
+                    },
+                },
+            },
+        },
+        structured_interpreter=RecordingInterpreter(
+            StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation=task_relation,
+                requires_clarification=False,
+                user_goal_summary="User started a separate investing idea.",
+                candidate_strategy_draft=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold NVDA during 2025.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    comparison_baseline="SPY",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                semantic_turn_act="new_idea",
+            )
+        ),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["NVDA"]
+    assert result.decision.candidate_strategy_draft.date_range == {
+        "start": "2025-01-01",
+        "end": "2025-12-31",
+    }
+    optional_status = result.patch.get("optional_parameter_status", {})
+    assert "initial_capital" not in optional_status
+    assert "fees" not in optional_status
+    assert "slippage" not in optional_status
+    assert "timeframe" not in optional_status
+
+
+
 def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choice(
     monkeypatch,
 ) -> None:
@@ -7374,6 +8350,8 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choi
                 "type": "select_response_option",
                 "label": "Compare with buy and hold",
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "replacement_values": {"strategy_type": "buy_and_hold"},
                 },
             },
@@ -7381,6 +8359,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_buy_hold_choi
         user=UserState(user_id="u1"),
         latest_task_snapshot=snapshot,
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",
@@ -7478,6 +8457,8 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
                 "type": "select_response_option",
                 "label": message,
                 "payload": {
+                    "source_assistant_id": "assistant-recovery",
+                    "validated_source_assistant_id": "assistant-recovery",
                     "replacement_values": typed_selection,
                 },
             },
@@ -7485,6 +8466,7 @@ def test_interpreter_unavailable_pending_simplification_uses_typed_selection(
         user=UserState(user_id="u1", language_preference="es-419"),
         latest_task_snapshot=snapshot,
         selected_thread_metadata={
+            "validated_source_assistant_id": "assistant-recovery",
             "last_stage_outcome": "await_user_reply",
             "response_intent": {
                 "kind": "unsupported_recovery",
@@ -9377,7 +10359,12 @@ def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) 
         user_goal_summary="User answered the missing date range.",
         semantic_turn_act="retry_failed_action",
         candidate_strategy_draft=StrategySummary(
-            date_range={"start": "2025-05-19", "end": "2026-05-19"},
+            date_range="past year",
+            extra_parameters={
+                "date_range_raw_text": "past year",
+                "evidence_spans": {"date_range": "past year"},
+                "field_provenance": {"date_range": "explicit_user"},
+            },
         ),
     )
 
@@ -9396,7 +10383,7 @@ def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) 
     assert "retry_route_repaired_to_pending_need" in result.patch["reason_codes"]
     draft = result.patch["candidate_strategy_draft"]
     assert draft["asset_universe"] == ["TSLA"]
-    assert draft["date_range"] == {"start": "2025-05-19", "end": "2026-05-19"}
+    assert draft["date_range"] == "past year"
     assert "assistant_response" not in result.stage_patch
 
 
@@ -9503,10 +10490,13 @@ def test_cold_start_explicit_costs_flow_to_launch_payload_when_flag_on(
             asset_class="equity",
             date_range={"start": "2025-01-01", "end": "2025-12-31"},
             capital_amount=10000,
-            extra_parameters={"fee_rate": 0.001, "slippage": 0.0005},
-            field_provenance={
-                "fee_rate": "explicit_user",
-                "slippage": "explicit_user",
+            extra_parameters={
+                "fee_rate": 0.001,
+                "slippage": 0.0005,
+                "field_provenance": {
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user",
+                },
             },
         ),
         missing_required_fields=[],
@@ -9561,8 +10551,10 @@ def test_cold_start_explicit_costs_stay_inert_when_flag_off(
             asset_class="equity",
             date_range={"start": "2025-01-01", "end": "2025-12-31"},
             capital_amount=10000,
-            extra_parameters={"fee_rate": 0.001},
-            field_provenance={"fee_rate": "explicit_user"},
+            extra_parameters={
+                "fee_rate": 0.001,
+                "field_provenance": {"fee_rate": "explicit_user"},
+            },
         ),
         missing_required_fields=[],
         semantic_turn_act="new_idea",
@@ -9580,3 +10572,439 @@ def test_cold_start_explicit_costs_stay_inert_when_flag_off(
     assert confirm_result.outcome == "await_approval"
     launch_payload = confirm_result.patch["confirmation_payload"]["launch_payload"]
     assert "_execution_realism" not in launch_payload
+
+
+def test_failed_benchmark_leg_keeps_unsupported_provenance(monkeypatch) -> None:
+    """Issue #296: the cleared baseline keeps provenance for the card disclosure."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+
+    samsung_provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="SAMSUNG",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="unsupported",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="unsupported",
+            raw_text="SAMSUNG",
+            asset=None,
+            candidates=(),
+            provenance=samsung_provenance,
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SAMSUNG",
+    )
+    updated, reason_codes = (
+        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
+    )
+
+    assert updated.comparison_baseline is None
+    assert "invalid_benchmark_symbol_cleared" in reason_codes
+    assert any(
+        item.raw_text == "SAMSUNG" and item.resolution_status == "unsupported"
+        for item in updated.resolution_provenance
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    # The leg never blocks: the confirmation card owns disclosing the swap.
+    constraints = _unsupported_constraints_from_resolution(
+        updated.resolution_provenance,
+        contract=_Contract(),
+    )
+    assert constraints == []
+
+
+def test_ambiguous_benchmark_leg_is_disclosed_not_silently_cleared(
+    monkeypatch,
+) -> None:
+    """Issue #296: 'Samsung' matches unrelated fund names; the cleared leg
+    keeps provenance so the confirmation card discloses the swap."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+
+    provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="SAMSUNG",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="ambiguous",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="ambiguous",
+            raw_text="SAMSUNG",
+            asset=None,
+            candidates=(),
+            provenance=provenance,
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SAMSUNG",
+    )
+    updated, reason_codes = (
+        interpret_module._strategy_with_validated_benchmark_symbol(strategy)
+    )
+
+    assert updated.comparison_baseline is None
+    assert "invalid_benchmark_symbol_cleared" in reason_codes
+    assert any(
+        item.raw_text == "SAMSUNG" and item.resolution_status == "ambiguous"
+        for item in updated.resolution_provenance
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    constraints = _unsupported_constraints_from_resolution(
+        updated.resolution_provenance,
+        contract=_Contract(),
+    )
+    assert constraints == []
+
+
+def test_resolved_benchmark_without_price_coverage_reconciles_on_the_card(
+    monkeypatch,
+) -> None:
+    """Issue #301: a catalog-resolved benchmark with no bars in the window
+    reconciles to the class default and is disclosed, never run to failure."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+    from argus.domain import market_data
+    from argus.domain.market_data import ResolvedAsset
+
+    nintendo_provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="NINTENDO",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol="NTDOY",
+        asset_class="equity",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="NINTENDO",
+            asset=ResolvedAsset(
+                canonical_symbol="NTDOY",
+                asset_class="equity",
+                name="Nintendo Co Ltd",
+                raw_symbol="NTDOY",
+            ),
+            candidates=(),
+            provenance=nintendo_provenance,
+        ),
+    )
+
+    def _no_bars(**kwargs):
+        raise ValueError("market_data_empty")
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", _no_bars)
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2023-01-03", "end": "2023-12-29"},
+        comparison_baseline="NINTENDO",
+    )
+    strategy, validated_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+    assert strategy.comparison_baseline == "NTDOY"
+    assert "benchmark_symbol_provider_validated" in validated_codes
+
+    strategy, coverage_codes = interpret_module._strategy_with_benchmark_price_coverage(
+        strategy
+    )
+    assert strategy.comparison_baseline is None
+    assert coverage_codes == ["benchmark_without_price_coverage_cleared"]
+
+    strategy, default_codes = interpret_module._strategy_with_default_benchmark(strategy)
+    assert strategy.comparison_baseline == "SPY"
+    assert "default_benchmark_applied" in default_codes
+
+    assert any(
+        item.raw_text == "NINTENDO"
+        and item.resolution_status == "unavailable_for_requested_run"
+        for item in strategy.resolution_provenance
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    # The reconciled leg never blocks: the card owns disclosing the swap.
+    constraints = _unsupported_constraints_from_resolution(
+        strategy.resolution_provenance,
+        contract=_Contract(),
+    )
+    assert constraints == []
+
+
+def test_validated_benchmark_keeps_resolved_provenance_for_the_probe(
+    monkeypatch,
+) -> None:
+    """Issue #301: the rewrite to the canonical symbol keeps the user's stated
+    name on provenance so a later coverage clearing discloses their words."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.domain.market_data import ResolvedAsset
+
+    provenance = ResolutionProvenance(
+        field="comparison_baseline",
+        raw_text="NINTENDO",
+        source="llm_extraction",
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol="NTDOY",
+        asset_class="equity",
+    )
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="NINTENDO",
+            asset=ResolvedAsset(
+                canonical_symbol="NTDOY",
+                asset_class="equity",
+                name="Nintendo Co Ltd",
+                raw_symbol="NTDOY",
+            ),
+            candidates=(),
+            provenance=provenance,
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="NINTENDO",
+    )
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+
+    assert updated.comparison_baseline == "NTDOY"
+    assert "benchmark_symbol_provider_validated" in reason_codes
+    assert any(
+        item.raw_text == "NINTENDO"
+        and item.resolution_status == "resolved"
+        and item.canonical_symbol == "NTDOY"
+        for item in updated.resolution_provenance
+    )
+
+
+def test_explicit_benchmark_change_retires_the_stale_disclosure(
+    monkeypatch,
+) -> None:
+    """PR #303 review: replacing a reconciled benchmark by name must not
+    let the card re-disclose the old swap against the new symbol."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.domain.market_data import ResolvedAsset
+
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="QQQ",
+            asset=ResolvedAsset(
+                canonical_symbol="QQQ",
+                asset_class="equity",
+                name="Invesco QQQ Trust",
+                raw_symbol="QQQ",
+            ),
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="QQQ",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="QQQ",
+            ),
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="QQQ",
+        resolution_provenance=[
+            ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="NINTENDO",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="unavailable_for_requested_run",
+                canonical_symbol="NTDOY",
+                validated_by="price_coverage_probe",
+            )
+        ],
+        extra_parameters={
+            "field_provenance": {"comparison_baseline": "explicit_user"}
+        },
+    )
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+
+    assert updated.comparison_baseline == "QQQ"
+    assert "stale_benchmark_disclosure_retired" in reason_codes
+    assert not any(
+        item.field == "comparison_baseline"
+        and item.resolution_status == "unavailable_for_requested_run"
+        for item in updated.resolution_provenance
+    )
+
+
+def test_merged_benchmark_keeps_the_disclosure_between_turns(monkeypatch) -> None:
+    """An edit that does not restate the benchmark keeps the reconciliation
+    disclosure — the card still runs against the swapped default."""
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.domain.market_data import ResolvedAsset
+
+    monkeypatch.setattr(
+        interpret_module.provider_context_assets,
+        "resolution_from_strategy_context",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "_resolve_asset_candidate",
+        lambda *args, **kwargs: AssetResolution(
+            status="resolved",
+            raw_text="SPY",
+            asset=ResolvedAsset(
+                canonical_symbol="SPY",
+                asset_class="equity",
+                name="SPDR S&P 500 ETF",
+                raw_symbol="SPY",
+            ),
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="SPY",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="SPY",
+            ),
+        ),
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="SPY",
+        resolution_provenance=[
+            ResolutionProvenance(
+                field="comparison_baseline",
+                raw_text="NINTENDO",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="unavailable_for_requested_run",
+                canonical_symbol="NTDOY",
+                validated_by="price_coverage_probe",
+            )
+        ],
+    )
+    updated, reason_codes = interpret_module._strategy_with_validated_benchmark_symbol(
+        strategy
+    )
+
+    assert "stale_benchmark_disclosure_retired" not in reason_codes
+    assert any(
+        item.raw_text == "NINTENDO"
+        and item.resolution_status == "unavailable_for_requested_run"
+        for item in updated.resolution_provenance
+    )
+
+
+def test_ambiguous_traded_assets_still_clarify_not_constrain() -> None:
+    """The ambiguous-benchmark disclosure is scoped: universe legs keep the
+    clarification path."""
+    from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
+        _unsupported_constraints_from_resolution,
+    )
+
+    class _Contract:
+        def get_simplification_options(self, category):
+            return []
+
+    constraints = _unsupported_constraints_from_resolution(
+        [
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="APPLE",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="ambiguous",
+            )
+        ],
+        contract=_Contract(),
+    )
+    assert constraints == []

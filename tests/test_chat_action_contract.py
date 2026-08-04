@@ -11,17 +11,6 @@ from fastapi.testclient import TestClient
 def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
-    client.patch(
-        "/api/v1/me",
-        json={
-            "onboarding": {
-                "stage": "ready",
-                "language_confirmed": True,
-                "primary_goal": "test_stock_idea",
-                "completed": False,
-            }
-        },
-    )
     return client
 
 
@@ -109,6 +98,7 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
+    confirmation_id = "confirm-aapl-asset"
     create_message(
         user_id=user_id,
         conversation_id=conversation["id"],
@@ -129,6 +119,8 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
                 "optional_parameters": {},
             },
             "confirmation_card": {
+                "confirmation_id": confirmation_id,
+                "confirmation_state": "active",
                 "title": "AAPL buy and hold",
                 "statusLabel": "Ready to run",
                 "summary": "I read this as AAPL using a buy and hold approach.",
@@ -141,7 +133,7 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
                         "label": "Change asset",
                         "labelKey": "chat.confirmation.actions.change_asset",
                         "presentation": "confirmation",
-                        "payload": {},
+                        "payload": {"confirmation_id": confirmation_id},
                     }
                 ],
             },
@@ -157,7 +149,7 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
                 "label": "Change asset",
                 "labelKey": "chat.confirmation.actions.change_asset",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": confirmation_id},
             },
             "language": "en",
         },
@@ -181,6 +173,9 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
         user_message["metadata"]["chat_action"]["labelKey"]
         == "chat.confirmation.actions.change_asset"
     )
+    assert user_message["metadata"]["chat_action"]["payload"] == {
+        "confirmation_id": confirmation_id
+    }
     assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
         "asset_universe"
     )
@@ -190,6 +185,7 @@ def test_change_dates_action_asks_natural_date_window_question() -> None:
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
+    confirmation_id = "confirm-aapl-dates"
     create_message(
         user_id=user_id,
         conversation_id=conversation["id"],
@@ -214,6 +210,8 @@ def test_change_dates_action_asks_natural_date_window_question() -> None:
                 "optional_parameters": {},
             },
             "confirmation_card": {
+                "confirmation_id": confirmation_id,
+                "confirmation_state": "active",
                 "title": "AAPL",
                 "statusLabel": "Ready to run",
                 "summary": "I read this as AAPL using a buy and hold approach.",
@@ -226,7 +224,7 @@ def test_change_dates_action_asks_natural_date_window_question() -> None:
                         "label": "Change dates",
                         "labelKey": "chat.confirmation.actions.change_dates",
                         "presentation": "confirmation",
-                        "payload": {},
+                        "payload": {"confirmation_id": confirmation_id},
                     }
                 ],
             },
@@ -242,7 +240,7 @@ def test_change_dates_action_asks_natural_date_window_question() -> None:
                 "label": "Change dates",
                 "labelKey": "chat.confirmation.actions.change_dates",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": confirmation_id},
             },
             "language": "en",
         },
@@ -266,6 +264,9 @@ def test_change_dates_action_asks_natural_date_window_question() -> None:
         user_message["metadata"]["chat_action"]["labelKey"]
         == "chat.confirmation.actions.change_dates"
     )
+    assert user_message["metadata"]["chat_action"]["payload"] == {
+        "confirmation_id": confirmation_id
+    }
     assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
         "date_range"
     )

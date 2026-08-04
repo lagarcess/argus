@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from argus.agent_runtime.recovery_messages import recovery_message
 from argus.agent_runtime.simplification_option_contract import simplification_option_kind
@@ -10,6 +10,8 @@ OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
     "clarification_generation_unavailable",
     language="en",
 )
+
+ClarificationPromptSource = Literal["llm_generated", "degraded_fallback"]
 
 
 def offline_clarification_fallback(
@@ -36,10 +38,29 @@ def typed_clarification_contract(
     response_intent: dict[str, Any] | None,
     requested_field: str | None = None,
     strategy: StrategySummary | dict[str, Any] | None = None,
+    prompt_source: ClarificationPromptSource = "degraded_fallback",
 ) -> dict[str, Any] | None:
     if not isinstance(response_intent, dict):
         return None
     kind = response_intent.get("kind")
+    if kind == "coverage_recovery":
+        options = _typed_options(response_intent)
+        coverage = _coverage_facts(response_intent)
+        if not options or coverage is None:
+            return None
+        return {
+            "kind": "coverage_recovery",
+            "reason_code": coverage["code"],
+            "prompt_source": prompt_source,
+            "requested_field": None,
+            "requested_fields": _requested_fields(response_intent),
+            "semantic_needs": _semantic_needs(response_intent),
+            "payload": {
+                "strategy": _strategy_payload(response_intent, strategy),
+                "coverage": coverage,
+            },
+            "options": options,
+        }
     if kind == "unsupported_recovery":
         options = _typed_options(response_intent)
         if not options:
@@ -48,6 +69,7 @@ def typed_clarification_contract(
         return {
             "kind": "unsupported_recovery",
             "reason_code": _unsupported_reason_code(response_intent),
+            "prompt_source": prompt_source,
             "requested_field": requested_field or "unsupported_constraints",
             "requested_fields": _requested_fields(response_intent)
             or ["unsupported_constraints"],
@@ -69,12 +91,26 @@ def typed_clarification_contract(
             requested_field=requested,
             semantic_needs=semantic_needs,
         ),
+        "prompt_source": prompt_source,
         "requested_field": requested,
         "requested_fields": requested_fields,
         "semantic_needs": semantic_needs,
         "payload": {"strategy": _strategy_payload(response_intent, strategy)},
         "options": [],
     }
+
+
+def _coverage_facts(response_intent: dict[str, Any]) -> dict[str, Any] | None:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return None
+    coverage = facts.get("coverage")
+    if not isinstance(coverage, dict):
+        return None
+    code = coverage.get("code")
+    if not isinstance(code, str) or not code:
+        return None
+    return dict(coverage)
 
 
 def intent_clarification_fallback(
@@ -85,6 +121,19 @@ def intent_clarification_fallback(
 ) -> str | None:
     if not isinstance(response_intent, dict):
         return None
+    if response_intent.get("kind") == "coverage_recovery":
+        coverage = _coverage_facts(response_intent)
+        code = coverage.get("code") if coverage is not None else None
+        _ = language
+        if code == "no_common_data_window":
+            return (
+                "Those assets and the benchmark do not share a usable data window. "
+                "Would you like to change the dates, an asset, or the benchmark?"
+            )
+        return (
+            "The shared data window is not sufficient for a trustworthy test. "
+            "Would you like to change the dates, an asset, or the benchmark?"
+        )
     if response_intent.get("kind") == "unsupported_recovery":
         return _unsupported_recovery_fallback(
             language=language,
@@ -124,16 +173,48 @@ def _unsupported_recovery_fallback(
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
     _ = language
+    reason_code = _unsupported_reason_code(response_intent)
+    if reason_code == "future_performance":
+        options = _option_labels(response_intent)
+        offer = (
+            f" Which direction should I take: {_join_options(options)}?"
+            if options
+            else " What historical period would you like to examine?"
+        )
+        return (
+            "I cannot predict future performance. I can test how the same idea "
+            f"performed over a historical period instead.{offer}"
+        )
+    if reason_code == "unsupported_time_granularity":
+        raw_value = _unsupported_raw_value(response_intent)
+        if raw_value:
+            return (
+                f"{raw_value} is not a supported bar size. "
+                "Choose daily or 1-hour bars."
+            )
+        return "That bar size is not supported. Choose daily or 1-hour bars."
     options = _option_labels(response_intent)
     if not options:
         return None
     raw_value = _unsupported_raw_value(response_intent)
     symbol = _primary_symbol(strategy)
     joined_options = _join_options(options)
-    subject = raw_value or "That rule"
     symbol_suffix = f" for {symbol}" if symbol else ""
+    if reason_code == "sentiment_news_rule":
+        return (
+            f"Argus can't test news or sentiment as an execution rule yet"
+            f"{symbol_suffix}. "
+            f"Which supported direction should I use: {joined_options}?"
+        )
+    # No category: nothing was recognized as a rule, so ask for one.
+    if reason_code == "unsupported_constraint":
+        return (
+            f"What rule should I test{symbol_suffix}? "
+            f"Which supported direction should I use: {joined_options}?"
+        )
+    subject = raw_value or "that rule"
     return (
-        f"{subject} does not define when to buy or sell{symbol_suffix} on its own. "
+        f"Argus can't run {subject} directly yet{symbol_suffix}. "
         f"Which supported direction should I use: {joined_options}?"
     )
 
@@ -164,7 +245,16 @@ def _typed_options(response_intent: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(option, dict):
             continue
         replacement_values = option.get("replacement_values")
-        option_id = simplification_option_kind(replacement_values) or f"option_{index}"
+        explicit_id = option.get("id")
+        option_id = (
+            simplification_option_kind(replacement_values)
+            or (
+                explicit_id.strip()
+                if isinstance(explicit_id, str) and explicit_id.strip()
+                else None
+            )
+            or f"option_{index}"
+        )
         if option_id in seen:
             continue
         seen.add(option_id)
@@ -276,11 +366,14 @@ def _looks_like_internal_code(value: str) -> bool:
     # lowercase snake_case token is an internal reason code and must never
     # render in prose. Uppercase underscore tokens (BTC_USDT, BRK_B) are
     # user-typed symbols and stay quotable.
-    return (
+    if (
         "_" in value
         and value == value.lower()
         and not any(character.isspace() for character in value)
-    )
+    ):
+        return True
+    # Sentence punctuation marks an explanation, not a name.
+    return value.rstrip().endswith(".") or ". " in value
 
 
 def _fallback_option_label(option: dict[str, Any]) -> str | None:

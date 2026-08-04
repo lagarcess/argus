@@ -4,17 +4,25 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+)
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.recovery.policy import should_retry
 from argus.agent_runtime.runtime import run_agent_turn
+from argus.agent_runtime.stages.clarify import clarify_stage
+from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.stages.explain import explain_stage, explain_stage_async
 from argus.agent_runtime.stages.interpret import InterpretationRequest
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import (
+    ConfirmationPayload,
     ResponseProfile,
     RunState,
     StrategySummary,
+    TaskSnapshot,
     UserState,
 )
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
@@ -22,6 +30,19 @@ from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
 from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 from langgraph.checkpoint.memory import MemorySaver
+
+
+def _coverage_approval(start: str, end: str) -> dict[str, object]:
+    date_range = {"start": start, "end": end}
+    return {
+        "requested_date_range": date_range,
+        "coverage_preflight": {
+            "outcome": "full_coverage",
+            "requested_date_range": date_range,
+            "effective_date_range": date_range,
+            "preflight_id": "sha256:test-coverage",
+        },
+    }
 
 
 def _assert_value_absent(value: object, forbidden: str) -> None:
@@ -151,6 +172,33 @@ def test_execute_does_not_retry_when_corrected_payload_changes_protected_intent_
     assert metadata["retryable"] is False
     assert metadata["recovery_mode"] == "reopen_confirmation"
     assert metadata["launch_payload"]["symbol"] == "TSLA"
+
+
+def test_execute_exposes_only_the_safe_guest_conversion_failure_code() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "account_required",
+                "error_message": None,
+                "retryable": False,
+                "payload": None,
+                "capability_context": {
+                    "execution_status": "rejected",
+                    "failure_code": "account_conversion_required",
+                },
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.confirmation_payload = {"strategy": {"asset_universe": ["TSLA"]}}
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_failed_terminally"
+    assert result.patch["final_response_payload"]["code"] == (
+        "account_conversion_required"
+    )
 
 
 def test_execute_retries_only_for_retryable_transient_failure() -> None:
@@ -586,6 +634,7 @@ def test_real_backtest_tool_maps_failure_codes_to_user_safe_messages(
             "parameters": {},
             "risk_rules": [],
             "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         }
     )
 
@@ -627,6 +676,497 @@ def test_execute_stage_keeps_raw_failure_code_out_of_ui_error_metadata() -> None
     )
     assert "draft" not in result.patch["final_response_payload"]["error"].lower()
     assert "current setup" in result.patch["final_response_payload"]["error"]
+
+
+def test_execute_stage_routes_approved_window_drift_to_fresh_preflight() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "parameter_validation_error",
+                "error_message": (
+                    "That confirmation needs its data window checked again before "
+                    "it can run. Review the refreshed dates and approve the new card."
+                ),
+                "retryable": False,
+                "payload": None,
+                "capability_context": {
+                    "failure_code": "approved_data_window_unavailable",
+                    "failure_detail": "approved_data_window_unavailable",
+                },
+            }
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        capital_amount=1_000,
+        extra_parameters={
+            "requested_date_range": {
+                "start": "2024-01-01",
+                "end": "2024-01-05",
+            },
+            "effective_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+        },
+    )
+    state.confirmation_payload = {
+        "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-03", "end": "2024-01-05"},
+            "requested_date_range": {
+                "start": "2024-01-01",
+                "end": "2024-01-05",
+            },
+            "coverage_preflight": {
+                "outcome": "adjusted_coverage",
+                "requested_date_range": {
+                    "start": "2024-01-01",
+                    "end": "2024-01-05",
+                },
+                "effective_date_range": {
+                    "start": "2024-01-03",
+                    "end": "2024-01-05",
+                },
+                "preflight_id": "sha256:stale-window",
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1_000,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": "en",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["confirmation_payload"] is None
+    assert result.patch["candidate_strategy_draft"]["date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-01-05",
+    }
+    assert "latest_failed_action_reference" not in result.patch
+    assert "final_response_payload" not in result.patch
+    assert (
+        "failure_code" not in result.patch["tool_call_records"][0]["capability_context"]
+    )
+
+
+@pytest.mark.parametrize(
+    "coverage_failure",
+    ["no_common_data_window", "insufficient_common_data"],
+)
+def test_real_execution_routes_approved_coverage_loss_to_fresh_preflight(
+    monkeypatch: pytest.MonkeyPatch,
+    coverage_failure: str,
+) -> None:
+    import pandas as pd
+    from argus.domain.engine_launch import adapter
+
+    def disjoint_provider_frame(symbol: str, **_: object) -> pd.DataFrame:
+        if coverage_failure == "insufficient_common_data":
+            days = ["2024-01-01"]
+        else:
+            days = (
+                ["2024-01-01", "2024-01-02"]
+                if symbol == "AAPL"
+                else ["2024-01-04", "2024-01-05"]
+            )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series(
+            [100.0 + offset for offset in range(len(days))],
+            index=index,
+        )
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(
+        adapter,
+        "classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(adapter, "fetch_ohlcv", disjoint_provider_frame)
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range=requested,
+        capital_amount=1_000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "requested_date_range": requested,
+            "effective_date_range": requested,
+        },
+    )
+    state.confirmation_payload = {
+        "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": requested,
+            "requested_date_range": requested,
+            "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": requested,
+                "effective_date_range": requested,
+                "preflight_id": "sha256:approved-window",
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1_000,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+
+    result = execute_stage(state=state, tool=RealBacktestTool(), max_retries=1)
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["confirmation_payload"] is None
+    assert result.patch["candidate_strategy_draft"]["date_range"] == requested
+    assert result.patch["artifact_references"] == []
+    assert "latest_failed_action_reference" not in result.patch
+    assert "final_response_payload" not in result.patch
+
+
+def test_approved_window_drift_falls_back_to_typed_coverage_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pandas as pd
+    from argus.domain import market_data
+
+    def disjoint_provider_frame(symbol: str, **_: object):
+        days = (
+            ["2024-01-01", "2024-01-02"]
+            if symbol == "AAPL"
+            else ["2024-01-04", "2024-01-05"]
+        )
+        index = pd.to_datetime(days, utc=True)
+        close = pd.Series([100.0, 101.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", disjoint_provider_frame)
+    state = RunState.new(current_user_message="Ejecutar", recent_thread_history=[])
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-03", "end": "2024-01-05"},
+        capital_amount=1_000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "requested_date_range": {
+                "start": "2024-01-01",
+                "end": "2024-01-05",
+            },
+            "effective_date_range": {
+                "start": "2024-01-03",
+                "end": "2024-01-05",
+            },
+            "language": "es-419",
+        },
+    )
+    state.confirmation_payload = ConfirmationPayload.model_validate(
+        {
+            "strategy": state.candidate_strategy_draft.model_dump(mode="python"),
+            "optional_parameters": {},
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-03", "end": "2024-01-05"},
+                "requested_date_range": {
+                    "start": "2024-01-01",
+                    "end": "2024-01-05",
+                },
+                "coverage_preflight": {
+                    "outcome": "adjusted_coverage",
+                    "requested_date_range": {
+                        "start": "2024-01-01",
+                        "end": "2024-01-05",
+                    },
+                    "effective_date_range": {
+                        "start": "2024-01-03",
+                        "end": "2024-01-05",
+                    },
+                    "preflight_id": "sha256:stale-window",
+                },
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1_000,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "es-419",
+            },
+            "validation": {"status": "ready_to_run", "executable": True},
+        }
+    )
+    drift = execute_stage(
+        state=state,
+        tool=StubBacktestTool(
+            responses=[
+                {
+                    "success": False,
+                    "error_type": "parameter_validation_error",
+                    "error_message": "Review the refreshed dates.",
+                    "retryable": False,
+                    "payload": None,
+                    "capability_context": {
+                        "failure_code": "approved_data_window_unavailable"
+                    },
+                }
+            ]
+        ),
+        max_retries=1,
+        language="es-419",
+    )
+    assert drift.patch["artifact_references"] == []
+    reconfirmation_state = RunState.model_validate(
+        {**state.model_dump(mode="python"), **drift.patch}
+    )
+
+    preflight = confirm_stage(
+        state=reconfirmation_state,
+        contract=build_default_capability_contract(),
+        language="es-419",
+    )
+
+    assert preflight.outcome == "needs_clarification"
+    assert "confirmation_payload" not in preflight.patch
+    assert (
+        preflight.patch["optional_parameter_status"]["coverage_recovery"]["code"]
+        == "no_common_data_window"
+    )
+    clarified = clarify_stage(
+        state=RunState.model_validate(
+            {**reconfirmation_state.model_dump(mode="python"), **preflight.patch}
+        ),
+        contract=build_default_capability_contract(),
+        clarification_generator=None,
+        language="es-419",
+    )
+    assert clarified.outcome == "await_user_reply"
+    assert clarified.patch["clarification"]["kind"] == "coverage_recovery"
+    assert "benchmark" in clarified.patch["assistant_prompt"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["en", "es-419"])
+async def test_workflow_supersedes_stale_coverage_approval_before_execution(
+    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+) -> None:
+    from argus.domain import market_data
+
+    def current_provider_frame(symbol: str, **_: object):  # noqa: ARG001
+        import pandas as pd
+
+        index = pd.to_datetime(
+            ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"],
+            utc=True,
+        )
+        close = pd.Series([100.0, 101.0, 102.0, 103.0], index=index)
+        return pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1.0,
+                "low": close - 1.0,
+                "close": close,
+                "volume": 1_000.0,
+            },
+            index=index,
+        )
+
+    monkeypatch.setattr(market_data, "fetch_ohlcv", current_provider_frame)
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "parameter_validation_error",
+                "error_message": "Review the refreshed dates and approve again.",
+                "retryable": False,
+                "payload": None,
+                "capability_context": {
+                    "failure_code": "approved_data_window_unavailable",
+                    "failure_detail": "approved_data_window_unavailable",
+                },
+            },
+            {
+                "success": True,
+                "payload": {"total_return": 0.14, "benchmark_return": 0.09},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    workflow = build_workflow(
+        structured_interpreter=None,
+        tool=tool,
+        max_retries=1,
+        checkpointer=MemorySaver(),
+    )
+    old_confirmation_id = f"confirmation-stale-{language}"
+    requested = {"start": "2024-01-01", "end": "2024-01-05"}
+    stale_effective = {"start": "2024-01-03", "end": "2024-01-05"}
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range=stale_effective,
+        capital_amount=1_000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "requested_date_range": requested,
+            "effective_date_range": stale_effective,
+            "language": language,
+        },
+    )
+    stale_confirmation = {
+        "confirmation_id": old_confirmation_id,
+        "artifact_id": old_confirmation_id,
+        "strategy": strategy.model_dump(mode="python"),
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": ["AAPL"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": stale_effective,
+            "requested_date_range": requested,
+            "coverage_preflight": {
+                "outcome": "adjusted_coverage",
+                "requested_date_range": requested,
+                "effective_date_range": stale_effective,
+                "preflight_id": "sha256:stale-window",
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1_000,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": language,
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+    old_reference = confirmation_artifact_reference(
+        confirmation_id=old_confirmation_id,
+        confirmation_payload=stale_confirmation,
+    )
+
+    def approval_action(reference) -> dict[str, object]:
+        return {
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "presentation": "confirmation",
+            "payload": {
+                "artifact_id": reference.artifact_id,
+                "confirmation_id": reference.artifact_id,
+                "launch_payload_hash": reference.metadata["launch_payload_hash"],
+            },
+        }
+
+    user = UserState(user_id="u1", language_preference=language)
+    thread_id = f"thread-coverage-reconfirmation-{language}"
+    refreshed = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Run backtest",
+        action_context=approval_action(old_reference),
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=strategy,
+            active_confirmation_reference=old_reference,
+            artifact_references=[old_reference],
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        fallback_artifact_references=[old_reference],
+        fallback_confirmation_payload=stale_confirmation,
+    )
+
+    assert refreshed["stage_outcome"] == "await_approval"
+    assert len(tool.calls) == 1
+    fresh_reference_payload = next(
+        raw_reference
+        for raw_reference in refreshed["artifact_references"]
+        if raw_reference["artifact_kind"] == "confirmation"
+    )
+    fresh_reference = type(old_reference).model_validate(fresh_reference_payload)
+    assert fresh_reference.artifact_id != old_confirmation_id
+    assert fresh_reference.metadata["confirmation_payload"]["launch_payload"][
+        "date_range"
+    ] == {
+        "start": "2024-01-02",
+        "end": "2024-01-05",
+    }
+
+    stale_retry = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Run backtest",
+        action_context=approval_action(old_reference),
+    )
+    assert stale_retry["stage_outcome"] == "await_user_reply"
+    assert len(tool.calls) == 1
+
+    completed = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Run backtest",
+        action_context=approval_action(fresh_reference),
+    )
+    assert completed["stage_outcome"] == "end_run"
+    assert len(tool.calls) == 2
+
 
 
 def test_execute_future_end_date_returns_non_retryable_date_prompt() -> None:
@@ -702,6 +1242,18 @@ def test_execute_stage_uses_real_backtest_tool_payload(
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
             "initial_capital": {"value": 1000.0, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         },
     }
 
@@ -844,6 +1396,18 @@ def test_execute_stage_passes_language_to_real_backtest_tool(
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
             "initial_capital": {"value": 1000.0, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         },
     }
 
@@ -994,6 +1558,18 @@ def test_execute_stage_preserves_multi_symbol_launch_payload(
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
             "initial_capital": {"value": 1000.0, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "SBUX",
+            "symbols": ["SBUX", "CMG"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 100000.0,
+            "benchmark_symbol": "SPY",
+            **_coverage_approval("2025-01-01", "2025-12-31"),
         },
     }
 
@@ -1300,6 +1876,11 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
         "capital_amount": 1000,
         "benchmark_symbol": "SPY",
         "language": "en",
+        "_execution_realism": {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        },
     }
 
     result = await run_agent_turn(
@@ -1329,6 +1910,18 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     launch = confirmation_payload["launch_payload"]
     assert launch["symbol"] == "MSFT"
     assert launch["date_range"] == {"start": "2025-05-13", "end": "2026-05-13"}
+    strategy = confirmation_payload["strategy"]
+    assert strategy["extra_parameters"]["fee_rate"] == 0.001
+    assert strategy["extra_parameters"]["slippage"] == 0.0005
+    assert strategy["extra_parameters"]["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert result["confirmation_payload"]["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
     state_snapshot = await workflow.aget_state(
         {"configurable": {"thread_id": "thread-retry-failed-action"}}
     )
@@ -1336,7 +1929,105 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     active_confirmation = snapshot.active_confirmation_reference
     assert active_confirmation is not None
     assert active_confirmation.artifact_kind == "confirmation"
+    persisted_confirmation = active_confirmation.metadata["confirmation_payload"]
+    persisted_costs = persisted_confirmation["strategy"]["extra_parameters"]
+    assert persisted_costs["fee_rate"] == 0.001
+    assert persisted_costs["slippage"] == 0.0005
+    assert persisted_costs["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert persisted_confirmation["launch_payload"]["_execution_realism"] == {
+        "enabled": True,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+    }
     assert snapshot.latest_failed_action_reference is None
+
+
+@pytest.mark.asyncio
+async def test_workflow_retry_preserves_explicit_zero_costs_from_pending_strategy() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    workflow = build_workflow(
+        structured_interpreter=RetryApprovalInterpreter(),
+        tool=tool,
+        max_retries=1,
+        checkpointer=MemorySaver(),
+    )
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+        "language": "en",
+    }
+    pending_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold MSFT.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": "2025-05-13", "end": "2026-05-13"},
+        sizing_mode="capital_amount",
+        capital_amount=1000,
+        comparison_baseline="SPY",
+        extra_parameters={
+            "fee_rate": 0.0,
+            "slippage": 0.0,
+            "field_provenance": {
+                "fee_rate": "explicit_user",
+                "slippage": "explicit_user",
+            },
+        },
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="en"),
+        thread_id="thread-retry-explicit-zero-costs",
+        message="Can you try again?",
+        fallback_latest_task_snapshot={
+            "pending_strategy_summary": pending_strategy.model_dump(mode="python"),
+            "latest_failed_action_reference": {
+                "artifact_kind": "failed_action",
+                "artifact_id": "failed-action-zero-costs",
+                "artifact_status": "failed",
+                "metadata": {
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                    "failure_classification": "upstream_dependency_error",
+                    "error": "market_data_unavailable",
+                    "retryable": True,
+                },
+            },
+        },
+    )
+
+    assert result["stage_outcome"] == "await_approval"
+    assert tool.calls == []
+    strategy = result["confirmation_payload"]["strategy"]
+    assert strategy["extra_parameters"]["fee_rate"] == 0.0
+    assert strategy["extra_parameters"]["slippage"] == 0.0
+    assert strategy["extra_parameters"]["field_provenance"] == {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user",
+    }
+    assert "_execution_realism" not in result["confirmation_payload"]["launch_payload"]
 
 
 def test_execute_stage_translates_provider_window_limit_to_human_recovery() -> None:

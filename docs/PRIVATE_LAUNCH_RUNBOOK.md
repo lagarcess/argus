@@ -113,6 +113,13 @@ SHA/status check with `ARGUS_CANARY_SHA`.
 .github/warmup-render.sh --expect-mode real-workflow
 ```
 
+Render workflow dispatch is ceremony-gated spend: the hosted product (real
+users), the scheduled Private Alpha Canary workflow, and these promotion steps
+are the only paths that run paid `workflow_proof` / `run_backtest_job` tasks.
+Local and dev-agent work runs backtests in-process on local compute; the mode
+scripts pin dispatch off (dev hard-off, QA default-off with explicit
+pre-export opt-in).
+
 11. Run the authoritative Spanish release journey with privacy-safe evidence.
 This is the only release canary: it checks the exact deployed SHA, the real
 Render workflow, finalized evidence identity, explicit decision capture, reload
@@ -126,18 +133,23 @@ cd ..
 mkdir -p temp/release-evidence
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
 ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
+ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json \
 .github/canary-render.sh
 ```
 
 If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
-Set `ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-failed-capture.json`,
-rerun it once to write a sanitized failed-capture artifact, then replay the
-captured payload locally before redeploying:
+The first authoritative run writes the sanitized capture beside the human-safe
+evidence. Do not rerun the charged journey to collect a capture. When that
+capture contains a final response, replay it locally before redeploying:
 
 ```bash
 poetry run python scripts/ops/canary_capture_replay.py \
-  temp/release-evidence/canary-es-419-failed-capture.json
+  temp/release-evidence/canary-es-419-capture.json
 ```
+
+If the failure happened before any final response existed, keep the capture as
+diagnostic evidence and inspect the hashed labels, failure stage, API logs, and
+route-receipt summary instead of forcing a replay or spending a second journey.
 
 If the exact candidate reaches the API but returns the normal interpreter
 recovery response, keep the failed capture and evidence. Record the safe HTTP
@@ -244,6 +256,12 @@ dispatch/execution and removes the Render API key from `argus-api`.
 public service URLs, public Supabase URL/anon key values, feature flags, paper
 trading mode, CORS origins, and model routing IDs.
 
+Both `argus-app` and `argus-api` must set the server-only `ARGUS_APP_ORIGIN` to
+the exact HTTPS app origin. The web service uses it for password-recovery
+redirects; the API uses it for approval signup links. It must never use a
+`NEXT_PUBLIC_` name. Local development may use the documented localhost
+origins; production must not use HTTP.
+
 Keep true secrets manual in Render:
 
 - `DATABASE_URL`
@@ -253,6 +271,7 @@ Keep true secrets manual in Render:
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_OPS_TOKEN`
+- `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`
 - `POSTHOG_PROJECT_TOKEN`
 
 Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty. Product analytics capture is
@@ -290,6 +309,135 @@ private-alpha launch; record any override in the release manifest.
 - `ARGUS_RUN_LIVE_EVALS=1` — runs the live eval suite under `tests/evals/` (real
   model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
   landing-gate run and every `main` promotion candidate.
+
+## Guest Staged Rollout
+
+The operational security checklist for later internet-facing Guest exposure is
+[Guest Public Launch Safety](GUEST_PUBLIC_LAUNCH_SAFETY.md). It is a promotion
+and traffic-exposure gate, not a prerequisite for merging the Guest
+implementation into the internal integration branch.
+
+Product defaults:
+
+```bash
+ARGUS_GUEST_ACCESS_ENABLED=true
+ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
+NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
+ARGUS_VISITOR_KEY_SECRET=<unique high-entropy environment secret>
+ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
+```
+
+Guest access is part of the normal product shape. The two Guest flags are
+default-on emergency kill switches; explicit `false` activates rollback. The
+frontend flag controls presentation only and the API remains authoritative.
+Public-account access remains off, permanent signup/login stays
+allowlist-gated, existing admin/developer behavior is unchanged, and no Create
+account promise is shown.
+
+Hosted Supabase prerequisites are external operations and must be recorded in
+the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
+`NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY` present in the web build, provider
+anonymous-sign-in limits, Argus origin enforcement and per-IP attempt limits,
+no direct anonymous-role access to product tables, migrations applied through
+`20260727230000_add_visitor_usage_counters.sql`, and a founder-approved
+`ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING`. Generate a unique
+`ARGUS_VISITOR_KEY_SECRET` for each deployed environment so visitor identifiers
+remain opaque and cannot be correlated across environments. Without the public
+site key, non-loopback production preserves the auth landing rather than
+beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
+as part of a code promotion.
+
+Run guest cleanup first as a dry run:
+
+```bash
+poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
+```
+
+Then, only from the scheduled trusted operations environment:
+
+```bash
+poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
+```
+
+Schedule a bounded batch at least daily after public guest exposure. Record the
+owner, effective schedule, selected/deleted/preserved/failed counts, oldest
+eligible expiry, and alert destination. A nonzero `auth_delete_failed` result
+or a failed cleanup transaction must alert and retry; never compensate by
+deleting product rows manually. Product deletion, anonymous-identity
+revalidation, and Auth-row deletion are one database transaction. Claimed
+source identities use a fifteen-minute reconciliation grace; incomplete
+bootstrap identities use five minutes.
+
+Conversion safety is non-negotiable: new accounts link the anonymous identity
+in place; existing accounts use the email-hash-bound one-time handoff that
+login claims before returning a permanent session. Guest
+usage never merges into registered hour/day counters. Cleanup re-verifies
+anonymous and unclaimed truth and must not delete a converted or permanent
+account.
+
+Guest funnel capture uses the shared metadata-only server envelope. Only the two
+typed browser-owned facts cross `POST /api/v1/analytics/guest-events`; PostHog
+keys, autocapture, session replay, prompts, assistant prose, exact
+capital/dates, email, Auth material, private titles/previews, provider/model
+names, and raw transcripts stay out.
+
+Rollback order:
+
+1. set `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`;
+2. set `ARGUS_GUEST_ACCESS_ENABLED=false`;
+3. keep `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`;
+4. verify the preserved centered auth landing path;
+5. stop new guest creation while retaining existing rows for safe expiry,
+   conversion, or bounded cleanup.
+
+Step 2 is a drain, not an active-session kill switch: already-verified guests
+remain usable until their fixed policy boundary.
+
+Do not roll back by reversing migrations or deleting anonymous users in bulk.
+Authentication continues to land both guest and registered identities directly
+in ordinary chat. Guest behavior differs through verified identity,
+persistence, allowances, and conversion policy, not through onboarding.
+
+### Paid waitlist rollback controls
+
+The live `argus-api` plan is `standard`. The live `argus-app` plan is
+`starter`. The requested-role migration and access-request exposure are
+complete after the paid-plan readback and maintenance/private-health probes in
+`docs/release-evidence/public-alpha-readiness.md`. Public account creation is
+still allowlist-gated; `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false`.
+The evidence records the paid API instance type plus the maintenance and
+private/SSH/local verification controls.
+
+The paid controls must remain available for rollback. If any control becomes
+unavailable, rollback below `061ba50e` remains forbidden until the maintenance,
+quiescence, and private route-absence proof can be completed.
+
+### Waitlist rollback floor
+
+The durable waitlist rollback procedure is
+`docs/release-evidence/public-alpha-readiness.md`. Commit `061ba50e` is the
+fail-closed floor while the schema can contain active `requested` rows. Prefer
+a forward fix. Before any authorized rollback below that commit:
+
+1. read back `serviceDetails.maintenanceMode.enabled=true` out of band and
+   require the exact maintenance status and page fingerprint on the onrender
+   URL and every configured custom domain;
+2. complete a same-SHA restart and prove Render's old-instance shutdown/drain
+   finished with no pre-maintenance worker left;
+3. only then take the `ACCESS EXCLUSIVE` lock, disable active requested rows,
+   read back and assert zero, then commit;
+4. deploy under maintenance and verify the exact rollback SHA from Render
+   metadata;
+5. require a private invalid-body route-absence probe to return HTTP `404`;
+6. re-verify the maintenance configuration and response signature;
+7. disable maintenance last, then require the public invalid-body readback to
+   return HTTP `404` on every public API surface.
+
+Generic error statuses are not maintenance proof. If control-plane state,
+response fingerprint, restart drain, exact SHA, or a private verification
+surface cannot be verified, rollback below the floor is forbidden; stop and
+forward-fix. Never execute the production cleanup SQL during local repository
+verification.
 
 ## Smoke Test
 

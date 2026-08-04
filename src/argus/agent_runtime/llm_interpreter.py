@@ -14,6 +14,14 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
+from argus.agent_runtime.interpreter.discovery_act_guard import (
+    discovery_response_ready_for_runtime,
+    preserve_typed_discovery_act,
+)
+from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
+    BENCHMARK_LANGUAGE_GUIDANCE,
+)
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -33,8 +41,10 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
     _request_targets_post_result_artifact_edit,
+    _required_edit_targets_from_primary_draft,
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
+    materialized_artifact_edit_targets,
 )
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
@@ -137,6 +147,7 @@ from argus.agent_runtime.interpreter.executable_grounding import (  # noqa: F401
     _response_needs_launch_field_fidelity_repair,
 )
 from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
+    strategy_extraction_repair_is_allowed,
     _base_response_was_unsupported,
     _comparison_baseline_provenance,
     _focused_artifact_edit_messages,
@@ -147,6 +158,11 @@ from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.execution_cost_capability import (
     execution_cost_capability_clause,
+    has_execution_cost_candidate,
+)
+from argus.agent_runtime.interpreter.unsupported_admission import (
+    future_performance_capability_clause,
+    requested_strategy_template_capability_clause,
 )
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
     _apply_pending_response_option_replacement,
@@ -237,6 +253,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _asset_recovery_query_is_explicit_ticker,
+    crossover_shorthand_prompt_clause,
     _audit_signal_rule_grounding_if_needed,
     _llm_draft_executable_indicator_spec,
     _llm_strategy_draft_has_non_asset_strategy_anchor,
@@ -271,7 +288,6 @@ from argus.agent_runtime.interpreter.strategy_builder import (  # noqa: F401
     _clean_evidence_spans,
     _clean_optional_text,
     _compact_asset_evidence_token,
-    _date_range_intent_from_bounded_evidence,
     _dca_amount_has_user_provenance,
     _dca_cadence_has_user_provenance,
     _dedupe_resolution_provenance,
@@ -355,6 +371,7 @@ from argus.agent_runtime.strategy_contract import (
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
+    safe_conflict_strategy_type,
 )
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
@@ -375,6 +392,7 @@ from argus.nlp.natural_time import (
     resolve_rolling_window_intent_text,
 )
 
+_carry_asset_blocker = provider_context_assets.carry_incomplete_asset_blocker
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _INTERPRETATION_REPAIR_TASK: OpenRouterTask = "interpretation_repair"
 
@@ -472,10 +490,10 @@ class OpenRouterStructuredInterpreter:
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
-                return self._to_runtime_interpretation(
-                    repaired_response,
-                    request=request,
+                repaired_response = _carry_asset_blocker(
+                    repaired_response, asset_resolution_context
                 )
+                return self._to_runtime_interpretation(repaired_response, request=request)
             repaired_response = await _focused_strategy_repair_after_candidate_failures(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
@@ -488,10 +506,7 @@ class OpenRouterStructuredInterpreter:
                     preferred_model=candidate_models[0] if candidate_models else "",
                     request=request,
                 )
-                return self._to_runtime_interpretation(
-                    repaired_response,
-                    request=request,
-                )
+                return self._to_runtime_interpretation(repaired_response, request=request)
             self.last_status = "failed"
             return None
 
@@ -543,8 +558,7 @@ class OpenRouterStructuredInterpreter:
         from argus.llm.openrouter import resolve_openrouter_model
 
         fallback_model_name = resolve_openrouter_model(
-            fallback=True,
-            task="interpretation",
+            fallback=True, task="interpretation"
         )
 
         # Don't retry with the same model name if resolve returned the same thing
@@ -611,6 +625,9 @@ class OpenRouterStructuredInterpreter:
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
+            repaired_response = _carry_asset_blocker(
+                repaired_response, asset_resolution_context
+            )
             return self._to_runtime_interpretation(repaired_response, request=request)
         repaired_response = await _focused_strategy_repair_after_candidate_failures(
             request=request,
@@ -624,10 +641,7 @@ class OpenRouterStructuredInterpreter:
                 preferred_model=fallback_model_name or primary_model_name,
                 request=request,
             )
-            return self._to_runtime_interpretation(
-                repaired_response,
-                request=request,
-            )
+            return self._to_runtime_interpretation(repaired_response, request=request)
         return None
 
     def _messages(
@@ -754,8 +768,10 @@ class OpenRouterStructuredInterpreter:
             "date_range_intent with canonical fields: kind=rolling_window with "
             "count/unit, kind=year_to_date with optional year, kind=calendar_year "
             "with year, kind=since with start/year, kind=explicit_range with "
-            "ISO start/end, or kind=endpoint_patch with endpoint plus ISO date or "
-            "anchor=today and day_offset for relative day edits. When the user "
+            "ISO start/end, kind=endpoint_patch with endpoint plus ISO date or "
+            "anchor=today and day_offset for relative day edits, or "
+            "kind=future_window with count/unit or year when the period points "
+            "forward from today. When the user "
             "asks for the same window as the latest completed test, in any "
             "language ('same time period', 'mismo periodo', 'same dates as "
             "before'), set kind=same_as_latest_result with the reference phrase "
@@ -776,7 +792,8 @@ class OpenRouterStructuredInterpreter:
             "messy, or grammatically imperfect follow-ups as normal user input, not "
             "malformed requests; extract supported strategy intent, asset evidence, "
             "date/window intent, and language when those facts are visible.\n\n"
-            "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
+            + requested_strategy_template_capability_clause()
+            + "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
             "dca_accumulation, registry-backed indicator threshold rules, and "
             "schema-backed signal strategies are executable. RSI is executable with "
             "user-specified thresholds from 0 to 100, a default period of 14, a "
@@ -791,41 +808,21 @@ class OpenRouterStructuredInterpreter:
             "currency pairs are supported through Kraken; currency pair benchmark is the tested "
             "pair itself. "
             + execution_cost_capability_clause()
-            + "Benchmark language matters in any user language: when a symbol is "
-            "framed as a benchmark, reference, comparison target, or market "
-            "baseline, put it in comparison_baseline instead of asset_universe. "
-            "A one-asset buy/hold request with a separate benchmark is executable "
-            "as the primary asset plus comparison_baseline; do not call this an "
-            "unsupported direct comparison. Do not add benchmark symbols to "
-            "asset_universe unless the user explicitly says to buy, hold, or test "
-            "both as traded assets. Examples: AAPL against SPY, AAPL with SPY "
-            "as the benchmark, and AAPL con SPY como referencia all mean "
-            "asset_universe=['AAPL'] and comparison_baseline='SPY'. "
-            "Set field_provenance.comparison_baseline="
-            "'explicit_user' only when the current user message explicitly names "
-            "the comparison or benchmark. When the user gives exact start/end dates, "
+            + BENCHMARK_LANGUAGE_GUIDANCE
+            + "When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
             "never replace them with past year, last year, or another default period. "
             f"The current runtime date is {date.today().isoformat()}; if the user "
             "says today, now, or current, preserve that endpoint as 'today' or the "
             "current runtime date, not a stale model date.\n\n"
-            "When the user says something like 'buy Nvidia when the 50-day moving average "
-            "crosses above the 200-day', classify it as signal_strategy, preserve "
-            "the crossover as entry_logic, and default the exit to the same fast "
-            "average crossing back below the slow average when the user leaves the "
-            "exit unspecified. Do not ask what the buy trigger is.\n\n"
-            "Common trader shorthand such as 'buy when the 50 crosses the 200', "
-            "'50/200 cross', or 'golden cross' also means a moving-average crossover. "
-            "If the user omits SMA/EMA, use SMA as the default assumption and expose "
-            "that assumption later in the confirmation card instead of asking them "
-            "to restate the trigger. Ask only for truly missing run facts such as "
-            "the asset or date window.\n\n"
-            "Do not turn vague momentum language such as 'starts rising', 'big drops', "
+            + crossover_shorthand_prompt_clause()
+            + "Do not turn vague momentum language such as 'starts rising', 'big drops', "
             "'breaks out', or 'looks strong' into a moving-average crossover or any "
             "other executable signal by yourself. If the user does not name the "
             "indicator, threshold, crossover, or price rule, mark the entry rule as "
             "missing or ask for the executable definition.\n\n"
-            "Valuation and fundamental language is valid investing intent, not user "
+            + future_performance_capability_clause()
+            + "Valuation and fundamental language is valid investing intent, not user "
             "error. If the user says a stock looked cheap, undervalued, expensive, "
             "or references P/E, earnings, revenue, margins, or fundamentals, preserve "
             "that meaning. The current engine cannot execute valuation or fundamental "
@@ -952,10 +949,8 @@ class OpenRouterStructuredInterpreter:
             "for a fresh testable idea, answer_pending_need when the user answers the "
             "latest missing fact, educational_question for product or investing concept "
             "questions, result_followup for questions about the latest completed run, "
-            "retry_failed_action when the user asks to try again, retry, rerun the same "
-            "one, or otherwise repeat the latest failed run without changing the idea, "
-            "and unsupported_request when the user asks for unsupported capabilities. "
-            "When semantic_turn_act is result_followup, set result_followup_focus to "
+            + DISCOVERY_ACT_GUIDANCE
+            + "When semantic_turn_act is result_followup, set result_followup_focus to "
             "the closest value: why_underperformed, max_drawdown, drawdown_date, "
             "peak_date, peak_value, result_card_fact, what_tested, "
             "next_experiment, assumptions, or general. Use peak_date when the user "
@@ -972,6 +967,13 @@ class OpenRouterStructuredInterpreter:
             "refine_current_idea even when it names a result-card fact such as "
             "starting capital, and even immediately after a fact question was "
             "answered. Never set result_followup_fact_key on a change request. "
+            "Short imperative test asks after a completed result — such as "
+            "'Test a different date range', 'Test the same setup on a similar "
+            "asset', 'Probar otro rango de fechas', or 'Comparar con comprar y "
+            "mantener' — are NEW experiment requests, not questions about the "
+            "last run: classify them refine_current_idea (or the matching "
+            "edit), ask for the one missing detail when needed, and never "
+            "answer them with a result recap. "
             "Result follow-ups must be answered from the latest result facts supplied to the runtime; do not "
             "invent metrics. Use why_underperformed for any why/how the result happened "
             "or other performance "
@@ -1051,7 +1053,7 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
-        strategy = _strategy_from_llm(response.candidate_strategy_draft)
+        strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
         _validate_capability_boundaries(
@@ -1086,6 +1088,7 @@ class OpenRouterStructuredInterpreter:
             capability_question_focus=response.capability_question_focus,
             context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
+            asset_discovery=response.asset_discovery,
         )
 
 
@@ -1391,15 +1394,19 @@ def _response_without_ungrounded_symbols(
                 dict.fromkeys([*missing_required_fields, "asset_universe"])
             )
             requires_clarification = True
-    return _response_with_canonical_interpreter_assets(response.model_copy(
-        update={
-            "candidate_strategy_draft": draft,
-            "assistant_response": None,
-            "requires_clarification": requires_clarification,
-            "missing_required_fields": missing_required_fields,
-            "reason_codes": list(dict.fromkeys([*response.reason_codes, reason_code])),
-        }
-    ))
+    return _response_with_canonical_interpreter_assets(
+        response.model_copy(
+            update={
+                "candidate_strategy_draft": draft,
+                "assistant_response": None,
+                "requires_clarification": requires_clarification,
+                "missing_required_fields": missing_required_fields,
+                "reason_codes": list(
+                    dict.fromkeys([*response.reason_codes, reason_code])
+                ),
+            }
+        )
+    )
 
 
 def _response_with_mixed_asset_guardrail_from_symbols(
@@ -2182,6 +2189,27 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
+    discovery_response = discovery_response_ready_for_runtime(
+        response=response,
+        request=request,
+        asset_resolution_context=asset_resolution_context,
+        normalize=_normalize_response_for_runtime_context,
+    )
+    if discovery_response is not None:
+        return discovery_response
+    return await _audited_response_ready_for_runtime(
+        response=response, preferred_model=preferred_model, request=request,
+        asset_resolution_context=asset_resolution_context,
+    )
+
+
+async def _audited_response_ready_for_runtime(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+    asset_resolution_context: str | None = None,
+) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(
         response, request=request, asset_resolution_context=asset_resolution_context
     )
@@ -2192,7 +2220,7 @@ async def _response_ready_for_runtime(
         request=request,
     )
     if planned_artifact_edit is not None:
-        return planned_artifact_edit
+        return _carry_asset_blocker(planned_artifact_edit, asset_resolution_context)
     if _response_can_skip_optional_runtime_readiness_audits(
         response=response,
         request=request,
@@ -2579,9 +2607,10 @@ async def _response_ready_for_runtime(
         planned_response = await _plan_artifact_edit_response(
             preferred_model=preferred_model,
             request=request,
+            primary_draft=response.candidate_strategy_draft,
         )
         if planned_response is not None:
-            return planned_response
+            return _carry_asset_blocker(planned_response, asset_resolution_context)
         raise ValueError(
             "OpenRouter interpretation replayed the active artifact without a "
             "material current-turn update"
@@ -2628,9 +2657,10 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
         rejected_response=response,
+        primary_draft=response.candidate_strategy_draft,
     )
     if planned_response is not None:
-        return planned_response
+        return _carry_asset_blocker(planned_response, asset_resolution_context)
     repaired_response = await _repair_incomplete_strategy_extraction(
         failed_response=response,
         preferred_model=preferred_model,
@@ -2699,14 +2729,19 @@ async def _ready_active_artifact_edit_planned_response(
         draft_has_valid_requested_asset_update=_draft_has_valid_requested_asset_update,
     ):
         return None
+
+    async def _planned_with_primary() -> LLMInterpretationResponse | None:
+        return await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=preferred_model,
+            primary_draft=response.candidate_strategy_draft,
+        )
+
     if _active_artifact_asset_universe_operation_needs_planner(
         response=response,
         request=request,
     ):
-        planned = await _plan_pending_artifact_assumption_edit(
-            request=request,
-            preferred_model=preferred_model,
-        )
+        planned = await _planned_with_primary()
         if planned is not None:
             return planned
         return _asset_universe_operation_clarification_response(
@@ -2716,17 +2751,8 @@ async def _ready_active_artifact_edit_planned_response(
     if _llm_strategy_draft_has_supported_artifact_assumption_edit(
         response.candidate_strategy_draft
     ):
-        planned = await _plan_pending_artifact_assumption_edit(
-            request=request,
-            preferred_model=preferred_model,
-        )
-        if planned is not None:
-            return planned
-        return None
-    planned = await _plan_pending_artifact_assumption_edit(
-        request=request,
-        preferred_model=preferred_model,
-    )
+        return await _planned_with_primary()
+    planned = await _planned_with_primary()
     if planned is None or planned.requires_clarification:
         return None
     return planned
@@ -2828,6 +2854,8 @@ def _optional_runtime_readiness_audit_blocker(
         draft
     ) and not _draft_has_supported_default_benchmark(draft):
         return "unprovenanced_benchmark"
+    if has_execution_cost_candidate(draft.extra_parameters):
+        return "stated_run_field_fidelity"
     if _response_needs_stated_timeframe_fidelity_audit(response):
         return "stated_run_field_fidelity"
     if _response_has_current_message_date_range_reconciliation(
@@ -2954,6 +2982,7 @@ async def _plan_artifact_edit_response(
     preferred_model: str,
     request: InterpretationRequest,
     rejected_response: LLMInterpretationResponse | None = None,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse | None:
     planned_response = None
     if rejected_response is None or not _refinement_reply_needs_full_interpretation(
@@ -2963,6 +2992,7 @@ async def _plan_artifact_edit_response(
         planned_response = await _plan_pending_artifact_assumption_edit(
             request=request,
             preferred_model=preferred_model,
+            primary_draft=primary_draft,
         )
     if planned_response is None:
         planned_response = await _plan_focused_artifact_edit(
@@ -3384,6 +3414,7 @@ async def _plan_pending_artifact_assumption_edit(
     request: InterpretationRequest,
     preferred_model: str,
     require_failure_edit_evidence: bool = False,
+    primary_draft: LLMStrategyDraft | None = None,
 ) -> LLMInterpretationResponse | None:
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
@@ -3402,33 +3433,35 @@ async def _plan_pending_artifact_assumption_edit(
         reconstructed = _current_artifact_strategy(request)
         if reconstructed is not None:
             prior_strategy = reconstructed.model_dump(mode="json")
-    active_confirmation = (
-        snapshot.active_confirmation_reference.model_dump(mode="json")
-        if snapshot is not None and snapshot.active_confirmation_reference is not None
-        else None
-    )
+    active_confirmation = snapshot.active_confirmation_reference.model_dump(mode="json") if snapshot is not None and snapshot.active_confirmation_reference is not None else None  # fmt: skip
+    resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
+    # fmt: off
     plan = await plan_artifact_assumption_edit(
         current_user_message=request.current_user_message,
         prior_strategy=prior_strategy,
         active_confirmation=active_confirmation,
         preferred_model=preferred_model,
         language=request.user.language_preference,
+        required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
+        materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
     )
+    # fmt: on
     if plan is None:
         return None
-    if _selected_requested_field_base(request) == "refinement":
-        # The refine prompt invites reshapes the edit-operation set cannot
-        # express; the online guard reads the interpreter response, which the
-        # model-failure paths never have, so the plan itself is checked here.
-        prior = _current_artifact_strategy(request)
-        if _edit_plan_reshapes_non_recurring_strategy(
-            plan,
-            prior_strategy_type=prior.strategy_type if prior is not None else None,
-        ):
-            return None
-    resolver = _asset_edit_symbol_resolver(_resolve_asset_candidate)
+    # Recurring fields reshape a non-recurring artifact regardless of which
+    # artifact-edit entry point produced the plan. The edit-operation set cannot
+    # change strategy family, so let the full interpretation path own that turn.
+    prior = _current_artifact_strategy(request)
+    if _edit_plan_reshapes_non_recurring_strategy(
+        plan,
+        prior_strategy_type=prior.strategy_type if prior is not None else None,
+    ):
+        return None
     return _response_from_artifact_assumption_edit_plan(
-        plan=plan, request=request, asset_symbol_resolver=resolver
+        plan=plan,
+        request=request,
+        asset_symbol_resolver=resolver,
+        primary_draft=primary_draft,
     )
 
 
@@ -4023,6 +4056,7 @@ async def _audit_stated_run_field_fidelity(
         response=response,
         request=request,
     )
+    audit_response = response
     try:
         audit = await invoke_openrouter_json_schema(
             task="field_fidelity",
@@ -4031,25 +4065,15 @@ async def _audit_stated_run_field_fidelity(
             schema_name="StatedRunFieldFidelityAudit",
         )
     except Exception:
-        capital_recheck = await _audit_stated_starting_capital_fidelity(
-            response=deterministic_repair or response,
-            request=request,
-        )
-        if capital_recheck is not None:
-            return capital_recheck
-        return deterministic_repair
+        audit = None
     if not isinstance(audit, StatedRunFieldFidelityAudit):
-        capital_recheck = await _audit_stated_starting_capital_fidelity(
-            response=deterministic_repair or response,
-            request=request,
-        )
-        if capital_recheck is not None:
-            return capital_recheck
-        return deterministic_repair
+        audit = StatedRunFieldFidelityAudit()
+        audit_response = deterministic_repair or response
     repaired = _response_from_stated_run_field_fidelity_audit(
-        response=response,
+        response=audit_response,
         audit=audit,
         current_message=request.current_user_message,
+        prior_strategy=_current_artifact_strategy(request),
     )
     candidate_response = repaired or deterministic_repair or response
     capital_recheck = await _audit_stated_starting_capital_fidelity(
@@ -4091,12 +4115,9 @@ async def _audit_supported_strategy_capability_conflict(
         and not audit.keep_unsupported_strategy_logic
         and audit.confidence >= 0.7
     ):
-        strategy_type = canonical_strategy_type(audit.selected_strategy_type)
-        if not strategy_type:
-            strategy_type = canonical_strategy_type(
-                response.candidate_strategy_draft.strategy_type
-            )
-        if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
+        draft = response.candidate_strategy_draft
+        strategy_type = safe_conflict_strategy_type(audit.selected_strategy_type, draft)
+        if strategy_type is None:
             return None
         repaired = _response_with_supported_strategy_capability_conflict_removed(
             response=response,
@@ -4139,6 +4160,10 @@ def _response_needs_stated_run_field_fidelity_audit(
         request=request,
     ):
         return True
+    draft = response.candidate_strategy_draft
+    current_message = request.current_user_message if request is not None else ""
+    if has_execution_cost_candidate(draft.extra_parameters):
+        return True
     if (
         request is not None
         and _response_replays_prior_strategy_without_current_turn_update(
@@ -4147,8 +4172,6 @@ def _response_needs_stated_run_field_fidelity_audit(
         )
     ):
         return False
-    draft = response.candidate_strategy_draft
-    current_message = request.current_user_message if request is not None else ""
     requested_field = ""
     if request is not None:
         requested_field = _field_path_base(
@@ -4689,45 +4712,18 @@ def _strategy_extraction_repair_is_allowed(
     *,
     request: InterpretationRequest,
 ) -> bool:
-    if response.task_relation == "refine":
-        return False
-    if response.semantic_turn_act == "retry_failed_action":
-        return not _request_has_failed_action_launch_payload(request)
-    if response.semantic_turn_act == "unsupported_request":
-        if _noncanonical_strategy_text_needs_focused_schema_repair(
-            response=response,
-            request=request,
-        ):
-            return True
-        if response.intent not in {
-            "unsupported_or_out_of_scope",
-            "beginner_guidance",
-            "conversation_followup",
-        }:
-            return False
-        if not response.unsupported_constraints:
-            return True
-        if not any(
-            item.category == "unsupported_strategy_logic"
-            for item in response.unsupported_constraints
-        ):
-            return False
-        if _request_has_active_strategy_context(
-            request
-        ) and not _request_current_turn_has_material_execution_evidence(request):
-            return False
-        return bool(
-            response.candidate_strategy_draft.raw_user_phrasing
-            or response.candidate_strategy_draft.strategy_thesis
-            or request.current_user_message.strip()
-        )
-    if response.semantic_turn_act == "answer_pending_need":
-        return _request_current_turn_has_material_execution_evidence(request)
-    return response.semantic_turn_act not in {
-        "refine_current_idea",
-        "approval",
-        "result_followup",
-    }
+    return strategy_extraction_repair_is_allowed(
+        response,
+        request=request,
+        has_failed_action_launch_payload=_request_has_failed_action_launch_payload,
+        noncanonical_text_needs_repair=(
+            _noncanonical_strategy_text_needs_focused_schema_repair
+        ),
+        has_active_strategy_context=_request_has_active_strategy_context,
+        current_turn_has_material_execution_evidence=(
+            _request_current_turn_has_material_execution_evidence
+        ),
+    )
 
 
 async def _focused_strategy_repair_after_candidate_failures(
@@ -5232,7 +5228,10 @@ def _validate_capability_boundaries(
             invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        context_asset_classes = (
+            provider_context_assets.resolved_asset_classes_from_strategy_context(strategy, symbol)
+        )
+        asset_classes.update(context_asset_classes or {resolution.asset.asset_class})
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
     if field_owned_indicator_symbols and (
         "field_owned_indicator_asset_token_removed" not in response.reason_codes

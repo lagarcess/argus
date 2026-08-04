@@ -192,6 +192,25 @@ class PendingResponseOptionSelectionAudit(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class StatedExecutionCost(BaseModel):
+    rate: float = Field(
+        strict=True,
+        description=(
+            "Canonical decimal rate explicitly stated by the current user message. "
+            "For example, 10 basis points is 0.001. Preserve 0.0 when the user "
+            "explicitly clears the cost."
+        )
+    )
+    evidence_span: str = Field(
+        min_length=1,
+        max_length=240,
+        description=(
+            "Exact bounded phrase copied from the current user message that states "
+            "this execution cost."
+        ),
+    )
+
+
 class StatedRunFieldFidelityAudit(BaseModel):
     capital_amount: float | None = Field(
         default=None,
@@ -249,6 +268,22 @@ class StatedRunFieldFidelityAudit(BaseModel):
             "user did not state one."
         ),
     )
+    fee: StatedExecutionCost | None = Field(
+        default=None,
+        description=(
+            "Per-trade fee explicitly stated by the current user message, with its "
+            "canonical decimal rate and exact bounded evidence span. Leave null when "
+            "the user did not state a fee. Preserve an explicit 0.0 clear."
+        ),
+    )
+    slippage: StatedExecutionCost | None = Field(
+        default=None,
+        description=(
+            "Execution slippage explicitly stated by the current user message, with "
+            "its canonical decimal rate and exact bounded evidence span. Leave null "
+            "when the user did not state slippage. Preserve an explicit 0.0 clear."
+        ),
+    )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
@@ -282,18 +317,19 @@ class SupportedStrategyCapabilityConflictAudit(BaseModel):
         description=(
             "Canonical executable strategy family when the current user message "
             "semantically selects a supported Alpha strategy. Use buy_and_hold or "
-            "dca_accumulation only when the message itself supports that choice. "
-            "Leave null when the request contains unsupported custom logic or "
-            "does not clearly select a supported strategy."
+            "dca_accumulation when the message supports that choice. Use "
+            "signal_strategy only when complete typed executable signal rules "
+            "support it. Leave null when the request contains unsupported custom "
+            "logic or does not clearly select a supported strategy."
         ),
     )
     drop_unsupported_strategy_logic: bool = Field(
         description=(
             "True only when the unsupported_strategy_logic constraint is a model "
             "contradiction because the current user message asks for a supported "
-            "buy_and_hold or dca_accumulation run without any extra unsupported "
-            "entry, exit, fundamental, sentiment, event, custom scripting, or "
-            "brokerage/trading rule."
+            "strategy whose complete typed execution fields are present, without "
+            "any extra unsupported entry, exit, fundamental, sentiment, event, "
+            "custom scripting, or brokerage/trading rule."
         ),
     )
     keep_unsupported_strategy_logic: bool = Field(

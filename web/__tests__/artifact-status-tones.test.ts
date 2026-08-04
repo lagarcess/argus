@@ -26,7 +26,10 @@ describe("artifact status tones", () => {
 
   test("keeps status tone classes muted and tokenized", () => {
     expect(artifactStatusToneClassName("info")).toContain("#7da0ca");
-    expect(artifactStatusToneClassName("danger")).toContain("#d66d75");
+    // Failure red is split from the value-negative rose on purpose.
+    expect(artifactStatusToneClassName("danger")).toContain("#b3593f");
+    expect(artifactStatusToneClassName("danger")).toContain("#e08d70");
+    expect(artifactStatusToneClassName("danger")).not.toContain("#d66d75");
     expect(artifactStatusToneClassName("neutral")).toContain("border-black/10");
     expect(artifactStatusToneClassName("success")).toContain("#70a38d");
   });

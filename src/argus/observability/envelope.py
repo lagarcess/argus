@@ -46,6 +46,7 @@ FeatureArea = Literal[
     "continuity",
     "evidence_capture",
     "decision_capture",
+    "guest_acquisition",
     "recall",
     "result_explanation",
     "memory_candidate_proposal",
@@ -92,6 +93,7 @@ FEATURE_AREAS: tuple[str, ...] = (
     "continuity",
     "evidence_capture",
     "decision_capture",
+    "guest_acquisition",
     "recall",
     "result_explanation",
     "memory_candidate_proposal",
@@ -106,23 +108,41 @@ FEATURE_AREAS: tuple[str, ...] = (
 _BLOCKED_KEY_PARTS = (
     "account_balance",
     "api_key",
+    "assistant_prose",
+    "auth_material",
     "auth_token",
+    "authorization",
     "broker_credentials",
+    "capital",
+    "cookie",
     "context_packets",
+    "date_",
+    "display_name",
+    "email",
+    "exact_date",
     "full_audio",
+    "header",
     "holdings",
+    "ip_address",
     "message_history",
+    "model",
     "model_metadata",
     "password",
     "payment_identifier",
+    "preview",
     "prompt",
+    "provider",
     "provider_metadata",
     "raw_payload",
     "route_receipt",
     "secret",
+    "_date",
+    "title",
     "token",
     "transcript",
+    "url",
 )
+_BLOCKED_EXACT_KEYS = {"date"}
 _POSTHOG_US_HOST = "https://us.i.posthog.com"
 _POSTHOG_EU_HOST = "https://eu.i.posthog.com"
 _POSTHOG_CAPTURE_PATH = "/i/v0/e/"
@@ -320,7 +340,9 @@ def _sanitize_value(value: Any) -> Any:
 
 def _blocked_key(key: str) -> bool:
     normalized = key.strip().lower()
-    return any(part in normalized for part in _BLOCKED_KEY_PARTS)
+    return normalized in _BLOCKED_EXACT_KEYS or any(
+        part in normalized for part in _BLOCKED_KEY_PARTS
+    )
 
 
 def _posthog_event_properties(envelope: ArgusEventEnvelope) -> dict[str, Any]:

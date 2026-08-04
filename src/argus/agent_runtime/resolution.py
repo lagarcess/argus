@@ -141,15 +141,25 @@ def resolve_asset_candidate(
     except Exception:
         candidates = _search_assets_safely(raw_text, limit=5)
         if is_ticker_like_query(raw_text) and source != "user_mention":
-            return _asset_resolution(
-                status="unsupported",
-                raw_text=raw_text,
-                field=field,
-                source=source,
-                asset=None,
-                candidates=(),
-                confidence="high",
+            # An extracted ticker-like string can be a company name carried
+            # verbatim ("APPLE"). Keep only exact leading-word name matches:
+            # a hallucinated symbol or a bare fragment ("DE" vs "Deere")
+            # matches no leading word and stays unsupported.
+            candidates = tuple(
+                asset
+                for asset in candidates
+                if _exact_leading_name_word_match(raw_text, asset)
             )
+            if not candidates:
+                return _asset_resolution(
+                    status="unsupported",
+                    raw_text=raw_text,
+                    field=field,
+                    source=source,
+                    asset=None,
+                    candidates=(),
+                    confidence="high",
+                )
 
     unique = _unique_assets(candidates)
     if len(unique) == 1:
@@ -273,6 +283,14 @@ def _provider_ranked_user_mention_asset(
     if _provider_name_prefix_match(raw_text, top):
         return top
     return None
+
+
+def _exact_leading_name_word_match(raw_text: str, asset: ResolvedAsset) -> bool:
+    lowered = " ".join(str(raw_text or "").casefold().split())
+    name_words = str(asset.name or "").casefold().split()
+    if not lowered or not name_words:
+        return False
+    return name_words[0].rstrip(".,") == lowered
 
 
 def _provider_name_prefix_match(raw_text: str, asset: ResolvedAsset) -> bool:

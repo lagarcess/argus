@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import Request
@@ -8,6 +9,12 @@ from loguru import logger
 from argus.api import state as api_state
 from argus.api.dependencies import problem
 from argus.api.schemas import BacktestRun, User
+from argus.domain import engine as domain_engine
+from argus.domain.backtesting.coverage import (
+    PreparedMarketData,
+    apply_coverage_to_config,
+    prepare_market_data,
+)
 from argus.domain.engine import (
     build_result_card,
     build_result_chart,
@@ -16,7 +23,22 @@ from argus.domain.engine import (
     normalize_backtest_config,
     validate_backtest_config,
 )
+from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
 from argus.domain.store import utcnow
+
+_DEFAULT_FETCH_OHLC = domain_engine.fetch_ohlcv
+
+
+def _market_calendar_for_preflight():
+    if domain_engine.fetch_ohlcv is not _DEFAULT_FETCH_OHLC:
+        return None
+    return fetch_alpaca_market_calendar
+
+
+@dataclass(frozen=True)
+class PreparedBacktestExecution:
+    config: dict[str, Any]
+    market_data: PreparedMarketData
 
 
 def raise_backtest_problem(
@@ -127,6 +149,21 @@ def raise_backtest_problem(
             "trustworthy comparison. Try a shorter date range or another "
             "same-class benchmark.",
         ),
+        "no_common_data_window": (
+            422,
+            "No Common Data Window",
+            "The selected assets and benchmark do not share a usable data window.",
+        ),
+        "insufficient_common_data": (
+            422,
+            "Insufficient Common Data",
+            "The shared data window is not complete enough for a trustworthy test.",
+        ),
+        "approved_data_window_unavailable": (
+            409,
+            "Approved Data Window Changed",
+            "The approved data window is no longer available. Review the dates again.",
+        ),
         "kraken_ohlc_window_exceeded": (
             422,
             "Data Window Too Wide",
@@ -192,38 +229,24 @@ def create_run_from_payload(
     persist_in_memory: bool = True,
     language: str | None = None,
     run_id: str | None = None,
+    prepared_execution: PreparedBacktestExecution | None = None,
 ) -> BacktestRun:
-    symbols = payload.get("symbols") or []
-    if not symbols:
-        raise problem(
-            request,
-            status_code=400,
-            code="validation_error",
-            title="Validation Error",
-            detail="Symbol is required.",
-        )
-    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(
-        symbols, request
-    )
-    requested_asset_class = payload.get("asset_class")
-    if requested_asset_class and requested_asset_class != inferred_asset_class:
-        raise_backtest_problem(
-            request,
-            "asset_class_conflict",
-            context={
-                "requested_asset_class": requested_asset_class,
-                "inferred_asset_class": inferred_asset_class,
-                "symbols": [entry.symbol for entry in classified_symbols],
-            },
-        )
+    if prepared_execution is None:
+        prepared_execution = prepare_run_from_payload(payload, request)
+    config = prepared_execution.config
+    prepared_market_data = prepared_execution.market_data
     try:
-        config = normalize_backtest_config(payload)
-        validate_backtest_config(config)
-        metrics = compute_alpha_metrics(config)
+        metrics = compute_alpha_metrics(
+            config,
+            prepared_market_data=prepared_market_data,
+        )
     except ValueError as exc:
         raise_backtest_problem(request, str(exc))
     try:
-        chart = build_result_chart(config)
+        chart = build_result_chart(
+            config,
+            prepared_market_data=prepared_market_data,
+        )
     except Exception as exc:
         logger.warning("Result chart build failed", error=str(exc))
         chart = None
@@ -254,6 +277,51 @@ def create_run_from_payload(
         if user_id:
             api_state.store.backtest_run_owners[run.id] = user_id
     return run
+
+
+def prepare_run_from_payload(
+    payload: dict[str, Any],
+    request: Request,
+) -> PreparedBacktestExecution:
+    symbols = payload.get("symbols") or []
+    if not symbols:
+        raise problem(
+            request,
+            status_code=400,
+            code="validation_error",
+            title="Validation Error",
+            detail="Symbol is required.",
+        )
+    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(
+        symbols, request
+    )
+    requested_asset_class = payload.get("asset_class")
+    if requested_asset_class and requested_asset_class != inferred_asset_class:
+        raise_backtest_problem(
+            request,
+            "asset_class_conflict",
+            context={
+                "requested_asset_class": requested_asset_class,
+                "inferred_asset_class": inferred_asset_class,
+                "symbols": [entry.symbol for entry in classified_symbols],
+            },
+        )
+    try:
+        config = normalize_backtest_config(payload)
+        validate_backtest_config(config)
+        prepared_market_data = prepare_market_data(
+            config,
+            fetch_ohlcv_func=domain_engine.fetch_ohlcv,
+            fetch_market_calendar_func=_market_calendar_for_preflight(),
+        )
+        config = apply_coverage_to_config(config, prepared_market_data)
+        validate_backtest_config(config)
+    except ValueError as exc:
+        raise_backtest_problem(request, str(exc))
+    return PreparedBacktestExecution(
+        config=config,
+        market_data=prepared_market_data,
+    )
 
 
 _raise_backtest_problem = raise_backtest_problem

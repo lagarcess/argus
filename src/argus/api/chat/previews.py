@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 try:
     from markdown_it import MarkdownIt
@@ -20,6 +21,34 @@ def plain_text_preview(content: str, max_length: int = 180) -> str | None:
     if not preview:
         return None
     return preview[:max_length]
+
+
+def accepted_user_message_preview(
+    content: str,
+    max_length: int = 180,
+) -> str | None:
+    """Hide legacy persisted onboarding markers from conversation previews."""
+
+    from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
+
+    if is_legacy_onboarding_marker(content):
+        return None
+    return plain_text_preview(content, max_length=max_length)
+
+
+def is_degraded_clarification_compatibility_text(
+    *,
+    role: str,
+    metadata: dict[str, Any] | None,
+) -> bool:
+    """Identify stored fallback copy that is display transport, not model history."""
+
+    if role != "assistant" or not isinstance(metadata, dict):
+        return False
+    clarification = metadata.get("clarification")
+    if not isinstance(clarification, dict):
+        return False
+    return clarification.get("prompt_source") != "llm_generated"
 
 
 def _preview_from_markdown(content: str) -> str:

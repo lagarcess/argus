@@ -1150,3 +1150,89 @@ def test_result_patch_asset_universe_ignores_dash_slash_spelling_difference():
         ),
         anchor_draft=StrategySummary(asset_universe=["BRK/B"]),
     ) == ["NVDA"]
+
+
+def test_post_result_family_swap_same_asset_keeps_own_strategy(monkeypatch) -> None:
+    """Captured #249 live shape: the prebaked DCA row re-uses the completed
+    run's asset, dates, and capital, changing only the strategy family. The
+    anchor date patch must step aside so the draft's dca shape survives."""
+
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_stub)
+    reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-249",
+        artifact_status="completed",
+        metadata={
+            "run_id": "run-249",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["AAPL"],
+                "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+                "initial_capital": 1000,
+            },
+        },
+    )
+    message = (
+        "Try monthly recurring buys of AAPL from 2023-01-03 to 2023-12-29 "
+        "with $1000 in total."
+    )
+    planned = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants monthly recurring buys of AAPL through 2023.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=1000,
+            date_range={"start": "2023-01-03", "end": "2023-12-29"},
+            extra_parameters={
+                "recurring_contribution": 1000,
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "recurring_contribution": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=message,
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=reference,
+        ),
+        selected_thread_metadata={
+            "latest_task_type": "results_explanation",
+            "last_stage_outcome": "ready_to_respond",
+        },
+        structured_interpreter=_RecordingInterpreter(planned),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.cadence == "monthly"
+    assert strategy.asset_universe == ["AAPL"]
+    assert "artifact_patch_from_latest_result" not in result.decision.reason_codes
+    patched_draft = result.patch.get("candidate_strategy_draft")
+    if isinstance(patched_draft, dict):
+        assert patched_draft.get("strategy_type") == "dca_accumulation"

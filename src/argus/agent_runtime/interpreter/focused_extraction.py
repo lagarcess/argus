@@ -5,6 +5,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -73,7 +74,12 @@ def _focused_strategy_extraction_messages(
                 "to buy, hold, or test one primary asset over a window with another "
                 "asset as a benchmark, reference, baseline, or comparison target is "
                 "an executable buy_and_hold setup with that other asset in "
-                "comparison_baseline; it is not unsupported custom logic. Relative windows such as "
+                "comparison_baseline; it is not unsupported custom logic. Carry "
+                "the named comparison target verbatim even when it is a company "
+                "name with no known symbol ('compare AAPL with Samsung' means "
+                "comparison_baseline='Samsung'); never substitute a default "
+                "benchmark for a target the user named — validation owns "
+                "reporting unsupported ones. Relative windows such as "
                 "'last 8 months' or equivalent phrases in any language must become "
                 "date_range_intent with kind=rolling_window, count, unit, "
                 "anchor=today, confidence, and evidence. Current-year-to-current-date "
@@ -293,3 +299,54 @@ def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str
             "task-specific instructions above as the contract for canonical values."
         )
     return wire_messages
+
+
+def strategy_extraction_repair_is_allowed(
+    response: Any,
+    *,
+    request: Any,
+    has_failed_action_launch_payload: Any,
+    noncanonical_text_needs_repair: Any,
+    has_active_strategy_context: Any,
+    current_turn_has_material_execution_evidence: Any,
+) -> bool:
+    if response.task_relation == "refine":
+        return False
+    if response.semantic_turn_act == "asset_discovery":
+        # A typed discovery ask has no strategy to extract — payload or not;
+        # the deterministic missing-target recovery owns the partial shape.
+        return False
+    if response.semantic_turn_act == "retry_failed_action":
+        return not has_failed_action_launch_payload(request)
+    if response.semantic_turn_act == "unsupported_request":
+        if noncanonical_text_needs_repair(response=response, request=request):
+            return True
+        if response.intent not in {
+            "unsupported_or_out_of_scope",
+            "beginner_guidance",
+            "conversation_followup",
+        }:
+            return False
+        if not response.unsupported_constraints:
+            return True
+        if not any(
+            item.category == "unsupported_strategy_logic"
+            for item in response.unsupported_constraints
+        ):
+            return False
+        if has_active_strategy_context(
+            request
+        ) and not current_turn_has_material_execution_evidence(request):
+            return False
+        return bool(
+            response.candidate_strategy_draft.raw_user_phrasing
+            or response.candidate_strategy_draft.strategy_thesis
+            or request.current_user_message.strip()
+        )
+    if response.semantic_turn_act == "answer_pending_need":
+        return current_turn_has_material_execution_evidence(request)
+    return response.semantic_turn_act not in {
+        "refine_current_idea",
+        "approval",
+        "result_followup",
+    }

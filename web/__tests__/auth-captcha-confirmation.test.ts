@@ -1,0 +1,154 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { loginWithEmail, signupWithEmail } from "../lib/argus-api";
+
+const root = join(import.meta.dir, "..");
+const originalFetch = globalThis.fetch;
+const originalNodeEnv = process.env.NODE_ENV;
+const originalLocalToken =
+  process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
+const originalTurnstileSiteKey =
+  process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+
+function successfulJson(payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+beforeEach(() => {
+  process.env.NODE_ENV = "test";
+  delete process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
+  delete process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  process.env.NODE_ENV = originalNodeEnv;
+  if (originalLocalToken === undefined) {
+    delete process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
+  } else {
+    process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN = originalLocalToken;
+  }
+  if (originalTurnstileSiteKey === undefined) {
+    delete process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+  } else {
+    process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY =
+      originalTurnstileSiteKey;
+  }
+});
+
+describe("password auth CAPTCHA and confirmation contract", () => {
+  test("signup acquires a CAPTCHA token and reports a sessionless confirmation", async () => {
+    let body: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (_input, init) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return successfulJson({ user: { id: "user-1" }, session: null });
+    }) as typeof globalThis.fetch;
+
+    const result = await signupWithEmail({
+      email: "alpha@example.com",
+      password: "password123",
+      language: "en",
+    });
+
+    expect(body).toMatchObject({
+      email: "alpha@example.com",
+      captcha_token: "argus-local-browser-qa",
+    });
+    expect(result.response.session).toBeNull();
+    expect(result.needsEmailConfirmation).toBe(true);
+  });
+
+  test("signup with a returned session preserves the authenticated outcome", async () => {
+    globalThis.fetch = (async () =>
+      successfulJson({ user: { id: "user-1" }, session: {} })) as typeof fetch;
+
+    const result = await signupWithEmail({
+      email: "alpha@example.com",
+      password: "password123",
+      language: "en",
+    });
+
+    expect(result.needsEmailConfirmation).toBe(false);
+  });
+
+  test("password login acquires a CAPTCHA token at the shared API boundary", async () => {
+    let body: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (_input, init) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return successfulJson({ user: { id: "user-1" }, session: {} });
+    }) as typeof globalThis.fetch;
+
+    await loginWithEmail({
+      email: "alpha@example.com",
+      password: "password123",
+    });
+
+    expect(body).toMatchObject({
+      email: "alpha@example.com",
+      captcha_token: "argus-local-browser-qa",
+    });
+  });
+
+  test("CAPTCHA acquisition failure is safe and classified before fetch", async () => {
+    process.env.NODE_ENV = "production";
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      return successfulJson({});
+    }) as typeof globalThis.fetch;
+
+    const error = await loginWithEmail({
+      email: "alpha@example.com",
+      password: "password123",
+    }).catch((caught: unknown) => caught);
+
+    expect(fetchCalls).toBe(0);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error & { code?: string }).code).toBe(
+      "captcha_unavailable",
+    );
+    expect((error as Error).message).not.toContain("Turnstile");
+    expect((error as Error).message).not.toContain("Guest");
+  });
+
+  test("the existing auth form owns localized check-email and CAPTCHA errors", () => {
+    const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const form = readFileSync(
+      join(root, "components/auth/AuthForm.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(
+        join(root, "public/locales/es-419/common.json"),
+        "utf-8",
+      ),
+    );
+
+    const submitHandler = page.slice(
+      page.indexOf("const handleAuthSubmit"),
+      page.indexOf("const isSignup"),
+    );
+    expect(submitHandler).toContain("needsEmailConfirmation");
+    expect(submitHandler.indexOf("needsEmailConfirmation")).toBeLessThan(
+      submitHandler.lastIndexOf('router.replace("/chat")'),
+    );
+    expect(form).toContain('data-testid="auth-check-email"');
+    expect(form).toContain("captcha_unavailable");
+    expect(en.auth.signup.confirmation_title).toBe("Check your email");
+    expect(en.auth.errors.captcha_unavailable).toBe(
+      "We couldn’t complete the security check. Please try again.",
+    );
+    expect(es.auth.signup.confirmation_title).toBe("Revisa tu correo");
+    expect(es.auth.errors.captcha_unavailable).toBe(
+      "No pudimos completar la verificación de seguridad. Inténtalo de nuevo.",
+    );
+  });
+});

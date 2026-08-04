@@ -18,8 +18,11 @@
     "unpin": "Unpin",
     "loading": "Loading...",
     "retry": "Retry",
+    "try_again": "Try again",
+    "back": "Back",
     "error_occurred": "An error occurred",
     "save": "Save",
+    "confirm": "Confirm",
     "cancel": "Cancel",
     "done": "Done",
     "search": "Search",
@@ -142,6 +145,7 @@
     "attach_files_feature": "Optional: add a screenshot, sketch, or example.",
     "consent": "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
     "consent_feature": "I consent to the Argus team using this feature request and contacting me if follow-up would help.",
+    "include_conversation_context": "Include approved context from this conversation",
     "rating_positive_prompt": "What went well?",
     "rating_negative_prompt": "What went wrong?",
     "subheading": {
@@ -172,8 +176,8 @@
     "placeholder_details": "Share details (optional)",
     "success": "Thank you for your feedback!",
     "error": "Failed to send feedback. Please try again.",
-    "footer_note": "App context like this page and timestamp may be included to help us understand this feedback.",
-    "footer_note_conversation": "Your current conversation context may be included to help us understand this feedback.",
+    "footer_note": "No conversation transcript or contact information is attached.",
+    "footer_note_conversation": "Approved conversation identifiers will be included. The transcript is not attached.",
     "tags": {
       "positive": {
         "accurate": "Accurate and complete",
@@ -217,12 +221,36 @@
     ],
     "view_history": "View history",
     "chat_options": "Chat options",
+    "jump_to_latest": "Jump to latest",
+    "activity": {
+      "working": "Working",
+      "queued": "Queued",
+      "checking": "Checking status",
+      "needs_attention": "Needs attention",
+      "needs_input": "Needs your input",
+      "new_activity": "New activity",
+      "manual_unread": "Marked unread",
+      "mark_unread": "Mark as unread",
+      "mark_read": "Mark as read",
+      "jump_working": "Jump to latest; Argus is working below",
+      "jump_new": "Jump to new activity",
+      "jump_needs_input": "Jump to the latest question",
+      "jump_needs_attention": "Jump to the latest recovery",
+      "mark_read_error": "Couldn’t mark this conversation as read. Try again.",
+      "mark_unread_error": "Couldn’t mark this conversation as unread. Try again.",
+      "mark_read_success": "Marked as read.",
+      "mark_unread_success": "Marked as unread.",
+      "announce_working": "Argus is working on {{title}}.",
+      "announce_needs_attention": "{{title}} needs attention.",
+      "announce_needs_input": "{{title}} needs your input.",
+      "announce_new_activity": "{{title}} is ready."
+    },
     "show_suggestions": "Show suggestions",
     "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",
-        "value": "Buy and hold AAPL over the last 12 months with SPY as the benchmark."
+        "value": "Compare Apple with SPY over the last 12 months."
       },
       "btc": {
         "label": "Test Bitcoin (BTC) hold",
@@ -239,8 +267,10 @@
       "q3": "What if I bought Tesla every month?"
     },
     "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
-    "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
-    "error_load": "Could not load that conversation. Try again.",
+    "error_offline": "Argus can’t reach its service right now. Check your connection and try again in a moment.",
+    "error_load": "Couldn’t load this conversation. Try again.",
+    "opening_conversation": "Opening conversation…",
+    "error_open_conversation": "Couldn’t open this conversation.",
     "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
     "error_generic": "Something went wrong. Try again.",
     "recovery": {
@@ -248,7 +278,7 @@
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
-      "latest_result_followup_unavailable": "I still have the latest result in this chat, but I could not safely answer that follow-up. Please retry in a moment.",
+      "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
       "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
@@ -265,6 +295,7 @@
       "context_market_movers_seed_recovery": "A short-lived movers snapshot can help pick experiment seeds: {{seeds}}. Treat those as symbols to validate, not recommendations or a live ranking. Choose one and I can shape a supported historical test.",
       "capability_answer_unavailable": "I could not phrase that capability answer clearly just now. Tell me the asset, period, or supported rule you want to test, or try again in a moment.",
       "runtime_failure": "Something went wrong. Your conversation is saved. Please try again.",
+      "turn_abandoned": "That turn stopped before finishing. Your message is saved, so you can retry.",
       "artifact_action_invalid_state": "That action is no longer attached to the current conversation state. Use the latest visible action or tell me what you want to do next.",
       "artifact_action_retry_stale": "That retry belongs to an older failed run. Use the latest retry action or confirm the setup you want to run.",
       "artifact_action_retry_missing_artifact_id": "That retry is missing its failed-run reference. Use the latest retry action or confirm the strategy you want me to run.",
@@ -276,7 +307,13 @@
       "data_kind": {
         "benchmark": "benchmark data",
         "market": "market data"
-      }
+      },
+      "discovery_unavailable": "Current source-backed discovery is not available for this request, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
+      "discovery_search_failed": "I could not complete a source-backed lookup just now, and I will not guess names from memory. Everything in this chat is unchanged; ask again in a moment or name a symbol and I can test it.",
+      "discovery_no_verified_candidates": "I could not verify any tradable match for that request. Name a symbol or company you have in mind and I can test it; everything in this chat is unchanged.",
+      "discovery_limit_reached": "You have used all the grounded lookups available for now. The allowance resets on a schedule; meanwhile, name a symbol you already have in mind and I can test it.",
+      "discovery_target_missing": "Tell me what to look for: a category like cybersecurity stocks, or a company to find peers of, and I can bring back verified candidates.",
+      "discovery_suggestions_unavailable": "I couldn't put together suggestions just now. Everything in this chat is unchanged; try again in a moment or name a symbol and I can test it."
     },
     "clarification": {
       "period": "What date window should I use?",
@@ -290,15 +327,80 @@
       "rule_definition": "What entry or exit rule should I test?",
       "refinement": "What would you like to change?",
       "refinement_for_asset": "What would you like to change, compare, or stress-test next for {{assetText}}?",
-      "unsupported_recovery": "That rule does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_for_asset": "That rule does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value": "{{rawValue}} does not define when to buy or sell on its own. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "{{rawValue}} does not define when to buy or sell for {{symbol}} on its own. Which supported direction should I use: {{options}}?"
+      "no_progress_actions": {
+        "supply_missing_value": "Provide missing detail",
+        "keep_unchanged": "Keep idea unchanged",
+        "cancel": "Cancel"
+      },
+      "unsupported_recovery": "Argus can't run that rule directly yet. Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_for_asset": "Argus can't run that rule directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_with_raw_value": "Argus can't run {{rawValue}} directly yet. Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_with_raw_value_for_asset": "Argus can't run {{rawValue}} directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_incomplete": "What rule should I test? Which supported direction should I use: {{options}}?",
+      "unsupported_recovery_incomplete_for_asset": "What rule should I test for {{symbol}}? Which supported direction should I use: {{options}}?",
+      "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
+      "unsupported_timeframe_with_raw_value": "{{rawValue}} is not a supported bar size. Choose daily or 1-hour bars.",
+      "timeframe_actions": {
+        "daily": "Retry with daily bars",
+        "hour_1": "Retry with 1-hour bars"
+      },
+      "future_performance": "I can't predict future performance. I can test how the same idea performed over a historical period instead. What historical period would you like to examine?",
+      "future_performance_with_options": "I can't predict future performance. I can test how the same idea performed over a historical period instead: {{options}}?"
+    },
+    "coverage_recovery": {
+      "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
+      "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "actions": {
+        "change_dates": "Change dates",
+        "change_asset": "Change asset",
+        "change_benchmark": "Change benchmark"
+      }
     },
     "simplification_options": {
       "rsi_threshold": "Use a supported RSI threshold rule",
       "buy_and_hold": "Compare with buy and hold",
-      "moving_average_crossover": "Use a supported moving-average crossover"
+      "moving_average_crossover": "Use a supported moving-average crossover",
+      "historical_period": "Test it over a historical period",
+      "supported_symbol": "Use a supported stock or crypto symbol"
+    },
+    "retest": {
+      "strategy_family": {
+        "buy_and_hold": "Buy and hold",
+        "dca_accumulation": "Recurring buys",
+        "indicator_threshold": "Indicator threshold",
+        "signal_strategy": "Signal rules"
+      },
+      "duration": {
+        "year_one": "same {{count}}-year duration",
+        "year_other": "same {{count}}-year duration",
+        "month_one": "same {{count}}-month duration",
+        "month_other": "same {{count}}-month duration",
+        "day_one": "same {{count}}-day duration",
+        "day_other": "same {{count}}-day duration"
+      }
+    },
+    "result_readout": {
+      "quick_take": "Quick take"
+    },
+    "discovery_results": {
+      "test_candidate": "Backtest {{symbol}}",
+      "unsourced_line": "From general knowledge, not a current search",
+      "search_current": "Search for current results",
+      "search_current_asset_equity": "stocks",
+      "search_current_asset_crypto": "cryptocurrencies",
+      "search_current_asset_currency_pair": "currency pairs",
+      "search_current_asset_asset": "assets",
+      "search_current_send_category": "Search for current {{assetKind}} for this category: {{query}}",
+      "search_current_send_peer": "Search for current {{assetKind}} similar to {{query}}",
+      "search_current_send_comparison": "Search for current {{assetKind}} comparable to {{query}}",
+      "sources_panel_open_one": "{{count}} source ›",
+      "sources_panel_open_other": "{{count}} sources ›",
+      "sources_panel_title": "Sources Argus read",
+      "sources_panel_note": "Argus read these while answering. Not recommended reading.",
+      "sources_panel_close": "Close sources",
+      "allowance_banner": "Grounded search allowance used",
+      "allowance_banner_cta": "Sign in for more searches"
     },
     "result_breakdown": {
       "aria_label": "Result breakdown",
@@ -363,9 +465,17 @@
       "last_7_days": "Last 7 days",
       "last_30_days": "Last 30 days",
       "earlier": "Earlier",
-      "new_activity": "New activity"
+      "new_activity": "New activity",
+      "show_more": "Show more",
+      "show_less": "Show less",
+      "show_more_in": "Show more in {{group}}",
+      "show_less_in": "Show less in {{group}}",
+      "load_older": "Load older",
+      "loading_older": "Loading older chats…",
+      "no_older": "No older chats",
+      "load_older_error": "Couldn’t load older chats. Try again."
     },
-    "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
+    "no_recent_activity": "No recent chats yet.",
     "new_chat": "New chat",
     "rename_chat": "Rename chat",
     "pin_chat": "Pin chat",
@@ -387,6 +497,13 @@
     "saved": "Saved",
     "saving": "Saving",
     "simulation_complete": "Simulation Complete",
+    "activity_rail": {
+      "aria_label": "Conversation activity",
+      "backtest_completed": "Backtest finished",
+      "needs_attention": "Needed attention",
+      "needs_attention_body": "This turn hit an issue and offered a way forward.",
+      "jump_hint": "Click to jump to this turn"
+    },
     "backtest_job": {
       "queued_title": "Backtest queued",
       "queued_status": "Queued",
@@ -471,6 +588,37 @@
       "markers": {
         "entry": "Buy",
         "exit": "Sell"
+      },
+      "range": {
+        "group_label": "Chart range",
+        "details": "Range details",
+        "presets": {
+          "1D": "1D",
+          "1W": "1W",
+          "1M": "1M",
+          "3M": "3M",
+          "YTD": "YTD",
+          "1Y": "1Y",
+          "ALL": "All"
+        },
+        "custom": "Custom",
+        "custom_heading": "Custom range",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "reset": "Reset",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "error_missing_date": "Choose a start and end date.",
+        "error_start_after_end": "Start date must be before end date.",
+        "error_insufficient_observations": "That range needs at least two observations.",
+        "visible_period": "Visible period: {{start}} to {{end}}.",
+        "peak_label": "Highest visible value",
+        "low_label": "Lowest visible value",
+        "event_count_one": "{{count}} displayed executed-fill event in this range.",
+        "event_count_other": "{{count}} displayed executed-fill events in this range.",
+        "no_events": "No displayed executed-fill events in this range.",
+        "event_sampling": "Showing {{shown}} of {{total}} supplied events.",
+        "marker_cap": "Argus stored {{included}} of {{total}} executed-fill groups for this result."
       }
     },
     "strategy_type": {
@@ -524,15 +672,19 @@
       "running_backtest": "Running backtest",
       "calculating_metrics": "Calculating metrics",
       "running": "Running simulation",
+      "checking": "Checking what was saved...",
       "preparing": "Preparing results",
       "intent_run_backtest": "Designing your strategy...",
-      "intent_onboarding_prompt": "Personalizing your experience...",
       "intent_education": "Thinking...",
-      "intent_unsupported_request": "Thinking..."
+      "intent_unsupported_request": "Thinking...",
+      "discovery_search": "Searching the web...",
+      "discovery_search_detail": "Searching the web: {{detail}}",
+      "discovery_verify": "Verifying candidates against supported markets..."
     },
     "confirmation": {
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
+      "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",
@@ -577,6 +729,28 @@
         "cancel": "Cancel",
         "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
         "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
+      },
+      "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
+    },
+    "next_experiments": {
+      "section": "Try next",
+      "labels": {
+        "change_date_range": "Test a different date range",
+        "same_setup_peer_asset": "Test the same setup on a similar asset",
+        "same_rule_peer_asset": "Test the same rule on a similar asset",
+        "supported_rsi_threshold": "Try a supported RSI threshold rule",
+        "supported_ma_crossover": "Try a supported SMA/EMA crossover",
+        "supported_rsi_or_ma_rule": "Simplify into a supported RSI or SMA/EMA rule",
+        "adjust_indicator_thresholds": "Test different indicator thresholds",
+        "adjust_signal_periods": "Test different signal periods",
+        "adjust_contribution_cadence": "Test a different contribution cadence",
+        "compare_buy_and_hold": "Compare with buy and hold",
+        "recurring_monthly_buys": "Try monthly recurring buys"
+      },
+      "why": {
+        "lost_to_benchmark": "Lagged the benchmark by {{points}} points",
+        "beat_benchmark": "Beat the benchmark by {{points}} points",
+        "deep_drawdown": "Worst drop was {{drawdown}}%"
       }
     }
   },
@@ -658,6 +832,22 @@
       "delete_account_note": "Request permanent deletion of your Argus account. Support will follow up by email.",
       "display_name_save_error": "Could not save that name yet.",
       "language_save_error": "Could not update language yet.",
+      "avatar_theme": {
+        "label": "Avatar color",
+        "change": "Edit avatar",
+        "close": "Hide avatar colors",
+        "hide": "Hide",
+        "save_error": "Could not update your avatar color yet.",
+        "themes": {
+          "ember": "Sienna",
+          "gold": "Lichen",
+          "slate": "Juniper",
+          "teal": "Lagoon",
+          "ocean": "Default",
+          "indigo": "Iris",
+          "plum": "Mulberry"
+        }
+      },
       "close": "Close profile",
       "title": "Profile",
       "request_deletion": {
@@ -680,6 +870,7 @@
     "app": {
       "title": "App",
       "language": "App language",
+      "close_language_modal": "Close language modal",
       "sidebar": "Sidebar",
       "security": "Security",
       "appearance": "Appearance",
@@ -721,13 +912,28 @@
       "delete_all_empty": "No conversations to delete.",
       "delete_all_error": "Couldn’t delete conversations. Try again.",
       "security": "Security",
-      "usage": "Usage"
+      "usage": "Usage",
+      "usage_panel": {
+        "title": "Usage",
+        "messages": "Messages",
+        "simulations": "Simulations",
+        "left_today": "{{count}} left today",
+        "used_of_limit": "{{used}} of {{limit}} used today",
+        "resets": "Resets {{time}}",
+        "hourly_available": "{{count}} available this hour · resets {{time}}",
+        "what_counts": "What counts?",
+        "loading": "Loading usage…",
+        "load_error": "Usage couldn’t be loaded.",
+        "retry": "Try again",
+        "close": "Close usage",
+        "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
+        "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
+      }
     },
     "help": {
       "title": "Help & Legal",
       "terms": "Terms of Use",
-      "privacy": "Privacy Policy",
-      "release_notes": "Release Notes"
+      "privacy": "Privacy Policy"
     },
     "about": {
       "title": "About",
@@ -738,9 +944,7 @@
       "feedback": "General feedback"
     },
     "logout": "Log out",
-    "dev": {
-      "reset_onboarding": "Reset onboarding (dev)"
-    },
+    "logout_error": "We couldn’t sign out this browser. Try again.",
     "search_language": "Search language",
     "no_languages": "No languages found.",
     "languages": {
@@ -757,33 +961,111 @@
       "confirm": "Delete conversation"
     }
   },
+  "keyboard_shortcuts": {
+    "title": "Keyboard shortcuts",
+    "description": "Quick ways to move through Argus.",
+    "close": "Close keyboard shortcuts",
+    "menu_item": "Keyboard shortcuts",
+    "groups": {
+      "navigation": "Navigation",
+      "chat": "Chat",
+      "quick_jump": "Quick jump"
+    },
+    "quick_jump_description": "Hold the modifier keys to reveal numbers on visible items.",
+    "shortcuts": {
+      "omnisearch": "Open search",
+      "keyboard_shortcuts": "Show keyboard shortcuts",
+      "new_chat": "New chat",
+      "open_recents": "Open Recents",
+      "delete_focused_chat": "Delete current chat",
+      "rename_focused_chat": "Rename current chat",
+      "archive_focused_chat": "Archive current chat",
+      "toggle_read_focused_chat": "Mark current chat as read or unread",
+      "expand_sidebar_recents": "Toggle sidebar and Recents",
+      "open_settings": "Open Settings",
+      "toggle_pin_focused_chat": "Pin or unpin current chat",
+      "quick_jump": "Quick-jump visible items"
+    }
+  },
+  "recents_quick_peek": {
+    "title": "Recents",
+    "close": "Close Recents",
+    "empty": "No recent chats yet."
+  },
   "command_palette": {
-    "close": "Close search",
-    "search_placeholder": "Search Argus...",
-    "no_results": "No results found",
-    "no_conversations": "No conversations yet",
-    "clear_search": "Clear search",
-    "rename_conversation": "Rename conversation",
+    "add_decision": "Add decision · {{run}}",
+    "add_decision_short": "Add decision",
     "archive_conversation": "Archive conversation",
+    "asset_rollup": {
+      "heading": "Your Argus history",
+      "scope_registered": "Across your conversations",
+      "scope_guest": "In this temporary conversation",
+      "runs_involving_one": "{{count}} run involving {{symbol}}",
+      "runs_involving_other": "{{count}} runs involving {{symbol}}",
+      "last_touched": "Last touched {{date}}"
+    },
+    "back_to_latest_run": "Back to latest run",
+    "back_to_run_details": "Back to run details",
+    "change_decision": "Change decision · {{run}}",
+    "change_decision_short": "Edit",
+    "clear_search": "Clear search",
+    "close": "Close search",
+    "conversation_count_one": "{{count}} conversation",
+    "conversation_count_other": "{{count}} conversations",
+    "decision_history": "Decision history",
+    "decision_history_count": "{{decided}} of {{total}} decided",
+    "decision_history_error": "Could not load decision history",
+    "decision_history_loading": "Loading decision history",
+    "decision_history_loading_older": "Loading older decisions",
+    "decision_history_retry": "Try again",
+    "decision_note_count": "{{count}} / {{max}}",
+    "decision_note_editor_label": "Decision note",
+    "decision_note_label": "Decision note: ",
+    "decision_saved": "Saved",
     "delete_conversation": "Delete conversation",
-    "preview": "Preview",
-    "preview_empty": "Open the source conversation to view more context.",
-    "open_conversation": "Open conversation",
-    "open_source_conversation": "Open source conversation",
-    "select_preview": "Select a result to preview its details.",
+    "dossier_values": {
+      "decision_on": "{{state}} · on {{run}}",
+      "run_count_one": "{{count}} run",
+      "run_count_other": "{{count}} runs",
+      "cadences": {
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "biweekly": "Biweekly",
+        "monthly": "Monthly",
+        "quarterly": "Quarterly"
+      },
+      "strategy_families": {
+        "buy_and_hold": "Buy and hold",
+        "buy_hold": "Buy and hold",
+        "buy_the_dip": "Buy the dip",
+        "dca": "Recurring buys",
+        "dca_accumulation": "Recurring buys",
+        "indicator_threshold": "RSI threshold",
+        "moving_average_crossover": "Moving-average crossover",
+        "rsi_mean_reversion": "RSI threshold",
+        "signal_strategy": "Moving-average crossover",
+        "unknown": "Strategy"
+      },
+      "nudges": {
+        "stale_result": "Result may need a refresh",
+        "suggestion_untaken": "Suggested next step",
+        "undecided": "No decision yet",
+        "unknown": "Next step saved"
+      }
+    },
+    "guest": {
+      "discovery_unavailable": "Search is limited to this temporary conversation. Broader grounded discovery isn’t available yet."
+    },
+    "keep_typing": "Keep typing",
+    "keep_typing_detail": "Search starts with a 2-character ticker or a 3-character word.",
     "ledger": {
       "decision_filters": "Decision filters",
       "no_saved_ideas": "No saved ideas in this state"
     },
-    "status": {
-      "archived": "Archived",
-      "captured": "Captured",
-      "decided": "Decided",
-      "decision": "Decision",
-      "discarded": "Discarded",
-      "reviewed": "Reviewed",
-      "saved": "Saved"
-    },
+    "load_more_error": "Argus couldn’t load more results. Your current results are still available.",
+    "load_older": "Load older",
+    "match_count_one": "{{count}} match",
+    "match_count_other": "{{count}} matches",
     "metric_labels": {
       "benchmark_return_pct": "Benchmark return",
       "delta_vs_benchmark_pct": "Against benchmark",
@@ -793,6 +1075,22 @@
       "total_return_pct": "Total return",
       "volatility_pct": "Volatility"
     },
+    "no_conversations": "No conversations yet",
+    "no_decision_saved": "No decision saved",
+    "no_results": "No results found",
+    "no_source_conversation": "No source conversation",
+    "shortcut_legend": {
+      "archive": "Archive",
+      "delete": "Delete",
+      "go": "Go",
+      "open_left_off": "Continue",
+      "rename": "Rename"
+    },
+    "open_conversation": "Open conversation",
+    "open_in_conversation": "Open in conversation",
+    "open_source_conversation": "Open source conversation",
+    "preview": "Preview",
+    "preview_empty": "Open the source conversation to view more context.",
     "preview_fields": {
       "assets": "Assets",
       "assumptions": "Assumptions",
@@ -800,17 +1098,42 @@
       "breakdown": "Breakdown",
       "decision": "Decision",
       "digest": "Digest",
+      "left_off": "Where you left off",
       "metrics": "Metrics",
+      "outcome": "How it went",
       "preview": "Preview",
-      "quick_take": "Quick take"
+      "quick_take": "Quick take",
+      "note": "Your note",
+      "tested": "What you tested",
+      "what_happened": "What happened"
     },
-    "conversation_count_one": "{{count}} conversation",
-    "conversation_count_other": "{{count}} conversations",
+    "read_error": "Argus couldn’t load these results.",
+    "rename_conversation": "Rename conversation",
     "result_count_one": "{{count}} result",
     "result_count_other": "{{count}} results",
+    "retest_current_data": "Retest with current data",
+    "retest_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    "retry_load_more": "Try loading more",
+    "retry_search": "Try searching again",
+    "save_decision": "Save decision",
+    "search_placeholder": "Search Argus...",
+    "select_preview": "Select a result to preview its details.",
+    "show_full_note": "Show full note",
+    "show_less_note": "Show less",
+    "status": {
+      "archived": "Archived",
+      "captured": "Captured",
+      "decided": "Decided",
+      "decision": "Decision",
+      "discarded": "Discarded",
+      "reviewed": "Reviewed",
+      "saved": "Saved"
+    },
+    "try_searching": "Try a ticker, phrase, or note you remember.",
     "type": {
       "backtest": "Backtest",
       "chat": "Conversation",
+      "conversation": "Conversation",
       "collection": "Collection",
       "decision": "Decision",
       "evidence": "Evidence",
@@ -819,50 +1142,30 @@
       "strategy": "Strategy"
     }
   },
-  "onboarding": {
-    "prompt": "What is your current primary goal? Don't worry, you can change it later.",
-    "language": {
-      "title": "Choose your language",
-      "subtitle": "Argus speaks multiple languages. Which one do you prefer?",
-      "description": "This helps us personalize your experience.",
-      "continue_in": "Continue in {{language}}",
-      "en": "English",
-      "es-419": "Español"
-    },
-    "primary_goal": "What is your primary goal?",
-    "goal_description": "We'll tailor your strategy insights based on this.",
-    "skip": "Skip for now",
-    "goals": {
-      "learn_basics": {
-        "title": "Learn investing basics",
-        "description": "Start with simple ideas and clear explanations."
-      },
-      "build_passive_strategy": {
-        "title": "Build a passive strategy",
-        "description": "Focus on long-term, low-maintenance ideas."
-      },
-      "test_stock_idea": {
-        "title": "Test a stock idea",
-        "description": "Validate a thesis on symbols you follow."
-      },
-      "explore_crypto": {
-        "title": "Explore crypto",
-        "description": "Try crypto-focused strategy starters."
-      }
-    },
-    "error": {
-      "title": "API Unreachable",
-      "description": "We couldn't connect to the Argus engine. Please ensure the backend service is running and try again.",
-      "retry": "Try Again"
-    }
-  },
   "auth": {
+    "captcha": {
+      "verifying": "Verifying you’re not a bot…"
+    },
+    "access_request": {
+      "title": "Request access to Argus",
+      "description": "Argus is in early access. Share your email to request access. If approved, we’ll email you when you can create an account.",
+      "email_label": "Email address",
+      "submit": "Request access",
+      "submitting": "Requesting access...",
+      "accepted_title": "Request received",
+      "accepted_description": "Thanks, we received your request. If access is approved, we’ll email you with the next step.",
+      "approved_prompt": "Already approved?",
+      "approved_action": "Sign up",
+      "existing_prompt": "Already have an account?",
+      "existing_action": "Sign in",
+      "error": "We couldn’t send your request. Please try again."
+    },
     "login": {
       "brand": "argus",
       "subtitle": "Sign in to continue",
       "email_placeholder": "Email address",
       "password_placeholder": "Password",
-      "submit": "Sign In",
+      "submit": "Sign in",
       "loading": "Signing in...",
       "errors": {
         "supabase_not_configured": "Supabase auth is not configured."
@@ -873,22 +1176,189 @@
       "name_placeholder": "Name",
       "submit": "Sign up",
       "loading": "Creating account...",
-      "new_account": "new to argus?"
+      "new_account": "New to Argus?",
+      "password_requirement": "At least 8 characters.",
+      "confirmation_title": "Check your email",
+      "confirmation_description": "Use the confirmation link we sent to finish creating your account. Then return here to sign in."
+    },
+    "legal": {
+      "continuing_prefix": "By continuing, you agree to our"
     },
     "password": {
       "show": "Show password",
       "hide": "Hide password"
     },
+    "recovery": {
+      "forgot": "Forgot password?",
+      "title": "Recover your account",
+      "description": "Enter your email and we’ll send recovery instructions if the account is eligible.",
+      "email_label": "Email address",
+      "send": "Send recovery instructions",
+      "sending": "Sending...",
+      "generic_sent": "If an eligible account exists for that email, recovery instructions will arrive shortly.",
+      "request_error": "We couldn’t start recovery. Wait a moment and try again.",
+      "back_to_sign_in": "Back to sign in",
+      "reset_title": "Choose a new password",
+      "checking": "Checking your recovery link...",
+      "invalid_link": "This recovery link is missing, expired, or already used.",
+      "request_new": "Request a new link",
+      "new_password": "New password",
+      "confirm_password": "Confirm new password",
+      "password_mismatch": "Passwords do not match.",
+      "update_password": "Update password",
+      "updating": "Updating...",
+      "reset_error": "This recovery link is no longer valid. Request a new one.",
+      "password_rejected": "We couldn’t update the password. Check the requirements or request a new recovery link.",
+      "password_updated": "Your password is updated.",
+      "reset_complete": "Your password is updated. Sign in again on every browser.",
+      "revocation_warning": "Argus could not confirm that every session was signed out. Retry before signing in again.",
+      "retry_revocation": "Retry sign out all sessions",
+      "retrying_revocation": "Retrying...",
+      "revocation_retry_error": "Argus still couldn’t confirm that every session was signed out. Try again.",
+      "cleanup_warning": "Sessions were revoked, but this browser could not confirm local cookie cleanup. A fresh sign-in is still required."
+    },
     "errors": {
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "captcha_unavailable": "We couldn’t complete the security check. Please try again.",
+      "unauthorized": "We couldn’t verify those account details. Check them and try again.",
+      "auth_signup_failed": "We couldn’t create the account. Please try again.",
+      "too_many_requests": "Too many attempts. Wait a moment and try again.",
+      "guest_access_unavailable": "Guest access isn’t available right now.",
+      "internal_error": "Argus couldn’t complete this account request. Please try again.",
+      "account_already_registered": "This session already belongs to a permanent account.",
+      "guest_bootstrap_failed": "We couldn’t start a temporary conversation. Please try again.",
+      "account_exists_use_login": "You already have an account. Sign in instead and your conversation comes with you.",
+      "guest_identity_link_failed": "We couldn’t finish creating the account. Your conversation is safe; try again.",
+      "csrf_origin_rejected": "We couldn’t verify this request. Refresh the page and try again.",
+      "registered_account_required": "Sign in to claim this temporary conversation.",
+      "access_request_unavailable": "We couldn’t send your access request. Please try again.",
+      "public_account_access_unavailable": "Account creation isn’t available right now.",
+      "guest_session_expired": "This temporary session has expired. Start a new one or sign in.",
+      "guest_handoff_invalid": "This conversation transfer is no longer valid. Please try signing in again.",
+      "guest_handoff_consumed": "This temporary conversation has already been claimed.",
+      "guest_handoff_expired": "The transfer expired. Start the sign-in flow again.",
+      "guest_handoff_wrong_destination": "Sign in with the account this temporary conversation was sent to.",
+      "guest_handoff_source_not_anonymous": "This conversation no longer belongs to a temporary account.",
+      "guest_handoff_unsafe_product_graph": "We couldn’t transfer this conversation safely. Your original conversation is unchanged.",
+      "guest_handoff_workspace_unavailable": "This temporary conversation is no longer available.",
+      "guest_handoff_claim_unavailable": "We couldn’t claim the temporary conversation right now. Please try again."
+    }
+  },
+  "account_security": {
+    "title": "Account security",
+    "description": "Change your password or choose exactly which sessions to sign out.",
+    "back": "Back to Argus",
+    "loading": "Checking your session...",
+    "session_check_unavailable": "Argus couldn’t verify your session right now. Try again.",
+    "retry": "Retry",
+    "cookie_sync_warning": "Sessions were revoked, but local cookie cleanup could not be confirmed.",
+    "password": {
+      "title": "Change password",
+      "description": "Enter your current password. After the change, every browser must sign in again.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "submit": "Change password",
+      "changing": "Changing...",
+      "changed": "Password changed. Sign in again on every browser.",
+      "revocation_warning": "Password changed, but Argus could not confirm every session was signed out. Retry Sign out all sessions.",
+      "error": "We couldn’t change the password. Check your current password and try again."
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Choose whether to keep this browser signed in.",
+      "sign_out_this": "Sign out this browser",
+      "sign_out_others": "Sign out other sessions",
+      "sign_out_all": "Sign out all sessions",
+      "others_complete": "Other sessions are signed out. This browser remains signed in.",
+      "signed_out": "The selected sessions are signed out.",
+      "revocation_warning": "Argus could not confirm the selected sessions were signed out. Try the session action again.",
+      "error": "We couldn’t complete that session change. Try again.",
+      "confirm_others_title": "Sign out other sessions?",
+      "confirm_others_description": "Other browsers will lose access. This browser stays signed in.",
+      "confirm_all_title": "Sign out everywhere?",
+      "confirm_all_description": "Every browser, including this one, will need a fresh login."
     }
   },
   "landing": {
-    "sign_up_email": "Sign up with Email",
-    "already_account": "already have an account?",
-    "sign_in": "sign in",
+    "sign_up_email": "Sign up with email",
+    "already_account": "Already have an account?",
+    "sign_in": "Sign in",
     "legal_prefix": "By signing up, you agree to our",
     "terms": "Terms",
     "privacy": "Privacy Policy"
+  },
+  "guest": {
+    "entry": {
+      "loading": "Opening Argus",
+      "sending": "Sending...",
+      "error": "Argus couldn't open a temporary chat. Try again."
+    },
+    "expired": {
+      "title": "This temporary chat has expired",
+      "detail": "Its messages and results can’t be recovered.",
+      "start_new": "Start a new temporary chat",
+      "sign_in": "Sign in",
+      "create_account": "Create account",
+      "restart_error": "Argus could not start a new temporary chat. Try again."
+    },
+    "conversion": {
+      "eyebrow": "Keep going with Argus",
+      "sign_in_title": "Sign in",
+      "create_title": "Create your account",
+      "simulation_limit": "Sign in to run another simulation.",
+      "simulation_limit_reset": "This temporary chat has reached today’s simulation limit. It resets on {{date}}. Create an account to continue now.",
+      "simulation_limit_request_access": "This temporary chat has reached today’s simulation limit. It resets on {{date}}. Request access or sign in to continue.",
+      "simulation_workspace_limit_reset": "This temporary chat has reached its simulation limit. It expires on {{date}}. Create an account to continue now.",
+      "simulation_workspace_limit_request_access": "This temporary chat has reached its simulation limit. It expires on {{date}}. Request access or sign in to continue.",
+      "message_limit": "Sign in to keep this conversation and continue.",
+      "save_decision": "Sign in to save this decision.",
+      "new_conversation": "Sign in to keep this conversation and start another.",
+      "new_conversation_create": "Create an account to keep this conversation and start another.",
+      "keep_history": "Sign in to keep this conversation and start another.",
+      "discovery_searches": "Sign in for more grounded searches with sources."
+    },
+    "new_conversation": {
+      "title": "Start a new conversation?",
+      "description": "Start over replaces this temporary conversation. Sign in to keep it and start another.",
+      "public_description": "Start over replaces this temporary conversation. Create an account to keep it and start another.",
+      "start_over": "Start over",
+      "sign_in": "Sign in to keep it",
+      "create_account": "Create account",
+      "error": "The temporary chat was left unchanged."
+    },
+    "history": {
+      "expires_at": "Available until {{date}}",
+      "keep_history": "Sign in to keep your history"
+    },
+    "shell": {
+      "value_title": "Test an investing idea against history.",
+      "input_placeholder": "What do you want to test?",
+      "sign_in": "Sign in",
+      "settings": "Guest settings",
+      "language": "Language",
+      "feedback": "Feedback",
+      "temporary_until": "Temporary chat · available until {{date}}",
+      "before_message": {
+        "prefix": "By messaging Argus, you agree to ",
+        "terms": "Terms",
+        "middle": " and acknowledge ",
+        "privacy": "Privacy"
+      },
+      "after_message": {
+        "safety": "Argus can make mistakes. For education only. Not financial advice.",
+        "terms": "Terms",
+        "privacy": "Privacy"
+      },
+      "new_chat_unavailable": "Sign in to keep this conversation and start another.",
+      "search_unavailable": "Search isn't available for temporary chats yet.",
+      "decision_unavailable": "Sign in to save this decision.",
+      "sign_in_unavailable": "Sign in is not available in this preview. Your temporary chat stays here."
+    },
+    "hints": {
+      "confirmation": "Review the assumptions, then run the test.",
+      "result": "Change the chart range or ask a follow-up.",
+      "dismiss": "Dismiss hint"
+    }
   }
 }

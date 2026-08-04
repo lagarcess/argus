@@ -94,7 +94,6 @@ The findings are grouped by category:
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Frontend Cards** | `web/components/chat/StrategyConfirmationCard.tsx`, `web/components/chat/confirmation-display.ts`, `src/argus/api/chat/confirmation.py` | Confirmation cards now emit/use stable `status`, `rows[].key`, and i18n label keys instead of using translated labels for behavior. | Resolved | Codex-owned | Keep the `spanish-ui-smoke` guard that rejects `row.label.toLowerCase()` and English status sets in card state logic. |
 | **Artifact Status** | `web/components/chat/artifact-history.ts`, `web/lib/chat-backtest-jobs.ts` | Confirmation lifecycle updates now store stable status codes while preserving legacy English fallback labels for old persisted cards. | Resolved | Codex-owned | Continue using `confirmation-display.ts` helpers for new confirmation status behavior. |
-| **Onboarding** | `web/components/onboarding/OnboardingGate.tsx` | Hardcoded titles: `"Choose your language"`, `"Learn investing basics"` | Medium | Jules-safe | Ensure `t()` handles localization via JSON mapping, standardizing keys. |
 | **Backend API Errors** | `src/argus/api/routers/conversations.py` | Hardcoded HTTP exception details: `"Conversation not found."`, `"Strategy not found."` | Medium | Product decision | Implement error code system (e.g., `error_code="CONVERSATION_NOT_FOUND"`) that frontend maps to `t()`. |
 | **Backend Results** | `src/argus/domain/benchmark_comparison.py` | User phrases generated in backend: `"Beat by {magnitude}"`, `"In line with benchmark"` | High | Product decision | Return structured data (e.g., `{ type: "beat_benchmark", value: magnitude }`) and localize in frontend. |
 | **LLM Prompts** | `src/argus/agent_runtime/stages/interpret.py` | System prompts: `"Supported-strategy facts:"`, `"Available short-lived context packet:"` | High | Codex-owned | Do not change. Treat as Codex-owned runtime contracts.|
@@ -110,7 +109,6 @@ The findings are grouped by category:
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `web/components/chat/StrategyConfirmationCard.tsx` | Confirmation row behavior now uses `rows[].key` with legacy fallback mapping in `confirmation-display.ts`. | UI Logic | Resolved | Codex-owned | Preserve stable row keys for future languages. |
 | `web/components/chat/ChatInput.tsx` | `t("chat.message_empty", "Message is empty")` | Fallback | Low | Jules-safe | Rely on localization JSON files instead of hardcoded fallbacks. |
-| `web/components/chat/ChatInterface.tsx` | `t("onboarding.goals.learn_basics.title", "Learn investing basics")` | Fallback | Low | Jules-safe | Rely on localization JSON files. |
 | `web/components/chat/StrategyResultCard.tsx` | `t("chat.result_card.ending_value", "Ending value")` | Fallback | Low | Jules-safe | Rely on localization JSON files. |
 | `web/components/sidebar/ProfileMenu.tsx` | `t("settings.profile.delete_account", "Delete account")` | Fallback | Low | Jules-safe | Rely on localization JSON files. |
 

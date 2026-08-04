@@ -1,4 +1,8 @@
-import type { ChatActionOption, Message } from "@/components/chat/types";
+import type {
+  ChatActionOption,
+  DiscoverySidecar,
+  Message,
+} from "@/components/chat/types";
 import type { RecoveryDisplay } from "./chat-recovery-display";
 
 type MergeFinalTextOptions = {
@@ -8,6 +12,9 @@ type MergeFinalTextOptions = {
   contentPresentation?: Message["contentPresentation"];
   resultFactHeadingKey?: string | null;
   recoveryDisplay?: RecoveryDisplay | null;
+  strategyPathContext?: Message["strategyPathContext"];
+  assistantRecoveryCode?: string | null;
+  discovery?: DiscoverySidecar | null;
 };
 
 export function mergeFinalTextMessage(
@@ -19,6 +26,9 @@ export function mergeFinalTextMessage(
     contentPresentation,
     resultFactHeadingKey,
     recoveryDisplay,
+    strategyPathContext,
+    assistantRecoveryCode,
+    discovery,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -32,5 +42,9 @@ export function mergeFinalTextMessage(
     contentPresentation: contentPresentation ?? message.contentPresentation,
     resultFactHeadingKey: resultFactHeadingKey ?? message.resultFactHeadingKey,
     recoveryDisplay: recoveryDisplay ?? message.recoveryDisplay,
+    strategyPathContext:
+      strategyPathContext ?? message.strategyPathContext,
+    assistantRecoveryCode: assistantRecoveryCode ?? message.assistantRecoveryCode,
+    discovery: discovery ?? message.discovery,
   };
 }

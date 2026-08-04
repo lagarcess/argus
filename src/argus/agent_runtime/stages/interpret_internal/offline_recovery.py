@@ -7,6 +7,9 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from argus.agent_runtime.artifacts.continuity import (
+    no_progress_response_if_equivalent,
+)
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -18,7 +21,11 @@ from argus.agent_runtime.recovery_messages import (
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
 )
-from argus.agent_runtime.stages.interpret_internal.shared import _field_base
+from argus.agent_runtime.stages.interpret_internal.shared import (
+    _field_base,
+    _selected_requested_field,
+    _selected_response_intent,
+)
 from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
     StageResult,
@@ -29,6 +36,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.strategy_contract import display_strategy_type
+from argus.agent_runtime.turn_execution import claim_turn_terminal
 
 _LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
 
@@ -40,6 +48,13 @@ def _offline_interpreter_unavailable_result(
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
+    pending_no_progress = _offline_pending_no_progress_result(
+        user=user,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata or {},
+    )
+    if pending_no_progress is not None:
+        return pending_no_progress
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -80,6 +95,69 @@ def _offline_interpreter_unavailable_result(
         outcome="ready_to_respond",
         decision=decision,
         stage_patch=stage_patch,
+    )
+
+
+def _offline_pending_no_progress_result(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return None
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return None
+    requested_field = _selected_requested_field(selected_thread_metadata)
+    prior_response_intent = _selected_response_intent(selected_thread_metadata)
+    if not requested_field or not isinstance(prior_response_intent, dict):
+        return None
+
+    candidate = snapshot.pending_strategy_summary.model_copy(deep=True)
+    decision = InterpretDecision(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary=(
+            "The pending answer made no typed progress while structured "
+            "interpretation was unavailable."
+        ),
+        candidate_strategy_draft=candidate,
+        missing_required_fields=[requested_field],
+        optional_parameter_opportunity=[],
+        confidence=0.0,
+        arbitration_mode="deterministic",
+        reason_codes=["llm_interpreter_unavailable_pending_no_progress"],
+        effective_response_profile=resolve_effective_response_profile(
+            user=user,
+            explicit_overrides=None,
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+    no_progress = no_progress_response_if_equivalent(
+        snapshot=snapshot,
+        prior_strategy=snapshot.pending_strategy_summary,
+        candidate_strategy=candidate,
+        prior_response_intent=prior_response_intent,
+        missing_fields=[requested_field],
+        semantic_turn_act="answer_pending_need",
+        optional_parameter_status=decision.to_patch()["optional_parameter_status"],
+        assistant_response=None,
+        language=user.language_preference,
+    )
+    if no_progress is None:
+        return None
+    claim_turn_terminal("no_progress", "interpreter_unavailable_unchanged_typed_state")
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={
+            "candidate_strategy_draft": candidate.model_dump(mode="python"),
+            "assistant_response": no_progress.assistant_response,
+            "response_intent": no_progress.response_intent,
+            "requested_field": requested_field,
+            "missing_required_fields": [requested_field],
+        },
     )
 
 

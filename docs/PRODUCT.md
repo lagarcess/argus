@@ -102,6 +102,14 @@ Needs:
 
 Users should understand assumptions, limits, and outcomes. Results are presented with honest context (e.g., explicit assumptions footers on all cards).
 
+Discovery answers follow the same rule: every suggested asset is
+resolver-verified and tappable, and the answer always states its grounding.
+The default path answers from model knowledge and is plainly marked "from
+general knowledge, not a current search"; a source-backed search runs only
+when the answer needs current facts (or the user asks), and then shows its
+sources and freshness date. A remembered answer and a researched one must
+never look alike.
+
 ## Chat First
 
 Conversation is the primary interface.
@@ -142,16 +150,18 @@ Alpha launches on web/PWA for speed. Long-term direction is mobile + web.
 
 A new user can:
 
-1. Enter Argus
-2. Select preferred language
-3. Be onboarded through chat
-4. Interact with **starter prompts** designed to reduce blank-page friction
-5. Describe or choose an investing idea
-6. Receive AI guidance
-7. Run a backtest using supported strategies
-8. View results clearly through **high-fidelity metrics cards, AI explanations, and follow-up questions**
-9. Revisit the conversation later
-10. See prior runs and saved items
+1. Enter Argus and sign up (language is chosen at signup and changeable in Settings)
+2. Arrive directly in normal chat
+3. Interact with **starter prompts** designed to reduce blank-page friction
+4. Describe or choose an investing idea
+5. Receive AI guidance
+6. Run a backtest using supported strategies
+7. View results clearly through **high-fidelity metrics cards, AI explanations, and follow-up questions**
+8. Revisit the conversation later
+9. See prior runs and saved items
+
+There is no separate onboarding flow. Activation begins in normal chat, and
+the first successful backtest is the meaningful onboarding milestone.
 
 ## Included Product Surfaces
 
@@ -161,10 +171,12 @@ A new user can:
 
 ### Supporting Surfaces
 
-- Recents
-- Strategies
-- Collections
+- Recents/history
+- Omnisearch and Idea Ledger recall
 - Settings / Account
+
+Strategies and Collections remain valid flagged product objects, but they are
+not visible private-alpha surfaces.
 
 ---
 
@@ -181,7 +193,7 @@ Argus should feel globally accessible from first launch.
 
 - Language selection should be intuitive and premium.
 - New users should clearly understand multilingual support.
-- Onboarding should occur in selected language.
+- First use should occur in the selected language.
 - Surface UI should reflect selected language.
 - AI should mirror user language preference dynamically.
 
@@ -196,8 +208,8 @@ Recents are a mixed chronological feed of recent user activity.
 Examples:
 
 - Recent chats
-- Recent strategies
-- Recent collections
+- Recent completed backtests
+- Prior idea/evidence activity reopened through Omnisearch
 
 Purpose:
 
@@ -205,6 +217,12 @@ Purpose:
 - reduce navigation friction
 - reinforce continuity
 - help users return repeatedly
+
+Recents distinguishes work in progress from attention. A task may be working
+without being unread; terminal activity becomes unseen only beyond the user's
+durable read boundary. Registered users may also deliberately mark a task
+unread as a reminder. These states come from backend lifecycle and read truth,
+never message wording, client timers, or changes to recency ordering.
 
 Private-alpha launch keeps the visible product surface to Chat, Recents/history,
 completed result cards, and minimal account/settings/feedback. Dedicated
@@ -260,7 +278,15 @@ state (promising, watching, rejected, revisit) with filter chips. Group order
 and counts are backend-owned; the frontend renders them without synthesizing
 its own groups.
 
+For P2, this durable `Idea` / `IdeaVersion` / `EvidenceArtifact` /
+`DecisionNote` recall is the product's "remembering" contract. It is distinct
+from personalization memory. Automatic or user-confirmed cross-conversation
+personalization memory remains post-PMF and must not be required for the P2
+idea/evidence/comparison loop.
+
 ## Surface Goals
+
+If the flagged Strategies surface is reactivated later, its goals are:
 
 - scan saved strategies quickly
 - compare ideas rapidly
@@ -296,11 +322,15 @@ Users should be able to manage their workspace cleanly.
 
 ## Strategies
 
+Hidden under private-alpha defaults.
+
 - rename
 - pin / unpin
 - delete
 
 ## Collections
+
+Hidden and indefinitely deferred from the private-alpha UI.
 
 - rename
 - pin / unpin
@@ -314,10 +344,10 @@ Deleted and archived surfaces should remain accessible where supported.
 
 The AI assistant should:
 
-- onboard new users
+- welcome first-time users into ordinary conversation
 - explain financial terms simply
 - gather requirements for supported backtests
-- recommend **API-driven starter prompts** (personalized by language/goal)
+- recommend **localized generic starter prompts**
 - guide users toward successful flows
 - explain results
 - suggest next experiments
@@ -353,8 +383,10 @@ Alpha supports:
 Examples:
 - Equity: `AAPL` + `MSFT` + `NVDA`
 - Crypto: `BTC` + `ETH` + `SOL`
+- Currency pair: `EURUSD` or a same-class group such as `EURUSD` + `GBPUSD`
 
-Alpha does **NOT** support mixed equity + crypto simulations.
+Alpha does **NOT** support mixed-asset-class simulations. Equity, crypto, and
+currency-pair runs each remain within their own class.
 
 This ensures reliability and benchmark coherence.
 
@@ -425,7 +457,9 @@ We are optimizing for:
 
 ## Activation
 
-Users complete onboarding and run first backtest.
+Users reach normal chat directly after authentication and complete their
+first successful backtest — that first successful backtest is the meaningful
+onboarding milestone.
 
 ## Delight
 
@@ -476,6 +510,7 @@ Argus should avoid:
 Every result card must include a lightweight assumptions footer to maintain integrity. Benchmark comparisons are class-based:
 - **Equities** compare to **SPY**
 - **Crypto** compares to **BTC**
+- **Currency pairs** compare to the tested pair itself
 
 Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
 
@@ -493,6 +528,56 @@ shows trades, markers, trade counts, and win-rate inputs after the execution
 layer has applied long-only position state, cash, sizing, and policy constraints.
 Ignored signals can be explained in breakdowns when useful, but they are not
 presented as real buys or sells.
+
+Freshness and "what changed" explanations must keep two evidence layers
+separate:
+
+- canonical run/evidence deltas state what the backtests and mechanically
+  verified corporate actions show;
+- source-backed news, earnings, regulatory, macro, or other event context may
+  explain what coincided with or may have contributed to a change.
+
+Argus must not present contextual correlation as proven causation. Context
+should carry sources and freshness, acknowledge uncertainty, and remain
+informational. It is not financial advice or a recommendation to buy, sell, or
+hold an asset.
+
+## Guest Entry (Default-On Kill Switch)
+
+Guest mode is part of the normal Argus product shape and supersedes the
+auth-first landing page by default. A guest is a
+real Supabase anonymous authenticated user with one temporary workspace, never
+the unauthenticated Postgres `anon` role, the mock developer, or a synthetic
+email profile.
+
+The checked-in policy is intentionally asymmetric:
+
+- `ARGUS_GUEST_ACCESS_ENABLED=true`
+- `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true`
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`
+
+The frontend presentation flag cannot grant access. The server remains
+authoritative. The Guest server and presentation flags default on; explicit
+`false` is their emergency rollback kill switch. Public-account access remains
+an independent false-by-default gate. While it is off, permanent signup and
+login remain allowlist-gated, the guest surface offers **Sign in**, and
+unlisted guests cannot create permanent accounts. Existing admin and developer
+roles remain unchanged.
+
+Two clocks govern a guest, and they are deliberately distinct. The
+**workspace** lives seven fixed days with one conversation: that is how long
+the temporary chat survives and the window to claim it to an account.
+Activity never extends the expiry. **Allowances** follow the visitor as an
+abuse boundary (decision 2026-07-28): ten useful assistant terminals and two
+unique simulations per visitor per day, resetting at UTC midnight. The
+workspace separately caps the temporary chat at two unique simulations over
+its fixed lifetime, plus five feedback submissions. A fresh session cannot
+mint a fresh daily allowance—the visitor counter keys on a keyed digest of the
+caller—and Start over preserves the workspace counters. Simulations keep a
+workspace-keyed reservation as replay identity; the visitor charge beside it
+is best-effort past admission, and settlement enforces the cap. The current
+landing implementation and its centered auth modal remain intact for
+configuration rollback and later conversion work.
 
 ---
 

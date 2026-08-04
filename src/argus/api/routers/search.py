@@ -1,24 +1,42 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user
+from argus.api.client_capabilities import (
+    ClientCapabilitiesHeader,
+    dossier_decision_action_availability,
+)
+from argus.api.dependencies import current_user, problem
+from argus.api.guest_access import account_context
+from argus.api.memory_ledger_index import MemoryLedgerWorkLimitExceeded
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     DecisionState,
     PaginatedSearch,
+    SearchAssetRollup,
     SearchItem,
     SearchLedgerGroup,
     User,
 )
 from argus.api.search_assembly import (
-    scored_memory_search_items,
+    memory_search_read,
     scored_supabase_search_items,
 )
 from argus.api.search_utils import search_rank_key
+from argus.domain.postgres_search_reader import (
+    SearchCursorError,
+    SearchReadResult,
+)
+from argus.domain.search_text import (
+    normalize_search_symbol,
+    search_has_indexable_token,
+    search_query_is_indexable,
+)
 from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
@@ -33,29 +51,202 @@ LEDGER_DECISION_STATE_ORDER: tuple[DecisionState, ...] = (
 
 @router.get("/search", response_model=PaginatedSearch)
 def search(
-    q: str,
+    q: Annotated[str, Query(max_length=512)],
     request: Request,
+    client_capabilities: ClientCapabilitiesHeader = None,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None),
     decision_state: DecisionState | None = Query(None),  # noqa: B008
     include_ledger_groups: bool = Query(False),  # noqa: B008
+    conversation_id: list[UUID] | None = Query(  # noqa: B008
+        None,
+        min_length=1,
+        max_length=50,
+    ),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedSearch:
+    context = account_context(request)
+    decision_action_availability = dossier_decision_action_availability(
+        can_save_decision=context.capabilities.can_save_decision,
+        raw_client_capabilities=client_capabilities,
+    )
     query = q.strip().lower()
-    # An empty query is allowed when filtering by decision_state (browse the
-    # ledger, e.g. "show my promising ideas"); otherwise it returns nothing.
-    if not query and decision_state is None and not include_ledger_groups:
-        return PaginatedSearch(items=[], next_cursor=None)
-    scored_items: list[tuple[int, SearchItem]] = []
-    if api_state.supabase_gateway is not None:
-        raw = api_state.supabase_gateway.search_rows(
-            user_id=user.id,
-            query=query,
-            limit=None,
+    requested_conversation_ids = list(
+        dict.fromkeys(str(value) for value in (conversation_id or ()))
+    )
+    id_scoped_recall = bool(requested_conversation_ids)
+    if id_scoped_recall and (
+        query
+        or cursor is not None
+        or decision_state is not None
+        or len(requested_conversation_ids) > limit
+    ):
+        raise problem(
+            request,
+            status_code=400,
+            code="validation_error",
+            title="Validation Error",
+            detail=(
+                "Visible conversation recall requires an empty query, no cursor "
+                "or decision filter, and a limit covering every requested id."
+            ),
         )
-        scored_items.extend(scored_supabase_search_items(raw=raw, query=query))
+
+    cursor_dt: datetime | None = None
+    cursor_id: str | None = None
+    if cursor:
+        cursor_updated_at, cursor_id = decode_cursor(cursor, request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_updated_at)
+        except ValueError:
+            raise invalid_cursor_problem(request) from None
+        if cursor_dt.tzinfo is None or cursor_dt.utcoffset() is None:
+            raise invalid_cursor_problem(request)
+
+    workspace_conversation_id: str | None = None
+    if context.kind == "guest" and api_state.supabase_gateway is not None:
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
+            user_id=user.id,
+            at=datetime.now(timezone.utc),
+        )
+        workspace_conversation_id = (
+            workspace.conversation_id if workspace is not None else None
+        )
+
+    if query and not search_query_is_indexable(query):
+        if cursor:
+            raise invalid_cursor_problem(request)
+        ledger_groups = (
+            []
+            if context.kind == "guest" and include_ledger_groups
+            else _ledger_groups_from_counts(None)
+            if include_ledger_groups
+            else None
+        )
+        capture_product_event(
+            "recall_usage",
+            user_id=user.id,
+            status="completed",
+            attributes={
+                "query_present": True,
+                "decision_state_filter_present": decision_state is not None,
+                "result_count": 0,
+                "returned_types": [],
+                "has_more": False,
+                "source": (
+                    "supabase" if api_state.supabase_gateway is not None else "memory"
+                ),
+            },
+        )
+        return PaginatedSearch(
+            items=[],
+            next_cursor=None,
+            ledger_groups=ledger_groups,
+        )
+
+    text_search_enabled = not query or search_has_indexable_token(query)
+    conversation_search_enabled = (
+        text_search_enabled or normalize_search_symbol(query) is not None
+    )
+    if cursor and not conversation_search_enabled:
+        raise invalid_cursor_problem(request)
+
+    scored_items: list[tuple[int, SearchItem]] = []
+    asset_rollup: SearchAssetRollup | None = None
+    search_read: SearchReadResult | None = None
+    memory_ledger_counts: dict[str, int] | None = None
+    if api_state.supabase_gateway is not None:
+        try:
+            read_kwargs: dict[str, Any] = {
+                "user_id": user.id,
+                "query": query,
+                "source_limit": (
+                    len(requested_conversation_ids)
+                    if id_scoped_recall
+                    else limit + 1
+                ),
+                "cursor_updated_at": cursor_dt,
+                "cursor_id": cursor_id,
+                "decision_state": decision_state,
+                "include_ledger_groups": include_ledger_groups,
+                "guest_scope": context.kind == "guest",
+                "guest_conversation_id": workspace_conversation_id,
+            }
+            if id_scoped_recall:
+                read_kwargs["conversation_ids"] = requested_conversation_ids
+            read_result = api_state.supabase_gateway.search_rows(
+                **read_kwargs,
+            )
+        except SearchCursorError:
+            raise invalid_cursor_problem(request) from None
+        if isinstance(read_result, SearchReadResult):
+            search_read = read_result
+            asset_rollup = read_result.asset_rollup
+            raw = read_result.rows
+        else:
+            # Keep injected test gateways compatible while the production
+            # Supabase gateway always returns the typed reader result.
+            raw = read_result
+        scored_items.extend(
+            scored_supabase_search_items(
+                raw=raw,
+                query=query,
+                decision_action_availability=decision_action_availability,
+                language=user.language,
+            )
+        )
     else:
-        scored_items.extend(scored_memory_search_items(user=user, query=query))
+        try:
+            memory_read = memory_search_read(
+                user=user,
+                query=query,
+                source_limit=(
+                    len(requested_conversation_ids)
+                    if id_scoped_recall
+                    else limit + 1
+                ),
+                decision_action_availability=decision_action_availability,
+                include_conversation_rows=conversation_search_enabled,
+                cursor_updated_at=cursor_dt,
+                cursor_id=cursor_id,
+                decision_state=decision_state,
+                include_ledger_groups=include_ledger_groups,
+                guest_conversation_id=workspace_conversation_id,
+                conversation_ids=(
+                    requested_conversation_ids if id_scoped_recall else None
+                ),
+            )
+        except MemoryLedgerWorkLimitExceeded:
+            raise problem(
+                request,
+                status_code=503,
+                code="search_temporarily_unavailable",
+                title="Search Temporarily Unavailable",
+                detail=(
+                    "Search is temporarily unavailable. Please refine your "
+                    "query and try again."
+                ),
+            ) from None
+        scored_items.extend(memory_read.scored_items)
+        asset_rollup = memory_read.asset_rollup
+        memory_ledger_counts = memory_read.ledger_counts
+
+    if context.kind == "guest":
+        # Defense in depth: the persistent reader applies this scope before
+        # each source limit; this keeps non-production injected gateways safe.
+        scored_items = [
+            pair
+            for pair in scored_items
+            if workspace_conversation_id is not None
+            and pair[1].conversation_id == workspace_conversation_id
+        ]
+    if id_scoped_recall:
+        requested_ids = set(requested_conversation_ids)
+        scored_items = [
+            pair
+            for pair in scored_items
+            if pair[1].conversation_id in requested_ids
+        ]
 
     scored_items.sort(
         key=lambda pair: search_rank_key(
@@ -67,28 +258,24 @@ def search(
         reverse=True,
     )
     ledger_groups = (
-        _ledger_groups_from_items(scored_items) if include_ledger_groups else None
+        []
+        if context.kind == "guest" and include_ledger_groups
+        else _ledger_groups_from_counts(search_read.ledger_counts)
+        if include_ledger_groups and search_read is not None
+        else _ledger_groups_from_counts(memory_ledger_counts)
+        if include_ledger_groups and memory_ledger_counts is not None
+        else _ledger_groups_from_items(scored_items)
+        if include_ledger_groups
+        else None
     )
     if decision_state is not None:
-        # Idea Ledger: narrow recall to ideas carrying the requested decision_state.
         scored_items = [
-            pair
-            for pair in scored_items
-            if pair[1].type == "idea" and pair[1].decision_state == decision_state
-        ]
-    elif include_ledger_groups and not query:
-        scored_items = [
-            pair
-            for pair in scored_items
-            if pair[1].type == "idea" and pair[1].decision_state is not None
+            pair for pair in scored_items if decision_state in pair[1].decision_states
         ]
     filtered = scored_items
-    if cursor:
-        cursor_updated_at, cursor_id = decode_cursor(cursor, request)
-        try:
-            cursor_dt = datetime.fromisoformat(cursor_updated_at)
-        except ValueError:
-            raise invalid_cursor_problem(request) from None
+    if cursor and search_read is None:
+        assert cursor_dt is not None
+        assert cursor_id is not None
         cursor_pair = next(
             (
                 pair
@@ -118,9 +305,9 @@ def search(
             < cursor_key
         ]
 
-    page = filtered[: limit + 1]
-    has_more = len(page) > limit
-    page_items = page[:limit]
+    page = filtered if id_scoped_recall else filtered[: limit + 1]
+    has_more = False if id_scoped_recall else len(page) > limit
+    page_items = page if id_scoped_recall else page[:limit]
     next_cursor = None
     if has_more and page_items:
         _, last_item = page_items[-1]
@@ -132,14 +319,17 @@ def search(
         attributes={
             "query_present": bool(query),
             "decision_state_filter_present": decision_state is not None,
-            "result_count": len(page_items),
-            "returned_types": _returned_types(page_items),
+            "result_count": len(page_items) + (1 if asset_rollup is not None else 0),
+            "returned_types": _returned_types(page_items, asset_rollup=asset_rollup),
             "has_more": has_more,
             "source": "supabase" if api_state.supabase_gateway is not None else "memory",
         },
     )
     return PaginatedSearch(
-        items=[item for _, item in page_items],
+        items=[
+            *([asset_rollup] if asset_rollup is not None else []),
+            *(item for _, item in page_items),
+        ],
         next_cursor=next_cursor,
         ledger_groups=ledger_groups,
     )
@@ -148,21 +338,34 @@ def search(
 def _ledger_groups_from_items(
     scored_items: list[tuple[int, SearchItem]],
 ) -> list[SearchLedgerGroup]:
-    counts: dict[DecisionState, int] = {
-        state: 0 for state in LEDGER_DECISION_STATE_ORDER
-    }
+    counts: dict[DecisionState, int] = {state: 0 for state in LEDGER_DECISION_STATE_ORDER}
     for _, item in scored_items:
-        if item.type != "idea" or item.decision_state not in counts:
-            continue
-        counts[item.decision_state] += 1
+        for state in item.decision_states:
+            counts[state] += 1
     return [
         SearchLedgerGroup(decision_state=state, count=counts[state])
         for state in LEDGER_DECISION_STATE_ORDER
     ]
 
 
-def _returned_types(page_items: list[tuple[int, SearchItem]]) -> list[str]:
+def _ledger_groups_from_counts(
+    counts: dict[str, int] | None,
+) -> list[SearchLedgerGroup]:
+    values = counts or {}
+    return [
+        SearchLedgerGroup(decision_state=state, count=int(values.get(state, 0)))
+        for state in LEDGER_DECISION_STATE_ORDER
+    ]
+
+
+def _returned_types(
+    page_items: list[tuple[int, SearchItem]],
+    *,
+    asset_rollup: SearchAssetRollup | None,
+) -> list[str]:
     returned: list[str] = []
+    if asset_rollup is not None:
+        returned.append(asset_rollup.type)
     for _, item in page_items:
         if item.type not in returned:
             returned.append(item.type)

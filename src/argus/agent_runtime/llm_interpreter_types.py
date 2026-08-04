@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
+    AssetDiscoveryRequest,
     CapabilityQuestionFocus,
     ContextQuestionFocus,
     ResultFollowupFocus,
 )
 from argus.agent_runtime.state.models import ResponseProfileOverrides
+from argus.domain.capability_registry import RegisteredStrategyTemplate
 
 
 class LLMRiskRule(BaseModel):
@@ -56,10 +58,18 @@ class LLMAssetMentionCandidate(BaseModel):
 class LLMAssetMentionExtraction(BaseModel):
     asset_mentions: list[LLMAssetMentionCandidate] = Field(
         default_factory=list,
+        max_length=6,
         description=(
             "Provider-resolution candidates identified by the LLM from the current "
-            "message. Keep at most five distinct asset-like mentions."
+            "message. Keep at most six distinct asset-like mentions."
         ),
+    )
+    all_traded_asset_mentions_included: bool = Field(
+        description=(
+            "True only when every traded-asset or unknown asset-like mention in "
+            "the current message is present in asset_mentions. Set false when the "
+            "six-item limit omits any such mention."
+        )
     )
 
 
@@ -73,6 +83,7 @@ class LLMDateRangeIntent(BaseModel):
             "since",
             "endpoint_patch",
             "same_as_latest_result",
+            "future_window",
         ]
         | None
     ) = Field(
@@ -82,7 +93,13 @@ class LLMDateRangeIntent(BaseModel):
             "or semantic windows such as last 12 months or year to date instead "
             "of asking deterministic code to parse localized prose. Use "
             "same_as_latest_result when the user references the latest completed "
-            "test's window; the runtime binds the dates from the canonical run."
+            "test's window; the runtime binds the dates from the canonical run. "
+            "Use future_window whenever the user's period points forward from "
+            "today — in ten years, over the next 3 years, by 2031, dentro de "
+            "diez años — with count/unit or year filled and the exact phrase as "
+            "evidence. A future_window is never a historical test window: do "
+            "not emit rolling_window or calendar dates for a forward-looking "
+            "period."
         ),
     )
     start: str | None = Field(
@@ -113,6 +130,14 @@ class LLMDateRangeIntent(BaseModel):
 
 
 class LLMStrategyDraft(BaseModel):
+    # Only deterministic runtime code can write this channel; model output cannot
+    # reach a private attribute. A str span is fidelity-audit evidence bound to a
+    # quote from the current message; a None span is typed edit-plan evidence,
+    # which has no bounded quote.
+    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = PrivateAttr(
+        default_factory=dict
+    )
+
     raw_user_phrasing: str | None = None
     language: str | None = Field(
         default=None,
@@ -122,9 +147,35 @@ class LLMStrategyDraft(BaseModel):
             "executable fields still use canonical Argus values."
         ),
     )
+    requested_strategy_template: RegisteredStrategyTemplate | None = Field(
+        default=None,
+        description=(
+            "Canonical registered strategy-template identity requested by the user. "
+            "Set this for both executable and recognized draft-only templates. Keep "
+            "it separate from strategy_type, which is the execution family, so a "
+            "recognized non-executable template is never silently converted into a "
+            "different runnable strategy."
+        ),
+    )
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
+    asset_inclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "includes in an anchored artifact edit. Do not copy carried assets or "
+            "symbols the user excludes."
+        ),
+    )
+    asset_exclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "excludes from an anchored artifact edit. Do not treat exclusions as "
+            "members of asset_universe."
+        ),
+    )
     asset_universe_operation: Literal["append", "add", "replace"] | None = Field(
         default=None,
         description=(
@@ -170,7 +221,10 @@ class LLMStrategyDraft(BaseModel):
         description=(
             "Short user-message spans that justify extracted canonical fields, keyed "
             "by field name such as strategy_type, asset_universe, date_range, "
-            "capital_amount, cadence, or comparison_baseline."
+            "capital_amount, cadence, comparison_baseline, fee_rate, or slippage. "
+            "For populated fee_rate or slippage, copy the exact bounded phrase from "
+            "the current user message into the corresponding evidence key; canonical "
+            "explicit-user provenance is derived from that evidence."
         ),
     )
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
@@ -251,9 +305,26 @@ class LLMInterpretationResponse(BaseModel):
             "retry_failed_action",
             "approval",
             "unsupported_request",
+            "asset_discovery",
         ]
         | None
     ) = None
+    asset_discovery: AssetDiscoveryRequest | None = Field(
+        default=None,
+        description=(
+            "Typed payload required when semantic_turn_act=asset_discovery: the "
+            "user explicitly asks Argus to find, discover, or list assets by "
+            "category ('what cybersecurity stocks could I test?'), by peer "
+            "similarity ('companies like Nvidia'), or for comparison candidates "
+            "('what else in Costco's category could I compare?'), in any "
+            "language. Set relationship to category, peer, or comparison; put "
+            "the plain category phrase in category_description; put known "
+            "anchor tickers in anchor_symbols; leave candidate_strategy_draft "
+            "empty for these turns. Ordinary 'what should I try next?' "
+            "follow-ups, capability questions, and direct backtest requests are "
+            "NOT asset discovery."
+        ),
+    )
     result_followup_focus: ResultFollowupFocus | None = None
     result_followup_fact_key: str | None = Field(
         default=None,

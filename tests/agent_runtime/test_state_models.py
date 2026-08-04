@@ -332,7 +332,12 @@ def test_capability_contract_exposes_default_simplification_templates() -> None:
         "unsupported_time_granularity",
         "unsupported_asset_mix",
         "unsupported_strategy_logic",
+        "future_performance",
     }
+    future_options = contract.get_simplification_options("future_performance")
+    assert [
+        option.replacement_values.get("requested_field") for option in future_options
+    ] == ["date_range", "date_range"]
     options = contract.get_simplification_options("unsupported_time_granularity")
 
     assert options == [

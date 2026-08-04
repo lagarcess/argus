@@ -31,3 +31,8 @@ globs: ["src/**/*.py", "web/**/*.ts", "web/**/*.tsx"]
 ---
 
 See: `.agent/skills/coding-standards/SKILL.md` for Python details, `.agent/skills/monorepo-patterns/SKILL.md` for sync patterns, `.agent/skills/mock-data-patterns/SKILL.md` for Faker usage.
+
+## User-Facing Copy Punctuation
+
+- Never use the em dash (—) in user-facing copy, in any language. Use a
+  comma, colon, period, or the word that fits. Founder-locked 2026-08-04.

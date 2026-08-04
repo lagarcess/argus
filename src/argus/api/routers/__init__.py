@@ -5,6 +5,7 @@ __all__ = [
     "auth",
     "backtest",
     "collections",
+    "conversation_activity",
     "conversations",
     "dev",
     "discovery",

@@ -573,6 +573,35 @@ The system is ready only when all of the following are true:
 - The backtest service task currently active in each environment is explicitly
   documented and verified before testers are invited.
 
+## Guest Candidate Canary Addendum
+
+A guest candidate adds gates; it does not bypass the release sequence above.
+Before any guest traffic:
+
+- the exact candidate SHA must pass the local real-Auth/Postgres browser matrix
+  in an isolated process;
+- checked-in server/frontend Guest defaults must remain true, explicit false
+  must preserve rollback, and public-account access must remain false;
+- the branch-deployed canary must prove `/` opens guest chat only in the
+  approved staged mode, while permanent signup/login remains allowlist-gated;
+- hosted Supabase must explicitly enable anonymous Auth, configure an approved
+  CAPTCHA posture, and retain provider plus Argus rate limits;
+- conversion must prove same-UUID linking and atomic existing-account claim
+  without duplicate artifacts, usage, jobs, or pending actions;
+- the cleanup dry run and bounded real run must be scheduled with an owner,
+  alert on failures/lag, and preserve converted or permanent accounts;
+- guest analytics must stay personless and metadata-only; browser facts cross
+  the authenticated server endpoint and never include financial prose, Auth
+  material, exact capital/dates, private titles, or provider/model names;
+- calibration evidence must record local synthetic p50/p95 where supported,
+  queue/backpressure decisions, anonymous-identity volume, cleanup lag, and the
+  single canary's provider-reported latency/cost. Unsupported production
+  projections must remain explicitly unmeasured.
+
+Canary failure rolls back presentation first, then server guest bootstrap.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` stays false unless a separate founder
+decision authorizes it. A local Block 4 pass is not “public ready.”
+
 ## Non-Goals
 
 - Do not add new product surfaces unrelated to release hygiene.

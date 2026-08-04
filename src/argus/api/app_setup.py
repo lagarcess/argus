@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import os
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -12,7 +11,12 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.dependencies import request_id_middleware
+from argus.api.dependencies import (
+    ChatRequestBoundaryMiddleware,
+    request_id_middleware,
+    validation_problem_body,
+)
+from argus.llm.openrouter_key_policy import validate_hosted_openrouter_configuration
 
 DEFAULT_CORS_ALLOW_ORIGINS = (
     "http://localhost:3000",
@@ -39,6 +43,7 @@ def cors_allow_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_hosted_openrouter_configuration()
     checkpointer_cm = None
     if api_state.CHECKPOINTER_MODE == "postgres":
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -88,46 +93,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
 
-def _json_safe_validation_error(value: Any) -> Any:
-    if value is None or isinstance(value, str | int | float | bool):
-        return value
-    if isinstance(value, BaseException):
-        return str(value)
-    if isinstance(value, dict):
-        return {
-            str(key): _json_safe_validation_error(nested)
-            for key, nested in value.items()
-        }
-    if isinstance(value, list | tuple):
-        return [_json_safe_validation_error(nested) for nested in value]
-    return str(value)
-
-
-def _json_safe_validation_errors(
-    errors: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    return [
-        {
-            str(key): _json_safe_validation_error(value)
-            for key, value in error.items()
-        }
-        for error in errors
-    ]
-
-
 async def validation_exception_handler(  # type: ignore[no-untyped-def]
     request: Request,
     exc: RequestValidationError,
 ):
-    body = {
-        "type": "https://api.argus.app/problems/validation-error",
-        "title": "Validation Error",
-        "status": 422,
-        "detail": "The request body or parameters did not match the API contract.",
-        "code": "validation_error",
-        "request_id": getattr(request.state, "request_id", api_state.store.new_id()),
-        "context": {"errors": _json_safe_validation_errors(exc.errors())},
-    }
+    body = validation_problem_body(
+        getattr(request.state, "request_id", api_state.store.new_id()),
+        exc.errors(),
+    )
 
     origin = request.headers.get("origin")
     headers: dict[str, str] = {}
@@ -138,6 +111,7 @@ async def validation_exception_handler(  # type: ignore[no-untyped-def]
 
 
 def add_core_middleware_and_handlers(app: FastAPI) -> None:
+    app.add_middleware(ChatRequestBoundaryMiddleware)
     app.middleware("http")(request_id_middleware)
     app.add_middleware(
         CORSMiddleware,

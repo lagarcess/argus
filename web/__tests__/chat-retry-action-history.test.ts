@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { normalizeRetryActionHistory } from "../lib/chat-retry-action-history";
+import { normalizeDurableRetryActionHistory } from "../lib/chat-retry-actions";
 import type { ChatActionOption, Message } from "../components/chat/types";
 
 const retryAction: ChatActionOption = {
@@ -24,6 +25,28 @@ function failedMessage(id = "failed-message"): Message {
 }
 
 describe("chat retry action history", () => {
+  test("keeps an abandoned input-side retry on its owning user message", () => {
+    const owner: Message = {
+      id: "request-message-1",
+      role: "user",
+      kind: "text",
+      content: "Test AAPL",
+      actions: [
+        {
+          id: "retry-last-turn-request-message-1",
+          label: "Retry",
+          type: "retry_last_turn",
+          payload: {
+            request_message_id: "request-message-1",
+            message: "Test AAPL",
+          },
+        },
+      ],
+    };
+
+    expect(normalizeDurableRetryActionHistory([owner])).toEqual([owner]);
+  });
+
   test("keeps retry visible on the latest unresolved failed assistant message", () => {
     const [message] = normalizeRetryActionHistory([failedMessage()]);
 

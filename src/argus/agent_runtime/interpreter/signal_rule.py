@@ -28,6 +28,24 @@ from argus.domain.backtesting.rules import canonicalize_rule_spec
 from argus.domain.indicators import executable_indicator_spec
 
 
+def crossover_shorthand_prompt_clause() -> str:
+    """Interpreter-prompt contract for moving-average crossover shorthand."""
+
+    return (
+        "When the user says something like 'buy Nvidia when the 50-day moving average "
+        "crosses above the 200-day', classify it as signal_strategy, preserve "
+        "the crossover as entry_logic, and default the exit to the same fast "
+        "average crossing back below the slow average when the user leaves the "
+        "exit unspecified. Do not ask what the buy trigger is.\n\n"
+        "Common trader shorthand such as 'buy when the 50 crosses the 200', "
+        "'50/200 cross', or 'golden cross' also means a moving-average crossover. "
+        "If the user omits SMA/EMA, use SMA as the default assumption and expose "
+        "that assumption later in the confirmation card instead of asking them "
+        "to restate the trigger. Ask only for truly missing run facts such as "
+        "the asset or date window.\n\n"
+    )
+
+
 def _response_needs_supported_signal_rule_recovery(
     response: LLMInterpretationResponse,
     *,

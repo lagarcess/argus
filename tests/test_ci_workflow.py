@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -8,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 CANARY_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-canary.yml"
 SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
-AGENT_RUNTIME_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
+AGENT_RUNTIME_WORKFLOW_PATH = (
+    ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
+)
 
 
 def _workflow() -> dict:
@@ -61,17 +64,24 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
         str(step.get("run", "")) for step in jobs["backend-checks"]["steps"]
     )
     assert "poetry run ruff check src tests workflows scripts" in backend_steps
-    assert "tests/test_environment_scripts.py" in backend_steps
-    assert "tests/test_api_import_boundary.py" in backend_steps
-    assert "tests/test_render_canary_script.py" in backend_steps
-    assert "tests/test_legacy_orchestrator_retirement.py" in backend_steps
-    assert "tests/test_chat_backtest_state_machine.py" in backend_steps
-    assert "tests/test_chat_runtime_reload_guardrails.py" in backend_steps
-    assert "tests/test_openrouter_policy.py" in backend_steps
-    assert "tests/agent_runtime/test_execute_recovery.py" in backend_steps
-    assert "tests/agent_runtime/test_latest_result_fact_answers.py" in backend_steps
-    assert "tests/section3/test_market_data_provider.py" in backend_steps
-    assert "--no-cov" in backend_steps
+    assert "poetry run pytest tests -q --no-cov" in backend_steps
+
+
+def test_backend_checks_gates_the_suite_by_directory() -> None:
+    """New test files must be gated without editing this workflow.
+
+    A curated file list drops new tests silently, so the backend suite step
+    runs `tests` as a directory and must never enumerate individual files.
+    """
+    jobs = _workflow()["jobs"]
+    backend_steps = "\n".join(
+        str(step.get("run", "")) for step in jobs["backend-checks"]["steps"]
+    )
+
+    assert re.search(r"pytest\s+tests\s", backend_steps)
+    assert "tests/test_" not in backend_steps
+    assert "tests/agent_runtime/" not in backend_steps
+    assert "tests/section3/" not in backend_steps
 
     frontend_steps = "\n".join(
         str(step.get("run", "")) for step in jobs["frontend-checks"]["steps"]
@@ -86,6 +96,35 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     assert "bun run build" in frontend_steps
 
 
+def test_ci_runs_guest_release_gates_with_disposable_local_supabase() -> None:
+    jobs = _workflow()["jobs"]
+    guest_job = jobs["guest-release-gates"]
+    joined_steps = "\n".join(str(step.get("run", "")) for step in guest_job["steps"])
+    uses_steps = {
+        str(step.get("uses", "")): step for step in guest_job["steps"] if step.get("uses")
+    }
+
+    assert "supabase/setup-cli@v1" in uses_steps
+    assert uses_steps["supabase/setup-cli@v1"]["with"]["version"] == "2.109.0"
+    assert "supabase start" in joined_steps
+    assert "supabase db reset" in joined_steps
+    assert "ARGUS_DISPOSABLE_DATABASE_URL" in joined_steps
+    assert "ARGUS_LOCAL_SUPABASE_URL" in joined_steps
+    assert "ARGUS_LOCAL_SUPABASE_ANON_KEY" in joined_steps
+    assert "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY" in joined_steps
+    assert "tests/evals/test_chat_runtime_trajectory_harness.py" in joined_steps
+    # Glob, not a hand-list: a new _postgres proof must be gated without
+    # editing the workflow. The hand-list was how uncovered tables shipped.
+    assert "tests/test_*_postgres.py" in joined_steps
+    assert "tests/test_guest_auth_local_supabase.py" in joined_steps
+    assert "scripts/qa/assert_pytest_gate.py" in joined_steps
+    assert guest_job["env"]["OPENROUTER_API_KEY"] == ""
+    assert guest_job["env"]["ALPACA_API_KEY"] == ""
+    assert guest_job["env"]["ALPACA_SECRET_KEY"] == ""
+    assert guest_job["env"]["ARGUS_MARKET_DATA_PROVIDER_MODE"] == "synthetic_unit_fixture"
+    assert "live_provider" not in joined_steps
+
+
 def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     jobs = _workflow()["jobs"]
 
@@ -93,6 +132,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "ownership-gate",
         "backend-checks",
         "frontend-checks",
+        "guest-release-gates",
     ]
 
 
@@ -148,8 +188,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     assert set(job["env"]) == {"ARGUS_WARMUP_EXPECT_MODE"}
 
     secret_steps = {
-        step["name"]: set((step.get("env") or {}).keys()) & secret_names
-        for step in steps
+        step["name"]: set((step.get("env") or {}).keys()) & secret_names for step in steps
     }
     assert secret_steps["Check required secrets"] == secret_names
     assert secret_steps["Warm Render product path"] == {
@@ -158,7 +197,8 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
         "ARGUS_WORKFLOW_DATABASE_URL",
     }
     assert secret_steps["Run authoritative Spanish release canary"] == secret_names
-    assert secret_steps["Upload canary evidence"] == set()
+    assert secret_steps["Upload human-safe canary evidence"] == set()
+    assert secret_steps["Upload failed canary capture"] == set()
 
     for step in steps:
         if step["name"] in {
@@ -178,10 +218,21 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     uses_steps = "\n".join(str(step.get("uses", "")) for step in job["steps"])
 
     assert "mkdir -p temp/canary-evidence" in joined_steps
+    prepare_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Prepare canary evidence directory"
+    )
+    warmup_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Warm Render product path"
+    )
+    assert prepare_index < warmup_index
+    assert ": > temp/canary-evidence/es-419-capture.json" in joined_steps
+    assert "rm -f temp/canary-evidence/es-419-capture.json" in joined_steps
     assert (
-        steps_by_name["Run authoritative Spanish release canary"][
-            "continue-on-error"
-        ]
+        steps_by_name["Run authoritative Spanish release canary"]["continue-on-error"]
         is True
     )
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
@@ -194,11 +245,15 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert "for locale in en es-419 provider-path" not in joined_steps
     assert "Install Chromium for the deployed browser canary" in steps_by_name
     assert "actions/upload-artifact@v4" in uses_steps
-    assert "private-alpha-canary-evidence" in CANARY_WORKFLOW_PATH.read_text(
-        encoding="utf-8"
+    workflow_source = CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "private-alpha-canary-evidence" in workflow_source
+    assert "temp/canary-evidence/*" not in workflow_source
+    assert steps_by_name["Upload human-safe canary evidence"]["with"]["path"] == (
+        "temp/canary-evidence/es-419.json\n" "temp/canary-evidence/es-419.exit\n"
     )
-    assert "path: temp/canary-evidence/*\n" in CANARY_WORKFLOW_PATH.read_text(
-        encoding="utf-8"
+    assert steps_by_name["Upload failed canary capture"]["if"] == "failure()"
+    assert steps_by_name["Upload failed canary capture"]["with"]["path"] == (
+        "temp/canary-evidence/es-419-capture.json"
     )
 
 
@@ -234,7 +289,7 @@ def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev,workflows --no-interaction" in joined_steps
     assert "cd web && bun install --frozen-lockfile" in joined_steps
-    assert ".github/local-smoke.sh --expected-sha \"$GITHUB_SHA\"" in joined_steps
+    assert '.github/local-smoke.sh --expected-sha "$GITHUB_SHA"' in joined_steps
     assert "RENDER_API_KEY" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
@@ -250,9 +305,7 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
     }
     assert workflow["on"]["schedule"] == [{"cron": "15 9 * * *"}]
     assert workflow["on"]["push"]["branches"] == ["codex/private-alpha-next"]
-    assert workflow["on"]["pull_request"]["branches"] == [
-        "codex/private-alpha-next"
-    ]
+    assert workflow["on"]["pull_request"]["branches"] == ["codex/private-alpha-next"]
     assert "src/argus/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
     assert "tests/agent_runtime/**" in workflow["on"]["pull_request"]["paths"]
     assert "tests/test_spine_guardrails.py" in workflow["on"]["pull_request"]["paths"]
@@ -288,7 +341,10 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
 
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev --no-interaction" in joined_steps
-    assert "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov" in joined_steps
+    assert (
+        "poetry run pytest tests/agent_runtime tests/test_spine_guardrails.py -q --no-cov"
+        in joined_steps
+    )
     sweep_step = next(
         step
         for step in job["steps"]

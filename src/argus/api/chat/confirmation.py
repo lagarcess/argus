@@ -5,6 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from argus.agent_runtime.confirmation_artifacts import (
+    canonical_payload_hash,
     confirmation_id_from_payload,
     stable_payload_hash,
     validate_confirmation_execution_payload,
@@ -25,6 +26,19 @@ from argus.domain.engine_launch.display import (
     format_date_range_label,
     format_timeframe_data_label,
 )
+
+
+def public_confirmation_projection(value: Any) -> Any:
+    """Remove private durable confirmation identity from public transport data."""
+    if isinstance(value, dict):
+        return {
+            key: public_confirmation_projection(item)
+            for key, item in value.items()
+            if key != "canonical_launch_payload_hash"
+        }
+    if isinstance(value, list):
+        return [public_confirmation_projection(item) for item in value]
+    return value
 
 
 def runtime_confirmation_card(
@@ -212,9 +226,15 @@ def runtime_confirmation_card(
                 "payload": action_payload,
             },
         )
-    card = {
+    card: dict[str, Any] = {
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
+        "launch_payload_hash": stable_payload_hash(
+            execution_validation.launch_payload
+        ),
+        "canonical_launch_payload_hash": canonical_payload_hash(
+            execution_validation.launch_payload
+        ),
         "title": title,
         "status": "ready_to_run" if is_ready_to_run else "needs_change",
         "statusLabel": _confirmation_status_label(
@@ -238,7 +258,69 @@ def runtime_confirmation_card(
         card["asset_class"] = asset_class
     if canonical_date_range is not None:
         card["date_range"] = canonical_date_range
+    period_adjustment = _period_adjustment_from_launch_payload(launch_payload)
+    if period_adjustment is not None:
+        card["period_adjustment"] = period_adjustment
+    benchmark_adjustment = _benchmark_adjustment_from_strategy(strategy)
+    if benchmark_adjustment is not None:
+        card["benchmark_adjustment"] = benchmark_adjustment
     return card
+
+
+def _benchmark_adjustment_from_strategy(
+    strategy: dict[str, Any],
+) -> dict[str, Any] | None:
+    """The user's named comparison target that could not be executed rides
+    the strategy's resolution provenance; the card owns disclosing the swap."""
+    effective = str(strategy.get("comparison_baseline") or "").strip()
+    if not effective:
+        return None
+    for item in strategy.get("resolution_provenance") or []:
+        if not isinstance(item, dict):
+            continue
+        if (
+            item.get("field") == "comparison_baseline"
+            and item.get("resolution_status")
+            in {"unsupported", "ambiguous", "unavailable_for_requested_run"}
+            and str(item.get("raw_text") or "").strip()
+        ):
+            return {
+                "code": "comparison_target_unsupported",
+                "requested_target": str(item["raw_text"]).strip(),
+                "effective_benchmark": effective,
+            }
+    return None
+
+
+def _period_adjustment_from_launch_payload(
+    launch_payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    coverage = launch_payload.get("coverage_preflight")
+    if (
+        not isinstance(coverage, dict)
+        or coverage.get("outcome") != "adjusted_coverage"
+        or coverage.get("adjustment_reason") != "provider_coverage_adjustment"
+    ):
+        return None
+    requested = _date_range_payload(coverage.get("requested_date_range"))
+    effective = _date_range_payload(coverage.get("effective_date_range"))
+    if requested is None or effective is None:
+        return None
+    return {
+        "code": "effective_window_adjusted",
+        "requested_date_range": dict(requested),
+        "effective_date_range": dict(effective),
+    }
+
+
+def _date_range_payload(value: Any) -> dict[str, str] | None:
+    if not (
+        isinstance(value, dict)
+        and isinstance(value.get("start"), str)
+        and isinstance(value.get("end"), str)
+    ):
+        return None
+    return {"start": value["start"], "end": value["end"]}
 
 
 def _confirmation_asset_class(strategy: dict[str, Any]) -> str | None:
@@ -359,9 +441,7 @@ def _confirmation_assumptions(
         launch_payload=launch_payload or {},
     )
     if execution_costs is not None:
-        assumptions.append(
-            _execution_cost_assumption(execution_costs, language=language)
-        )
+        assumptions.append(_execution_cost_assumption(execution_costs, language=language))
     else:
         fees = _optional_parameter_value(optional_parameters, "fees")
         if fees in (0, 0.0, "0", "0.0"):

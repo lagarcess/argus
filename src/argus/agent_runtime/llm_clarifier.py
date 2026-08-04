@@ -187,9 +187,11 @@ class OpenRouterClarificationGenerator:
             ),
             "missing_required_fields": request.missing_required_fields,
             "ambiguous_fields": request.ambiguous_fields,
-            "unsupported_constraints": request.unsupported_constraints,
+            "unsupported_constraints": _unsupported_constraints_for_voice(
+                request.unsupported_constraints
+            ),
             "optional_parameter_choices": request.optional_parameter_choices,
-            "response_intent": request.response_intent,
+            "response_intent": _response_intent_for_voice(request.response_intent),
             "expected_question_targets": sorted(_expected_question_targets(request)),
             "expected_detail_targets": sorted(_expected_detail_targets(request)),
         }
@@ -202,6 +204,10 @@ class OpenRouterClarificationGenerator:
                     "Target 45-90 words unless the user explicitly asks for depth. "
                     "Ask for only the next decision needed, or offer at most three "
                     "short runnable choices. "
+                    "When typed choices accompany this response they render as "
+                    "separate selectable rows; never enumerate them inline after "
+                    "the question, never end the question with a dash or a "
+                    "half-started list, and finish on the question itself. "
                     "Do not expose field names such as asset_universe, capital_amount, "
                     "date_range, requested_field, or missing_required_fields. Do not "
                     "put JSON text inside the question. Do not use headings or "
@@ -218,6 +224,10 @@ class OpenRouterClarificationGenerator:
                     "allows adding assets, removing assets, keeping a subset, "
                     "replacing assets, or changing another setup field. Do not ask "
                     "which single asset to replace or what to use instead. "
+                    "When response_intent.kind is 'coverage_recovery', explain "
+                    "provider-neutrally that the shared history is unavailable or "
+                    "insufficient, then ask whether to change the dates, an asset, "
+                    "or the benchmark. Do not describe it as an unsupported rule. "
                     "When the expected target includes DCA sizing, direct_question "
                     "must contain the concrete question the user needs to answer, "
                     "not just an acknowledgement that another detail is needed. "
@@ -264,14 +274,46 @@ class OpenRouterClarificationGenerator:
                     "candidate strategy's asset, period, and unsupported rule when "
                     "available; name the limitation in product language; then offer "
                     "the provided simplification_options as concrete runnable next "
-                    "moves. Ask which direction to use. Do not claim the unsupported "
-                    "part is executable."
+                    "moves. Ask which direction to use. Say what Argus can or cannot "
+                    "test in plain user language. Do not use implementation terms "
+                    "such as rule_spec, signal engine, executable, provider, schema, "
+                    "registry, metadata, or reason code. Do not claim the unsupported "
+                    "part is executable or can become runnable after the user defines "
+                    "custom logic."
                 )
             ),
             SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),
             *history,
             HumanMessage(content=request.current_user_message),
         ]
+
+
+def _unsupported_constraints_for_voice(
+    constraints: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep typed recovery facts while withholding internal explanation copy."""
+
+    return [
+        {key: value for key, value in constraint.items() if key != "explanation"}
+        for constraint in constraints
+    ]
+
+
+def _response_intent_for_voice(response_intent: dict[str, Any]) -> dict[str, Any]:
+    sanitized = dict(response_intent)
+    facts = sanitized.get("facts")
+    if not isinstance(facts, dict):
+        return sanitized
+    sanitized_facts = dict(facts)
+    constraints = sanitized_facts.get("unsupported_constraints")
+    if isinstance(constraints, list) and all(
+        isinstance(item, dict) for item in constraints
+    ):
+        sanitized_facts["unsupported_constraints"] = (
+            _unsupported_constraints_for_voice(constraints)
+        )
+    sanitized["facts"] = sanitized_facts
+    return sanitized
 
 
 def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str]]:

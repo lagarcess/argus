@@ -13,6 +13,8 @@ from pydantic import (
     model_validator,
 )
 
+from argus.domain.capability_registry import RegisteredStrategyTemplate
+
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
 ExpertiseMode = Literal["beginner", "intermediate", "advanced"]
@@ -41,6 +43,7 @@ PendingNeedName = Literal[
 ResponseIntentKind = Literal[
     "clarification",
     "beginner_guidance",
+    "coverage_recovery",
     "unsupported_recovery",
     "ambiguity_check",
     "optional_settings",
@@ -112,6 +115,7 @@ class ConversationMessage(BaseModel):
 
 class StrategySummary(BaseModel):
     raw_user_phrasing: str | None = None
+    requested_strategy_template: RegisteredStrategyTemplate | None = None
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
@@ -354,6 +358,12 @@ class ThreadState(BaseModel):
 class RunState(BaseModel):
     current_user_message: str
     recent_thread_history: list[ConversationMessage] = Field(default_factory=list)
+    # Backend-derived per-turn discovery allowance truth; the runtime consumes
+    # it and never computes quota itself.
+    discovery_allowance_available: bool = True
+    # Kinds offered on the previous result turn; ran or ignored, they are
+    # spent for the next Try next composition.
+    prior_next_experiment_kinds: list[str] = Field(default_factory=list)
     normalized_signals: dict[str, Any] = Field(default_factory=dict)
     intent: IntentName | None = None
     task_relation: TaskRelation | None = None

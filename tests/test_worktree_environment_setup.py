@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / ".github" / "setup-worktree-env.sh"
 SETUP = ROOT / ".github" / "setup.sh"
 CODEX_ENVIRONMENT = ROOT / ".codex" / "environments" / "environment.toml"
+GITIGNORE = ROOT / ".gitignore"
 BACKEND_SECRET = "backend-secret-value"
 FRONTEND_SECRET = "frontend-secret-value"
 
@@ -76,14 +77,19 @@ def _run_helper(
     target: Path,
     *,
     canonical_override: Path | None = None,
+    check_only: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env.pop("ARGUS_CANONICAL_WORKTREE_ROOT", None)
     if canonical_override is not None:
         env["ARGUS_CANONICAL_WORKTREE_ROOT"] = str(canonical_override)
 
+    command = ["bash", str(HELPER)]
+    if check_only:
+        command.append("--check")
+    command.append(str(target))
     return subprocess.run(
-        ["bash", str(HELPER), str(target)],
+        command,
         cwd=target,
         env=env,
         capture_output=True,
@@ -105,6 +111,39 @@ def test_setup_calls_worktree_env_helper_before_dependency_setup() -> None:
     assert invocation in source
     assert source.index(invocation) < source.index("PINNED_PYTHON=")
     assert "git ls-files -- .env web/.env.local" in source
+
+
+def test_setup_pins_poetry_and_bun_to_ci_versions() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'PINNED_POETRY_VERSION="2.1.3"' in source
+    assert 'POETRY_VERSION="$PINNED_POETRY_VERSION" "$PYTHON_CMD" -' in source
+    assert 'PINNED_BUN_VERSION="1.3.14"' in source
+    assert 'bash -s "bun-v$PINNED_BUN_VERSION"' in source
+
+
+def test_setup_binds_poetry_to_exact_repo_python_version() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'uv python install "$PINNED_PYTHON"' in source
+    assert 'uv python find "$PINNED_PYTHON"' in source
+    assert "== '$PINNED_PYTHON'" in source
+    assert 'poetry env use "$PYTHON_CMD"' in source
+
+
+def test_setup_persists_cloud_toolchain_path_and_disables_next_telemetry() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'SHELL_PROFILE="$HOME/.bashrc"' in source
+    assert 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' in source
+    assert 'export NEXT_TELEMETRY_DISABLED=1' in source
+    assert "next telemetry disable" not in source
+
+
+def test_next_telemetry_cache_cannot_dirty_cloud_checkouts() -> None:
+    source = GITIGNORE.read_text(encoding="utf-8")
+
+    assert "web/cache/config.json" in source.splitlines()
 
 
 def test_codex_environment_delegates_to_tracked_setup_and_cleanup() -> None:
@@ -130,9 +169,7 @@ def test_links_missing_environment_files_from_integration_worktree(
     assert (worker / ".env").is_symlink()
     assert (worker / "web" / ".env.local").is_symlink()
     assert (worker / ".env").resolve() == canonical / ".env"
-    assert (worker / "web" / ".env.local").resolve() == (
-        canonical / "web" / ".env.local"
-    )
+    assert (worker / "web" / ".env.local").resolve() == (canonical / "web" / ".env.local")
     assert BACKEND_SECRET not in _combined_output(result)
     assert FRONTEND_SECRET not in _combined_output(result)
 
@@ -154,6 +191,50 @@ def test_rerun_keeps_existing_canonical_links(tmp_path: Path) -> None:
     assert os.readlink(worker / "web" / ".env.local") == frontend_link
     assert BACKEND_SECRET not in _combined_output(second)
     assert FRONTEND_SECRET not in _combined_output(second)
+
+
+def test_check_mode_reports_canonical_links_without_mutating_them(
+    tmp_path: Path,
+) -> None:
+    canonical, worker = _create_worktrees(tmp_path)
+    _write_canonical_env(canonical)
+    setup = _run_helper(worker)
+    backend_link = os.readlink(worker / ".env") if setup.returncode == 0 else ""
+    frontend_link = (
+        os.readlink(worker / "web" / ".env.local") if setup.returncode == 0 else ""
+    )
+
+    result = _run_helper(worker, check_only=True)
+
+    assert setup.returncode == 0, _combined_output(setup)
+    assert result.returncode == 0, _combined_output(result)
+    assert "root .env: canonical-linked" in result.stdout
+    assert "web/.env.local: canonical-linked" in result.stdout
+    assert os.readlink(worker / ".env") == backend_link
+    assert os.readlink(worker / "web" / ".env.local") == frontend_link
+    assert BACKEND_SECRET not in _combined_output(result)
+    assert FRONTEND_SECRET not in _combined_output(result)
+
+
+def test_check_mode_fails_for_missing_or_conflicting_topology_without_repair(
+    tmp_path: Path,
+) -> None:
+    canonical, worker = _create_worktrees(tmp_path)
+    _write_canonical_env(canonical)
+    alternate_frontend_env = tmp_path / "alternate-frontend.env"
+    alternate_frontend_env.write_text("alternate-owned\n", encoding="utf-8")
+    (worker / "web").mkdir(exist_ok=True)
+    (worker / "web" / ".env.local").symlink_to(alternate_frontend_env)
+
+    result = _run_helper(worker, check_only=True)
+
+    assert result.returncode == 1, _combined_output(result)
+    assert "root .env: missing" in result.stdout
+    assert "web/.env.local: conflicting-link" in result.stdout
+    assert not (worker / ".env").exists()
+    assert (worker / "web" / ".env.local").resolve() == alternate_frontend_env
+    assert BACKEND_SECRET not in _combined_output(result)
+    assert FRONTEND_SECRET not in _combined_output(result)
 
 
 def test_preserves_existing_file_and_conflicting_symlink(tmp_path: Path) -> None:

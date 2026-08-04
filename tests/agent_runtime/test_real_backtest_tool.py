@@ -6,6 +6,59 @@ from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
 from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 
 
+def _coverage_approval(start: str, end: str) -> dict[str, object]:
+    date_range = {"start": start, "end": end}
+    return {
+        "requested_date_range": date_range,
+        "coverage_preflight": {
+            "outcome": "full_coverage",
+            "requested_date_range": date_range,
+            "effective_date_range": date_range,
+            "preflight_id": "sha256:test-coverage",
+        },
+    }
+
+
+def test_real_backtest_tool_rejects_execution_without_coverage_approval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter_called = False
+
+    def fake_run_launch_backtest(*args, **kwargs):
+        nonlocal adapter_called
+        adapter_called = True
+        raise AssertionError("legacy confirmation reached the execution adapter")
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
+    )
+
+    result = RealBacktestTool().run(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10_000,
+            "benchmark_symbol": "SPY",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "parameter_validation_error"
+    assert result["capability_context"]["failure_code"] == (
+        "approved_data_window_unavailable"
+    )
+    assert result["capability_context"]["failure_detail"] == (
+        "approved_data_window_unavailable"
+    )
+    assert adapter_called is False
+
+
 def test_real_backtest_tool_returns_success_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -66,6 +119,7 @@ def test_real_backtest_tool_returns_success_payload(
             "risk_rules": [],
             "benchmark_symbol": "SPY",
             "language": "es-419",
+            **_coverage_approval("2024-01-01", "2024-12-31"),
         }
     )
 
@@ -130,6 +184,7 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
             "parameters": {},
             "risk_rules": [],
             "benchmark_symbol": "SPY",
+            **_coverage_approval("2024-01-01", "2024-12-31"),
         }
     )
 
@@ -191,6 +246,7 @@ def test_real_backtest_tool_maps_benchmark_data_unavailable_as_retryable_depende
             "parameters": {},
             "risk_rules": [],
             "benchmark_symbol": "SPY",
+            **_coverage_approval("2024-01-01", "2024-12-31"),
         }
     )
 

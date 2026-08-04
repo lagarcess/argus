@@ -13,5 +13,9 @@ cases:
       date_range:
         start: "2024-01-01"
         end: "2024-06-30"
+      effective_date_range:
+        start: "2024-01-02"
+        end: "2024-06-28"
+      adjustment_reason: calendar_alignment
       benchmark_symbol: SPY
       stage_outcomes: ["ready_for_confirmation", "await_approval"]

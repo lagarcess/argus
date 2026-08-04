@@ -89,6 +89,9 @@ class WorkflowState(TypedDict, total=False):
     result_action_request: dict[str, Any]
     clarification: dict[str, Any]
     recovery: dict[str, Any]
+    discovery: dict[str, Any]
+    discovery_usage: dict[str, Any]
+    next_experiments: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -111,6 +114,9 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "result_action_request",
         "clarification",
         "recovery",
+        "discovery",
+        "discovery_usage",
+        "next_experiments",
     }
 )
 
@@ -215,6 +221,7 @@ def build_workflow(
         WorkflowNode.EXECUTE.value,
         _route_from_stage_outcome,
         {
+            WorkflowRoute.CONFIRM.value: WorkflowNode.CONFIRM.value,
             WorkflowRoute.EXPLAIN.value: WorkflowNode.EXPLAIN.value,
             WorkflowRoute.END.value: END,
         },
@@ -322,6 +329,14 @@ def _apply_stage_result(
         and isinstance(state.get("assistant_response"), str)
     ):
         cleared_output_keys.discard("assistant_response")
+    # The Try next sidecar survives the closing no-op stage the same way the
+    # response text does; only a stage that patches it may replace it.
+    if (
+        outcome is WorkflowStageOutcome.END_RUN
+        and "next_experiments" not in result.patch
+        and isinstance(state.get("next_experiments"), dict)
+    ):
+        cleared_output_keys.discard("next_experiments")
     workflow_state: WorkflowState = {
         **state,
         **{key: None for key in cleared_output_keys},
@@ -656,6 +671,35 @@ def _build_thread_metadata(
         "latest_task_type": run_state.intent,
         "last_stage_outcome": stage_outcome_value,
     }
+    offered = workflow_state.get("next_experiments")
+    if isinstance(offered, dict):
+        kinds = [
+            str(row.get("kind"))
+            for row in offered.get("rows") or []
+            if isinstance(row, dict) and row.get("kind")
+        ]
+        if kinds:
+            metadata["next_experiments_offered_kinds"] = kinds
+            sends = {
+                str(row.get("kind")): str(row.get("send_text"))
+                for row in offered.get("rows") or []
+                if isinstance(row, dict) and row.get("kind") and row.get("send_text")
+            }
+            if sends:
+                metadata["next_experiments_offered_texts"] = sends
+    if "next_experiments_offered_kinds" not in metadata:
+        # A turn without a new result keeps the previous result's offer on
+        # record; only a fresh offer replaces it (spec §4.3 non-repetition).
+        prior_offer_metadata = workflow_state.get("selected_thread_metadata")
+        if isinstance(prior_offer_metadata, dict):
+            prior_kinds = prior_offer_metadata.get("next_experiments_offered_kinds")
+            if isinstance(prior_kinds, list) and prior_kinds:
+                metadata["next_experiments_offered_kinds"] = list(prior_kinds)
+                prior_sends = prior_offer_metadata.get(
+                    "next_experiments_offered_texts"
+                )
+                if isinstance(prior_sends, dict) and prior_sends:
+                    metadata["next_experiments_offered_texts"] = dict(prior_sends)
     requested_field = workflow_state.get("requested_field")
     if requested_field in (None, ""):
         requested_field = run_state.requested_field
@@ -677,6 +721,22 @@ def _build_thread_metadata(
             requested_field = prior_metadata.get("requested_field")
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
+    prior_metadata = workflow_state.get("selected_thread_metadata")
+    if (
+        stage_outcome_value
+        in {
+            "needs_clarification",
+            "ready_for_confirmation",
+            "await_user_reply",
+            "await_approval",
+        }
+        and run_state.task_relation in {"continue", "refine"}
+        and isinstance(prior_metadata, dict)
+    ):
+        for key in ("source_result_run_id", "strategy_path_id"):
+            value = prior_metadata.get(key)
+            if isinstance(value, str) and value:
+                metadata[key] = value
     if run_state.response_intent is not None:
         metadata["response_intent"] = run_state.response_intent.model_dump(mode="python")
     clarification = workflow_state.get("clarification")

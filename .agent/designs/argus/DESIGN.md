@@ -214,7 +214,62 @@ _Design targets below are intentional for this system; if implementation keeps T
 
   - The frontend must **never fake these states with timers**. If no `stage_start` event has been received, show a neutral loading indicator only.
 - **Inline Results**: Backtest result cards appear directly in the flow of conversation.
-- **Minimal Actions**: Follow-up actions should be clear but few (e.g., "Save Strategy", "Add to Collection").
+- **Minimal Actions**: Follow-up actions should be clear but few. Under
+  private-alpha defaults, examples are "Explain result", "Refine idea", and
+  "Add decision". "Save Strategy" and "Add to Collection" must not appear while
+  their product flags are disabled.
+- **Pills are buttons; rows are next moves.** A pill is a true button — result
+  and confirmation card CTAs, starter prompts, and the user's own echoed action
+  bubble. Anything conversational the assistant offers — clarify options,
+  follow-ups, discovery candidates — renders as a stacked next-move row under
+  the message that offered it, so a question and its answers stay together.
+  Sentence-length choices do not belong in pills; they wrap badly and they hide
+  the detail that makes the choice meaningful.
+
+### Next-move rows
+
+- **Anatomy**: borderless at rest, with a muted leading `↳` glyph carrying the
+  affordance — touch devices never hover, so the rest state must read as
+  tappable on its own. On hover or press, a hairline border plus wash appears,
+  **sized to the text**: a short label gets a short box.
+- **Hit area is not the visible box.** The tappable region spans the full
+  message column and stays at least 44px tall regardless of how narrow the
+  hover box is. Never make someone aim at the text.
+- **Detail is visible, never a tooltip.** A discovery row shows the
+  resolver-owned name and its reason inline. Tooltips hide the very thing that
+  makes one candidate different from another, and they do not exist on touch.
+- **Text is sized by rules, not by locale.** Never truncate identity; clamp only
+  secondary detail. Use logical properties so RTL mirrors (the `↳` included),
+  keep separators as their own nodes so locales can restyle them, allow wrapping
+  in scripts without spaces, and let content grow the row rather than fixing its
+  height.
+- **Grounded rows wear their evidence; the drawer owns the rest** (decision
+  2026-07-28). Each grounded discovery row carries one muted domain chip — its
+  first corroborating source — after the reason text; tapping it opens the
+  sources drawer anchored to that source. The footer under grounded rows is the
+  `N sources ›` entry point alone: never a respelled domain list, and never an
+  "as of" date, because the search date is not the articles' date — each source
+  shows its own date in the drawer, which also keeps sole ownership of outbound
+  URLs. Cheap answers carry no chips and show the from-general-knowledge marker
+  line instead; zero sources **is** the ungrounded signal, derived, never
+  asserted.
+
+### When next moves are live
+
+- **Exclusive vs menu.** Clarify options answer one question, so the group stops
+  rendering once answered — the reply is already in the transcript. Discovery
+  candidates are a menu, not a question: choosing one does not retire the
+  others, so they persist and stay tappable. Discarding them would force the
+  user to ask again, which re-runs a metered search to re-tell them something
+  Argus already said.
+- **One in-flight lock.** The composer and every next-move row share a single
+  "a turn is running" signal. Persistent rows outlive the newest turn, so
+  without the shared lock they become a way to fire turns around a disabled
+  composer. Locked rows stay visible and readable — they are evidence — and
+  simply stop accepting taps. This is per-tab UI state, not a substitute for a
+  backend concurrency guard.
+- **Cards win.** While an active card owns the conversation's actions, no
+  conversational next moves are offered alongside it.
 
 ## 12. Result Card Design
 
@@ -229,7 +284,9 @@ Result cards are the primary unit of "validation." They must be glanceable and h
 
 ## 13. Strategy Surface Design
 
-The strategies surface is for rapid comparison and organization.
+The strategies surface is a flagged future/reference surface for rapid
+comparison and organization. It is hidden under private-alpha defaults; current
+saved-idea recall and decision-state browsing live in Omnisearch/Idea Ledger.
 - **Expandable Cards**: Use a "glance-first" card that expands to show symbol-level rows.
 - **Glanceable Metrics**: Support user-selected metrics from supported presets (Configurable rows).
 - **Headline Hints**: Use simple text labels like "Best performer" or "Needs review" to guide the eye.
@@ -237,10 +294,81 @@ The strategies surface is for rapid comparison and organization.
 
 ## 14. Recents, Collections, and Search
 
-- **Recents Feed**: A mixed chronological feed (Chats, Strategies, Collections, Runs) that serves as the "Global Context."
-- **Collections**: Lightweight organizational theme groupings (e.g., "Crypto Dips", "Dividend Ideas"). Not for batch execution or aggregate performance in Alpha.
+- **Recents Feed**: A chronological continuity surface for chats and completed
+  runs. Do not advertise hidden Strategies or Collections as current
+  private-alpha destinations.
+- **Collections**: Lightweight organizational theme groupings remain a future
+  flagged model. They are hidden and indefinitely deferred from the
+  private-alpha UI.
+- **Idea Recall**: Omnisearch/Idea Ledger is the active artifact-recall surface
+  for Ideas, Evidence, Decisions, Backtests, and their source conversations.
 - **Fuzzy Search UI**: Global omni-search should support "Fuzzy Human Memory" with suggestion chips:
   - *Suggestions*: `Last week`, `Tesla ideas`, `Crypto`, `Pinned`, `Recent chats`.
+
+### Conversation activity and unread presentation
+
+Conversation activity is a typed continuity signal, not a reason to reorder
+Recents or infer state from message text. Each chat row shows at most one marker
+using this locked precedence:
+
+| Priority | Typed state | Left-lane presentation |
+| ---: | --- | --- |
+| 1 | `queued`, `running`, or `checking` | Calm working ring |
+| 2 | `needs_attention` | Existing shared attention/failure treatment |
+| 3 | `needs_input` | Static attention marker |
+| 4 | `new_activity` | Muted teal dot |
+| 5 | `manual_unread` | Muted teal dot |
+| 6 | `none` | No marker |
+
+- **Fixed row geometry**: The existing left `w-11` lane owns the marker. The
+  right trailing slot owns the quick-jump keycap or ellipsis menu. A marker,
+  keycap, hover state, or selection must never move the title, subtitle, or row
+  height.
+- **Selected rows preserve state**: The selected-row wash does not hide,
+  replace, or recolor away the winning marker. Expanded Recents and Quick Peek
+  use the same per-row presentation; the collapsed aggregate uses a ring when
+  any loaded chat is working and otherwise a dot when any loaded chat is
+  unread.
+- **Typed accessible names**: Marker graphics are decorative. The row's
+  accessible name appends exactly one phrase derived from typed state, with
+  catalog-backed English and Latin American Spanish parity:
+
+  | State | English (`en`) | Spanish (`es-419`) |
+  | --- | --- | --- |
+  | Running | Working | En curso |
+  | Queued | Queued | En espera |
+  | Checking | Checking status | Consultando el estado |
+  | New activity | New activity | Actividad nueva |
+  | Manual unread | Marked unread | Marcada como no leída |
+  | Needs input | Needs your input | Necesita tu respuesta |
+  | Needs attention | Needs attention | Necesita atención |
+
+- **One Jump to latest control**: When the latest activity is visible, the
+  control is hidden. Above the latest activity, one unchanged 44px target uses
+  this state machine and always scrolls to the same latest-activity sentinel:
+
+  | Current presentation | Inner treatment | Accessible label |
+  | --- | --- | --- |
+  | Idle/read | Down arrow | Jump to latest |
+  | Queued/running/checking | Restrained three-dot wave | Jump to latest; Argus is working below |
+  | New/manual unread | Down arrow plus teal marker | Jump to new activity |
+  | Needs input | Down arrow plus attention marker | Jump to the latest question |
+  | Needs attention | Down arrow plus shared failure treatment | Jump to the latest recovery |
+
+- **Recents owner menu**: Keep one restrained ellipsis glyph inside a target
+  that is at least 44px in both axes. On fine pointers it appears on row hover,
+  trigger focus, or while open; on coarse pointers it remains visible without
+  hover. Focus uses the standard visible ring. Escape closes the menu and
+  returns focus to its trigger. Mark as read/unread remains the first item, and
+  nested menu actions never activate the row.
+- **Reduced motion**: Under `prefers-reduced-motion`, the working marker is a
+  static open ring and the Jump control uses a static three-dot glyph. Remove
+  rotation, wave, flashing, rapid pulsing, and repeated scale animation without
+  removing the state label or immediate visual meaning.
+- **Polite transitions**: Meaningful typed transitions may be announced once
+  through one polite live region. Polling, token updates, and animated dots are
+  never announced. All row, menu, Jump, toast, and announcement copy comes from
+  the `en` and `es-419` catalogs.
 
 ## 15. Settings and Feedback UX
 
@@ -252,7 +380,7 @@ The strategies surface is for rapid comparison and organization.
 
 - **Supported Languages**: English (`en`) and Spanish (`es-419`).
 - **Standardized i18n**: All static UI strings must be translatable.
-- **Language Selection**: Should feel premium and be accessible from the onboarding flow and settings.
+- **Language Selection**: Should feel premium and be accessible at signup and in settings.
 - **Consistency**: The AI response language must always mirror the UI language preference.
 - **Locale Logic**: Date, number, and currency formatting must adapt to the `locale` token.
 
@@ -290,7 +418,36 @@ Argus is **NOT**:
 
 ---
 
-## 22. Design Decision Filter
+## 22. Guest Entry and Rollback
+
+- `/` presents the chat-first guest entry by default. The Guest server and
+  presentation flags are emergency kill switches: explicit `false` restores
+  the auth-first landing and stops new anonymous bootstrap.
+- Preserve the current landing implementation and centered auth modal for
+  configuration rollback and later conversion.
+- While public permanent accounts remain disabled, guest chrome offers
+  **Sign in**, never a public **Create account** action.
+- Temporary status, fixed expiry, allowance boundaries, feedback, and errors
+  must remain calm, accessible, and localized in English and Spanish.
+- The frontend flag selects presentation only; a server-denied guest session
+  must stay on the entry surface with one honest retry and no fake local
+  conversation.
+
+## 23. Usage Allowance Meter
+
+- Use the lowest normalized remaining capacity across the active hourly and
+  daily allowance windows. The window closest to exhaustion governs the meter
+  because it is the user's real near-term constraint.
+- **Green / Muted Teal** (`--rui-color-teal`): more than 50% remains.
+- **Amber / Dusty Gold** (`--rui-color-warning`): more than 20% and at most 50%
+  remains.
+- **Red / Muted Rose** (`--rui-color-danger`): 20% or less remains, including
+  exhaustion.
+- Color is supporting information only. Always retain the exact remaining
+  count and truthful reset time, and use calm localized language with no pulse,
+  flashing, or casino-terminal treatment.
+
+## 24. Design Decision Filter
 
 When designing any Argus surface, ask:
 

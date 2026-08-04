@@ -1062,7 +1062,11 @@ def _ambiguous_fields_from_resolution(
             reason_code=f"{item.candidate_kind}_resolution_ambiguous",
         )
         for item in provenance
-        if item.source == "llm_extraction" and item.resolution_status == "ambiguous"
+        if item.source == "llm_extraction"
+        and item.resolution_status == "ambiguous"
+        # A reconciled benchmark leg proceeds with the default and is
+        # disclosed on the confirmation card; it never re-asks here.
+        and item.field != "comparison_baseline"
     ]
 
 
@@ -1150,6 +1154,9 @@ def _unsupported_constraints_from_resolution(
                 "unavailable_for_requested_run",
             }
             or item.source != "llm_extraction"
+            # A cleared benchmark leg proceeds with the default benchmark and
+            # is disclosed on the confirmation card, never blocked here.
+            or item.field == "comparison_baseline"
         ):
             continue
         category = (
@@ -1215,6 +1222,14 @@ def _missing_fields_for_interpretation(
         required_missing_fields = list(
             dict.fromkeys(["entry_logic", *required_missing_fields])
         )
+    incomplete_asset_context = (
+        "provider_context_incomplete_asset_mentions" in interpretation.reason_codes
+        or "asset_universe_operation_needs_clarification" in interpretation.reason_codes
+    )
+    if incomplete_asset_context:
+        required_missing_fields = list(
+            dict.fromkeys(["asset_universe", *required_missing_fields])
+        )
     allowed_missing_fields = set(required_missing_fields)
     missing = [
         field
@@ -1224,6 +1239,11 @@ def _missing_fields_for_interpretation(
     if "entry_logic" in required_missing_fields and "entry_logic" not in missing:
         missing.insert(0, "entry_logic")
     missing.extend(required_missing_fields)
+    if incomplete_asset_context:
+        missing = [
+            "asset_universe",
+            *[field for field in missing if field != "asset_universe"],
+        ]
     return list(dict.fromkeys(missing))
 
 

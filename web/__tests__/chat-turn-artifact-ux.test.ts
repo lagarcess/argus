@@ -10,6 +10,7 @@ import {
   confirmationRowKey,
   confirmationStatusAllowsActions,
 } from "../components/chat/confirmation-display";
+import { visibleComposerResponseActions } from "../lib/chat-recovery-display";
 import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
@@ -46,6 +47,117 @@ describe("chat turn artifact UX", () => {
     expect(visibleComposerActions(actions).map((action) => action.label)).toEqual([
       "Try again",
       "Ask follow-up",
+    ]);
+  });
+
+  test("retry stays icon-owned by its message instead of duplicating as a composer chip", () => {
+    const retryAction = {
+      type: "retry_last_turn",
+      label: "Retry",
+      value: "Retry",
+    } satisfies ChatActionOption;
+    const followUpAction = {
+      id: "ask-follow-up",
+      label: "Ask follow-up",
+    } satisfies ChatActionOption;
+
+    expect(
+      visibleComposerResponseActions([retryAction, followUpAction]),
+    ).toEqual([followUpAction]);
+  });
+
+  test("live unsupported-strategy alternatives stay once on their owning assistant", () => {
+    const alternatives = [
+      {
+        id: "unsupported-strategy-rsi-threshold",
+        label: "Use a supported RSI threshold rule",
+        labelKey: "chat.simplification_options.rsi_threshold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "rsi_threshold",
+          replacement_values: { simplify_logic: "rsi_only" },
+        },
+      },
+      {
+        id: "unsupported-strategy-buy-and-hold",
+        label: "Compare with buy and hold",
+        labelKey: "chat.simplification_options.buy_and_hold",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "buy_and_hold",
+          replacement_values: { strategy_type: "buy_and_hold" },
+        },
+      },
+      {
+        id: "unsupported-strategy-moving-average-crossover",
+        label: "Use a supported moving-average crossover",
+        labelKey: "chat.simplification_options.moving_average_crossover",
+        type: "select_response_option",
+        payload: {
+          source_assistant_id: "assistant-strategy",
+          option_id: "moving_average_crossover",
+          replacement_values: {
+            strategy_type: "signal_strategy",
+            rule_family: "moving_average_crossover",
+          },
+        },
+      },
+    ] satisfies ChatActionOption[];
+    const coverageAction = {
+      id: "coverage-change-dates",
+      label: "Change dates",
+      type: "select_response_option",
+      payload: {
+        source_assistant_id: "assistant-coverage",
+        option_id: "change_dates",
+        replacement_values: { requested_field: "date_range" },
+      },
+    } satisfies ChatActionOption;
+    const timeframeAction = {
+      id: "unsupported-timeframe-option-1",
+      label: "Retry with daily bars",
+      type: "select_response_option",
+      payload: {
+        source_assistant_id: "assistant-timeframe",
+        option_id: "option_1",
+        replacement_values: { timeframe: "1D" },
+      },
+    } satisfies ChatActionOption;
+
+    expect(new Set(alternatives.map((action) => action.id)).size).toBe(3);
+    for (const alternative of alternatives) {
+      expect(
+        alternatives.filter((action) => action.id === alternative.id),
+      ).toHaveLength(1);
+    }
+    expect(
+      visibleComposerResponseActions([
+        coverageAction,
+        timeframeAction,
+        ...alternatives,
+      ]),
+    ).toEqual([coverageAction, timeframeAction]);
+    expect(alternatives.map((action) => action.payload)).toEqual([
+      {
+        source_assistant_id: "assistant-strategy",
+        option_id: "rsi_threshold",
+        replacement_values: { simplify_logic: "rsi_only" },
+      },
+      {
+        source_assistant_id: "assistant-strategy",
+        option_id: "buy_and_hold",
+        replacement_values: { strategy_type: "buy_and_hold" },
+      },
+      {
+        source_assistant_id: "assistant-strategy",
+        option_id: "moving_average_crossover",
+        replacement_values: {
+          strategy_type: "signal_strategy",
+          rule_family: "moving_average_crossover",
+        },
+      },
     ]);
   });
 
@@ -109,12 +221,12 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
     const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
+      join(root, "components/chat/chat-message-projection.ts"),
       "utf-8",
     );
 
     expect(card).toContain("confirmationStatusAllowsActions(displayState.status)");
-    expect(chat).toContain("confirmationStatusAllowsActions(confirmationStatus)");
+    expect(chat).toContain("confirmationStatusAllowsActions(status)");
   });
 
   test("confirmation row identity uses structured keys instead of translated labels", () => {
@@ -137,14 +249,18 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
     const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
+      join(root, "components/chat/chat-message-projection.ts"),
       "utf-8",
     );
 
     expect(ownership).toContain("export function actionHasCardScopedOwnership");
     expect(ownership).toContain("export function visibleComposerActions");
-    expect(chat).toContain("visibleComposerActions(latestAi?.actions ?? [])");
-    expect(message).toContain('import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";');
+    expect(chat).toContain(
+      "visibleComposerResponseActions(latestAi?.actions ?? [])",
+    );
+    expect(message).toMatch(
+      /import \{\s*actionHasCardScopedOwnership\s*\} from "@\/lib\/chat-action-ownership";/,
+    );
     expect(message).toContain("const footerMessageActions =");
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
     expect(message).toContain("const shouldShowAssistantFooter =");
@@ -156,24 +272,46 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("const shouldShowTextFooter =");
   });
 
-  test("card-scoped confirmation actions close the source card before sending", () => {
+  test("card-scoped confirmation actions close only after guest admission", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
-    const handleActionStart = chat.indexOf("const handleAction =");
-    const handleActionEnd = chat.indexOf("// ── Chat options helpers", handleActionStart);
-    const handleActionBlock = chat.slice(handleActionStart, handleActionEnd);
+    const handleSendStart = chat.indexOf("const handleSend =");
+    const handleSendEnd = chat.indexOf("// ── Conversation", handleSendStart);
+    const handleSendBlock = chat.slice(handleSendStart, handleSendEnd);
+    const admissionIndex = handleSendBlock.indexOf(
+      "await guestExperience.admitSend",
+    );
+    const consumeIndex = handleSendBlock.indexOf(
+      "consumeConfirmationActionOnMessages",
+    );
 
-    expect(handleActionStart).toBeGreaterThan(-1);
-    expect(handleActionBlock).toContain(
-      "const confirmationEffect = confirmationActionEffectFromAction(action)",
+    expect(handleSendStart).toBeGreaterThan(-1);
+    expect(admissionIndex).toBeGreaterThan(-1);
+    expect(consumeIndex).toBeGreaterThan(admissionIndex);
+    expect(handleSendBlock).toContain("setMessages((prev) =>");
+  });
+
+  test("first guest submit locks synchronously and stays neutral before SSE", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
     );
-    expect(handleActionBlock).toContain("setMessages((prev) =>");
-    expect(handleActionBlock).toContain("normalizeConfirmationHistory(");
-    expect(handleActionBlock).toContain(
-      "applyConfirmationActionEffects(prev, [confirmationEffect])",
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
     );
+    const handleSendStart = chat.indexOf("const handleSend =");
+    const handleSendEnd = chat.indexOf("// ── Conversation", handleSendStart);
+    const handleSendBlock = chat.slice(handleSendStart, handleSendEnd);
+
+    expect(handleSendBlock).toContain("sendAdmissionInFlightRef.current");
+    expect(handleSendBlock).toContain("setGuestSubmissionPending(true)");
+    expect(handleSendBlock).toContain("guestExperience.admitSend");
+    expect(emptyChat).toContain('t("guest.entry.sending", "Sending...")');
+    expect(emptyChat).toContain("aria-busy={guestSubmissionPending}");
+    expect(emptyChat).toContain('t("common.try_again", "Try again")');
   });
 
   test("final recovery responses hydrate retry controls from structured metadata", () => {
@@ -212,7 +350,12 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
 
-    expect(card).toContain('artifactStatusToneClassName("neutral")');
+    // Completion is passive muted text — never a success tone and no longer a
+    // button-shaped pill; only the explicit saved state keeps the success tone.
+    expect(card).not.toContain('artifactStatusToneClassName("neutral")');
+    expect(card).toContain(
+      "Passive status, not an action: plain muted text",
+    );
     expect(card).toContain('artifactStatusToneClassName("success")');
     expect(card).toContain("view.hero.tone === \"positive\"");
   });
@@ -229,7 +372,7 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("handleCopy(message.id)");
   });
 
-  test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
+  test("stream error handling settles confirmation artifacts and offers no stale next moves", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -240,7 +383,9 @@ describe("chat turn artifact UX", () => {
 
     expect(errorStart).toBeGreaterThan(-1);
     expect(errorBlock).toContain("retryLastTurnActionFromMetadata(errorPayload");
-    expect(errorBlock).toContain("setInputActions([])");
+    // Stale options no longer need clearing on error: next-move rows render
+    // only on the newest assistant message, and the error message replaces it.
+    expect(chat).not.toContain("setInputActions");
     expect(errorBlock).toContain("settleOpenConfirmationsAfterStreamError(");
     expect(errorBlock).not.toContain("settleOpenConfirmationsAfterTextFinal(");
   });

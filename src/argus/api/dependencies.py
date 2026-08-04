@@ -2,19 +2,248 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+from loguru import logger
+from pydantic import ValidationError
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from argus.api import state as api_state
-from argus.api.schemas import User
+from argus.api.auth_sessions import (
+    AuthSessionVerificationUnavailable,
+    auth_session_is_active,
+)
+from argus.api.guest_access import (
+    guest_account_context,
+    permanent_account_access_allowed,
+    registered_account_context,
+    store_account_context,
+)
+from argus.api.schemas import CHAT_STREAM_MAX_BODY_BYTES, ChatStreamRequest, User
+
+CHAT_STREAM_PATH = "/api/v1/chat/stream"
+
+
+class ChatRequestBoundaryMiddleware:
+    """Bound the chat ingress and validate it before FastAPI resolves dependencies."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] != "http"
+            or scope["method"] != "POST"
+            or scope["path"] != CHAT_STREAM_PATH
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        state = scope.setdefault("state", {})
+        request_id = state.get("request_id") or _scope_request_id(scope)
+        state["request_id"] = request_id
+        declared_length = _declared_content_length(scope)
+        if declared_length is not None and declared_length > CHAT_STREAM_MAX_BODY_BYTES:
+            await _send_problem(
+                scope,
+                receive,
+                send,
+                status_code=413,
+                body=_request_body_too_large_problem(request_id),
+                request_id=request_id,
+            )
+            return
+
+        body_parts: list[bytes] = []
+        received_bytes = 0
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            if message["type"] != "http.request":
+                continue
+            chunk = message.get("body", b"")
+            received_bytes += len(chunk)
+            if received_bytes > CHAT_STREAM_MAX_BODY_BYTES:
+                await _send_problem(
+                    scope,
+                    receive,
+                    send,
+                    status_code=413,
+                    body=_request_body_too_large_problem(request_id),
+                    request_id=request_id,
+                )
+                return
+            body_parts.append(chunk)
+            if not message.get("more_body", False):
+                break
+
+        body = b"".join(body_parts)
+        validation_errors = _chat_stream_validation_errors(body)
+        if validation_errors is not None:
+            await _send_problem(
+                scope,
+                receive,
+                send,
+                status_code=422,
+                body=validation_problem_body(request_id, validation_errors),
+                request_id=request_id,
+            )
+            return
+
+        replayed = False
+
+        async def replay_receive() -> Message:
+            nonlocal replayed
+            if replayed:
+                return await receive()
+            replayed = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        await self.app(scope, replay_receive, send)
+
+
+def _scope_request_id(scope: Scope) -> str:
+    for name, value in scope.get("headers", []):
+        if name.lower() == b"x-request-id" and value:
+            return value.decode("latin-1")
+    return api_state.store.new_id()
+
+
+def _declared_content_length(scope: Scope) -> int | None:
+    values = [
+        value
+        for name, value in scope.get("headers", [])
+        if name.lower() == b"content-length"
+    ]
+    if len(values) != 1:
+        return None
+    try:
+        declared = int(values[0])
+    except ValueError:
+        return None
+    return declared if declared >= 0 else None
+
+
+def _chat_stream_validation_errors(body: bytes) -> list[dict[str, Any]] | None:
+    try:
+        payload = json.loads(body)
+    except RecursionError:
+        return [
+            {
+                "type": "value_error",
+                "loc": ["body"],
+                "msg": "Value error, request_body_nesting_exceeded",
+            }
+        ]
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    try:
+        ChatStreamRequest.model_validate(payload)
+    except ValidationError as exc:
+        return [
+            {key: value for key, value in error.items() if key != "url"}
+            | {"loc": ["body", *error["loc"]]}
+            for error in exc.errors()
+        ]
+    return None
+
+
+def _request_body_too_large_problem(request_id: str) -> dict[str, Any]:
+    return {
+        "type": "https://api.argus.app/problems/request-body-too-large",
+        "title": "Request Body Too Large",
+        "status": 413,
+        "detail": "Request body exceeds the 65,536-byte limit.",
+        "code": "request_body_too_large",
+        "request_id": request_id,
+    }
+
+
+async def _send_problem(
+    scope: Scope,
+    receive: Receive,
+    send: Send,
+    *,
+    status_code: int,
+    body: dict[str, Any],
+    request_id: str,
+) -> None:
+    response = JSONResponse(
+        body,
+        status_code=status_code,
+        headers={"X-Request-Id": request_id},
+    )
+    await response(scope, receive, send)
+
+
+def _json_safe_validation_error(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, BaseException):
+        return str(value)
+    if isinstance(value, dict):
+        return {
+            str(key): _json_safe_validation_error(nested) for key, nested in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [_json_safe_validation_error(nested) for nested in value]
+    return str(value)
+
+
+def validation_problem_body(
+    request_id: str,
+    errors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "type": "https://api.argus.app/problems/validation-error",
+        "title": "Validation Error",
+        "status": 422,
+        "detail": "The request body or parameters did not match the API contract.",
+        "code": "validation_error",
+        "request_id": request_id,
+        "context": {
+            "errors": [
+                {
+                    str(key): _json_safe_validation_error(value)
+                    for key, value in error.items()
+                }
+                for error in errors
+            ]
+        },
+    }
 
 
 async def request_id_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
-    request_id = request.headers.get("x-request-id") or api_state.store.new_id()
+    request_id = (
+        getattr(request.state, "request_id", None)
+        or request.headers.get("x-request-id")
+        or api_state.store.new_id()
+    )
     request.state.request_id = request_id
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "Unexpected API failure",
+            request_id=request_id,
+            method=request.method,
+            status_code=500,
+        )
+        response = JSONResponse(
+            {
+                "type": "https://api.argus.app/problems/internal-error",
+                "title": "Internal Error",
+                "status": 500,
+                "detail": "An unexpected error occurred. Please try again.",
+                "code": "internal_error",
+                "request_id": request_id,
+            },
+            status_code=500,
+        )
     response.headers["X-Request-Id"] = request_id
     return response
 
@@ -55,11 +284,58 @@ def private_alpha_access_problem(request: Request) -> HTTPException:
     )
 
 
+AccountCapabilityName = Literal[
+    "can_create_additional_conversation",
+    "can_manage_conversation",
+    "can_save_decision",
+    "can_manage_account",
+]
+
+
+def require_account_capability(
+    request: Request,
+    capability: AccountCapabilityName,
+    *,
+    detail: str,
+    reason: str,
+) -> None:
+    from argus.api.guest_access import account_context
+
+    capabilities = account_context(request).capabilities
+    allowed = {
+        "can_create_additional_conversation": (
+            capabilities.can_create_additional_conversation
+        ),
+        "can_manage_conversation": capabilities.can_manage_conversation,
+        "can_save_decision": capabilities.can_save_decision,
+        "can_manage_account": capabilities.can_manage_account,
+    }[capability]
+    if allowed:
+        return
+    raise problem(
+        request,
+        status_code=403,
+        code="account_conversion_required",
+        title="Account Required",
+        detail=detail,
+        context={"reason": reason},
+    )
+
+
 def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
     response = JSONResponse(payload)
+    _apply_auth_session_cookies(request, response, payload)
+    return response
+
+
+def _apply_auth_session_cookies(
+    request: Request,
+    response: JSONResponse,
+    payload: dict[str, Any],
+) -> None:
     session = payload.get("session")
     if not isinstance(session, dict):
-        return response
+        return
 
     access_token = session.get("access_token")
     refresh_token = session.get("refresh_token")
@@ -77,7 +353,6 @@ def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
         response.set_cookie("sb-auth-token", access_token, **cookie_kwargs)
     if isinstance(refresh_token, str) and refresh_token:
         response.set_cookie("sb-refresh-token", refresh_token, **cookie_kwargs)
-    return response
 
 
 def _session_cookie_secure(request: Request) -> bool:
@@ -109,11 +384,15 @@ def current_user(request: Request) -> User:
     ):
         if api_state.supabase_gateway is not None:
             try:
-                return api_state.supabase_gateway.get_or_create_mock_user()
+                user = api_state.supabase_gateway.get_or_create_mock_user()
+                store_account_context(request, registered_account_context(user.id))
+                return user
             except Exception:
                 if not dev_memory_fallback_enabled():
                     raise
-        return api_state.store.get_or_create_dev_user()
+        user = api_state.store.get_or_create_dev_user()
+        store_account_context(request, registered_account_context(user.id))
+        return user
 
     if api_state.supabase_gateway is None:
         raise problem(
@@ -173,8 +452,51 @@ def current_user(request: Request) -> User:
             detail="Invalid or expired access token.",
         ) from None
 
+    auth_user_id = str(auth_user.get("id") or "")
+    try:
+        session_is_active = auth_session_is_active(
+            database_url=api_state.DATABASE_URL,
+            token=token,
+            user_id=auth_user_id,
+        )
+    except AuthSessionVerificationUnavailable:
+        raise problem(
+            request,
+            status_code=503,
+            code="auth_session_verification_unavailable",
+            title="Session Verification Unavailable",
+            detail="Argus could not verify this session. Please try again.",
+        ) from None
+    if not session_is_active:
+        raise problem(
+            request,
+            status_code=401,
+            code="unauthorized",
+            title="Unauthorized",
+            detail="Invalid or expired access token.",
+        )
+
+    if auth_user.get("is_anonymous") is True:
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
+            user_id=auth_user_id,
+            at=datetime.now(timezone.utc),
+        )
+        if workspace is None:
+            raise problem(
+                request,
+                status_code=403,
+                code="guest_session_expired",
+                title="Guest Session Expired",
+                detail="This temporary guest session is no longer available.",
+            )
+        user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+        store_account_context(request, guest_account_context(workspace))
+        return user
+
     auth_email = str(auth_user.get("email") or "")
-    if not api_state.supabase_gateway.private_alpha_email_allowed(auth_email):
+    if not permanent_account_access_allowed(api_state.supabase_gateway, auth_email):
         raise private_alpha_access_problem(request)
 
-    return api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+    user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+    store_account_context(request, registered_account_context(user.id))
+    return user

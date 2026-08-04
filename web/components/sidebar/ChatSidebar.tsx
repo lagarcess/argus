@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TFunction } from "i18next";
 import {
   ChevronDown,
   Compass,
@@ -14,6 +13,13 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import {
+  ConversationActivityIndicator,
+  conversationActivityLabelDescriptor,
+  useConversationActivityPresentation,
+} from "@/components/chat/ConversationActivityIndicator";
+import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
+import { useQuickJump } from "@/components/keyboard/useQuickJump";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
@@ -24,15 +30,40 @@ import {
   patchConversation,
   deleteConversation as apiDeleteConversation,
 } from "@/lib/argus-api";
+import {
+  conversationDisplayTitle,
+  renamePrefillTitle,
+} from "@/lib/chat-title-display";
+import {
+  isKeyboardShortcutHintModifierActive,
+  keyboardShortcutHintDisplay,
+} from "@/lib/keyboard-shortcuts";
+import {
+  RECENTS_INITIAL_GROUP_LIMIT,
+  getVisibleRecentChats,
+  groupRecentChats,
+  type RecentChatGroupKey,
+} from "@/lib/chat-recents";
 
-import type { HistoryItem, SearchItem } from "@/lib/argus-api";
+import type { HistoryItem, SearchConversationItem } from "@/lib/argus-api";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
 type View = "chat" | "strategies" | "settings";
-const EMPTY_ATTENTION_IDS = new Set<string>();
+
+type ConversationActivityReadOwner = Readonly<{
+  hasEffectiveUnread: (conversationId: string) => boolean;
+  selectAttentionCursor: (conversationId: string) => string | null;
+  markRead: (conversationId: string, cursor: string | null) => Promise<void>;
+  markUnread: (conversationId: string) => Promise<void>;
+  isMutationPending: (
+    conversationId: string,
+    action: "mark_read" | "mark_unread",
+  ) => boolean;
+}>;
 
 export type ChatSidebarProps = {
   /** Whether the sidebar is expanded or collapsed */
@@ -47,6 +78,7 @@ export type ChatSidebarProps = {
 
   /** Currently active conversation id (used for highlighting) */
   conversationId: string | null;
+  conversationActivity: ConversationActivityReadOwner;
 
   // ── Recents ──────────────────────────────────────────────────────────────
   /** Whether the Recents accordion is expanded */
@@ -54,17 +86,19 @@ export type ChatSidebarProps = {
   onToggleRecents: () => void;
   /** History items for the Recents list */
   historyItems: HistoryItem[];
-  /** Session-local conversations with completed Argus turns the user has not opened yet */
-  attentionConversationIds?: ReadonlySet<string>;
   /** Whether more history pages are available */
   historyNextCursor: string | null;
   /** Whether a history page load is in progress */
   isLoadingMoreHistory: boolean;
+  /** Whether the user has explicitly requested at least one older page */
+  hasRequestedOlderHistory: boolean;
+  /** Whether the latest explicit history-page request failed */
+  historyLoadMoreError: boolean;
 
   // ── Callbacks ────────────────────────────────────────────────────────────
   onNewChat: () => void;
   onNavigate: (view: View) => void;
-  onOpenItem: (item: HistoryItem | SearchItem) => void;
+  onOpenItem: (item: HistoryItem | SearchConversationItem) => void;
   onLoadMoreHistory: () => void;
   onOpenSearch: () => void;
   /** Callback when a chat is mutated (pin/archive/delete/rename) so parent can refresh */
@@ -81,63 +115,17 @@ export type ChatSidebarProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   /** Sidebar preference handler */
   onOpenSidebarPreference?: () => void;
+  onOpenKeyboardShortcuts?: () => void;
+  settingsOpenRequest?: number;
   strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
+  /** Keep background shortcut hints visually quiet while a foreground surface owns focus. */
+  shortcutHintsSuppressed?: boolean;
+  canManageConversation?: boolean;
+  showProfileMenu?: boolean;
+  isGuest?: boolean;
+  guestExpiresAt?: string | null;
 };
-
-// ─── Date grouping helpers ────────────────────────────────────────────────────
-
-type HistoryGroup = {
-  label: string;
-  items: HistoryItem[];
-  isPinned: boolean;
-};
-
-function groupByDate(
-  items: HistoryItem[],
-  t: TFunction,
-) {
-  const pinned: HistoryItem[] = [];
-  const today: HistoryItem[] = [];
-  const yesterday: HistoryItem[] = [];
-  const last7Days: HistoryItem[] = [];
-  const last30Days: HistoryItem[] = [];
-  const older: HistoryItem[] = [];
-
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterdayStart = todayStart - 86400000;
-  const last7Start = todayStart - 86400000 * 6;
-  const last30Start = todayStart - 86400000 * 29;
-
-  items.forEach((item) => {
-    if (item.pinned) {
-      pinned.push(item);
-      return;
-    }
-    const d = new Date(item.created_at).getTime();
-    if (d >= todayStart) {
-      today.push(item);
-    } else if (d >= yesterdayStart) {
-      yesterday.push(item);
-    } else if (d >= last7Start) {
-      last7Days.push(item);
-    } else if (d >= last30Start) {
-      last30Days.push(item);
-    } else {
-      older.push(item);
-    }
-  });
-
-  const groups: HistoryGroup[] = [];
-  if (pinned.length > 0) groups.push({ label: t("chat.history.pinned"), items: pinned, isPinned: true });
-  if (today.length > 0) groups.push({ label: t("chat.history.today"), items: today, isPinned: false });
-  if (yesterday.length > 0) groups.push({ label: t("chat.history.yesterday"), items: yesterday, isPinned: false });
-  if (last7Days.length > 0) groups.push({ label: t("chat.history.last_7_days"), items: last7Days, isPinned: false });
-  if (last30Days.length > 0) groups.push({ label: t("chat.history.last_30_days", "Last 30 Days"), items: last30Days, isPinned: false });
-  if (older.length > 0) groups.push({ label: t("chat.history.earlier"), items: older, isPinned: false });
-  return groups;
-}
 
 function historyConversationId(item: HistoryItem): string {
   return item.conversation_id ?? item.id;
@@ -151,12 +139,14 @@ export default function ChatSidebar({
   mode = "expanded",
   currentView,
   conversationId,
+  conversationActivity,
   isRecentsExpanded,
   onToggleRecents,
   historyItems,
-  attentionConversationIds = EMPTY_ATTENTION_IDS,
   historyNextCursor,
   isLoadingMoreHistory,
+  hasRequestedOlderHistory,
+  historyLoadMoreError,
   onNewChat,
   onNavigate,
   onOpenItem,
@@ -169,10 +159,19 @@ export default function ChatSidebar({
   onLogout,
   onFeedback,
   onOpenSidebarPreference,
+  onOpenKeyboardShortcuts,
+  settingsOpenRequest = 0,
   strategiesEnabled = false,
   omnisearchEnabled = false,
+  shortcutHintsSuppressed = false,
+  canManageConversation = true,
+  showProfileMenu = true,
+  isGuest = false,
+  guestExpiresAt = null,
 }: ChatSidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
+    useConversationActivityPresentation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -181,8 +180,15 @@ export default function ChatSidebar({
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isDeletingAllConversations, setIsDeletingAllConversations] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [expandedRecentGroups, setExpandedRecentGroups] = useState<
+    Set<RecentChatGroupKey>
+  >(() => new Set());
+  const [usesCommandKey, setUsesCommandKey] = useState(false);
+  const [showShortcutHints, setShowShortcutHints] = useState(false);
+  const shortcutHintsVisible =
+    showShortcutHints && !shortcutHintsSuppressed;
   const profileButtonRef = useRef<HTMLElement | null>(null);
-  const recentsScrollRef = useRef<HTMLDivElement>(null);
+  const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPointerInsideSidebarRef = useRef(false);
 
@@ -235,14 +241,107 @@ export default function ChatSidebar({
     };
   }, [isProfileMenuOpen, isOpen, mode, onToggle]);
 
+  useEffect(() => {
+    setUsesCommandKey(
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowShortcutHints(false);
+      return;
+    }
+
+    const updateShortcutHints = (event: KeyboardEvent) => {
+      setShowShortcutHints(
+        isKeyboardShortcutHintModifierActive(event, usesCommandKey),
+      );
+    };
+    const hideShortcutHints = () => setShowShortcutHints(false);
+
+    document.addEventListener("keydown", updateShortcutHints);
+    document.addEventListener("keyup", updateShortcutHints);
+    window.addEventListener("blur", hideShortcutHints);
+    return () => {
+      document.removeEventListener("keydown", updateShortcutHints);
+      document.removeEventListener("keyup", updateShortcutHints);
+      window.removeEventListener("blur", hideShortcutHints);
+    };
+  }, [isOpen, usesCommandKey]);
+
+  useEffect(() => {
+    if (settingsOpenRequest === previousSettingsOpenRequestRef.current) return;
+    previousSettingsOpenRequestRef.current = settingsOpenRequest;
+    setIsProfileMenuOpen(true);
+  }, [settingsOpenRequest]);
+
   // ── Filter to chats only ────────────────────────────────────────────────
   const chatItems = useMemo(
     () => historyItems.filter((item) => item.type === "chat"),
     [historyItems],
   );
+  const loadedConversationIds = useMemo(
+    () => chatItems.map(historyConversationId),
+    [chatItems],
+  );
+  const aggregateActivityPresentation = selectAggregatePresentation(loadedConversationIds);
 
   // ── Date-grouped history ────────────────────────────────────────────────
-  const groupedHistory = useMemo(() => groupByDate(chatItems, t), [chatItems, t]);
+  const groupedHistory = useMemo(
+    () => groupRecentChats(chatItems),
+    [chatItems],
+  );
+
+  const toggleRecentGroup = useCallback((groupKey: RecentChatGroupKey) => {
+    setExpandedRecentGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  }, []);
+
+  const visibleRecentItems = useMemo(
+    () =>
+      groupedHistory.flatMap((group) =>
+        getVisibleRecentChats(group, {
+          expanded: expandedRecentGroups.has(group.key),
+          selectedConversationId: conversationId,
+        }),
+      ),
+    [conversationId, expandedRecentGroups, groupedHistory],
+  );
+  const quickJumpRecentItems = useMemo(
+    () =>
+      visibleRecentItems.map((item) => ({
+        id: historyConversationId(item),
+        pinned: item.pinned,
+      })),
+    [visibleRecentItems],
+  );
+  const handleQuickJumpRecent = useCallback(
+    (id: string) => {
+      const item = visibleRecentItems.find(
+        (candidate) => historyConversationId(candidate) === id,
+      );
+      if (item) onOpenItem(item);
+    },
+    [onOpenItem, visibleRecentItems],
+  );
+  const { isQuickJumpActive, numberFor } = useQuickJump({
+    enabled:
+      isOpen &&
+      isRecentsExpanded &&
+      renamingId === null &&
+      !isProfileMenuOpen,
+    items: quickJumpRecentItems,
+    onSelect: handleQuickJumpRecent,
+    usesCommandKey,
+  });
 
   // ── Chat actions ────────────────────────────────────────────────────────
   const handlePin = useCallback(async (id: string, pinned: boolean) => {
@@ -329,7 +428,7 @@ export default function ChatSidebar({
   const handleStartRename = useCallback((id: string) => {
     const item = chatItems.find((i) => i.id === id);
     setRenamingId(id);
-    setRenameValue(item?.title ?? "");
+    setRenameValue(renamePrefillTitle(item));
     setRenameError(null);
   }, [chatItems]);
 
@@ -362,32 +461,11 @@ export default function ChatSidebar({
     [chatItems, pendingDeleteId],
   );
 
-  // ── Infinite scroll for recents ─────────────────────────────────────────
-  useEffect(() => {
-    const el = recentsScrollRef.current;
-    if (!el || !historyNextCursor || isLoadingMoreHistory) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onLoadMoreHistory();
-        }
-      },
-      { root: el, threshold: 0.1 },
-    );
-
-    // Observe the last item in the list as a sentinel
-    const sentinel = el.querySelector("[data-sentinel]");
-    if (sentinel) observer.observe(sentinel);
-
-    return () => observer.disconnect();
-  }, [historyNextCursor, isLoadingMoreHistory, onLoadMoreHistory, groupedHistory]);
-
   return (
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
+      className={`flex shrink-0 flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
         isOpen ? "w-72" : "w-14"
       }`}
     >
@@ -427,6 +505,8 @@ export default function ChatSidebar({
           icon={MessageCirclePlus}
           label={t("chat.new_chat")}
           collapsed={!isOpen}
+          shortcutHint={keyboardShortcutHintDisplay("new_chat", usesCommandKey)}
+          showShortcutHint={shortcutHintsVisible}
           onClick={() => {
             onNewChat();
           }}
@@ -438,6 +518,8 @@ export default function ChatSidebar({
             icon={Search}
             label={t("common.search", "Search")}
             collapsed={!isOpen}
+            shortcutHint={keyboardShortcutHintDisplay("omnisearch", usesCommandKey)}
+            showShortcutHint={shortcutHintsVisible}
             onClick={onOpenSearch}
             iconSize={20}
           />
@@ -459,6 +541,12 @@ export default function ChatSidebar({
             icon={History}
             label={t("common.recents")}
             collapsed={!isOpen}
+            activityPresentation={aggregateActivityPresentation}
+            shortcutHint={keyboardShortcutHintDisplay(
+              "expand_sidebar_recents",
+              usesCommandKey,
+            )}
+            showShortcutHint={shortcutHintsVisible}
             onClick={() => {
               if (!isOpen) {
                 // When collapsed: expand sidebar + open recents
@@ -478,7 +566,8 @@ export default function ChatSidebar({
           />
 
           {isRecentsExpanded && isOpen && (
-            <div ref={recentsScrollRef} className="max-h-[50vh] overflow-y-auto pb-2">
+            <div className="max-h-[50vh] overflow-y-auto pb-2">
+              <div className="flex flex-col gap-4 pb-2">
               {chatItems.length === 0 ? (
                 <div className="px-11 py-6">
                   <p className="text-[13px] leading-relaxed text-black/30 dark:text-white/30">
@@ -486,28 +575,75 @@ export default function ChatSidebar({
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-4 pb-2">
-                  {groupedHistory.map((group) => (
-                    <div key={group.label} className="flex flex-col">
-                      <div className="px-11 py-2">
-                        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                          {group.isPinned && (
-                            <Pin className="h-3 w-3" />
-                          )}
-                          {group.label}
-                        </span>
-                      </div>
-                      {group.items.map((item) => {
+                <>
+                  {groupedHistory.map((group) => {
+                    const groupLabel = t(`chat.history.${group.key}`);
+                    const groupHeadingId = `recents-${group.key}-heading`;
+                    const groupItemsId = `recents-${group.key}-items`;
+                    const isGroupExpanded = expandedRecentGroups.has(group.key);
+                    const canToggleGroup =
+                      !group.isPinned &&
+                      group.items.length > RECENTS_INITIAL_GROUP_LIMIT;
+                    const visibleItems = getVisibleRecentChats(group, {
+                      expanded: isGroupExpanded,
+                      selectedConversationId: conversationId,
+                    });
+
+                    return (
+                      <section
+                        key={group.key}
+                        aria-labelledby={groupHeadingId}
+                        className="flex flex-col"
+                      >
+                        <div className="px-11 py-2">
+                          <h3
+                            id={groupHeadingId}
+                            className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40"
+                          >
+                            {group.isPinned && (
+                              <Pin className="h-3 w-3" />
+                            )}
+                            {groupLabel}
+                          </h3>
+                        </div>
+                        <div id={groupItemsId}>
+                        {visibleItems.map((item) => {
                         const itemConversationId = historyConversationId(item);
                         const isActiveConversation = conversationId === itemConversationId;
-                        const hasConversationAttention =
-                          !isActiveConversation && attentionConversationIds.has(itemConversationId);
-                        const attentionLabel = t("chat.history.new_activity", "New activity");
-                        const rowAriaLabel = hasConversationAttention
-                          ? `${item.title}. ${attentionLabel}.`
-                          : item.title;
+                        const isUnread = conversationActivity.hasEffectiveUnread(itemConversationId);
+                        const isReadMutationPending = isUnread
+                          ? conversationActivity.isMutationPending(itemConversationId, "mark_read")
+                          : conversationActivity.isMutationPending(itemConversationId, "mark_unread");
+                        const itemActivityPresentation = selectPresentation(itemConversationId);
+                        const itemOperationLabel = selectOperationLabel(itemConversationId);
+                        const displayTitle = conversationDisplayTitle(
+                          item,
+                          t("chat.new_chat", "New chat"),
+                        );
+                        const activityLabel = conversationActivityLabelDescriptor(
+                          itemActivityPresentation,
+                          itemOperationLabel,
+                        );
+                        const rowAriaLabel = activityLabel
+                          ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
+                          : displayTitle;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
+                        const expiresAt = item.expires_at ?? guestExpiresAt;
+                        const quickJumpNumber = numberFor(itemConversationId);
+                        const quickJumpHint =
+                          isQuickJumpActive && quickJumpNumber !== null ? (
+                            <span
+                              data-quick-jump-hint={quickJumpNumber}
+                              className="pointer-events-none flex h-[22px] items-center justify-end"
+                            >
+                              <QuickJumpBadge
+                                number={quickJumpNumber}
+                                presentation="shortcut_hint"
+                                usesCommandKey={usesCommandKey}
+                              />
+                            </span>
+                          ) : null;
 
                         return (
                           <div
@@ -517,7 +653,6 @@ export default function ChatSidebar({
                             aria-label={rowAriaLabel}
                             aria-current={isActiveConversation ? "page" : undefined}
                             data-active-conversation={isActiveConversation ? "true" : undefined}
-                            data-has-attention={hasConversationAttention ? "true" : undefined}
                             data-conversation-id={itemConversationId}
                             onClick={(e) => {
                               // Only navigate if click was on this element or its text children,
@@ -529,25 +664,29 @@ export default function ChatSidebar({
                               }
                             }}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter" && renamingId !== item.id) {
+                              if (
+                                (e.key === "Enter" || e.key === " ") &&
+                                e.target === e.currentTarget &&
+                                renamingId !== item.id
+                              ) {
+                                e.preventDefault();
                                 onOpenItem(item);
                               }
                             }}
-                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 ${
+                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-offset-1 dark:hover:bg-white/5 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-[#141517] ${
                               isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
                             }`}
                           >
-                          {hasConversationAttention && (
-                            <span
-                              aria-hidden="true"
-                              className="absolute left-4 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[#f4f4f4] bg-[#70a38d] dark:border-[#191c1f] dark:bg-[#9bc6b4]"
+                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
+                            <ConversationActivityIndicator
+                              presentation={itemActivityPresentation}
                             />
-                          )}
-                          {hasConversationAttention && (
-                            <span className="sr-only">{attentionLabel}</span>
-                          )}
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
-                          <div className="min-w-0 flex-1 pl-3 pr-10">
+                          </div>
+                          <div
+                            className={`min-w-0 flex-1 pl-3 ${
+                              quickJumpHint ? "pr-[104px]" : "pr-10"
+                            }`}
+                          >
                             {renamingId === item.id ? (
                               <>
                                 <input
@@ -570,119 +709,228 @@ export default function ChatSidebar({
                                   maxLength={80}
                                 />
                                 {renameError && (
-                                  <p className="mt-1 text-[11px] font-medium text-[#d66d75]" role="alert">
+                                  <p className={`mt-1 text-[11px] font-medium ${inlineFailureTextClass}`} role="alert">
                                     {renameError}
                                   </p>
                                 )}
                               </>
                             ) : (
                               <>
-                                <span className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white">
-                                  {item.title}
+                                <span
+                                  key={displayTitle}
+                                  className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white animate-in fade-in duration-300"
+                                >
+                                  {displayTitle}
                                 </span>
-                                <span className={`mt-0.5 block truncate text-[12px] ${
-                                  hasConversationAttention
-                                    ? "text-black/60 dark:text-white/60"
-                                    : "text-black/40 dark:text-white/40"
-                                }`}>
+                                <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
                                   {item.subtitle}
                                 </span>
+                                {isGuest && expiresAt ? (
+                                  <time
+                                    dateTime={expiresAt}
+                                    title={expiresAt}
+                                    className="mt-0.5 block truncate text-[11px] text-black/35 dark:text-white/35"
+                                  >
+                                    {t("guest.history.expires_at", {
+                                      defaultValue: "Available until {{date}}",
+                                      date: new Intl.DateTimeFormat(
+                                        i18n.resolvedLanguage ?? i18n.language,
+                                        {
+                                          dateStyle: "medium",
+                                          timeStyle: "short",
+                                        },
+                                      ).format(new Date(expiresAt)),
+                                    })}
+                                  </time>
+                                ) : null}
                               </>
                             )}
                           </div>
-                          {renamingId !== item.id && (
-                            <div data-actions className="absolute right-2 top-1/2 -translate-y-1/2">
-                              <RecentChatActions
-                                item={conversationActionItem}
-                                onPin={handlePin}
-                                onRename={handleStartRename}
-                                onArchive={handleArchive}
-                                onDelete={handleRequestDelete}
-                              />
-                            </div>
-                          )}
+                          {renamingId !== item.id &&
+                            (canManageConversation || quickJumpHint) && (
+                              <div className="absolute right-2 top-1/2 flex h-11 w-[88px] -translate-y-1/2 items-center justify-end">
+                                {canManageConversation ? (
+                                  <RecentChatActions
+                                    item={conversationActionItem}
+                                    onPin={handlePin}
+                                    onRename={handleStartRename}
+                                    onArchive={handleArchive}
+                                    onDelete={handleRequestDelete}
+                                    isUnread={isUnread}
+                                    isReadMutationPending={isReadMutationPending}
+                                    onToggleUnread={() =>
+                                      isUnread
+                                        ? conversationActivity.markRead(itemConversationId, conversationActivity.selectAttentionCursor(itemConversationId))
+                                        : conversationActivity.markUnread(itemConversationId)
+                                    }
+                                    quickJumpHint={quickJumpHint}
+                                  />
+                                ) : (
+                                  quickJumpHint
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
-                      })}
-                    </div>
-                  ))}
-                  {/* Infinite scroll sentinel */}
+                        })}
+                        </div>
+                        {canToggleGroup && (
+                          <button
+                            type="button"
+                            aria-controls={groupItemsId}
+                            aria-expanded={isGroupExpanded}
+                            aria-label={t(
+                              isGroupExpanded
+                                ? "chat.history.show_less_in"
+                                : "chat.history.show_more_in",
+                              { group: groupLabel },
+                            )}
+                            onClick={() => toggleRecentGroup(group.key)}
+                            className="mx-11 flex min-h-11 items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40"
+                          >
+                            {t(
+                              isGroupExpanded
+                                ? "chat.history.show_less"
+                                : "chat.history.show_more",
+                            )}
+                          </button>
+                        )}
+                      </section>
+                    );
+                  })}
+                </>
+              )}
                   {historyNextCursor && (
-                    <div data-sentinel className="h-4">
-                      {isLoadingMoreHistory && (
-                        <p className="px-11 text-[12px] text-black/30 dark:text-white/30">
-                          {t("common.loading")}
-                        </p>
-                      )}
+                    <div className="px-11">
+                      <button
+                        type="button"
+                        disabled={isLoadingMoreHistory}
+                        aria-busy={isLoadingMoreHistory}
+                        onClick={onLoadMoreHistory}
+                        className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:text-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40 dark:disabled:text-white/30"
+                      >
+                        {t(
+                          isLoadingMoreHistory
+                            ? "chat.history.loading_older"
+                            : "chat.history.load_older",
+                        )}
+                      </button>
                     </div>
                   )}
+                  {!historyNextCursor &&
+                    hasRequestedOlderHistory &&
+                    !historyLoadMoreError && (
+                      <div className="px-11">
+                        <button
+                          type="button"
+                          disabled
+                          className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/30 dark:text-white/30"
+                        >
+                          {t("chat.history.no_older")}
+                        </button>
+                      </div>
+                    )}
+                  {historyLoadMoreError && (
+                    <p
+                      role="alert"
+                      className={`px-11 text-[12px] leading-relaxed ${inlineFailureTextClass}`}
+                    >
+                      {t("chat.history.load_older_error")}
+                    </p>
+                  )}
+                  {isGuest ? (
+                    <p className="px-11 pb-2 text-[12px] leading-relaxed text-black/45 dark:text-white/45">
+                      {t(
+                        "guest.history.keep_history",
+                        "Sign in to keep your history",
+                      )}
+                    </p>
+                  ) : null}
                 </div>
-              )}
             </div>
           )}
         </div>
       </div>
-      <ConfirmDialog
-        isOpen={Boolean(pendingDeleteItem)}
-        title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
-        description={t(
-          "sidebar.delete_confirm.description",
-          "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
-          { title: pendingDeleteItem?.title ?? t("common.conversation", "Conversation") },
-        )}
-        confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
-        cancelLabel={t("common.cancel", "Cancel")}
-        isBusy={isDeleting}
-        onCancel={() => {
-          if (!isDeleting) setPendingDeleteId(null);
-        }}
-        onConfirm={() => void handleConfirmDelete()}
-      />
-      <ConfirmDialog
-        isOpen={isDeleteAllDialogOpen}
-        title={t(
-          "settings.data.delete_all_confirm.title",
-          "Delete all conversations?",
-        )}
-        description={t(
-          "settings.data.delete_all_confirm.description",
-          "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
-        )}
-        confirmLabel={t(
-          "settings.data.delete_all_confirm.confirm",
-          "Delete all conversations",
-        )}
-        cancelLabel={t("common.cancel", "Cancel")}
-        isBusy={isDeletingAllConversations}
-        onCancel={() => {
-          if (!isDeletingAllConversations) setIsDeleteAllDialogOpen(false);
-        }}
-        onConfirm={() => void handleConfirmDeleteAllConversations()}
-      />
+      {canManageConversation && (
+        <>
+          <ConfirmDialog
+            isOpen={Boolean(pendingDeleteItem)}
+            title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
+            description={t(
+              "sidebar.delete_confirm.description",
+              "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+              {
+                title: pendingDeleteItem
+                  ? conversationDisplayTitle(
+                      pendingDeleteItem,
+                      t("chat.new_chat", "New chat"),
+                    )
+                  : t("common.conversation", "Conversation"),
+              },
+            )}
+            confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+            cancelLabel={t("common.cancel", "Cancel")}
+            isBusy={isDeleting}
+            onCancel={() => {
+              if (!isDeleting) setPendingDeleteId(null);
+            }}
+            onConfirm={() => void handleConfirmDelete()}
+          />
+          <ConfirmDialog
+            isOpen={isDeleteAllDialogOpen}
+            title={t(
+              "settings.data.delete_all_confirm.title",
+              "Delete all conversations?",
+            )}
+            description={t(
+              "settings.data.delete_all_confirm.description",
+              "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
+            )}
+            confirmLabel={t(
+              "settings.data.delete_all_confirm.confirm",
+              "Delete all conversations",
+            )}
+            cancelLabel={t("common.cancel", "Cancel")}
+            isBusy={isDeletingAllConversations}
+            onCancel={() => {
+              if (!isDeletingAllConversations) setIsDeleteAllDialogOpen(false);
+            }}
+            onConfirm={() => void handleConfirmDeleteAllConversations()}
+          />
+        </>
+      )}
 
       {/* Footer: Profile menu trigger */}
-      <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
-        <ProfileMenu
-          isOpen={isProfileMenuOpen}
-          onClose={() => setIsProfileMenuOpen(false)}
-          onLogout={onLogout}
-          onFeedback={onFeedback}
-          onDeleteAllConversations={handleRequestDeleteAllConversations}
-          onHistoryMutated={onHistoryMutated}
-          onOpenSidebarPreference={onOpenSidebarPreference}
-          anchorRef={profileButtonRef}
-          sidebarCollapsed={!isOpen}
-        />
-        <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
-          <SidebarNavButton
-            icon={User}
-            label={t("common.settings")}
-            collapsed={!isOpen}
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            iconSize={20}
+      {showProfileMenu ? (
+        <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
+          <ProfileMenu
+            isOpen={isProfileMenuOpen}
+            onClose={() => setIsProfileMenuOpen(false)}
+            onLogout={onLogout}
+            onFeedback={onFeedback}
+            onDeleteAllConversations={handleRequestDeleteAllConversations}
+            onHistoryMutated={onHistoryMutated}
+            onOpenSidebarPreference={onOpenSidebarPreference}
+            onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
+            anchorRef={profileButtonRef}
+            sidebarCollapsed={!isOpen}
           />
+          <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
+            <SidebarNavButton
+              icon={User}
+              label={t("common.settings")}
+              collapsed={!isOpen}
+              shortcutHint={keyboardShortcutHintDisplay(
+                "open_settings",
+                usesCommandKey,
+              )}
+              showShortcutHint={shortcutHintsVisible}
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              iconSize={20}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
     </aside>
   );
 }

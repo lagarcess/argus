@@ -18,6 +18,7 @@ _MARKDOWN_HEADING_PREFIX_RE = re.compile(r"(?m)^\s{0,3}#{1,6}\s+")
 _MARKDOWN_BULLET_PREFIX_RE = re.compile(r"(?m)^\s*[-*]\s+")
 _MARKDOWN_EMPHASIS_RE = re.compile(r"[*`]+")
 _WHITESPACE_RE = re.compile(r"\s+")
+_MAX_DECISION_NOTE_LENGTH = 2000
 
 
 @dataclass(frozen=True)
@@ -145,6 +146,38 @@ def evidence_preview_from_artifact(artifact: EvidenceArtifact) -> dict[str, Any]
     )
 
 
+def decision_recall_preview(
+    *,
+    decision_state: object,
+    note: object,
+    artifact_title: object,
+    artifact_digest: object,
+    artifact_payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Decision-first recall from existing canonical facts: the exact note is
+    its own verbatim field, never concatenated with the evidence digest."""
+    preview = evidence_preview_from_payload(
+        digest=artifact_digest,
+        title=artifact_title,
+        payload=artifact_payload,
+    )
+    state = _safe_text(decision_state)
+    if state is not None:
+        preview["decision_state"] = state
+    note_text = _safe_verbatim_note(note)
+    if note_text is not None:
+        preview["note"] = note_text
+    return preview
+
+
+def _safe_verbatim_note(value: object) -> str | None:
+    """Bound a decision note without flattening its user-authored newlines."""
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned[:_MAX_DECISION_NOTE_LENGTH] or None
+
+
 def evidence_preview_from_payload(
     *,
     digest: object,
@@ -176,9 +209,7 @@ def evidence_preview_from_payload(
     )
     if quick_take is not None:
         preview["quick_take"] = quick_take
-    breakdown = _safe_breakdown(
-        payload.get("breakdown") or result_card.get("breakdown")
-    )
+    breakdown = _safe_breakdown(payload.get("breakdown") or result_card.get("breakdown"))
     if breakdown is not None:
         preview["breakdown"] = breakdown
     return {
@@ -261,8 +292,34 @@ def _payload_from_run(run: BacktestRun, *, digest: str) -> dict[str, Any]:
             "symbols": list(run.symbols),
             "benchmark_symbol": run.benchmark_symbol,
             "created_at": run.created_at.isoformat(),
+            **_data_window_provenance(run.config_snapshot),
         },
     }
+
+
+def _data_window_provenance(config_snapshot: dict[str, Any]) -> dict[str, Any]:
+    sources = [config_snapshot]
+    resolved_parameters = config_snapshot.get("resolved_parameters")
+    if isinstance(resolved_parameters, dict):
+        sources.append(resolved_parameters)
+    engine_config = config_snapshot.get("engine_config")
+    if isinstance(engine_config, dict):
+        sources.append(engine_config)
+
+    for source in sources:
+        requested = source.get("requested_date_range")
+        effective = source.get("effective_date_range")
+        coverage = source.get("data_coverage")
+        if not isinstance(requested, dict) or not isinstance(effective, dict):
+            continue
+        data_window: dict[str, Any] = {
+            "requested": dict(requested),
+            "effective": dict(effective),
+        }
+        if isinstance(coverage, dict) and isinstance(coverage.get("dataset_id"), str):
+            data_window["dataset_id"] = coverage["dataset_id"]
+        return {"data_window": data_window}
+    return {}
 
 
 def _chart_summary(chart: dict[str, Any] | None) -> dict[str, Any] | None:

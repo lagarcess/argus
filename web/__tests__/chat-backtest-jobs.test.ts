@@ -6,6 +6,7 @@ import {
   normalizeConfirmationHistory,
   supersedePriorConfirmations,
 } from "../components/chat/artifact-history";
+import { hydrateMessagesFromApi } from "../components/chat/ChatInterface";
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
@@ -100,12 +101,65 @@ function apiMessageWithJob(currentJob: BacktestJob): ApiMessage {
   };
 }
 
+function projectedUserActionWithJob(currentJob: BacktestJob): ApiMessage {
+  return {
+    ...apiMessageWithJob(currentJob),
+    id: "request-message-1",
+    role: "user",
+    content: "Run backtest",
+    metadata: {
+      chat_action: {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirmation-1" },
+      },
+      backtest_job: currentJob,
+      backtest_job_id: currentJob.id,
+    },
+  };
+}
+
 function queuedJobMessage(): Message {
   const message = backtestJobMessageFromApi(apiMessageWithJob(job()));
   if (!message) {
     throw new Error("Expected hydrated backtest job message.");
   }
   return message;
+}
+
+function confirmationCardMessage(
+  messageId = "confirmation-message-1",
+  confirmationId = "confirmation-1",
+): Message {
+  const actions = [
+    {
+      type: "run_backtest" as const,
+      label: "Run backtest",
+      presentation: "confirmation" as const,
+      payload: { confirmation_id: confirmationId },
+    },
+  ];
+  return {
+    id: messageId,
+    role: "ai",
+    kind: "strategy_confirmation",
+    confirmation: {
+      confirmation_id: confirmationId,
+      confirmation_state: "active",
+      title: "AAPL buy and hold",
+      status: "ready_to_run",
+      statusLabel: "Ready to run",
+      summary: "Ready to test AAPL.",
+      rows: [],
+      actions,
+    },
+    actions,
+  };
+}
+
+function freshConfirmationCard(): Message {
+  return confirmationCardMessage("confirmation-message-2", "confirmation-2");
 }
 
 describe("chat backtest jobs", () => {
@@ -117,6 +171,93 @@ describe("chat backtest jobs", () => {
     expect(message?.backtestJob?.status).toBe("queued");
     expect(pendingBacktestJobIds([message!])).toEqual(["job-1"]);
   });
+
+  test("hydrates owner-scoped missing-message Run projection into a job card", () => {
+    const message = backtestJobMessageFromApi(
+      projectedUserActionWithJob(
+        job({
+          status: "failed",
+          failure_code: "workflow_dispatch_missing",
+          retryable: true,
+        }),
+      ),
+    );
+
+    expect(message?.role).toBe("ai");
+    expect(message?.kind).toBe("backtest_job");
+    expect(message?.backtestJob?.status).toBe("failed");
+    expect(message?.backtestJob?.retryable).toBe(true);
+  });
+
+  for (const terminal of [
+    {
+      // The job card owns the red failure signal; the settled confirmation
+      // reads quietly (failure-class inventory item 8).
+      status: "failed" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+    {
+      status: "canceled" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+    {
+      status: "expired" as const,
+      expectedStatus: "not_completed",
+      expectedLabel: "Not completed",
+    },
+  ]) {
+    test(`raw reload keeps ${terminal.status} durable truth after Run action effects`, () => {
+      const terminalJob = job({
+        status: terminal.status,
+        finished_at: "2026-06-06T12:00:04Z",
+      });
+      const rawItems: ApiMessage[] = [
+        {
+          id: "confirmation-message-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: "Ready to run.",
+          created_at: "2026-06-06T12:00:00Z",
+          metadata: {
+            confirmation_card: {
+              confirmation_id: "confirmation-1",
+              confirmation_state: "active",
+              title: "AAPL buy and hold",
+              status: "ready_to_run",
+              statusLabel: "Ready to run",
+              summary: "Ready to test AAPL.",
+              rows: [],
+              actions: [
+                {
+                  type: "run_backtest",
+                  label: "Run backtest",
+                  presentation: "confirmation",
+                  payload: { confirmation_id: "confirmation-1" },
+                },
+              ],
+            },
+          },
+        },
+        projectedUserActionWithJob(terminalJob),
+      ];
+
+      const hydrated = hydrateMessagesFromApi(rawItems);
+      const confirmation = hydrated.messages.find(
+        (message) => message.id === "confirmation-message-1",
+      );
+      const durableJob = hydrated.messages.find(
+        (message) => message.kind === "backtest_job",
+      );
+
+      expect(confirmation?.confirmation?.status).toBe(terminal.expectedStatus);
+      expect(confirmation?.confirmation?.statusLabel).toBe(terminal.expectedLabel);
+      expect(confirmation?.confirmation?.statusLabel).not.toBe("Running");
+      expect(durableJob?.backtestJob?.status).toBe(terminal.status);
+      expect(pendingBacktestJobIds(hydrated.messages)).toEqual([]);
+    });
+  }
 
   test("hydrates stream final job payloads into durable job state", () => {
     const currentJob = job({ status: "running" });
@@ -144,6 +285,137 @@ describe("chat backtest jobs", () => {
       "running",
       "succeeded",
     ]);
+  });
+
+  test("normalization preserves a superseded running card owned by a matching queued job", () => {
+    const runningConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "running",
+    );
+
+    const [ownedConfirmation, activeJob, freshConfirmation] =
+      normalizeConfirmationHistory([
+        runningConfirmation,
+        queuedJobMessage(),
+        freshConfirmationCard(),
+      ]);
+
+    expect(ownedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(ownedConfirmation.confirmation?.status).toBe("running");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Running");
+    expect(ownedConfirmation.confirmation?.actions).toEqual([]);
+    expect(activeJob.backtestJob?.status).toBe("queued");
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
+  });
+
+  test("polling restores an owned updated card when the matching job is running", () => {
+    const incorrectlySettledConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "updated",
+    );
+
+    const [ownedConfirmation, activeJob, freshConfirmation] =
+      normalizeConfirmationHistory(
+        applyBacktestJobUpdate(
+          [
+            incorrectlySettledConfirmation,
+            queuedJobMessage(),
+            freshConfirmationCard(),
+          ],
+          {
+            job: job({
+              status: "running",
+              started_at: "2026-06-06T12:00:01Z",
+            }),
+            run: null,
+          },
+        ),
+      );
+
+    expect(ownedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(ownedConfirmation.confirmation?.status).toBe("request_sent");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(activeJob.backtestJob?.status).toBe("running");
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
+  });
+
+  test("polling does not settle an in-progress confirmation owned by another job", () => {
+    const runningConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "running",
+    );
+    const unrelatedJob = job({
+      confirmation_message_id: "confirmation-message-other",
+      status: "queued",
+    });
+    const unrelatedJobMessage: Message = {
+      ...queuedJobMessage(),
+      backtestJob: unrelatedJob,
+    };
+
+    const [unrelatedConfirmation] = applyBacktestJobUpdate(
+      [runningConfirmation, unrelatedJobMessage],
+      { job: unrelatedJob, run: null },
+    );
+
+    expect(unrelatedConfirmation.confirmation?.status).toBe("running");
+    expect(unrelatedConfirmation.confirmation?.statusLabel).toBe("Running");
+  });
+
+  test("reload normalization uses hydrated queued-job provenance before activating a fresh card", () => {
+    const hydratedJob = backtestJobMessageFromApi(
+      apiMessageWithJob(job({ status: "queued" })),
+    );
+    if (!hydratedJob) {
+      throw new Error("Expected hydrated backtest job message.");
+    }
+
+    const [ownedConfirmation, activeJob, freshConfirmation] =
+      normalizeConfirmationHistory([
+        confirmationCardMessage(),
+        hydratedJob,
+        freshConfirmationCard(),
+      ]);
+
+    expect(ownedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(ownedConfirmation.confirmation?.status).toBe("request_sent");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(ownedConfirmation.confirmation?.actions).toEqual([]);
+    expect(activeJob.backtestJob?.confirmation_message_id).toBe(
+      "confirmation-message-1",
+    );
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
+  });
+
+  test("a completed owned job still settles the earlier confirmation as run complete", () => {
+    const runningConfirmation = supersedePriorConfirmations(
+      confirmationCardMessage(),
+      "running",
+    );
+
+    const [ownedConfirmation, result, freshConfirmation] =
+      normalizeConfirmationHistory(
+        applyBacktestJobUpdate(
+          [runningConfirmation, queuedJobMessage(), freshConfirmationCard()],
+          {
+            job: job({
+              status: "succeeded",
+              result_run_id: "run-1",
+              finished_at: "2026-06-06T12:00:04Z",
+            }),
+            run: run(),
+          },
+        ),
+      );
+
+    expect(ownedConfirmation.confirmation?.status).toBe("run_complete");
+    expect(ownedConfirmation.confirmation?.statusLabel).toBe("Run complete");
+    expect(result.kind).toBe("strategy_result");
+    expect(freshConfirmation.confirmation?.confirmation_state).toBe("active");
+    expect(freshConfirmation.confirmation?.status).toBe("ready_to_run");
   });
 
   test("failed durable job update replaces a local running state", () => {
@@ -201,6 +473,356 @@ describe("chat backtest jobs", () => {
     expect(updated.content).toBe(resultReadout);
     expect(updated.content).not.toContain("I started the backtest");
     expect(updated.content).not.toContain("as soon as it is ready");
+  });
+
+  for (const accountKind of ["guest", "registered"] as const) {
+    test(`${accountKind} reload gives one canonical result message sole card and action ownership`, () => {
+      const resultReadout =
+        "**Quick take**\n\nMSFT returned 12.4% while SPY returned 10.1%.";
+      const resultCard = {
+        ...run().conversation_result_card,
+        evidence_artifact_id: "evidence-1",
+        actions: [
+          {
+            type: "show_breakdown" as const,
+            label: "Explain result",
+            presentation: "result" as const,
+            payload: {},
+          },
+          {
+            type: "refine_strategy" as const,
+            label: "Refine idea",
+            presentation: "result" as const,
+            payload: {},
+          },
+        ],
+      };
+      const completedJob = job({
+        status: "succeeded",
+        result_run_id: "run-1",
+        finished_at: "2026-06-06T12:00:04Z",
+      });
+      const items: ApiMessage[] = [
+        {
+          id: "assistant-job-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: "",
+          created_at: "2026-06-06T12:00:03Z",
+          metadata: {
+            backtest_job_id: "job-1",
+            backtest_job: completedJob,
+            result_card: resultCard,
+            result_run_id: "run-1",
+            latest_run_id: "run-1",
+            result_conversation_id: "conversation-1",
+            result_fact_bank: {
+              run_id: "run-1",
+              symbols: ["MSFT"],
+              benchmark_symbol: "SPY",
+              asset_class: "equity",
+              config_snapshot: { template: "buy_and_hold" },
+            },
+          },
+        },
+        {
+          id: "assistant-result-1",
+          conversation_id: "conversation-1",
+          role: "assistant",
+          content: resultReadout,
+          created_at: "2026-06-06T12:00:04Z",
+          metadata: {
+            result_card: resultCard,
+            result_run_id: "run-1",
+            latest_run_id: "run-1",
+            result_conversation_id: "conversation-1",
+            result_fact_bank: {
+              run_id: "run-1",
+              symbols: ["MSFT"],
+              benchmark_symbol: "SPY",
+              asset_class: "equity",
+              config_snapshot: { template: "buy_and_hold" },
+            },
+          },
+        },
+      ];
+
+      const hydrated = hydrateMessagesFromApi(items);
+      const resultMessages = hydrated.messages.filter(
+        (message) => message.kind === "strategy_result",
+      );
+      const quickTakeOwners = resultMessages.filter((message) =>
+        message.content?.includes("**Quick take**"),
+      );
+      const addDecisionEditorOwners = resultMessages.filter(
+        (message) => message.result?.evidenceArtifactId === "evidence-1",
+      );
+      const resultActionOwners = resultMessages.filter(
+        (message) => (message.result?.actions?.length ?? 0) > 0,
+      );
+
+      expect(resultMessages).toHaveLength(1);
+      expect(resultMessages[0]?.id).toBe("assistant-result-1");
+      expect(resultMessages[0]?.result?.runId).toBe("run-1");
+      expect(resultMessages[0]?.result?.evidenceArtifactId).toBe("evidence-1");
+      expect(quickTakeOwners).toHaveLength(1);
+      expect(addDecisionEditorOwners).toHaveLength(1);
+      expect(resultActionOwners).toHaveLength(1);
+    });
+  }
+
+  test("reload polling keeps the durable result as the sole owner for a succeeded job alias", () => {
+    const resultReadout =
+      "**Quick take**\n\nMSFT returned 12.4% while SPY returned 10.1%.";
+    const resultCard = {
+      ...run().conversation_result_card,
+      evidence_artifact_id: "evidence-result-1",
+      actions: [
+        {
+          type: "show_breakdown" as const,
+          label: "Explain result",
+          presentation: "result" as const,
+          payload: {},
+        },
+        {
+          type: "refine_strategy" as const,
+          label: "Refine idea",
+          presentation: "result" as const,
+          payload: {},
+        },
+      ],
+    };
+    const completedJob = job({
+      id: "job-result-1",
+      status: "succeeded",
+      result_run_id: "run-result-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const completedRun: BacktestRun = {
+      ...run(),
+      id: "run-result-1",
+      conversation_result_card: resultCard,
+    };
+    const apiTranscript: ApiMessage[] = [
+      {
+        id: "message-run-action-1",
+        conversation_id: "conversation-1",
+        role: "user",
+        content: "Run backtest",
+        created_at: "2026-06-06T12:00:03Z",
+        metadata: {
+          chat_action: {
+            type: "run_backtest",
+            label: "Run backtest",
+            presentation: "confirmation",
+            payload: { confirmation_id: "confirmation-1" },
+          },
+          backtest_job_id: completedJob.id,
+          backtest_job: completedJob,
+        },
+      },
+      {
+        id: "message-result-1",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: resultReadout,
+        created_at: "2026-06-06T12:00:04Z",
+        metadata: {
+          result_card: resultCard,
+          result_run_id: completedRun.id,
+          latest_run_id: completedRun.id,
+          result_conversation_id: "conversation-1",
+          result_fact_bank: {
+            run_id: completedRun.id,
+            symbols: ["MSFT"],
+            benchmark_symbol: "SPY",
+            asset_class: "equity",
+            config_snapshot: { template: "buy_and_hold" },
+          },
+        },
+      },
+    ];
+
+    const hydrated = hydrateMessagesFromApi(apiTranscript).messages;
+    expect(
+      hydrated.map((message) => ({
+        messageId: message.id,
+        kind: message.kind,
+        jobId: message.backtestJob?.id ?? null,
+        runId: message.result?.runId ?? message.backtestJob?.result_run_id ?? null,
+        ownsResult: message.kind === "strategy_result",
+      })),
+    ).toEqual([
+      {
+        messageId: "message-run-action-1",
+        kind: "backtest_job",
+        jobId: "job-result-1",
+        runId: "run-result-1",
+        ownsResult: false,
+      },
+      {
+        messageId: "message-result-1",
+        kind: "strategy_result",
+        jobId: null,
+        runId: "run-result-1",
+        ownsResult: true,
+      },
+    ]);
+    expect(pendingBacktestJobIds(hydrated)).toEqual(["job-result-1"]);
+
+    const afterPolling = applyBacktestJobUpdate(hydrated, {
+      job: completedJob,
+      run: completedRun,
+      result_readout: null,
+    });
+    const resultOwners = afterPolling.filter(
+      (message) =>
+        message.kind === "strategy_result" &&
+        message.result?.runId === completedRun.id,
+    );
+    const quickTakeOwners = resultOwners.filter((message) =>
+      message.content?.includes("**Quick take**"),
+    );
+    const decisionOwners = resultOwners.filter(
+      (message) =>
+        message.result?.evidenceArtifactId === "evidence-result-1",
+    );
+    const actionOwners = resultOwners.filter(
+      (message) => (message.result?.actions?.length ?? 0) > 0,
+    );
+
+    expect(
+      resultOwners.map((message) => ({
+        messageId: message.id,
+        kind: message.kind,
+        jobId: message.backtestJob?.id ?? null,
+        runId: message.result?.runId ?? null,
+        evidenceId: message.result?.evidenceArtifactId ?? null,
+      })),
+    ).toEqual([
+      {
+        messageId: "message-result-1",
+        kind: "strategy_result",
+        jobId: null,
+        runId: "run-result-1",
+        evidenceId: "evidence-result-1",
+      },
+    ]);
+    expect(quickTakeOwners).toHaveLength(1);
+    expect(decisionOwners).toHaveLength(1);
+    expect(actionOwners).toHaveLength(1);
+  });
+
+  test("completed job projection remains the result owner when the durable result message is absent", () => {
+    const completedJob = job({
+      status: "succeeded",
+      result_run_id: "run-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const [resultMessage] = hydrateMessagesFromApi([
+      {
+        id: "assistant-job-1",
+        conversation_id: "conversation-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-06-06T12:00:03Z",
+        metadata: {
+          backtest_job_id: "job-1",
+          backtest_job: completedJob,
+          result_card: {
+            ...run().conversation_result_card,
+            evidence_artifact_id: "evidence-1",
+          },
+          result_run_id: "run-1",
+          latest_run_id: "run-1",
+          result_conversation_id: "conversation-1",
+          result_fact_bank: {
+            run_id: "run-1",
+            symbols: ["MSFT"],
+            benchmark_symbol: "SPY",
+            asset_class: "equity",
+            config_snapshot: { template: "buy_and_hold" },
+          },
+        },
+      },
+    ]).messages;
+
+    expect(resultMessage?.id).toBe("assistant-job-1");
+    expect(resultMessage?.kind).toBe("strategy_result");
+    expect(resultMessage?.result?.runId).toBe("run-1");
+    expect(resultMessage?.result?.evidenceArtifactId).toBe("evidence-1");
+  });
+
+  test("completed job recovery chooses one stable fallback owner when aliases share a run", () => {
+    const completedJob = job({
+      status: "succeeded",
+      result_run_id: "run-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const projection = (id: string): ApiMessage => ({
+      id,
+      conversation_id: "conversation-1",
+      role: "assistant",
+      content: "",
+      created_at: "2026-06-06T12:00:03Z",
+      metadata: {
+        backtest_job_id: "job-1",
+        backtest_job: completedJob,
+        result_card: {
+          ...run().conversation_result_card,
+          evidence_artifact_id: "evidence-1",
+        },
+        result_run_id: "run-1",
+        latest_run_id: "run-1",
+        result_conversation_id: "conversation-1",
+        result_fact_bank: {
+          run_id: "run-1",
+          symbols: ["MSFT"],
+          benchmark_symbol: "SPY",
+          asset_class: "equity",
+          config_snapshot: { template: "buy_and_hold" },
+        },
+      },
+    });
+
+    const resultMessages = hydrateMessagesFromApi([
+      projection("assistant-job-z"),
+      projection("assistant-job-a"),
+    ]).messages.filter((message) => message.kind === "strategy_result");
+
+    expect(resultMessages).toHaveLength(1);
+    expect(resultMessages[0]?.id).toBe("assistant-job-a");
+    expect(resultMessages[0]?.result?.runId).toBe("run-1");
+    expect(resultMessages[0]?.result?.evidenceArtifactId).toBe("evidence-1");
+  });
+
+  test("succeeded polling chooses one stable fallback when no durable result exists", () => {
+    const completedJob = job({
+      id: "job-result-1",
+      status: "succeeded",
+      result_run_id: "run-1",
+      finished_at: "2026-06-06T12:00:04Z",
+    });
+    const alias = (id: string): Message => ({
+      ...queuedJobMessage(),
+      id,
+      backtestJob: completedJob,
+      artifactId: completedJob.id,
+      artifactStatus: completedJob.status,
+    });
+
+    const resultMessages = applyBacktestJobUpdate(
+      [alias("message-job-z"), alias("message-job-a")],
+      {
+        job: completedJob,
+        run: run(),
+        result_readout: null,
+      },
+    ).filter((message) => message.kind === "strategy_result");
+
+    expect(resultMessages).toHaveLength(1);
+    expect(resultMessages[0]?.id).toBe("message-job-a");
+    expect(resultMessages[0]?.result?.runId).toBe("run-1");
   });
 
   test("durable job hydration does not generate backend-owned quick takes in the frontend", () => {
@@ -329,8 +951,8 @@ describe("chat backtest jobs", () => {
       },
     );
 
-    expect(settledConfirmation.confirmation?.statusLabel).toBe("Could not run");
-    expect(settledConfirmation.confirmation?.status).toBe("could_not_run");
+    expect(settledConfirmation.confirmation?.statusLabel).toBe("Not completed");
+    expect(settledConfirmation.confirmation?.status).toBe("not_completed");
     expect(failedJob.kind).toBe("backtest_job");
     expect(failedJob.backtestJob?.status).toBe("failed");
   });
@@ -449,16 +1071,77 @@ describe("chat backtest jobs", () => {
   });
 
   test("chat stream, polling, and reload paths use durable job helpers", () => {
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const chatInterface = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const projection = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
+    const chat = [chatInterface, projection].join("\n");
+    const polling = readFileSync(
+      join(root, "lib/chat-run-reconciliation.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("getBacktestJob");
-    expect(chat).toContain("backtestJobMessageFromApi(m)");
-    expect(chat).toContain("const finalBacktestJob = backtestJobFromFinalPayload(finalPayload)");
+    expect(chat).toContain("useBacktestJobPolling");
+    expect(polling).toContain("getBacktestJob");
+    expect(projection).toContain("backtestJobMessageFromApi(message)");
+    expect(
+      projection.indexOf(
+        'message.role === "user" ? backtestJobMessageFromApi(message)',
+      ),
+    ).toBeLessThan(
+      projection.indexOf("chatAction &&"),
+    );
+    expect(chat).toMatch(
+      /const finalBacktestJob = backtestJobFromFinalPayload\(\s*finalPayload,?\s*\)/,
+    );
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
-    expect(chat).toContain("pendingBacktestJobKey");
-    expect(chat).toContain("response.job.status === \"succeeded\" && !response.run");
-    expect(chat).toContain("response.job.status === \"running\"");
+    expect(polling).toContain("pendingBacktestJobKey");
+    expect(polling).toContain("response.job.status === \"succeeded\" && !response.run");
+    expect(polling).toContain("response.job.status === \"running\"");
     expect(chat).not.toContain('workflow_proof');
+  });
+
+  test("ChatInterface exits ambiguous Run checking through typed recovery", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const ambiguityStart = chat.indexOf(
+      "const confirmationId = ambiguousRunConfirmationId",
+    );
+    const ambiguityEnd = chat.indexOf(
+      "const canApplyVisibleUpdate",
+      ambiguityStart,
+    );
+    const ambiguity = chat.slice(ambiguityStart, ambiguityEnd);
+    const recoveryStart = ambiguity.indexOf(
+      'reconciliation.kind === "recoverable"',
+    );
+    const recovery = ambiguity.slice(recoveryStart);
+    expect(ambiguityStart).toBeGreaterThan(-1);
+    expect(ambiguity).toContain("applyRecoverableRunReconciliation");
+    expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
+    expect(ambiguity).toContain("finishRequestTransport(requestSession)");
+    expect(ambiguity).toContain(
+      "streamToConversation(requestSession.identity.conversationId)",
+    );
+    expect(chat).toContain(
+      'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
+    );
+    expect(chat).not.toContain("conversationActivity.settleRequest");
+    expect(ambiguity).toContain(
+      'requestSessions.authorize(requestSession, "run_replay")',
+    );
+    expect(ambiguity).toContain("canApplyVisibleStreamUpdate()");
+    expect(chat).not.toContain("setIsStreamingResponse(false)");
+    expect(ambiguity).toContain("durableStateUnknown: true");
+    expect(recovery).not.toContain(
+      "settleConfirmationAfterActionTransportError(",
+    );
   });
 });

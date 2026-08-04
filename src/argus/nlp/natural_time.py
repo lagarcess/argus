@@ -87,16 +87,21 @@ def resolve_date_range_text(
     first = parsed[0]
     last = parsed[-1]
     if (
-        first.period == "month"
-        and last.period == "month"
+        first.period in {"day", "month"}
+        and last.period in {"day", "month"}
         and not _span_has_explicit_year(first.span)
         and _span_has_explicit_year(last.span)
     ):
-        first = _ParsedDate(
-            value=first.value.replace(year=last.value.year),
-            period=first.period,
-            span=first.span,
-        )
+        try:
+            shared_year_first = first.value.replace(year=last.value.year)
+        except ValueError:
+            return None
+        if shared_year_first <= last.value:
+            first = _ParsedDate(
+                value=shared_year_first,
+                period=first.period,
+                span=first.span,
+            )
 
     start = _endpoint_date(first, endpoint="start", today=current_date)
     end = _endpoint_date(last, endpoint="end", today=current_date)
@@ -225,6 +230,11 @@ def resolve_date_range_intent(
 
     kind = str(payload.get("kind") or "").strip()
     evidence = _intent_evidence_spans(payload)
+
+    if kind == "future_window":
+        # A forward-looking horizon is original intent, never a resolvable
+        # historical test window (issue #241 executable boundary).
+        return None
 
     if kind == "rolling_window":
         count = _positive_int(payload.get("count"))
