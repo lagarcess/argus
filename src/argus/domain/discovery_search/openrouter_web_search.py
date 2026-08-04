@@ -102,7 +102,9 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
     if not isinstance(message_content, str):
         message_content = ""
     sanitized: list[SearchResult] = []
-    previous_citation_end = 0
+    claim_floor = 0
+    citation_group_start: int | None = None
+    previous_citation_end: int | None = None
     for annotation in annotations:
         if not isinstance(annotation, dict):
             continue
@@ -110,6 +112,26 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
         if not isinstance(citation, dict):
             continue
         citation_span = _citation_span(message_content, citation)
+        if citation_span is not None:
+            citation_start, _ = citation_span
+            starts_new_group = (
+                previous_citation_end is None
+                or citation_start < previous_citation_end
+                or any(
+                    character.isalnum()
+                    for character in message_content[
+                        previous_citation_end:citation_start
+                    ]
+                )
+            )
+            if starts_new_group:
+                claim_floor = (
+                    previous_citation_end
+                    if previous_citation_end is not None
+                    and previous_citation_end <= citation_start
+                    else 0
+                )
+                citation_group_start = citation_start
         result = sanitize_search_result(
             title=str(citation.get("title") or ""),
             url=str(citation.get("url") or ""),
@@ -117,14 +139,17 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
             or _cited_message_context(
                 message_content,
                 citation,
-                previous_citation_end=previous_citation_end,
+                previous_citation_end=claim_floor,
+                claim_end_index=citation_group_start,
             ),
             source_date=None,
         )
         if result is not None:
             sanitized.append(result)
         if citation_span is not None:
-            previous_citation_end = max(previous_citation_end, citation_span[1])
+            previous_citation_end = max(
+                previous_citation_end or 0, citation_span[1]
+            )
     return sanitized
 
 
@@ -185,6 +210,7 @@ def _cited_message_context(
     citation: dict[str, Any],
     *,
     previous_citation_end: int = 0,
+    claim_end_index: int | None = None,
 ) -> str:
     """Recover only the claim structurally attached to a citation marker."""
     span = _citation_span(content, citation)
@@ -196,9 +222,14 @@ def _cited_message_context(
     if not citation_url or citation_url not in annotated:
         return annotated
     claim_floor = previous_citation_end if previous_citation_end <= start else 0
-    line_start = content.rfind("\n", claim_floor, start) + 1
-    claim_start = max(claim_floor, line_start, start - 400)
-    claim = content[claim_start:start].strip()
+    claim_end = (
+        claim_end_index
+        if claim_end_index is not None and claim_floor <= claim_end_index <= start
+        else start
+    )
+    line_start = content.rfind("\n", claim_floor, claim_end) + 1
+    claim_start = max(claim_floor, line_start, claim_end - 400)
+    claim = content[claim_start:claim_end].strip()
     boundary_text = claim[:-1] if claim.endswith((".", "!", "?", ";")) else claim
     claim_break = max(
         boundary_text.rfind(separator) for separator in ("\n", "! ", "? ", "; ")
