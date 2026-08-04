@@ -20,6 +20,7 @@ from argus.api.schemas import (
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
+from argus.domain.supabase_guest_accounts import EmailAlreadyRegisteredError
 from fastapi import Request
 from fastapi.testclient import TestClient
 
@@ -701,3 +702,37 @@ def test_identity_link_retry_reconciles_provider_completed_same_uuid(
     assert response.json()["account_kind"] == "registered"
     assert response.json()["user"]["id"] == REGISTERED_ID
     gateway.link_anonymous_identity.assert_not_called()
+
+
+def test_identity_link_maps_existing_email_to_sign_in_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_disabled.return_value = False
+    gateway.link_anonymous_identity.side_effect = EmailAlreadyRegisteredError(
+        "email already registered"
+    )
+    app.dependency_overrides.clear()
+    from argus.api.dependencies import current_user
+
+    app.dependency_overrides[current_user] = _guest_dependency
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            TestClient(app) as client,
+        ):
+            response = client.post(
+                "/api/v1/auth/guest/link",
+                json={
+                    "email": "existing-member@example.com",
+                    "password": "strong-password",
+                    "refresh_token": "current-browser-refresh-token",
+                },
+                headers={"Authorization": "Bearer current-browser-access-token"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "account_exists_use_login"

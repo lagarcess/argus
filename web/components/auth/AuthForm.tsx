@@ -72,6 +72,11 @@ const AUTH_ERROR_MESSAGE_BY_CODE: Readonly<
     key: "auth.errors.account_already_registered",
     fallback: "This session already belongs to a permanent account.",
   },
+  account_exists_use_login: {
+    key: "auth.errors.account_exists_use_login",
+    fallback:
+      "You already have an account. Sign in instead — your conversation comes with you.",
+  },
   guest_bootstrap_failed: {
     key: "auth.errors.guest_bootstrap_failed",
     fallback: "We couldn’t start a temporary conversation. Please try again.",

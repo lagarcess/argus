@@ -43,6 +43,7 @@ from argus.api.schemas import (
     User,
     guest_safe_user,
 )
+from argus.domain.supabase_guest_accounts import EmailAlreadyRegisteredError
 from argus.domain.username_signup import serialized_username_signup
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
@@ -651,6 +652,17 @@ def link_guest_identity(
         return auth_response(request, payload)
     except HTTPException:
         raise
+    except EmailAlreadyRegisteredError:
+        raise problem(
+            request,
+            status_code=409,
+            code="account_exists_use_login",
+            title="Account Already Exists",
+            detail=(
+                "This email already has an Argus account. Sign in instead; "
+                "your conversation comes with you."
+            ),
+        ) from None
     except Exception:
         raise problem(
             request,

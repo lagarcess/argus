@@ -1227,6 +1227,7 @@
       "internal_error": "Argus no pudo completar esta solicitud de cuenta. Inténtalo de nuevo.",
       "account_already_registered": "Esta sesión ya pertenece a una cuenta permanente.",
       "guest_bootstrap_failed": "No pudimos iniciar una conversación temporal. Inténtalo de nuevo.",
+      "account_exists_use_login": "Ya tienes una cuenta. Inicia sesión: tu conversación te acompaña.",
       "guest_identity_link_failed": "No pudimos terminar de crear la cuenta. Tu conversación está segura; inténtalo de nuevo.",
       "csrf_origin_rejected": "No pudimos verificar esta solicitud. Actualiza la página e inténtalo de nuevo.",
       "registered_account_required": "Inicia sesión para conservar esta conversación temporal.",
