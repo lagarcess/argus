@@ -295,7 +295,7 @@ export function RunDossierView({
             {metrics.length > 0 && (
               <dl
                 data-dossier-metrics-layout="compact"
-                className="mt-3 grid grid-cols-2 border-y border-black/[0.06] dark:border-white/[0.08]"
+                className="mt-3 grid grid-cols-2 border-t border-black/[0.06] dark:border-white/[0.08]"
               >
                 {metrics.map((metric, index) => {
                   const spansFullRow =
