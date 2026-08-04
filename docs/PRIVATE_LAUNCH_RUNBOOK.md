@@ -273,6 +273,8 @@ Keep true secrets manual in Render:
 - `ARGUS_OPS_TOKEN`
 - `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`
 - `POSTHOG_PROJECT_TOKEN`
+- `PERPLEXITY_API_KEY`
+- `ARGUS_VISITOR_KEY_SECRET`
 
 Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty. Product analytics capture is
 server-side only through the sanitized observability envelope.
