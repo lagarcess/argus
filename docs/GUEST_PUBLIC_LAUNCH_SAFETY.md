@@ -137,6 +137,25 @@ proves they are necessary:
 These may be reconsidered if real traffic defeats the minimum controls or if
 Argus later promises a strict per-person benefit.
 
+## Eyes-Open Postures — 2026-08-04 Acceptance Walk
+
+Three accepted-risk behaviors of the guest metering design, recorded so
+support and monitoring recognize them instead of re-diagnosing:
+
+1. **Shared networks share guest caps.** The visitor key digests network
+   identity, so a household or office behind one address shares the guest
+   simulation and message allowances. Support signature: "limit reached but
+   I did not run anything." The response is education or an access
+   approval, not debugging.
+2. **Address rotation defeats visitor caps.** A rotating-IP visitor can farm
+   fresh guest workspaces. Standing mitigations: Turnstile on hosted guest
+   entry, allowlist-gated account creation, and guest backtests costing
+   in-process compute rather than provider spend. No further code owed at
+   alpha scale.
+3. **Account deletion is manual.** The delete-and-return loop is founder
+   gated. Acceptable at alpha scale; revisit when self-serve deletion
+   ships.
+
 ## Minimum Public-Launch Safety Bundle
 
 ### 1. Turnstile and anonymous Auth
