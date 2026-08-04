@@ -1148,7 +1148,7 @@
     },
     "access_request": {
       "title": "Request access to Argus",
-      "description": "Argus is in public alpha. Share your email to request access. If approved, we’ll email you when you can create an account.",
+      "description": "Argus is in early access. Share your email to request access. If approved, we’ll email you when you can create an account.",
       "email_label": "Email address",
       "submit": "Request access",
       "submitting": "Requesting access...",

@@ -1148,7 +1148,7 @@
     },
     "access_request": {
       "title": "Solicita acceso a Argus",
-      "description": "Argus está en alfa pública. Comparte tu correo para solicitar acceso. Si se aprueba, te enviaremos un correo cuando puedas crear una cuenta.",
+      "description": "Argus está en acceso anticipado. Comparte tu correo para solicitar acceso. Si se aprueba, te enviaremos un correo cuando puedas crear una cuenta.",
       "email_label": "Correo electrónico",
       "submit": "Solicitar acceso",
       "submitting": "Solicitando acceso...",
