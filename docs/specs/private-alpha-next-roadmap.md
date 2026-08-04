@@ -333,6 +333,25 @@ Pre-flight is complete and its findings are the promotion agent's brief:
   `cost_ledger_entries`; canary cadence (keep daily vs thin out) is a
   founder decision made from that measured number.
 
+### Acceptance walk amendment — 2026-08-04 evening
+
+A founder-witnessed acceptance walk on the local candidate stack (guest lane,
+conversion, signed-in journeys, adversarial Spanish) moved the candidate tip
+from `58fe1049` to **`70ba33cc`** (all CI-green). It found and fixed in place:
+the conversion resume 409 (stale idempotency key), two omnisearch dossier
+divider strays, the presumptuous default decision state (now unchosen
+end-to-end including the guest resume target), "public alpha" copy replaced
+with "early access" (en/es-419), existing-email re-signup now points to sign
+in on the conversion modal (409 `account_exists_use_login`; the public signup
+page stays deliberately opaque for anti-enumeration), and an em dash purge
+from all user-facing copy (rule locked in `.agent/rules/coding-standards.md`).
+Eyes-open guest metering postures are recorded in
+`GUEST_PUBLIC_LAUNCH_SAFETY.md`. Findings filed instead of fixed: pending-card
+NL edits ignored in any language (evidence on #335), reply language follows
+workspace not message language (#378), Run-backtest action as localized token
+chip without message metering (#379). None are batch regressions; promotion
+proceeds on `70ba33cc`.
+
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
 active pointer.
