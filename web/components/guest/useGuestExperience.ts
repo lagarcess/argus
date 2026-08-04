@@ -127,13 +127,7 @@ export function useGuestExperience({
       } else if (action.reason === "simulation_limit") {
         await sendRef.current?.(
           action.action.label || action.action.value || "",
-          {
-            ...action.action,
-            payload: {
-              ...action.action.payload,
-              idempotency_key: action.actionId,
-            },
-          },
+          action.action,
           undefined,
           { bypassGuestGate: true },
         );
