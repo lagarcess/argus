@@ -68,6 +68,8 @@ services:
         value: "25"
       - key: ARGUS_OPS_TOKEN
         sync: false
+      - key: ARGUS_VISITOR_KEY_SECRET
+        sync: false
       - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD
         sync: false
       - key: DATABASE_URL
@@ -141,6 +143,8 @@ services:
         value: https://argus-ohr5.onrender.com/api/v1
       - key: NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY
         sync: false
+      - key: NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL
+        value: support@get-argus.com
       - key: NEXT_PUBLIC_STRATEGIES_ENABLED
         value: "false"
       - key: NEXT_PUBLIC_COLLECTIONS_ENABLED

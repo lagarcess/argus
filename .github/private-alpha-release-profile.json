@@ -46,6 +46,7 @@
         "ARGUS_CORS_ALLOW_ORIGINS",
         "ARGUS_OPS_TOKEN",
         "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
+        "ARGUS_VISITOR_KEY_SECRET",
         "DATABASE_URL",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
@@ -69,7 +70,8 @@
         "NEXT_PUBLIC_STRATEGIES_ENABLED": "false",
         "NEXT_PUBLIC_COLLECTIONS_ENABLED": "false",
         "NEXT_PUBLIC_OMNISEARCH_ENABLED": "true",
-        "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED": "false"
+        "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED": "false",
+        "NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL": "support@get-argus.com"
       },
       "required_present": [
         "NEXT_PUBLIC_SUPABASE_URL",
