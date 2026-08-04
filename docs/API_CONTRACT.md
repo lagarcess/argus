@@ -2437,7 +2437,10 @@ Contract rules:
   latest result; reload hydrates the response and this sidecar from persisted
   message metadata without re-querying any provider.
 - Typed discovery recovery uses the standard `recovery` object with codes
-  `discovery_unavailable`, `discovery_search_failed` (retryable),
+  `discovery_unavailable` (non-retryable when Search is disabled, missing its
+  configured credentials, or receives HTTP 401/403),
+  `discovery_search_failed` (retryable for temporary timeout, transport, other
+  HTTP, malformed-provider-response, extraction, or voicing failures),
   `discovery_no_verified_candidates`, `discovery_suggestions_unavailable`
   (retryable; the model-knowledge path failed), `discovery_limit_reached`
   (retained; an exhausted allowance now falls through to the model-knowledge

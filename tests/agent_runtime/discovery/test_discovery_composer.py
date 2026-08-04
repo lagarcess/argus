@@ -239,10 +239,11 @@ class TestFlagOnPipeline:
         assert provider.calls[0]["max_results"] == 5
 
     @pytest.mark.asyncio()
-    async def test_provider_unavailable_yields_search_failed_recovery(
-        self, flag_on: pytest.MonkeyPatch
+    @pytest.mark.parametrize("reason", ("timeout", "http_error", "malformed_response"))
+    async def test_temporary_provider_failure_yields_retryable_search_recovery(
+        self, flag_on: pytest.MonkeyPatch, reason: str
     ) -> None:
-        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        provider = _FakeProvider(SearchUnavailableError(reason=reason))
         _wire(flag_on, provider=provider, extraction=_extraction())
         result = await _run(_decision())
         patch = result.patch
@@ -250,6 +251,7 @@ class TestFlagOnPipeline:
         assert patch["recovery"]["retryable"] is True
         assert "discovery" not in patch
         assert patch["discovery_usage"]["search_attempted"] is True
+        assert patch["discovery_usage"]["fallback_code"] == f"search_{reason}"
 
     @pytest.mark.asyncio()
     async def test_not_configured_failure_does_not_count_as_attempt(
@@ -259,8 +261,49 @@ class TestFlagOnPipeline:
         _wire(flag_on, provider=provider, extraction=_extraction())
         result = await _run(_decision())
         patch = result.patch
-        assert patch["recovery"]["code"] == "discovery_search_failed"
+        assert patch["recovery"]["code"] == "discovery_unavailable"
+        assert patch["recovery"]["retryable"] is False
         assert patch["discovery_usage"]["search_attempted"] is False
+
+    @pytest.mark.asyncio()
+    async def test_authentication_failure_is_non_retryable_after_attempt(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(
+            SearchUnavailableError(reason="authentication_failed")
+        )
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await _run(_decision())
+        patch = result.patch
+        assert patch["recovery"]["code"] == "discovery_unavailable"
+        assert patch["recovery"]["retryable"] is False
+        assert patch["discovery_usage"] == {
+            "search_attempted": True,
+            "fallback_code": "search_authentication_failed",
+        }
+
+    @pytest.mark.asyncio()
+    async def test_same_request_succeeds_when_temporary_provider_recovers(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(SearchUnavailableError(reason="timeout"))
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        decision = _decision()
+
+        failed = await _run(decision)
+        provider._packet = _packet()
+        recovered = await _run(decision)
+
+        assert failed.patch["recovery"] == {
+            "code": "discovery_search_failed",
+            "retryable": True,
+        }
+        assert "recovery" not in recovered.patch
+        assert [
+            candidate["symbol"] for candidate in recovered.patch["discovery"]["candidates"]
+        ] == ["CRWD"]
+        assert len(provider.calls) == 2
+        assert provider.calls[0]["query"] == provider.calls[1]["query"]
 
     @pytest.mark.asyncio()
     async def test_zero_validated_candidates_yields_no_verified_recovery(
@@ -535,6 +578,160 @@ class TestRetryAffordance:
         no_verified = await _run(_decision())
         assert no_verified.patch["recovery"]["retryable"] is False
         assert "retry_last_turn" not in no_verified.patch
+
+    @pytest.mark.asyncio()
+    @pytest.mark.parametrize(
+        ("language", "user_message"),
+        (
+            ("en", "Find current pharmaceutical stocks"),
+            ("es-419", "Busca acciones farmacéuticas actuales"),
+        ),
+    )
+    async def test_non_retryable_unavailable_skips_voice_in_each_locale(
+        self,
+        flag_on: pytest.MonkeyPatch,
+        language: str,
+        user_message: str,
+    ) -> None:
+        async def _unexpected_voice(**kwargs: Any) -> str:
+            raise AssertionError(f"unexpected voice call: {kwargs}")
+
+        flag_on.setattr(
+            composer_module, "invoke_openrouter_chat_completion", _unexpected_voice
+        )
+
+        response = await composer_module._voiced_discovery_recovery(
+            code="discovery_unavailable",
+            retryable=False,
+            current_user_message=user_message,
+            language=language,
+            unverified_names=[],
+            uncorroborated_names=[],
+        )
+
+        assert response is None
+
+    @pytest.mark.asyncio()
+    async def test_unavailable_recovery_rejects_generated_retry_promise(
+        self,
+        flag_on: pytest.MonkeyPatch,
+    ) -> None:
+        async def _unsafe_voice(
+            *, task: str, messages: list[dict[str, str]]
+        ) -> str:
+            assert task == "chat_composer"
+            assert messages
+            return "Current discovery is unavailable, so try again later."
+
+        flag_on.setattr(
+            composer_module, "invoke_openrouter_chat_completion", _unsafe_voice
+        )
+
+        response = await composer_module._voiced_discovery_recovery(
+            code="discovery_unavailable",
+            retryable=False,
+            current_user_message="Find current pharmaceutical stocks",
+            language="en",
+            unverified_names=[],
+            uncorroborated_names=[],
+        )
+
+        assert response is None
+
+    @pytest.mark.asyncio()
+    @pytest.mark.parametrize(
+        ("code", "expected_next_step"),
+        (
+            (
+                "discovery_target_missing",
+                "Ask for a category or an anchor company to search.",
+            ),
+            (
+                "discovery_no_verified_candidates",
+                "Ask for a different category or a specific symbol or company to test.",
+            ),
+        ),
+    )
+    async def test_other_non_retryable_voice_preserves_code_specific_next_step(
+        self,
+        flag_on: pytest.MonkeyPatch,
+        code: str,
+        expected_next_step: str,
+    ) -> None:
+        captured_messages: list[dict[str, str]] = []
+
+        async def _capture_voice(
+            *, task: str, messages: list[dict[str, str]]
+        ) -> str:
+            assert task == "chat_composer"
+            captured_messages.extend(messages)
+            return "safe response"
+
+        flag_on.setattr(
+            composer_module, "invoke_openrouter_chat_completion", _capture_voice
+        )
+
+        response = await composer_module._voiced_discovery_recovery(
+            code=code,
+            retryable=False,
+            current_user_message="Find some investments",
+            language="en",
+            unverified_names=[],
+            uncorroborated_names=[],
+        )
+
+        assert response == "safe response"
+        system_prompt = captured_messages[0]["content"]
+        assert expected_next_step in system_prompt
+        assert "Describe availability only as unavailable for this request." not in system_prompt
+        assert "Do not describe discovery as unavailable." in system_prompt
+
+    @pytest.mark.asyncio()
+    @pytest.mark.parametrize(
+        ("language", "user_message", "expected_response"),
+        (
+            (
+                "en",
+                "Find current pharmaceutical stocks",
+                "Current source-backed discovery is not available for this request, "
+                "and I will not guess from memory. Name a symbol or company you "
+                "already have in mind and I can test it. Everything in this chat is "
+                "unchanged.",
+            ),
+            (
+                "es-419",
+                "Busca acciones farmacéuticas actuales",
+                "La búsqueda actual respaldada por fuentes no está disponible para "
+                "esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o "
+                "una empresa que tengas en mente y puedo probarla. Todo en este chat "
+                "sigue igual.",
+            ),
+        ),
+    )
+    async def test_unavailable_recovery_uses_deterministic_localized_copy(
+        self,
+        flag_on: pytest.MonkeyPatch,
+        language: str,
+        user_message: str,
+        expected_response: str,
+    ) -> None:
+        provider = _FakeProvider(
+            SearchUnavailableError(reason="authentication_failed")
+        )
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        result = await discovery_stage_result_if_applicable(
+            decision=_decision(),
+            current_user_message=user_message,
+            language=language,
+        )
+
+        assert result is not None
+        patch = result.patch
+        assert patch["recovery"] == {
+            "code": "discovery_unavailable",
+            "retryable": False,
+        }
+        assert str(patch["assistant_response"]) == expected_response
 
 
 class TestVoicedRecoveryMetadata:

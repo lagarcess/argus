@@ -16,6 +16,7 @@ from loguru import logger
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
+    discovery_response_ready_for_runtime,
     preserve_typed_discovery_act,
 )
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
@@ -2188,18 +2189,17 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
     asset_resolution_context: str | None = None,
 ) -> LLMInterpretationResponse:
-    primary_act_typed = response.semantic_turn_act == "asset_discovery"
-    primary_discovery = response.asset_discovery if primary_act_typed else None
-    audited = await _audited_response_ready_for_runtime(
+    discovery_response = discovery_response_ready_for_runtime(
         response=response,
-        preferred_model=preferred_model,
         request=request,
         asset_resolution_context=asset_resolution_context,
+        normalize=_normalize_response_for_runtime_context,
     )
-    return preserve_typed_discovery_act(
-        primary_act_typed=primary_act_typed,
-        primary_discovery=primary_discovery,
-        audited=audited,
+    if discovery_response is not None:
+        return discovery_response
+    return await _audited_response_ready_for_runtime(
+        response=response, preferred_model=preferred_model, request=request,
+        asset_resolution_context=asset_resolution_context,
     )
 
 

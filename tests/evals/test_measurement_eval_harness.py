@@ -270,6 +270,34 @@ def test_asset_discovery_expectations_flag_misroutes() -> None:
     assert any(failure.startswith("semantic_turn_act:") for failure in discovery_leak)
 
 
+def test_asset_discovery_expectations_compare_current_fact_requirement() -> None:
+    case = _asset_discovery_case(
+        {
+            "relationship": "category",
+            "anchor_symbols": [],
+            "needs_current_facts": True,
+        }
+    )
+
+    failures = harness.typed_expectation_failures(
+        case=case,
+        outcome=_asset_discovery_outcome(
+            semantic_turn_act="asset_discovery",
+            asset_discovery={
+                "relationship": "category",
+                "category_description": "recent IPO stocks",
+                "anchor_symbols": [],
+                "asset_class_hint": "equity",
+                "needs_current_facts": False,
+            },
+        ),
+    )
+
+    assert failures == [
+        "asset_discovery.needs_current_facts: expected True, got False"
+    ]
+
+
 def test_typed_outcome_extracts_discovery_route_fields() -> None:
     case = _asset_discovery_case({"relationship": "peer", "anchor_symbols": ["NVDA"]})
     interpret_result = SimpleNamespace(

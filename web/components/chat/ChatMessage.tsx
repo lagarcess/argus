@@ -34,6 +34,7 @@ import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
+import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 
 
 type ChatMessageProps = {
@@ -502,14 +503,20 @@ export default function ChatMessage({
                       "chat.discovery_results.search_current",
                       { defaultValue: "Search for current results" },
                     );
+                    const copyPlan = discoveryEscalationCopyPlan(
+                      message.discovery,
+                    );
+                    const assetKind = t(copyPlan.assetKindKey, {
+                      defaultValue: copyPlan.assetKindDefaultValue,
+                    });
                     // Restate the relationship: peer/comparison query_summary
                     // is bare symbols, and "search for: AAPL" reads as a test.
                     const searchSendText = t(
-                      `chat.discovery_results.search_current_send_${message.discovery.relationship}`,
+                      copyPlan.messageKey,
                       {
-                        query: message.discovery.query_summary,
-                        defaultValue:
-                          "Search current sources for: {{query}}",
+                        query: copyPlan.query,
+                        assetKind,
+                        defaultValue: copyPlan.messageDefaultValue,
                       },
                     );
                     return (

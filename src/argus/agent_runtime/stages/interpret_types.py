@@ -95,8 +95,9 @@ class AssetDiscoveryRequest(BaseModel):
         description=(
             "True only when a correct answer requires facts newer than model "
             "knowledge -- recent IPOs, this week's movers, current rankings, "
-            "anything whose right answer changes with time -- or when the user "
-            "explicitly asks to search current sources. False for stable "
+            "anything whose right answer changes with time -- when the user "
+            "asks for current or up-to-date candidates, or explicitly asks to "
+            "search current sources, in any language. False for stable "
             "relationships: sectors, categories, peers, 'names like X'. Judge "
             "the answer, not the wording."
         ),

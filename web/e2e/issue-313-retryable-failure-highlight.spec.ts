@@ -40,7 +40,7 @@ const copy = {
     capability: "I can test one asset class at a time.",
     clarification: "Which date range should I use?",
     nonRetryable:
-      "I cannot look up current source-backed candidates yet, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
+      "Current source-backed discovery is not available for this request, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
     retry: "Retry",
     retrySuccess: "The retry completed without changing your original request.",
   },
@@ -48,7 +48,7 @@ const copy = {
     capability: "Puedo probar una clase de activo a la vez.",
     clarification: "¿Qué rango de fechas quieres usar?",
     nonRetryable:
-      "Todavía no puedo buscar candidatos respaldados por fuentes actuales, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
+      "La búsqueda actual respaldada por fuentes no está disponible para esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
     retry: "Reintentar",
     retrySuccess: "El reintento terminó sin cambiar tu solicitud original.",
   },
