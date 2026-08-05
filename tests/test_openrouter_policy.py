@@ -3203,8 +3203,67 @@ def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> Non
     assert "model=test/model" in message
     assert "max_tokens=3200" in message
     assert "error_type=RuntimeError" in message
-    assert "provider rejected request" not in message
+    # The detail belongs in the rendered message: the default sink drops extra,
+    # so binding it alone left production with only the exception type.
+    assert "provider rejected request" in message
     assert kwargs["error_type"] == "RuntimeError"
+    assert kwargs["error"] == "provider rejected request"
+
+
+def _captured_failure_log(monkeypatch, exc: Exception) -> str:
+    observed: list[str] = []
+    monkeypatch.setattr(
+        "argus.llm.openrouter.logger.warning",
+        lambda message, **_kwargs: observed.append(message),
+    )
+    log_openrouter_failure(
+        task="interpretation",
+        model_name="test/model",
+        exc=exc,
+        message="LLM interpretation failed",
+    )
+    return observed[0]
+
+
+def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
+    def _raise_local_rejection() -> None:
+        raise ValueError(
+            "OpenRouter interpretation returned an incomplete strategy draft"
+        )
+
+    try:
+        _raise_local_rejection()
+    except ValueError as exc:
+        message = _captured_failure_log(monkeypatch, exc)
+
+    assert "error_type=ValueError" in message
+    assert "OpenRouter interpretation returned an incomplete strategy draft" in message
+    # Points at the raising line so a deterministic local rejection is
+    # distinguishable from a provider transport failure.
+    assert "error_origin=test_openrouter_policy.py:" in message
+
+
+def test_openrouter_failure_log_survives_braces_in_detail() -> None:
+    # Real loguru here: a stubbed warning would not exercise its formatting.
+    try:
+        raise ValueError('provider said {"error": {"code": 400}}')
+    except ValueError as exc:
+        log_openrouter_failure(
+            task="interpretation",
+            model_name="test/model",
+            exc=exc,
+            message="LLM interpretation failed",
+        )
+
+
+def test_openrouter_failure_log_bounds_long_provider_detail(monkeypatch) -> None:
+    try:
+        raise RuntimeError("x" * 5000)
+    except RuntimeError as exc:
+        message = _captured_failure_log(monkeypatch, exc)
+
+    assert "<truncated>" in message
+    assert len(message) < 1000
 
 
 def test_direct_json_schema_payload_uses_interpretation_profile_reasoning(
