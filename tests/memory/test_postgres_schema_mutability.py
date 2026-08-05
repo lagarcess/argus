@@ -611,6 +611,56 @@ def test_provider_cleanup_identity_remains_immutable(
                     )
 
 
+def test_candidate_sensitivity_flags_require_restricted_status(
+    memory_graph: dict[str, str],
+) -> None:
+    with _connect() as connection:
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="sensitivity_flags_require_restricted",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    insert into public.memory_candidates (
+                      id,
+                      owner_id,
+                      category,
+                      source_label,
+                      source_value,
+                      future_benefit,
+                      trigger,
+                      proposed_context,
+                      opt_in_scope,
+                      sensitivity_status,
+                      sensitivity_flags,
+                      sensitivity_policy_version,
+                      sensitivity_content_digest
+                    )
+                    values (
+                      %s,
+                      %s,
+                      'workflow_preference',
+                      'Show assumptions first',
+                      'Show assumptions before every result explanation.',
+                      'Keeps future result reviews consistent.',
+                      'explicit_request',
+                      'ordinary',
+                      array['workflow_preference'],
+                      'clear',
+                      array['account_balance'],
+                      'argus.memory-sensitivity/v1',
+                      %s
+                    )
+                    """,
+                    (
+                        f"candidate-{uuid.uuid4().hex}",
+                        memory_graph["owner_id"],
+                        f"sha256:{'4' * 64}",
+                    ),
+                )
+
+
 def test_child_identity_trigger_rejects_unknown_table_names() -> None:
     with _connect() as connection:
         with connection.cursor() as cursor:
