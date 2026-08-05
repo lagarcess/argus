@@ -2,14 +2,37 @@
 
 Status: Active integration staging/process context
 Date: 2026-06-10
-Last reconciled: 2026-07-29
+Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product checkpoint: PR #304 at `59a274c3`. Later commits may reconcile
-documentation and issue state without changing product behavior. New work must
-branch from the current remote `codex/private-alpha-next` head rather than
-pinning this product SHA. The accepted post-promotion
+Latest product change: PR #366 at `2b023576`, which makes grounded
+discovery's failures as honest as its successes — typed routing for current
+searches, working Retry for transient failures, non-retryable honesty with a
+forward path for configuration failures, and fail-closed citation evidence
+(issue #344). This completes the #347 checkpoint-gap batch for this cycle;
+the integration head is the promotion-freeze candidate. It follows PR #354
+at `4a6a237a` (truthful guest quota recovery, issue #346) and PR #358 at
+`7b3221a1` (all-or-retry compound edits, issue #339) and PR #359 at
+`a35bb29f` (recommendation continuity through the shared clarify contract,
+issue #345) and PR #373 at `81e7a1ac` (first-login guest
+claims with preserved anti-enumeration, issue #372) and PR #351 at `30af0dca` (immediate Recents refresh on
+claimed conversions, issue #342) and PR #374 at `d8c7070a` (robust activity timestamp parsing and
+exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
+cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
+evidence), and PR #375 at `c334cf3e` (stated-capital preservation on unsupported
+turns, issue #368), PR #352 at `0942507b` (unified OS-aware keyboard
+registry and contextual shortcut legend, issue #334), PR #356 at `48de2f3f`
+(rounded menu highlights, issue #343), PR #357 at
+`9f97f1dc` (guest dossier conversion gating, issue #340), PR #353 at
+`7e4c58f8` (proven-continuity rail attention clearing, issue #337), PR #355
+at `c01d5730` (opening-turn asset/capital preservation, issue #336), PR #362
+at `b2e8975c` (live-eval environment repair, issue #361), and PR #348 at
+`38874bae` (self-hosted canonical fonts).
+Later commits may reconcile documentation and issue state without changing
+product behavior. New work must branch from the current remote
+`codex/private-alpha-next` head rather than pinning either product SHA. The
+accepted post-promotion
 vertical slices are graph range switching (PR #264), account recovery/session
 controls (PR #261), truthful Usage allowances/accounting (PR #259), and
 executable capability truth (PR #266), the Always Progresses continuity
@@ -36,7 +59,196 @@ bounded progressive Recents disclosure, and PR #303 reconciled catalog-valid
 benchmarks with explicit zero price bars before confirmation. PR #304 then
 completed distinct Quick take, Explain result, typed Try next, and recoverable
 failure ownership across live turns, durable jobs, reload, English, and
-Spanish.
+Spanish. PR #305 then completed issue #253's deterministic decision-first
+recall projection and panel as `88ab906d`. PR #306 completed the Full
+Omnisearch memory-inspector journey as `b71f1eaf`: one ranked conversation row,
+bounded object-first transcript recall, jump-to-match, deterministic dossiers
+and asset rollups, exact decision filtering and mutation refresh, and
+provider-free **Run it fresh** composition. The accepted implementation keeps
+the #232 pagination/cursor boundary and #252 navigation-race guarantees, adds
+no RAG/embeddings or durable recall model, and closes the Omnisearch product
+lane without claiming deployment or tester exposure.
+PR #316 subsequently completed issue #309's bounded run-dossier history and
+effective-decision browser as `9aa209d4`. PR #318 made accepted-turn downstream
+failures remain assistant-owned across reload and Retry as `f6d0981e`, followed
+by the test-isolation checkpoint `1ed8d4f0`; issue #313 is closed. PR #315 added
+the current-conversation activity rail as `6e20328c`. PR #317 then added one
+central keyboard-shortcut registry, localized help overlay, and shared Recents
+and Settings quick-jump behavior as `2ff6f3c6`, without changing Cmd/Ctrl+K
+Omnisearch or the existing F2 rename binding. PR #324 aligned Recents hints with
+that registry as `812c8fef`, and PR #311 then completed the typed, provider-free
+current-data retest action as `51984a42`; issue #310 is closed.
+
+The next integrated group adds bounded product and release-readiness work:
+registered-only avatar themes through PR #312 (`40eba1f6`); public-alpha
+capacity, capped-key, requested-access, approval-email, and hosted-proof
+mechanics through PR #319 (`1c3775aa`); one shared frontend failure vocabulary
+through PR #320 (`53c36d40`); auth copy, localized errors, and consistent card
+containment through PRs #323, #325, and #328 (`c1a13949`, `05fbef06`, and
+`403ea114`); and removal of the unavailable Release Notes row through PR #327
+(`22bec7da`). Public account access remains explicitly disabled and founder
+controlled despite the completed technical-readiness proof.
+
+PR #329 added the durable backend/data conversation-activity and read-state
+foundation as `8a5d621b`; PR #331 completed its chat/Recents frontend consumer
+as `ec3a0a52`. The #329 migration is not claimed as hosted by these integration
+merges. PR #326 closed issue #321 as `8e2a6217` with bounded
+invisible/interactive CAPTCHA deadlines and an accessible localized challenge
+dialog. PR #330 then completed deferred Guest bootstrap as `94476226`, keeping
+anonymous identity and CAPTCHA acquisition behind the first submission while
+preserving #331 activity ownership. Issue #314 remains a separate API evidence
+gap discovered during typed-retest delivery, not unfinished #310 work.
+PR #348 then self-hosted the canonical Inter and Space Grotesk variable fonts
+as `38874bae`, removing the Google Fonts network dependency from build,
+runtime, and provider-free browser QA. It added no environment variable,
+deployment, API, schema, or migration requirement. The separate low-priority
+fallback-order alignment remains issue #350.
+PR #362 then repaired the sanctioned live-eval harness as `b2e8975c`, closing
+issue #361: the explicit `ARGUS_EVAL_ENV_FILE` environment now preloads before
+Argus imports, so calendar-aware live cases exercise real market sessions and
+report `calendar_alignment` truthfully instead of failing 17 of 39 cases under
+the leaked synthetic fixture calendar. The change is confined to
+`tests/evals/` and added no environment variable, deployment, API, schema, or
+migration requirement.
+PR #355 then closed issue #336 as `c01d5730`: provider-resolved assets and
+capital supplied in a terse opening turn survive into clarification and the
+confirmation card, with post-LLM provider-context reconciliation removing only
+stale asset blockers once every extracted traded-asset mention is accounted
+for. Mixed, ambiguous, underfilled, overflow, and cross-class contexts stay
+blocked. Accepted evidence includes the exact-head live-eval gate and a
+founder-witnessed browser reproduction of the original G-01 transcript. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #353 then closed issue #337 as `7e4c58f8`: a rail needs-attention tick for
+a clarification clears only when a later active confirmation is proven, via
+backend-owned typed metadata (`strategy_path_id`, `source_result_run_id`, and
+provenance-checked user values), to continue the same strategy path; unproven
+or unrelated confirmations fail closed. The Guest rail keeps its single
+legitimate completed-run tick visible. The first exact-head verification
+failed and was repaired (e2e seed omitted real workflow metadata) before
+acceptance; the final head passed the real local-Supabase Guest replay
+independently. It added no environment variable, deployment, API, schema, or
+migration requirement.
+PR #357 then closed issue #340 as `9f97f1dc`: guest Omnisearch dossiers keep
+Add/Edit decision actions visible and conversion-gate activation through a
+typed `available | account_conversion_required` availability contract across
+Python, OpenAPI, and TypeScript, then resume the exact run, decision state,
+and note after conversion. The server remains authoritative and no guest
+write path exists; the gated presentation activates only for clients
+declaring the additive `dossier_decision_conversion_v1` capability header, so
+legacy clients keep the prior stripped behavior. `docs/API_CONTRACT.md` and
+`docs/api/openapi.yaml` changed in-PR with compatibility tests; it added no
+environment variable, deployment, schema, or migration requirement. Issue
+#341 is now unblocked for dispatch from the post-#357 integration head.
+PR #356 then closed issue #343 as `48de2f3f`: menu-row hover/selected
+highlights use one rounded inset-pill geometry across Settings, Profile,
+Recents overflow, and chat-header menus, with destructive-red and neutral
+action colors unchanged. Class-only change; hover evidence is committed
+in-repo under `docs/reports/evidence/issue-343/`. The founder explicitly
+overruled the absent on-PR Codex review after personal visual checks. It
+added no environment variable, deployment, API, schema, or migration
+requirement.
+PR #352 then closed issue #334 as `0942507b`: Omnisearch and active-chat
+keyboard actions share one OS-aware behavior registry (EN/es-419 labels and
+execution from one source), with a contextual shortcut legend that stays
+quiet at rest, contextual Omnisearch actions, arrow navigation, quick jump,
+keyboard-aware delete confirmation, and a responsive help sheet. Its first
+head was returned for composed-tree modularity violations and re-landed
+after genuine extraction; ChatInterface.tsx now sits exactly at its budget
+limit, so future lanes touching it must extract first. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #375 then closed issue #368 as `c334cf3e`: the stated-starting-capital
+recheck now also runs on `unsupported_or_out_of_scope` turns, so an explicit
+non-DCA capital amount survives capability-honesty recoveries without
+changing the unsupported verdict, dates, assets, or DCA behavior. Accepted
+evidence: red-first mocked regression plus one targeted live rerun of the
+original news-sentiment case, re-captured at the exact final head. The
+founder waived the ceremony reconcile-merge commit after an independently
+verified no-overlap disposition (all intervening landings were docs or
+web-only). This fix upgrades PR #363's pending evidence bar. It added no
+environment variable, deployment, API, schema, or migration requirement.
+PR #370 then closed issue #341 as `c324f877`: explicit `timestamptz`/`uuid`
+casts on the nullable first-page dossier cursors repair the guest Decision
+history 500 (`AmbiguousParameter` on the untyped null comparison) — not a
+guest-guard or transport failure, and the issue was nearly closed as
+not-reproducible before the mandated real-browser re-evidencing surfaced
+the true failure in the Postgres reader. Evidence: same-session 500→200 at
+the exact head with the screenshot committed in-repo; guest workspace
+isolation re-proven. It added no environment variable, deployment, API,
+schema, or migration requirement.
+PR #360 then closed issue #349 as `42d96da7`: conversation-activity truth is
+now verified with durable in-repo evidence — registered manual-unread
+persists, survives reload, clears, and never reorders Recents; each Guest
+state is individually classified with owner actions account-only. Docs and
+four committed screenshots plus one date-stable Playwright fixture line; no
+product behavior, API, schema, or migration change.
+PR #374 then closed issue #371 as `d8c7070a`: `_as_datetime` normalizes
+Postgres-trimmed fractional seconds and trailing `Z` offsets with explicit
+regex-free string handling before parsing (founder-directed), repairing the
+~1-in-10 broken-Recents failure observed in live QA, and the API middleware
+now retains the exception in its failure log while keeping the HTTP body
+generic. No environment variable, deployment, API, schema, or migration
+requirement was added.
+PR #351 then closed issue #342 as `30af0dca`: the guest-to-account handoff
+awaits the promise-returning Recents refresh after ownership confirmation and
+before a pending action resumes, so the claimed conversation is visible
+immediately; ordinary mutation refreshes remain fire-and-forget. Accepted on
+a founder-witnessed live conversion journey at the exact composed tree plus
+full composed-tree gates. Its first live-proof attempt discovered #371 and
+#372; the integration-side headroom extraction `34782abd` preceded this
+landing. No environment variable, deployment, API, schema, or migration
+requirement was added.
+PR #373 then closed issue #372 as `81e7a1ac`: signup eagerly creates the
+destination profile (guarded against Supabase's obfuscated duplicate
+response) so a brand-new account's first-login claim satisfies the handoff
+foreign key; optional usernames are prevalidated case-insensitively before
+Auth-user creation under transaction-scoped advisory locks, returning typed
+`409 username_taken` for new-account conflicts while existing-email requests
+keep the provider's indistinguishable duplicate path. Three review rounds
+each removed a real regression (FK failure, email oracle, username oracle).
+No environment variable, deployment, schema, or migration requirement was
+added; `docs/API_CONTRACT.md` records the username semantics.
+PR #359 then closed issue #345 as `a35bb29f`: recommendation follow-ups
+inherit every still-applicable owned fact (assets, capital, window,
+timeframe, benchmark, modeled costs) unless the user changes them, with the
+historical result immutable and the new confirmation active — routed through
+the shared clarify contract with model voice and degraded fallback. Accepted
+at the full clean bar: live 40/40 with no waivers, strategy-diverse browser
+proof (weekly DCA with recurring contribution; SMA 50/200 inheritance), and
+full deterministic gates. No environment variable, deployment, API, schema,
+or migration requirement was added.
+PR #358 then closed issue #339 as `7b3221a1`: the artifact-edit planner
+derives required typed targets from the entire turn — any operation count
+over the full edit vocabulary — and only plans that provably materialize
+every target may claim ready_to_confirm, verified against the real
+application path; partial application retries or asks, and unsupported
+content declines to the normal flow. Six adversarial review rounds hardened
+coverage against faked completeness. The lane's 24/41 live report was
+independently diagnosed and lane-confirmed as the known root-.env
+synthetic-calendar misconfiguration, corroborated by #359's adjacent 40/40.
+Issue #335 is unblocked and stacked for the next cycle. No environment
+variable, deployment, API, schema, or migration requirement was added.
+PR #354 then closed issue #346 as `4a6a237a`: the guest quota-exhaustion
+message states the actual reset time and offers conversion; the guest
+allowance rises to two simulations via migration
+`20260802090000_raise_guest_simulation_allowance.sql` (landed in-repo and
+preview-proven; hosted application remains a promotion-runbook step);
+visitor prechecks use the daily reset horizon; first-admission
+classification is atomic; and the authoritative public-launch canary in
+`docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` now expects the two-simulation policy.
+`first_result_completed` idempotency is explicitly deferred to #376. The
+lane also fixed a real guest chat-stream cookie-auth gap its browser matrix
+exposed, and its dead-at-birth Supabase preview branch was deleted and
+recreated to prove the migration on hosted preview infrastructure.
+PR #366 then closed issue #344 as `2b023576`: recent-IPO, trending-crypto,
+multi-category, and escalation requests route through the typed discovery
+path with resolver-validated cited candidates; transient failures retry and
+genuinely recover; configuration failures stop honestly without dead-end
+affordances or wait-promises, redirecting to provider-free symbol testing;
+and citation fallback evidence is bounded and fail-closed. Sixteen per-SHA
+in-repo evidence sets with probe-vs-proof labeling; provider-mode breadth is
+parked as #377. This was the cycle's final landing before the promotion
+freeze.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -66,6 +278,13 @@ deployed automatically.
 The private-alpha promotion path still uses the CI/CD SOTA gate in
 `docs/specs/private-alpha-ci-cd-sota.md` plus the operator instructions in
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+
+**Production promotion executed 2026-08-05:** the sixteen-landing checkpoint
+batch plus the acceptance-walk fixes shipped to production at `7ef89a90`
+(`argus-api`, `argus-app`, and workflow version `wfv-d9p88253erlc73d3u8s0`).
+Evidence: [`docs/release-manifests/2026-08-05-main-production-promotion.md`](../release-manifests/2026-08-05-main-production-promotion.md).
+`main` and `codex/private-alpha-next` were identical at that SHA; the branch
+resumes its staging-lane role for the next cycle from this baseline.
 
 Before testers are invited, the release captain must prove:
 

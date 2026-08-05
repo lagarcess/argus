@@ -9,9 +9,11 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import { RetestReceipt } from "./RetestReceipt";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
+import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
@@ -21,17 +23,25 @@ import {
 } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
+import FailureNotice from "./FailureNotice";
+import {
+  retryableNoticeBodyClass,
+  retryableNoticeContainerClass,
+  retryableNoticeIconClass,
+  retryableNoticeRetryPillClass,
+} from "@/lib/failure-treatment";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
+import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 
 
 type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
-  onToast?: (message: string) => void;
+  onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
   conversationId?: string | null;
@@ -40,7 +50,7 @@ type ChatMessageProps = {
   isGuest?: boolean;
   canSaveDecision?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
-  onDecisionSaved?: () => void;
+  onDecisionSaved?: (decisionState: DecisionState) => void;
   onRequestSearchUpgrade?: () => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
@@ -193,7 +203,10 @@ export default function ChatMessage({
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
-    onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"));
+    onToast?.(
+      t(copied ? "chat.copy_success" : "chat.copy_failed"),
+      copied ? "neutral" : "error",
+    );
   };
 
   const getDisplayContent = () => {
@@ -262,11 +275,21 @@ export default function ChatMessage({
   );
 
   if (isUser && message.kind === "action") {
+    const actionText =
+      displayContent ||
+      (message.selectedAction ? actionLabel(message.selectedAction) : "");
     return (
       <div className="flex w-full flex-col items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
-          {displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}
-        </div>
+        {message.retestReceipt ? (
+          <RetestReceipt
+            receipt={message.retestReceipt}
+            actionLabel={actionText}
+          />
+        ) : (
+          <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
+            {actionText}
+          </div>
+        )}
         <UserTurnRecovery
           recoveryText={userRecoveryText}
           retryAction={retryAction}
@@ -362,13 +385,13 @@ export default function ChatMessage({
             // no normal-answer bubble (issue #249).
             <div
               role="status"
-              className="flex w-full max-w-[min(100%,660px)] items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]"
+              className={`${retryableNoticeContainerClass} max-w-[min(100%,660px)]`}
             >
               <MessageSquareWarning
-                className="mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70"
+                className={retryableNoticeIconClass}
                 aria-hidden="true"
               />
-              <div className="min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
+              <div className={retryableNoticeBodyClass}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {displayContent}
                 </ReactMarkdown>
@@ -377,12 +400,24 @@ export default function ChatMessage({
                 <button
                   type="button"
                   onClick={() => onAction?.(retryAction)}
-                  className="shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10"
+                  className={retryableNoticeRetryPillClass}
                 >
                   {actionLabel(retryAction)}
                 </button>
               ) : null}
             </div>
+          ) : !isUser &&
+            message.recoveryDisplay?.kind === "artifact_action_recovery" ? (
+            // A rejected/inactive action is still a failure statement; it
+            // must not read as an ordinary answer, only quieter than amber.
+            <FailureNotice
+              className="max-w-[min(100%,660px)]"
+              testId="artifact-action-failure-notice"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {displayContent}
+              </ReactMarkdown>
+            </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               {factHeadingLabel && (
@@ -439,7 +474,7 @@ export default function ChatMessage({
                       ) : null}
                       {candidate.reason_text ? (
                         <>
-                          <NextMoveSeparator>—</NextMoveSeparator>
+                          <NextMoveSeparator>·</NextMoveSeparator>
                           <NextMoveDetail>{candidate.reason_text}</NextMoveDetail>
                         </>
                       ) : null}
@@ -468,14 +503,20 @@ export default function ChatMessage({
                       "chat.discovery_results.search_current",
                       { defaultValue: "Search for current results" },
                     );
+                    const copyPlan = discoveryEscalationCopyPlan(
+                      message.discovery,
+                    );
+                    const assetKind = t(copyPlan.assetKindKey, {
+                      defaultValue: copyPlan.assetKindDefaultValue,
+                    });
                     // Restate the relationship: peer/comparison query_summary
                     // is bare symbols, and "search for: AAPL" reads as a test.
                     const searchSendText = t(
-                      `chat.discovery_results.search_current_send_${message.discovery.relationship}`,
+                      copyPlan.messageKey,
                       {
-                        query: message.discovery.query_summary,
-                        defaultValue:
-                          "Search current sources for: {{query}}",
+                        query: copyPlan.query,
+                        assetKind,
+                        defaultValue: copyPlan.messageDefaultValue,
                       },
                     );
                     return (
@@ -588,7 +629,15 @@ export default function ChatMessage({
                         key={row.kind}
                         ariaLabel={rowLabel}
                         disabled={turnInFlight}
-                        onClick={() => onAction?.(nextExperimentAction(row, rowLabel))}
+                        onClick={() =>
+                          onAction?.(
+                            nextExperimentAction(
+                              row,
+                              rowLabel,
+                              message.result?.runId,
+                            ),
+                          )
+                        }
                       >
                         <NextMoveTitle>{rowLabel}</NextMoveTitle>
                         {row.detail ? (

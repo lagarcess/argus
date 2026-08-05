@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -83,17 +83,25 @@ async def plan_artifact_assumption_edit(
     active_confirmation: dict[str, Any] | None,
     preferred_model: str,
     language: str | None = None,
+    required_targets: set[str] | None = None,
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
+    | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
     if prior_strategy is None and active_confirmation is None:
         return None
 
+    required_target_set = set(required_targets or ())
+    supported_targets = set(get_args(EditOperation.model_fields["target"].annotation))
+    if not required_target_set <= supported_targets:
+        return None
     messages = _artifact_assumption_edit_messages(
         current_user_message=current_user_message,
         prior_strategy=prior_strategy,
         active_confirmation=active_confirmation,
         language=language,
+        required_targets=required_target_set,
     )
     for model_name in _unique_models(preferred_model):
         try:
@@ -114,6 +122,12 @@ async def plan_artifact_assumption_edit(
             active_confirmation=active_confirmation,
         ):
             continue
+        if plan.outcome == "ready_to_confirm" and not _covers_required_targets(
+            plan,
+            required_targets=required_target_set,
+            materialized_targets_for_plan=materialized_targets_for_plan,
+        ):
+            continue
         if plan.outcome != "ready_to_confirm" and not plan.assistant_response:
             continue
         return plan
@@ -126,11 +140,19 @@ def _artifact_assumption_edit_messages(
     prior_strategy: dict[str, Any] | None,
     active_confirmation: dict[str, Any] | None,
     language: str | None = None,
+    required_targets: set[str] | None = None,
 ) -> list[dict[str, str]]:
     language_line = (
         f"Write assistant_response in the user's language ({language})."
         if language
         else "Write assistant_response in the user's language."
+    )
+    required_targets_line = (
+        "Required typed targets for this turn: "
+        f"{', '.join(sorted(required_targets))}. "
+        "A ready_to_confirm operation list must cover every required target.\n\n"
+        if required_targets
+        else ""
     )
     return [
         {
@@ -145,6 +167,7 @@ def _artifact_assumption_edit_messages(
                 "(add | remove | replace | set | clear) and target, plus the value "
                 "carrier for that target. Resolve references such as 'that', 'it', "
                 "or 'the second one' against the current card.\n\n"
+                f"{required_targets_line}"
                 "Targets and their value carriers:\n"
                 "- asset (traded tickers, use symbols): add new tickers, remove "
                 "named tickers, replace the whole traded set, or clear. For add and "
@@ -224,6 +247,72 @@ def _artifact_assumption_edit_messages(
         },
         {"role": "user", "content": current_user_message},
     ]
+
+
+def _covers_required_targets(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    required_targets: set[str],
+    materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
+    | None = None,
+) -> bool:
+    if materialized_targets_for_plan is not None:
+        try:
+            covered_targets = materialized_targets_for_plan(plan)
+        except Exception:
+            return False
+        if covered_targets is None:
+            return False
+    elif required_targets:
+        covered_targets = _materialized_legacy_flat_targets(plan)
+    else:
+        return True
+    return required_targets.issubset(covered_targets)
+
+
+def _materialized_legacy_flat_targets(
+    plan: ArtifactAssumptionEditPlan,
+) -> set[str]:
+    """Name flat fields that the legacy application path really materializes.
+
+    Typed operations need request context (date resolution, asset resolution,
+    active strategy family) to prove applicability, so callers must supply the
+    real materializer for them. Flat fields remain context-free compatibility
+    inputs and can be checked here without pretending a carrier is a mutation.
+    """
+
+    if plan.operations:
+        return set()
+    targets: set[str] = set()
+    if plan.asset_universe:
+        targets.add("asset")
+    if str(plan.comparison_baseline or "").strip():
+        targets.add("benchmark")
+    if plan.initial_capital is not None:
+        targets.add("capital")
+    if plan.recurring_contribution_amount is not None:
+        targets.add("recurring_contribution")
+    if str(plan.cadence or "").strip().casefold() in {
+        "daily",
+        "weekly",
+        "biweekly",
+        "monthly",
+        "quarterly",
+    }:
+        targets.add("cadence")
+    if plan.timeframe is not None:
+        targets.add("timeframe")
+    if (
+        plan.fee_rate is not None
+        and supported_cost_rate_value(plan.fee_rate, field_name="fee_rate") is not None
+    ):
+        targets.add("fees")
+    if (
+        plan.slippage is not None
+        and supported_cost_rate_value(plan.slippage, field_name="slippage") is not None
+    ):
+        targets.add("slippage")
+    return targets
 
 
 def _has_supported_edit(
@@ -389,7 +478,7 @@ def apply_edit_operations(
         op = operation.op
 
         if target == "asset":
-            patch = _normalized_operation_symbols(
+            patch = resolved_asset_operation_symbols(
                 operation.symbols,
                 asset_symbol_resolver=asset_symbol_resolver,
             )
@@ -462,17 +551,13 @@ def apply_edit_operations(
                 elif target == "recurring_contribution":
                     resolved.recurring_contribution_amount = amount
                 elif target == "fees":
-                    fee_rate = supported_cost_rate_value(
-                        amount, field_name="fee_rate"
-                    )
+                    fee_rate = supported_cost_rate_value(amount, field_name="fee_rate")
                     if fee_rate is None:
                         resolved.unsupported.append(f"{op}.{target}")
                         continue
                     resolved.fee_rate = fee_rate
                 elif target == "slippage":
-                    slippage = supported_cost_rate_value(
-                        amount, field_name="slippage"
-                    )
+                    slippage = supported_cost_rate_value(amount, field_name="slippage")
                     if slippage is None:
                         resolved.unsupported.append(f"{op}.{target}")
                         continue
@@ -597,11 +682,13 @@ def _rules_form_opposite_crossover(
     )
 
 
-def _normalized_operation_symbols(
+def resolved_asset_operation_symbols(
     symbols: list[str],
     *,
     asset_symbol_resolver: Callable[[str], str | None] | None,
 ) -> list[str]:
+    """Resolve asset-operation values through the materializer's symbol path."""
+
     resolved_symbols: list[str] = []
     for symbol in symbols:
         raw_symbol = str(symbol or "").strip()

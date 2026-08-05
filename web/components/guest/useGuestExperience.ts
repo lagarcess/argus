@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type MutableRefObject,
 } from "react";
@@ -11,19 +12,25 @@ import type {
   ChatMention,
   Message,
 } from "@/components/chat/types";
+import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import { useGuestConversion } from "@/components/guest/useGuestConversion";
 import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
   decideGuestMessageGate,
   decideGuestSimulationGate,
+  guestSimulationPrecheckResetAt,
   isExactGuestRunReplay,
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
+import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import type { UserResponse } from "@/lib/guest-account";
+import { startGuestSession } from "@/lib/guest-session";
+import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
   newConversationConversionMode,
+  type GuestDecisionResumeTarget,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
 
@@ -48,16 +55,21 @@ export function useGuestSendBridge(
 
 type UseGuestExperienceInput = {
   account: UserResponse | null;
+  guestBootstrapRequired: boolean;
   conversationId: string | null;
   messages: Message[];
   sendRef: MutableRefObject<GuestResumeSend | null>;
   refreshAccount: () => Promise<UserResponse | null>;
   refreshHistory: () => void;
+  refreshHistoryForActivity: () => Promise<unknown>;
   closeTransientSidebar: () => void;
   startNewChat: () => Promise<unknown>;
   onOpenFeedback: () => void;
   onOpenOmnisearch: () => void;
+  onRequestPendingGuestSignIn: () => void;
   onAdoptConversation: (conversationId: string) => void;
+  onGuestBootstrapExpired: (publicAccountAccessEnabled: boolean) => void;
+  onGuestBootstrapError: () => void;
   onGateError: () => void;
   onStartOverError: () => void;
   omnisearchShortcutEnabled: boolean;
@@ -67,28 +79,44 @@ type GuestSendAdmissionInput = {
   text: string;
   mentions: ChatMention[];
   action?: ChatActionOption;
+  starterSelection?: StarterSelectionMetadata;
+  language?: string | null;
 };
 
 export function useGuestExperience({
   account,
+  guestBootstrapRequired,
   conversationId,
   messages,
   sendRef,
   refreshAccount,
   refreshHistory,
+  refreshHistoryForActivity,
   closeTransientSidebar,
   startNewChat,
   onOpenFeedback,
   onOpenOmnisearch,
+  onRequestPendingGuestSignIn,
   onAdoptConversation,
+  onGuestBootstrapExpired,
+  onGuestBootstrapError,
   onGateError,
   onStartOverError,
   omnisearchShortcutEnabled,
 }: UseGuestExperienceInput) {
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [isReplacingConversation, setIsReplacingConversation] = useState(false);
-  const [resumeDecisionArtifactId, setResumeDecisionArtifactId] =
-    useState<string | null>(null);
+  const [resumeDecisionTarget, setResumeDecisionTarget] =
+    useState<GuestDecisionResumeTarget | null>(null);
+  const pendingGuestAdmissionRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      pendingGuestAdmissionRef.current?.abort();
+      pendingGuestAdmissionRef.current = null;
+    },
+    [],
+  );
 
   const resumeGuestAction = useCallback(
     async (action: GuestPendingAction) => {
@@ -96,21 +124,15 @@ export function useGuestExperience({
         await sendRef.current?.(action.text, action.mentions, undefined, {
           bypassGuestGate: true,
         });
-      } else if (action.reason === "second_simulation") {
+      } else if (action.reason === "simulation_limit") {
         await sendRef.current?.(
           action.action.label || action.action.value || "",
-          {
-            ...action.action,
-            payload: {
-              ...action.action.payload,
-              idempotency_key: action.actionId,
-            },
-          },
+          action.action,
           undefined,
           { bypassGuestGate: true },
         );
       } else if (action.reason === "save_decision") {
-        setResumeDecisionArtifactId(action.artifactId);
+        setResumeDecisionTarget(action.target);
       } else if (action.reason === "new_conversation") {
         await startNewChat();
       }
@@ -123,27 +145,35 @@ export function useGuestExperience({
     account,
     conversationId,
     refreshAccount,
+    refreshHistory: refreshHistoryForActivity,
     onResume: resumeGuestAction,
   });
 
   const shell = useGuestShellActions({
     account,
+    guestBootstrapRequired,
     hasAcceptedContent: messages.some((message) => message.role === "user"),
     closeTransientSidebar,
     onOpenFeedback,
     onNewChat: startNewChat,
     onRequestNonEmptyGuestChoice: () => setIsNewConversationOpen(true),
-    onRequestGuestDecision: (artifactId) => {
+    onRequestGuestDecision: (target) => {
       if (!conversationId) return;
       conversion.requestConversion("save_decision", {
         reason: "save_decision",
         conversationId,
         actionId: crypto.randomUUID(),
-        artifactId,
+        target,
       });
     },
     onOpenOmnisearch,
-    onRequestSignIn: () =>
+    onRequestSignIn: () => {
+      if (guestBootstrapRequired) {
+        pendingGuestAdmissionRef.current?.abort();
+        pendingGuestAdmissionRef.current = null;
+        onRequestPendingGuestSignIn();
+        return;
+      }
       conversion.requestConversion(
         "keep_history",
         conversationId
@@ -153,55 +183,130 @@ export function useGuestExperience({
               actionId: crypto.randomUUID(),
             }
           : null,
-      ),
+      );
+    },
     omnisearchShortcutEnabled,
   });
 
   const admitSend = useCallback(
-    async ({ text, mentions, action }: GuestSendAdmissionInput) => {
-      if (!shell.isGuest) return true;
+    async ({
+      text,
+      mentions,
+      action,
+      starterSelection,
+      language,
+    }: GuestSendAdmissionInput) => {
+      const admissionController = guestBootstrapRequired
+        ? new AbortController()
+        : null;
+      const admissionCancelled = () =>
+        admissionController?.signal.aborted ?? false;
+      if (admissionController) {
+        pendingGuestAdmissionRef.current?.abort();
+        pendingGuestAdmissionRef.current = admissionController;
+      }
+
       try {
-        const usage = await getUsageAllowances();
-        if (action?.type === "run_backtest") {
-          const decision = decideGuestSimulationGate({
-            accountKind: "guest",
-            availableNow: usage.allowances.backtests.available_now,
-            exactReplay: isExactGuestRunReplay(messages, action),
-          });
-          if (decision.kind === "convert") {
-            if (!conversationId) return false;
-            conversion.requestConversion(decision.reason, {
-              reason: "second_simulation",
-              conversationId,
-              actionId: crypto.randomUUID(),
-              action,
-            });
-            return false;
-          }
-        } else if (!action?.type) {
-          const decision = decideGuestMessageGate({
-            accountKind: "guest",
-            availableNow: usage.allowances.messages.available_now,
-          });
-          if (decision.kind === "convert") {
-            if (!conversationId) return false;
-            conversion.requestConversion(decision.reason, {
-              reason: "message_limit",
-              conversationId,
-              actionId: crypto.randomUUID(),
-              text,
-              mentions,
-            });
+        let effectiveAccount = account;
+        if (guestBootstrapRequired) {
+          try {
+            const bootstrap = await startGuestSession(language);
+            if (admissionCancelled()) return false;
+            if (bootstrap.renewed_after_expiry) {
+              onGuestBootstrapExpired(
+                bootstrap.public_account_access_enabled ?? false,
+              );
+              return false;
+            }
+            const refreshedAccount = await refreshAccount();
+            if (admissionCancelled()) return false;
+            if (refreshedAccount === null) {
+              onGuestBootstrapError();
+              return false;
+            }
+            effectiveAccount = refreshedAccount;
+          } catch {
+            if (!admissionCancelled()) onGuestBootstrapError();
             return false;
           }
         }
-        return true;
-      } catch {
-        onGateError();
-        return false;
+        if (admissionCancelled()) return false;
+        if (effectiveAccount?.account_kind !== "guest") return true;
+
+        if (starterSelection) {
+          captureGuestFunnelEvent({
+            event: "starter_action_selected",
+            language: normalizeEnabledLanguage(language),
+            surface: "starter_actions",
+            strategy_category: starterSelection.strategy_category,
+            terminal_outcome: "selected",
+          });
+        }
+
+        try {
+          const usage = await getUsageAllowances();
+          if (admissionCancelled()) return false;
+          if (action?.type === "run_backtest") {
+            const decision = decideGuestSimulationGate({
+              accountKind: "guest",
+              availableNow: usage.allowances.backtests.available_now,
+              exactReplay: isExactGuestRunReplay(messages, action),
+            });
+            if (decision.kind === "convert") {
+              if (!conversationId) return false;
+              conversion.requestConversion(
+                decision.reason,
+                {
+                  reason: "simulation_limit",
+                  conversationId,
+                  actionId: crypto.randomUUID(),
+                  action,
+                },
+                "signup",
+                guestSimulationPrecheckResetAt(usage.allowances.backtests),
+                "daily",
+              );
+              return false;
+            }
+          } else if (!action?.type) {
+            const decision = decideGuestMessageGate({
+              accountKind: "guest",
+              availableNow: usage.allowances.messages.available_now,
+            });
+            if (decision.kind === "convert") {
+              if (!conversationId) return false;
+              conversion.requestConversion(decision.reason, {
+                reason: "message_limit",
+                conversationId,
+                actionId: crypto.randomUUID(),
+                text,
+                mentions,
+              });
+              return false;
+            }
+          }
+          return true;
+        } catch {
+          if (!admissionCancelled()) onGateError();
+          return false;
+        }
+      } finally {
+        if (pendingGuestAdmissionRef.current === admissionController) {
+          pendingGuestAdmissionRef.current = null;
+        }
       }
     },
-    [conversationId, conversion, messages, onGateError, shell.isGuest],
+    [
+      conversationId,
+      conversion,
+      account,
+      guestBootstrapRequired,
+      messages,
+      onGuestBootstrapError,
+      onGuestBootstrapExpired,
+      onGateError,
+      refreshAccount,
+    ],
   );
 
   const startOver = useCallback(async () => {
@@ -244,10 +349,40 @@ export function useGuestExperience({
     );
   }, [conversationId, conversion]);
 
+  const recoverGuestSimulationRejection = useCallback(
+    (action: ChatActionOption) => {
+      if (
+        account?.account_kind !== "guest" ||
+        !conversationId ||
+        action.type !== "run_backtest"
+      ) {
+        return false;
+      }
+      conversion.requestConversion(
+        "simulation_limit",
+        {
+          reason: "simulation_limit",
+          conversationId,
+          actionId: crypto.randomUUID(),
+          action,
+        },
+        "signup",
+        account.guest?.expires_at ?? null,
+        "workspace",
+      );
+      return true;
+    },
+    [account, conversationId, conversion],
+  );
+
   const clearResumeDecision = useCallback(
-    () => setResumeDecisionArtifactId(null),
+    () => setResumeDecisionTarget(null),
     [],
   );
+  const resumeDecisionArtifactId =
+    resumeDecisionTarget?.surface === "result_card"
+      ? resumeDecisionTarget.artifactId
+      : null;
   const resumeDecisionMessageId = latestDecisionResumeMessageId(
     messages,
     resumeDecisionArtifactId,
@@ -261,7 +396,9 @@ export function useGuestExperience({
   return {
     ...shell,
     admitSend,
+    recoverGuestSimulationRejection,
     requestGuestSearchUpgrade,
+    resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
     clearResumeDecision,

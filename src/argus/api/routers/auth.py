@@ -30,6 +30,8 @@ from argus.api.guest_observability import (
 )
 from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import (
+    AccessRequestAccepted,
+    AccessRequestCreate,
     GuestBootstrapRequest,
     GuestHandoffClaimResponse,
     GuestHandoffCreateRequest,
@@ -39,16 +41,20 @@ from argus.api.schemas import (
     LoginRequest,
     SignupRequest,
     User,
+    guest_safe_user,
 )
+from argus.domain.supabase_guest_accounts import EmailAlreadyRegisteredError
+from argus.domain.username_signup import serialized_username_signup
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
 AUTH_LOGIN_ATTEMPT_LIMIT = 8
 AUTH_SIGNUP_ATTEMPT_LIMIT = 5
+AUTH_ACCESS_REQUEST_ATTEMPT_LIMIT = 5
 AUTH_GUEST_ATTEMPT_LIMIT = 5
 AUTH_GUEST_HANDOFF_ATTEMPT_LIMIT = 5
 _AUTH_ATTEMPT_WINDOW_SECONDS = 10 * 60
-_AuthAction = Literal["login", "signup", "handoff"]
+_AuthAction = Literal["login", "signup", "access_request", "handoff"]
 _GUEST_HANDOFF_COOKIE = "argus-guest-handoff"
 _GUEST_HANDOFF_ID_COOKIE = "argus-guest-handoff-id"
 _GUEST_HANDOFF_MAX_AGE_SECONDS = 10 * 60
@@ -80,6 +86,16 @@ def _signup_auth_problem(request: Request) -> HTTPException:
     )
 
 
+def _username_taken_problem(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=409,
+        code="username_taken",
+        title="Username Taken",
+        detail="That username is already taken.",
+    )
+
+
 def _enforce_auth_attempt_limit(
     request: Request,
     *,
@@ -89,6 +105,7 @@ def _enforce_auth_attempt_limit(
     limits = {
         "login": AUTH_LOGIN_ATTEMPT_LIMIT,
         "signup": AUTH_SIGNUP_ATTEMPT_LIMIT,
+        "access_request": AUTH_ACCESS_REQUEST_ATTEMPT_LIMIT,
         "handoff": AUTH_GUEST_HANDOFF_ATTEMPT_LIMIT,
     }
     limit = limits[action]
@@ -134,9 +151,21 @@ def _enforce_guest_attempt_limit(request: Request) -> None:
     )
 
 
+def _auth_user_payload(user: User, *, account_kind: str) -> dict[str, object]:
+    response_user = guest_safe_user(user) if account_kind == "guest" else user
+    return response_user.model_dump(mode="json")
+
+
 @router.get("/auth/session")
-def auth_session(user: User = Depends(current_user)) -> dict[str, object]:  # noqa: B008
-    return {"authenticated": True, "user": user.model_dump(mode="json")}
+def auth_session(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> dict[str, object]:
+    context = account_context(request)
+    return {
+        "authenticated": True,
+        "user": _auth_user_payload(user, account_kind=context.kind),
+    }
 
 
 @router.post("/auth/guest")
@@ -189,7 +218,7 @@ def guest_bootstrap(
                     "reused": True,
                     "renewed_after_expiry": False,
                     "public_account_access_enabled": public_account_access_enabled(),
-                    "user": existing.model_dump(mode="json"),
+                    "user": _auth_user_payload(existing, account_kind=context.kind),
                     "account_kind": "guest",
                 }
             )
@@ -526,14 +555,6 @@ def link_guest_identity(
     user: User = Depends(current_user),  # noqa: B008
 ) -> JSONResponse:
     _enforce_browser_auth_origin(request)
-    if not public_account_access_enabled():
-        raise problem(
-            request,
-            status_code=403,
-            code="public_account_access_unavailable",
-            title="Account Creation Unavailable",
-            detail="Public account creation is not available.",
-        )
     if api_state.supabase_gateway is None:
         raise problem(
             request,
@@ -631,6 +652,17 @@ def link_guest_identity(
         return auth_response(request, payload)
     except HTTPException:
         raise
+    except EmailAlreadyRegisteredError:
+        raise problem(
+            request,
+            status_code=409,
+            code="account_exists_use_login",
+            title="Account Already Exists",
+            detail=(
+                "This email already has an Argus account. Sign in instead; "
+                "your conversation comes with you."
+            ),
+        ) from None
     except Exception:
         raise problem(
             request,
@@ -665,16 +697,79 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
     if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
         raise _signup_auth_problem(request)
     try:
-        result = api_state.supabase_gateway.signup(
-            email=body.email,
-            password=body.password,
-            display_name=body.display_name,
-            username=body.username,
-            language=body.language,
-        )
-        return auth_response(request, result)
+        with serialized_username_signup(
+            api_state.DATABASE_URL,
+            body.email,
+            body.username,
+        ) as prevalidation:
+            if (
+                body.username is not None
+                and not prevalidation.auth_user_exists
+                and not prevalidation.username_available
+            ):
+                raise _username_taken_problem(request)
+            result = api_state.supabase_gateway.signup(
+                email=body.email,
+                password=body.password,
+                captcha_token=body.captcha_token,
+                display_name=body.display_name,
+                username=body.username,
+                language=body.language,
+            )
+            auth_user = result.get("user")
+            if not isinstance(auth_user, dict):
+                raise RuntimeError("Provider signup did not return an Auth user.")
+            identities = auth_user.get("identities")
+            # Supabase uses an empty identity list for its obfuscated existing-user
+            # response. Persisting that fake user would reveal the account exists.
+            if identities != []:
+                api_state.supabase_gateway.get_or_create_profile_for_auth_user(
+                    auth_user
+                )
+            return auth_response(request, result)
+    except HTTPException:
+        raise
     except Exception:
         raise _signup_auth_problem(request) from None
+
+
+@router.post(
+    "/auth/access-requests",
+    response_model=AccessRequestAccepted,
+    status_code=202,
+)
+def request_access(
+    request: Request,
+    body: AccessRequestCreate,
+) -> AccessRequestAccepted:
+    _enforce_browser_auth_origin(request)
+    _enforce_auth_attempt_limit(
+        request,
+        action="access_request",
+        email=body.email,
+    )
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=503,
+            code="access_request_unavailable",
+            title="Access Request Unavailable",
+            detail="Argus could not record this access request. Please try again.",
+        )
+    try:
+        api_state.supabase_gateway.request_private_alpha_access(
+            email=body.email,
+            language=body.language,
+        )
+    except Exception:
+        raise problem(
+            request,
+            status_code=503,
+            code="access_request_unavailable",
+            title="Access Request Unavailable",
+            detail="Argus could not record this access request. Please try again.",
+        ) from None
+    return AccessRequestAccepted(accepted=True)
 
 
 @router.post("/auth/login")
@@ -693,7 +788,9 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         raise _login_auth_problem(request)
     try:
         result = api_state.supabase_gateway.login(
-            email=body.email, password=body.password
+            email=body.email,
+            password=body.password,
+            captcha_token=body.captcha_token,
         )
     except Exception:
         raise _login_auth_problem(request) from None

@@ -12,6 +12,11 @@ from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
 )
+from argus.api.client_capabilities import (
+    ClientCapabilitiesHeader,
+    dossier_decision_action_availability,
+)
+from argus.api.conversation_activity import conversation_activity_service
 from argus.api.dependencies import (
     current_user,
     dev_memory_fallback_enabled,
@@ -19,6 +24,7 @@ from argus.api.dependencies import (
     require_account_capability,
 )
 from argus.api.guest_access import account_context
+from argus.api.memory_run_dossiers import list_memory_run_dossier_source_rows
 from argus.api.message_store import (
     memory_conversation,
     reconcile_reload_message_metadata,
@@ -33,6 +39,7 @@ from argus.api.schemas import (
     Message,
     PaginatedConversations,
     PaginatedMessages,
+    PaginatedRunDossiers,
     SuccessResponse,
     User,
 )
@@ -42,10 +49,30 @@ from argus.domain.backtest_message_projection import (
     hydrate_backtest_job_action_messages,
     represented_backtest_job_request_ids,
 )
+from argus.domain.postgres_run_dossier_reader import RunDossierCursorError
+from argus.domain.run_dossiers import project_run_dossier
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import ConversationCursorError, MessageCursorError
+from argus.domain.supabase_gateway import (
+    ConversationCursorError,
+    MessageAnchorError,
+    MessageCursorError,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
+
+
+def _with_activity(
+    conversation: Conversation,
+    *,
+    user_id: str,
+    reconcile: bool = False,
+) -> Conversation:
+    activity = conversation_activity_service.project(
+        user_id=user_id,
+        conversation_ids=[conversation.id],
+        reconcile=reconcile,
+    )[conversation.id]
+    return conversation.model_copy(update={"activity": activity})
 
 
 def _memory_conversation_owned_by(
@@ -66,10 +93,7 @@ def _public_message_projection(messages: list[Message]) -> list[Message]:
             update={"metadata": public_confirmation_projection(message.metadata)}
         )
         for message in messages
-        if not (
-            message.role == "user"
-            and is_legacy_onboarding_marker(message.content)
-        )
+        if not (message.role == "user" and is_legacy_onboarding_marker(message.content))
     ]
 
 
@@ -147,7 +171,9 @@ def create_conversation(
                         )
                     )
                     if not has_user_message:
-                        return ConversationResponse(conversation=existing)
+                        return ConversationResponse(
+                            conversation=_with_activity(existing, user_id=user.id)
+                        )
                     require_account_capability(
                         request,
                         "can_create_additional_conversation",
@@ -184,7 +210,9 @@ def create_conversation(
             language=language,
             user_id=user.id,
         )
-    return ConversationResponse(conversation=conversation)
+    return ConversationResponse(
+        conversation=_with_activity(conversation, user_id=user.id)
+    )
 
 
 @router.post(
@@ -220,7 +248,9 @@ def replace_guest_conversation(
             title="Could Not Start Over",
             detail="The temporary conversation was left unchanged.",
         ) from exc
-    return ConversationResponse(conversation=conversation)
+    return ConversationResponse(
+        conversation=_with_activity(conversation, user_id=user.id)
+    )
 
 
 @router.get("/conversations", response_model=PaginatedConversations)
@@ -292,6 +322,15 @@ def list_conversations(
     page = items[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
+    activities = conversation_activity_service.project(
+        user_id=user.id,
+        conversation_ids=[item.id for item in page_items],
+        reconcile=True,
+    )
+    page_items = [
+        item.model_copy(update={"activity": activities[item.id]})
+        for item in page_items
+    ]
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
@@ -389,7 +428,9 @@ def patch_conversation(
         data["updated_at"] = utcnow()
         updated = Conversation.model_validate(data)
         api_state.store.conversations[conversation_id] = updated
-    return ConversationResponse(conversation=updated)
+    return ConversationResponse(
+        conversation=_with_activity(updated, user_id=user.id)
+    )
 
 
 @router.delete("/conversations/{conversation_id}", response_model=SuccessResponse)
@@ -436,14 +477,170 @@ def delete_conversation(
     return SuccessResponse(success=True)
 
 
+@router.get(
+    "/conversations/{conversation_id}/run-dossiers",
+    response_model=PaginatedRunDossiers,
+    responses={
+        400: {
+            "description": "The pagination cursor is invalid or stale.",
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/Error"}
+                }
+            },
+        },
+        404: {
+            "description": "The conversation was not found.",
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/Error"}
+                }
+            },
+        },
+    },
+)
+def list_run_dossiers(
+    conversation_id: str,
+    request: Request,
+    client_capabilities: ClientCapabilitiesHeader = None,
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    user: User = Depends(current_user),  # noqa: B008
+) -> PaginatedRunDossiers:
+    context = account_context(request)
+    decision_action_availability = dossier_decision_action_availability(
+        can_save_decision=context.capabilities.can_save_decision,
+        raw_client_capabilities=client_capabilities,
+    )
+    conversation = (
+        api_state.supabase_gateway.get_conversation(
+            user_id=user.id,
+            conversation_id=conversation_id,
+        )
+        if api_state.supabase_gateway is not None
+        else api_state.store.conversations.get(conversation_id)
+    )
+    memory_owned = (
+        api_state.supabase_gateway is not None
+        or _memory_conversation_owned_by(
+            conversation_id,
+            user.id,
+            allow_unowned=False,
+        )
+    )
+    if (
+        conversation is None
+        or conversation.deleted_at is not None
+        or not memory_owned
+    ):
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="Conversation not found.",
+        )
+
+    if context.kind == "guest":
+        if api_state.supabase_gateway is None:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
+        workspace = api_state.supabase_gateway.get_active_guest_workspace(
+            user_id=user.id,
+            at=datetime.now(timezone.utc),
+        )
+        if workspace is None or workspace.conversation_id != conversation_id:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
+
+    cursor_completed_at: datetime | None = None
+    cursor_run_id: str | None = None
+    if cursor is not None:
+        raw_completed_at, cursor_run_id = decode_cursor(cursor, request)
+        try:
+            cursor_completed_at = datetime.fromisoformat(raw_completed_at)
+        except ValueError:
+            raise invalid_cursor_problem(request) from None
+        if (
+            cursor_completed_at.tzinfo is None
+            or cursor_completed_at.utcoffset() is None
+        ):
+            raise invalid_cursor_problem(request)
+
+    try:
+        page = (
+            api_state.supabase_gateway.list_run_dossier_source_rows(
+                user_id=user.id,
+                conversation_id=conversation_id,
+                limit=limit + 1,
+                cursor_completed_at=cursor_completed_at,
+                cursor_run_id=cursor_run_id,
+            )
+            if api_state.supabase_gateway is not None
+            else list_memory_run_dossier_source_rows(
+                store=api_state.store,
+                user_id=user.id,
+                conversation_id=conversation_id,
+                limit=limit + 1,
+                cursor_completed_at=cursor_completed_at,
+                cursor_run_id=cursor_run_id,
+            )
+        )
+    except RunDossierCursorError:
+        raise invalid_cursor_problem(request) from None
+
+    selected_rows = page.rows[:limit]
+    items = [
+        project_run_dossier(
+            run=row.run,
+            artifact=row.artifact,
+            decision=row.decision,
+            result_message_id=row.result_message_id,
+            decision_action_availability=decision_action_availability,
+            language=user.language,
+        )
+        for row in selected_rows
+    ]
+    next_cursor = (
+        encode_cursor(items[-1].completed_at.isoformat(), items[-1].run_id)
+        if len(page.rows) > limit and items
+        else None
+    )
+    return PaginatedRunDossiers(
+        items=items,
+        next_cursor=next_cursor,
+        total_runs=page.total_runs,
+        decided_runs=page.decided_runs,
+    )
+
+
 @router.get("/conversations/{conversation_id}/messages", response_model=PaginatedMessages)
 def list_messages(
     conversation_id: str,
     request: Request,
     limit: int = Query(50, ge=1, le=100),
     cursor: str | None = Query(None),
+    anchor_message_id: str | None = Query(None),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedMessages:
+    if cursor is not None and anchor_message_id is not None:
+        raise problem(
+            request,
+            status_code=422,
+            code="invalid_message_anchor",
+            title="Invalid Message Anchor",
+            detail="A message anchor cannot be combined with a cursor.",
+        )
     conversation = (
         api_state.supabase_gateway.get_conversation(
             user_id=user.id,
@@ -491,14 +688,17 @@ def list_messages(
     transcript_represented_request_ids: set[str] = set()
     if api_state.supabase_gateway is not None:
         try:
-            items = api_state.supabase_gateway.list_messages(
-                user_id=user.id,
-                conversation_id=conversation_id,
-                limit=limit,
-                cursor_created_at=cursor_created_at,
-                cursor_id=cursor_id,
-                page=True,
-            )
+            message_page_options = {
+                "user_id": user.id,
+                "conversation_id": conversation_id,
+                "limit": limit,
+                "cursor_created_at": cursor_created_at,
+                "cursor_id": cursor_id,
+                "page": True,
+            }
+            if anchor_message_id is not None:
+                message_page_options["anchor_message_id"] = anchor_message_id
+            items = api_state.supabase_gateway.list_messages(**message_page_options)
             database_page = True
             database_page_ids = {message.id for message in items}
             if (
@@ -520,6 +720,14 @@ def list_messages(
                 items = [*items, *later_work]
         except MessageCursorError:
             raise invalid_cursor_problem(request) from None
+        except MessageAnchorError:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Message anchor not found.",
+            ) from None
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -568,6 +776,19 @@ def list_messages(
     if not database_page and cursor_created_at is not None and cursor_id is not None:
         cursor_key = (cursor_created_at, cursor_id)
         items = [item for item in items if (item.created_at, item.id) > cursor_key]
+    if not database_page and anchor_message_id is not None:
+        anchors = [item for item in items if item.id == anchor_message_id]
+        if len(anchors) != 1:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Message anchor not found.",
+            )
+        anchor = anchors[0]
+        anchor_key = (anchor.created_at, anchor.id)
+        items = [item for item in items if (item.created_at, item.id) >= anchor_key]
     page = items[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]

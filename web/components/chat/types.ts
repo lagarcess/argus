@@ -90,7 +90,8 @@ export type ChatActionOption = {
     | "select_response_option"
     | "select_discovery_candidate"
     | "retry_last_turn"
-    | "retry_load_conversation";
+    | "retry_load_conversation"
+    | "retest_run";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -229,8 +230,19 @@ export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
 };
 
+export type StrategyPathContext = {
+  kind: "clarification" | "confirmation";
+  requestedField?: string | null;
+  strategy: Record<string, unknown>;
+  sourceResultRunId?: string | null;
+  strategyPathId?: string | null;
+  optionalParameters?: Record<string, unknown> | null;
+};
+
 export type Message = {
   id: string;
+  /** Hidden durable message ids that should focus this projected transcript row. */
+  transcriptAnchorIds?: string[];
   role: "user" | "ai";
   kind?:
     | "text"
@@ -259,9 +271,13 @@ export type Message = {
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
+  /** Existing backend-owned strategy facts used to prove turn continuity. */
+  strategyPathContext?: StrategyPathContext | null;
   assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;
+  /** Backend-owned structured context for a retest receipt turn. */
+  retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
 };
 

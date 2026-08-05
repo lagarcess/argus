@@ -78,7 +78,15 @@ ArtifactTarget = Literal[
 class AssetDiscoveryRequest(BaseModel):
     """Typed payload for an explicit peer/category asset-discovery request."""
 
-    relationship: AssetDiscoveryRelationship
+    relationship: AssetDiscoveryRelationship = Field(
+        description=(
+            "Classify the user's discovery goal: comparison when the user's goal "
+            "is choosing what to compare against an anchor, even when the "
+            "comparison candidates share a category; peer for assets similar to "
+            "an anchor; category only when the category itself is the discovery "
+            "goal and no comparison anchor is requested."
+        )
+    )
     category_description: str | None = Field(default=None, max_length=200)
     anchor_symbols: list[str] = Field(default_factory=list, max_length=5)
     asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = None
@@ -87,8 +95,9 @@ class AssetDiscoveryRequest(BaseModel):
         description=(
             "True only when a correct answer requires facts newer than model "
             "knowledge -- recent IPOs, this week's movers, current rankings, "
-            "anything whose right answer changes with time -- or when the user "
-            "explicitly asks to search current sources. False for stable "
+            "anything whose right answer changes with time -- when the user "
+            "asks for current or up-to-date candidates, or explicitly asks to "
+            "search current sources, in any language. False for stable "
             "relationships: sectors, categories, peers, 'names like X'. Judge "
             "the answer, not the wording."
         ),

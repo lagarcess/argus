@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / ".github" / "setup-worktree-env.sh"
 SETUP = ROOT / ".github" / "setup.sh"
 CODEX_ENVIRONMENT = ROOT / ".codex" / "environments" / "environment.toml"
+GITIGNORE = ROOT / ".gitignore"
 BACKEND_SECRET = "backend-secret-value"
 FRONTEND_SECRET = "frontend-secret-value"
 
@@ -110,6 +111,39 @@ def test_setup_calls_worktree_env_helper_before_dependency_setup() -> None:
     assert invocation in source
     assert source.index(invocation) < source.index("PINNED_PYTHON=")
     assert "git ls-files -- .env web/.env.local" in source
+
+
+def test_setup_pins_poetry_and_bun_to_ci_versions() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'PINNED_POETRY_VERSION="2.1.3"' in source
+    assert 'POETRY_VERSION="$PINNED_POETRY_VERSION" "$PYTHON_CMD" -' in source
+    assert 'PINNED_BUN_VERSION="1.3.14"' in source
+    assert 'bash -s "bun-v$PINNED_BUN_VERSION"' in source
+
+
+def test_setup_binds_poetry_to_exact_repo_python_version() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'uv python install "$PINNED_PYTHON"' in source
+    assert 'uv python find "$PINNED_PYTHON"' in source
+    assert "== '$PINNED_PYTHON'" in source
+    assert 'poetry env use "$PYTHON_CMD"' in source
+
+
+def test_setup_persists_cloud_toolchain_path_and_disables_next_telemetry() -> None:
+    source = SETUP.read_text(encoding="utf-8")
+
+    assert 'SHELL_PROFILE="$HOME/.bashrc"' in source
+    assert 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' in source
+    assert 'export NEXT_TELEMETRY_DISABLED=1' in source
+    assert "next telemetry disable" not in source
+
+
+def test_next_telemetry_cache_cannot_dirty_cloud_checkouts() -> None:
+    source = GITIGNORE.read_text(encoding="utf-8")
+
+    assert "web/cache/config.json" in source.splitlines()
 
 
 def test_codex_environment_delegates_to_tracked_setup_and_cleanup() -> None:

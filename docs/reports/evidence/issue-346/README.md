@@ -1,0 +1,30 @@
+# Issue 346 guest quota recovery evidence
+
+This directory contains the exact-head local-Supabase browser captures for the
+guest simulation exhaustion recovery modal.
+
+Recaptured at candidate head `4d265dbcb901f1117741962d527584fa6807af5c` on
+2026-08-03 after a fresh `supabase db reset --local` applied
+`20260802090000_raise_guest_simulation_allowance.sql`. The browser acceptance
+journey exhausted the two-simulation workspace allowance, then verified the
+truthful visitor-day reset time and conversion offer in both languages. The
+capture runner permits its own first-language evidence write while it runs the
+Spanish assertion, so the bilingual capture is one pinned candidate journey.
+
+- `guest-quota-recovery-en.png` verifies the English reset-time and conversion
+  offer after the two-simulation allowance is exhausted.
+- `guest-quota-recovery-es-419.png` verifies the equivalent Spanish surface.
+
+Capture command (with the candidate SHA pinned at execution):
+
+```bash
+ARGUS_EXPECTED_CANDIDATE_SHA="$(git rev-parse HEAD)" \
+  ARGUS_GUEST_QA_CAPTURE_DURABLE_EVIDENCE=true \
+  ARGUS_GUEST_QA_APP_PORT=59900 \
+  ARGUS_GUEST_QA_API_PORT=59901 \
+  bash scripts/qa/run-guest-experience-qa.sh preflight \
+  --grep "exhausted guest simulation"
+```
+
+The gate builds the production frontend, uses only the disposable local
+Supabase stack, and runs the English and Spanish checks serially.

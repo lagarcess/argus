@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,8 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_finalization import MemoryBacktestFinalizationGateway
 from argus.domain.chat_turn_lifecycle import TransitionResult
+from argus.domain.conversation_activity import Boundary, encode_attention_cursor
+from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.postgres_history_reader import (
     HistoryCursorError,
@@ -37,6 +40,7 @@ from argus.domain.supabase_gateway import (
     QuotaExceededError,
     SupabaseGateway,
 )
+from argus.domain.username_signup import UsernameSignupPrevalidation
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -211,15 +215,42 @@ def test_gateway_auth_flows_use_separate_auth_client():
 
     gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
 
-    assert gateway.signup(email="alpha@example.com", password="password") == {
+    assert gateway.signup(
+        email="alpha@example.com",
+        password="password",
+        captcha_token="captcha-proof",
+    ) == {
         "user": {"id": "auth-user"}
     }
-    assert gateway.login(email="alpha@example.com", password="password") == {
+    assert gateway.login(
+        email="alpha@example.com",
+        password="password",
+        captcha_token="captcha-proof",
+    ) == {
         "session": {"access_token": "token"}
     }
 
-    auth_client.auth.sign_up.assert_called_once()
-    auth_client.auth.sign_in_with_password.assert_called_once()
+    auth_client.auth.sign_up.assert_called_once_with(
+        {
+            "email": "alpha@example.com",
+            "password": "password",
+            "options": {
+                "data": {
+                    "display_name": None,
+                    "username": None,
+                    "language": "en",
+                },
+                "captcha_token": "captcha-proof",
+            },
+        }
+    )
+    auth_client.auth.sign_in_with_password.assert_called_once_with(
+        {
+            "email": "alpha@example.com",
+            "password": "password",
+            "options": {"captcha_token": "captcha-proof"},
+        }
+    )
     service_client.auth.sign_up.assert_not_called()
     service_client.auth.sign_in_with_password.assert_not_called()
 
@@ -236,6 +267,7 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
     gateway.signup(
         email="alpha@example.com",
         password="password",
+        captcha_token="captcha-proof",
         language="es-419",
     )
 
@@ -248,7 +280,8 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
                     "display_name": None,
                     "username": None,
                     "language": "es-419",
-                }
+                },
+                "captcha_token": "captcha-proof",
             },
         }
     )
@@ -462,6 +495,17 @@ def mock_gateway():
     gateway.list_message_page_context.return_value = ([], set())
     gateway.reconcile_stale_chat_turns.return_value = []
     gateway.list_projectable_chat_turns.return_value = []
+    gateway.reconcile_conversation_activity_turns.return_value = []
+    gateway.read_conversation_activity_batch.side_effect = (
+        lambda *, user_id, conversation_ids: [
+            {
+                "conversation_id": conversation_id,
+                "sources": [],
+                "read_state": None,
+            }
+            for conversation_id in conversation_ids
+        ]
+    )
     gateway.get_latest_completed_run_for_conversation.return_value = None
     gateway.accept_chat_turn.side_effect = lambda **kwargs: kwargs["message"]
     gateway.transition_chat_turn.return_value = TransitionResult(outcome="applied")
@@ -904,6 +948,91 @@ def test_patch_me_supabase_ignores_legacy_onboarding_field(mock_gateway):
     mock_gateway.update_user.assert_called_once()
 
 
+def test_patch_me_persists_a_curated_avatar_theme(mock_gateway):
+    before = _mock_profile()
+    mock_gateway.get_user.return_value = before
+
+    def _updated_user(_user_id: str, payload: dict) -> User:
+        return User.model_validate(payload)
+
+    mock_gateway.update_user.side_effect = _updated_user
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": "plum"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["avatar_theme"] == "plum"
+    assert mock_gateway.update_user.call_args.args[1]["avatar_theme"] == "plum"
+
+
+def test_patch_me_rejects_an_unknown_avatar_theme(mock_gateway):
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": "arbitrary-hex"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_me_rejects_a_null_avatar_theme(mock_gateway):
+    response = client.patch(
+        "/api/v1/me",
+        json={"avatar_theme": None},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
+    now = utcnow()
+    registered = UserResponse(
+        user=_mock_profile(),
+        account_kind="registered",
+        guest=None,
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=True,
+            can_manage_conversation=True,
+            can_save_decision=True,
+            can_manage_account=True,
+            can_use_omnisearch=True,
+            can_search_current_workspace=False,
+            can_use_grounded_discovery=True,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+    guest = UserResponse(
+        user=_mock_profile(),
+        account_kind="guest",
+        guest=GuestAccountSummary(
+            expires_at=now + timedelta(days=7),
+            conversation_limit=1,
+            message_limit=10,
+            simulation_limit=1,
+            feedback_limit=5,
+        ),
+        capabilities=AccountCapabilities(
+            can_create_additional_conversation=False,
+            can_manage_conversation=False,
+            can_save_decision=False,
+            can_manage_account=False,
+            can_use_omnisearch=False,
+            can_search_current_workspace=True,
+            can_use_grounded_discovery=False,
+            can_submit_feedback=True,
+        ),
+        public_account_access_enabled=False,
+    )
+
+    assert registered.model_dump(mode="json")["user"]["avatar_theme"] == "ocean"
+    assert "avatar_theme" not in guest.model_dump(mode="json")["user"]
+
+
 def test_feedback_accepts_account_deletion_request_and_enriches_context(mock_gateway):
     response = client.post(
         "/api/v1/feedback",
@@ -992,6 +1121,121 @@ def test_delete_all_conversations_supabase_delegates_with_user_ownership(
     )
 
 
+def test_supabase_activity_get_and_patch_use_verified_source_identity(
+    mock_gateway,
+) -> None:
+    now = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    conversation_id = "11111111-1111-4111-8111-111111111111"
+    source_id = "22222222-2222-4222-8222-222222222222"
+    conversation = Conversation(
+        id=conversation_id,
+        title="Activity task",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview="Done",
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    source = {
+        "conversation_id": conversation_id,
+        "source_kind": "chat_turn",
+        "source_id": source_id,
+        "status": "completed",
+        "occurred_at": now.isoformat(),
+        "stage_outcome": "ready_to_respond",
+        "result_hydrateable": False,
+    }
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.read_conversation_activity_batch.side_effect = None
+    mock_gateway.read_conversation_activity_batch.return_value = [
+        {
+            "conversation_id": conversation_id,
+            "sources": [source],
+            "read_state": None,
+        }
+    ]
+
+    current = client.get(
+        f"/api/v1/conversations/{conversation_id}/activity",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert current.status_code == 200
+    assert current.json()["attention"]["status"] == "new_activity"
+    cursor = current.json()["attention"]["cursor"]
+    assert cursor == encode_attention_cursor(
+        Boundary("chat_turn", source_id, now)
+    )
+
+    mock_gateway.mutate_conversation_activity_read_state.return_value = {
+        "outcome": "applied",
+        "read_state": {},
+    }
+    mock_gateway.read_conversation_activity_batch.return_value = [
+        {
+            "conversation_id": conversation_id,
+            "sources": [source],
+            "read_state": {
+                "read_through_occurred_at": now.isoformat(),
+                "read_through_source_kind": "chat_turn",
+                "read_through_source_id": source_id,
+                "manual_unread_at": None,
+            },
+        }
+    ]
+
+    marked = client.patch(
+        f"/api/v1/conversations/{conversation_id}/activity",
+        json={"action": "mark_read", "through_attention_cursor": cursor},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert marked.status_code == 200
+    assert marked.json()["attention"] == {"status": "none", "cursor": None}
+    mock_gateway.mutate_conversation_activity_read_state.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_id=conversation_id,
+        action="mark_read",
+        source_kind="chat_turn",
+        source_id=source_id,
+    )
+
+
+def test_supabase_activity_conflict_maps_to_rfc_problem(mock_gateway) -> None:
+    now = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    conversation_id = "11111111-1111-4111-8111-111111111111"
+    source_id = "22222222-2222-4222-8222-222222222222"
+    mock_gateway.get_conversation.return_value = Conversation(
+        id=conversation_id,
+        title="Activity task",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.mutate_conversation_activity_read_state.return_value = {
+        "outcome": "conflict",
+        "read_state": None,
+    }
+    cursor = encode_attention_cursor(Boundary("chat_turn", source_id, now))
+
+    response = client.patch(
+        f"/api/v1/conversations/{conversation_id}/activity",
+        json={"action": "mark_read", "through_attention_cursor": cursor},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "attention_cursor_conflict"
+    assert response.json()["type"].endswith("/attention-cursor-conflict")
+
+
 def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
     monkeypatch: pytest.MonkeyPatch,
     mock_gateway,
@@ -1030,6 +1274,75 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
         "enabled": False,
         "fee_bps": 0.0,
         "slippage_bps": 0.0,
+    }
+    assert mock_gateway.admit_backtest_job.call_args.kwargs[
+        "execution_metadata"
+    ] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "registered",
+    }
+
+
+def test_guest_run_backtest_supabase_persists_guest_traffic_class(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+) -> None:
+    from argus.api.routers import backtest as backtest_router
+
+    profile = _mock_profile().model_copy(
+        update={
+            "email": None,
+            "username": None,
+            "display_name": None,
+            "is_admin": False,
+        }
+    )
+    workspace = GuestWorkspace(
+        user_id=profile.id,
+        conversation_id=None,
+        status="active",
+        created_at=profile.created_at,
+        expires_at=profile.created_at + timedelta(days=7),
+        claimed_by=None,
+        claimed_at=None,
+        updated_at=profile.created_at,
+    )
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": profile.id,
+        "email": None,
+        "is_anonymous": True,
+    }
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = profile
+    mock_gateway.get_active_guest_workspace.return_value = workspace
+    mock_gateway.client = object()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    monkeypatch.setattr(
+        backtest_router,
+        "visitor_within_limits",
+        lambda *_args, **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        backtest_router,
+        "settle_visitor_usage",
+        lambda *_args, **_kwargs: None,
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={
+            "Authorization": "Bearer guest-token",
+            "Idempotency-Key": "guest-supabase-traffic-class",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert mock_gateway.admit_backtest_job.call_args.kwargs[
+        "execution_metadata"
+    ] == {
+        "source": "api_direct",
+        "openrouter_traffic_class": "guest",
     }
 
 
@@ -1694,7 +2007,11 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": password},
+        json={
+            "email": email,
+            "password": password,
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 200
@@ -1720,7 +2037,11 @@ def test_login_forces_secure_session_cookies_in_production(mock_gateway, monkeyp
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "beta@example.com", "password": "password123"},
+        json={
+            "email": "beta@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 200
@@ -1920,16 +2241,195 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
 
     response = client.post(
         "/api/v1/auth/signup",
-        json={"email": "beta@example.com", "password": "password123"},
+        json={
+            "email": "beta@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 200
     mock_gateway.private_alpha_email_allowed.assert_called_once_with("beta@example.com")
     mock_gateway.signup.assert_called_once()
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once_with(
+        mock_gateway.signup.return_value["user"]
+    )
     assert "mark_private_alpha_signup_accepted" not in [
         call[0] for call in mock_gateway.method_calls
     ]
     assert response.cookies.get("sb-auth-token") == "access-token-123"
+
+
+def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    fresh_provider_response = {
+        "session": None,
+        "user": {
+            "id": "fresh-user-id",
+            "email": "fresh@example.com",
+            "identities": [{"id": "fresh-identity-id"}],
+        },
+    }
+    duplicate_provider_response = {
+        "session": None,
+        "user": {
+            "id": "obfuscated-user-id",
+            "email": "existing@example.com",
+            "identities": [],
+        },
+    }
+    mock_gateway.signup.side_effect = [
+        fresh_provider_response,
+        duplicate_provider_response,
+    ]
+    profile_rows: set[str] = set()
+    mock_gateway.get_or_create_profile_for_auth_user.side_effect = (
+        lambda auth_user: profile_rows.add(str(auth_user["id"]))
+    )
+    headers = {"X-Forwarded-For": "203.0.113.92"}
+
+    fresh = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "fresh@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+        headers=headers,
+    )
+    duplicate = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "existing@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+        headers=headers,
+    )
+
+    assert fresh.status_code == duplicate.status_code == 200
+    assert fresh.json() == fresh_provider_response
+    assert duplicate.json() == duplicate_provider_response
+    assert set(fresh.json()) == set(duplicate.json()) == {"session", "user"}
+    assert set(fresh.json()["user"]) == set(duplicate.json()["user"])
+    assert profile_rows == {"fresh-user-id"}
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once_with(
+        fresh_provider_response["user"]
+    )
+
+
+def test_signup_retry_does_not_reveal_profile_creation_through_username(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.side_effect = [
+        {
+            "session": None,
+            "user": {
+                "id": "fresh-user-id",
+                "email": "fresh@example.com",
+                "identities": [{"id": "fresh-identity-id"}],
+            },
+        },
+        {
+            "session": None,
+            "user": {
+                "id": "obfuscated-user-id",
+                "email": "fresh@example.com",
+                "identities": [],
+            },
+        },
+    ]
+    headers = {"X-Forwarded-For": "203.0.113.93"}
+
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        side_effect=[
+            nullcontext(
+                UsernameSignupPrevalidation(
+                    auth_user_exists=False,
+                    username_available=True,
+                )
+            ),
+            nullcontext(
+                UsernameSignupPrevalidation(
+                    auth_user_exists=True,
+                    username_available=False,
+                )
+            ),
+        ],
+    ):
+        first = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "portfolioalpha",
+            },
+            headers=headers,
+        )
+        retry = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "portfolioalpha",
+            },
+            headers=headers,
+        )
+
+    assert first.status_code == retry.status_code == 200
+    assert retry.json()["user"]["identities"] == []
+    assert mock_gateway.signup.call_count == 2
+    mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
+
+
+def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        return_value=nullcontext(
+            UsernameSignupPrevalidation(
+                auth_user_exists=False,
+                username_available=False,
+            )
+        ),
+    ) as serialize_username:
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "fresh@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "PortfolioAlpha",
+            },
+        )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "username_taken"
+    assert response.json()["detail"] == "That username is already taken."
+    serialize_username.assert_called_once_with(
+        api_state.DATABASE_URL,
+        "fresh@example.com",
+        "portfolioalpha",
+    )
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
 
 
 def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
@@ -1943,6 +2443,7 @@ def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
         json={
             "email": "alpha@example.com",
             "password": "password123",
+            "captcha_token": "captcha-proof",
             "language": "es-419",
         },
     )
@@ -1954,6 +2455,7 @@ def test_signup_passes_selected_language_to_gateway(mock_gateway, monkeypatch):
         display_name=None,
         username=None,
         language="es-419",
+        captcha_token="captcha-proof",
     )
 
 
@@ -1969,12 +2471,57 @@ def test_signup_rejects_unsupported_language_before_provider_signup(
         json={
             "email": "alpha@example.com",
             "password": "password123",
+            "captcha_token": "captcha-proof",
             "language": "fr-CA",
         },
     )
 
     assert response.status_code == 422
     mock_gateway.signup.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/signup", "/api/v1/auth/login"])
+def test_password_auth_requires_captcha_before_provider_call(
+    path,
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+
+    response = client.post(
+        path,
+        json={"email": "alpha@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 422
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.login.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/auth/signup", "/api/v1/auth/login"])
+def test_password_auth_bounds_captcha_before_provider_call(
+    path,
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+
+    response = client.post(
+        path,
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "captcha_token": "x" * 4097,
+        },
+    )
+
+    assert response.status_code == 422
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.login.assert_not_called()
 
 
 def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
@@ -1987,7 +2534,11 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
 
     response = client.post(
         "/api/v1/auth/signup",
-        json={"email": "stranger@example.com", "password": "password123"},
+        json={
+            "email": "stranger@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 400
@@ -2013,7 +2564,11 @@ def test_signup_sanitizes_provider_errors(mock_gateway, monkeypatch):
 
     response = client.post(
         "/api/v1/auth/signup",
-        json={"email": "alpha@example.com", "password": "password123"},
+        json={
+            "email": "alpha@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 400
@@ -2032,7 +2587,11 @@ def test_login_normalizes_private_alpha_access_failures(
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "disabled@example.com", "password": "password123"},
+        json={
+            "email": "disabled@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 401
@@ -2055,7 +2614,11 @@ def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "alpha@example.com", "password": "wrong-password"},
+        json={
+            "email": "alpha@example.com",
+            "password": "wrong-password",
+            "captcha_token": "captcha-proof",
+        },
     )
 
     assert response.status_code == 401
@@ -2064,6 +2627,7 @@ def test_login_normalizes_provider_auth_failures(mock_gateway, monkeypatch):
     mock_gateway.login.assert_called_once_with(
         email="alpha@example.com",
         password="wrong-password",
+        captcha_token="captcha-proof",
     )
 
 
@@ -2083,14 +2647,22 @@ def test_login_rate_limit_blocks_extra_attempt_before_provider(
     for _ in range(auth_router.AUTH_LOGIN_ATTEMPT_LIMIT):
         response = client.post(
             "/api/v1/auth/login",
-            json={"email": "alpha@example.com", "password": "wrong-password"},
+            json={
+                "email": "alpha@example.com",
+                "password": "wrong-password",
+                "captcha_token": "captcha-proof",
+            },
             headers=headers,
         )
         assert response.status_code == 401
 
     blocked = client.post(
         "/api/v1/auth/login",
-        json={"email": "alpha@example.com", "password": "wrong-password"},
+        json={
+            "email": "alpha@example.com",
+            "password": "wrong-password",
+            "captcha_token": "captcha-proof",
+        },
         headers=headers,
     )
 
@@ -2115,7 +2687,11 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
     for _ in range(auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT):
         response = client.post(
             "/api/v1/auth/signup",
-            json={"email": "stranger@example.com", "password": "password123"},
+            json={
+                "email": "stranger@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+            },
             headers=headers,
         )
         assert response.status_code == 400
@@ -2123,7 +2699,11 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
 
     blocked = client.post(
         "/api/v1/auth/signup",
-        json={"email": "stranger@example.com", "password": "password123"},
+        json={
+            "email": "stranger@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
         headers=headers,
     )
 
@@ -2388,11 +2968,10 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["items"]) == 2
-    assert payload["next_cursor"] is not None
-    assert {item["type"] for item in payload["items"]}.issubset(
-        {"chat", "strategy", "collection", "run"}
-    )
+    assert [(item["type"], item["id"]) for item in payload["items"]] == [
+        ("conversation", "chat-1")
+    ]
+    assert payload["next_cursor"] is None
 
 
 def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
@@ -2443,6 +3022,58 @@ def test_search_supabase_pushes_bounded_cursor_and_filter_to_gateway(
         guest_scope=False,
         guest_conversation_id=None,
     )
+
+
+def test_search_supabase_pushes_visible_conversation_ids_to_bounded_reader(
+    mock_gateway,
+):
+    conversation_ids = [
+        "00000000-0000-0000-0000-000000000091",
+        "00000000-0000-0000-0000-000000000092",
+    ]
+    mock_gateway.search_rows.return_value = SearchReadResult(
+        rows={
+            "conversations": [],
+            "strategies": [],
+            "collections": [],
+            "runs": [],
+            "ideas": [],
+            "evidence": [],
+            "decisions": [],
+        },
+        ledger_counts={
+            "promising": 0,
+            "watching": 0,
+            "rejected": 0,
+            "revisit_later": 0,
+        },
+    )
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "",
+            "limit": 2,
+            "conversation_id": conversation_ids,
+            "include_ledger_groups": "true",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.search_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        query="",
+        source_limit=2,
+        cursor_updated_at=None,
+        cursor_id=None,
+        decision_state=None,
+        include_ledger_groups=True,
+        guest_scope=False,
+        guest_conversation_id=None,
+        conversation_ids=conversation_ids,
+    )
+    assert response.json()["next_cursor"] is None
 
 
 def test_search_reader_cursor_failure_maps_to_invalid_cursor_problem(
@@ -2574,39 +3205,125 @@ def test_search_supabase_returns_typed_p1_artifacts(mock_gateway):
 
     assert response.status_code == 200
     items = response.json()["items"]
-    assert {item["type"] for item in items} == {
-        "backtest",
-        "idea",
-        "evidence",
-        "decision",
+    assert len(items) == 1
+    item = items[0]
+    assert item["type"] == "conversation"
+    assert item["id"] == item["conversation_id"] == "conversation-1"
+    assert item["dossier"]["decision"] == {
+        "state": "promising",
+        "note": "Worth revisiting.",
+        "run_label": "AAPL MSFT evidence run",
     }
-    evidence = next(item for item in items if item["type"] == "evidence")
-    assert evidence["preview"] == {
-        "digest": "AAPL MSFT beat SPY in the test window.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
+    assert item["dossier"]["tested"]["symbols"] == ["AAPL", "MSFT"]
+    assert item["total_runs"] == 1
+    assert item["decided_runs"] == 1
+
+
+def test_search_supabase_projects_localized_actions_without_generation(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_gateway,
+):
+    from argus.agent_runtime import runtime as agent_runtime
+    from argus.domain import engine as domain_engine
+
+    def unexpected_external_call(*_: object, **__: object) -> None:
+        raise AssertionError("Search action projection must not call external systems")
+
+    monkeypatch.setattr(domain_engine, "resolve_asset", unexpected_external_call)
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", unexpected_external_call)
+    monkeypatch.setattr(agent_runtime, "run_agent_turn", unexpected_external_call)
+    spanish_user = _mock_profile(language="es-419")
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = spanish_user
+    mock_gateway.get_or_create_mock_user.return_value = spanish_user
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "conversation-action-es",
+                "title": "Dossier GLD",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "runs": [
+            {
+                "id": "run-action-es",
+                "conversation_id": "conversation-action-es",
+                "status": "completed",
+                "asset_class": "equity",
+                "symbols": ["GLD"],
+                "benchmark_symbol": "SPY",
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "timeframe": "1D",
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-12-31",
+                    "resolved_parameters": {
+                        "sizing_mode": "capital_amount",
+                        "capital_amount": 10_000,
+                    },
+                },
+                "conversation_result_card": {
+                    "title": "GLD anual",
+                    "evidence_artifact_id": "evidence-action-es",
+                    "idea_id": "idea-action-es",
+                    "idea_version_id": "idea-version-action-es",
+                },
+                "created_at": now.isoformat(),
+            }
+        ],
+        "ideas": [],
+        "evidence": [
+            {
+                "id": "evidence-action-es",
+                "source_conversation_id": "conversation-action-es",
+                "source_run_id": "run-action-es",
+                "title": "GLD anual",
+                "digest": "GLD frente a SPY.",
+                "payload": {},
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-action-es",
+                "source_conversation_id": "conversation-action-es",
+                "evidence_artifact_id": "evidence-action-es",
+                "decision_state": "promising",
+                "note": "Revisar el próximo año.",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        ],
+        "messages": [],
     }
-    assert "context_packets" not in evidence["preview"]
-    assert not any(key.endswith("_id") for key in evidence["preview"])
-    idea = next(item for item in items if item["type"] == "idea")
-    assert idea["preview"]["digest"] == "Test AAPL and MSFT against SPY."
-    assert not any(key.endswith("_id") for key in idea["preview"])
-    decision = next(item for item in items if item["type"] == "decision")
-    assert decision["preview"]["decision_state"] == "promising"
-    assert not any(key.endswith("_id") for key in decision["preview"])
-    assert decision["matched_text"] == (
-        "Worth revisiting. · AAPL MSFT beat SPY in the test window."
+
+    response = client.get(
+        "/api/v1/search?q=GLD&limit=20",
+        headers={"Authorization": "Bearer test-token"},
     )
-    assert "promising" not in decision["matched_text"]
-    # Decision recall (issue #253): verbatim note, artifact-only digest, and
-    # the linked evidence facts projected from the hydrated payload.
-    assert decision["preview"]["note"] == "Worth revisiting."
-    assert decision["preview"]["digest"] == (
-        "AAPL MSFT beat SPY in the test window."
-    )
-    assert decision["preview"]["quick_take"] == "AAPL and MSFT beat SPY."
-    assert decision["preview"]["symbols"] == ["AAPL", "MSFT"]
-    assert decision["preview"]["benchmark_symbol"] == "SPY"
+
+    assert response.status_code == 200
+    conversation = response.json()["items"][0]
+    retest, decision = conversation["dossier"]["actions"]
+    # Localization no longer rides a generated prompt: the action is identity
+    # and policy only, and the confirmation card carries the localized copy.
+    assert retest == {
+        "type": "retest_run",
+        "source_run_id": "run-action-es",
+        "run_label": retest["run_label"],
+        "window_policy": "same_duration_ending_today",
+        "contract_version": "argus_retest_run/v1",
+    }
+    assert decision == {
+        "type": "decision",
+        "availability": "available",
+        "evidence_artifact_id": "evidence-action-es",
+        "decision_state": "promising",
+        "note": "Revisar el próximo año.",
+        "run_label": "GLD anual",
+    }
 
 
 def test_search_supabase_decision_without_payload_keeps_honest_fallback(
@@ -2640,17 +3357,12 @@ def test_search_supabase_decision_without_payload_keeps_honest_fallback(
     )
 
     assert response.status_code == 200
-    decision = next(
-        item for item in response.json()["items"] if item["type"] == "decision"
-    )
-    preview = decision["preview"]
-    assert preview["note"] == "Too volatile for me."
-    assert preview["decision_state"] == "rejected"
-    assert preview["digest"] == "NVDA lost to SPY in the window."
-    # No payload means no invented facts: nothing beyond the stored truth.
-    assert "quick_take" not in preview
-    assert "metrics_summary" not in preview
-    assert "symbols" not in preview
+    item = response.json()["items"][0]
+    assert item["type"] == "conversation"
+    assert item["dossier"] is None
+    assert item["total_runs"] == 0
+    assert item["decided_runs"] == 0
+    assert item["decision_states"] == ["rejected"]
 
 
 def test_search_supabase_orders_p1_artifacts_before_source_conversation(
@@ -2734,10 +3446,9 @@ def test_search_supabase_orders_p1_artifacts_before_source_conversation(
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    chat_index = ordered_types.index("chat")
-    for artifact_type in ("backtest", "evidence", "idea", "decision"):
-        assert ordered_types.index(artifact_type) < chat_index
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
@@ -2783,8 +3494,9 @@ def test_search_supabase_preserves_pinned_chat_above_p1_artifacts(mock_gateway):
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts(
@@ -2832,8 +3544,9 @@ def test_search_supabase_preserves_exact_chat_above_lower_relevance_p1_artifacts
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("chat") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifact(
@@ -2882,8 +3595,9 @@ def test_search_supabase_preserves_symbol_match_above_lower_relevance_p1_artifac
     )
 
     assert response.status_code == 200
-    ordered_types = [item["type"] for item in response.json()["items"]]
-    assert ordered_types.index("strategy") < ordered_types.index("evidence")
+    assert [(item["type"], item["id"]) for item in response.json()["items"]] == [
+        ("conversation", "conversation-1")
+    ]
 
 
 def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
@@ -2952,6 +3666,15 @@ def test_history_supabase_chat_items_carry_title_source(mock_gateway):
     ]
     assert non_chat_items
     assert all("title_source" not in item for item in non_chat_items)
+    assert all("activity" not in item for item in non_chat_items)
+    mock_gateway.reconcile_conversation_activity_turns.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_ids=["22222222-2222-2222-2222-222222222222"],
+    )
+    mock_gateway.read_conversation_activity_batch.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_ids=["22222222-2222-2222-2222-222222222222"],
+    )
 
 
 def test_history_supabase_can_request_archived_rows(mock_gateway):
@@ -3206,8 +3929,13 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
         headers={"Authorization": "Bearer test-token"},
     )
     assert final_page.status_code == 200
+    expected_final = conversations[4].model_dump(mode="json")
+    expected_final["activity"] = {
+        "operation": {"status": "idle", "kind": None, "updated_at": None},
+        "attention": {"status": "none", "cursor": None},
+    }
     assert final_page.json() == {
-        "items": [conversations[4].model_dump(mode="json")],
+        "items": [expected_final],
         "next_cursor": None,
     }
 
@@ -3233,6 +3961,15 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
     assert calls[2].kwargs["cursor_id"] == "conv-3"
     assert calls[3].kwargs["cursor_updated_at"] is None
     assert calls[3].kwargs["cursor_id"] is None
+    projected_pages = [
+        call.kwargs["conversation_ids"]
+        for call in mock_gateway.read_conversation_activity_batch.call_args_list
+    ]
+    assert projected_pages == [
+        ["conv-0", "conv-1"],
+        ["conv-2", "conv-3"],
+        ["conv-4"],
+    ]
 
 
 def test_conversation_missing_pivot_uses_existing_invalid_cursor_problem(mock_gateway):

@@ -925,7 +925,12 @@ async def _stage_result_from_interpretation(
         unsupported_strategy_logic_owns_pending_need
         and "draft_only_indicator_text_preserved" in interpretation.reason_codes
     ):
-        missing_required_fields = []
+        missing_required_fields = (
+            ["asset_universe"]
+            if "provider_context_incomplete_asset_mentions"
+            in interpretation.reason_codes
+            else []
+        )
     pending_date_edit_reason_codes: list[str] = []
     # A planned edit or an explicit money answer may change another field
     # while reusing the prior window; that is not a date-answer noop.
@@ -1688,15 +1693,14 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
         return interpretation
-    candidate_endpoints = _date_range_endpoints(
-        interpretation.candidate_strategy_draft.date_range
-    )
+    candidate_endpoints = _date_range_endpoints(interpretation.candidate_strategy_draft.date_range)
     if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
         return interpretation
     if candidate_endpoints is not None and any(candidate_endpoints):
         return interpretation
     if (
         interpretation.semantic_turn_act != "answer_pending_need"
+        and "date_range_refinement" not in interpretation.reason_codes
         and not interpretation.requires_clarification
         and _candidate_strategy_has_backtest_shape(
             interpretation.candidate_strategy_draft
@@ -1708,7 +1712,7 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
-        today=date.today(),
+        today=date.today(), allow_result_anchor=True,
         require_explicit_range=(
             "pending_date_answer_unowned_candidate_stripped"
             in interpretation.reason_codes
@@ -3010,7 +3014,7 @@ def _canonicalized_strategy(
                 invalid_symbols.append(symbol)
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
-        asset_classes.add(resolution.asset.asset_class)
+        asset_classes.update(provider_context_assets.resolved_asset_classes_from_strategy_context(updated, symbol) or {resolution.asset.asset_class})
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))

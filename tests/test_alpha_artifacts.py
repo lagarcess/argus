@@ -161,6 +161,7 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
         "`docs/api/openapi.yaml` is the checked compatibility artifact",
         "`GET /health`",
         "`GET /internal/readiness`",
+        "`POST /internal/access-requests/approve`",
         "`POST /api/v1/dev/reset`",
         "`POST /api/v1/chat/stream` 200 `text/event-stream` response body",
         "`/api/v1` appears exactly once",
@@ -175,6 +176,7 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
     assert excluded_operations == {
         "`GET /health`",
         "`GET /internal/readiness`",
+        "`POST /internal/access-requests/approve`",
         "`POST /api/v1/dev/reset`",
     }
 
@@ -343,10 +345,21 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
             "Server-authoritative permission to expose ordinary account creation."
         ),
     }
-    assert user_response["properties"]["user"] == {"$ref": "#/components/schemas/User"}
+    assert user_response["properties"]["user"] == {
+        "anyOf": [
+            {"$ref": "#/components/schemas/User"},
+            {"$ref": "#/components/schemas/GuestUser"},
+        ]
+    }
     assert openapi["components"]["schemas"]["User"]["properties"]["email"] == {
         "anyOf": [{"type": "string"}, {"type": "null"}]
     }
+    assert "avatar_theme" in openapi["components"]["schemas"]["User"][
+        "properties"
+    ]
+    assert "avatar_theme" not in openapi["components"]["schemas"]["GuestUser"][
+        "properties"
+    ]
 
 
 def test_backtests_run_openapi_requires_idempotency_key() -> None:
@@ -394,6 +407,21 @@ def test_logout_openapi_declares_browser_origin_rejection() -> None:
     assert "untrusted browser origin" in responses["403"]["description"].lower()
 
 
+def test_password_auth_openapi_requires_bounded_captcha_tokens() -> None:
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+
+    for schema_name in ("SignupRequest", "LoginRequest"):
+        schema = openapi["components"]["schemas"][schema_name]
+        assert "captcha_token" in schema["required"]
+        assert schema["properties"]["captcha_token"] == {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+        }
+
+
 def test_authenticated_openapi_declares_session_verification_unavailable() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 
@@ -404,6 +432,7 @@ def test_authenticated_openapi_declares_session_verification_unavailable() -> No
     unauthenticated_paths = {
         "/api/v1/auth/signup",
         "/api/v1/auth/login",
+        "/api/v1/auth/access-requests",
         "/api/v1/auth/guest",
         "/api/v1/auth/logout",
     }
@@ -418,6 +447,14 @@ def test_authenticated_openapi_declares_session_verification_unavailable() -> No
                 response = operation["responses"]["503"]
                 assert "auth_session_verification_unavailable" in response["description"]
                 assert "market_data_unavailable" in response["description"]
+                assert response["content"]["application/json"]["schema"] == {
+                    "$ref": "#/components/schemas/Error"
+                }
+                continue
+            if path == "/api/v1/search":
+                response = operation["responses"]["503"]
+                assert "exact bounded recall" in response["description"]
+                assert "authentication-session verification" in response["description"]
                 assert response["content"]["application/json"]["schema"] == {
                     "$ref": "#/components/schemas/Error"
                 }

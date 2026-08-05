@@ -169,6 +169,11 @@ def _strategy_with_contextual_merge(
     if preserve_prior_family:
         strategy_family_changed = False
         incoming_strategy_family = prior_strategy_family
+    effective_strategy_family = (
+        incoming_strategy_family
+        if incoming_strategy_family in SUPPORTED_STRATEGY_TYPES
+        else prior_strategy_family
+    )
     merged = (
         _reset_contextual_strategy_definition(
             prior,
@@ -177,6 +182,21 @@ def _strategy_with_contextual_merge(
         if strategy_family_changed and incoming_strategy_family is not None
         else prior.model_copy(deep=True)
     )
+    incoming_position_size_shape = (
+        strategy.sizing_mode == "position_size" and strategy.position_size is not None
+    )
+    position_size_owns_edit = (
+        incoming_position_size_shape
+        and effective_strategy_family in SUPPORTED_STRATEGY_TYPES
+        and effective_strategy_family != "dca_accumulation"
+        and _strategy_field_provenance_value(strategy, "position_size")
+        == "explicit_user"
+    )
+    if position_size_owns_edit:
+        merged.capital_amount = None
+        merged.extra_parameters = _extra_parameters_without_unrequested_money_context(
+            merged.extra_parameters
+        )
     incoming = strategy.model_dump(mode="python")
     for key, value in incoming.items():
         if key == "raw_user_phrasing":
@@ -194,12 +214,20 @@ def _strategy_with_contextual_merge(
             "resolution_provenance",
         }:
             continue
-        if preserve_prior_money_context and key in {
+        if preserve_prior_money_context and not position_size_owns_edit and key in {
             "capital_amount",
             "initial_capital",
             "total_capital",
             "position_size",
         }:
+            continue
+        if position_size_owns_edit and key == "capital_amount":
+            continue
+        if (
+            incoming_position_size_shape
+            and not position_size_owns_edit
+            and key in {"sizing_mode", "position_size"}
+        ):
             continue
         if preserve_prior_date_context and key in {"date_range", "timeframe"}:
             continue
@@ -235,7 +263,11 @@ def _strategy_with_contextual_merge(
                     for nested_key, nested_value in value.items()
                     if nested_key not in {"raw_strategy_type", "template"}
                 }
-            if preserve_prior_money_context and isinstance(value, dict):
+            if position_size_owns_edit and isinstance(value, dict):
+                value = _extra_parameters_for_position_sizing(value)
+            elif incoming_position_size_shape and isinstance(value, dict):
+                value = _extra_parameters_without_position_size_context(value)
+            elif preserve_prior_money_context and isinstance(value, dict):
                 value = _extra_parameters_without_unrequested_money_context(value)
             if preserve_prior_date_context and isinstance(value, dict):
                 value = _extra_parameters_without_unrequested_date_context(value)
@@ -385,6 +417,7 @@ def _extra_parameters_without_unrequested_money_context(
     extra_parameters: dict[str, Any],
 ) -> dict[str, Any]:
     money_context_keys = {
+        "capital_amount",
         "initial_capital",
         "starting_capital",
         "starting_principal",
@@ -426,6 +459,49 @@ def _extra_parameters_without_unrequested_money_context(
             continue
         cleaned[key] = value
     return cleaned
+
+
+def _extra_parameters_for_position_sizing(
+    extra_parameters: dict[str, Any],
+) -> dict[str, Any]:
+    cleaned = _extra_parameters_without_unrequested_money_context(extra_parameters)
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return cleaned
+    position_size_source = field_provenance.get("position_size")
+    if position_size_source in (None, ""):
+        return cleaned
+    cleaned_provenance = dict(cleaned.get("field_provenance") or {})
+    cleaned_provenance["position_size"] = position_size_source
+    cleaned["field_provenance"] = cleaned_provenance
+    return cleaned
+
+
+def _extra_parameters_without_position_size_context(
+    extra_parameters: dict[str, Any],
+) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    for key, value in extra_parameters.items():
+        if key == "position_size":
+            continue
+        if key == "field_provenance" and isinstance(value, dict):
+            provenance = dict(value)
+            provenance.pop("position_size", None)
+            if provenance:
+                cleaned[key] = provenance
+            continue
+        cleaned[key] = value
+    return cleaned
+
+
+def _strategy_field_provenance_value(
+    strategy: StrategySummary,
+    field_name: str,
+) -> str:
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return ""
+    return str(field_provenance.get(field_name) or "").strip()
 
 
 def _extra_parameters_without_unrequested_date_context(

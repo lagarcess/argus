@@ -15,6 +15,7 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
+from typing_extensions import NotRequired, TypedDict
 
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
@@ -27,6 +28,7 @@ from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
+AvatarTheme = Literal["ocean", "plum", "teal", "ember", "gold", "indigo", "slate"]
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
 BacktestJobStatus = Literal[
@@ -42,8 +44,23 @@ ArtifactLifecycle = Literal[
 ]
 EvidenceArtifactType = Literal["backtest"]
 DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
+DecisionActionAvailability = Literal[
+    "available",
+    "account_conversion_required",
+]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
+ConversationOperationStatus = Literal["idle", "queued", "running", "checking"]
+ConversationOperationKind = Literal["chat_turn", "backtest_job"]
+ConversationAttentionStatus = Literal[
+    "none",
+    "new_activity",
+    "manual_unread",
+    "needs_input",
+    "needs_attention",
+]
+
+DECISION_NOTE_WRITE_MAX_LENGTH = 500
 
 CHAT_STREAM_MAX_BODY_BYTES = 65_536
 CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH = 128
@@ -120,6 +137,7 @@ class User(BaseModel):
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
+    avatar_theme: AvatarTheme = "ocean"
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
@@ -149,14 +167,42 @@ class AccountCapabilities(BaseModel):
     can_submit_feedback: bool
 
 
+class GuestUser(BaseModel):
+    """Guest-safe profile projection without registered-only preferences."""
+
+    id: str
+    email: str | None
+    username: str | None = None
+    display_name: str | None = None
+    language: Language = "en"
+    locale: Locale = "en-US"
+    theme: Theme = "dark"
+    is_admin: bool = False
+    onboarding: OnboardingState = Field(default_factory=OnboardingState)
+    created_at: datetime
+    updated_at: datetime
+
+
+def guest_safe_user(user: User) -> GuestUser:
+    """Project a profile for a guest-facing response."""
+
+    return GuestUser.model_validate(user.model_dump())
+
+
 class UserResponse(BaseModel):
-    user: User
+    user: User | GuestUser
     account_kind: Literal["guest", "registered"]
     guest: GuestAccountSummary | None
     capabilities: AccountCapabilities
     public_account_access_enabled: bool = Field(
         description="Server-authoritative permission to expose ordinary account creation."
     )
+
+    @model_validator(mode="after")
+    def _hide_registered_preferences_from_guests(self) -> UserResponse:
+        if self.account_kind == "guest" and isinstance(self.user, User):
+            self.user = guest_safe_user(self.user)
+        return self
 
 
 class UsageWindow(BaseModel):
@@ -198,6 +244,7 @@ class ProfilePatch(BaseModel):
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
+    avatar_theme: AvatarTheme = "ocean"
 
 
 class ConversationCreate(BaseModel):
@@ -212,6 +259,47 @@ class ConversationPatch(BaseModel):
     deleted_at: datetime | None = None
 
 
+class ConversationOperation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: ConversationOperationStatus
+    kind: ConversationOperationKind | None = None
+    updated_at: datetime | None = None
+
+
+class ConversationAttention(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: ConversationAttentionStatus
+    cursor: str | None = None
+
+
+class ConversationActivity(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    operation: ConversationOperation
+    attention: ConversationAttention
+
+
+class ConversationActivityMarkUnread(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["mark_unread"]
+
+
+class ConversationActivityMarkRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["mark_read"]
+    through_attention_cursor: str | None = Field(default=None, max_length=256)
+
+
+ConversationActivityPatch = Annotated[
+    ConversationActivityMarkUnread | ConversationActivityMarkRead,
+    Field(discriminator="action"),
+]
+
+
 class Conversation(BaseModel):
     id: str
     title: str
@@ -223,6 +311,7 @@ class Conversation(BaseModel):
     updated_at: datetime
     last_message_preview: str | None = None
     language: Language | None = None
+    activity: ConversationActivity | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -463,7 +552,10 @@ class DecisionNote(BaseModel):
 
 class DecisionNoteCreate(BaseModel):
     decision_state: DecisionState
-    note: str | None = Field(default=None, max_length=2000)
+    note: str | None = Field(
+        default=None,
+        max_length=DECISION_NOTE_WRITE_MAX_LENGTH,
+    )
 
     @field_validator("note")
     @classmethod
@@ -479,6 +571,19 @@ class DecisionNoteResponse(BaseModel):
     evidence_artifact: EvidenceArtifact
 
 
+class HistoryItemWire(TypedDict):
+    type: Literal["chat", "strategy", "collection", "run"]
+    id: str
+    title: str
+    title_source: NotRequired[NameSource]
+    subtitle: str
+    pinned: bool
+    created_at: datetime
+    conversation_id: str | None
+    expires_at: datetime | None
+    activity: NotRequired[ConversationActivity]
+
+
 class HistoryItem(BaseModel):
     type: Literal["chat", "strategy", "collection", "run"]
     id: str
@@ -490,15 +595,26 @@ class HistoryItem(BaseModel):
     created_at: datetime
     conversation_id: str | None = None
     expires_at: datetime | None = None
+    # Chat items only; non-chat records omit the additive projection.
+    activity: ConversationActivity | None = None
 
-    @model_serializer(mode="wrap")
-    def _omit_absent_title_source(
-        self, handler: SerializerFunctionWrapHandler
-    ) -> dict[str, Any]:
-        # The contract keeps title_source absent, not null, on non-chat items.
-        data = handler(self)
-        if data.get("title_source") is None:
-            data.pop("title_source", None)
+    @model_serializer(mode="plain", return_type=HistoryItemWire)
+    def _omit_absent_chat_fields(self) -> HistoryItemWire:
+        # Return Python values for Pydantic to serialize against the wire type.
+        data: HistoryItemWire = {
+            "type": self.type,
+            "id": self.id,
+            "title": self.title,
+            "subtitle": self.subtitle,
+            "pinned": self.pinned,
+            "created_at": self.created_at,
+            "conversation_id": self.conversation_id,
+            "expires_at": self.expires_at,
+        }
+        if self.title_source is not None:
+            data["title_source"] = self.title_source
+        if self.activity is not None:
+            data["activity"] = self.activity
         return data
 
 
@@ -507,25 +623,150 @@ class PaginatedHistory(BaseModel):
     next_cursor: str | None = None
 
 
+class SearchDossierDecision(BaseModel):
+    state: DecisionState
+    note: str | None = Field(default=None, max_length=2000)
+    run_label: str | None = Field(default=None, max_length=160)
+
+
+class SearchDossierMetric(BaseModel):
+    name: str = Field(max_length=80)
+    value: str | int | float
+
+
+class SearchDossierOutcome(BaseModel):
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    benchmark_symbol: str | None = Field(default=None, max_length=24)
+    quick_take: str | None = Field(default=None, max_length=500)
+    metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
+
+
+class SearchRetestAction(BaseModel):
+    """Bounded typed retest envelope (spec 2.2).
+
+    Carries identity and policy only. The executable setup is reloaded
+    server-side from the owner-scoped source run, so no client value can
+    reach canonical state.
+    """
+
+    type: Literal["retest_run"] = "retest_run"
+    source_run_id: str
+    run_label: str = Field(max_length=160)
+    window_policy: Literal["same_duration_ending_today"] = (
+        "same_duration_ending_today"
+    )
+    contract_version: Literal["argus_retest_run/v1"] = "argus_retest_run/v1"
+
+
+class SearchDecisionAction(BaseModel):
+    type: Literal["decision"] = "decision"
+    availability: DecisionActionAvailability
+    evidence_artifact_id: str
+    decision_state: DecisionState | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    run_label: str = Field(max_length=160)
+
+
+SearchDossierAction = Annotated[
+    SearchRetestAction | SearchDecisionAction,
+    Field(discriminator="type"),
+]
+
+
+class RunDossierTested(BaseModel):
+    symbols: list[str] = Field(default_factory=list, max_length=5)
+    strategy_family: str | None = Field(default=None, max_length=80)
+    cadence: str | None = Field(default=None, max_length=24)
+    timeframe: str | None = Field(default=None, max_length=24)
+    start_date: date | None = None
+    end_date: date | None = None
+
+
+class RunDossier(BaseModel):
+    run_id: str
+    run_label: str = Field(max_length=160)
+    completed_at: datetime
+    result_message_id: str | None = None
+    tested: RunDossierTested
+    outcome: SearchDossierOutcome
+    decision: SearchDossierDecision | None = None
+    actions: list[SearchDossierAction] = Field(default_factory=list, max_length=2)
+
+
+class PaginatedRunDossiers(BaseModel):
+    items: list[RunDossier]
+    next_cursor: str | None = None
+    total_runs: int = Field(ge=0)
+    decided_runs: int = Field(ge=0)
+
+
+SearchMatchLayer = Literal[
+    "conversation",
+    "message",
+    "run",
+    "idea",
+    "evidence",
+    "decision",
+]
+
+
+class SearchMatch(BaseModel):
+    layer: SearchMatchLayer
+    fragment: str = Field(max_length=500)
+    count: int = Field(ge=1)
+    message_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_message_anchor(self) -> SearchMatch:
+        if (self.layer == "message") != (self.message_id is not None):
+            raise ValueError("message_id must be present only for message matches")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_message_id(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        if data.get("message_id") is None:
+            data.pop("message_id", None)
+        return data
+
+
 class SearchItem(BaseModel):
-    type: Literal[
-        "chat",
-        "strategy",
-        "collection",
-        "run",
-        "backtest",
-        "evidence",
-        "decision",
-        "idea",
-    ]
+    type: Literal["conversation"]
     id: str
     title: str
+    archived: bool
     matched_text: str
     updated_at: datetime
-    conversation_id: str | None = None
-    lifecycle: ArtifactLifecycle | None = None
-    decision_state: DecisionState | None = None
-    preview: dict[str, Any] | None = None
+    conversation_id: str
+    match: SearchMatch
+    dossier: RunDossier | None
+    total_runs: int = Field(ge=0)
+    decided_runs: int = Field(ge=0)
+    # Bounded conversation aggregate used for decision filters and counts.
+    # The dossier separately carries the latest decision.
+    decision_states: tuple[DecisionState, ...] = ()
+
+
+class SearchAssetDecisionCounts(BaseModel):
+    promising: int = Field(ge=0)
+    watching: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+    revisit_later: int = Field(ge=0)
+
+
+class SearchAssetRollup(BaseModel):
+    type: Literal["asset_rollup"] = "asset_rollup"
+    symbol: str = Field(min_length=1, max_length=24)
+    run_count: int = Field(ge=1)
+    decision_counts: SearchAssetDecisionCounts
+    last_touched_at: datetime
+
+
+SearchResultItem = Annotated[
+    SearchItem | SearchAssetRollup,
+    Field(discriminator="type"),
+]
 
 
 class SearchLedgerGroup(BaseModel):
@@ -534,7 +775,7 @@ class SearchLedgerGroup(BaseModel):
 
 
 class PaginatedSearch(BaseModel):
-    items: list[SearchItem]
+    items: list[SearchResultItem]
     next_cursor: str | None = None
     ledger_groups: list[SearchLedgerGroup] | None = None
 
@@ -551,6 +792,7 @@ ChatActionType = Literal[
     "retry_failed_action",
     "select_response_option",
     "select_discovery_candidate",
+    "retest_run",
 ]
 
 
@@ -697,14 +939,75 @@ def _context_depth(value: Any) -> int:
 class SignupRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str = Field(min_length=1, max_length=4096)
     language: Language = "en"
     display_name: str | None = None
     username: str | None = None
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().casefold()
+        return normalized or None
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+    captcha_token: str = Field(min_length=1, max_length=4096)
+
+
+class AccessRequestCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    email: str = Field(min_length=3, max_length=320)
+    language: Language
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+
+class AccessRequestAccepted(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    accepted: Literal[True]
+
+
+class AccessApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if (
+            "@" not in normalized
+            or normalized.startswith("@")
+            or normalized.endswith("@")
+            or any(character.isspace() for character in normalized)
+        ):
+            raise ValueError("invalid_email")
+        return normalized
+
+
+class AccessApprovalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    approved: Literal[True] = True
 
 
 class GuestBootstrapRequest(BaseModel):
@@ -714,6 +1017,7 @@ class GuestBootstrapRequest(BaseModel):
 
 GuestConversionReason = Literal[
     "second_simulation",
+    "simulation_limit",
     "message_limit",
     "save_decision",
     "new_conversation",

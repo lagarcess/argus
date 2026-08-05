@@ -530,12 +530,16 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
         assert kwargs["fallback_selected_thread_metadata"]["requested_field"] == (
             "initial_capital"
         )
+        assert kwargs["fallback_selected_thread_metadata"]["strategy_path_id"] == (
+            clarification_message.id
+        )
         yield {"type": "stage_start", "stage": "interpret"}
         yield {
             "type": "final",
             "payload": {
                 "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL buy and hold.",
+                "strategy_path_id": clarification_message.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "buy_and_hold",
@@ -557,7 +561,7 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
-    create_message(
+    clarification_message = create_message(
         user_id=user_id,
         conversation_id=conversation["id"],
         role="assistant",
@@ -577,7 +581,15 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
     assert final["confirmation"]["summary"]
+    assert final["strategy_path_id"] == clarification_message.id
     assert captured["thread_id"] == conversation["id"]
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    assert persisted[-1]["metadata"]["strategy_path_id"] == clarification_message.id
+    assert persisted[-1]["metadata"]["confirmation_payload"][
+        "optional_parameters"
+    ]["initial_capital"]["value"] == 10000
 
 
 def test_adjust_assumptions_action_round_trips_pending_edit_after_reload(
@@ -2134,9 +2146,10 @@ def test_response_option_action_accepts_the_current_recovery_message_identity(
     assert captured["fallback_selected_thread_metadata"] == {
         "latest_task_type": "backtest_execution",
         "last_stage_outcome": "await_user_reply",
-        "fallback_source": "validated_response_option_source",
-        "validated_source_assistant_id": current_recovery.id,
-        "response_intent": _timeframe_recovery_metadata("NVDA")["response_intent"],
+            "fallback_source": "validated_response_option_source",
+            "validated_source_assistant_id": current_recovery.id,
+            "strategy_path_id": current_recovery.id,
+            "response_intent": _timeframe_recovery_metadata("NVDA")["response_intent"],
         "clarification": _timeframe_recovery_metadata("NVDA")["clarification"],
         "requested_field": "timeframe",
     }
@@ -2995,6 +3008,122 @@ def test_refine_strategy_action_preserves_completed_dca_fields_after_reload() ->
     assert strategy["comparison_baseline"] == "SPY"
 
 
+def test_issue_345_compare_recommendation_uses_persisted_result_after_reload() -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    realism = {"enabled": True, "fee_bps": 40.0, "slippage_bps": 0.25}
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["WMT", "HD", "TGT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 20.6}}},
+        config_snapshot={
+            "template": "dca_accumulation",
+            "symbols": ["WMT", "HD", "TGT"],
+            "date_range": {"start": "2021-01-04", "end": "2025-12-31"},
+            "resolved_strategy": {
+                "strategy_type": "dca_accumulation",
+                "asset_universe": ["WMT", "HD", "TGT"],
+                "asset_class": "equity",
+                "date_range": {
+                    "start": "2021-01-04",
+                    "end": "2025-12-31",
+                },
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "capital_amount": 1000,
+                "recurring_contribution": 1000,
+                "cadence": "weekly",
+                "benchmark_symbol": "SPY",
+                "engine_config": {"_execution_realism": dict(realism)},
+            },
+            "engine_config": {"_execution_realism": dict(realism)},
+        },
+        conversation_result_card={
+            "title": "WMT, HD, TGT DCA Accumulation",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": ["40 bps fees", "0.25 bps slippage"],
+            "actions": [],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I tested that idea.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+            "next_experiments": {
+                "version": "argus_next_experiments/v1",
+                "rows": [
+                    {
+                        "kind": "compare_buy_and_hold",
+                        "label": "Compare with buy and hold",
+                        "label_key": (
+                            "chat.next_experiments.labels.compare_buy_and_hold"
+                        ),
+                    }
+                ],
+            },
+        },
+    )
+    api_state.reset_agent_runtime_workflow(app)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Compare with buy and hold",
+                "labelKey": "chat.next_experiments.labels.compare_buy_and_hold",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run.id,
+                    "next_experiment_kind": "compare_buy_and_hold",
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["stage_outcome"] == "await_approval"
+    strategy = final["confirmation_payload"]["strategy"]
+    assert strategy["strategy_type"] == "buy_and_hold"
+    assert strategy["asset_universe"] == ["WMT", "HD", "TGT"]
+    assert strategy["date_range"] == {
+        "start": "2021-01-04",
+        "end": "2025-12-31",
+    }
+    assert strategy["capital_amount"] == 1000
+    assert strategy["timeframe"] == "1D"
+    assert strategy["comparison_baseline"] == "SPY"
+    assert strategy["extra_parameters"]["fee_rate"] == 0.004
+    assert strategy["extra_parameters"]["slippage"] == 0.000025
+
+
 def test_review_one_replay_preserves_result_artifact_through_date_patch(
     monkeypatch,
 ) -> None:
@@ -3296,8 +3425,9 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
         yield {
             "type": "final",
             "payload": {
-                "stage_outcome": "ready_for_confirmation",
+                "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL recurring buys.",
+                "source_result_run_id": run.id,
                 "confirmation_payload": {
                     "strategy": {
                         "strategy_type": "dca_accumulation",
@@ -3326,6 +3456,18 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
 
     assert response.status_code == 200
     assert captured["message"].startswith("i want to do recurrent biweekly")
+    [final] = _stream_payloads(response.text, "final")
+    assert final["source_result_run_id"] == run.id
+
+    persisted = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    persisted_confirmation = persisted[-1]
+    assert persisted_confirmation["role"] == "assistant"
+    assert persisted_confirmation["metadata"]["source_result_run_id"] == run.id
+    assert persisted_confirmation["metadata"]["confirmation_payload"] == final[
+        "confirmation_payload"
+    ]
 
 
 def test_refine_strategy_action_uses_card_run_before_runtime_memory(
@@ -5106,6 +5248,91 @@ def _seed_completed_run(user_id: str, conversation_id: str) -> str:
     api_state.store.backtest_runs[run_id] = run
     api_state.store.backtest_run_owners[run_id] = user_id
     return run_id
+
+
+@pytest.mark.parametrize(
+    "next_experiment_kind",
+    ["change_date_range", "compare_buy_and_hold"],
+)
+def test_historical_recommendation_action_loads_card_run_before_runtime(
+    monkeypatch,
+    next_experiment_kind: str,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Captured the historical action context.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+
+    historical_run_id = _seed_completed_run(user_id, conversation["id"])
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Historical AAPL result.",
+        metadata={
+            "result_run_id": historical_run_id,
+            "latest_run_id": historical_run_id,
+            "result_card": {"title": "Historical AAPL result"},
+        },
+    )
+    latest_run_id = _seed_completed_run(user_id, conversation["id"])
+    latest_run = api_state.store.backtest_runs[latest_run_id]
+    latest_run.symbols = ["MSFT"]
+    latest_run.config_snapshot = {"template": "buy_and_hold", "symbols": ["MSFT"]}
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Latest MSFT result.",
+        metadata={
+            "result_run_id": latest_run_id,
+            "latest_run_id": latest_run_id,
+            "result_card": {"title": "Latest MSFT result"},
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Try next",
+                "presentation": "result",
+                "payload": {
+                    "run_id": historical_run_id,
+                    "next_experiment_kind": next_experiment_kind,
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.latest_backtest_result_reference is not None
+    assert snapshot.latest_backtest_result_reference.artifact_id == latest_run_id
+    references = captured["fallback_artifact_references"]
+    assert {reference.artifact_id for reference in references} == {
+        historical_run_id,
+        latest_run_id,
+    }
 
 
 def _fact_answer_metadata(run_id: str) -> dict[str, Any]:

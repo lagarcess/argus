@@ -227,7 +227,7 @@ async def request_id_middleware(request: Request, call_next):  # type: ignore[no
     try:
         response = await call_next(request)
     except Exception:
-        logger.error(
+        logger.exception(
             "Unexpected API failure",
             request_id=request_id,
             method=request.method,

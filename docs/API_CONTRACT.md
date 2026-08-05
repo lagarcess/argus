@@ -383,6 +383,7 @@ non-product operations:
 
 - `GET /health`
 - `GET /internal/readiness`
+- `POST /internal/access-requests/approve`
 - `POST /api/v1/dev/reset`
 
 No public `/api/v1` product route may be hidden by a prefix or wildcard
@@ -1429,7 +1430,31 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
 - `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
 - Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
-- The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
+- `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
+  `{"email":"person@example.com","language":"en"}` where `language` is exactly
+  `en` or `es-419`. Every syntactically valid new, duplicate, approved,
+  disabled, or concurrent request returns HTTP `202` with
+  `{"accepted":true}`; it must not reveal allowlist state.
+- Access-request failures use RFC 9457 Problem Details: untrusted browser
+  origins return `403` / `csrf_origin_rejected`, rate limiting returns `429` /
+  `too_many_requests` with `Retry-After`, and unavailable persistence returns
+  `503` / `access_request_unavailable`.
+- An access request may insert only a missing `requested` row with normalized
+  email and the requested language. It must never overwrite an existing
+  requested, approved, privileged, or disabled row. `requested` and unknown
+  roles do not grant permanent access.
+- `POST /internal/access-requests/approve` is an ops-token-protected,
+  non-product operation excluded from the public OpenAPI artifact by exact
+  method and path. It loads one active requested row and its language, sends
+  one localized approval email linking to
+  `${ARGUS_APP_ORIGIN}/?auth=signup`, then compare-and-sets
+  `role=requested AND disabled_at IS NULL` to `role=user`. Missing
+  configuration, missing or disabled state, SMTP failure, and a compare-and-set
+  miss do not return success. Missing or invalid ops authorization returns
+  `404`.
+- The allowlist remains intentionally narrow: `email`, `role`, `language`,
+  `disabled_at`, `created_at`, and `updated_at`. The approval notification does
+  not pre-create an Auth user or create an invite/password-setup flow.
 - Access is not controlled by a frontend flag or comma-separated deployed env var.
 
 **Browser session cookies:**
@@ -1525,9 +1550,11 @@ defaults to `true` and controls presentation only. The independent
 - `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
   update to add verified email/password credentials to the current anonymous
   identity. The browser supplies its current rotated session refresh token;
-  the original bootstrap cookie is only a backward-compatible fallback. It is
-  available only when the server enables public account access and preserves
-  the Auth UUID.
+  the original bootstrap cookie is only a backward-compatible fallback. The
+  route preserves the Auth UUID and uses `permanent_account_access_allowed` as
+  its sole permanent-account gate: when public account access is disabled,
+  only active allowlisted roles may link; when enabled, any email not explicitly
+  disabled may link.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
   pending action to a ten-minute handoff without resolving whether that account
@@ -1554,7 +1581,7 @@ defaults to `true` and controls presentation only. The independent
   and server capabilities with the ordinary profile.
 
 The response includes `user`, `account_kind`, a nullable `guest` summary with
-expiry plus limits `1/10/1/5`, typed `capabilities`, and the
+expiry plus limits `1/10/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
@@ -1597,11 +1624,18 @@ Create account.
 {
   "email": "user@email.com",
   "password": "string",
+  "captcha_token": "bounded-turnstile-token",
   "display_name": "Lucas",
   "username": "lucas",
   "language": "es-419"
 }
 ```
+
+**CAPTCHA:**
+- `captcha_token` is required and must contain 1–4,096 characters.
+- The browser acquires a fresh token for each signup submission through the
+  existing Turnstile boundary. Argus passes it to Supabase Auth and never logs
+  or persists it.
 
 **Language persistence:**
 - The private-alpha web client sends its selected `language` (`en` or `es-419`)
@@ -1618,15 +1652,28 @@ Create account.
 ```json
 {
   "user": {},
-  "session": {}
+  "session": null
 }
 ```
+
+`session` is an auth-session object when signup immediately establishes a
+session. It is `null` when email confirmation is required; the client must show
+the existing localized check-your-email state and must not redirect to chat.
 
 **Private-alpha blocked response:** signup intentionally returns the same
 generic `400 auth_signup_failed` shape used for provider signup failures, while
 still checking the allowlist before calling Supabase Auth signup. Public signup
 attempts must not distinguish unlisted/disabled private-alpha emails from
 listed emails that fail provider signup.
+
+When an optional username is supplied, the server trims and case-folds it and
+serializes same-email and same-username signup attempts before checking profile
+availability and creating the Auth user. A conflict for an email that can
+create a new Auth user returns `409 username_taken`; the Auth provider and
+profile write are not called for the losing request. If the Auth email already
+exists, Argus preserves Supabase's public duplicate-signup response instead of
+letting the username check reveal that account. An obfuscated response with an
+empty identity list never creates a profile.
 
 ```json
 {
@@ -1644,11 +1691,17 @@ listed emails that fail provider signup.
 **Request:**
 ```json
 {
-  "identifier": "user@email.com",
-  "password": "string"
+  "email": "user@email.com",
+  "password": "string",
+  "captcha_token": "bounded-turnstile-token"
 }
 ```
-*Note: `identifier` may be email. Username login is deferred unless explicitly implemented.*
+
+Username login is deferred unless explicitly implemented.
+
+`captcha_token` is required and bounded to 1–4,096 characters. The browser
+acquires a fresh token for each password-login submission; Argus forwards it to
+Supabase Auth without logging or persistence.
 
 **Response:**
 ```json
@@ -1700,6 +1753,8 @@ csrf_origin_rejected` problem response and does not clear cookies.
 }
 ```
 
+Guest sessions omit registered-account preferences, including `avatar_theme`.
+
 ---
 
 # 8. User / Preferences
@@ -1719,6 +1774,7 @@ Retrieve the current authenticated user profile and preferences.
     "language": "en",
     "locale": "en-US",
     "theme": "dark",
+    "avatar_theme": "ocean",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -1781,30 +1837,31 @@ create or increment a counter.
 }
 ```
 
-Guests receive the same typed resource keys with `hour` and `day` set to
-`null`. Their real fixed-lifetime counter is returned as `guest_session`; for
-example, message usage at 8/10 reports `used: 8`, `remaining: 2`, the workspace
-expiry as `period_end`, and `limiting_window: "guest_session"`. A 1/1 guest
-simulation counter reports `available_now: false`. Guest responses never
-fabricate registered hour/day windows.
+Guests receive the same typed resource keys with `hour` and `guest_session`
+set to `null`. Their visitor-owned UTC-day counter is returned as `day`; for
+example, message usage at 8/10 reports `used: 8`, `remaining: 2`, UTC midnight
+as `period_end`, and `limiting_window: "day"`. A 2/2 guest simulation counter
+reports `available_now: false`. The separate workspace-lifetime ceiling is
+enforced during admission and is not misrepresented as another UI reset
+window.
 
 **Allowance semantics:**
 - `messages` reports the `chat_messages` counters; `backtests` reports the
   `backtest_runs` counters charged by unique durable simulation admission.
 - Registered accounts receive both active UTC calendar windows. Guests receive
-  only the fixed `guest_session` window. Every populated window carries the
+  only the visitor-owned UTC `day` window. Every populated window carries the
   exact backend-owned `period_end`; clients may localize its display, but must
   not infer or replace it with a countdown, local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
   concurrent in-flight turns settle, and `remaining` clamps at zero.
 - `available_now` is backend-derived: for registered accounts it is true when
-  both calendar windows have capacity; for guests it follows the one fixed
-  session window.
+  both calendar windows have capacity; for guests it follows the visitor-owned
+  UTC `day` window. The separate workspace ceiling is admission-only.
 - `limiting_window` is backend-derived: registered accounts use the calendar
   window with the smaller remaining capacity (`day` on ties), while guests use
-  `guest_session`. The frontend must not compute, estimate, or hardcode quota
-  truth; it renders these derived fields.
+  `day`. The frontend must not compute, estimate, or hardcode quota truth; it
+  renders these derived fields.
 - The UI emphasizes the daily allowance and reveals the hourly window whenever
   `limiting_window` is `hour` or the hourly window is exhausted.
 
@@ -1838,7 +1895,8 @@ Update profile preferences. Partial update semantics are supported.
   "display_name": "Lucas",
   "language": "es",
   "locale": "es-419",
-  "theme": "dark"
+  "theme": "dark",
+  "avatar_theme": "plum"
 }
 ```
 
@@ -1853,6 +1911,11 @@ Update profile preferences. Partial update semantics are supported.
 - Clients may send only the fields that changed.
 - Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- `avatar_theme` accepts only `ocean`, `plum`, `teal`, `ember`, `gold`,
+  `indigo`, or `slate`; it cannot be `null`, and invalid values return 422.
+- Avatar themes are registered-account preferences. Guests cannot update a
+  profile, and guest-facing `/me` and `/auth/session` responses omit
+  `avatar_theme`.
 - A legacy `onboarding` object from an old client is ignored; the API cannot
   write onboarding state.
 
@@ -1932,7 +1995,18 @@ What remains is inert compatibility state only:
     {
       "id": "uuid",
       "title": "...",
-      "updated_at": "timestamp"
+      "updated_at": "timestamp",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
     }
   ],
   "next_cursor": null
@@ -1993,6 +2067,73 @@ Rename, pin, archive, or restore a soft-deleted conversation.
 *Note: User-provided title changes set `title_source = user_renamed`.*
 *Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
 
+Every emitted `Conversation` includes the additive `activity` projection,
+including create, guest replacement, patch, and paginated list responses. The
+schema field remains optional for wire compatibility, but this API version does
+not omit it from emitted conversation records.
+
+## Conversation activity
+
+`GET /api/v1/conversations/{id}/activity` returns the current projection.
+`PATCH /api/v1/conversations/{id}/activity` accepts exactly one of:
+
+```json
+{ "action": "mark_unread" }
+```
+
+```json
+{
+  "action": "mark_read",
+  "through_attention_cursor": "opaque-cursor-or-null"
+}
+```
+
+Both endpoints return:
+
+```json
+{
+  "operation": {
+    "status": "idle | queued | running | checking",
+    "kind": "chat_turn | backtest_job | null",
+    "updated_at": "timestamp-or-null"
+  },
+  "attention": {
+    "status": "none | new_activity | manual_unread | needs_input | needs_attention",
+    "cursor": "opaque-cursor-or-null"
+  }
+}
+```
+
+Operation precedence is `running > queued > checking > idle`; equal states use
+the newest source timestamp, then prefer a backtest job. Accepted turns and
+queued jobs are `queued`; running turns/jobs are `running`. A succeeded job is
+`checking` until its completed Run and evidence identity can be hydrated.
+
+Completed turns and hydrateable succeeded jobs produce `new_activity` beyond
+the read boundary. Existing typed `await_user_reply`, `needs_clarification`,
+and `await_approval` outcomes produce `needs_input`. Existing terminal
+lifecycle/job failures produce `needs_attention`; this contract adds no failure
+taxonomy or recovery behavior. Classification never matches message prose.
+
+`mark_unread` preserves the read-through boundary and is idempotent while the
+manual flag is already set. It requires a registered account. `mark_read(null)`
+clears only that manual flag. `mark_read(cursor)` also advances monotonically
+through the server-verified terminal boundary; a newer completion therefore
+remains unseen.
+
+Attention cursors are versioned and opaque and encode only source kind and
+UUID. The server reloads the timestamp and revalidates owner, conversation, and
+terminal eligibility under lock. Missing, deleted, foreign, or guest-out-of-
+workspace conversations return `404 not_found`; guest `mark_unread` returns
+`403 account_conversion_required`; a well-shaped but invalid/stale source
+returns `409 attention_cursor_conflict`; malformed actions or cursor shapes
+return `422`. All errors use the standard RFC 9457 Problem Details envelope.
+
+Activity reads may perform the existing evidence-based stale-turn
+reconciliation, bounded to 20 rows across at most 100 supplied task ids. They
+never mutate read state. Conversation ordering, pagination cursors, previews,
+and `conversations.updated_at` are unchanged.
+
 ## `DELETE /conversations/{id}`
 
 Soft delete conversation.
@@ -2004,11 +2145,101 @@ Soft delete conversation.
 }
 ```
 
+## `GET /api/v1/conversations/{conversation_id}/run-dossiers`
+
+Returns a lazy, newest-first page of finalized evidence-backed runs for one
+owned conversation.
+
+**Query Params:**
+
+- `limit`: optional, defaults to `20`, minimum `1`, maximum `100`.
+- `cursor`: optional opaque keyset cursor over the previous page's final
+  `(completed_at, run_id)` row.
+
+A row is eligible only when its BacktestRun is completed and has an owned
+EvidenceArtifact in the same conversation. Failed, incomplete, or
+evidence-less runs do not appear and do not contribute to `total_runs` or
+`decided_runs`. `decided_runs` counts eligible runs whose selected evidence
+artifact has a current DecisionNote.
+
+The owner must match the conversation and every projected child record. A guest
+may read only its active guest workspace conversation. Missing, deleted,
+foreign, and out-of-workspace conversations all return the existing
+non-leaking `404 Conversation not found` response. Malformed, stale, foreign,
+or no-longer-eligible cursor pivots return `400 validation_error` with
+`Invalid cursor.`
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "run_id": "uuid",
+      "run_label": "Weekly GLD pullback",
+      "completed_at": "timestamp",
+      "result_message_id": "uuid-or-null",
+      "tested": {
+        "symbols": ["GLD"],
+        "strategy_family": "indicator_threshold",
+        "cadence": null,
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-12-31"
+      },
+      "outcome": {
+        "run_label": "Weekly GLD pullback",
+        "completed_at": "timestamp",
+        "benchmark_symbol": "SPY",
+        "quick_take": "GLD held up better than SPY.",
+        "metrics": [
+          { "name": "total_return_pct", "value": 8.4 }
+        ]
+      },
+      "decision": {
+        "state": "watching",
+        "note": "Hold through earnings.\nReview risk first.",
+        "run_label": "Weekly GLD pullback"
+      },
+      "actions": [
+        {
+          "type": "decision",
+          "availability": "available",
+          "evidence_artifact_id": "uuid",
+          "decision_state": "watching",
+          "note": "Hold through earnings.\nReview risk first.",
+          "run_label": "Weekly GLD pullback"
+        }
+      ]
+    }
+  ],
+  "next_cursor": null,
+  "total_runs": 1,
+  "decided_runs": 1
+}
+```
+
+`result_message_id` prefers the latest owned assistant message whose metadata
+contains a non-empty `result_card` and points to that exact run through
+`result_run_id` or `latest_run_id`. When no such result-card message exists, it
+falls back to the latest owned assistant pointer for legacy history; it is
+`null` when neither exists. Notes preserve internal whitespace and newlines
+within the existing 2,000-character bound. Actions are deterministic, bounded
+to two, and always target the same run/evidence pair as their row. The endpoint
+stores nothing and makes no LLM, provider, or market-data call.
+
 ## `GET /conversations/{id}/messages`
 
 **Query Params:**
 - `limit`
 - `cursor`
+- `anchor_message_id`: optional owner-scoped message id. It is mutually
+  exclusive with `cursor` and returns one bounded page beginning with the
+  anchor (inclusive), followed by later messages in canonical
+  `(created_at, id)` order. Missing, foreign, or cross-conversation anchors
+  return `404` without revealing whether the message exists. Clients that need
+  the complete later transcript must follow `next_cursor` without repeating
+  `anchor_message_id`.
 
 **Response:**
 ```json
@@ -2070,6 +2301,24 @@ Soft delete conversation.
   A valid action reaches LangGraph with the pending strategy and continuity
   artifacts recovered from that exact source message, not from a newer
   checkpoint draft.
+- `retest_run` replays a stored supported experiment onto today's matching
+  window. Its payload is a bounded v1 envelope containing exactly
+  `source_run_id`, `window_policy: "same_duration_ending_today"`, and
+  `contract_version: "argus_retest_run/v1"`; any other key, value, or a
+  `source_run_id` that is not a UUID is rejected. Client display copy is
+  non-authoritative and never persisted. Before persisting the request or
+  invoking the runtime, the backend verifies that the source run and its
+  source conversation belong to the user, that the action conversation equals
+  the source conversation, and that the run is completed with finalized
+  evidence identity; it then reloads every executable field from the stored
+  run rather than from any client value. Missing, malformed, foreign,
+  unfinished, deleted, or cross-conversation sources fail uniformly with `409
+  artifact_action_invalid_state`, so they stay indistinguishable from each
+  other. The action makes no LLM, research, discovery, or market-data provider
+  call, always stops at a Ready-to-run confirmation, and never executes a
+  backtest; a transient materialization failure after the accepted user turn
+  reuses the existing retryable `runtime_failure` recovery whose in-place Retry
+  replays the persisted typed action.
 
 ### Conversation Artifact Continuity Contract
 
@@ -2188,7 +2437,10 @@ Contract rules:
   latest result; reload hydrates the response and this sidecar from persisted
   message metadata without re-querying any provider.
 - Typed discovery recovery uses the standard `recovery` object with codes
-  `discovery_unavailable`, `discovery_search_failed` (retryable),
+  `discovery_unavailable` (non-retryable when Search is disabled, missing its
+  configured credentials, or receives HTTP 401/403),
+  `discovery_search_failed` (retryable for temporary timeout, transport, other
+  HTTP, malformed-provider-response, extraction, or voicing failures),
   `discovery_no_verified_candidates`, `discovery_suggestions_unavailable`
   (retryable; the model-knowledge path failed), `discovery_limit_reached`
   (retained; an exhausted allowance now falls through to the model-knowledge
@@ -2817,6 +3069,20 @@ localized sentence a tap submits as an ordinary user turn). The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
 
+When the user selects `change_date_range` or `compare_buy_and_hold`, the web
+client submits a result-presented `refine_strategy` action whose payload carries
+the source `run_id` and `next_experiment_kind`. The backend seeds the follow-up
+from that owner-scoped canonical result draft. Buy-and-hold applies its typed
+patch immediately; a date-range row opens a date-only clarification and applies
+the user's bounded date answer to the anchored draft. All omitted,
+still-applicable owned facts carry forward, including modeled fees, slippage,
+and their provenance. Other Try next kinds keep the ordinary conversational
+turn path. The action label remains localized presentation copy; it is not the
+source of recommendation semantics. The date-only question follows the normal
+model-voiced clarification path with `prompt_source = llm_generated` when the
+clarifier succeeds. Deterministic copy is limited to the existing typed offline
+path and must declare `prompt_source = degraded_fallback`.
+
 ```json
 "next_experiments": {
   "version": "argus_next_experiments/v1",
@@ -2990,6 +3256,11 @@ Server behavior:
 }
 ```
 
+`note` is optional and accepts at most 500 characters on every new or repeated
+write. Read projections continue to return previously accepted notes up to the
+existing 2,000-character transport bound so tightening authoring does not hide
+or corrupt legacy user text.
+
 `decision_state` enum:
 - `watching`
 - `promising`
@@ -3068,7 +3339,18 @@ Mixed recent activity feed.
       "pinned": false,
       "created_at": "timestamp",
       "conversation_id": "uuid",
-      "expires_at": "timestamp or null"
+      "expires_at": "timestamp or null",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
     }
   ],
   "next_cursor": null
@@ -3079,6 +3361,11 @@ Mixed recent activity feed.
 | user_renamed`, mirroring the conversation record). While it is
 `system_default`, clients should render a localized "New chat" placeholder
 instead of the stored default title.
+
+`activity` is present on every `chat` item, including the guest workspace row,
+and omitted from `run`, `strategy`, and `collection` items. It is projected in
+one bounded owner-scoped batch after the History page is selected, so it cannot
+change mixed-feed ordering or cursors.
 
 A verified guest receives at most its one workspace-bound conversation.
 `expires_at` is the exact fixed workspace expiry. Clients may localize its
@@ -3092,78 +3379,112 @@ sign-in path for keeping history.
 
 ## `GET /search`
 
-Global omni-search across conversations and typed recall objects.
+Deterministic omni-search over a conversation-shaped memory read model. Each
+conversation appears at most once; its runs, ideas, evidence, and decisions
+feed the dossier and never become separate rows.
 
 For guests, this endpoint is current-workspace search, not Grounded Discovery:
 results are restricted to the one owned temporary conversation and its
-conversation-linked chat, run/backtest, Idea, EvidenceArtifact, and Decision
-records. Strategy and Collection destinations, ledger groups, other owners,
+conversation-linked canonical records. Ledger groups, other owners,
 and provider/model/runtime metadata are excluded. Grounded Discovery remains a
 separate chat capability and reports `can_use_grounded_discovery=true` for both
 account classes; its backend allowance and typed limit recovery do not alter
 the `/search` contract.
 
 **Query Params:**
-- `q`
+- `q`: required string, maximum 512 Unicode code points
 - `limit`
 - `cursor`
-- `decision_state`: optional Idea Ledger browse filter. Valid values:
+- `decision_state`: optional conversation decision filter. It returns
+  conversations holding that state. Valid values:
   `watching`, `promising`, `rejected`, `revisit_later`.
 - `include_ledger_groups`: optional boolean. When true, the response includes
-  backend-owned Idea Ledger decision-state groups and counts.
+  backend-owned conversation decision-state groups and exact counts.
+- `conversation_id`: optional repeated conversation id for bounded Recents
+  dossier hydration. At most 50 ids are accepted. This mode requires empty
+  `q`, no `cursor` or `decision_state`, and `limit` greater than or equal to
+  the number of unique requested ids. Returned conversation rows include
+  canonical `archived` state so an already-open Recents surface can remove a
+  conversation archived elsewhere without hiding archived conversations from
+  ordinary Omnisearch.
 
 **Response:**
 ```json
 {
   "items": [
     {
-      "type": "chat",
-      "id": "uuid",
-      "title": "Tesla Dip Strategy",
-      "matched_text": "...",
-      "updated_at": "timestamp",
-      "conversation_id": "uuid",
-      "lifecycle": null,
-      "preview": null
+      "type": "asset_rollup",
+      "symbol": "GLD",
+      "run_count": 2,
+      "decision_counts": {
+        "promising": 0,
+        "watching": 1,
+        "rejected": 0,
+        "revisit_later": 0
+      },
+      "last_touched_at": "timestamp"
     },
     {
-      "type": "evidence",
+      "type": "conversation",
       "id": "uuid",
-      "title": "AAPL, MSFT Buy and Hold",
-      "matched_text": "AAPL and MSFT were tested against SPY.",
+      "title": "Gold pullback ideas",
+      "archived": false,
+      "matched_text": "Hold through earnings.",
       "updated_at": "timestamp",
       "conversation_id": "uuid",
-      "lifecycle": "captured",
-      "preview": {
-        "digest": "AAPL and MSFT were tested against SPY.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
-        "assumptions": ["Benchmark: SPY", "No fees"],
-        "metrics_summary": {
-          "total_return_pct": 12.5
+      "match": {
+        "layer": "message",
+        "fragment": "Hold through earnings.",
+        "count": 2,
+        "message_id": "uuid"
+      },
+      "decision_states": ["watching"],
+      "total_runs": 2,
+      "decided_runs": 1,
+      "dossier": {
+        "run_id": "uuid",
+        "run_label": "Weekly GLD pullback",
+        "completed_at": "timestamp",
+        "result_message_id": "uuid",
+        "tested": {
+          "symbols": ["GLD"],
+          "strategy_family": "indicator_threshold",
+          "cadence": null,
+          "timeframe": "1D",
+          "start_date": "2025-01-01",
+          "end_date": "2026-07-29"
         },
-        "quick_take": "AAPL and MSFT beat SPY in this historical test."
-      }
-    },
-    {
-      "type": "decision",
-      "id": "uuid",
-      "title": "AAPL, MSFT Buy and Hold",
-      "matched_text": "Track it. · AAPL and MSFT were tested against SPY.",
-      "updated_at": "timestamp",
-      "conversation_id": "uuid",
-      "lifecycle": "decided",
-      "preview": {
-        "decision_state": "watching",
-        "note": "Track it.",
-        "digest": "AAPL and MSFT were tested against SPY.",
-        "symbols": ["AAPL", "MSFT"],
-        "benchmark_symbol": "SPY",
-        "assumptions": ["Benchmark: SPY", "No fees"],
-        "metrics_summary": {
-          "total_return_pct": 12.5
+        "outcome": {
+          "run_label": "Weekly GLD pullback",
+          "completed_at": "timestamp",
+          "benchmark_symbol": "SPY",
+          "quick_take": "GLD held up better than SPY.",
+          "metrics": [
+            { "name": "total_return_pct", "value": 8.4 }
+          ]
         },
-        "quick_take": "AAPL and MSFT beat SPY in this historical test."
+        "decision": {
+          "state": "watching",
+          "note": "Hold through earnings.\nReview risk first.",
+          "run_label": "Weekly GLD pullback"
+        },
+        "actions": [
+          {
+            "type": "retest_run",
+            "source_run_id": "uuid",
+            "run_label": "Weekly GLD pullback",
+            "window_policy": "same_duration_ending_today",
+            "contract_version": "argus_retest_run/v1"
+          },
+          {
+            "type": "decision",
+            "availability": "available",
+            "evidence_artifact_id": "uuid",
+            "decision_state": "watching",
+            "note": "Hold through earnings.\nReview risk first.",
+            "run_label": "Weekly GLD pullback"
+          }
+        ]
       }
     }
   ],
@@ -3177,57 +3498,151 @@ the `/search` contract.
 }
 ```
 
-`type` enum:
-- `chat`
-- `strategy`
-- `collection`
-- `run`
-- `backtest`
-- `idea`
-- `evidence`
-- `decision`
+`type` is `asset_rollup` or `conversation`. When a single-token exact or
+unambiguous prefix query matches a canonical symbol from the owner's completed
+runs, the response places one `asset_rollup` above the conversation rows. It
+summarizes completed runs involving that symbol; a multi-asset run counts once
+under each involved symbol. Each decision count comes from the latest
+owner-scoped DecisionNote reached through that run's EvidenceArtifact, so one
+run contributes to at most one decision state. `last_touched_at` is the latest
+activity on those runs or their evidence/decision lineage.
 
-**Decision preview (recall) fields:** a `decision` item's `preview` carries the
-decision-first recall projection assembled from existing canonical facts:
-`decision_state`, `note` (the user's stored note, verbatim — never
-concatenated with the digest), `digest` (the linked evidence artifact's own
-digest), and, when the evidence payload has them, the same bounded fields as
-an `evidence` preview (`quick_take`, `symbols`, `benchmark_symbol`,
-`assumptions`, `metrics_summary`). Absent facts are omitted rather than
-invented; `matched_text` keeps the legacy note·digest match display. No field
-ever includes `*_id` keys, and assembling the preview makes zero LLM or
-provider calls.
+Text recall requires at least one normalized token with three characters. A
+single symbol-shaped query is separately eligible at two characters so stored
+symbols such as `BA` can resolve through the bounded symbol index without
+opening broad two-character text search. An exact stored-symbol query returns
+the rollup plus the normal bounded, cursor-safe conversation rows whose
+completed runs contain that symbol. A merely unambiguous symbol prefix may
+still return only the rollup. One-character, whitespace-containing, and
+non-alphanumeric symbol queries remain deferred.
+
+The asset rollup is an additive presentation row. It is outside the
+conversation `limit`, ranking, decision filter, ledger grouping, and cursor
+sequence; it has no conversation id or management actions and cannot become a
+cursor pivot. Conversation `id` and `conversation_id` are always the same
+canonical conversation id.
+
+`match` is the bounded provenance for the winning searchable layer. `layer` is
+one of `conversation`, `message`, `run`, `idea`, `evidence`, or `decision`;
+`fragment` is the bounded display text and `count` is the number of matches in
+that winning layer. `message_id` is present only when `layer = message`. It is
+an owner-scoped jump anchor for the normal conversation message read above.
+
+`dossier` is either `null` or one completed evidence-backed run. It is `null`
+only for ordinary conversation/message/idea recall that has no finalized
+evidence-backed run; in that case `total_runs = 0` and `decided_runs = 0`.
+Every present dossier anchors its run identity, tested setup, outcome, current
+decision, result-message anchor, and actions to the same run/evidence pair.
+Lists are bounded to five symbols and four typed metrics. A decision note is
+the user's exact bounded note with internal newlines preserved. New writes are
+bounded to 500 characters, while read projections retain the existing 2,000-
+character compatibility bound for legacy notes. `total_runs`
+and `decided_runs` are backend-owned full-lineage counts, not page totals.
+
+`dossier.actions` is a bounded, backend-owned list. It contains at most one
+`retest_run` action followed by at most one `decision` action:
+
+- `retest_run` is projected only from the selected supported completed
+  evidence-backed run dossier. It carries identity and policy only:
+  `source_run_id`, a display-only `run_label`, the fixed
+  `window_policy: "same_duration_ending_today"`, and
+  `contract_version: "argus_retest_run/v1"`. It carries no executable setup and
+  no generated prompt, so a client cannot supply canonical state. The backend
+  reloads every executable field from the owner-scoped stored run when the
+  action is submitted, preserves the original inclusive window length, and
+  shifts that window to end on the current date. Eligibility and admission
+  share one reconstruction, so the action is offered only when the backend can
+  faithfully materialize the confirmation - including under the
+  execution-realism kill switch, which would otherwise idealize a costed run.
+  If the stored facts are absent, conflicting, or unfaithful, the backend omits
+  the action instead of guessing. Submitting it reaches the normal Ready-to-run
+  confirmation and never directly executes a backtest.
+- `decision` targets the latest evidence artifact for that same latest run.
+  Its optional state and note describe the current decision on that exact
+  artifact. Its required `availability` is either `available` or
+  `account_conversion_required`. Only `available` may reach the existing
+  owner-checked, idempotent
+  `POST /evidence-artifacts/{artifact_id}/decision` contract; the client then
+  re-reads `/search` as canonical truth. Activating
+  `account_conversion_required` opens the account-conversion gate without
+  attempting the mutation. After successful conversion, the client re-reads
+  canonical dossier truth and may resume the same run/artifact action once.
+
+The action ids are narrow, opaque mutation targets for those two explicit
+owner actions. They are not searchable content and do not authorize access by
+themselves. Eligible guest dossiers retain the `decision` action with
+`availability: "account_conversion_required"`; `can_save_decision` remains
+false and direct guest writes still fail with `403 account_conversion_required`.
+Asset rollups have no `actions` field. Unsupported or incomplete stored run
+shapes omit `retest_run` rather than guessing.
+
+During rolling frontend/API deployments, conversion-gated decision actions are
+projected only when the request advertises
+`X-Argus-Client-Capabilities: dossier_decision_conversion_v1`. A missing or
+unknown signal preserves the legacy omission for accounts that cannot save
+decisions, so an already-open older client cannot mistake action presence for
+write access. Overlong signals are rejected by request validation. Registered
+`availability: "available"` projection is unchanged. This header is an additive
+presentation-compatibility handshake, not authorization or account-policy
+truth; the account context and mutation endpoint continue to own those
+boundaries. The same rule applies to `GET /search` and
+`GET /conversations/{conversation_id}/run-dossiers`.
 
 **Ranking Logic:**
 Results are ranked by:
 1. **Pinned Boost**: Pinned items always appear first.
 2. **Exact Match**: Full title/name match.
-3. **Symbol Match**: Match against symbols in strategies/backtests.
-4. **P1 Artifact Priority**: Backtest, Evidence, Decision, and Idea results
-   rank ahead of source conversation wrappers within the same relevance tier.
-5. **Recency**: Sorted by `updated_at` within same relevance and type tier.
-6. **Basic Text Relevance**: Keyword matching in metadata.
+3. **Symbol Match**: Match against symbols in backtests.
+4. **Object Priority**: Decision/evidence/idea/run matches beat user-message
+   matches, which beat conversation wrapper text.
+5. **Recency**: Sorted by latest canonical activity.
+6. **Basic Text Relevance**: Exact and prefix-oriented metadata matching.
 
 **Search Scope:**
 Search is limited to:
 - Titles and Names
 - Symbols
 - Last message preview (Conversations)
-- Collection names
-- Strategy template labels (e.g. "RSI Mean Reversion")
-- P1 evidence digests, idea summaries, decision state/note text, and sanitized
-  preview metadata.
+- User-authored message content (assistant/system/tool content is excluded)
+- Backtest symbols and strategy families
+- Evidence digests, idea summaries, and decision state/note text.
 
-*Note: Alpha search does not perform deep indexing of full message bodies or complex template parameters.*
+Alpha search does not return raw transcript rows or expose full transcripts in
+the search response. It selects one bounded user-message fragment and count for
+the conversation row; opening that row uses the typed message anchor. Complex
+template parameters remain outside the search index.
 
-P1 previews must be sanitized owner-only summaries. They must not expose raw
+The dossier is an owner-scoped, bounded projection. It never exposes raw
 context packets, route receipts, provider/model metadata, retry payloads,
-conversation transcripts, private memory, internal source-run ids, or internal
-artifact implementation fields. Object identity and product type are carried by
-the top-level `id`, `type`, `conversation_id`, and `lifecycle` fields; `preview`
-is reserved for grounded display context such as digest, symbols, benchmark,
-assumptions, compact metrics summaries, quick take, and breakdown context when
-available.
+conversation transcripts, or general internal ids. The only id exceptions are
+the opaque latest-run and latest-evidence targets inside the typed actions
+described above. Search and dossier/action assembly make zero LLM or
+market-data provider calls. Asset recognition uses only canonical symbols
+stored on owned completed BacktestRuns; it does not resolve aliases or call an
+asset resolver/provider. Archived conversations remain eligible, soft-deleted
+conversations are excluded, and guest rollups are restricted to the active
+owned guest workspace.
+
+Persistent asset rollups resolve a bounded set of raw-casefolded symbol
+prefixes through the five canonical BacktestRun symbol slots before reading
+evidence or decisions. Once an exact or unambiguous stored symbol is selected,
+only that symbol's indexed run lineage is aggregated. Memory mode mirrors this
+shape with a non-durable, revision-keyed in-process index over canonical
+records: canonical writes invalidate it, while consecutive palette keystrokes
+read bounded postings rather than copying or projecting the full transcript.
+Exact Idea Ledger counts use the same revision snapshot's non-durable SQLite
+FTS5 trigram index plus per-candidate normalized-token rechecks and pre-indexed
+conversation/decision-state membership. Each revision indexes at most 20,000
+eligible, non-empty normalized ledger candidates. If a revision contains more,
+every non-empty indexable ledger query fails closed before FTS traversal,
+exact or short-token rechecks, deduplication, or aggregation, returning
+`503 search_temporarily_unavailable` with no partial counts. Registered
+empty-query counts are precomputed with the revision, while guest empty-query
+counts use the single keyed conversation membership. Under the cap, the query
+returns all four exact aggregate groups directly without a per-keystroke Python
+candidate scan.
+This cache is runtime acceleration only; it is not a durable recall model,
+summary, RAG surface, or alternate source of truth.
 
 When `include_ledger_groups=true`, `ledger_groups` is the source of truth for
 Idea Ledger group order and counts. Empty groups must be returned with
@@ -3235,9 +3650,19 @@ Idea Ledger group order and counts. Empty groups must be returned with
 Clients localize the stable `decision_state` enum for display, but must keep the
 enum value from the backend attached to filters, pills, and grouped rows.
 
-For typed P1 objects, Omnisearch treats artifacts as first-class results and
-the source conversation as provenance. Evidence-like objects do not expose chat
-owner actions such as rename, archive, or delete.
+Empty `q` returns recents-first conversation rows. Archived conversations remain
+eligible and soft-deleted conversations are excluded before ranking and limits.
+When `conversation_id` is supplied, ranking and cursor pagination do not apply:
+the response contains only those requested, owner-visible, non-deleted
+conversation dossiers and `next_cursor = null`. Missing, foreign, or deleted
+ids are omitted without revealing ownership. This is one bounded read for the
+at-most-50 chats already visible in History; clients must not replace it with
+one request per row or an automatic walk through unrelated ranked pages.
+For a non-empty query, text recall begins only when at least one normalized
+token has three characters. One- and two-character ordinary or partial text
+does not read transcript or artifact haystacks; the palette asks the user to
+keep typing. The exact stored-symbol exception above reads only completed-run
+symbol lineage. This protects the bounded per-keystroke read contract.
 
 *Future semantic retrieval may extend this endpoint.*
 

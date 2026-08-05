@@ -16,3 +16,11 @@ _LEGACY_GOAL_PREFIX = "__ONBOARDING_GOAL__:"
 
 def is_legacy_onboarding_marker(content: str) -> bool:
     return content == _LEGACY_SKIP_MARKER or content.startswith(_LEGACY_GOAL_PREFIX)
+
+
+def legacy_onboarding_sql_filters() -> tuple[str, str]:
+    """Return exact and escaped LIKE filters for persistent read surfaces."""
+    escaped_goal_prefix = (
+        _LEGACY_GOAL_PREFIX.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    )
+    return _LEGACY_SKIP_MARKER, f"{escaped_goal_prefix}%"

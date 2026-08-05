@@ -27,20 +27,43 @@ describe("shared starter actions", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const starter = readFileSync(
+      join(root, "components/chat/StarterActions.tsx"),
+      "utf-8",
+    );
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
+    const initialSession = readFileSync(
+      join(root, "components/chat/useInitialChatSession.ts"),
+      "utf-8",
+    );
+    const guestExperience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("<StarterActions");
-    expect(chat).toContain("onSelect={handleSend}");
-    expect(chat).toContain("if (isBootstrappingProfile) {");
-    expect(chat).toContain(
-      "disabled={isStreamingResponse || isHydratingConversation}",
-    );
+    expect(emptyChat).toContain("<StarterActions");
+    expect(chat).toContain("onSend={handleSend}");
+    expect(emptyChat).toContain("onSelect={onSend}");
+    expect(chat).toContain('profileState === "probing"');
+    expect(chat).toContain("guestSubmissionPending");
     expect(chat).toContain("hasAcceptedUserInputRef.current = true");
-    expect(chat).toContain(
-      "cancelled || hasAcceptedUserInputRef.current",
-    );
-    expect(chat.match(/<StarterActions/g)?.length).toBe(1);
-    expect(chat).not.toContain(
+    expect(initialSession).toContain("cancelled || hasAcceptedUserInputRef.current");
+    expect(emptyChat.match(/<StarterActions/g)?.length).toBe(1);
+    expect(`${chat}\n${emptyChat}`).not.toContain(
       "onClick={() => handleSend(t('chat.starter_actions.tsla.value'",
+    );
+    expect(starter).toMatch(/onSelect\(value,\s*\{\s*strategy_category\s*\}\)/);
+    expect(starter).not.toContain("captureGuestFunnelEvent");
+    expect(guestExperience).toContain("startGuestSession");
+    expect(`${chat}\n${guestExperience}`).toContain("captureGuestFunnelEvent");
+    const admissionOwner = guestExperience.slice(
+      guestExperience.indexOf("const admitSend"),
+    );
+    expect(admissionOwner.indexOf("startGuestSession")).toBeLessThan(
+      admissionOwner.indexOf("getUsageAllowances"),
     );
   });
 });

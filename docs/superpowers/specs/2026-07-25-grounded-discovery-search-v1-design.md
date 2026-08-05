@@ -445,6 +445,15 @@ voice preferred, deterministic i18n fallback):
 | Results but zero validated candidates | `discovery_no_verified_candidates` | Honest "found sources but couldn't verify tradable matches"; may name unverified names in prose; asks for a symbol. |
 | Per-user discovery allowance exhausted | existing quota shape (`429` semantics in-chat) | Honest limit message with reset framing, consistent with Usage truth. |
 
+> **Reconciled 2026-08-02**
+> ([issue #344](https://github.com/garcesjose/argus/issues/344)):
+> missing provider configuration and HTTP 401/403 authorization failures are
+> durable availability failures, so they use non-retryable
+> `discovery_unavailable`. Timeouts, transport errors, other HTTP failures,
+> malformed provider responses, and later composition failures retain
+> retryable `discovery_search_failed`. This narrows the original generic
+> provider-error row; it does not add automatic retry or provider fallback.
+
 - Never: a model-memory shortlist presented as current, silent empty response,
   erased draft/result context, or provider-name leakage.
   > **Reconciled 2026-07-28** (`2026-07-27-discovery-continuity-and-cheap-verified-rows.md`):

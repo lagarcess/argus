@@ -548,7 +548,14 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
             model = payload["model"]
             posts.append((schema_name, model))
             content = "{}"
-            if schema_name == "FocusedStrategyExtraction":
+            if schema_name == "LLMAssetMentionExtraction":
+                content = json.dumps(
+                    {
+                        "asset_mentions": [],
+                        "all_traded_asset_mentions_included": True,
+                    }
+                )
+            elif schema_name == "FocusedStrategyExtraction":
                 content = json.dumps(
                     {
                         "is_testable_strategy": True,

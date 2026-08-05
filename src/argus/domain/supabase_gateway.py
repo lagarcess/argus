@@ -40,12 +40,19 @@ from argus.domain.postgres_keyset_reader import (
     ConversationKeysetCursorError,
     PostgresKeysetReader,
 )
+from argus.domain.postgres_run_dossier_reader import (
+    PostgresRunDossierReader,
+    RunDossierSourcePage,
+)
 from argus.domain.postgres_search_reader import (
     PostgresSearchReader,
     SearchReadResult,
 )
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
+from argus.domain.supabase_conversation_activity import (
+    SupabaseConversationActivityMixin,
+)
 from argus.domain.supabase_conversation_messages import (
     ConversationMessagePersistenceMixin,
 )
@@ -55,6 +62,9 @@ from argus.domain.supabase_message_reads import (
     SupabaseMessageReadMixin,
     _distinct_chunks,
     _unique_owned_rows_by_id,
+)
+from argus.domain.supabase_message_reads import (
+    MessageAnchorError as MessageAnchorError,
 )
 from argus.domain.supabase_message_reads import (
     MessageCursorError as MessageCursorError,
@@ -105,6 +115,13 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+def _normalize_username(username: object) -> str | None:
+    if not isinstance(username, str):
+        return None
+    normalized = username.strip().casefold()
+    return normalized or None
+
+
 def _supabase_client_options() -> ClientOptions:
     return ClientOptions(
         httpx_client=httpx.Client(http2=False, timeout=120),
@@ -116,6 +133,7 @@ def _supabase_client_options() -> ClientOptions:
 class SupabaseGateway(
     GuestAccountPersistenceMixin,
     ChatTurnLifecycleGatewayMixin,
+    SupabaseConversationActivityMixin,
     SupabaseMessageReadMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
@@ -125,6 +143,7 @@ class SupabaseGateway(
     history_reader: PostgresHistoryReader | None = None
     search_reader: PostgresSearchReader | None = None
     keyset_reader: PostgresKeysetReader | None = None
+    run_dossier_reader: PostgresRunDossierReader | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -154,6 +173,7 @@ class SupabaseGateway(
             history_reader=history_reader,
             keyset_reader=PostgresKeysetReader(history_reader.pool),
             search_reader=PostgresSearchReader(history_reader.pool),
+            run_dossier_reader=PostgresRunDossierReader(history_reader.pool),
         )
 
     def new_id(self) -> str:
@@ -171,6 +191,7 @@ class SupabaseGateway(
         for table in (
             "feedback",
             "usage_counters",
+            "conversation_read_states",
             "chat_turn_lifecycles",
             "collection_strategies",
             "decision_notes",
@@ -269,6 +290,7 @@ class SupabaseGateway(
         self,
         email: str,
         password: str,
+        captcha_token: str,
         display_name: str | None = None,
         username: str | None = None,
         language: Language = "en",
@@ -284,7 +306,8 @@ class SupabaseGateway(
                             "display_name": display_name,
                             "username": username,
                             "language": language,
-                        }
+                        },
+                        "captcha_token": captcha_token,
                     },
                 }
             )
@@ -305,17 +328,69 @@ class SupabaseGateway(
         row = _row_one(rows)
         if not row or row.get("disabled_at") is not None:
             return None
-        role = str(row.get("role") or "user").strip().lower()
-        return role if role in {"admin", "developer", "user"} else "user"
+        role = str(row.get("role") or "").strip().lower()
+        return role if role in {"admin", "developer", "user"} else None
 
     def private_alpha_email_allowed(self, email: str) -> bool:
         return self.private_alpha_role_for_email(email) is not None
 
-    def login(self, email: str, password: str) -> dict[str, Any]:
+    def request_private_alpha_access(
+        self,
+        *,
+        email: str,
+        language: Language,
+    ) -> None:
+        self.client.table("private_alpha_allowlist").upsert(
+            {
+                "email": _normalize_email(email),
+                "role": "requested",
+                "language": language,
+            },
+            on_conflict="email",
+            ignore_duplicates=True,
+        ).execute()
+
+    def get_requested_private_alpha_access(self, email: str) -> dict[str, Any] | None:
+        rows = (
+            self.client.table("private_alpha_allowlist")
+            .select("email,role,language,disabled_at")
+            .eq("email", _normalize_email(email))
+            .eq("role", "requested")
+            .is_("disabled_at", "null")
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        if row is None or row.get("language") not in {"en", "es-419"}:
+            return None
+        return row
+
+    def approve_requested_private_alpha_access(self, *, email: str) -> bool:
+        updated = (
+            self.client.table("private_alpha_allowlist")
+            .update({"role": "user", "updated_at": _now_iso()})
+            .eq("email", _normalize_email(email))
+            .eq("role", "requested")
+            .is_("disabled_at", "null")
+            .execute()
+        )
+        row = _row_one(updated)
+        return bool(row and row.get("role") == "user")
+
+    def login(
+        self,
+        email: str,
+        password: str,
+        captcha_token: str,
+    ) -> dict[str, Any]:
         try:
             auth_client = self.auth_client or self.client
             response = auth_client.auth.sign_in_with_password(
-                {"email": email, "password": password}
+                {
+                    "email": email,
+                    "password": password,
+                    "options": {"captcha_token": captcha_token},
+                }
             )
             if not response.session:
                 raise RuntimeError("Login failed: No session returned.")
@@ -436,9 +511,7 @@ class SupabaseGateway(
                 f"and(updated_at.eq.{timestamp},id.lt.{canonical_cursor_id}))"
             )
             if cursor_pinned:
-                keyset_filter = (
-                    f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
-                )
+                keyset_filter = f"pinned.eq.false,and(pinned.eq.true,{within_tier})"
             else:
                 keyset_filter = f"and(pinned.eq.false,{within_tier})"
             query = query.or_(keyset_filter)
@@ -1540,19 +1613,46 @@ class SupabaseGateway(
         include_ledger_groups: bool = False,
         guest_scope: bool = False,
         guest_conversation_id: str | None = None,
+        conversation_ids: list[str] | None = None,
     ) -> SearchReadResult:
         if self.search_reader is None:
             raise RuntimeError("Persistent Search requires its Postgres reader.")
+        kwargs: dict[str, Any] = {
+            "user_id": user_id,
+            "query": query,
+            "source_limit": source_limit,
+            "cursor_updated_at": cursor_updated_at,
+            "cursor_id": cursor_id,
+            "decision_state": decision_state,
+            "include_ledger_groups": include_ledger_groups,
+            "guest_scope": guest_scope,
+            "guest_conversation_id": guest_conversation_id,
+        }
+        if conversation_ids is not None:
+            kwargs["conversation_ids"] = conversation_ids
         return self.search_reader.search_rows(
+            **kwargs,
+        )
+
+    def list_run_dossier_source_rows(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        limit: int,
+        cursor_completed_at: datetime | None,
+        cursor_run_id: str | None,
+    ) -> RunDossierSourcePage:
+        if self.run_dossier_reader is None:
+            raise RuntimeError(
+                "Persistent run dossier history requires its Postgres reader."
+            )
+        return self.run_dossier_reader.list_source_rows(
             user_id=user_id,
-            query=query,
-            source_limit=source_limit,
-            cursor_updated_at=cursor_updated_at,
-            cursor_id=cursor_id,
-            decision_state=decision_state,
-            include_ledger_groups=include_ledger_groups,
-            guest_scope=guest_scope,
-            guest_conversation_id=guest_conversation_id,
+            conversation_id=conversation_id,
+            limit=limit,
+            cursor_completed_at=cursor_completed_at,
+            cursor_run_id=cursor_run_id,
         )
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
@@ -1875,7 +1975,7 @@ class SupabaseGateway(
         payload = {
             "id": user_id,
             "email": email,
-            "username": user_metadata.get("username"),
+            "username": _normalize_username(user_metadata.get("username")),
             "display_name": user_metadata.get("display_name"),
             "language": language,
             "locale": _PROFILE_LOCALE_BY_LANGUAGE[language],

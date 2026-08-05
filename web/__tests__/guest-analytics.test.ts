@@ -37,15 +37,21 @@ describe("guest funnel analytics", () => {
     });
   });
 
-  test("records starter identity without sending its prompt value", () => {
+  test("routes starter identity to the authenticated send owner without prompt analytics", () => {
     const starter = readFileSync(
       join(root, "components/chat/StarterActions.tsx"),
       "utf-8",
     );
+    const guestExperience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
 
-    expect(starter).toContain('"starter_action_selected"');
     expect(starter).toContain("strategy_category");
-    expect(starter).not.toContain("prompt:");
+    expect(starter).toMatch(/onSelect\(value,\s*\{\s*strategy_category\s*\}\)/);
+    expect(starter).not.toContain("captureGuestFunnelEvent");
+    expect(guestExperience).toContain('event: "starter_action_selected"');
+    expect(guestExperience).toContain("strategy_category");
   });
 
   test("records each conversion exposure with its typed reason", () => {

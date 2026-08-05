@@ -6,20 +6,28 @@ import { useTranslation } from "react-i18next";
 import AuthForm, {
   type AuthFormMode,
   type AuthFormSubmission,
+  type AuthFormSubmissionResult,
 } from "@/components/auth/AuthForm";
+import RequestAccess from "@/components/auth/RequestAccess";
 import {
   guestConversionBenefitKey,
   type GuestConversionMode,
   type GuestConversionReason,
 } from "@/lib/guest-conversion";
+import { formatAllowancePeriodEnd } from "@/lib/usage-allowance";
 
 type GuestConversionModalProps = {
   isOpen: boolean;
   reason: GuestConversionReason;
   initialMode: GuestConversionMode;
   publicAccountAccessEnabled: boolean;
+  resetAt?: string | null;
+  resetKind?: "daily" | "workspace";
+  locale?: "en-US" | "es-419";
   onClose: () => void;
-  onAuthenticate: (submission: AuthFormSubmission) => Promise<void>;
+  onAuthenticate: (
+    submission: AuthFormSubmission,
+  ) => Promise<AuthFormSubmissionResult | void>;
 };
 
 export default function GuestConversionModal({
@@ -27,21 +35,30 @@ export default function GuestConversionModal({
   reason,
   initialMode,
   publicAccountAccessEnabled,
+  resetAt = null,
+  resetKind = "daily",
+  locale = "en-US",
   onClose,
   onAuthenticate,
 }: GuestConversionModalProps) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<AuthFormMode>(initialMode);
+  const [mode, setMode] = useState<AuthFormMode | "request">(
+    publicAccountAccessEnabled ? initialMode : "request",
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // This modal is mounted fresh for each open. Capture the trigger during
+  // render, before a child `autoFocus` can move focus inside the dialog.
+  const restoreFocusRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
 
   useEffect(() => {
     if (!isOpen) return;
-    restoreFocusRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    setMode(initialMode);
+    const restoreFocusTarget = restoreFocusRef.current;
+    setMode(publicAccountAccessEnabled ? initialMode : "request");
     const dialog = dialogRef.current;
     const focusable = dialog?.querySelector<HTMLElement>(
       'input, button, a[href], [tabindex]:not([tabindex="-1"])',
@@ -74,9 +91,9 @@ export default function GuestConversionModal({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      restoreFocusRef.current?.focus();
+      restoreFocusTarget?.focus();
     };
-  }, [initialMode, isOpen, onClose]);
+  }, [initialMode, isOpen, onClose, publicAccountAccessEnabled]);
 
   if (!isOpen) return null;
 
@@ -93,7 +110,7 @@ export default function GuestConversionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="guest-conversion-title"
-        className="relative w-full max-w-[440px] rounded-[28px] border border-black/10 bg-[#f9f9f9] p-6 shadow-2xl dark:border-white/10 dark:bg-[#1c1f24] sm:p-8"
+        className="relative w-full max-w-[440px] rounded-[20px] border border-black/10 bg-[#f9f9f9] p-6 dark:border-white/10 dark:bg-[#1c1f24] sm:p-8"
       >
         <button
           type="button"
@@ -103,39 +120,58 @@ export default function GuestConversionModal({
         >
           <X className="h-5 w-5" />
         </button>
-        <div className="mb-6 pr-12">
-          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
-            {t("guest.conversion.eyebrow", "Keep going with Argus")}
-          </p>
-          <h2
-            id="guest-conversion-title"
-            className="font-display mt-2 text-[24px] font-semibold tracking-tight text-black dark:text-white"
-          >
+        <p className="mb-2 pr-12 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+          {t("guest.conversion.eyebrow", "Keep going with Argus")}
+        </p>
+        {reason === "simulation_limit" && resetAt ? (
+          <p className="mb-5 pr-12 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
             {t(
-              mode === "signup"
-                ? "guest.conversion.create_title"
-                : "guest.conversion.sign_in_title",
-              mode === "signup" ? "Create your account" : "Sign in",
+              resetKind === "daily"
+                ? publicAccountAccessEnabled
+                  ? "guest.conversion.simulation_limit_reset"
+                  : "guest.conversion.simulation_limit_request_access"
+                : publicAccountAccessEnabled
+                  ? "guest.conversion.simulation_workspace_limit_reset"
+                  : "guest.conversion.simulation_workspace_limit_request_access",
+              {
+              date: formatAllowancePeriodEnd(resetAt, locale),
+              },
             )}
-          </h2>
-          <p className="mt-2 text-[14px] leading-relaxed text-black/55 dark:text-white/55">
-            {t(guestConversionBenefitKey(reason, mode))}
           </p>
-        </div>
-        {mode === "login" ? (
-          <AuthForm
-            mode="login"
-            allowModeSwitch={publicAccountAccessEnabled}
-            onModeChange={setMode}
-            onSubmit={onAuthenticate}
+        ) : null}
+        {mode === "request" ? (
+          <RequestAccess
+            headingId="guest-conversion-title"
+            embedded
+            onShowSignup={() => setMode("signup")}
+            onShowLogin={() => setMode("login")}
           />
         ) : (
-          <AuthForm
-            mode="signup"
-            allowModeSwitch={publicAccountAccessEnabled}
-            onModeChange={setMode}
-            onSubmit={onAuthenticate}
-          />
+          <>
+            <div className="mb-6 pr-12">
+              <h2
+                id="guest-conversion-title"
+                className="font-display text-[24px] font-semibold tracking-tight text-black dark:text-white"
+              >
+                {t(
+                  mode === "signup"
+                    ? "guest.conversion.create_title"
+                    : "guest.conversion.sign_in_title",
+                  mode === "signup" ? "Create your account" : "Sign in",
+                )}
+              </h2>
+              <p className="mt-2 text-[14px] leading-relaxed text-black/55 dark:text-white/55">
+                {t(guestConversionBenefitKey(reason, mode))}
+              </p>
+            </div>
+            <AuthForm
+              mode={mode}
+              allowModeSwitch={publicAccountAccessEnabled}
+              embedded
+              onModeChange={setMode}
+              onSubmit={onAuthenticate}
+            />
+          </>
         )}
       </div>
     </div>

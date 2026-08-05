@@ -14,6 +14,7 @@ from argus.agent_runtime.discovery.contracts import (
 from argus.agent_runtime.discovery.extraction import extract_candidates
 from argus.agent_runtime.discovery.model_knowledge import name_candidates
 from argus.agent_runtime.discovery.validation import validated_candidates
+from argus.agent_runtime.presentation_i18n import runtime_locale
 from argus.agent_runtime.recovery_messages import (
     RecoveryMessageCode,
     recovery_message,
@@ -116,6 +117,10 @@ async def discovery_stage_result_if_applicable(
         if exc.reason == "not_configured":
             usage["search_attempted"] = False
         usage["fallback_code"] = f"search_{exc.reason}"
+        permanently_unavailable = exc.reason in {
+            "not_configured",
+            "authentication_failed",
+        }
         logger.warning(
             "Grounded discovery search unavailable",
             reason=exc.reason,
@@ -123,8 +128,12 @@ async def discovery_stage_result_if_applicable(
         )
         return await _recovery_result(
             decision=decision,
-            code="discovery_search_failed",
-            retryable=True,
+            code=(
+                "discovery_unavailable"
+                if permanently_unavailable
+                else "discovery_search_failed"
+            ),
+            retryable=not permanently_unavailable,
             current_user_message=current_user_message,
             language=language,
             usage=usage,
@@ -368,6 +377,7 @@ async def _recovery_result(
 ) -> StageResult:
     voiced = await _voiced_discovery_recovery(
         code=code,
+        retryable=retryable,
         current_user_message=current_user_message,
         language=language,
         unverified_names=unverified_names or [],
@@ -378,14 +388,17 @@ async def _recovery_result(
     # prompt_source=llm_generated tells clients the voiced prose owns display;
     # without it (deterministic fallback), clients render localized copy from
     # the code.
-    assistant_response = voiced or recovery_message(code, retryable=retryable)
-    stage_patch: dict[str, Any] = {"assistant_response": assistant_response}
+    assistant_response = voiced or (
+        _NON_RETRYABLE_UNAVAILABLE_MESSAGES[runtime_locale(language)]
+        if code == "discovery_unavailable" and not retryable
+        else recovery_message(code, retryable=retryable)
+    )
+    stage_patch: dict[str, Any] = {
+        "assistant_response": assistant_response,
+        "recovery": {"code": code, "retryable": retryable},
+    }
     if voiced:
-        stage_patch["recovery"] = {
-            "code": code,
-            "retryable": retryable,
-            "prompt_source": "llm_generated",
-        }
+        stage_patch["recovery"]["prompt_source"] = "llm_generated"
     # retryable=True is the whole signal; the API layer owns the durable retry.
     if usage is not None:
         stage_patch["discovery_usage"] = usage
@@ -458,7 +471,7 @@ def _drop_reason_facts(
 
 _RECOVERY_VOICING_FACTS: dict[str, str] = {
     "discovery_unavailable": (
-        "Grounded source-backed discovery is not available right now, so you "
+        "Grounded source-backed discovery is not available for this request, so you "
         "cannot look up current candidates and you will not guess from memory."
     ),
     "discovery_search_failed": (
@@ -483,21 +496,64 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
     ),
 }
 
+_NON_RETRYABLE_NEXT_STEPS: dict[str, str] = {
+    "discovery_unavailable": (
+        "Do not suggest retrying now or later. Describe availability only as "
+        "unavailable for this request. Do not use time qualifiers or imply future "
+        "availability. Ask only for a specific symbol or company to test."
+    ),
+    "discovery_target_missing": (
+        "Do not suggest retrying. Do not describe discovery as unavailable. "
+        "Ask for a category or an anchor company to search."
+    ),
+    "discovery_no_verified_candidates": (
+        "Do not suggest retrying the same request. Do not describe discovery as "
+        "unavailable. Ask for a different category or a specific symbol or company "
+        "to test."
+    ),
+}
+
+_NON_RETRYABLE_UNAVAILABLE_MESSAGES = {
+    "en": (
+        "Current source-backed discovery is not available for this request, and I "
+        "will not guess from memory. Name a symbol or company you already have in "
+        "mind and I can test it. Everything in this chat is unchanged."
+    ),
+    "es-419": (
+        "La búsqueda actual respaldada por fuentes no está disponible para esta "
+        "solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa "
+        "que tengas en mente y puedo probarla. Todo en este chat sigue igual."
+    ),
+}
+
 
 async def _voiced_discovery_recovery(
     *,
     code: RecoveryMessageCode,
+    retryable: bool,
     current_user_message: str,
     language: str,
     unverified_names: list[str],
     uncorroborated_names: list[str] | None = None,
 ) -> str | None:
+    if code == "discovery_unavailable" and not retryable:
+        return None
     message = current_user_message.strip()
     facts = _RECOVERY_VOICING_FACTS.get(code)
     if not message or facts is None:
         return None
     facts += _drop_reason_facts(unverified_names, uncorroborated_names or [])
     language_instruction = response_language_instruction(language)
+    next_step_instruction = (
+        "Offer one concrete next step: ask again in a moment or name a specific "
+        "symbol or company to test."
+        if retryable
+        else _NON_RETRYABLE_NEXT_STEPS.get(
+            code,
+            "Do not suggest retrying the same request. Offer only a next step "
+            "supported by the stated situation.",
+        )
+    )
     messages = [
         {
             "role": "system",
@@ -506,8 +562,8 @@ async def _voiced_discovery_recovery(
                 "assistant. The user asked you to find or discover assets. "
                 f"Situation: {facts} {language_instruction} "
                 "Reply in at most two short plain sentences: state the "
-                "situation honestly, then one concrete next step (retry, or "
-                "name a symbol to test). No reassurance boilerplate, no "
+                f"situation honestly. {next_step_instruction} "
+                "No reassurance boilerplate, no "
                 "tradable asset suggestions from memory, no providers or "
                 "internal tools, no investment advice."
             ),

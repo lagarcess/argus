@@ -9,7 +9,7 @@ from contextvars import ContextVar, Token
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from loguru import logger
@@ -43,6 +43,7 @@ DEFAULT_STALE_RUNNING_SECONDS = 15 * 60
 class BacktestJobShadowContext:
     user_id: str
     conversation_id: str
+    account_kind: Literal["guest", "registered"]
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     idempotency_key: str | None = None

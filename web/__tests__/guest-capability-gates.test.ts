@@ -5,6 +5,7 @@ import {
   decideGuestMessageGate,
   decideGuestNewConversationGate,
   decideGuestSimulationGate,
+  guestSimulationPrecheckResetAt,
   isExactGuestRunReplay,
 } from "../lib/guest-capability-gates";
 
@@ -24,7 +25,7 @@ describe("guest capability gate policy", () => {
     ).toEqual({ kind: "allow" });
   });
 
-  test("allows exact replay before converting a second unique guest simulation", () => {
+  test("allows exact replay before converting a third unique guest simulation", () => {
     expect(
       decideGuestSimulationGate({
         accountKind: "guest",
@@ -38,7 +39,7 @@ describe("guest capability gate policy", () => {
         availableNow: false,
         exactReplay: false,
       }),
-    ).toEqual({ kind: "convert", reason: "second_simulation" });
+    ).toEqual({ kind: "convert", reason: "simulation_limit" });
     expect(
       isExactGuestRunReplay(
         [
@@ -71,6 +72,21 @@ describe("guest capability gate policy", () => {
         },
       ),
     ).toBe(false);
+  });
+
+  test("uses the visitor-day reset after a workspace renewal", () => {
+    const newWorkspaceExpiresAt = "2026-08-10T12:00:00Z";
+
+    expect(
+      guestSimulationPrecheckResetAt({
+        day: { period_end: "2026-08-04T00:00:00Z" },
+      }),
+    ).toBe("2026-08-04T00:00:00Z");
+    expect(
+      guestSimulationPrecheckResetAt({
+        day: { period_end: "2026-08-04T00:00:00Z" },
+      }),
+    ).not.toBe(newWorkspaceExpiresAt);
   });
 
   test("resets an empty guest chat and asks before replacing accepted content", () => {

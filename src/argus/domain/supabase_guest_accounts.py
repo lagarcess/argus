@@ -21,6 +21,24 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return data
 
 
+class EmailAlreadyRegisteredError(RuntimeError):
+    """The linking email already belongs to a permanent account."""
+
+
+def _email_already_registered_response(response: Any) -> bool:
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    if not isinstance(body, dict):
+        return False
+    code = str(body.get("error_code") or body.get("code") or "").strip().lower()
+    if code == "email_exists":
+        return True
+    message = str(body.get("msg") or body.get("message") or "").lower()
+    return "already" in message and "registered" in message
+
+
 class GuestAccountPersistenceMixin:
     """Supabase operations owned by the guest account and allowance spine."""
 
@@ -213,6 +231,10 @@ class GuestAccountPersistenceMixin:
                     json={"email": email, "password": password},
                 )
                 if not updated.is_success:
+                    if _email_already_registered_response(updated):
+                        raise EmailAlreadyRegisteredError(
+                            "The email already belongs to a permanent account."
+                        )
                     raise RuntimeError("Provider rejected anonymous identity linking.")
                 refreshed = client.post(
                     f"{auth_url}/auth/v1/token?grant_type=refresh_token",
@@ -222,6 +244,8 @@ class GuestAccountPersistenceMixin:
                 if not refreshed.is_success:
                     raise RuntimeError("Provider could not refresh the linked identity.")
                 payload = refreshed.json()
+        except EmailAlreadyRegisteredError:
+            raise
         except Exception as exc:
             raise RuntimeError("Anonymous identity linking failed.") from exc
 

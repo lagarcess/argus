@@ -58,10 +58,18 @@ class LLMAssetMentionCandidate(BaseModel):
 class LLMAssetMentionExtraction(BaseModel):
     asset_mentions: list[LLMAssetMentionCandidate] = Field(
         default_factory=list,
+        max_length=6,
         description=(
             "Provider-resolution candidates identified by the LLM from the current "
-            "message. Keep at most five distinct asset-like mentions."
+            "message. Keep at most six distinct asset-like mentions."
         ),
+    )
+    all_traded_asset_mentions_included: bool = Field(
+        description=(
+            "True only when every traded-asset or unknown asset-like mention in "
+            "the current message is present in asset_mentions. Set false when the "
+            "six-item limit omits any such mention."
+        )
     )
 
 
@@ -126,8 +134,8 @@ class LLMStrategyDraft(BaseModel):
     # reach a private attribute. A str span is fidelity-audit evidence bound to a
     # quote from the current message; a None span is typed edit-plan evidence,
     # which has no bounded quote.
-    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = (
-        PrivateAttr(default_factory=dict)
+    _validated_execution_cost_evidence: dict[str, tuple[float, str | None]] = PrivateAttr(
+        default_factory=dict
     )
 
     raw_user_phrasing: str | None = None
@@ -152,6 +160,22 @@ class LLMStrategyDraft(BaseModel):
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
+    asset_inclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "includes in an anchored artifact edit. Do not copy carried assets or "
+            "symbols the user excludes."
+        ),
+    )
+    asset_exclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Role-separated canonical asset symbols the current user explicitly "
+            "excludes from an anchored artifact edit. Do not treat exclusions as "
+            "members of asset_universe."
+        ),
+    )
     asset_universe_operation: Literal["append", "add", "replace"] | None = Field(
         default=None,
         description=(

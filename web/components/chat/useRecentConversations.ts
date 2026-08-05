@@ -14,15 +14,23 @@ import {
 } from "@/lib/argus-api";
 import {
   mergeRecentChats,
+  prepareFirstPageRecentChatsRefresh,
   projectConversationToRecentChat,
 } from "@/lib/chat-recents";
+import {
+  createConversationActivityCausalClock,
+  type ConversationActivityCausalClock,
+  type ConversationActivityHistorySnapshot,
+} from "@/lib/conversation-activity-state";
 
 type UseRecentConversationsOptions = Readonly<{
   guestExpiresAt?: string | null;
+  activityCausalClock?: ConversationActivityCausalClock;
 }>;
 
 type RecentConversationsState = {
   historyItems: HistoryItem[];
+  historyActivityRevision: number;
   setHistoryItems: Dispatch<SetStateAction<HistoryItem[]>>;
   historyNextCursor: string | null;
   isLoadingMoreHistory: boolean;
@@ -31,16 +39,59 @@ type RecentConversationsState = {
   loadHistoryPage: (
     nextCursor?: string | null,
     append?: boolean,
-  ) => Promise<void>;
+  ) => Promise<ConversationActivityHistorySnapshot>;
   clearHistory: () => void;
   loadMoreHistory: () => void;
   refreshHistory: () => void;
+  refreshHistoryForActivity: () => Promise<ConversationActivityHistorySnapshot>;
+};
+
+export type RecentHistoryActivityState = Readonly<{
+  historyItems: HistoryItem[];
+  historyActivityRevision: number;
+}>;
+
+export const applyRecentHistoryActivityUpdate = (
+  current: RecentHistoryActivityState,
+  update: SetStateAction<HistoryItem[]>,
+  revision: number,
+): RecentHistoryActivityState => ({
+  historyItems:
+    typeof update === "function" ? update(current.historyItems) : update,
+  historyActivityRevision: revision,
+});
+
+export const runHistoryRefreshSafely = (
+  refresh: () => Promise<ConversationActivityHistorySnapshot>,
+): void => {
+  void refresh().catch(() => undefined);
 };
 
 export function useRecentConversations({
   guestExpiresAt,
+  activityCausalClock,
 }: UseRecentConversationsOptions): RecentConversationsState {
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [fallbackActivityCausalClock] = useState(
+    createConversationActivityCausalClock,
+  );
+  const causalClock = activityCausalClock ?? fallbackActivityCausalClock;
+  const [historyActivityState, setHistoryActivityState] =
+    useState<RecentHistoryActivityState>({
+      historyItems: [],
+      historyActivityRevision: 0,
+    });
+  const { historyItems, historyActivityRevision } = historyActivityState;
+  const setHistoryItems = useCallback<
+    Dispatch<SetStateAction<HistoryItem[]>>
+  >(
+    (update) => {
+      const revision = causalClock.nextRevision();
+      setHistoryActivityState((current) =>
+        applyRecentHistoryActivityUpdate(current, update, revision),
+      );
+    },
+    [causalClock],
+  );
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(
     null,
   );
@@ -49,7 +100,10 @@ export function useRecentConversations({
     useState(false);
   const [historyLoadMoreError, setHistoryLoadMoreError] = useState(false);
   const paginationInFlightRef = useRef(false);
-  const pageRequestsRef = useRef(new Map<string, Promise<void>>());
+  const pageRequestsRef = useRef(
+    new Map<string, Promise<ConversationActivityHistorySnapshot>>(),
+  );
+  const firstPageConversationIdsRef = useRef<Set<string>>(new Set());
   const guestExpiresAtRef = useRef(guestExpiresAt);
 
   useEffect(() => {
@@ -61,6 +115,7 @@ export function useRecentConversations({
       const requestKey = nextCursor ?? "first-page";
       const existingRequest = pageRequestsRef.current.get(requestKey);
       if (existingRequest) return existingRequest;
+      const activityRevision = causalClock.nextRevision();
 
       const request = listConversations({
         limit: 30,
@@ -78,10 +133,30 @@ export function useRecentConversations({
                 guestExpiresAt: guestExpiresAtRef.current,
               }),
             );
-          setHistoryItems((current) =>
-            append ? mergeRecentChats(current, projected) : projected,
-          );
+          if (append) {
+            setHistoryActivityState((current) =>
+              applyRecentHistoryActivityUpdate(
+                current,
+                (items) => mergeRecentChats(items, projected),
+                activityRevision,
+              ),
+            );
+          } else {
+            const refresh = prepareFirstPageRecentChatsRefresh(
+              firstPageConversationIdsRef.current,
+              projected,
+            );
+            setHistoryActivityState((current) =>
+              applyRecentHistoryActivityUpdate(
+                current,
+                refresh.apply,
+                activityRevision,
+              ),
+            );
+            firstPageConversationIdsRef.current = refresh.nextFirstPageConversationIds;
+          }
           setHistoryNextCursor(next_cursor);
+          return { items: projected, revision: activityRevision };
         })
         .finally(() => {
           pageRequestsRef.current.delete(requestKey);
@@ -89,27 +164,36 @@ export function useRecentConversations({
       pageRequestsRef.current.set(requestKey, request);
       return request;
     },
-    [],
+    [causalClock],
   );
 
-  const refreshHistory = useCallback(() => {
+  const refreshHistoryForActivity = useCallback(() => {
     const runRefresh = () => loadHistoryPage(null, false);
     const inFlightFirstPage =
       pageRequestsRef.current.get("first-page");
     const refreshRequest = inFlightFirstPage
       ? inFlightFirstPage.then(runRefresh, runRefresh)
       : runRefresh();
-    void refreshRequest.catch(() => undefined);
+    return refreshRequest;
   }, [loadHistoryPage]);
 
+  const refreshHistory = useCallback(() => {
+    runHistoryRefreshSafely(refreshHistoryForActivity);
+  }, [refreshHistoryForActivity]);
+
   const clearHistory = useCallback(() => {
-    setHistoryItems([]);
+    const revision = causalClock.nextRevision();
+    setHistoryActivityState({
+      historyItems: [],
+      historyActivityRevision: revision,
+    });
     setHistoryNextCursor(null);
     setHasRequestedOlderHistory(false);
     setHistoryLoadMoreError(false);
     pageRequestsRef.current.clear();
+    firstPageConversationIdsRef.current.clear();
     paginationInFlightRef.current = false;
-  }, []);
+  }, [causalClock]);
 
   const loadMoreHistory = useCallback(() => {
     if (!historyNextCursor || paginationInFlightRef.current) return;
@@ -131,6 +215,7 @@ export function useRecentConversations({
 
   return {
     historyItems,
+    historyActivityRevision,
     setHistoryItems,
     historyNextCursor,
     isLoadingMoreHistory,
@@ -140,5 +225,6 @@ export function useRecentConversations({
     clearHistory,
     loadMoreHistory,
     refreshHistory,
+    refreshHistoryForActivity,
   };
 }

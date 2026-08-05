@@ -16,6 +16,26 @@ echo "🔵 [Setup] Enforcing safe environment variables..."
 export ENVIRONMENT=DEV
 export DONT_WRITE_BYTECODE=1
 export PYTHONUNBUFFERED=1
+export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+export NEXT_TELEMETRY_DISABLED=1
+
+# Codex Cloud runs setup and agent phases in separate shells. Persist the
+# pinned tool locations and telemetry setting so the agent phase uses the
+# versions installed here without writing Next.js CLI state into the checkout.
+SHELL_PROFILE="$HOME/.bashrc"
+touch "$SHELL_PROFILE"
+for shell_export in \
+    'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' \
+    'export NEXT_TELEMETRY_DISABLED=1'
+do
+    if ! grep -Fqx "$shell_export" "$SHELL_PROFILE"; then
+        printf '%s\n' "$shell_export" >> "$SHELL_PROFILE"
+    fi
+done
+
+# Keep local and Cloud setup aligned with the exact toolchain used by CI.
+PINNED_POETRY_VERSION="2.1.3"
+PINNED_BUN_VERSION="1.3.14"
 
 # ============================================================================
 # 1A. WORKTREE ENVIRONMENT FILES
@@ -30,12 +50,12 @@ echo "🔵 [Setup] Provisioning worktree environment files..."
 # a newer local Python resolves different dependency wheels and fakes test results.
 PINNED_PYTHON="$(cat .python-version 2>/dev/null || echo 3.10)"
 PINNED_MINOR="$(echo "$PINNED_PYTHON" | cut -d. -f1-2)"
-echo "🔵 [Setup] Resolving pinned Python ${PINNED_MINOR} (.python-version: ${PINNED_PYTHON})..."
+echo "🔵 [Setup] Resolving pinned Python ${PINNED_PYTHON}..."
 
 PYTHON_CMD=""
 if command -v uv &> /dev/null; then
-    uv python install "$PINNED_MINOR" >/dev/null 2>&1 || true
-    PYTHON_CMD="$(uv python find "$PINNED_MINOR" 2>/dev/null || true)"
+    uv python install "$PINNED_PYTHON" >/dev/null 2>&1 || true
+    PYTHON_CMD="$(uv python find "$PINNED_PYTHON" 2>/dev/null || true)"
 fi
 if [ -z "$PYTHON_CMD" ] && command -v "python$PINNED_MINOR" &> /dev/null; then
     PYTHON_CMD="python$PINNED_MINOR"
@@ -44,42 +64,57 @@ if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
 fi
 if [ -z "$PYTHON_CMD" ]; then
-    echo "❌ [Setup] Python not found. Install Python ${PINNED_MINOR} (e.g. 'uv python install ${PINNED_MINOR}')."
+    echo "❌ [Setup] Python not found. Install Python ${PINNED_PYTHON} (e.g. 'uv python install ${PINNED_PYTHON}')."
     exit 1
 fi
 
 PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
 echo "🔵 [Setup] Python version: $PYTHON_VERSION (command: $PYTHON_CMD)"
 
-if ! $PYTHON_CMD -c "import sys; sys.exit(0 if f'{sys.version_info[0]}.{sys.version_info[1]}' == '$PINNED_MINOR' else 1)"; then
-    echo "❌ [Setup] Python ${PINNED_MINOR} required (repo pin). Found: $PYTHON_VERSION"
-    echo "   Install it with: uv python install ${PINNED_MINOR}"
+if ! $PYTHON_CMD -c "import platform, sys; sys.exit(0 if platform.python_version() == '$PINNED_PYTHON' else 1)"; then
+    echo "❌ [Setup] Python ${PINNED_PYTHON} required (repo pin). Found: $PYTHON_VERSION"
+    echo "   Install it with: uv python install ${PINNED_PYTHON}"
     exit 1
 fi
 
 # ============================================================================
-# 3. INSTALL POETRY (if needed)
+# 3. INSTALL PINNED POETRY
 # ============================================================================
-echo "🔵 [Setup] Checking Poetry..."
-if ! command -v poetry &> /dev/null; then
-    echo "🔵 [Setup] Installing Poetry (Official Installer)..."
-    curl -sSL https://install.python-poetry.org | python3 -
-    export PATH="$HOME/.local/bin:$PATH"
-else
-    echo "🟢 [Setup] Poetry is already installed: $(poetry --version)"
+echo "🔵 [Setup] Checking Poetry ${PINNED_POETRY_VERSION}..."
+CURRENT_POETRY_VERSION=""
+if command -v poetry &> /dev/null; then
+    CURRENT_POETRY_VERSION="$(poetry --version 2>/dev/null | sed -E 's/^Poetry \(version ([^)]+)\)$/\1/')"
 fi
+if [ "$CURRENT_POETRY_VERSION" != "$PINNED_POETRY_VERSION" ]; then
+    echo "🔵 [Setup] Installing Poetry ${PINNED_POETRY_VERSION} (Official Installer)..."
+    curl -sSL https://install.python-poetry.org | \
+        POETRY_VERSION="$PINNED_POETRY_VERSION" "$PYTHON_CMD" -
+fi
+CURRENT_POETRY_VERSION="$(poetry --version 2>/dev/null | sed -E 's/^Poetry \(version ([^)]+)\)$/\1/')"
+if [ "$CURRENT_POETRY_VERSION" != "$PINNED_POETRY_VERSION" ]; then
+    echo "❌ [Setup] Poetry ${PINNED_POETRY_VERSION} required. Found: ${CURRENT_POETRY_VERSION:-missing}"
+    exit 1
+fi
+echo "🟢 [Setup] Poetry is ready: $(poetry --version)"
 
 # ============================================================================
-# 4. INSTALL BUN (if needed)
+# 4. INSTALL PINNED BUN
 # ============================================================================
-echo "🔵 [Setup] Checking Bun..."
-if ! command -v bun &> /dev/null; then
-    echo "🔵 [Setup] Installing Bun..."
-    curl -fsSL https://bun.sh/install | bash
-    export PATH="$HOME/.bun/bin:$PATH"
-else
-    echo "🟢 [Setup] Bun is already installed: $(bun --version)"
+echo "🔵 [Setup] Checking Bun ${PINNED_BUN_VERSION}..."
+CURRENT_BUN_VERSION=""
+if command -v bun &> /dev/null; then
+    CURRENT_BUN_VERSION="$(bun --version 2>/dev/null || true)"
 fi
+if [ "$CURRENT_BUN_VERSION" != "$PINNED_BUN_VERSION" ]; then
+    echo "🔵 [Setup] Installing Bun ${PINNED_BUN_VERSION}..."
+    curl -fsSL https://bun.com/install | bash -s "bun-v$PINNED_BUN_VERSION"
+fi
+CURRENT_BUN_VERSION="$(bun --version 2>/dev/null || true)"
+if [ "$CURRENT_BUN_VERSION" != "$PINNED_BUN_VERSION" ]; then
+    echo "❌ [Setup] Bun ${PINNED_BUN_VERSION} required. Found: ${CURRENT_BUN_VERSION:-missing}"
+    exit 1
+fi
+echo "🟢 [Setup] Bun is ready: ${CURRENT_BUN_VERSION}"
 
 # ============================================================================
 # 5. CONFIGURE POETRY
@@ -116,9 +151,6 @@ cd ..
 # 9. VALIDATE FRONTEND BUILD
 # ============================================================================
 echo "🔵 [Setup] Validating Next.js frontend setup..."
-cd web
-bun run --silent next telemetry disable >/dev/null 2>&1 || true  # Disable telemetry silently
-cd ..
 echo "🟢 [Setup] Next.js frontend is ready"
 
 # ============================================================================

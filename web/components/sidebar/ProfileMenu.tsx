@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Activity,
   Archive,
   ChevronRight,
+  ChevronUp,
   Database,
   HelpCircle,
+  Keyboard,
   LogOut,
   MessageSquareText,
   Palette,
@@ -17,7 +19,6 @@ import {
   Trash2,
   User,
   FileText,
-  BookOpen,
   Bug,
   Lightbulb,
   MessageCircle,
@@ -27,6 +28,12 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
+import {
+  AVATAR_THEMES,
+  avatarThemeClassName,
+  avatarThemeStyle,
+  type AvatarTheme,
+} from "@/lib/avatar-theme";
 import {
   ENABLED_LANGUAGES,
   languageDisplayAbbreviation,
@@ -39,6 +46,8 @@ import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import UsageModal from "@/components/settings/UsageModal";
+import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
+import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +59,7 @@ type ProfileMenuProps = {
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
   onOpenSidebarPreference?: () => void;
+  onOpenKeyboardShortcuts?: () => void;
   /** Anchor position */
   anchorRef: React.RefObject<HTMLElement | null>;
   /** Whether the sidebar is collapsed (affects menu position) */
@@ -68,6 +78,11 @@ type ActiveModal =
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
 
 type DeleteRequestState = "idle" | "submitting" | "success" | "error";
+
+type ProfileQuickJumpItem = {
+  id: string;
+  onSelect: () => void;
+};
 
 const SUPPORT_EMAIL =
   process.env.NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL ?? "support@argus.local";
@@ -99,15 +114,21 @@ export default function ProfileMenu({
   onDeleteAllConversations,
   onHistoryMutated,
   onOpenSidebarPreference,
+  onOpenKeyboardShortcuts,
   anchorRef,
   sidebarCollapsed = false,
 }: ProfileMenuProps) {
   const { t, i18n } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
+  const avatarTriggerRef = useRef<HTMLButtonElement>(null);
+  const avatarThemeDrawerRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<SubMenu>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [profile, setProfile] = useState<ApiUser | null>(null);
+  const [accountKind, setAccountKind] = useState<"guest" | "registered" | null>(
+    null,
+  );
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -115,10 +136,47 @@ export default function ProfileMenu({
   const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string | null>(null);
+  const [isSavingAvatarTheme, setIsSavingAvatarTheme] = useState(false);
+  const [avatarThemeError, setAvatarThemeError] = useState<string | null>(null);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
+  const [usesCommandKey, setUsesCommandKey] = useState(false);
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeAvatarPicker = useCallback(() => {
+    if (!isAvatarPickerOpen) return;
+
+    setIsAvatarPickerOpen(false);
+    avatarTriggerRef.current?.focus();
+  }, [isAvatarPickerOpen]);
+
+  const toggleAvatarPicker = useCallback(() => {
+    if (accountKind !== "registered") return;
+
+    if (isAvatarPickerOpen) {
+      closeAvatarPicker();
+      return;
+    }
+
+    setAvatarThemeError(null);
+    setIsAvatarPickerOpen(true);
+  }, [accountKind, closeAvatarPicker, isAvatarPickerOpen]);
+
+  const closeProfileModal = useCallback(() => {
+    setIsAvatarPickerOpen(false);
+    setActiveModal(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isAvatarPickerOpen) return;
+
+    const selectedTheme = avatarThemeDrawerRef.current?.querySelector<HTMLButtonElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    selectedTheme?.focus();
+  }, [isAvatarPickerOpen]);
 
   // Fetch profile on open
   useEffect(() => {
@@ -126,7 +184,10 @@ export default function ProfileMenu({
       setNameError(null);
       setLanguageError(null);
       getMe()
-        .then(({ user }) => setProfile(user))
+        .then(({ user, account_kind }) => {
+          setProfile(user);
+          setAccountKind(account_kind);
+        })
         .catch(() => null);
     }
   }, [isOpen]);
@@ -137,6 +198,12 @@ export default function ProfileMenu({
       // Don't clear submenu here — preserve for re-open persistence
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    setUsesCommandKey(
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
+    );
+  }, []);
 
   // Close on click-outside
   useEffect(() => {
@@ -173,17 +240,24 @@ export default function ProfileMenu({
         setIsLanguagePickerOpen(false);
         return;
       }
+      if (isAvatarPickerOpen) {
+        closeAvatarPicker();
+        return;
+      }
       if (isDeleteRequestOpen) {
         if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
         return;
       }
-      setActiveModal(null);
+      closeProfileModal();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [
     activeModal,
+    closeAvatarPicker,
+    closeProfileModal,
     deleteRequestState,
+    isAvatarPickerOpen,
     isDeleteRequestOpen,
     isLanguagePickerOpen,
   ]);
@@ -247,6 +321,12 @@ export default function ProfileMenu({
     onDeleteAllConversations?.();
   }, [onClose, onDeleteAllConversations]);
 
+  const handleOpenKeyboardShortcuts = useCallback(() => {
+    setActiveSubmenu(null);
+    onClose();
+    onOpenKeyboardShortcuts?.();
+  }, [onClose, onOpenKeyboardShortcuts]);
+
   // Profile name editing
   const handleStartEditName = useCallback(() => {
     setNameValue(profile?.display_name ?? "");
@@ -284,6 +364,14 @@ export default function ProfileMenu({
   );
   const currentLanguageAbbreviation =
     languageDisplayAbbreviation(currentLanguage);
+  const avatarClassName =
+    accountKind === "registered"
+      ? avatarThemeClassName(profile?.avatar_theme)
+      : "bg-[#191c1f] text-white dark:bg-white/10";
+  const avatarStyle =
+    accountKind === "registered"
+      ? avatarThemeStyle(profile?.avatar_theme, "ambient")
+      : undefined;
   const handleLanguageSelect = useCallback(
     async (code: string) => {
       const nextLanguage = normalizeEnabledLanguage(code);
@@ -337,10 +425,197 @@ export default function ProfileMenu({
     [i18n, isSavingLanguage, profile, t],
   );
 
+  const handleAvatarThemeSelect = useCallback(
+    async (avatarTheme: AvatarTheme) => {
+      if (!profile || accountKind !== "registered" || isSavingAvatarTheme) return;
+
+      const previousTheme = profile.avatar_theme;
+      setAvatarThemeError(null);
+      setIsSavingAvatarTheme(true);
+      setProfile((current) =>
+        current ? { ...current, avatar_theme: avatarTheme } : current,
+      );
+
+      try {
+        const { user } = await patchMe({ avatar_theme: avatarTheme });
+        setProfile(user);
+      } catch (err) {
+        console.error("Failed to update avatar theme", err);
+        setProfile((current) =>
+          current ? { ...current, avatar_theme: previousTheme } : current,
+        );
+        setAvatarThemeError(
+          t(
+            "settings.profile.avatar_theme.save_error",
+            "Could not update your avatar color yet.",
+          ),
+        );
+      } finally {
+        setIsSavingAvatarTheme(false);
+      }
+    },
+    [accountKind, isSavingAvatarTheme, profile, t],
+  );
+
+  const handleAvatarThemeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+      if (isSavingAvatarTheme) return;
+
+      const lastIndex = AVATAR_THEMES.length - 1;
+      let nextIndex: number | null = null;
+
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+          break;
+        case "Home":
+          nextIndex = 0;
+          break;
+        case "End":
+          nextIndex = lastIndex;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      avatarThemeDrawerRef.current
+        ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+        [nextIndex]?.focus();
+      void handleAvatarThemeSelect(AVATAR_THEMES[nextIndex].token);
+    },
+    [handleAvatarThemeSelect, isSavingAvatarTheme],
+  );
+
   const handleOpenDeleteRequest = useCallback(() => {
     setDeleteRequestState("idle");
     setIsDeleteRequestOpen(true);
   }, []);
+
+  const quickJumpItems = useMemo<ProfileQuickJumpItem[]>(() => {
+    if (activeSubmenu === "data") {
+      return [
+        { id: "archived", onSelect: () => openModal("archived") },
+        { id: "deleted", onSelect: () => openModal("deleted") },
+        {
+          id: "security",
+          onSelect: () => {
+            onClose();
+            window.location.href = "/account/security";
+          },
+        },
+        { id: "usage", onSelect: () => openModal("usage") },
+        { id: "delete-all", onSelect: handleDeleteAllConversations },
+        { id: "delete-account", onSelect: handleOpenDeleteRequest },
+      ];
+    }
+    if (activeSubmenu === "settings") {
+      return [
+        { id: "appearance", onSelect: () => openModal("appearance") },
+        { id: "language", onSelect: () => openModal("language") },
+        ...(onOpenSidebarPreference
+          ? [
+              {
+                id: "sidebar",
+                onSelect: () => {
+                  onOpenSidebarPreference();
+                  onClose();
+                },
+              },
+            ]
+          : []),
+      ];
+    }
+    if (activeSubmenu === "help") {
+      return [
+        {
+          id: "keyboard-shortcuts",
+          onSelect: handleOpenKeyboardShortcuts,
+        },
+        {
+          id: "terms",
+          onSelect: () => {
+            window.location.href = "/terms";
+          },
+        },
+        {
+          id: "privacy",
+          onSelect: () => {
+            window.location.href = "/privacy";
+          },
+        },
+      ];
+    }
+    if (activeSubmenu === "feedback") {
+      return [
+        {
+          id: "feedback-bug",
+          onSelect: () => {
+            onFeedback?.("bug");
+            onClose();
+          },
+        },
+        {
+          id: "feedback-feature",
+          onSelect: () => {
+            onFeedback?.("feature");
+            onClose();
+          },
+        },
+        {
+          id: "feedback-general",
+          onSelect: () => {
+            onFeedback?.("general");
+            onClose();
+          },
+        },
+      ];
+    }
+    return [
+      { id: "profile", onSelect: () => openModal("profile") },
+      { id: "data", onSelect: () => handleSubmenuToggle("data") },
+      { id: "settings", onSelect: () => handleSubmenuToggle("settings") },
+      { id: "help", onSelect: () => handleSubmenuToggle("help") },
+      { id: "feedback", onSelect: () => handleSubmenuToggle("feedback") },
+    ];
+  }, [
+    activeSubmenu,
+    handleDeleteAllConversations,
+    handleOpenDeleteRequest,
+    handleOpenKeyboardShortcuts,
+    handleSubmenuToggle,
+    onClose,
+    onFeedback,
+    onOpenSidebarPreference,
+    openModal,
+  ]);
+  const handleQuickJump = useCallback(
+    (id: string) => {
+      quickJumpItems.find((item) => item.id === id)?.onSelect();
+    },
+    [quickJumpItems],
+  );
+  const { isQuickJumpActive, numberFor } = useQuickJump({
+    enabled: isOpen && !activeModal && !isDeleteRequestOpen,
+    items: quickJumpItems,
+    onSelect: handleQuickJump,
+    usesCommandKey,
+  });
+  const quickJumpBadge = (id: string) => {
+    const number = numberFor(id);
+    return isQuickJumpActive && number !== null ? (
+      <QuickJumpBadge
+        number={number}
+        presentation="shortcut_hint"
+        usesCommandKey={usesCommandKey}
+      />
+    ) : null;
+  };
 
   const handleSubmitDeleteRequest = useCallback(async () => {
     if (deleteRequestState === "submitting" || deleteRequestState === "success") {
@@ -535,7 +810,7 @@ export default function ProfileMenu({
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
           <button
             className="absolute inset-0"
-            onClick={() => setActiveModal(null)}
+            onClick={closeProfileModal}
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
@@ -553,7 +828,7 @@ export default function ProfileMenu({
                 {t("settings.profile.title", "Profile")}
               </h2>
               <button
-                onClick={() => setActiveModal(null)}
+                onClick={closeProfileModal}
                 className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
                 aria-label={t("settings.profile.close", "Close profile")}
               >
@@ -564,9 +839,41 @@ export default function ProfileMenu({
             <div className="flex flex-col gap-3">
               {/* Avatar + Name */}
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#191c1f] text-[16px] font-bold text-white dark:bg-white/10">
-                  {profileInitial(profile)}
-                </div>
+                {accountKind === "registered" ? (
+                  <button
+                    ref={avatarTriggerRef}
+                    type="button"
+                    onClick={toggleAvatarPicker}
+                    className="group relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50"
+                    aria-label={t(
+                      "settings.profile.avatar_theme.change",
+                      "Edit avatar",
+                    )}
+                    aria-expanded={isAvatarPickerOpen}
+                    aria-controls="argus-avatar-theme-drawer"
+                    data-avatar-theme-trigger
+                  >
+                    <span
+                      className={`flex h-full w-full items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
+                      style={avatarStyle}
+                    >
+                      {profileInitial(profile)}
+                    </span>
+                    <span
+                      className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-black ring-1 ring-black/10 dark:bg-[#2b2e33] dark:text-white dark:ring-white/15"
+                      aria-hidden="true"
+                    >
+                      <Edit2 className="h-2.5 w-2.5" />
+                    </span>
+                  </button>
+                ) : (
+                  <div
+                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
+                    style={avatarStyle}
+                  >
+                    {profileInitial(profile)}
+                  </div>
+                )}
                 <div className="flex min-w-0 flex-1 flex-col">
                   {/* Display Name - editable */}
                   {editingName ? (
@@ -651,6 +958,117 @@ export default function ProfileMenu({
                   </span>
                 </div>
               </div>
+
+              {accountKind === "registered" && (
+                <div
+                  id="argus-avatar-theme-drawer"
+                  ref={avatarThemeDrawerRef}
+                  className={`grid transition-[grid-template-rows,margin,opacity] duration-200 ease-out motion-reduce:transition-none ${
+                    isAvatarPickerOpen
+                      ? "mt-0 grid-rows-[1fr] opacity-100"
+                      : "mt-0 grid-rows-[0fr] opacity-0"
+                  }`}
+                  aria-hidden={!isAvatarPickerOpen}
+                  inert={!isAvatarPickerOpen}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={closeAvatarPicker}
+                        className="flex h-11 w-full items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30"
+                        aria-label={t(
+                          "settings.profile.avatar_theme.close",
+                          "Hide avatar colors",
+                        )}
+                      >
+                        <span className="whitespace-nowrap text-[13px] text-black/50 dark:text-white/50">
+                          {t(
+                            "settings.profile.avatar_theme.label",
+                            "Avatar color",
+                          )}
+                        </span>
+                        <span
+                          className="h-px flex-1 bg-black/10 dark:bg-white/10"
+                          aria-hidden="true"
+                        />
+                        <span className="text-[11px] text-black/35 dark:text-white/35">
+                          {t(
+                            "settings.profile.avatar_theme.hide",
+                            "Hide",
+                          )}
+                        </span>
+                        <ChevronUp
+                          className="h-3.5 w-3.5 text-black/35 dark:text-white/35"
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <div
+                        className="grid grid-cols-8 place-items-center gap-y-2 sm:grid-cols-7"
+                        role="radiogroup"
+                        aria-busy={isSavingAvatarTheme || undefined}
+                        aria-label={t(
+                          "settings.profile.avatar_theme.label",
+                          "Avatar color",
+                        )}
+                      >
+                        {AVATAR_THEMES.map((theme, index) => {
+                          const selected =
+                            (profile?.avatar_theme ?? "ocean") === theme.token;
+                          const themeLabel = t(
+                            `settings.profile.avatar_theme.themes.${theme.token}`,
+                            theme.token,
+                          );
+                          return (
+                            <button
+                              key={theme.token}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              aria-label={themeLabel}
+                              title={themeLabel}
+                              aria-disabled={isSavingAvatarTheme || undefined}
+                              onClick={() => void handleAvatarThemeSelect(theme.token)}
+                              onKeyDown={(event) =>
+                                handleAvatarThemeKeyDown(event, index)
+                              }
+                              tabIndex={selected ? 0 : -1}
+                              className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50 sm:col-span-1 ${
+                                isSavingAvatarTheme
+                                  ? "cursor-wait opacity-60"
+                                  : ""
+                              } ${
+                                index === 4 ? "col-start-2 sm:col-auto" : ""
+                              }`}
+                            >
+                              <span
+                                className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-bold ${theme.className} ${
+                                  theme.token === "ocean"
+                                    ? "border-black/20 dark:border-white/20"
+                                    : "border-transparent"
+                                } ${
+                                  selected
+                                    ? "ring-2 ring-black/70 dark:ring-white/80"
+                                    : ""
+                                }`}
+                                style={avatarThemeStyle(theme.token, "picker")}
+                                aria-hidden="true"
+                              >
+                                {profileInitial(profile)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {avatarThemeError && (
+                        <span className="mt-3 block text-[12px] text-[#d66d75]">
+                          {avatarThemeError}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {/* Info */}
             <div className="mt-2 flex flex-col gap-2 text-[13px]">
@@ -737,7 +1155,7 @@ export default function ProfileMenu({
     <div
       ref={menuRef}
       data-profile-menu-surface
-      className="fixed bottom-16 z-[60] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225]"
+      className="fixed bottom-16 z-[60] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>div>button]:mx-1 [&>div>button]:my-0.5 [&>div>button]:w-[calc(100%-0.5rem)] [&>div>button]:rounded-[10px]"
       style={{
         left: menuLeft,
         boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
@@ -746,10 +1164,11 @@ export default function ProfileMenu({
       {/* Profile */}
       <button
         onClick={() => openModal("profile")}
-        className="font-display flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        className="font-display flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
       >
         <User className="h-4 w-4 text-black/50 dark:text-white/50" />
         {t("settings.profile.title", "Profile")}
+        <span className="ml-auto flex shrink-0">{quickJumpBadge("profile")}</span>
       </button>
 
       {/* Data */}
@@ -760,69 +1179,88 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("data")}
-          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
         >
           <div className="flex items-center gap-2.5">
             <Database className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.data.title", "Data Controls")}
           </div>
-          <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("data")}</span>
+          {!isQuickJumpActive && (
+            <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          )}
         </button>
         {activeSubmenu === "data" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-h-[294px] min-w-[304px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
             <button
               onClick={() => openModal("archived")}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Archive className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-              {t("settings.data.archived_chats", "Archived chats")}
+              <span className="whitespace-nowrap">
+                {t("settings.data.archived_chats", "Archived chats")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("archived")}</span>
             </button>
             <button
               onClick={() => openModal("deleted")}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Trash2 className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-              {t("settings.data.recently_deleted", "Recently Deleted")}
+              <span className="whitespace-nowrap">
+                {t("settings.data.recently_deleted", "Recently Deleted")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("deleted")}</span>
             </button>
             <button
               onClick={() => {
                 onClose();
                 window.location.href = "/account/security";
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Shield className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-              {t("settings.data.security", "Security")}
+              <span className="whitespace-nowrap">
+                {t("settings.data.security", "Security")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("security")}</span>
             </button>
             <button
               onClick={() => openModal("usage")}
               className="flex min-h-11 w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Activity className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-              {t("settings.data.usage", "Usage")}
+              <span className="whitespace-nowrap">
+                {t("settings.data.usage", "Usage")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("usage")}</span>
             </button>
             <button
               onClick={handleDeleteAllConversations}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 dark:hover:bg-[#d66d75]/10"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 dark:hover:bg-[#d66d75]/10"
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">
                 {t("settings.data.delete_all_conversations", "Delete all conversations")}
               </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("delete-all")}</span>
             </button>
             <button
               type="button"
               onClick={handleOpenDeleteRequest}
-              className="flex w-full flex-col items-start gap-1 px-3.5 py-2 text-left text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d66d75]/25 dark:hover:bg-[#d66d75]/10"
+              className="flex min-h-[88px] w-full flex-col items-start gap-1 px-3.5 py-2 text-left text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d66d75]/25 dark:hover:bg-[#d66d75]/10"
             >
-              <span className="flex items-center gap-2.5 text-[13px] font-medium">
+              <span className="flex h-[22px] w-full items-center gap-2.5 text-[13px] font-medium">
                 <Trash2 className="h-3.5 w-3.5" />
-                {t("settings.profile.delete_account", "Delete account")}
+                <span className="whitespace-nowrap">
+                  {t("settings.profile.delete_account", "Delete account")}
+                </span>
+                <span className="ml-auto flex shrink-0">{quickJumpBadge("delete-account")}</span>
               </span>
               <span className="pl-6 text-[11px] leading-snug text-black/35 dark:text-white/35">
                 {t(
@@ -843,35 +1281,44 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("settings")}
-          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
         >
           <div className="flex items-center gap-2.5">
             <Palette className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.preferences.title", "Preferences")}
           </div>
-          <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("settings")}</span>
+          {!isQuickJumpActive && (
+            <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          )}
         </button>
         {activeSubmenu === "settings" && (
           <div
             aria-label={t("settings.preferences.title", "Preferences")}
-            className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
             <button
               onClick={() => openModal("appearance")}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Palette className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-              {t("settings.app.appearance", "Appearance")}
+              <span className="whitespace-nowrap">
+                {t("settings.app.appearance", "Appearance")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("appearance")}</span>
             </button>
             <button
               onClick={() => openModal("language")}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Globe className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-              {t("settings.app.language", "Language")}
+              <span className="whitespace-nowrap">
+                {t("settings.app.language", "Language")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("language")}</span>
             </button>
             {onOpenSidebarPreference && (
               <button
@@ -879,10 +1326,13 @@ export default function ProfileMenu({
                   onOpenSidebarPreference();
                   onClose();
                 }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+                className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
               >
                 <PanelLeft className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-                {t("settings.app.sidebar", "Sidebar")}
+                <span className="whitespace-nowrap">
+                  {t("settings.app.sidebar", "Sidebar")}
+                </span>
+                <span className="ml-auto flex shrink-0">{quickJumpBadge("sidebar")}</span>
               </button>
             )}
           </div>
@@ -897,33 +1347,49 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("help")}
-          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
         >
           <div className="flex items-center gap-2.5">
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.help.title", "Help & Legal")}
           </div>
-          <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("help")}</span>
+          {!isQuickJumpActive && (
+            <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          )}
         </button>
         {activeSubmenu === "help" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>a]:mx-1 [&>a]:my-0.5 [&>a]:w-[calc(100%-0.5rem)] [&>a]:rounded-[10px]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
-            <a href="/terms" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
-              <FileText className="h-3.5 w-3.5" />
-              {t("settings.help.terms", "Terms of Use")}
-            </a>
-            <a href="/privacy" className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
-              <Shield className="h-3.5 w-3.5" />
-              {t("settings.help.privacy", "Privacy Policy")}
-            </a>
-            <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
-              <BookOpen className="h-3.5 w-3.5" />
-              {t("settings.help.release_notes", "Release Notes")}
+            <button
+              type="button"
+              onClick={handleOpenKeyboardShortcuts}
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+            >
+              <Keyboard className="h-3.5 w-3.5" />
+              <span className="whitespace-nowrap">
+                {t("keyboard_shortcuts.menu_item", "Keyboard shortcuts")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("keyboard-shortcuts")}</span>
             </button>
+            <a href="/terms" className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="whitespace-nowrap">
+                {t("settings.help.terms", "Terms of Use")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("terms")}</span>
+            </a>
+            <a href="/privacy" className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+              <Shield className="h-3.5 w-3.5" />
+              <span className="whitespace-nowrap">
+                {t("settings.help.privacy", "Privacy Policy")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("privacy")}</span>
+            </a>
           </div>
         )}
       </div>
@@ -936,17 +1402,20 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("feedback")}
-          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
         >
           <div className="flex items-center gap-2.5">
             <MessageSquareText className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("feedback.eyebrow", "Feedback")}
           </div>
-          <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback")}</span>
+          {!isQuickJumpActive && (
+            <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
+          )}
         </button>
         {activeSubmenu === "feedback" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[200px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -956,30 +1425,39 @@ export default function ProfileMenu({
                 onFeedback?.("bug");
                 onClose();
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Bug className="h-3.5 w-3.5" />
-              {t("feedback.type.bug", "Report a bug")}
+              <span className="whitespace-nowrap">
+                {t("feedback.type.bug", "Report a bug")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback-bug")}</span>
             </button>
             <button
               onClick={() => {
                 onFeedback?.("feature");
                 onClose();
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Lightbulb className="h-3.5 w-3.5" />
-              {t("feedback.type.feature", "Request a feature")}
+              <span className="whitespace-nowrap">
+                {t("feedback.type.feature", "Request a feature")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback-feature")}</span>
             </button>
             <button
               onClick={() => {
                 onFeedback?.("general");
                 onClose();
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <MessageCircle className="h-3.5 w-3.5" />
-              {t("feedback.type.general", "General feedback")}
+              <span className="whitespace-nowrap">
+                {t("feedback.type.general", "General feedback")}
+              </span>
+              <span className="ml-auto flex shrink-0">{quickJumpBadge("feedback-general")}</span>
             </button>
           </div>
         )}

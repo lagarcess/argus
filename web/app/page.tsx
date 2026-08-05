@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AuthForm, {
   type AuthFormSubmission,
 } from "@/components/auth/AuthForm";
+import RequestAccess from "@/components/auth/RequestAccess";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import GuestEntry from "@/components/guest/GuestEntry";
 import { useTranslation } from "react-i18next";
@@ -20,13 +21,16 @@ import {
   resolveLandingEntrySurface,
 } from "@/lib/landing-entry";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
+import { guestProfileProbeOutcome } from "@/lib/guest-account";
 
-type AuthMode = "intro" | "signup" | "login";
+type AuthMode = "intro" | "request" | "signup" | "login";
 
 function authModeFromLocation(): AuthMode {
   if (typeof window === "undefined") return "intro";
   const mode = new URLSearchParams(window.location.search).get("auth");
-  return mode === "signup" || mode === "login" ? mode : "intro";
+  return mode === "request" || mode === "signup" || mode === "login"
+    ? mode
+    : "intro";
 }
 
 function skipAuthenticatedRedirect(): boolean {
@@ -35,6 +39,7 @@ function skipAuthenticatedRedirect(): boolean {
   const authMode = params.get("auth");
   return (
     params.get("preview") === "true" ||
+    authMode === "request" ||
     authMode === "signup" ||
     authMode === "login"
   );
@@ -46,6 +51,8 @@ export default function LandingPage() {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const [authMode, setAuthMode] = useState<AuthMode>("intro");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [profileProbeFailedClosed, setProfileProbeFailedClosed] =
+    useState(false);
 
   useEffect(() => {
     const nextAuthMode = authModeFromLocation();
@@ -57,11 +64,19 @@ export default function LandingPage() {
     let cancelled = false;
     (async () => {
       try {
-        await getMe();
+        const meResponse = await getMe();
         if (cancelled) return;
+        if (meResponse === null) {
+          setProfileProbeFailedClosed(true);
+          setIsCheckingSession(false);
+          return;
+        }
         router.replace("/chat");
-      } catch {
+      } catch (error) {
         if (cancelled) return;
+        setProfileProbeFailedClosed(
+          guestProfileProbeOutcome(error) === "fail_closed",
+        );
         setIsCheckingSession(false);
       }
     })();
@@ -85,6 +100,7 @@ export default function LandingPage() {
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", nextUrl);
   };
+  const showRequest = () => updateAuthMode("request");
   const showSignup = () => updateAuthMode("signup");
   const showLogin = () => updateAuthMode("login");
 
@@ -96,12 +112,15 @@ export default function LandingPage() {
     }
 
     if (submission.mode === "signup") {
-      await signupWithEmail({
+      const result = await signupWithEmail({
         email: submission.email,
         password: submission.password,
         language: normalizeApiLanguage(i18n.resolvedLanguage ?? i18n.language),
         display_name: submission.displayName || null,
       });
+      if (result.needsEmailConfirmation) {
+        return { status: "email_confirmation_required" as const };
+      }
     } else {
       await loginWithEmail({
         email: submission.email,
@@ -116,7 +135,8 @@ export default function LandingPage() {
   const isSignup = authMode === "signup";
   const entrySurface = resolveLandingEntrySurface({
     authMode,
-    guestEntryAvailable: guestAccessEnabled && guestCaptchaConfigured,
+    guestEntryAvailable:
+      !profileProbeFailedClosed && guestAccessEnabled && guestCaptchaConfigured,
     isCheckingSession,
   });
 
@@ -151,18 +171,25 @@ export default function LandingPage() {
           {authMode === "intro" ? (
             <button
               type="button"
-              onClick={showSignup}
+              onClick={showRequest}
               className="font-display flex w-full max-w-sm items-center justify-center rounded-[9999px] bg-black px-[32px] py-[14px] text-[16px] font-medium text-white transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black dark:bg-white dark:text-black dark:focus-visible:ring-white"
             >
-              {t('landing.sign_up_email')}
+              {t("auth.access_request.submit")}
             </button>
           ) : (
             <div className="w-full max-w-sm">
-              <AuthForm
-                mode={isSignup ? "signup" : "login"}
-                onModeChange={(mode) => updateAuthMode(mode)}
-                onSubmit={handleAuthSubmit}
-              />
+              {authMode === "request" ? (
+                <RequestAccess
+                  onShowSignup={showSignup}
+                  onShowLogin={showLogin}
+                />
+              ) : (
+                <AuthForm
+                  mode={isSignup ? "signup" : "login"}
+                  onModeChange={(mode) => updateAuthMode(mode)}
+                  onSubmit={handleAuthSubmit}
+                />
+              )}
             </div>
           )}
 

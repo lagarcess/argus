@@ -1,5 +1,7 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { AssetClass } from "./argus-types";
+import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
+import type { DecisionState as RunDossierDecisionState } from "./run-dossier-contract";
 import type {
   ChatActionOption,
   ChatMention,
@@ -12,6 +14,7 @@ import {
 } from "./language-features";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
   displayResultActionLabel,
@@ -19,6 +22,14 @@ import {
   displayResultMetricLabel,
   resultMetricDisplayOrder,
 } from "./result-card-display";
+import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
+import {
+  ARGUS_API_BASE_URL,
+  apiFetch,
+  unauthenticatedApiFetch,
+} from "./argus-api-transport";
+
+export { apiFetch, unauthenticatedApiFetch } from "./argus-api-transport";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -33,6 +44,34 @@ export type BacktestJobStatus =
   | "expired";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
+export type ConversationOperationStatus =
+  | "idle"
+  | "queued"
+  | "running"
+  | "checking";
+export type ConversationOperationKind = "chat_turn" | "backtest_job" | null;
+export type ConversationOperation = {
+  status: ConversationOperationStatus;
+  kind?: ConversationOperationKind;
+  updated_at?: string | null;
+};
+export type ConversationAttentionStatus =
+  | "none"
+  | "new_activity"
+  | "manual_unread"
+  | "needs_input"
+  | "needs_attention";
+export type ConversationAttention = {
+  status: ConversationAttentionStatus;
+  cursor?: string | null;
+};
+export type ConversationActivity = {
+  operation: ConversationOperation;
+  attention: ConversationAttention;
+};
+export type ConversationActivityPatch =
+  | { action: "mark_unread" }
+  | { action: "mark_read"; through_attention_cursor?: string | null };
 
 // ─── Metric / result card types ──────────────────────────────────────────────
 
@@ -164,6 +203,7 @@ export type Conversation = {
   updated_at: string;
   last_message_preview?: string | null;
   language?: "en" | "es-419" | null;
+  activity?: ConversationActivity | null;
 };
 
 type AuthSessionPayload = {
@@ -230,11 +270,11 @@ export type Collection = {
   updated_at: string;
 };
 
-export type HistoryItem = {
+type HistoryItemBase = {
   type: HistoryItemType;
   id: string;
   title: string;
-  /** Chat items only; mirrors the conversation record. */
+  /** Present on chat items; retained as optional for existing history consumers. */
   title_source?: TitleSource | null;
   subtitle: string;
   pinned: boolean;
@@ -242,6 +282,18 @@ export type HistoryItem = {
   conversation_id?: string | null;
   expires_at?: string | null;
 };
+
+export type ChatHistoryItem = HistoryItemBase & {
+  type: "chat";
+  activity?: ConversationActivity | null;
+};
+
+export type NonChatHistoryItem = HistoryItemBase & {
+  type: Exclude<HistoryItemType, "chat">;
+  activity?: never;
+};
+
+export type HistoryItem = ChatHistoryItem | NonChatHistoryItem;
 
 export type ArtifactLifecycle =
   | "captured"
@@ -251,11 +303,7 @@ export type ArtifactLifecycle =
   | "archived"
   | "discarded";
 
-export type DecisionState =
-  | "watching"
-  | "promising"
-  | "rejected"
-  | "revisit_later";
+export type DecisionState = RunDossierDecisionState;
 
 export type EvidenceArtifact = {
   id: string;
@@ -284,25 +332,17 @@ export type DecisionNote = {
   updated_at: string;
 };
 
-export type SearchItem = {
-  type:
-    | "chat"
-    | "strategy"
-    | "collection"
-    | "run"
-    | "backtest"
-    | "evidence"
-    | "decision"
-    | "idea";
-  id: string;
-  title: string;
-  matched_text: string;
-  updated_at: string;
-  conversation_id?: string | null;
-  lifecycle?: ArtifactLifecycle | null;
-  decision_state?: DecisionState | null;
-  preview?: Record<string, unknown> | null;
+export type SearchConversationItem = SearchConversationContract;
+
+export type SearchAssetRollupItem = {
+  type: "asset_rollup";
+  symbol: string;
+  run_count: number;
+  decision_counts: Record<DecisionState, number>;
+  last_touched_at: string;
 };
+
+export type SearchItem = SearchConversationItem | SearchAssetRollupItem;
 
 export type SearchLedgerGroup = {
   decision_state: DecisionState;
@@ -342,6 +382,7 @@ export type ChatStreamEvent =
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
+  code?: string;
   stage_outcome?: string;
   assistant_response?: string | null;
   assistant_prompt?: string | null;
@@ -401,16 +442,6 @@ export type DiscoveryItem = {
 type DiscoveryResponsePayload = { items: DiscoveryItem[] };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-
-const API_BASE = (() => {
-  if (process.env.NEXT_PUBLIC_ARGUS_API_URL) {
-    return process.env.NEXT_PUBLIC_ARGUS_API_URL;
-  }
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:8000/api/v1`;
-  }
-  return "http://127.0.0.1:8000/api/v1";
-})();
 
 export type ApiLanguage = "en" | "es-419";
 
@@ -540,83 +571,6 @@ export function formatRelativeDate(
   });
 }
 
-// ─── Generic fetch helper ─────────────────────────────────────────────────────
-
-export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  const authHeaders: Record<string, string> = {};
-
-  if (!isMockAuth) {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      throw new Error("Supabase auth client is unavailable in non-mock mode.");
-    }
-    const { data, error } = await supabase.auth.getSession();
-    if (!error && data.session) {
-      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
-    }
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...(options?.headers || {}),
-    },
-    credentials: "include",
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const detail = (body as { detail?: unknown }).detail;
-    const errorMsg =
-      typeof detail === "object" && detail !== null
-        ? ((detail as { title?: unknown }).title as string)
-        : detail;
-
-    const error = new Error(
-      (errorMsg as string) ?? `API error ${response.status}`,
-    ) as Error & { status: number; code: string };
-    (error as Error & { status: number }).status = response.status;
-    (error as Error & { code: string }).code =
-      ((body as Record<string, unknown>).code as string) ?? "unknown";
-    throw error;
-  }
-  return response.json() as Promise<T>;
-}
-
-export async function unauthenticatedApiFetch<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers || {}),
-    },
-    credentials: "include",
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const detail = (body as { detail?: unknown }).detail;
-    const message =
-      typeof detail === "object" && detail !== null && "detail" in detail
-        ? String((detail as { detail?: unknown }).detail ?? "")
-        : typeof detail === "string"
-          ? detail
-          : `API error ${response.status}`;
-    const error = new Error(message) as Error & {
-      status: number;
-      code: string;
-    };
-    error.status = response.status;
-    error.code = String((body as Record<string, unknown>).code ?? "unknown");
-    throw error;
-  }
-  return response.json() as Promise<T>;
-}
-
 export async function persistBrowserSession(payload: AuthResponsePayload) {
   const session = payload.session;
   if (!session?.access_token || !session.refresh_token) {
@@ -642,6 +596,7 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
+  avatar_theme?: AvatarTheme;
 };
 
 export async function getMe() {
@@ -675,26 +630,28 @@ export async function signupWithEmail(payload: {
   display_name?: string | null;
   username?: string | null;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/signup",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);
-  return response;
+  return { response, needsEmailConfirmation: !response.session };
 }
 
 export async function loginWithEmail(payload: {
   email: string;
   password: string;
 }) {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await unauthenticatedApiFetch<AuthResponsePayload>(
     "/auth/login",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
     },
   );
   await persistBrowserSession(response);
@@ -777,10 +734,16 @@ export async function getConversationMessages(
   conversationId: string,
   limit = 50,
   cursor?: string,
-  options: Readonly<{ signal?: AbortSignal }> = {},
+  options: Readonly<{
+    signal?: AbortSignal;
+    anchorMessageId?: string;
+  }> = {},
 ) {
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
+  if (options.anchorMessageId) {
+    searchParams.append("anchor_message_id", options.anchorMessageId);
+  }
   return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
     { signal: options.signal },
@@ -799,6 +762,27 @@ export async function patchConversation(
   return apiFetch<{ conversation: Conversation }>(
     `/conversations/${conversationId}`,
     { method: "PATCH", body: JSON.stringify(patch) },
+  );
+}
+
+export async function getConversationActivity(conversationId: string) {
+  return apiFetch<ConversationActivity>(
+    `/conversations/${conversationId}/activity`,
+  );
+}
+
+export async function patchConversationActivity(
+  conversationId: string,
+  patch: ConversationActivityPatch,
+  options: Readonly<{ signal?: AbortSignal }> = {},
+) {
+  return apiFetch<ConversationActivity>(
+    `/conversations/${conversationId}/activity`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+      signal: options.signal,
+    },
   );
 }
 
@@ -904,6 +888,7 @@ export async function searchGlobal(params: {
   cursor?: string;
   decisionState?: DecisionState | null;
   includeLedgerGroups?: boolean;
+  conversationIds?: string[];
 }) {
   const {
     q,
@@ -911,6 +896,7 @@ export async function searchGlobal(params: {
     cursor,
     decisionState,
     includeLedgerGroups = false,
+    conversationIds,
   } = params;
   const searchParams = new URLSearchParams({
     q,
@@ -921,6 +907,8 @@ export async function searchGlobal(params: {
   if (includeLedgerGroups) {
     searchParams.append("include_ledger_groups", "true");
   }
+  for (const id of conversationIds ?? [])
+    searchParams.append("conversation_id", id);
   return apiFetch<SearchResponse>(
     `/search?${searchParams.toString()}`,
   );
@@ -1005,16 +993,22 @@ export async function getBacktestJob(jobId: string) {
 
 // ─── Chat stream ──────────────────────────────────────────────────────────────
 
+export type ChatStreamOptions = Readonly<{
+  requestId?: string;
+  signal?: AbortSignal;
+}>;
+
 export async function streamChatMessage(
   conversationId: string,
   input: string | ChatActionRequest,
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
   mentions: ChatMention[] = [],
+  options: ChatStreamOptions = {},
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-  const submittedRequestId = crypto.randomUUID();
+  const submittedRequestId = options.requestId ?? crypto.randomUUID();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -1026,8 +1020,10 @@ export async function streamChatMessage(
     }
   }
 
-  const response = await fetch(`${API_BASE}/chat/stream`, {
+  const response = await fetch(`${ARGUS_API_BASE_URL}/chat/stream`, {
     method: "POST",
+    credentials: "include",
+    signal: options.signal,
     headers: {
       "Content-Type": "application/json",
       "X-Request-Id": submittedRequestId,

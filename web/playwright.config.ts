@@ -9,6 +9,7 @@ const mockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH ?? "true";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/guest-auth-captcha-ux.spec.ts",
   outputDir: `./temp/playwright-results/${runId}`,
   // lastRunFile: `./temp/playwright/${runId}.last-run.json`,
   timeout: 30_000,

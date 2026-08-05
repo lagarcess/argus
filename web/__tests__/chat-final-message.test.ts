@@ -50,6 +50,45 @@ describe("chat final message merge", () => {
     expect(message.content).toBe("Ready to test AAPL buy and hold.");
   });
 
+  test("final clarification carries its backend-owned strategy path", () => {
+    const message = mergeFinalTextMessage(
+      {
+        id: "assistant-1",
+        role: "ai",
+        kind: "text",
+        content: "Which asset should I test?",
+      },
+      {
+        assistantId: "assistant-1",
+        finalText: "Which asset should I test?",
+        finalActions: [],
+        strategyPathContext: {
+          kind: "clarification",
+          requestedField: "asset_universe",
+          strategy: {
+            strategy_type: "buy_and_hold",
+            capital_amount: 10_000,
+          },
+        },
+      } as Parameters<typeof mergeFinalTextMessage>[1] & {
+        strategyPathContext: {
+          kind: "clarification";
+          requestedField: string;
+          strategy: Record<string, unknown>;
+        };
+      },
+    );
+
+    expect(message.strategyPathContext).toEqual({
+      kind: "clarification",
+      requestedField: "asset_universe",
+      strategy: {
+        strategy_type: "buy_and_hold",
+        capital_amount: 10_000,
+      },
+    });
+  });
+
   test("leaves unrelated messages unchanged", () => {
     const message = {
       id: "other",

@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { copyFileSync, mkdirSync } from "node:fs";
+import path from "node:path";
 import {
   BackendController,
   BrowserSafetyMonitor,
@@ -23,7 +25,9 @@ import {
   seedDistinctGuestConfirmation,
   seedDurableRetryableFailure,
   seedGuestActiveConfirmationFixture,
+  seedGuestResolvedClarificationRailHistory,
   seedGuestSimulationExhaustionFixture,
+  safeVisibleProductScreenshot,
   workspaceFacts,
   zeroStateSnapshot,
 } from "./support/guest-qa";
@@ -51,6 +55,16 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
   const backend = new BackendController();
   const monitor = new BrowserSafetyMonitor();
   monitor.attach(page);
+  let pageBootstrapCalls = 0;
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      request.method() === "POST" &&
+      url.pathname.endsWith("/api/v1/auth/guest")
+    ) {
+      pageBootstrapCalls += 1;
+    }
+  });
   let guestOwner = "";
   try {
     await backend.start(false);
@@ -73,6 +87,20 @@ test("guest QA setup and teardown are healthy without a runtime turn", async ({
     expect(guest.account_kind).toBe("guest");
     expect(guest.user.email).toBeNull();
     expect(guest.guest).not.toBeNull();
+    expect(pageBootstrapCalls).toBe(0);
+    await expect(page.getByTestId("turnstile-challenge-shell")).toHaveCount(0);
+    expect(ownerSnapshot(guest.user.id)).toMatchObject({
+      conversations: 0,
+      messages: 0,
+      user_messages: 0,
+      assistant_messages: 0,
+      jobs: 0,
+      runs: 0,
+      chat_units: 0,
+      simulation_units: 0,
+      route_receipts: 0,
+      cost_rows: 0,
+    });
     await page.getByRole("button", { name: "Guest settings" }).click();
     await page.getByRole("menuitem", { name: "Language" }).click();
     await page.getByRole("button", { name: /Español/ }).click();
@@ -128,9 +156,12 @@ test("guest entry errors fail promptly without minting an identity", async ({
         }),
       });
     });
-    await expect(freshGuest(page)).rejects.toThrow(
-      "Guest public entry failed before authentication",
-    );
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const composer = page.getByTestId("chat-input");
+    await composer.fill("Compare Apple with SPY");
+    await composer.press("Enter");
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(composer).toHaveText("Compare Apple with SPY");
     expect(zeroStateSnapshot().auth_users).toBe(0);
   } finally {
     await backend.stop();
@@ -227,7 +258,7 @@ test("durable retry fixture hydrates without sending an interpreter turn", async
   }
 });
 
-test("second-simulation gate fixture rekeys one durable confirmation without work", async ({
+test("exhausted-simulation gate fixture rekeys one durable confirmation without work", async ({
   page,
 }) => {
   assertExactLocalCandidate();
@@ -312,6 +343,180 @@ test("second-simulation gate fixture rekeys one durable confirmation without wor
       if (key === "messages") continue;
       expect(afterGraph[key]).toEqual(beforeGraph[key]);
     }
+  } finally {
+    await backend.stop();
+    if (guestOwner) await deleteDisposableIdentity(guestOwner);
+    purgeDisposableQaEvidence();
+    assertZeroState();
+  }
+});
+
+for (const expectation of [
+  {
+    language: "en" as const,
+    runLabel: /Run backtest/i,
+    resetCopy: /temporary chat has reached today’s simulation limit\. It resets on/i,
+  },
+  {
+    language: "es-419" as const,
+    runLabel: /Ejecutar backtest/i,
+    resetCopy: /chat temporal alcanzó el límite de simulaciones de hoy\. Se restablece el/i,
+  },
+]) {
+  test(`exhausted guest simulation shows truthful conversion recovery in ${expectation.language}`, async ({
+    page,
+  }) => {
+    assertExactLocalCandidate();
+    assertZeroState();
+    const backend = new BackendController();
+    let guestOwner = "";
+    try {
+      await backend.start(false);
+      const guest = await freshGuest(page, {
+        language: expectation.language,
+        onBootstrapOwner(owner) {
+          guestOwner = owner;
+        },
+      });
+      guestOwner = guest.user.id;
+      const created = await apiJson<{ conversation: { id: string } }>(
+        page.context().request,
+        "/conversations",
+        { method: "POST", data: { title: null, language: expectation.language } },
+      );
+      expect(created.status).toBe(200);
+      seedGuestSimulationExhaustionFixture({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      });
+      seedGuestActiveConfirmationFixture({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      });
+      await page.goto(`/chat?conversation=${created.body.conversation.id}`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: expectation.runLabel }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText(expectation.resetCopy)).toBeVisible();
+      if (process.env.ARGUS_GUEST_QA_CAPTURE_DURABLE_EVIDENCE === "true") {
+        const screenshot = await safeVisibleProductScreenshot(
+          page,
+          `issue-346-exhausted-${expectation.language}`,
+        );
+        const durableDirectory = path.join(
+          process.cwd(),
+          "../docs/reports/evidence/issue-346",
+        );
+        mkdirSync(durableDirectory, { recursive: true });
+        copyFileSync(
+          screenshot,
+          path.join(durableDirectory, `guest-quota-recovery-${expectation.language}.png`),
+        );
+      }
+    } finally {
+      await backend.stop();
+      if (guestOwner) await deleteDisposableIdentity(guestOwner);
+      purgeDisposableQaEvidence();
+      assertZeroState();
+    }
+  });
+}
+
+test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
+  page,
+}) => {
+  assertExactLocalCandidate();
+  assertZeroState();
+  const backend = new BackendController();
+  const monitor = new BrowserSafetyMonitor();
+  monitor.attach(page);
+  let guestOwner = "";
+  try {
+    await backend.start(false);
+    const guest = await freshGuest(page, {
+      onBootstrapOwner(owner) {
+        guestOwner = owner;
+      },
+    });
+    guestOwner = guest.user.id;
+    expect(guest.account_kind).toBe("guest");
+    const created = await apiJson<{
+      conversation: { id: string };
+    }>(page.context().request, "/conversations", {
+      method: "POST",
+      data: { title: null, language: "en" },
+    });
+    expect(created.status).toBe(200);
+    const conversationId = created.body.conversation.id;
+    seedGuestSimulationExhaustionFixture({
+      userId: guestOwner,
+      conversationId,
+    });
+    const { clarificationMessageId } =
+      seedGuestResolvedClarificationRailHistory({
+        userId: guestOwner,
+        conversationId,
+      });
+    seedGuestActiveConfirmationFixture({
+      userId: guestOwner,
+      conversationId,
+      symbol: "AAPL",
+      strategyPathId: clarificationMessageId,
+    });
+
+    const assertRecoveredRail = async () => {
+      await expect(page.getByTestId("guest-temporary-notice")).toBeVisible();
+      const rail = page.getByTestId("conversation-activity-rail");
+      await expect(rail).toBeVisible();
+      await expect(rail.getByRole("button")).toHaveCount(1);
+      const completedTick = rail.getByRole("button", {
+        name: /Backtest finished — MSFT/,
+      });
+      await expect(completedTick).toBeVisible();
+      await expect(
+        rail.getByRole("button", { name: /Needed attention/ }),
+      ).toHaveCount(0);
+      return completedTick;
+    };
+
+    await page.goto(`/chat?conversation=${conversationId}`, {
+      waitUntil: "domcontentloaded",
+    });
+    const completedTick = await assertRecoveredRail();
+    await expect(page.getByTestId("result-equity-chart")).toBeVisible();
+    await completedTick.hover();
+    await expect(
+      page
+        .getByTestId("conversation-activity-rail-preview")
+        .getByText("Backtest finished", { exact: true }),
+    ).toBeVisible();
+    await safeVisibleProductScreenshot(page, "issue-337-guest-recovered");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const reloadedCompletedTick = await assertRecoveredRail();
+    await reloadedCompletedTick.hover();
+    await expect(
+      page
+        .getByTestId("conversation-activity-rail-preview")
+        .getByText("Backtest finished", { exact: true }),
+    ).toBeVisible();
+    await safeVisibleProductScreenshot(
+      page,
+      "issue-337-guest-recovered-reload",
+    );
+
+    expect(ownerSnapshot(guestOwner)).toMatchObject({
+      messages: 12,
+      runs: 1,
+      simulation_units: 2,
+      route_receipts: 0,
+      cost_rows: 0,
+    });
+    expect(monitor.detailSnapshot()).toEqual([]);
+    expect(monitor.hostedWrites).toBe(0);
+    expect(monitor.credentialExposure).toBe(0);
   } finally {
     await backend.stop();
     if (guestOwner) await deleteDisposableIdentity(guestOwner);
@@ -492,19 +697,12 @@ test("feedback evidence helper distinguishes consent without private content", a
   }
 });
 
-test("guest entry without a terminal signal fails within its bounded deadline", async ({
+test("guest setup without a local backend fails within its bounded deadline", async ({
   page,
 }) => {
   test.setTimeout(10_000);
   assertExactLocalCandidate();
   assertZeroState();
-  await page.route(`${LOCAL_APP_ORIGIN}/`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>Blank local QA entry</title>",
-    });
-  });
   await expect(freshGuest(page, { timeoutMs: 1_000 })).rejects.toThrow(
     "Guest public entry failed before authentication",
   );

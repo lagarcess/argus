@@ -1,526 +1,239 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Iterable, Mapping
 
 from argus.api import state as api_state
-from argus.api.memory_ownership import memory_object_visible
-from argus.api.schemas import DecisionState, SearchItem, User
-from argus.api.search_utils import score_search_item
-from argus.domain.evidence import (
-    decision_recall_preview,
-    evidence_preview_from_artifact,
-    evidence_preview_from_payload,
+from argus.api.memory_search_candidates import bounded_memory_search_snapshot
+from argus.api.schemas import (
+    DecisionActionAvailability,
+    SearchAssetRollup,
+    SearchItem,
+    User,
 )
-from argus.domain.search_text import search_text_matches_query
+from argus.domain.conversation_recall import (
+    project_conversation_recall,
+)
 
 ScoredSearchItem = tuple[int, SearchItem]
 
 
-def _latest_decision_state_by_idea(
-    decisions: list[tuple[Any, Any, Any]],
-) -> dict[str, DecisionState]:
-    """Map each idea_id to its most-recent decision_state."""
-    latest: dict[str, tuple[Any, DecisionState]] = {}
-    for idea_id, decision_state, updated_at in decisions:
-        if not idea_id or not decision_state:
-            continue
-        key = str(idea_id)
-        state = cast(DecisionState, str(decision_state))
-        prior = latest.get(key)
-        if prior is None:
-            latest[key] = (updated_at, state)
-        elif updated_at is not None and (prior[0] is None or updated_at >= prior[0]):
-            latest[key] = (updated_at, state)
-    return {idea_id: state for idea_id, (_ts, state) in latest.items()}
+@dataclass(frozen=True)
+class MemorySearchRead:
+    scored_items: list[ScoredSearchItem]
+    asset_rollup: SearchAssetRollup | None
+    ledger_counts: dict[str, int] | None = None
+
+
+def memory_search_read(
+    *,
+    user: User,
+    query: str,
+    source_limit: int,
+    decision_action_availability: DecisionActionAvailability | None = "available",
+    include_conversation_rows: bool = True,
+    cursor_updated_at: datetime | None = None,
+    cursor_id: str | None = None,
+    decision_state: str | None = None,
+    include_ledger_groups: bool = False,
+    guest_conversation_id: str | None = None,
+    conversation_ids: Iterable[str] | None = None,
+) -> MemorySearchRead:
+    """Project owned memory records through the same conversation read model."""
+    snapshot = bounded_memory_search_snapshot(
+        store=api_state.store,
+        user=user,
+        query=query,
+        source_limit=source_limit,
+        include_conversation_rows=include_conversation_rows,
+        cursor_updated_at=cursor_updated_at,
+        cursor_id=cursor_id,
+        decision_state=decision_state,
+        include_ledger_groups=include_ledger_groups,
+        guest_conversation_id=guest_conversation_id,
+        conversation_ids=conversation_ids,
+    )
+    return MemorySearchRead(
+        scored_items=(
+            _project_rows(
+                conversations=snapshot.conversations,
+                runs=snapshot.runs,
+                ideas=snapshot.ideas,
+                evidence=snapshot.evidence,
+                decisions=snapshot.decisions,
+                messages=snapshot.messages,
+                query=query,
+                decision_action_availability=decision_action_availability,
+                language=user.language,
+            )
+            if include_conversation_rows
+            else []
+        ),
+        asset_rollup=snapshot.asset_rollup,
+        ledger_counts=snapshot.ledger_counts,
+    )
+
+
+def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
+    return memory_search_read(
+        user=user,
+        query=query,
+        source_limit=101,
+    ).scored_items
 
 
 def scored_supabase_search_items(
     *,
     raw: dict[str, list[dict[str, object]]],
     query: str,
+    decision_action_availability: DecisionActionAvailability | None = "available",
+    language: str = "en",
 ) -> list[ScoredSearchItem]:
-    scored_items: list[ScoredSearchItem] = []
-    for row in raw.get("conversations", []):
-        item = SearchItem(
-            type="chat",
-            id=str(row["id"]),
-            title=str(row["title"]),
-            matched_text=str(row.get("last_message_preview") or row["title"]),
-            updated_at=row["updated_at"],
-        )
-        scored_items.append(
-            (
-                score_search_item(
-                    query=query,
-                    title=str(row["title"]),
-                    matched_text=item.matched_text,
-                    pinned=bool(row.get("pinned", False)),
-                ),
-                item,
-            )
-        )
-    for row in raw.get("strategies", []):
-        symbols = row.get("symbols") or []
-        matched_text = ", ".join(str(symbol) for symbol in symbols) or str(row["name"])
-        symbol_exact_match = any(query == str(symbol).lower() for symbol in symbols)
-        item = SearchItem(
-            type="strategy",
-            id=str(row["id"]),
-            title=str(row["name"]),
-            matched_text=matched_text,
-            updated_at=row["updated_at"],
-        )
-        scored_items.append(
-            (
-                score_search_item(
-                    query=query,
-                    title=str(row["name"]),
-                    matched_text=matched_text,
-                    pinned=bool(row.get("pinned", False)),
-                    symbol_exact_match=symbol_exact_match,
-                ),
-                item,
-            )
-        )
-    for row in raw.get("collections", []):
-        item = SearchItem(
-            type="collection",
-            id=str(row["id"]),
-            title=str(row["name"]),
-            matched_text=str(row["name"]),
-            updated_at=row["updated_at"],
-        )
-        scored_items.append(
-            (
-                score_search_item(
-                    query=query,
-                    title=str(row["name"]),
-                    matched_text=str(row["name"]),
-                    pinned=bool(row.get("pinned", False)),
-                ),
-                item,
-            )
-        )
-    for row in raw.get("runs", []):
-        scored_items.append(_scored_supabase_run(row=row, query=query))
-    for row in raw.get("ideas", []):
-        item = SearchItem(
-            type="idea",
-            id=str(row["id"]),
-            title=str(row["title"]),
-            matched_text=str(row.get("summary") or row["title"]),
-            updated_at=row["updated_at"],
-            conversation_id=row.get("source_conversation_id"),
-            lifecycle=row.get("lifecycle"),
-            decision_state=cast("DecisionState | None", row.get("decision_state")),
-            preview={
-                "digest": row.get("summary"),
-            },
-        )
-        scored_items.append(
-            (
-                score_search_item(
-                    query=query,
-                    title=str(row["title"]),
-                    matched_text=item.matched_text,
-                    pinned=False,
-                ),
-                item,
-            )
-        )
-    for row in raw.get("evidence", []):
-        preview = _evidence_preview_from_search_row(row)
-        item = SearchItem(
-            type="evidence",
-            id=str(row["id"]),
-            title=str(row["title"]),
-            matched_text=str(row.get("digest") or row["title"]),
-            updated_at=row["updated_at"],
-            conversation_id=row.get("source_conversation_id"),
-            lifecycle=row.get("lifecycle"),
-            preview=preview,
-        )
-        scored_items.append(
-            (
-                score_search_item(
-                    query=query,
-                    title=str(row["title"]),
-                    matched_text=item.matched_text,
-                    pinned=False,
-                    symbol_exact_match=any(
-                        query == str(symbol).lower()
-                        for symbol in preview.get("symbols") or []
-                    ),
-                ),
-                item,
-            )
-        )
-    for row in raw.get("decisions", []):
-        scored_items.append(_scored_decision_row(row=row, query=query))
-    return scored_items
+    """Adapt persistent and injected-gateway rows to the shared projector."""
+    if "conversation_recall" in raw:
+        rows = raw["conversation_recall"]
+        projected: list[ScoredSearchItem] = []
+        for row in rows:
+            raw_item = row.get("item")
+            if not isinstance(raw_item, dict):
+                continue
+            normalized_item = dict(raw_item)
+            raw_dossier = normalized_item.get("dossier")
+            if isinstance(raw_dossier, dict):
+                normalized_dossier = dict(raw_dossier)
+                raw_actions = normalized_dossier.get("actions")
+                if isinstance(raw_actions, list):
+                    normalized_dossier["actions"] = [
+                        {
+                            **action,
+                            "availability": decision_action_availability,
+                        }
+                        if isinstance(action, dict)
+                        and action.get("type") == "decision"
+                        else action
+                        for action in raw_actions
+                        if not (
+                            isinstance(action, dict)
+                            and action.get("type") == "decision"
+                            and decision_action_availability is None
+                        )
+                    ]
+                normalized_item["dossier"] = normalized_dossier
+            item = SearchItem.model_validate(normalized_item)
+            projected.append((int(row.get("score") or 0), item))
+        return projected
 
+    conversations: dict[str, dict[str, Any]] = {
+        str(row["id"]): dict(row)
+        for row in raw.get("conversations", [])
+        if row.get("id") is not None and row.get("deleted_at") is None
+    }
+    runs = [dict(row) for row in raw.get("runs", [])]
+    ideas = [dict(row) for row in raw.get("ideas", [])]
+    evidence = [dict(row) for row in raw.get("evidence", [])]
+    decisions = [dict(row) for row in raw.get("decisions", [])]
+    messages = [dict(row) for row in raw.get("messages", [])]
 
-def scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
-    with api_state.store.backtest_finalization_lock:
-        return _scored_memory_search_items(user=user, query=query)
-
-
-def _scored_memory_search_items(*, user: User, query: str) -> list[ScoredSearchItem]:
-    scored_items: list[ScoredSearchItem] = []
-    for conversation in api_state.store.conversations.values():
-        if not memory_object_visible(
-            owner_map=api_state.store.conversation_owners,
-            object_id=conversation.id,
-            user_id=user.id,
-        ):
+    # Compatibility for narrow injected gateways: production readers include
+    # canonical conversations, while test doubles may return only a matched
+    # child record.
+    for row in (*runs, *ideas, *evidence, *decisions):
+        conversation_id = _conversation_id(row)
+        if conversation_id is None or conversation_id in conversations:
             continue
-        if conversation.deleted_at:
-            continue
-        haystack = f"{conversation.title} {conversation.last_message_preview or ''}"
-        if search_text_matches_query(query=query, text=haystack):
-            item = SearchItem(
-                type="chat",
-                id=conversation.id,
-                title=conversation.title,
-                matched_text=conversation.last_message_preview or conversation.title,
-                updated_at=conversation.updated_at,
-            )
-            scored_items.append(
-                (
-                    score_search_item(
-                        query=query,
-                        title=conversation.title,
-                        matched_text=item.matched_text,
-                        pinned=conversation.pinned,
-                    ),
-                    item,
-                )
-            )
-    for strategy in api_state.store.strategies.values():
-        if not memory_object_visible(
-            owner_map=api_state.store.strategy_owners,
-            object_id=strategy.id,
-            user_id=user.id,
-        ):
-            continue
-        if strategy.deleted_at:
-            continue
-        haystack = f"{strategy.name} {' '.join(strategy.symbols)} {strategy.template}"
-        if search_text_matches_query(query=query, text=haystack):
-            matched_text = ", ".join(strategy.symbols) or strategy.name
-            item = SearchItem(
-                type="strategy",
-                id=strategy.id,
-                title=strategy.name,
-                matched_text=matched_text,
-                updated_at=strategy.updated_at,
-            )
-            scored_items.append(
-                (
-                    score_search_item(
-                        query=query,
-                        title=strategy.name,
-                        matched_text=matched_text,
-                        pinned=strategy.pinned,
-                        symbol_exact_match=any(
-                            query == symbol.lower() for symbol in strategy.symbols
-                        ),
-                    ),
-                    item,
-                )
-            )
-    for collection in api_state.store.collections.values():
-        if not memory_object_visible(
-            owner_map=api_state.store.collection_owners,
-            object_id=collection.id,
-            user_id=user.id,
-        ):
-            continue
-        if collection.deleted_at:
-            continue
-        if search_text_matches_query(query=query, text=collection.name):
-            item = SearchItem(
-                type="collection",
-                id=collection.id,
-                title=collection.name,
-                matched_text=collection.name,
-                updated_at=collection.updated_at,
-            )
-            scored_items.append(
-                (
-                    score_search_item(
-                        query=query,
-                        title=collection.name,
-                        matched_text=collection.name,
-                        pinned=collection.pinned,
-                    ),
-                    item,
-                )
-            )
-    for run in api_state.store.backtest_runs.values():
-        if not memory_object_visible(
-            owner_map=api_state.store.backtest_run_owners,
-            object_id=run.id,
-            user_id=user.id,
-        ):
-            continue
-        title = run.conversation_result_card.get("title", "Backtest run")
-        haystack = f"{title} {' '.join(run.symbols)} {run.config_snapshot.get('template', '')}"
-        if search_text_matches_query(query=query, text=haystack):
-            scored_items.append(_scored_memory_run(run=run, query=query))
-    decision_state_by_idea = _latest_decision_state_by_idea(
-        [
-            (decision.idea_id, decision.decision_state, decision.updated_at)
-            for decision in api_state.store.decision_notes.values()
-            if api_state.store.decision_note_owners.get(decision.id) == user.id
-        ]
-    )
-    for idea in api_state.store.ideas.values():
-        if api_state.store.idea_owners.get(idea.id) != user.id:
-            continue
-        haystack = f"{idea.title} {idea.summary}"
-        # Empty-query browse (q="" + decision_state filter) must still surface
-        # ideas so the router can narrow them by state, matching the Supabase path.
-        if not query or search_text_matches_query(query=query, text=haystack):
-            item = SearchItem(
-                type="idea",
-                id=idea.id,
-                title=idea.title,
-                matched_text=idea.summary or idea.title,
-                updated_at=idea.updated_at,
-                conversation_id=idea.source_conversation_id,
-                lifecycle=idea.lifecycle,
-                decision_state=decision_state_by_idea.get(idea.id),
-                preview={
-                    "digest": idea.summary,
-                },
-            )
-            scored_items.append(
-                (
-                    score_search_item(
-                        query=query,
-                        title=idea.title,
-                        matched_text=idea.summary,
-                        pinned=False,
-                    ),
-                    item,
-                )
-            )
-    for artifact in api_state.store.evidence_artifacts.values():
-        if api_state.store.evidence_artifact_owners.get(artifact.id) != user.id:
-            continue
-        haystack = f"{artifact.title} {artifact.digest}"
-        if search_text_matches_query(query=query, text=haystack):
-            preview = evidence_preview_from_artifact(artifact)
-            item = SearchItem(
-                type="evidence",
-                id=artifact.id,
-                title=artifact.title,
-                matched_text=artifact.digest,
-                updated_at=artifact.updated_at,
-                conversation_id=artifact.source_conversation_id,
-                lifecycle=artifact.lifecycle,
-                preview=preview,
-            )
-            scored_items.append(
-                (
-                    score_search_item(
-                        query=query,
-                        title=artifact.title,
-                        matched_text=artifact.digest,
-                        pinned=False,
-                        symbol_exact_match=any(
-                            query == str(symbol).lower()
-                            for symbol in preview.get("symbols") or []
-                        ),
-                    ),
-                    item,
-                )
-            )
-    for decision in api_state.store.decision_notes.values():
-        if api_state.store.decision_note_owners.get(decision.id) != user.id:
-            continue
-        artifact = api_state.store.evidence_artifacts.get(decision.evidence_artifact_id)
-        if artifact is None:
-            continue
-        artifact_text = f"{artifact.title} {artifact.digest}"
-        note = decision.note or ""
-        haystack = f"{decision.decision_state} {note} {artifact_text}"
-        if search_text_matches_query(query=query, text=haystack):
-            title = artifact.title
-            matched_text = _decision_preview_digest(
-                note=note,
-                artifact_digest=artifact.digest,
-            )
-            item = SearchItem(
-                type="decision",
-                id=decision.id,
-                title=title,
-                matched_text=matched_text,
-                updated_at=decision.updated_at,
-                conversation_id=decision.source_conversation_id,
-                lifecycle="decided",
-                preview=decision_recall_preview(
-                    decision_state=decision.decision_state,
-                    note=decision.note,
-                    artifact_title=artifact.title,
-                    artifact_digest=artifact.digest,
-                    artifact_payload=artifact.payload,
-                ),
-            )
-            scored_items.append(
-                (
-                    score_search_item(
-                        query=query,
-                        title=title,
-                        matched_text=haystack,
-                        pinned=False,
-                    ),
-                    item,
-                )
-            )
-    return scored_items
-
-
-def _scored_supabase_run(*, row: dict[str, object], query: str) -> ScoredSearchItem:
-    card = row.get("conversation_result_card")
-    if not isinstance(card, dict):
-        card = {}
-    title = str(card.get("title") or "Backtest run")
-    result_type = (
-        "backtest"
-        if card.get("artifact_type") == "backtest" or card.get("evidence_artifact_id")
-        else "run"
-    )
-    symbols = list(card.get("symbols") or [])
-    item = SearchItem(
-        type=result_type,
-        id=str(row["id"]),
-        title=title,
-        matched_text=title,
-        updated_at=row["created_at"],
-        conversation_id=row.get("conversation_id"),
-        lifecycle=card.get("evidence_lifecycle"),
-        preview={
-            "digest": title,
-            "symbols": symbols,
-            "benchmark_symbol": row.get("benchmark_symbol"),
+        conversations[conversation_id] = {
+            "id": conversation_id,
+            "title": row.get("title")
+            or row.get("artifact_title")
+            or row.get("artifact_digest")
+            or "Untitled conversation",
+            "last_message_preview": None,
+            "pinned": False,
+            "updated_at": row.get("updated_at") or row.get("created_at"),
         }
-        if result_type == "backtest"
-        else None,
-    )
-    return (
-        score_search_item(
-            query=query,
-            title=title,
-            matched_text=title,
-            pinned=False,
-            symbol_exact_match=any(query == str(symbol).lower() for symbol in symbols),
-        ),
-        item,
-    )
 
-
-def _scored_memory_run(*, run, query: str) -> ScoredSearchItem:  # noqa: ANN001
-    card = (
-        run.conversation_result_card if isinstance(run.conversation_result_card, dict) else {}
-    )
-    title = str(card.get("title", "Backtest run"))
-    result_type = (
-        "backtest"
-        if card.get("artifact_type") == "backtest" or card.get("evidence_artifact_id")
-        else "run"
-    )
-    item = SearchItem(
-        type=result_type,
-        id=run.id,
-        title=title,
-        matched_text=title,
-        updated_at=run.created_at,
-        conversation_id=run.conversation_id,
-        lifecycle=card.get("evidence_lifecycle"),
-        preview={
-            "digest": title,
-            "symbols": list(run.symbols),
-            "benchmark_symbol": run.benchmark_symbol,
-        }
-        if result_type == "backtest"
-        else None,
-    )
-    return (
-        score_search_item(
-            query=query,
-            title=title,
-            matched_text=title,
-            pinned=False,
-            symbol_exact_match=any(query == symbol.lower() for symbol in run.symbols),
-        ),
-        item,
-    )
-
-
-def _scored_decision_row(*, row: dict[str, object], query: str) -> ScoredSearchItem:
-    title = str(row.get("artifact_title") or row.get("artifact_digest") or row["id"])
-    search_text = " ".join(
-        str(part)
-        for part in (
-            row.get("decision_state"),
-            row.get("note"),
-            row.get("artifact_digest"),
+    # The old bounded reader hydrates a decision's evidence inline.
+    for decision in decisions:
+        artifact_id = decision.get("evidence_artifact_id")
+        if artifact_id is None or any(
+            str(row.get("id")) == str(artifact_id) for row in evidence
+        ):
+            continue
+        evidence.append(
+            {
+                "id": artifact_id,
+                "source_conversation_id": decision.get("source_conversation_id"),
+                "source_run_id": decision.get("source_run_id"),
+                "title": decision.get("artifact_title"),
+                "digest": decision.get("artifact_digest"),
+                "payload": decision.get("artifact_payload"),
+                "created_at": decision.get("created_at"),
+                "updated_at": decision.get("updated_at"),
+            }
         )
-        if part
-    )
-    matched_text = _decision_preview_digest(
-        note=row.get("note"),
-        artifact_digest=row.get("artifact_digest"),
-    )
-    artifact_payload = row.get("artifact_payload")
-    item = SearchItem(
-        type="decision",
-        id=str(row["id"]),
-        title=title,
-        matched_text=matched_text,
-        updated_at=row["updated_at"],
-        conversation_id=row.get("source_conversation_id"),
-        lifecycle="decided",
-        preview=decision_recall_preview(
-            decision_state=row.get("decision_state"),
-            note=row.get("note"),
-            artifact_title=row.get("artifact_title"),
-            artifact_digest=row.get("artifact_digest"),
-            artifact_payload=(
-                artifact_payload if isinstance(artifact_payload, dict) else None
-            ),
-        ),
-    )
-    return (
-        score_search_item(
-            query=query,
-            title=title,
-            matched_text=search_text,
-            pinned=False,
-        ),
-        item,
+
+    return _project_rows(
+        conversations=list(conversations.values()),
+        runs=runs,
+        ideas=ideas,
+        evidence=evidence,
+        decisions=decisions,
+        messages=messages,
+        query=query,
+        decision_action_availability=decision_action_availability,
+        language=language,
     )
 
 
-def _evidence_preview_from_search_row(row: dict[str, object]) -> dict[str, object]:
-    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
-    return evidence_preview_from_payload(
-        digest=row.get("digest"),
-        title=row.get("title"),
-        payload=payload,
-    )
-
-
-def _decision_preview_digest(
+def _project_rows(
     *,
-    note: object,
-    artifact_digest: object,
-) -> str:
-    parts = [
-        part.strip()
-        for part in (note, artifact_digest)
-        if isinstance(part, str) and part.strip()
-    ]
-    return " · ".join(parts)
+    conversations: list[Mapping[str, Any]],
+    runs: list[Mapping[str, Any]],
+    ideas: list[Mapping[str, Any]],
+    evidence: list[Mapping[str, Any]],
+    decisions: list[Mapping[str, Any]],
+    messages: list[Mapping[str, Any]],
+    query: str,
+    decision_action_availability: DecisionActionAvailability | None = "available",
+    language: str = "en",
+) -> list[ScoredSearchItem]:
+    runs_by_conversation = _group_by_conversation(runs)
+    ideas_by_conversation = _group_by_conversation(ideas)
+    evidence_by_conversation = _group_by_conversation(evidence)
+    decisions_by_conversation = _group_by_conversation(decisions)
+    messages_by_conversation = _group_by_conversation(messages)
+    projected: list[ScoredSearchItem] = []
+    for conversation in conversations:
+        conversation_id = str(conversation.get("id") or "")
+        item = project_conversation_recall(
+            conversation=conversation,
+            runs=runs_by_conversation[conversation_id],
+            ideas=ideas_by_conversation[conversation_id],
+            evidence=evidence_by_conversation[conversation_id],
+            decisions=decisions_by_conversation[conversation_id],
+            messages=messages_by_conversation[conversation_id],
+            query=query,
+            decision_action_availability=decision_action_availability,
+            language=language,
+        )
+        if item is not None:
+            projected.append(item)
+    return projected
+
+
+def _group_by_conversation(
+    rows: list[Mapping[str, Any]],
+) -> defaultdict[str, list[Mapping[str, Any]]]:
+    grouped: defaultdict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for row in rows:
+        conversation_id = _conversation_id(row)
+        if conversation_id is not None:
+            grouped[conversation_id].append(row)
+    return grouped
+
+
+def _conversation_id(row: Mapping[str, Any]) -> str | None:
+    value = row.get("conversation_id") or row.get("source_conversation_id")
+    return str(value) if value is not None else None

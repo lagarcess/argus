@@ -1,6 +1,9 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/Tooltip";
+import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
+import { ConversationActivityIndicator } from "@/components/chat/ConversationActivityIndicator";
+import type { ConversationActivityPresentation } from "@/lib/conversation-activity-state";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -19,8 +22,14 @@ type SidebarNavButtonProps = {
   className?: string;
   /** Optional right-side content (e.g. chevron for accordion) */
   trailing?: ReactNode;
+  /** A compact keyboard hint shown while the primary modifier is held */
+  shortcutHint?: string;
+  /** Whether the keyboard hint is currently visible */
+  showShortcutHint?: boolean;
   /** Icon size override (default: 22) */
   iconSize?: number;
+  /** Optional aggregate conversation activity rendered over the icon */
+  activityPresentation?: ConversationActivityPresentation;
 };
 
 /**
@@ -38,7 +47,10 @@ export default function SidebarNavButton({
   onClick,
   className = "",
   trailing,
+  shortcutHint,
+  showShortcutHint = false,
   iconSize = 22,
+  activityPresentation = "none",
 }: SidebarNavButtonProps) {
   const button = (
     <button
@@ -50,11 +62,22 @@ export default function SidebarNavButton({
       } ${className}`}
     >
       {/* Icon container: fixed 44px square, always centered */}
-      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
+      <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center">
         <Icon
           style={{ width: iconSize, height: iconSize }}
           className="text-black/60 transition-transform duration-150 ease-out group-hover:scale-[1.06] group-hover:text-black dark:text-white/60 dark:group-hover:text-white"
         />
+        {activityPresentation !== "none" ? (
+          <span
+            data-sidebar-activity-overlay="true"
+            className="pointer-events-none absolute right-1 top-1"
+          >
+            <ConversationActivityIndicator
+              presentation={activityPresentation}
+              compact
+            />
+          </span>
+        ) : null}
       </div>
       {/* Label: font-display (Space Grotesk) per DESIGN.md Nav/UI role */}
       <span
@@ -66,9 +89,15 @@ export default function SidebarNavButton({
       >
         {label}
       </span>
-      {trailing && !collapsed && (
-        <div className="ml-auto pr-4">
-          {trailing}
+      {!collapsed && (shortcutHint || trailing) && (
+        <div className="ml-auto flex h-[22px] shrink-0 items-center justify-end pr-4">
+          {showShortcutHint && shortcutHint ? (
+            <KeyboardShortcutKeycap className="select-none">
+              {shortcutHint}
+            </KeyboardShortcutKeycap>
+          ) : (
+            trailing
+          )}
         </div>
       )}
     </button>

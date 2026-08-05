@@ -34,6 +34,28 @@ def response_with_runtime_context_assets(
     )
 
 
+def carry_incomplete_asset_blocker(
+    response: LLMInterpretationResponse,
+    asset_resolution_context: str | None,
+) -> LLMInterpretationResponse:
+    """Carry explicit provider incompleteness across response replacement.
+
+    Artifact planning can replace the normalized model response with a full
+    active-artifact draft. Reconcile only the provider-owned completeness flag
+    at that boundary; the current message's provider rows do not describe
+    inherited artifact assets and must not be used to normalize that full draft.
+    """
+
+    if (
+        response.intent
+        not in {"strategy_drafting", "backtest_execution", "conversation_followup"}
+        or response.semantic_turn_act == "unsupported_request"
+        or _all_traded_asset_mentions_accounted_for(asset_resolution_context) is not False
+    ):
+        return response
+    return response.model_copy(update=_incomplete_asset_context_update(response))
+
+
 def _response_without_model_authored_provider_records(
     response: LLMInterpretationResponse,
 ) -> LLMInterpretationResponse:
@@ -71,6 +93,13 @@ def response_with_provider_context_assets(
     if response.intent not in supported_intents:
         return response
     rows = _asset_context_rows(asset_resolution_context)
+    all_traded_asset_mentions_accounted_for = _all_traded_asset_mentions_accounted_for(
+        asset_resolution_context
+    )
+    incomplete_asset_context = (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and all_traded_asset_mentions_accounted_for is False
+    )
     candidate_rows = [
         row
         for row in rows
@@ -78,10 +107,13 @@ def response_with_provider_context_assets(
         and row.get("status") in {"resolved", "ambiguous"}
     ]
     if not candidate_rows:
+        if incomplete_asset_context:
+            return response.model_copy(update=_incomplete_asset_context_update(response))
         return response
 
     resolved_symbols: list[str] = []
     resolved_records: list[dict[str, Any]] = []
+    resolved_record_identities: set[tuple[str, str]] = set()
     asset_classes: set[str] = set()
     ambiguous_fields: list[LLMAmbiguousField] = []
     for row in candidate_rows[:5]:
@@ -89,20 +121,29 @@ def response_with_provider_context_assets(
             ambiguous_fields.append(_ambiguous_field_from_context_row(row))
             continue
         symbol = str(row.get("symbol") or "").strip().upper()
+        asset_class = str(row.get("asset_class") or "").strip().lower()
         if symbol and symbol not in resolved_symbols:
             resolved_symbols.append(symbol)
-            resolved_records.append(_resolved_asset_record_from_context_row(row))
-        asset_class = str(row.get("asset_class") or "").strip().lower()
+        if symbol:
+            resolved_record = _resolved_asset_record_from_context_row(row)
+            resolved_record_identity = (symbol, asset_class)
+            if resolved_record_identity not in resolved_record_identities:
+                resolved_record_identities.add(resolved_record_identity)
+                resolved_records.append(resolved_record)
         if asset_class:
             asset_classes.add(asset_class)
 
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     draft_assets = [
-        str(value).strip()
-        for value in draft.asset_universe
-        if str(value).strip()
+        str(value).strip() for value in draft.asset_universe if str(value).strip()
     ]
-    context_is_partial = len(resolved_symbols) < len(draft_assets)
+    context_is_partial = len(draft_assets) > len(resolved_symbols) and any(
+        not any(
+            _provider_record_matches_symbol(record, draft_asset)
+            for record in resolved_records
+        )
+        for draft_asset in draft_assets
+    )
     preserved_fuller_draft = context_is_partial
     if not context_is_partial:
         draft.asset_universe = resolved_symbols
@@ -138,10 +179,44 @@ def response_with_provider_context_assets(
     if (
         not ambiguous_fields
         and not preserved_fuller_draft
+        and not incomplete_asset_context
         and draft == response.candidate_strategy_draft
     ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
+    resolved_missing_asset = (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and "asset_universe" in response.missing_required_fields
+        and bool(resolved_symbols)
+        and not ambiguous_fields
+        and not preserved_fuller_draft
+        and all_traded_asset_mentions_accounted_for is True
+    )
+    if resolved_missing_asset:
+        remaining_missing_fields = [
+            field
+            for field in response.missing_required_fields
+            if field != "asset_universe"
+        ]
+        update.update(
+            {
+                "missing_required_fields": remaining_missing_fields,
+                "requires_clarification": bool(
+                    remaining_missing_fields
+                    or response.ambiguous_fields
+                    or response.unsupported_constraints
+                ),
+                "assistant_response": None,
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "provider_context_resolved_missing_asset",
+                        ]
+                    )
+                ),
+            }
+        )
     if preserved_fuller_draft:
         update["reason_codes"] = list(
             dict.fromkeys(
@@ -149,6 +224,13 @@ def response_with_provider_context_assets(
                     *response.reason_codes,
                     "provider_context_partial_preserved_fuller_draft",
                 ]
+            )
+        )
+    if incomplete_asset_context:
+        update.update(
+            _incomplete_asset_context_update(
+                response,
+                reason_codes=update.get("reason_codes"),
             )
         )
     if ambiguous_fields:
@@ -163,6 +245,37 @@ def response_with_provider_context_assets(
             }
         )
     return response.model_copy(update=update)
+
+
+def _incomplete_asset_context_update(
+    response: LLMInterpretationResponse,
+    *,
+    reason_codes: list[str] | None = None,
+) -> dict[str, Any]:
+    remaining_missing_fields = [
+        field for field in response.missing_required_fields if field != "asset_universe"
+    ]
+    return {
+        "missing_required_fields": [
+            "asset_universe",
+            *remaining_missing_fields,
+        ],
+        "requires_clarification": True,
+        "assistant_response": (
+            response.assistant_response
+            if response.requires_clarification
+            and "asset_universe" in response.missing_required_fields
+            else None
+        ),
+        "reason_codes": list(
+            dict.fromkeys(
+                [
+                    *(reason_codes or response.reason_codes),
+                    "provider_context_incomplete_asset_mentions",
+                ]
+            )
+        ),
+    }
 
 
 def response_with_grounded_partial_context(
@@ -232,6 +345,21 @@ def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:
     return symbols
 
 
+def resolved_asset_classes_from_strategy_context(
+    strategy: Any,
+    symbol: str,
+) -> set[str]:
+    """Provider-owned asset classes for every record matching ``symbol``."""
+
+    return {
+        asset_class
+        for record in resolved_asset_records_from_strategy_context(strategy)
+        if _provider_record_matches_symbol(record, symbol)
+        and (asset_class := str(record.get("asset_class") or "").strip().lower())
+        in {"equity", "crypto", "currency_pair"}
+    }
+
+
 def resolution_from_strategy_context(
     strategy: Any,
     symbol: str,
@@ -294,6 +422,10 @@ def response_with_canonical_interpreter_assets(
             changed = True
             continue
         symbol = raw_text
+        context_asset_classes = resolved_asset_classes_from_strategy_context(
+            draft,
+            raw_text,
+        )
         try:
             resolution = resolution_from_strategy_context(
                 draft,
@@ -312,13 +444,13 @@ def response_with_canonical_interpreter_assets(
             and resolution.status == "resolved"
             and resolution.asset is not None
         ):
-            resolved_symbol = str(
-                resolution.asset.canonical_symbol or ""
-            ).strip().upper()
+            resolved_symbol = str(resolution.asset.canonical_symbol or "").strip().upper()
             if resolved_symbol:
                 symbol = resolved_symbol
             asset_class = str(resolution.asset.asset_class or "").strip().lower()
-            if asset_class:
+            if context_asset_classes:
+                asset_classes.update(context_asset_classes)
+            elif asset_class:
                 asset_classes.add(asset_class)
         if symbol != raw_text:
             changed = True
@@ -360,9 +492,22 @@ def _asset_context_rows(asset_resolution_context: str | None) -> list[dict[str, 
     return [row for row in rows if isinstance(row, dict)]
 
 
+def _all_traded_asset_mentions_accounted_for(
+    asset_resolution_context: str | None,
+) -> bool | None:
+    if not asset_resolution_context:
+        return None
+    try:
+        payload = json.loads(asset_resolution_context)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    measurement = payload.get("all_traded_asset_mentions_accounted_for")
+    return measurement if isinstance(measurement, bool) else None
+
+
 def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, Any]:
     symbol = str(row.get("symbol") or "").strip().upper()
-    return {
+    record = {
         "raw_text": str(row.get("raw_text") or "").strip(),
         "symbol": symbol,
         "asset_class": str(row.get("asset_class") or "").strip().lower(),
@@ -371,6 +516,12 @@ def _resolved_asset_record_from_context_row(row: dict[str, Any]) -> dict[str, An
         "provider": str(row.get("provider") or "provider_catalog").strip(),
         "exchange": str(row.get("exchange") or "").strip(),
     }
+    aliases = row.get("aliases")
+    if isinstance(aliases, list):
+        record["aliases"] = [
+            str(alias).strip() for alias in aliases if str(alias).strip()
+        ]
+    return record
 
 
 def _resolved_asset_record_for_symbol(
@@ -398,9 +549,11 @@ def _provider_record_matches_symbol(record: dict[str, Any], symbol: str) -> bool
         str(record.get("raw_text") or "").strip().upper(),
         str(record.get("name") or "").strip().upper(),
     }
+    aliases = record.get("aliases")
+    if isinstance(aliases, list):
+        candidates.update(str(alias or "").strip().upper() for alias in aliases)
     return any(
-        candidate and candidate.replace("/", "") == compact
-        for candidate in candidates
+        candidate and candidate.replace("/", "") == compact for candidate in candidates
     )
 
 

@@ -9,6 +9,7 @@ import {
   streamChatMessage,
   type ChatStreamEvent,
 } from "../lib/argus-api";
+import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
 
 const root = join(import.meta.dir, "..");
 
@@ -190,6 +191,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
     const starterActions = readFileSync(
       join(root, "components/chat/StarterActions.tsx"),
       "utf-8",
@@ -219,13 +224,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(envExample).toContain(
       "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false",
     );
-    expect(chat).toContain("chatExploratorySuggestionsEnabled");
-    expect(chat).toContain("showExploratorySuggestions");
+    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled");
+    expect(emptyChat).toContain("showSuggestions");
     expect(starterActions).toContain("chat.starter_actions.tsla.value");
     expect(starterActions).toContain("chat.starter_actions.btc.value");
     expect(starterActions).toContain("chat.starter_actions.dca.value");
-    expect(chat).toContain("<StarterActions");
-    expect(chat).toContain("showExploratorySuggestions &&");
+    expect(emptyChat).toContain("<StarterActions");
+    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled && showSuggestions &&");
     expect(input).toContain("chatExploratorySuggestionsEnabled");
     expect(input).toContain(
       "const prompts = chatExploratorySuggestionsEnabled",
@@ -343,9 +348,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain(
       "appendOrReplacePendingAssistantMessage(baseMessages",
     );
-    expect(chat).toContain(
-      "replacementAssistantId: failedAssistantId ?? undefined",
-    );
+    expect(chat).toContain("failedAssistantId");
+    expect(chat).toContain("renderUserMessage: false");
+    expect(chat).toContain("replacementAssistantId: failedAssistantId");
+    expect(chat).toContain("requestMessageId");
+    expect(chat).toContain("renderUserMessage: true");
     expect(chat).toContain(
       "const persistedErrorMessageId = event.data.message_id?.trim()",
     );
@@ -365,7 +372,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(retry).not.toContain(".match(");
     // Action labels localize where the actions now render: next-move rows own
     // labelKey interpolation since the floating composer strip was removed.
-    expect(message).toContain("const actionLabel = (action: ChatActionOption) =>");
+    expect(message).toContain(
+      "const actionLabel = (action: ChatActionOption) =>",
+    );
     expect(message).toContain("{actionLabel(action)}");
     expect(chat).toContain("const actionDisplayLabel = useCallback");
     expect(chat).toContain(
@@ -375,12 +384,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain(
       "{action.label}\n                          </button>",
     );
-    expect(message).toContain(
-      "? t(action.labelKey, {",
-    );
+    expect(message).toContain("? t(action.labelKey, {");
     expect(message).toContain("defaultValue: action.label,");
     expect(message).toContain(
-      '{displayContent || (message.selectedAction ? actionLabel(message.selectedAction) : "")}',
+      '(message.selectedAction ? actionLabel(message.selectedAction) : "")',
     );
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
@@ -647,7 +654,7 @@ describe("Argus Alpha frontend contract", () => {
       chat.indexOf("const turnInFlight ="),
       chat.indexOf("const nextMovesEnabled ="),
     );
-    expect(inFlight).toContain("streamStatus");
+    expect(inFlight).toContain("visibleStreamStatus");
     expect(inFlight).toContain("isStreamingResponse");
     expect(inFlight).toContain("isHydratingConversation");
     const gate = chat.slice(
@@ -843,10 +850,13 @@ describe("Argus Alpha frontend contract", () => {
     globalThis.fetch = ((_input, init) => {
       submittedRequestId = new Headers(init?.headers).get("X-Request-Id");
       return Promise.resolve(
-        new Response(new ReadableStream({ start: (controller) => controller.close() }), {
-          status: 200,
-          headers: { "Content-Type": "text/event-stream" },
-        }),
+        new Response(
+          new ReadableStream({ start: (controller) => controller.close() }),
+          {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          },
+        ),
       );
     }) as typeof fetch;
 
@@ -979,10 +989,15 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
+    const projection = readFileSync(
+      join(root, "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
     expect(chat).toContain("isStreamingResponse");
-    expect(chat).toContain("latestAiIndex");
+    expect(chat).toContain("messageStreamPresentation(");
     expect(chat).toContain("isWorkingMessage");
-    expect(chat).toContain('(msg.content ?? "") === ""');
+    expect(projection).toContain("latestAiIndex");
+    expect(projection).toContain('(message.content ?? "") === ""');
     expect(chat).toContain("isStreaming={isWorkingMessage}");
     expect(message).toContain("{!isUser && !isStreaming && (");
     expect(message).not.toContain("{copyFeedback && (");
@@ -996,7 +1011,7 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("latestAssistantContent");
     expect(chat).toMatch(
-      /const showStreamStatus = Boolean\s*\(\s*streamStatus && latestAssistantContent\.length === 0,?\s*\)/,
+      /const showStreamStatus = Boolean\s*\(\s*visibleStreamStatus && latestAssistantContent\.length === 0,?\s*\)/,
     );
     expect(chat).toContain("{showStreamStatus && (");
   });
@@ -1010,17 +1025,41 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInput.tsx"),
       "utf-8",
     );
-
-    expect(chat).toContain("if (isStreamingResponse) return false;");
-    expect(chat).toContain("<ChatInput");
-    expect(chat).toContain("onSend={handleSend}");
-    expect(chat).toContain(
-      "disabled={isStreamingResponse || isHydratingConversation}",
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
     );
+
+    expect(chat).toContain(
+      "conversationActivity.isConversationLocked(targetConversationId)",
+    );
+    expect(chat).toContain(
+      "conversationActivity.isConversationLocked(conversationId)",
+    );
+
+    expect(chat).toContain("sendAdmissionInFlightRef.current ||");
+    expect(chat).toContain("sendAdmissionInFlightRef.current = true;");
+    expect(`${chat}\n${emptyChat}`).toContain("<ChatInput");
+    expect(chat).toContain("onSend={handleSend}");
+    expect(emptyChat).toMatch(
+      /const disabled =\s*isStreamingResponse \|\| isHydratingConversation \|\| guestSubmissionPending/,
+    );
+    expect(emptyChat).toContain("disabled={disabled}");
     expect(chat).toContain("disabled={conversationComposerUnavailable}");
     expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
-    expect(chat).toContain("setIsStreamingResponse(false);");
+    expect(chat).toContain(
+      "createChatRequestSessionController",
+    );
+    expect(chat).toContain(
+      'requestSessions.authorize(requestSession, "final")',
+    );
+    expect(chat).toContain(
+      'requestSessions.authorize(\n            requestSession,\n            "title",',
+    );
+    expect(chat).toContain("finishRequestTransport(requestSession)");
+    expect(chat).not.toContain("conversationActivity.settleRequest");
+    expect(chat).not.toContain("setIsStreamingResponse(false);");
     expect(input).toContain("disabled?: boolean");
     expect(input).toContain("if (disabled) return;");
     expect(input).toContain("contentEditable={!disabled}");
@@ -1035,11 +1074,18 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const scrollControls = readFileSync(
+      join(root, "components/chat/useChatScrollControls.ts"),
+      "utf-8",
+    );
 
     expect(chat).toContain("scrollContainerRef");
     expect(chat).toContain("showJumpToLatest");
-    expect(chat).toContain('aria-label="Jump to latest"');
-    expect(chat).toContain("distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX");
+    expect(chat.match(/<ConversationActivityJumpButton/g)).toHaveLength(1);
+    expect(chat).not.toContain('aria-label="Jump to latest"');
+    expect(scrollControls).toContain(
+      "distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX",
+    );
     expect(chat).toContain("scrollToLatest");
     expect(chat).toContain("shouldAutoScrollRef.current");
   });
@@ -1201,10 +1247,13 @@ describe("Argus Alpha frontend contract", () => {
       'import { writeClipboardText } from "@/lib/clipboard";',
     );
     expect(message).toContain("await writeClipboardText(text)");
-    expect(message).toContain("onToast?: (message: string) => void");
     expect(message).toContain(
-      'onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"))',
+      'onToast?: (message: string, variant?: "neutral" | "error") => void',
     );
+    expect(message).toContain(
+      't(copied ? "chat.copy_success" : "chat.copy_failed")',
+    );
+    expect(message).toContain('copied ? "neutral" : "error"');
     expect(message).not.toContain("absolute -left-12");
     expect(message).toContain("chat.copy_success");
     expect(message).toContain("chat.copy_failed");
@@ -1214,7 +1263,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain('className="h-28"');
     expect(toast).toContain("absolute inset-x-0 bottom-24");
     expect(toast).toContain("flex justify-center");
-    expect(toast).toContain('role="status"');
+    // Success stays a polite status pill; failures escalate to an alert.
+    expect(toast).toContain('role={isError ? "alert" : "status"}');
+    expect(toast).toContain('aria-live={isError ? "assertive" : "polite"}');
     expect(toast).toContain("dark:bg-[#1f2225]");
     expect(chat).not.toContain("rounded-full bg-black dark:bg-white");
     expect(en).toContain('"copy_success": "Copied"');
@@ -1240,12 +1291,20 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
     );
+    const routing = readFileSync(
+      join(root, "lib/chat-conversation-routing.ts"),
+      "utf-8",
+    );
+    const initialSession = readFileSync(
+      join(root, "components/chat/useInitialChatSession.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
-    expect(chat).toContain("readActiveConversationIdFromUrl");
+    expect(routing).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
+    expect(`${chat}\n${initialSession}`).toContain("readActiveConversationRouteState");
     expect(chat).not.toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
     expect(chat).not.toContain("readActiveConversationId()");
-    expect(chat).toContain(
+    expect(initialSession).toContain(
       "await navigateConversationTranscript(activeConversationId, userId, {",
     );
     expect(chat).toContain(
@@ -1322,48 +1381,122 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/command-palette-items.ts"),
       "utf-8",
     );
+    const dossier = readFileSync(
+      join(
+        root,
+        "components/sidebar/command-palette/RunDossierView.tsx",
+      ),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
-    expect(palette).toContain("searchGlobal({ q: trimmed, limit: 30 })");
+    expect(palette).toContain("includeLedgerGroups: true");
     expect(palette).toContain("commandPaletteItemFromSearch");
     expect(palette).toContain("commandPaletteGroupsByLedgerState");
-    expect(palette).not.toContain('t("command_palette.ledger.title", "Idea Ledger")');
+    expect(palette).not.toContain(
+      't("command_palette.ledger.title", "Idea Ledger")',
+    );
     expect(palette).not.toContain("command_palette.ledger.all_saved_ideas");
     expect(palette).toContain("decisionStateFilter === group.decision_state");
     expect(palette).toContain("clearSearchAndLedger();");
     expect(palette).toContain("group.count === 0");
-    expect(palette).toContain("commandPaletteSelectedPreview(previewItem, displayItems)");
+    expect(palette).toContain(
+      "commandPaletteSelectedRenderedPreview(\n    previewItem,\n    groupedItems,",
+    );
     expect(palette).toContain("setPreviewItem(null)");
-    expect(adapter).toContain("command_palette.open_source_conversation");
+    expect(adapter).toContain("command_palette.open_conversation");
+    expect(adapter).toContain('type: "chat" | "conversation"');
+    expect(adapter).toContain("item.dossier");
     expect(adapter).toContain('activation: "open_conversation"');
     expect(adapter).toContain("export function commandPaletteStatusLabelKey");
     expect(adapter).toContain("export function commandPaletteStatusFallback");
-    expect(adapter).toContain("export function commandPalettePreviewFields");
-    expect(palette).toContain("const selectedPreviewFields = useMemo");
-    expect(palette).toContain("selectedPreviewFields.map");
-    expect(palette).toContain("t(field.labelKey, field.labelFallback)");
+    expect(adapter).not.toContain("commandPalettePreviewFields");
+    expect(palette).toContain("<RunDossierView");
+    expect(dossier).toContain("formatRunDossierSetup");
+    expect(dossier).toContain("formatRunDossierMetrics");
     expect(palette).toContain("const activateItem = useCallback");
     expect(palette).not.toContain('item.activation === "select_preview"');
     expect(palette).toContain("onMouseEnter={() => setPreviewItem(item)}");
     expect(palette).toContain("onFocus={() => setPreviewItem(item)}");
     expect(palette).toContain("commandPaletteStatusLabelKey(item)");
     expect(palette).toContain("commandPaletteStatusFallback(item)");
-    expect(palette).toContain('t("command_palette.clear_search", "Clear search")');
     expect(palette).toContain(
-      '"Select a result to preview its details."',
+      't("command_palette.clear_search", "Clear search")',
     );
+    expect(palette).toContain('"Select a result to preview its details."');
     expect(palette).toContain("const openSourceConversation = useCallback");
     expect(palette).toContain("MessageSquare");
     expect(palette).toContain("md:flex-row");
     expect(palette).not.toContain("hidden w-[44%]");
-    expect(palette).toContain('t("command_palette.search_placeholder", "Search Argus...")');
+    expect(palette).toContain('"command_palette.search_placeholder"');
+    expect(palette).toContain('"Search Argus..."');
+    expect(palette).toContain("maxLength={512}");
     expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");
     expect(api).toContain("decisionState?: DecisionState | null");
     expect(api).toContain("includeLedgerGroups?: boolean");
-    expect(api).toContain('searchParams.append("decision_state", decisionState)');
-    expect(api).toContain('searchParams.append("include_ledger_groups", "true")');
+    expect(api).toContain(
+      'searchParams.append("decision_state", decisionState)',
+    );
+    expect(api).toContain(
+      'searchParams.append("include_ledger_groups", "true")',
+    );
     expect(api).toContain("export async function searchGlobal");
+  });
+
+  test("transcript matches load the complete thread before focusing the message", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain("anchorMessageId?: string");
+    expect(api).toContain(
+      'searchParams.append("anchor_message_id", options.anchorMessageId)',
+    );
+    const turnAnchor = readFileSync(
+      join(root, "components/chat/useTranscriptTurnAnchor.ts"),
+      "utf-8",
+    );
+    expect(chat).toContain(
+      "loadAllConversationMessagePages(\n          targetConversationId,",
+    );
+    expect(chat).toContain("data-message-id={msg.id}");
+    expect(chat).toContain("useTranscriptTurnAnchor({");
+    expect(turnAnchor).toContain('element.scrollIntoView({ block: "center" })');
+    expect(turnAnchor).toContain("element.focus({ preventScroll: true })");
+    expect(palette).toContain(
+      "commandPaletteOpenMessageId(item, openAtLeftOff)",
+    );
+    const anchoredNavigation = chat.slice(
+      chat.indexOf("if (options.messageId)"),
+      chat.indexOf("let renderedStaleSnapshot"),
+    );
+    expect(anchoredNavigation).not.toContain(
+      "{ anchorMessageId: requestedMessageId }",
+    );
+    expect(anchoredNavigation).toContain(
+      "loadAllConversationMessagePages(\n          targetConversationId,\n        )",
+    );
+    expect(anchoredNavigation).toContain(
+      "isCurrentAnchoredConversationRequest({",
+    );
+    expect(anchoredNavigation.match(/isCurrentRequest\(\)/g)).toHaveLength(2);
+  });
+
+  test("command palette highlights normalized search tokens without rewriting display text", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+
+    expect(palette).toContain("<SearchHighlight");
+    expect(palette).not.toContain("function highlightText");
   });
 
   test("result cards expose typed decision capture without prose parsing", () => {
@@ -1383,6 +1516,564 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain("decisionChipClassName");
     expect(card).toContain("border-[#5ba897]/18 bg-transparent");
     expect(card).toContain("selectedDecisionState === state");
+    expect(card).toContain("DECISION_NOTE_MAX_LENGTH");
+    expect(card).toContain("nextDecisionNoteValue(");
+    expect(card).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
+  });
+
+  test("omnisearch dossier verbs reuse ordinary send and owner-checked decision paths", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const contract = readFileSync(
+      join(root, "lib/run-dossier-contract.ts"),
+      "utf-8",
+    );
+
+    expect(contract).toContain('type: "retest_run"');
+    // The typed envelope carries no client-authoritative setup.
+    expect(contract).not.toContain("canonical_setup");
+    expect(contract).not.toContain("send_text");
+    expect(contract).toContain('type: "decision"');
+    expect(palette).toContain("createEvidenceDecision");
+    expect(palette).toContain("onRetest");
+    expect(palette).toContain("canonicalMutationIdRef");
+    expect(palette).toContain("searchRequestIdRef");
+    expect(palette).toContain("includeLedgerGroups: true");
+    const omnisearchActions = readFileSync(
+      join(root, "components/chat/omnisearch-actions.ts"),
+      "utf-8",
+    );
+    expect(chat).toContain("omnisearchActionHandlers(() => ({");
+    expect(chat).toContain("onRetest={omnisearch.retest}");
+    expect(omnisearchActions).toContain(
+      "await deps.loadConversation(conversationId, undefined, true)",
+    );
+    expect(omnisearchActions).toContain(
+      "if (!deps.isSourceConversationReady(conversationId)) return",
+    );
+    expect(omnisearchActions).toContain("void deps.send(action.label, action)");
+    expect(palette).not.toContain("run_backtest");
+  });
+
+  test("omnisearch disables Retest while another turn owns the stream", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const dossier = readFileSync(
+      join(
+        root,
+        "components/sidebar/command-palette/RunDossierView.tsx",
+      ),
+      "utf-8",
+    );
+
+    expect(chat).toContain("turnInFlight={turnInFlight}");
+    expect(palette).toContain("turnInFlight?: boolean");
+    expect(palette).toContain("retestDisabled={turnInFlight}");
+    expect(dossier).toContain("disabled={retestDisabled}");
+    expect(dossier).toContain("disabled:cursor-not-allowed");
+    expect(dossier).toContain("disabled:opacity-50");
+  });
+
+  test("omnisearch preserves the active turn when its conversation is selected", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const openSourceConversation = palette.slice(
+      palette.indexOf("const openSourceConversation = useCallback"),
+      palette.indexOf("const activateItem = useCallback"),
+    );
+
+    expect(chat).toContain("turnInFlight={turnInFlight}");
+    expect(palette).toContain("turnInFlight?: boolean");
+    expect(openSourceConversation).toContain(
+      "commandPaletteConversationNavigationDisabled",
+    );
+    expect(openSourceConversation).toContain("activeConversationId");
+    expect(openSourceConversation).toContain("return;");
+    expect(palette).toContain("aria-disabled={isNavigationDisabled}");
+    expect(palette).toContain("!selectedPreview.conversationId ||");
+    expect(palette).toContain("selectedNavigationDisabled");
+  });
+
+  test("debounced omnisearch synchronizes rows and ledger counts under one request owner", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const debouncedSearch = palette.slice(
+      palette.indexOf("debounceRef.current = setTimeout"),
+      palette.indexOf(
+        "return () =>",
+        palette.indexOf("debounceRef.current = setTimeout"),
+      ),
+    );
+
+    expect(debouncedSearch).toContain("includeLedgerGroups: true");
+    expect(debouncedSearch).toContain(
+      ".then(({ items, next_cursor, ledger_groups }) => {",
+    );
+    expect(debouncedSearch).toContain("setSearchResults(items)");
+    expect(debouncedSearch).toContain("setSearchNextCursor(next_cursor)");
+    expect(debouncedSearch).toContain("setLedgerGroups(ledger_groups ?? [])");
+    expect(
+      debouncedSearch.indexOf("commandPaletteRequestIsCurrent"),
+    ).toBeLessThan(
+      debouncedSearch.indexOf("setLedgerGroups(ledger_groups ?? [])"),
+    );
+  });
+
+  test("deferred search keeps its query signature through transition and clear", async () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const searchEffect = palette.slice(
+      palette.indexOf("const trimmed = query.trim()"),
+      palette.indexOf("const isFiltering = query.trim().length > 0"),
+    );
+    const timerStart = searchEffect.indexOf(
+      "debounceRef.current = setTimeout",
+    );
+    const timerBody = searchEffect.slice(timerStart);
+    const captureStart = searchEffect.indexOf(
+      "const capturedSignature = JSON.stringify",
+    );
+
+    expect(captureStart).toBeGreaterThanOrEqual(0);
+    expect(captureStart).toBeLessThan(timerStart);
+    expect(timerBody).not.toContain(
+      "const capturedSignature = JSON.stringify",
+    );
+
+    const querySignature = JSON.stringify(["gold", false, null]);
+    for (const nextSignature of [
+      JSON.stringify(["silver", false, null]),
+      JSON.stringify(["", false, null]),
+    ]) {
+      let currentSignature = querySignature;
+      let currentRequestId = 0;
+      const capturedSignature = currentSignature;
+      const deferredOwner = new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          const capturedRequestId = ++currentRequestId;
+          resolve(
+            commandPaletteRequestIsCurrent({
+              capturedSignature,
+              capturedRequestId,
+              currentSignature,
+              currentRequestId,
+            }),
+          );
+        }, 0);
+      });
+
+      currentSignature = nextSignature;
+      currentRequestId += 1;
+
+      expect(await deferredOwner).toBe(false);
+    }
+  });
+
+  test("search retry cannot let a history failure replace successful results", async () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const historyRequestStart = palette.indexOf(
+      "const requestId = ++historyRequestIdRef.current",
+    );
+    const historyEffect = palette.slice(
+      palette.lastIndexOf("useEffect(() => {", historyRequestStart),
+      palette.indexOf("const clearSearchAndLedger"),
+    );
+
+    expect(historyEffect).toContain("!isRecentsMode");
+    expect(historyEffect).toContain(
+      "searchSignatureRef.current !== RECENTS_SEARCH_SIGNATURE",
+    );
+    expect(historyEffect).toContain(
+      "const capturedSignature = RECENTS_SEARCH_SIGNATURE",
+    );
+
+    const recentsSignature = JSON.stringify(["", false, null]);
+    let currentSignature = JSON.stringify(["gold", false, null]);
+    let readError: "search" | "history" | null = "search";
+    let failHistory: (() => void) | null = null;
+    const retryHistory = (): Promise<void> | null => {
+      if (currentSignature !== recentsSignature) return null;
+      return new Promise<void>((resolve) => {
+        failHistory = () => {
+          readError = "history";
+          resolve();
+        };
+      });
+    };
+
+    const searchScopedHistoryRetry = retryHistory();
+    readError = null;
+    failHistory?.();
+    if (searchScopedHistoryRetry) await searchScopedHistoryRetry;
+
+    expect(searchScopedHistoryRetry).toBeNull();
+    expect(readError).toBeNull();
+
+    currentSignature = recentsSignature;
+    const recentsHistoryRetry = retryHistory();
+    failHistory?.();
+    if (recentsHistoryRetry) await recentsHistoryRetry;
+
+    expect(recentsHistoryRetry).not.toBeNull();
+    expect(readError).toBe("history");
+  });
+
+  test("returning to Recents retries history after an ignored search-time failure", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const historyRequestStart = palette.indexOf(
+      "const requestId = ++historyRequestIdRef.current",
+    );
+    const historyEffect = palette.slice(
+      palette.lastIndexOf("useEffect(() => {", historyRequestStart),
+      palette.indexOf("const refreshRecentsLedgerGroups"),
+    );
+    const clearSearchAndLedger = palette.slice(
+      palette.indexOf("const clearSearchAndLedger"),
+      palette.indexOf("const loadLedgerBrowse"),
+    );
+    const searchInputChange = palette.slice(
+      palette.indexOf("onChange={(event) => {"),
+      palette.indexOf(
+        "placeholder={",
+        palette.indexOf("onChange={(event) => {"),
+      ),
+    );
+
+    expect(palette).toContain("const isRecentsMode =");
+    expect(historyEffect).toContain("!isRecentsMode");
+    expect(historyEffect).toContain(
+      "[isGuest, isRecentsMode, retryNonce]",
+    );
+    expect(historyRequestStart).toBeLessThan(
+      palette.indexOf("const trimmed = query.trim()"),
+    );
+    expect(
+      clearSearchAndLedger.indexOf(
+        "historyRequestIdRef.current += 1",
+      ),
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      clearSearchAndLedger.indexOf(
+        "historyRequestIdRef.current += 1",
+      ),
+    ).toBeLessThan(
+      clearSearchAndLedger.indexOf(
+        "searchSignatureRef.current = RECENTS_SEARCH_SIGNATURE",
+      ),
+    );
+    expect(clearSearchAndLedger).toContain(
+      "searchSignatureRef.current !== RECENTS_SEARCH_SIGNATURE",
+    );
+    expect(
+      clearSearchAndLedger.indexOf(
+        "searchSignatureRef.current = RECENTS_SEARCH_SIGNATURE",
+      ),
+    ).toBeLessThan(clearSearchAndLedger.indexOf('setQuery("")'));
+    expect(
+      searchInputChange.indexOf("historyRequestIdRef.current += 1"),
+    ).toBeGreaterThanOrEqual(0);
+    expect(searchInputChange).toContain(
+      "const nextSignature = JSON.stringify",
+    );
+    expect(searchInputChange).toContain(
+      "nextSignature !== searchSignatureRef.current",
+    );
+    expect(
+      searchInputChange.indexOf("historyRequestIdRef.current += 1"),
+    ).toBeLessThan(
+      searchInputChange.indexOf(
+        "searchSignatureRef.current = nextSignature",
+      ),
+    );
+    expect(
+      searchInputChange.indexOf(
+        "searchSignatureRef.current = nextSignature",
+      ),
+    ).toBeLessThan(searchInputChange.indexOf("setQuery(nextQuery)"));
+
+    const recentsSignature = JSON.stringify(["", false, null]);
+    let currentSignature = recentsSignature;
+    let currentRequestId = 0;
+    const startHistoryRead = (isRecentsMode: boolean) => {
+      if (!isRecentsMode || currentSignature !== recentsSignature) return null;
+      return {
+        id: ++currentRequestId,
+        signature: recentsSignature,
+      };
+    };
+    const requestIsCurrent = (request: {
+      id: number;
+      signature: string;
+    }) =>
+      commandPaletteRequestIsCurrent({
+        capturedSignature: request.signature,
+        capturedRequestId: request.id,
+        currentSignature,
+        currentRequestId,
+      });
+    const updateSignature = (nextSignature: string) => {
+      if (nextSignature !== currentSignature) currentRequestId += 1;
+      currentSignature = nextSignature;
+    };
+
+    const initialHistory = startHistoryRead(true);
+    expect(initialHistory).not.toBeNull();
+
+    updateSignature(JSON.stringify(["gold", false, null]));
+    expect(requestIsCurrent(initialHistory!)).toBe(false);
+    expect(startHistoryRead(false)).toBeNull();
+
+    updateSignature(recentsSignature);
+    expect(requestIsCurrent(initialHistory!)).toBe(false);
+    const returnedHistory = startHistoryRead(true);
+    expect(returnedHistory).not.toBeNull();
+    expect(requestIsCurrent(initialHistory!)).toBe(false);
+    expect(requestIsCurrent(returnedHistory!)).toBe(true);
+
+    const whitespaceSignature = JSON.stringify([" ".trim(), false, null]);
+    updateSignature(whitespaceSignature);
+    expect(requestIsCurrent(returnedHistory!)).toBe(true);
+    updateSignature(recentsSignature);
+    expect(requestIsCurrent(returnedHistory!)).toBe(true);
+  });
+
+  test("ledger counts stay scoped to the active query through transitions and clear", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const recentRecall = readFileSync(
+      join(root, "lib/command-palette-recent-recall.ts"),
+      "utf-8",
+    );
+    const recentsHistoryAndDossierRead = palette.slice(
+      palette.indexOf("const requestId = ++historyRequestIdRef.current"),
+      palette.indexOf("const clearSearchAndLedger"),
+    );
+    const clearSearchAndLedger = palette.slice(
+      palette.indexOf("const clearSearchAndLedger"),
+      palette.indexOf("const loadLedgerBrowse"),
+    );
+    const loadLedgerBrowse = palette.slice(
+      palette.indexOf("const loadLedgerBrowse"),
+      palette.indexOf(
+        "useEffect(() =>",
+        palette.indexOf("const loadLedgerBrowse"),
+      ),
+    );
+    const searchInputChange = palette.slice(
+      palette.indexOf("onChange={(event) => {"),
+      palette.indexOf(
+        "placeholder={t(",
+        palette.indexOf("onChange={(event) => {"),
+      ),
+    );
+
+    expect(recentsHistoryAndDossierRead).toContain(
+      "const capturedSignature = RECENTS_SEARCH_SIGNATURE",
+    );
+    expect(recentsHistoryAndDossierRead).toContain(
+      "commandPaletteRequestIsCurrent",
+    );
+    expect(recentsHistoryAndDossierRead).toContain(
+      "loadCommandPaletteRecentRecall",
+    );
+    expect(recentRecall).toContain("includeLedgerGroups: true");
+    expect(clearSearchAndLedger).toContain("setLedgerGroups([])");
+    expect(clearSearchAndLedger).not.toContain("searchGlobal(");
+    expect(loadLedgerBrowse).toContain("setLedgerGroups([])");
+    expect(searchInputChange).toContain(
+      "ledgerBrowseRequestIdRef.current += 1",
+    );
+    expect(searchInputChange).toContain("setLedgerGroups([])");
+    expect(searchInputChange).not.toContain("searchGlobal(");
+  });
+
+  test("decision refresh invalidates an older Recents dossier enrichment", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const canonicalRefresh = palette.slice(
+      palette.indexOf("const refreshCanonicalSearch"),
+      palette.indexOf("const saveDecision"),
+    );
+
+    expect(canonicalRefresh).toContain("historyRequestIdRef.current += 1");
+    expect(
+      canonicalRefresh.indexOf("historyRequestIdRef.current += 1"),
+    ).toBeLessThan(
+      canonicalRefresh.indexOf(
+        "const requestId = ++searchRequestIdRef.current",
+      ),
+    );
+  });
+
+  test("omnisearch canon pins keyboard, error truth, debounce, and mobile controls", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const dossierIntegration = readFileSync(
+      join(root, "lib/command-palette-dossier-integration.ts"),
+      "utf-8",
+    );
+    const initialHistoryFetch = palette.slice(
+      palette.indexOf("const requestId = ++historyRequestIdRef.current"),
+      palette.indexOf("const clearSearchAndLedger"),
+    );
+    const clearSearchAndLedger = palette.slice(
+      palette.indexOf("const clearSearchAndLedger"),
+      palette.indexOf("const loadLedgerBrowse"),
+    );
+    const loadLedgerBrowse = palette.slice(
+      palette.indexOf("const loadLedgerBrowse"),
+      palette.indexOf(
+        "useEffect(() =>",
+        palette.indexOf("const loadLedgerBrowse"),
+      ),
+    );
+    const readErrorPanel = palette.slice(
+      palette.indexOf(") : readError ? ("),
+      palette.indexOf(") : displayItems.length"),
+    );
+    const loadMore = palette.slice(
+      palette.indexOf("const loadMoreSearch"),
+      palette.indexOf("const openSourceConversation"),
+    );
+    const refreshCanonicalSearch = palette.slice(
+      palette.indexOf("const refreshCanonicalSearch"),
+      palette.indexOf("const saveDecision"),
+    );
+    const saveDecision = palette.slice(
+      palette.indexOf("const saveDecision"),
+      palette.indexOf("const updateLocalTitle"),
+    );
+
+    expect(palette).toContain("const SEARCH_DEBOUNCE_MS = 200");
+    expect(palette).toContain("searchQueryIsIndexable");
+    expect(palette).toContain("command_palette.keep_typing");
+    expect(palette).toContain("const ledgerBrowseRequestIdRef = useRef(0)");
+    expect(initialHistoryFetch).toContain(
+      "const capturedSignature = RECENTS_SEARCH_SIGNATURE",
+    );
+    expect(initialHistoryFetch).toContain("commandPaletteRequestIsCurrent");
+    expect(initialHistoryFetch).toContain(
+      "loadCommandPaletteRecentRecall",
+    );
+    expect(initialHistoryFetch).toContain("setLedgerGroups(");
+    expect(loadLedgerBrowse).toContain("++ledgerBrowseRequestIdRef.current");
+    expect(loadLedgerBrowse).not.toContain("++searchRequestIdRef.current");
+    expect(clearSearchAndLedger).toContain(
+      "ledgerBrowseRequestIdRef.current += 1",
+    );
+    expect(readErrorPanel).toContain('readError === "ledger" && isLedgerMode');
+    expect(readErrorPanel).toContain(
+      "void loadLedgerBrowse(decisionStateFilter)",
+    );
+    expect(palette).toContain("commandPaletteKeyboardAction");
+    expect(palette).toContain(
+      "commandPaletteItemsInRenderedOrder(groupedItems)",
+    );
+    expect(palette).toContain("itemCount: keyboardItems.length");
+    expect(palette).toContain("const item = keyboardItems[action.index]");
+    expect(palette).toContain("const rowIndex = groupRowStart + itemIndex");
+    expect(palette).toContain(
+      "targetIsSearchInput: event.target === inputRef.current",
+    );
+    expect(palette).toContain("isEditableKeyboardTarget");
+    expect(loadMore).toContain(
+      "const capturedSignature = searchSignatureRef.current",
+    );
+    expect(loadMore).toContain(
+      "const requestId = ++searchRequestIdRef.current",
+    );
+    expect(loadMore).toContain("commandPaletteRequestIsCurrent");
+    expect(loadMore).toContain("isSavingDecision");
+    expect(loadMore).not.toContain("setReadError");
+    expect(loadMore).toContain("setIsLoadingMoreSearch(false)");
+    expect(refreshCanonicalSearch).toContain("setIsLoadingMoreSearch(false)");
+    expect(refreshCanonicalSearch).toContain(
+      "ledgerBrowseRequestIdRef.current += 1",
+    );
+    expect(
+      refreshCanonicalSearch.indexOf("ledgerBrowseRequestIdRef.current += 1"),
+    ).toBeLessThan(
+      refreshCanonicalSearch.indexOf("++searchRequestIdRef.current"),
+    );
+    expect(
+      refreshCanonicalSearch.indexOf("setIsLoadingMoreSearch(false)"),
+    ).toBeLessThan(
+      refreshCanonicalSearch.indexOf("++searchRequestIdRef.current"),
+    );
+    expect(saveDecision.indexOf("await createEvidenceDecision")).toBeLessThan(
+      saveDecision.indexOf("onMutated?.()"),
+    );
+    expect(saveDecision.indexOf("onMutated?.()")).toBeLessThan(
+      saveDecision.indexOf("refreshCanonicalSearch:"),
+    );
+    expect(saveDecision).toContain("refreshLoadedHistory:");
+    expect(dossierIntegration).toMatch(
+      /Promise\.all\(\[\s*refreshCanonicalSearch\(\),\s*refreshLoadedHistory\(\),\s*\]\)/,
+    );
+    expect(saveDecision).not.toContain("setDecisionDraft");
+    expect(
+      saveDecision.slice(
+        saveDecision.indexOf("refreshCanonicalSearch:"),
+      ),
+    ).not.toContain("setDecisionSaveFailed(true)");
+    expect(refreshCanonicalSearch).toContain(': currentQuery');
+    expect(refreshCanonicalSearch).toContain('? "search"');
+    expect(refreshCanonicalSearch).toContain(': "history"');
+    expect(saveDecision).not.toContain("capturedSignature");
+    expect(saveDecision).not.toContain("const currentSignature");
+    expect(refreshCanonicalSearch).toContain(
+      "JSON.parse(capturedSignature)",
+    );
+    expect(refreshCanonicalSearch).toContain("q: currentQuery");
+    expect(refreshCanonicalSearch).toContain(
+      "commandPaletteCanonicalRecallLimit(",
+    );
+    expect(refreshCanonicalSearch).toContain("setRecentItems((current)");
+    expect(refreshCanonicalSearch).toContain("retainRecalledRecentItems(");
+    expect(refreshCanonicalSearch).toContain("currentQuery,");
+    expect(refreshCanonicalSearch).toContain("currentLedgerMode,");
+    expect(palette).toContain(
+      "disabled={isLoadingMoreSearch || isSavingDecision}",
+    );
+    expect(palette).toContain("command_palette.read_error");
+    expect(palette).toContain("command_palette.try_searching");
+    expect(palette).toContain('window.matchMedia("(pointer: coarse)")');
+    expect(palette).toContain("text-[16px]");
+    expect(palette).toContain("min-h-11");
   });
 
   test("chat command palette keeps safe hover management actions without chat hydration", () => {
@@ -1419,9 +2110,109 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("handleAction");
   });
 
+  test("successful search-result deletion refreshes backend-owned aggregates", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const confirmDeleteStart = palette.indexOf("const handleConfirmDelete");
+    const confirmDelete = palette.slice(
+      confirmDeleteStart,
+      palette.indexOf("useEffect(() =>", confirmDeleteStart),
+    );
+    const refreshAfterMutation = palette.slice(
+      palette.indexOf("const refreshAfterCanonicalMutation"),
+      palette.indexOf("const saveDecision"),
+    );
+
+    expect(confirmDelete).toContain(
+      "const mutationId = ++canonicalMutationIdRef.current",
+    );
+    expect(confirmDelete.indexOf("await apiDeleteConversation")).toBeLessThan(
+      confirmDelete.indexOf("onMutated?.()"),
+    );
+    expect(confirmDelete.indexOf("onMutated?.()")).toBeLessThan(
+      confirmDelete.indexOf(
+        "await refreshAfterCanonicalMutation(mutationId)",
+      ),
+    );
+    expect(refreshAfterMutation).toContain(
+      "await refreshCanonicalSearch(currentSignature, mutationId)",
+    );
+    expect(refreshAfterMutation).toContain("setReadError(");
+  });
+
+  test("failed More keeps loaded results visible and isolates its retry state", () => {
+    const palette = readFileSync(
+      join(root, "components/sidebar/ChatCommandPalette.tsx"),
+      "utf-8",
+    );
+    const loadMoreControl = readFileSync(
+      join(root, "components/sidebar/CommandPaletteLoadMoreControl.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(
+        join(root, "public/locales/es-419/common.json"),
+        "utf-8",
+      ),
+    );
+    const loadMore = palette.slice(
+      palette.indexOf("const loadMoreSearch"),
+      palette.indexOf("const openSourceConversation"),
+    );
+    const loadMoreCatch = loadMore.slice(
+      loadMore.indexOf("} catch {"),
+      loadMore.indexOf("} finally {"),
+    );
+    const resultsRenderStart = palette.indexOf("displayItems.length === 0");
+    const resultsRender = palette.slice(
+      resultsRenderStart,
+      palette.indexOf('layoutMode === "expanded"', resultsRenderStart),
+    );
+
+    expect(loadMore).toContain("setLoadMoreFailed(false)");
+    expect(loadMoreCatch).toContain("setLoadMoreFailed(true)");
+    expect(loadMoreCatch).not.toContain("setReadError");
+    expect(loadMoreCatch).not.toContain("setSearchResults");
+    expect(resultsRender).toContain("CommandPaletteLoadMoreControl");
+    expect(resultsRender).toContain("failed={loadMoreFailed}");
+    expect(resultsRender).toContain("onLoadMore={() => void loadMoreSearch()}");
+    expect(loadMoreControl).toContain('"command_palette.load_more_error"');
+    expect(loadMoreControl).toContain('"command_palette.retry_load_more"');
+    expect(en.command_palette.load_more_error).toBe(
+      "Argus couldn’t load more results. Your current results are still available.",
+    );
+    expect(es.command_palette.load_more_error).toBe(
+      "Argus no pudo cargar más resultados. Tus resultados actuales siguen disponibles.",
+    );
+    expect(en.command_palette.retry_load_more).toBe("Try loading more");
+    expect(es.command_palette.retry_load_more).toBe(
+      "Intentar cargar más",
+    );
+
+    const loadedResults = ["first-page-a", "first-page-b"];
+    const cursor = "next-page";
+    const readError: "search" | null = null;
+    let loadMoreFailed = false;
+    loadMoreFailed = true;
+
+    expect(loadedResults).toEqual(["first-page-a", "first-page-b"]);
+    expect(cursor).toBe("next-page");
+    expect(readError).toBeNull();
+    expect(loadMoreFailed).toBeTrue();
+  });
+
   test("chat schedules bounded history refreshes for async artifact naming", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const viewHelpers = readFileSync(
+      join(root, "lib/chat-conversation-view-helpers.ts"),
       "utf-8",
     );
 
@@ -1429,13 +2220,21 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("listConversations");
     expect(chat).toContain("title_source");
     expect(chat).toContain("window.setTimeout");
-    expect(chat).toContain("1500");
-    expect(chat).toContain("5000");
-    expect(chat).toContain("9000");
-    expect(chat).toContain("13000");
+    expect(viewHelpers).toContain("1500");
+    expect(viewHelpers).toContain("5000");
+    expect(viewHelpers).toContain("9000");
+    expect(viewHelpers).toContain("13000");
     expect(chat).toContain(
-      "schedulePostTurnHistoryRefresh(targetConversationId);",
+      "session.identity.conversationId,",
     );
+    const finishTransportStart = chat.indexOf("function finishRequestTransport");
+    const finishTransportEnd = chat.indexOf("useEffect(", finishTransportStart);
+    const finishTransport = chat.slice(finishTransportStart, finishTransportEnd);
+    expect(finishTransport).toContain(
+      "requestSessions.finishTransport(session)",
+    );
+    expect(finishTransport).toContain("requestSessions.isAccountCurrent(session)");
+    expect(finishTransport).not.toContain("request_settled");
     expect(chat).toContain("Title/sidebar refresh is fail-open");
     expect(chat).toContain(
       "void refreshAndCheckTitle().catch(() => undefined);",
@@ -1627,6 +2426,8 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "public/locales/es-419/common.json"),
       "utf-8",
     );
+    const enCatalog = JSON.parse(en);
+    const esCatalog = JSON.parse(es);
 
     const dataStart = profileMenu.indexOf('{activeSubmenu === "data"');
     const preferencesStart = profileMenu.indexOf(
@@ -1662,10 +2463,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(preferencesBlock).toContain("settings.app.language");
     expect(preferencesBlock).toContain("settings.app.sidebar");
     expect(preferencesBlock).not.toContain("settings.app.security");
+    expect(legalBlock).toContain("keyboard_shortcuts.menu_item");
+    expect(legalBlock).toContain("settings.help.terms");
+    expect(legalBlock).toContain("settings.help.privacy");
     expect(legalBlock).toContain('href="/terms"');
     expect(legalBlock).toContain('href="/privacy"');
-    expect(legalBlock).toContain("settings.help.release_notes");
-    expect(legalBlock).toContain("disabled");
+    expect(legalBlock).not.toContain("settings.help.release_notes");
+    expect(enCatalog.settings.help).not.toHaveProperty("release_notes");
+    expect(esCatalog.settings.help).not.toHaveProperty("release_notes");
     expect(profileMenu).toContain('href="/terms"');
     expect(profileMenu).toContain('href="/privacy"');
   });
@@ -1822,7 +2627,7 @@ describe("Argus Alpha frontend contract", () => {
       readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
     );
 
-    expect(authForm).toContain('/auth/forgot-password');
+    expect(authForm).toContain("/auth/forgot-password");
     expect(existsSync(forgot)).toBe(true);
     expect(existsSync(recovery)).toBe(true);
     expect(existsSync(security)).toBe(true);
@@ -1901,7 +2706,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(authForm).toContain("auth.password.hide");
     expect(page).toContain("signupWithEmail");
     expect(page).toContain("loginWithEmail");
-    expect(page).toContain('type AuthMode = "intro" | "signup" | "login"');
+    expect(page).toContain(
+      'type AuthMode = "intro" | "request" | "signup" | "login"',
+    );
+    expect(page).toContain('updateAuthMode("request")');
     expect(page).toContain('updateAuthMode("signup")');
     expect(page).toContain('const showLogin = () => updateAuthMode("login")');
     expect(page).toContain('href="/terms"');
@@ -1940,8 +2748,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(logoutHandler).toContain('result.revocation === "failed"');
     expect(logoutHandler).toContain("resetToEmptyChatSurface()");
     expect(logoutHandler).toContain("clearHistory()");
-    expect(logoutHandler.indexOf("resetToEmptyChatSurface()"))
-      .toBeLessThan(logoutHandler.indexOf('window.location.href = "/"'));
+    expect(logoutHandler.indexOf("resetToEmptyChatSurface()")).toBeLessThan(
+      logoutHandler.indexOf('window.location.href = "/"'),
+    );
   });
 
   test("front door auth states stay interactive during auth entry", () => {
@@ -2056,4 +2865,3 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).not.toContain("[argus-api] Fetching");
   });
 });
-

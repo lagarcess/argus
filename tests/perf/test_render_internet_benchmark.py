@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK_SCRIPT = (
@@ -124,6 +127,19 @@ def test_extract_confirmation_run_action_uses_backend_action_shape() -> None:
     assert action == {"type": "run_backtest", "payload": {"symbol": "AAPL"}}
 
 
+def test_run_action_headers_bind_idempotency_to_confirmation() -> None:
+    module = _load_benchmark_module()
+
+    headers = module._run_action_headers(
+        {
+            "type": "run_backtest",
+            "payload": {"confirmation_id": "confirmation-123"},
+        }
+    )
+
+    assert headers == {"Idempotency-Key": "confirmation-123"}
+
+
 def test_extract_run_reference_prefers_async_backtest_job() -> None:
     module = _load_benchmark_module()
 
@@ -141,6 +157,65 @@ def test_extract_run_reference_prefers_async_backtest_job() -> None:
 
     assert reference.kind == "job"
     assert reference.id == "job-123"
+
+
+def test_job_poll_requires_llm_result_voice_by_default(monkeypatch: Any) -> None:
+    module = _load_benchmark_module()
+    monkeypatch.setattr(
+        module,
+        "_timed_json_request",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            body={
+                "job": {"status": "succeeded"},
+                "run": {"id": "run-123"},
+                "result_readout_source": "deterministic_fallback",
+                "result_readout_fallback_used": True,
+            }
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="LLM result readout voice"):
+        module._poll_backtest_job(
+            client=object(),
+            api_url="https://api.example.test",
+            job_id="job-123",
+            timeout_seconds=1.0,
+            poll_sleep_seconds=0.0,
+        )
+
+
+def test_job_poll_capacity_mode_accepts_product_result_fallback(
+    monkeypatch: Any,
+) -> None:
+    module = _load_benchmark_module()
+    monkeypatch.setattr(
+        module,
+        "_timed_json_request",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            body={
+                "job": {"status": "succeeded"},
+                "run": {"id": "run-123"},
+                "result_readout_source": "deterministic_fallback",
+                "result_readout_fallback_used": True,
+            }
+        ),
+    )
+
+    result = module._poll_backtest_job(
+        client=object(),
+        api_url="https://api.example.test",
+        job_id="job-123",
+        timeout_seconds=1.0,
+        poll_sleep_seconds=0.0,
+        require_llm_result_voice=False,
+    )
+
+    assert result["run_id"] == "run-123"
+    assert result["voice"] == {
+        "result_readout_source": "deterministic_fallback",
+        "result_readout_fallback_used": True,
+        "result_readout_failure_mode": None,
+    }
 
 
 def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None:
@@ -271,3 +346,14 @@ def test_safe_job_summary_extracts_workflow_timestamps_and_durations() -> None:
         "result_readout_total": 900.679,
         "link_result": 80.789,
     }
+
+
+def test_timestamp_value_accepts_postgres_variable_fractional_precision() -> None:
+    module = _load_benchmark_module()
+
+    started = module._timestamp_value("2026-07-31T06:04:17.78465+00:00")
+    finished = module._timestamp_value("2026-07-31T06:04:18.78465+00:00")
+
+    assert started is not None
+    assert finished is not None
+    assert round((finished - started) * 1000.0, 3) == 1000.0

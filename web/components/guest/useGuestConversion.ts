@@ -23,6 +23,7 @@ type UseGuestConversionInput = {
   account: UserResponse | null;
   conversationId: string | null;
   refreshAccount: () => Promise<UserResponse | null>;
+  refreshHistory: () => void | Promise<unknown>;
   onResume: (action: GuestPendingAction) => void | Promise<void>;
 };
 
@@ -30,6 +31,7 @@ export function useGuestConversion({
   account,
   conversationId,
   refreshAccount,
+  refreshHistory,
   onResume,
 }: UseGuestConversionInput) {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,6 +39,8 @@ export function useGuestConversion({
     useState<GuestConversionReason>("keep_history");
   const [initialMode, setInitialMode] =
     useState<GuestConversionMode>("login");
+  const [resetAt, setResetAt] = useState<string | null>(null);
+  const [resetKind, setResetKind] = useState<"daily" | "workspace">("daily");
   const latchRef = useRef<SingleUseGuestAction | null>(null);
   const handoffPreparedRef = useRef(false);
 
@@ -45,6 +49,8 @@ export function useGuestConversion({
       nextReason: GuestConversionReason,
       pendingAction?: GuestPendingAction | null,
       nextInitialMode: GuestConversionMode = "login",
+      nextResetAt: string | null = null,
+      nextResetKind: "daily" | "workspace" = "daily",
     ) => {
       if (account?.account_kind === "guest") {
         captureGuestFunnelEvent({
@@ -57,6 +63,8 @@ export function useGuestConversion({
       }
       setReason(nextReason);
       setInitialMode(nextInitialMode);
+      setResetAt(nextResetAt);
+      setResetKind(nextResetKind);
       latchRef.current = pendingAction
         ? new SingleUseGuestAction(pendingAction)
         : null;
@@ -125,6 +133,10 @@ export function useGuestConversion({
       }
 
       await refreshAccount();
+      // The handoff changes the durable owner in the same request path. Refresh
+      // Recents before a pending follow-up can fail or navigate away, so the
+      // account's canonical conversation projection is visible immediately.
+      await refreshHistory();
       const actionLatch = latchRef.current;
       const action = actionLatch?.take() ?? null;
       setIsOpen(false);
@@ -133,15 +145,21 @@ export function useGuestConversion({
         await onResume(action);
       }
     },
-    [conversationId, onResume, refreshAccount],
+    [conversationId, onResume, refreshAccount, refreshHistory],
   );
 
   return {
     isOpen,
     reason,
     initialMode,
+    resetAt,
+    resetKind,
     publicAccountAccessEnabled:
       account?.public_account_access_enabled ?? false,
+    locale:
+      account?.user.language === "es-419"
+        ? ("es-419" as const)
+        : ("en-US" as const),
     requestConversion,
     close,
     authenticate,

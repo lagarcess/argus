@@ -5,10 +5,12 @@ import GuestSettingsMenu from "./GuestSettingsMenu";
 
 export default function GuestHeader({
   expiresAt,
+  feedbackEnabled,
   onFeedback,
   onSignIn,
 }: {
   expiresAt: string | null | undefined;
+  feedbackEnabled: boolean;
   onFeedback: () => void;
   onSignIn: () => void;
 }) {
@@ -19,7 +21,10 @@ export default function GuestHeader({
       className="flex items-center gap-1.5"
       data-guest-expires-at={expiresAt ?? undefined}
     >
-      <GuestSettingsMenu onFeedback={onFeedback} />
+      <GuestSettingsMenu
+        feedbackEnabled={feedbackEnabled}
+        onFeedback={onFeedback}
+      />
       <button
         type="button"
         onClick={onSignIn}

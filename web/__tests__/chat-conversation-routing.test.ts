@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 
 import {
   activeConversationRouteStateFromUrl,
+  isCurrentAnchoredConversationRequest,
+  shouldApplyConversationRequestUpdate,
   shouldApplyConversationOwnedUpdate,
-  shouldRetireActiveStreamForNavigation,
   shouldStartConversationForVisibleEmptyChat,
   shouldApplyConversationScopedUpdate,
   targetConversationIdForSend,
 } from "../lib/chat-conversation-routing";
+import * as conversationRouting from "../lib/chat-conversation-routing";
 
 describe("chat conversation route state", () => {
   test("treats /chat without a conversation id as an empty new-chat intent", () => {
@@ -15,6 +17,7 @@ describe("chat conversation route state", () => {
 
     expect(routeState).toEqual({
       conversationId: null,
+      messageId: null,
       isChatRoute: true,
       isNewChatRoute: true,
     });
@@ -36,6 +39,7 @@ describe("chat conversation route state", () => {
     );
 
     expect(explicitRoute.conversationId).toBe("existing-1");
+    expect(explicitRoute.messageId).toBeNull();
     expect(explicitRoute.isNewChatRoute).toBe(false);
     expect(
       shouldStartConversationForVisibleEmptyChat({
@@ -56,6 +60,52 @@ describe("chat conversation route state", () => {
         routeState: visibleRouteWithoutQuery,
         visibleMessageCount: 0,
         hasStructuredAction: true,
+      }),
+    ).toBe(false);
+  });
+
+  test("preserves an owned transcript match anchor on an explicit chat route", () => {
+    const routeState = activeConversationRouteStateFromUrl(
+      "http://localhost:3000/chat?conversation=existing-1&message=message-7",
+    );
+
+    expect(routeState).toEqual({
+      conversationId: "existing-1",
+      messageId: "message-7",
+      isChatRoute: true,
+      isNewChatRoute: false,
+    });
+  });
+
+  test("rejects stale anchor A after same-conversation ordinary or anchor B navigation", () => {
+    expect(
+      isCurrentAnchoredConversationRequest({
+        activeConversationId: "conversation-1",
+        targetConversationId: "conversation-1",
+        routeState: activeConversationRouteStateFromUrl(
+          "http://localhost:3000/chat?conversation=conversation-1&message=message-a",
+        ),
+        requestedMessageId: "message-a",
+      }),
+    ).toBe(true);
+    expect(
+      isCurrentAnchoredConversationRequest({
+        activeConversationId: "conversation-1",
+        targetConversationId: "conversation-1",
+        routeState: activeConversationRouteStateFromUrl(
+          "http://localhost:3000/chat?conversation=conversation-1",
+        ),
+        requestedMessageId: "message-a",
+      }),
+    ).toBe(false);
+    expect(
+      isCurrentAnchoredConversationRequest({
+        activeConversationId: "conversation-1",
+        targetConversationId: "conversation-1",
+        routeState: activeConversationRouteStateFromUrl(
+          "http://localhost:3000/chat?conversation=conversation-1&message=message-b",
+        ),
+        requestedMessageId: "message-a",
       }),
     ).toBe(false);
   });
@@ -167,33 +217,62 @@ describe("chat conversation route state", () => {
     ).toBe(false);
   });
 
-  test("retires active streams only when navigation leaves the stream conversation", () => {
+  test("exposes request-scoped routing instead of navigation retirement", () => {
+    const requestRouting = conversationRouting as typeof conversationRouting & {
+      shouldApplyConversationRequestUpdate?: unknown;
+    };
+
+    expect(typeof requestRouting.shouldApplyConversationRequestUpdate).toBe(
+      "function",
+    );
+  });
+
+  test("lets a current background request settle without writing into the visible chat", () => {
+    const routeState = activeConversationRouteStateFromUrl(
+      "http://localhost:3000/chat?conversation=conversation-b",
+    );
+
     expect(
-      shouldRetireActiveStreamForNavigation({
-        activeStreamConversationId: "conversation-a",
-        nextConversationId: "conversation-b",
+      shouldApplyConversationRequestUpdate({
+        targetConversationId: "conversation-a",
+        requestId: "request-a",
+        currentRequestId: "request-a",
+        scope: "request",
+        activeConversationId: "conversation-b",
+        currentView: "chat",
+        routeState,
       }),
     ).toBe(true);
-
     expect(
-      shouldRetireActiveStreamForNavigation({
-        activeStreamConversationId: "conversation-a",
-        nextConversationId: null,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldRetireActiveStreamForNavigation({
-        activeStreamConversationId: "conversation-a",
-        nextConversationId: "conversation-a",
+      shouldApplyConversationRequestUpdate({
+        targetConversationId: "conversation-a",
+        requestId: "request-a",
+        currentRequestId: "request-a",
+        scope: "visible",
+        activeConversationId: "conversation-b",
+        currentView: "chat",
+        routeState,
       }),
     ).toBe(false);
+  });
 
-    expect(
-      shouldRetireActiveStreamForNavigation({
-        activeStreamConversationId: null,
-        nextConversationId: "conversation-a",
-      }),
-    ).toBe(false);
+  test("rejects every callback from a superseded request identity", () => {
+    const routeState = activeConversationRouteStateFromUrl(
+      "http://localhost:3000/chat?conversation=conversation-a",
+    );
+
+    for (const scope of ["request", "visible"] as const) {
+      expect(
+        shouldApplyConversationRequestUpdate({
+          targetConversationId: "conversation-a",
+          requestId: "request-old",
+          currentRequestId: "request-new",
+          scope,
+          activeConversationId: "conversation-a",
+          currentView: "chat",
+          routeState,
+        }),
+      ).toBe(false);
+    }
   });
 });

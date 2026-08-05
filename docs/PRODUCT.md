@@ -218,6 +218,12 @@ Purpose:
 - reinforce continuity
 - help users return repeatedly
 
+Recents distinguishes work in progress from attention. A task may be working
+without being unread; terminal activity becomes unseen only beyond the user's
+durable read boundary. Registered users may also deliberately mark a task
+unread as a reminder. These states come from backend lifecycle and read truth,
+never message wording, client timers, or changes to recency ordering.
+
 Private-alpha launch keeps the visible product surface to Chat, Recents/history,
 completed result cards, and minimal account/settings/feedback. Dedicated
 Strategies and Collections surfaces are not visible under private-alpha defaults.
@@ -561,17 +567,17 @@ roles remain unchanged.
 Two clocks govern a guest, and they are deliberately distinct. The
 **workspace** lives seven fixed days with one conversation: that is how long
 the temporary chat survives and the window to claim it to an account.
-Activity never extends the expiry. **Allowances** follow the visitor, not the
-workspace (decision 2026-07-28): ten useful assistant terminals and one
-unique simulation per visitor per day, resetting at UTC midnight, plus five
-feedback submissions. A fresh session mints a fresh workspace but never a
-fresh allowance — the counter keys on a keyed digest of the caller, so the
-renewal loophole stays closed while a curious guest gets a new daily budget
-inside the same chat. Simulations keep a workspace-keyed reservation as
-replay identity; the visitor charge beside it is best-effort past admission,
-and settlement enforces the cap. The current landing implementation and its
-centered auth modal remain intact for configuration rollback and later
-conversion work.
+Activity never extends the expiry. **Allowances** follow the visitor as an
+abuse boundary (decision 2026-07-28): ten useful assistant terminals and two
+unique simulations per visitor per day, resetting at UTC midnight. The
+workspace separately caps the temporary chat at two unique simulations over
+its fixed lifetime, plus five feedback submissions. A fresh session cannot
+mint a fresh daily allowance—the visitor counter keys on a keyed digest of the
+caller—and Start over preserves the workspace counters. Simulations keep a
+workspace-keyed reservation as replay identity; the visitor charge beside it
+is best-effort past admission, and settlement enforces the cap. The current
+landing implementation and its centered auth modal remain intact for
+configuration rollback and later conversion work.
 
 ---
 

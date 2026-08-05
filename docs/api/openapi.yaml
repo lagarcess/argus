@@ -39,6 +39,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/auth/access-requests:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestCreate'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestAccepted'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Untrusted browser origin rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many access request attempts. Please wait before trying again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Argus could not record this access request. Please try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/guest:
     post:
       tags:
@@ -876,6 +917,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/activity:
+    get:
+      tags:
+      - conversation-activity
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationActivity'
+        '404':
+          description: The conversation was not found or visible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - conversation-activity
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/ConversationActivityMarkUnread'
+              - $ref: '#/components/schemas/ConversationActivityMarkRead'
+              discriminator:
+                propertyName: action
+                mapping:
+                  mark_unread: '#/components/schemas/ConversationActivityMarkUnread'
+                  mark_read: '#/components/schemas/ConversationActivityMarkRead'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationActivity'
+        '403':
+          description: A guest cannot manually mark a task unread.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found or visible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The supplied terminal source is no longer eligible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/messages:
     get:
       tags:
@@ -901,6 +1040,13 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
+      - name: anchor_message_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -908,6 +1054,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedMessages'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/run-dossiers:
+    get:
+      tags:
+      - conversations
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRunDossiers'
+        '400':
+          description: The pagination cursor is invalid or stale.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The conversation was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Validation Error
           content:
@@ -1203,6 +1415,7 @@ paths:
         required: true
         schema:
           type: string
+          maxLength: 512
       - name: limit
         in: query
         required: false
@@ -1236,6 +1449,26 @@ paths:
         schema:
           type: boolean
           default: false
+      - name: conversation_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: array
+            items:
+              type: string
+              format: uuid
+            minItems: 1
+            maxItems: 50
+          - type: 'null'
+      - name: X-Argus-Client-Capabilities
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 1024
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
@@ -1250,7 +1483,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+          description: Search temporarily unavailable because exact bounded recall could not
+            be completed, or authentication-session verification is temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: An unexpected server error occurred.
           content:
@@ -1403,6 +1641,39 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
+    AccessApprovalResponse:
+      properties:
+        approved:
+          type: boolean
+          const: true
+          default: true
+      additionalProperties: false
+      type: object
+    AccessRequestAccepted:
+      properties:
+        accepted:
+          type: boolean
+          const: true
+      additionalProperties: false
+      type: object
+      required:
+      - accepted
+    AccessRequestCreate:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - language
     AccountCapabilities:
       properties:
         can_create_additional_conversation:
@@ -1711,6 +1982,7 @@ components:
           - retry_failed_action
           - select_response_option
           - select_discovery_candidate
+          - retest_run
         label:
           anyOf:
           - type: string
@@ -1926,12 +2198,66 @@ components:
             - en
             - es-419
           - type: 'null'
+        activity:
+          anyOf:
+          - $ref: '#/components/schemas/ConversationActivity'
+          - type: 'null'
       type: object
       required:
       - id
       - title
       - created_at
       - updated_at
+    ConversationActivity:
+      properties:
+        operation:
+          $ref: '#/components/schemas/ConversationOperation'
+        attention:
+          $ref: '#/components/schemas/ConversationAttention'
+      type: object
+      required:
+      - operation
+      - attention
+    ConversationActivityMarkRead:
+      properties:
+        action:
+          type: string
+          const: mark_read
+        through_attention_cursor:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - action
+    ConversationActivityMarkUnread:
+      properties:
+        action:
+          type: string
+          const: mark_unread
+      additionalProperties: false
+      type: object
+      required:
+      - action
+    ConversationAttention:
+      properties:
+        status:
+          type: string
+          enum:
+          - none
+          - new_activity
+          - manual_unread
+          - needs_input
+          - needs_attention
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - status
     ConversationCreate:
       properties:
         title:
@@ -1946,6 +2272,30 @@ components:
             - es-419
           - type: 'null'
       type: object
+    ConversationOperation:
+      properties:
+        status:
+          type: string
+          enum:
+          - idle
+          - queued
+          - running
+          - checking
+        kind:
+          anyOf:
+          - type: string
+            enum:
+            - chat_turn
+            - backtest_job
+          - type: 'null'
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - status
     ConversationPatch:
       properties:
         title:
@@ -2025,7 +2375,7 @@ components:
         note:
           anyOf:
           - type: string
-            maxLength: 2000
+            maxLength: 500
           - type: 'null'
       type: object
       required:
@@ -2264,6 +2614,7 @@ components:
           - type: string
             enum:
             - second_simulation
+            - simulation_limit
             - message_limit
             - save_decision
             - new_conversation
@@ -2350,6 +2701,7 @@ components:
           type: string
           enum:
           - second_simulation
+          - simulation_limit
           - message_limit
           - save_decision
           - new_conversation
@@ -2375,19 +2727,123 @@ components:
       - reason
       - conversation_id
       - action_id
-    HistoryItem:
-      additionalProperties: true
+    GuestUser:
+      properties:
+        id:
+          type: string
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        locale:
+          type: string
+          enum:
+          - en-US
+          - es-419
+          default: en-US
+        theme:
+          type: string
+          enum:
+          - dark
+          - light
+          - system
+          default: dark
+        is_admin:
+          type: boolean
+          default: false
+        onboarding:
+          $ref: '#/components/schemas/OnboardingState'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
       type: object
+      required:
+      - id
+      - email
+      - created_at
+      - updated_at
+      description: Guest-safe profile projection without registered-only preferences.
+    HistoryItem:
+      $ref: '#/components/schemas/HistoryItemWire'
+    HistoryItemWire:
+      properties:
+        type:
+          type: string
+          enum:
+          - chat
+          - strategy
+          - collection
+          - run
+        id:
+          type: string
+        title:
+          type: string
+        title_source:
+          type: string
+          enum:
+          - system_default
+          - ai_generated
+          - user_renamed
+        subtitle:
+          type: string
+        pinned:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        activity:
+          $ref: '#/components/schemas/ConversationActivity'
+      type: object
+      required:
+      - type
+      - id
+      - title
+      - subtitle
+      - pinned
+      - created_at
+      - conversation_id
+      - expires_at
     LoginRequest:
       properties:
         email:
           type: string
         password:
           type: string
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
       type: object
       required:
       - email
       - password
+      - captcha_token
     Message:
       properties:
         id:
@@ -2506,11 +2962,39 @@ components:
       type: object
       required:
       - items
+    PaginatedRunDossiers:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/RunDossier'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        total_runs:
+          type: integer
+          minimum: 0.0
+        decided_runs:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - items
+      - total_runs
+      - decided_runs
     PaginatedSearch:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/SearchItem'
+            oneOf:
+            - $ref: '#/components/schemas/SearchItem'
+            - $ref: '#/components/schemas/SearchAssetRollup'
+            discriminator:
+              propertyName: type
+              mapping:
+                asset_rollup: '#/components/schemas/SearchAssetRollup'
+                conversation: '#/components/schemas/SearchItem'
           type: array
         next_cursor:
           anyOf:
@@ -2566,44 +3050,149 @@ components:
             - light
             - system
           - type: 'null'
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
       type: object
-    SearchItem:
+    RunDossier:
+      properties:
+        run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        result_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        tested:
+          $ref: '#/components/schemas/RunDossierTested'
+        outcome:
+          $ref: '#/components/schemas/SearchDossierOutcome'
+        decision:
+          anyOf:
+          - $ref: '#/components/schemas/SearchDossierDecision'
+          - type: 'null'
+        actions:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/SearchRetestAction'
+            - $ref: '#/components/schemas/SearchDecisionAction'
+            discriminator:
+              propertyName: type
+              mapping:
+                decision: '#/components/schemas/SearchDecisionAction'
+                retest_run: '#/components/schemas/SearchRetestAction'
+          type: array
+          maxItems: 2
+      type: object
+      required:
+      - run_id
+      - run_label
+      - completed_at
+      - tested
+      - outcome
+    RunDossierTested:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+        strategy_family:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+        cadence:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        timeframe:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        start_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+      type: object
+    SearchAssetDecisionCounts:
+      properties:
+        promising:
+          type: integer
+          minimum: 0.0
+        watching:
+          type: integer
+          minimum: 0.0
+        rejected:
+          type: integer
+          minimum: 0.0
+        revisit_later:
+          type: integer
+          minimum: 0.0
+      type: object
+      required:
+      - promising
+      - watching
+      - rejected
+      - revisit_later
+    SearchAssetRollup:
       properties:
         type:
           type: string
-          enum:
-          - chat
-          - strategy
-          - collection
-          - run
-          - backtest
-          - evidence
-          - decision
-          - idea
-        id:
+          const: asset_rollup
+          default: asset_rollup
+        symbol:
           type: string
-        title:
-          type: string
-        matched_text:
-          type: string
-        updated_at:
+          maxLength: 24
+          minLength: 1
+        run_count:
+          type: integer
+          minimum: 1.0
+        decision_counts:
+          $ref: '#/components/schemas/SearchAssetDecisionCounts'
+        last_touched_at:
           type: string
           format: date-time
-        conversation_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-        lifecycle:
-          anyOf:
-          - type: string
-            enum:
-            - captured
-            - reviewed
-            - saved
-            - decided
-            - archived
-            - discarded
-          - type: 'null'
+      type: object
+      required:
+      - symbol
+      - run_count
+      - decision_counts
+      - last_touched_at
+    SearchDecisionAction:
+      properties:
+        type:
+          type: string
+          const: decision
+          default: decision
+        availability:
+          type: string
+          enum:
+          - available
+          - account_conversion_required
+        evidence_artifact_id:
+          type: string
         decision_state:
           anyOf:
           - type: string
@@ -2613,18 +3202,135 @@ components:
             - rejected
             - revisit_later
           - type: 'null'
-        preview:
+        note:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - type: string
+            maxLength: 2000
           - type: 'null'
+        run_label:
+          type: string
+          maxLength: 160
+      type: object
+      required:
+      - availability
+      - evidence_artifact_id
+      - run_label
+    SearchDossierDecision:
+      properties:
+        state:
+          type: string
+          enum:
+          - watching
+          - promising
+          - rejected
+          - revisit_later
+        note:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+        run_label:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+      type: object
+      required:
+      - state
+    SearchDossierMetric:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        value:
+          anyOf:
+          - type: string
+          - type: integer
+          - type: number
+      type: object
+      required:
+      - name
+      - value
+    SearchDossierOutcome:
+      properties:
+        run_label:
+          type: string
+          maxLength: 160
+        completed_at:
+          type: string
+          format: date-time
+        benchmark_symbol:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
+        quick_take:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+        metrics:
+          items:
+            $ref: '#/components/schemas/SearchDossierMetric'
+          type: array
+          maxItems: 4
+      type: object
+      required:
+      - run_label
+      - completed_at
+    SearchItem:
+      properties:
+        type:
+          type: string
+          const: conversation
+        id:
+          type: string
+        title:
+          type: string
+        archived:
+          type: boolean
+        matched_text:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        conversation_id:
+          type: string
+        match:
+          $ref: '#/components/schemas/SearchMatch'
+        dossier:
+          anyOf:
+          - $ref: '#/components/schemas/RunDossier'
+          - type: 'null'
+        total_runs:
+          type: integer
+          minimum: 0.0
+        decided_runs:
+          type: integer
+          minimum: 0.0
+        decision_states:
+          items:
+            type: string
+            enum:
+            - watching
+            - promising
+            - rejected
+            - revisit_later
+          type: array
+          default: []
       type: object
       required:
       - type
       - id
       - title
+      - archived
       - matched_text
       - updated_at
+      - conversation_id
+      - match
+      - dossier
+      - total_runs
+      - decided_runs
     SearchLedgerGroup:
       properties:
         decision_state:
@@ -2640,12 +3346,73 @@ components:
       required:
       - decision_state
       - count
+    SearchMatch:
+      properties:
+        layer:
+          type: string
+          enum:
+          - conversation
+          - message
+          - run
+          - idea
+          - evidence
+          - decision
+        fragment:
+          type: string
+          maxLength: 500
+        count:
+          type: integer
+          minimum: 1.0
+        message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - layer
+      - fragment
+      - count
+    SearchRetestAction:
+      properties:
+        type:
+          type: string
+          const: retest_run
+          default: retest_run
+        source_run_id:
+          type: string
+        run_label:
+          type: string
+          maxLength: 160
+        window_policy:
+          type: string
+          const: same_duration_ending_today
+          default: same_duration_ending_today
+        contract_version:
+          type: string
+          const: argus_retest_run/v1
+          default: argus_retest_run/v1
+      type: object
+      required:
+      - source_run_id
+      - run_label
+      description: 'Bounded typed retest envelope (spec 2.2).
+
+
+        Carries identity and policy only. The executable setup is reloaded
+
+        server-side from the owner-scoped source run, so no client value can
+
+        reach canonical state.'
     SignupRequest:
       properties:
         email:
           type: string
         password:
           type: string
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
         language:
           type: string
           enum:
@@ -2664,6 +3431,7 @@ components:
       required:
       - email
       - password
+      - captcha_token
     StarterPromptsResponse:
       properties:
         prompts:
@@ -2933,6 +3701,17 @@ components:
           - light
           - system
           default: dark
+        avatar_theme:
+          type: string
+          enum:
+          - ocean
+          - plum
+          - teal
+          - ember
+          - gold
+          - indigo
+          - slate
+          default: ocean
         is_admin:
           type: boolean
           default: false
@@ -2953,7 +3732,9 @@ components:
     UserResponse:
       properties:
         user:
-          $ref: '#/components/schemas/User'
+          anyOf:
+          - $ref: '#/components/schemas/User'
+          - $ref: '#/components/schemas/GuestUser'
         account_kind:
           type: string
           enum:

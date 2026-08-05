@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "react-i18next";
 
 import { requestPasswordRecovery } from "@/lib/auth-security";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center px-6 py-12">
-      <section className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#151719]">
+      <section className="w-full max-w-md rounded-[20px] border border-black/10 bg-white p-7 dark:border-white/10 dark:bg-[#151719]">
         <Link
           href="/?auth=login"
           className="text-sm font-medium text-black/55 hover:text-black dark:text-white/55 dark:hover:text-white"
@@ -67,7 +68,7 @@ export default function ForgotPasswordPage() {
               />
             </label>
             {status === "error" && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-300">
+              <p role="alert" className={`text-sm ${inlineFailureTextClass}`}>
                 {t(
                   "auth.recovery.request_error",
                   "We couldn’t start recovery. Wait a moment and try again.",

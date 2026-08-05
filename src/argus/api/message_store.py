@@ -329,6 +329,7 @@ def _append_memory_message(message: Message) -> Message:
                     update={"created_at": latest_created_at + timedelta(microseconds=1)}
                 )
         messages.append(message)
+        api_state.store.bump_search_revision()
         preview = message_preview(
             message.content,
             role=message.role,

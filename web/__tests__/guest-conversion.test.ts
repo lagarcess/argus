@@ -5,6 +5,7 @@ import { join } from "node:path";
 import GuestExperienceSurfaces from "../components/guest/GuestExperienceSurfaces";
 import type { GuestExperience } from "../components/guest/useGuestExperience";
 import {
+  dossierDecisionResumeTarget,
   guestConversionBenefitKey,
   latestDecisionResumeMessageId,
   newConversationConversionMode,
@@ -45,7 +46,7 @@ describe("guest conversion contract", () => {
   test("keeps the five contextual reasons typed and localized", () => {
     const actions: GuestPendingAction[] = [
       {
-        reason: "second_simulation",
+        reason: "simulation_limit",
         conversationId: "conversation-1",
         actionId: "run-2",
         action: {
@@ -65,7 +66,10 @@ describe("guest conversion contract", () => {
         reason: "save_decision",
         conversationId: "conversation-1",
         actionId: "decision-1",
-        artifactId: "artifact-1",
+        target: {
+          surface: "result_card",
+          artifactId: "artifact-1",
+        },
       },
       {
         reason: "new_conversation",
@@ -80,7 +84,7 @@ describe("guest conversion contract", () => {
     ];
 
     expect(actions.map((action) => guestConversionBenefitKey(action.reason))).toEqual([
-      "guest.conversion.second_simulation",
+      "guest.conversion.simulation_limit",
       "guest.conversion.message_limit",
       "guest.conversion.save_decision",
       "guest.conversion.new_conversation",
@@ -104,12 +108,45 @@ describe("guest conversion contract", () => {
       reason: "save_decision",
       conversationId: "conversation-1",
       actionId: "decision-1",
-      artifactId: "artifact-1",
+      target: {
+        surface: "result_card",
+        artifactId: "artifact-1",
+      },
     };
     const latch = new SingleUseGuestAction(action);
 
     expect(latch.take()).toEqual(action);
     expect(latch.take()).toBeNull();
+  });
+
+  test("keeps dossier resume context ephemeral while binding the handoff to evidence", () => {
+    const action: GuestPendingAction = {
+      reason: "save_decision",
+      conversationId: "conversation-1",
+      actionId: "decision-1",
+      target: {
+        surface: "omnisearch_dossier",
+        artifactId: "artifact-1",
+        runId: "run-1",
+        decisionState: "watching",
+        note: "Keep this exact note",
+      },
+    };
+
+    expect(pendingGuestActionSummary(action)).toEqual({
+      reason: "save_decision",
+      conversation_id: "conversation-1",
+      action_id: "decision-1",
+      artifact_id: "artifact-1",
+    });
+    expect(new SingleUseGuestAction(action).take()).toEqual(action);
+    expect(dossierDecisionResumeTarget(action.target)).toEqual(action.target);
+    expect(
+      dossierDecisionResumeTarget({
+        surface: "result_card",
+        artifactId: "artifact-1",
+      }),
+    ).toBeNull();
   });
 
   test("resumes a decision on only the newest matching result projection", () => {
@@ -188,8 +225,54 @@ describe("guest conversion contract", () => {
       "utf-8",
     );
     expect(modal).toContain("publicAccountAccessEnabled");
-    expect(modal).toContain("mode=\"login\"");
-    expect(modal).toContain("mode=\"signup\"");
+    expect(modal).toContain(
+      'publicAccountAccessEnabled ? initialMode : "request"',
+    );
+    expect(modal).toContain("allowModeSwitch={publicAccountAccessEnabled}");
+    expect(modal).toContain("<RequestAccess");
+    expect(modal).toContain("mode={mode}");
+  });
+
+  test("uses the daily reset only for the renewed-workspace precheck", () => {
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const admission = experience.slice(
+      experience.indexOf("const admitSend"),
+      experience.indexOf("const recoverGuestSimulationRejection"),
+    );
+    const authoritativeRejection = experience.slice(
+      experience.indexOf("const recoverGuestSimulationRejection"),
+    );
+
+    // A renewed workspace receives its own allowance; the visitor's daily
+    // window, not the old workspace expiry, is the truthful precheck reset.
+    expect(admission).toContain("guestSimulationPrecheckResetAt(usage.allowances.backtests)");
+    // The server-only workspace ceiling still names the actual temporary
+    // workspace expiry after an authoritative rejection.
+    expect(authoritativeRejection).toContain(
+      "account.guest?.expires_at ?? null",
+    );
+  });
+
+  test("opens quota recovery for an authoritative workspace-limit rejection", () => {
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(experience).toContain("recoverGuestSimulationRejection");
+    expect(chat).toContain("isGuestSimulationConversionRejection");
+    expect(chat).toContain("errorPayload.code");
+    expect(chat).toContain("finalPayload.code");
+    expect(chat).toContain("finalPayload.final_response_payload");
+    expect(chat).toContain("loadConversation(requestSession.identity.conversationId)");
+    expect(chat.indexOf("errorPayload.code")).toBeLessThan(
+      chat.indexOf("throwIfAmbiguousRunSseError", chat.indexOf('event.event === "error"')),
+    );
+    expect(chat).toContain("recoverGuestSimulationRejection(action)");
   });
 
   test("derives the New-chat auth mode from server-owned public access truth", () => {
@@ -249,7 +332,7 @@ describe("guest conversion contract", () => {
     );
   });
 
-  test("claims in place before refreshing and resumes through a single-use latch", () => {
+  test("refreshes Recents after the claim before a pending action resumes", () => {
     const hookPath = join(root, "components/guest/useGuestConversion.ts");
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
@@ -257,6 +340,10 @@ describe("guest conversion contract", () => {
     );
     const surfaces = readFileSync(
       join(root, "components/guest/GuestExperienceSurfaces.tsx"),
+      "utf-8",
+    );
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
       "utf-8",
     );
     expect(existsSync(hookPath)).toBe(true);
@@ -272,6 +359,15 @@ describe("guest conversion contract", () => {
     );
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");
+    expect(authenticate).toContain("await refreshHistory()");
+    expect(authenticate.indexOf("await refreshAccount()")).toBeLessThan(
+      authenticate.indexOf("await refreshHistory()"),
+    );
+    expect(authenticate.indexOf("await refreshHistory()")).toBeLessThan(
+      authenticate.indexOf("await onResume(action)"),
+    );
+    expect(experience).toContain("refreshHistoryForActivity");
+    expect(experience).toContain("refreshHistory: refreshHistoryForActivity");
     expect(chat).toContain("<GuestExperienceSurfaces");
     expect(surfaces).toContain("<GuestConversionModal");
     expect(surfaces).toContain("publicAccountAccessEnabled");

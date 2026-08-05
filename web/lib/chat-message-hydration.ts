@@ -18,7 +18,11 @@ import {
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
-import type { ChatActionOption, Message } from "@/components/chat/types";
+import type {
+  ChatActionOption,
+  Message,
+  StrategyPathContext,
+} from "@/components/chat/types";
 
 type TextMessageHydrationOptions = {
   contentPresentation?: Message["contentPresentation"];
@@ -137,13 +141,26 @@ function classifyOrdinaryTransportAmbiguity(
 export async function loadAllConversationMessagePages(
   conversationId: string,
   loadPage: typeof getConversationMessages = getConversationMessages,
-  options: Readonly<{ signal?: AbortSignal }> = {},
+  options: Readonly<{
+    signal?: AbortSignal;
+    anchorMessageId?: string;
+  }> = {},
 ): Promise<ApiMessage[]> {
   const items: ApiMessage[] = [];
   const seenCursors = new Set<string>();
   let cursor: string | undefined;
   while (true) {
-    const page = await loadPage(conversationId, 100, cursor, options);
+    const page = await loadPage(
+      conversationId,
+      100,
+      cursor,
+      cursor
+        ? { signal: options.signal }
+        : {
+            signal: options.signal,
+            anchorMessageId: options.anchorMessageId,
+          },
+    );
     items.push(...page.items);
     const nextCursor = page.next_cursor?.trim();
     if (!nextCursor) return items;
@@ -352,6 +369,49 @@ export function isHydratableResultCard(
   );
 }
 
+export function strategyPathContextFromMetadata(
+  metadata: Record<string, unknown>,
+  messageId?: string,
+): StrategyPathContext | null {
+  const pendingStrategy = recordOrNull(metadata.pending_strategy);
+  const sourceResult = recordOrNull(pendingStrategy?.source_result);
+  const sourceResultRunId =
+    stringOrNull(metadata.source_result_run_id) ??
+    stringOrNull(sourceResult?.run_id) ??
+    stringOrNull(sourceResult?.runId);
+  const strategyPathId = stringOrNull(metadata.strategy_path_id);
+  const confirmationPayload = recordOrNull(metadata.confirmation_payload);
+  const confirmedStrategy = recordOrNull(confirmationPayload?.strategy);
+  const optionalParameters = recordOrNull(
+    confirmationPayload?.optional_parameters,
+  );
+  if (confirmedStrategy) {
+    return {
+      kind: "confirmation",
+      strategy: confirmedStrategy,
+      sourceResultRunId,
+      strategyPathId,
+      optionalParameters,
+    };
+  }
+  const pendingStrategyFacts = recordOrNull(pendingStrategy?.strategy);
+  const clarification = recordOrNull(metadata.clarification);
+  const requestedField =
+    stringOrNull(pendingStrategy?.requested_field) ??
+    stringOrNull(clarification?.requested_field);
+  if (!pendingStrategyFacts || !requestedField) return null;
+  return {
+    kind: "clarification",
+    requestedField,
+    strategy: pendingStrategyFacts,
+    sourceResultRunId,
+    strategyPathId:
+      strategyPathId ??
+      stringOrNull(metadata.message_id) ??
+      stringOrNull(messageId),
+  };
+}
+
 export function hydrateTextMessageFromApi(
   message: ApiMessage,
   options: TextMessageHydrationOptions = {},
@@ -415,6 +475,7 @@ export function hydrateTextMessageFromApi(
       ? resultFactHeadingKeyFromMetadata(metadata)
       : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
+    strategyPathContext: strategyPathContextFromMetadata(metadata, message.id),
     assistantRecoveryCode: isAssistant
       ? retryableAssistantRecoveryCode(metadata.recovery)
       : null,

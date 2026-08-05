@@ -931,7 +931,7 @@ async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> N
 
 
 @pytest.mark.asyncio
-async def test_next_experiment_followup_renders_supported_options_not_invented_text() -> (
+async def test_next_experiment_followup_is_retired_for_rows_sidecar() -> (
     None
 ):
     async def fake_schema_client(**kwargs: Any) -> object:
@@ -971,12 +971,9 @@ async def test_next_experiment_followup_renders_supported_options_not_invented_t
         invoke_json_schema_func=fake_schema_client,
     )
 
-    assert response is not None
-    assert "RSI filter" not in response
-    assert "social sentiment" not in response
-    normalized = response.lower()
-    assert "adjust the signal periods or crossover direction" in normalized
-    assert "compare tsla with buy-and-hold" in normalized
+    # The deterministic prose surface is retired; the next_experiments rows
+    # sidecar owns this focus, so the followup composer must stay silent.
+    assert response is None
 
 
 @pytest.mark.asyncio

@@ -142,6 +142,8 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
+- `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
+  `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
 - `is_admin`: `boolean` (Default: `false`)
 - `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
   to the historical shape below)
@@ -174,7 +176,12 @@ product behavior reads it, and no API path writes it.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.
-- `username` is optional for Alpha.
+- `username` is optional for Alpha. When supplied at signup, it is trimmed and
+  case-folded before the case-insensitive uniqueness check and profile write.
+  Same-email and same-username signup attempts are serialized across API
+  instances so only the request that owns the available username may create an
+  Auth user. An already-existing Auth email follows the provider's obfuscated
+  duplicate path without a profile write or a username-dependent public error.
 ---
 
 ## 5.1 guest_workspaces
@@ -267,17 +274,24 @@ and login; it should not be exposed as a frontend product surface.
 ### Fields
 - `email`: `text` (Primary Key, lowercased)
 - `role`: `text` (Default: `user`)
+- `language`: `text` (Default: `en`)
 - `disabled_at`: `timestamptz` (Nullable)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
 ### Enums
-- **role**: `admin`, `developer`, `user`
+- **role**: `admin`, `developer`, `user`, `requested`
+- **language**: `en`, `es-419`
 
 ### Notes
-- Rows are managed directly in Supabase during private alpha. No invite
-  dashboard, waitlist, referral system, or public invite-code flow is part of
-  this pass.
+- The public access-request endpoint may insert a missing `requested` row. It
+  never updates an existing requested, approved, privileged, or disabled row.
+- `requested` and unknown roles never grant permanent account access.
+- The ops approval action loads an active requested row and stored language,
+  sends the localized approval email first, and only then compare-and-sets
+  `requested` to `user` while `disabled_at` remains null.
+- There is no invite dashboard, referral system, public invite-code flow,
+  pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
 - If an email is missing or `disabled_at` is set, `/auth/signup` and
@@ -383,6 +397,16 @@ Represents individual messages within a conversation.
   references. Later turns that create a new draft, active confirmation,
   completed result, or explicit cancellation should supersede stale retry
   affordances during hydration.
+- Omnisearch may recall only `role = 'user'` message content. The partial
+  `idx_messages_user_content_norm_trgm` GIN index uses the same checked-in
+  Python 3.10-compatible normalized-content SQL expression as the bounded
+  search reader and `extensions.gin_trgm_ops`. The index adds no function,
+  view, grant, or RLS change; owner, active-conversation, guest-workspace, and
+  exact-token rechecks remain query predicates before ranking and limits.
+- A transcript jump reuses the owner-scoped message page read with
+  `anchor_message_id`. The anchor is resolved inside the requested
+  conversation, and the response remains capped at the requested page limit;
+  it is not a transcript scan or a new durable memory record.
 ---
 
 ## 8.1 chat_turn_lifecycles
@@ -468,7 +492,48 @@ remain immutable; message reads project the current lifecycle row into
   recovery, and typed `retry_last_turn` metadata without changing the immutable
   message row. The frontend places the presentation-only recovery row directly
   after that user message; the API does not create or persist an assistant
-  message for this projection.
+message for this projection.
+
+---
+
+## 8.2 conversation_read_states
+
+Stores one durable read boundary and optional manual-unread flag for an owned
+conversation. It is not an event log and does not duplicate lifecycle, job,
+message, or result content.
+
+### Fields
+
+- `user_id`: `uuid` (Part of the primary key; references `profiles.id` with
+  update/delete cascade)
+- `conversation_id`: `uuid` (Part of the primary key)
+- `read_through_occurred_at`: `timestamptz` (Nullable)
+- `read_through_source_kind`: `text` (`chat_turn` or `backtest_job`, nullable)
+- `read_through_source_id`: `uuid` (Nullable)
+- `manual_unread_at`: `timestamptz` (Nullable and independent of read-through)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+The three read-through fields are either all null or all non-null. Boundaries
+compare as `(occurred_at, source_kind_rank, source_id)`, with `chat_turn = 1`
+and `backtest_job = 2`, and advance monotonically. The primary key is
+`(user_id, conversation_id)`. A composite foreign key to
+`conversations(id, user_id)` uses `ON UPDATE CASCADE` and `ON DELETE CASCADE`,
+so guest claim transfers the state and conversation cleanup removes it in the
+same transaction.
+
+Authenticated owners may select their row through RLS but cannot insert,
+update, or delete it directly. Server-only RPCs own mutation, lock the
+conversation/read/source rows, and revalidate terminal eligibility before
+advancing a cursor. Read RPCs accept at most 100 owned conversation ids and the
+activity reconciler settles at most 20 stale turns across that batch using the
+existing lifecycle evidence predicate.
+
+The migration baseline is idempotent and keyset-batched at 500 conversations.
+It marks only the newest eligible terminal boundary at or before the captured
+migration-start cutoff as read. Activity completing after that cutoff remains
+unread. The baseline and later activity reads do not update conversation,
+message, job, Run, artifact, or sort timestamps.
 
 ---
 
@@ -775,6 +840,25 @@ Constraints:
   user-owned evidence artifact.
 - Duplicate POST/retry semantics update the existing decision row and return the
   canonical current decision.
+- The public decision write contract accepts at most 500 note characters. The
+  durable column remains nullable `text` so previously accepted longer notes
+  stay readable; no migration or destructive truncation is introduced.
+
+### Run dossier read projection
+
+Run dossier history is not a table or durable summary. The
+`GET /api/v1/conversations/{conversation_id}/run-dossiers` endpoint projects
+existing owner-scoped records in this order:
+
+`Conversation -> completed BacktestRun -> EvidenceArtifact -> current
+DecisionNote (optional) -> assistant result message anchor (optional)`.
+
+Only completed evidence-backed runs are eligible. Ordering and pagination use
+the run's effective completion activity, `coalesce(updated_at, created_at)`,
+then run id, newest first. `total_runs` and `decided_runs` are scalar
+server-owned counts over the complete eligible set; clients never accumulate
+them from pages. This projection creates no record, migration, revision log,
+embedding, or generated recap.
 
 Durable decision capture:
 - The API uses the service-role-only `upsert_current_decision_note` RPC so the
@@ -782,6 +866,18 @@ Durable decision capture:
   idea-version lifecycle move to `decided` together.
 - The RPC is not a public/client surface. Frontend code only calls
   `POST /evidence-artifacts/{id}/decision`.
+- Omnisearch recall uses the same bounded normalized-text pattern over the
+  existing canonical `decision_state` and `note` fields. The
+  `idx_decision_notes_recall_norm_trgm` GIN index adds no new durable memory
+  record, function, view, grant, or RLS change; owner and conversation checks
+  remain in the recall query before ranking and limits.
+- Asset rollups use the existing maximum-five-symbol BacktestRun contract as
+  an index boundary. `argus_search_symbol_casefold(text)` is a pure immutable
+  SQL helper with Python 3.10 raw-casefold parity, and
+  `idx_backtest_runs_owner_symbol_{1..5}_prefix` are owner-first partial
+  B-tree expression indexes for completed non-null symbol slots. They add no
+  table, recall record, view, grant, or RLS change. The reader resolves an
+  exact or unique indexed prefix before evidence/decision lineage hydration.
 
 ### RLS
 
@@ -1194,7 +1290,7 @@ Tracks resource consumption for quotas and limits.
 - Usage counters are operational safety data, not monetization data in Alpha.
 - For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
   `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
-  assistant terminals, one unique simulation admission, and five feedback
+  assistant terminals, two unique simulation admissions, and five feedback
   submissions over the identity lifetime.
 - Registered users continue to use the existing UTC hour/day accounting.
 
@@ -1283,9 +1379,16 @@ Recents is a mixed-type feed displaying activity across the platform.
   "title": "Tesla dip thread",
   "subtitle": "Last message or metric preview",
   "pinned": false,
-  "created_at": "timestamp"
+  "created_at": "timestamp",
+  "activity": {
+    "operation": {"status": "idle", "kind": null, "updated_at": null},
+    "attention": {"status": "none", "cursor": null}
+  }
 }
 ```
+
+`activity` is projected on `chat` rows only and omitted from all other History
+types. It is not stored on the conversation and does not affect History order.
 ---
 
 # 18. Search Model
@@ -1318,9 +1421,15 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   role may insert, update, delete, or execute its server transition function;
   the server-side persistence boundary owns every write.
 
+### Conversation read state
+- `conversation_read_states` grants authenticated owners `SELECT` only.
+  `PUBLIC`, `anon`, and `authenticated` cannot write or execute its mutation,
+  read-source, reconciliation, or baseline functions; service-role persistence
+  owns those operations.
+
 ### Tables Requiring RLS
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
-  `chat_turn_lifecycles`, `strategies`, `collections`,
+  `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
   `usage_counters`, `guest_workspaces`, `memory_settings`,
   `memory_candidates`, `memory_consent_actions`, `memory_records`,
@@ -1335,10 +1444,17 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - Another guest and a permanent user see zero guest workspace rows.
 - Guest memory state must be zero before either same-identity claim or
   existing-account handoff. Memory rows are rejected rather than transferred.
+- `profiles.avatar_theme` is a registered-account preference. The database
+  default keeps every row valid, but restrictive profile RLS policies use the
+  trusted `is_anonymous` JWT claim so a guest cannot read or write it through
+  the client role. The API omits the field from guest responses.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
-- Backend service-role access checks the table before auth signup/login.
+- All privileges remain revoked from `public`, `anon`, and `authenticated`;
+  no client policy permits direct requested-row access.
+- Backend service-role access owns request capture, approval transition, and
+  access checks before auth signup/login.
 
 ---
 
@@ -1351,11 +1467,19 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **messages**: `(conversation_id, created_at DESC)`
 - **chat_turn_lifecycles**: `(conversation_id, status, updated_at)`,
   `(user_id, status, updated_at)`, unique `(assistant_message_id)` where not null
+- **chat_turn_lifecycles activity reads**:
+  `(user_id, conversation_id, status, updated_at DESC, turn_id DESC)` for active
+  rows and `(user_id, conversation_id, status, terminal_at DESC, turn_id DESC)`
+  for terminal rows
 - **strategies**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **strategies (gin)**: `USING gin(symbols)`
 - **collections**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **collection_strategies**: `(collection_id)`, `(strategy_id)`
 - **backtest_jobs**: `(user_id, status, queued_at DESC)`, `(conversation_id, created_at DESC)`, `(result_run_id)`
+- **backtest_jobs activity reads**:
+  `(user_id, conversation_id, status, updated_at DESC, id DESC)` for active or
+  checking rows and `(user_id, conversation_id, status, finished_at DESC, id DESC)`
+  for terminal rows
 - **backtest_jobs unique/idempotency**:
   `UNIQUE(user_id, operation_scope, idempotency_key)`
 - **backtest_jobs payload lookup**: `(user_id, payload_hash, created_at DESC)`

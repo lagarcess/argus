@@ -1112,6 +1112,8 @@ describe("Checks 6–20 harness guards", () => {
       '[ "$(git branch --show-current)" = "codex/guest-experience" ]',
     );
     expect(runner).toContain("ARGUS_EXPECTED_CANDIDATE_SHA");
+    expect(support).not.toContain("codex/guest-experience");
+    expect(support).not.toContain("approved guest candidate branch");
     expect(config).toContain("bun run start");
     expect(config).not.toContain("bun run dev");
     expect(config).toContain("guestQaEndpointConfig");

@@ -1,0 +1,708 @@
+{
+  "category_pass_rates": {
+    "asset_discovery_routing": {
+      "expected_failed": 0,
+      "failed": 0,
+      "pass_rate": 1.0,
+      "passed": 5,
+      "skipped": 0,
+      "unexpected_pass": 0
+    }
+  },
+  "generated_at": "2026-08-03T21:31:26.880767+00:00",
+  "results": [
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "asset_discovery_recent_ipo_exact_issue_344",
+      "prose_judge": {
+        "failed_criteria": [],
+        "notes": "The response honestly states the limitation without exposing runtime errors.",
+        "pass": true,
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:29:48.660159+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 932,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 783,
+            "total_tokens": 800
+          },
+          "usage_cost_usd": 0.00021485
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:29:50.105858+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 1445,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 33,
+            "prompt_tokens": 771,
+            "total_tokens": 804
+          },
+          "usage_cost_usd": 0.000936
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:00.737774+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 10631,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1094,
+            "prompt_tokens": 8936,
+            "total_tokens": 10030
+          },
+          "usage_cost_usd": 0.0137034
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:07.946542+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 6981,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 411,
+            "prompt_tokens": 120,
+            "total_tokens": 531
+          },
+          "usage_cost_usd": 8.30844e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "recently IPO'ed stocks",
+          "needs_current_facts": true,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "strategy_type": null
+      }
+    },
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "prose_judge": {
+        "failed_criteria": [],
+        "notes": "",
+        "pass": true,
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:11.846501+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 988,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 782,
+            "total_tokens": 799
+          },
+          "usage_cost_usd": 0.0008856
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:13.024234+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 1177,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 33,
+            "prompt_tokens": 768,
+            "total_tokens": 801
+          },
+          "usage_cost_usd": 0.000933
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:20.363531+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 7338,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 715,
+            "prompt_tokens": 8935,
+            "total_tokens": 9650
+          },
+          "usage_cost_usd": 0.01275465
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:24.082197+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 3555,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 107,
+            "prompt_tokens": 118,
+            "total_tokens": 225
+          },
+          "usage_cost_usd": 4.5709e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "crypto",
+          "category_description": "cryptos that are trending",
+          "needs_current_facts": true,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "strategy_type": null
+      }
+    },
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "prose_judge": {
+        "failed_criteria": [],
+        "notes": "",
+        "pass": true,
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:25.897941+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 926,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 782,
+            "total_tokens": 799
+          },
+          "usage_cost_usd": 0.0002136
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:27.027707+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 1129,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 33,
+            "prompt_tokens": 768,
+            "total_tokens": 801
+          },
+          "usage_cost_usd": 0.000933
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:39.133914+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 12105,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1207,
+            "prompt_tokens": 8967,
+            "total_tokens": 10174
+          },
+          "usage_cost_usd": 0.01402465
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:48.460231+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 9143,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 21,
+            "prompt_tokens": 118,
+            "total_tokens": 139
+          },
+          "usage_cost_usd": 2.24e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "pharmaceutical sector",
+          "needs_current_facts": true,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "strategy_type": null
+      }
+    },
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+      "prose_judge": {
+        "failed_criteria": [],
+        "notes": "",
+        "pass": true,
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:51.321996+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 917,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 17,
+            "prompt_tokens": 783,
+            "total_tokens": 800
+          },
+          "usage_cost_usd": 0.00088685
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:30:52.478514+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 1156,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 33,
+            "prompt_tokens": 769,
+            "total_tokens": 802
+          },
+          "usage_cost_usd": 0.000934
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:31:00.787051+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 8307,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 972,
+            "prompt_tokens": 8936,
+            "total_tokens": 9908
+          },
+          "usage_cost_usd": 0.0133984
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:31:05.964716+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 4983,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 166,
+            "prompt_tokens": 119,
+            "total_tokens": 285
+          },
+          "usage_cost_usd": 3.97782e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "pharmaceutical sector",
+          "needs_current_facts": true,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "strategy_type": null
+      }
+    },
+    {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "prose_judge": {
+        "failed_criteria": [],
+        "notes": "",
+        "pass": true,
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:31:12.951228+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 846,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 786,
+            "total_tokens": 803
+          },
+          "usage_cost_usd": 0.0002186
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:31:14.956480+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": true,
+          "latency_ms": 2004,
+          "mode": "json_schema",
+          "model": "anthropic/claude-haiku-4.5",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 33,
+            "prompt_tokens": 780,
+            "total_tokens": 813
+          },
+          "usage_cost_usd": 0.000945
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:31:22.324446+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 7367,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 5440,
+            "completion_tokens": 899,
+            "prompt_tokens": 8969,
+            "total_tokens": 9868
+          },
+          "usage_cost_usd": 0.00774675
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T21:31:24.487643+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 2002,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 32,
+            "completion_tokens": 43,
+            "prompt_tokens": 127,
+            "total_tokens": 170
+          },
+          "usage_cost_usd": 1.6866e-05
+        }
+      ],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "equity",
+          "category_description": "acciones farmac\u00e9uticas",
+          "needs_current_facts": true,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "asset_discovery",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "strategy_type": null
+      }
+    }
+  ],
+  "schema_version": 1,
+  "totals": {
+    "expected_failed": 0,
+    "failed": 0,
+    "passed": 5,
+    "skipped": 0,
+    "unexpected_pass": 0
+  }
+}

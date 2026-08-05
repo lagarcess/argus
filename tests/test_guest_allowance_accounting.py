@@ -103,7 +103,7 @@ def test_backtest_gateway_passes_guest_window_to_existing_atomic_owner() -> None
     assert client.rpc.call_args.args[1]["p_allowance_limits"] == [
         {
             "period": "guest_session",
-            "limit": 1,
+            "limit": 2,
             "period_start": windows[0]["period_start"].isoformat(),
             "period_end": windows[0]["period_end"].isoformat(),
         }
@@ -144,7 +144,7 @@ def test_memory_guest_simulation_admission_charges_once_and_replays_zero() -> No
         "identity_hash": f"sha256:{'a' * 64}",
         "payload_hash": f"sha256:{'b' * 64}",
         "launch_payload": {"kind": "proof"},
-        "initial_status": "running",
+        "initial_status": "succeeded",
         "allowance_limits": windows,
     }
 
@@ -160,15 +160,20 @@ def test_memory_guest_simulation_admission_charges_once_and_replays_zero() -> No
         idempotency_key="guest-second",
         **common,
     )
+    third = backtest_admission.admit_backtest_job_memory(
+        idempotency_key="guest-third",
+        **common,
+    )
 
     assert first.kind == "admitted"
     assert replay.kind == "replay"
-    assert second.kind == "conversion_required"
+    assert second.kind == "admitted"
+    assert third.kind == "conversion_required"
     row = store.usage_counters[
         (account.user_id, SIMULATION_USAGE_RESOURCE, "guest_session")
     ]
-    assert row["used_count"] == 1
-    assert len(store.backtest_jobs) == 1
+    assert row["used_count"] == 2
+    assert len(store.backtest_jobs) == 2
 
 
 def test_memory_registered_dict_windows_keep_hour_and_day_accounting() -> None:
@@ -203,7 +208,7 @@ def test_guest_summary_policy_matches_python_openapi_typescript_and_sql() -> Non
     assert policy == {
         "conversation_limit": 1,
         "message_limit": 10,
-        "simulation_limit": 1,
+        "simulation_limit": 2,
         "feedback_limit": 5,
     }
 
@@ -227,7 +232,7 @@ def test_guest_summary_policy_matches_python_openapi_typescript_and_sql() -> Non
         root
         / "supabase"
         / "migrations"
-        / "20260724102309_add_guest_session_allowances.sql"
+        / "20260802090000_raise_guest_simulation_allowance.sql"
     ).read_text(encoding="utf-8")
     sql_policy = {
         resource: int(limit)

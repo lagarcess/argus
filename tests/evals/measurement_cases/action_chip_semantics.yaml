@@ -731,6 +731,84 @@ cases:
       stage_outcomes:
         ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
 
+  - id: compound_benchmark_start_date_preserves_confirmation_issue_339
+    prompt: "change the benchmark to QQQ and change the beginning of the period to April 1, 2026"
+    user_language: en
+    ui_language: en
+    thread_metadata:
+      requested_field: assumption
+    snapshot:
+      latest_task_type: backtest_execution
+      completed: false
+      pending_strategy:
+        requested_strategy_template: buy_and_hold
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold LOW and HD."
+        asset_universe: ["LOW", "HD"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2026-03-02"
+          end: "2026-07-30"
+        sizing_mode: capital_amount
+        capital_amount: 100000
+        comparison_baseline: SPY
+    confirmation_payload:
+      confirmation_id: "eval-confirm-low-hd-339"
+      artifact_id: "eval-confirm-low-hd-339"
+      strategy:
+        requested_strategy_template: buy_and_hold
+        strategy_type: buy_and_hold
+        strategy_thesis: "Buy and hold LOW and HD."
+        asset_universe: ["LOW", "HD"]
+        asset_class: equity
+        timeframe: 1D
+        date_range:
+          start: "2026-03-02"
+          end: "2026-07-30"
+        sizing_mode: capital_amount
+        capital_amount: 100000
+        comparison_baseline: SPY
+      optional_parameters: {}
+      launch_payload:
+        strategy_type: buy_and_hold
+        symbol: LOW
+        symbols: ["LOW", "HD"]
+        asset_class: equity
+        timeframe: 1D
+        requested_date_range:
+          start: "2026-03-02"
+          end: "2026-07-30"
+        date_range:
+          start: "2026-03-02"
+          end: "2026-07-30"
+        sizing_mode: capital_amount
+        capital_amount: 100000
+        benchmark_symbol: SPY
+        language: en
+      validation:
+        status: ready_to_run
+        executable: true
+    expected:
+      intent: backtest_execution
+      capability_verdict: executable
+      assets: ["LOW", "HD"]
+      asset_class: equity
+      requested_strategy_template: buy_and_hold
+      strategy_type: buy_and_hold
+      date_range:
+        start: "2026-04-01"
+        end: "2026-07-30"
+      requested_date_range:
+        start: "2026-04-01"
+        end: "2026-07-30"
+      effective_date_range:
+        start: "2026-04-01"
+        end: "2026-07-30"
+      benchmark_symbol: QQQ
+      capital_amount: 100000
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
   - id: ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en
     prompt: "Change the active NVDA setup to $30,000 and keep every other owned fact unchanged."
     user_language: en

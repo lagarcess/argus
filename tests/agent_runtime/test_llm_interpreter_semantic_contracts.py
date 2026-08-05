@@ -2,6 +2,165 @@
 from tests.agent_runtime._llm_interpreter_common import *
 
 
+def test_interpreter_facade_reexports_discovery_act_guard() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.interpreter.discovery_act_guard import (
+        preserve_typed_discovery_act,
+    )
+
+    assert interpreter_module.preserve_typed_discovery_act is preserve_typed_discovery_act
+
+
+@pytest.mark.asyncio
+async def test_discovery_payload_restores_missing_semantic_act_without_strategy_audits(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+
+    discovery = AssetDiscoveryRequest(
+        relationship="category",
+        category_description="cybersecurity stocks",
+        asset_class_hint="equity",
+        needs_current_facts=False,
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="new_task",
+        user_goal_summary="Find cybersecurity stocks to test.",
+        semantic_turn_act=None,
+        asset_discovery=discovery,
+    )
+
+    async def audited_response(**_kwargs):
+        raise AssertionError("typed discovery must bypass strategy-readiness audits")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audited_response_ready_for_runtime",
+        audited_response,
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Find cybersecurity stocks to test.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired.semantic_turn_act == "asset_discovery"
+    assert repaired.asset_discovery == discovery
+    assert "typed_discovery_act_restored" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_discovery_payload_does_not_override_an_explicit_other_act(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="new_task",
+        user_goal_summary="Explain diversification.",
+        semantic_turn_act="educational_question",
+        asset_discovery=AssetDiscoveryRequest(
+            relationship="category",
+            category_description="technology stocks",
+            asset_class_hint="equity",
+            needs_current_facts=False,
+        ),
+    )
+
+    async def audited_response(**kwargs):
+        return kwargs["response"]
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audited_response_ready_for_runtime",
+        audited_response,
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Explain diversification.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired.semantic_turn_act == "educational_question"
+
+
+@pytest.mark.asyncio
+async def test_missing_discovery_act_does_not_override_a_backtest_response(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Backtest Nvidia over the last year.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Backtest Nvidia over the last year.",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Nvidia.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"start": "2025-08-02", "end": "2026-08-02"},
+        ),
+        semantic_turn_act=None,
+        asset_discovery=AssetDiscoveryRequest(
+            relationship="category",
+            category_description="semiconductor stocks",
+            asset_class_hint="equity",
+            needs_current_facts=False,
+        ),
+    )
+    audited = False
+
+    async def audited_response(**kwargs):
+        nonlocal audited
+        audited = True
+        return interpreter_module._normalize_response_for_runtime_context(
+            kwargs["response"],
+            request=kwargs["request"],
+            asset_resolution_context=kwargs["asset_resolution_context"],
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audited_response_ready_for_runtime",
+        audited_response,
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="Backtest Nvidia over the last year.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert audited is True
+    assert repaired.intent == "backtest_execution"
+    assert repaired.semantic_turn_act == "new_idea"
+    assert "coerced_missing_turn_act_to_new_idea" in repaired.reason_codes
+
+
 def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
     monkeypatch,
 ) -> None:
@@ -83,7 +242,8 @@ def test_provider_asset_context_resolves_only_llm_identified_mentions(
                 {"raw_text": "target", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "Walmart", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "costco", "role": "traded_asset", "confidence": 0.9},
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         )
     )
 
@@ -127,7 +287,8 @@ def test_provider_asset_context_dedupes_before_the_five_mention_cap(
                 {"raw_text": "walmart", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "Walmart", "role": "traded_asset", "confidence": 0.9},
                 {"raw_text": "nvidia", "role": "traded_asset", "confidence": 0.9},
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         )
     )
 
@@ -182,7 +343,8 @@ def test_provider_asset_context_uses_name_search_for_company_mentions() -> None:
                     "mention_kind": "company_name",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -243,7 +405,8 @@ def test_provider_asset_context_uses_name_search_for_crypto_name_mentions() -> N
                     "mention_kind": "crypto",
                     "confidence": 0.9,
                 },
-            ]
+            ],
+            all_traded_asset_mentions_included=True,
         ),
         resolve_asset_candidate=resolve_candidate,
     )
@@ -594,7 +757,8 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
                     "name": "Costco Wholesale Corporation",
                     "confidence": 0.95,
                 },
-            ]
+            ],
+            "all_traded_asset_mentions_accounted_for": True,
         }
     )
     message = (

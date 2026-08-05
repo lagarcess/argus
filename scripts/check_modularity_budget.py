@@ -2,7 +2,7 @@
 """Guard large-file modularity budgets without forcing immediate refactors.
 
 The guard compares explicitly watched files against recorded line-count baselines
-and fails only when a watched file grows beyond the shared allowed-growth
+and fails only when a watched file grows beyond its configured allowed-growth
 threshold. It also scans production source roots for a non-blocking top-offender
 report so newly large files are visible without becoming surprise CI failures.
 """
@@ -103,6 +103,9 @@ def collect_budgets(config_path: Path = DEFAULT_CONFIG) -> list[FileBudget]:
     config = _load_config(config_path)
     root = _repo_root(config_path)
     allowed_growth_lines = int(config.get("allowed_growth_lines", 75))
+    growth_overrides = config.get("allowed_growth_lines_by_file", {})
+    if not isinstance(growth_overrides, dict):
+        raise ValueError("allowed_growth_lines_by_file must be an object")
     budgets: list[FileBudget] = []
     for raw_path, raw_baseline in sorted(config["watched_files"].items()):
         file_path = Path(raw_path)
@@ -114,7 +117,9 @@ def collect_budgets(config_path: Path = DEFAULT_CONFIG) -> list[FileBudget]:
                 path=_display_path(resolved_path, root),
                 baseline_lines=int(raw_baseline),
                 current_lines=_line_count(resolved_path),
-                allowed_growth_lines=allowed_growth_lines,
+                allowed_growth_lines=int(
+                    growth_overrides.get(raw_path, allowed_growth_lines)
+                ),
             )
         )
     return budgets

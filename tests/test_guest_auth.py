@@ -209,8 +209,33 @@ def test_valid_guest_cookie_reuses_identity_across_reload(
     assert response.json()["renewed_after_expiry"] is False
     assert response.json()["public_account_access_enabled"] is False
     assert response.json()["user"]["id"] == USER_ID
+    assert "avatar_theme" not in response.json()["user"]
     gateway.sign_in_anonymously.assert_not_called()
     gateway.create_guest_workspace.assert_not_called()
+
+
+def test_guest_auth_session_omits_registered_avatar_preferences(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_guest(monkeypatch)
+    gateway.get_auth_user_from_token.return_value = (
+        gateway.sign_in_anonymously.return_value["user"]
+    )
+
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        TestClient(app) as client,
+    ):
+        response = client.get(
+            "/api/v1/auth/session",
+            headers={"Authorization": "Bearer verified-guest-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["authenticated"] is True
+    assert "avatar_theme" not in response.json()["user"]
 
 
 def test_expired_verified_guest_session_mints_a_fresh_anonymous_identity(
@@ -399,6 +424,7 @@ def test_public_account_mode_allows_unlisted_signup_without_role_elevation(
             json={
                 "email": "ordinary@example.com",
                 "password": "password-strong",
+                "captcha_token": "captcha-proof",
                 "language": "en",
             },
         )
@@ -423,6 +449,7 @@ def test_public_account_mode_still_blocks_explicitly_disabled_identity(
             json={
                 "email": "disabled@example.com",
                 "password": "password-strong",
+                "captcha_token": "captcha-proof",
                 "language": "en",
             },
         )

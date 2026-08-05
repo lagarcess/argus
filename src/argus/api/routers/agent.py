@@ -83,6 +83,12 @@ from argus.api.chat.request_admission import (
     reject_invalid_non_run_confirmation_action,
 )
 from argus.api.chat.result_actions import result_action_request_type
+from argus.api.chat.retest import (
+    complete_retest_turn,
+    failed_retest_turn,
+    is_retest_action,
+    prepare_retest_turn,
+)
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.run_action_identity import (
     require_run_action_identity,
@@ -127,6 +133,7 @@ from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
 )
+from argus.llm.openrouter_key_policy import openrouter_traffic_class
 
 router = APIRouter(tags=["agent"])
 RUNTIME_EVENT_TIMEOUT_SECONDS = 120.0
@@ -396,6 +403,13 @@ async def chat_stream(
         stale_confirmation_message=stale_confirmation_message,
         language=language,
     )
+    retest_turn = prepare_retest_turn(
+        payload=payload,
+        request=request,
+        user_id=user.id,
+        conversation_id=conversation.id,
+        language=language,
+    )
     request_admission = prepare_chat_request_admission(
         payload=payload,
         request=request,
@@ -406,8 +420,14 @@ async def chat_stream(
         enabled=True,
         language=language,
         owner="message_only" if is_run_backtest_turn else "ordinary_turn",
+        extra_user_metadata=(
+            {"retest_receipt": dict(retest_turn.receipt)}
+            if retest_turn is not None
+            else None
+        ),
     )
     runtime_fallback = RuntimeFallbackContext()
+    validated_result_action_run: BacktestRun | None = None
     validated_option_source = request_admission.admit_response_option()
     if validated_option_source is not None:
         runtime_fallback = validated_option_source.runtime_fallback
@@ -424,7 +444,7 @@ async def chat_stream(
     lifecycle_hooks = (
         None if is_run_backtest_turn else request_admission.lifecycle_hooks()
     )
-    deterministic_control_turn = cancel_confirmation_action
+    deterministic_control_turn = cancel_confirmation_action or is_retest_action(payload)
 
     workflow: Any | None = None
     retry_finalization_execution_identity: str | None = None
@@ -584,9 +604,16 @@ async def chat_stream(
         elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
     elif is_result_action(payload):
+        validated_result_action_run = run_for_result_action(
+            payload=payload,
+            user=user,
+            conversation_id=conversation.id,
+            require_run_id=True,
+        )
         result_fallback = latest_result_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
+            action_run=validated_result_action_run,
         )
         if result_fallback is not None:
             runtime_fallback = result_fallback
@@ -733,6 +760,47 @@ async def chat_stream(
             yield sse_done()
             return
 
+        if retest_turn is not None:
+            try:
+                retest_payload = complete_retest_turn(
+                    turn=retest_turn,
+                    lifecycle_hooks=lifecycle_hooks,
+                    conversation_id=conversation.id,
+                    language=runtime_user.language_preference,
+                    settle_usage=ordinary_turn_settlement(
+                        is_run_backtest_turn=False,
+                        account=turn_account,
+                        visitor_key=(
+                            visitor_key_for(client_identity(request))
+                            if turn_account.kind == "guest"
+                            else None
+                        ),
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "Retest confirmation materialization failed",
+                    conversation_id=conversation.id,
+                    source_run_id=retest_turn.source_run_id,
+                )
+                failure_payload = failed_retest_turn(
+                    turn=retest_turn,
+                    lifecycle_hooks=lifecycle_hooks,
+                    request_message=request_message_record,
+                    language=runtime_user.language_preference,
+                )
+                claim_turn_terminal("recoverable_failed", "agent_runtime_failure")
+                record_control_exit("retest_run", "recoverable_failed")
+                persist_turn_evidence()
+                yield sse_data({"type": "final", "payload": failure_payload})
+                yield sse_done()
+                return
+            record_control_exit("retest_run", "finished")
+            persist_turn_evidence()
+            yield sse_data({"type": "final", "payload": retest_payload})
+            yield sse_done()
+            return
+
         if cancel_confirmation_action and payload.action is not None:
             assert cancellation_admission is not None
             _, final_payload = complete_confirmation_cancellation(
@@ -751,6 +819,7 @@ async def chat_stream(
             BacktestJobShadowContext(
                 user_id=user.id,
                 conversation_id=conversation.id,
+                account_kind=turn_account.kind,
                 request_message_id=(
                     request_message_record.id if request_message_record else None
                 ),
@@ -867,7 +936,7 @@ async def chat_stream(
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
-                result_action_run = None
+                result_action_run = validated_result_action_run
                 saved_strategy_id_for_naming: str | None = None
                 result_action_type = result_action_request_type(runtime_result)
                 if (
@@ -917,12 +986,13 @@ async def chat_stream(
                     runtime_result.pop("confirmation", None)
                     runtime_result.pop("confirmation_payload", None)
                     runtime_result.pop("active_confirmation_reference", None)
-                    result_action_run = run_for_result_action(
-                        payload=payload,
-                        user=user,
-                        conversation_id=conversation.id,
-                        require_run_id=True,
-                    )
+                    if result_action_run is None:
+                        result_action_run = run_for_result_action(
+                            payload=payload,
+                            user=user,
+                            conversation_id=conversation.id,
+                            require_run_id=True,
+                        )
                     if result_action_type == "show_breakdown":
                         yield sse_data({"type": "stage_start", "stage": "explain"})
                         breakdown_message = result_breakdown_message_with_metadata(
@@ -988,6 +1058,8 @@ async def chat_stream(
                             )
                 for key in (
                     "latest_run_id",
+                    "source_result_run_id",
+                    "strategy_path_id",
                     "result_run_id",
                     "result_strategy_id",
                     "result_conversation_id",
@@ -1326,7 +1398,10 @@ async def chat_stream(
             persist_turn_evidence()
 
     async def events() -> AsyncIterator[str]:
-        with turn_execution_scope(entry_state=checkpoint_values or {}):
+        with (
+            openrouter_traffic_class(turn_account.kind),
+            turn_execution_scope(entry_state=checkpoint_values or {}),
+        ):
             workflow_input_error: Exception | None = None
             try:
                 workflow_input = build_workflow_input(

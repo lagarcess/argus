@@ -293,6 +293,27 @@ describe("chat turn artifact UX", () => {
     expect(handleSendBlock).toContain("setMessages((prev) =>");
   });
 
+  test("first guest submit locks synchronously and stays neutral before SSE", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
+    const handleSendStart = chat.indexOf("const handleSend =");
+    const handleSendEnd = chat.indexOf("// ── Conversation", handleSendStart);
+    const handleSendBlock = chat.slice(handleSendStart, handleSendEnd);
+
+    expect(handleSendBlock).toContain("sendAdmissionInFlightRef.current");
+    expect(handleSendBlock).toContain("setGuestSubmissionPending(true)");
+    expect(handleSendBlock).toContain("guestExperience.admitSend");
+    expect(emptyChat).toContain('t("guest.entry.sending", "Sending...")');
+    expect(emptyChat).toContain("aria-busy={guestSubmissionPending}");
+    expect(emptyChat).toContain('t("common.try_again", "Try again")');
+  });
+
   test("final recovery responses hydrate retry controls from structured metadata", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
