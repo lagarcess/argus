@@ -507,6 +507,7 @@ class OpenRouterStructuredInterpreter:
         if self.model_name is None:
             candidate_models = candidate_models or []
             for index, candidate_model in enumerate(candidate_models):
+                started_at = time.perf_counter()
                 try:
                     response = await invoke_openrouter_json_schema(
                         task="interpretation",
@@ -537,6 +538,19 @@ class OpenRouterStructuredInterpreter:
                     )
                     if isinstance(exc, InterpretationContractError):
                         self.last_failure_kind = "contract_rejected"
+                        # The provider call already recorded its own succeeded
+                        # receipt, so without this the turn reads as green.
+                        # Transport and schema failures are not recorded here:
+                        # invoke_openrouter_json_schema already books those.
+                        record_openrouter_route_receipt(
+                            task="interpretation",
+                            model_name=candidate_model,
+                            mode="json_schema",
+                            schema_name="LLMInterpretationResponse",
+                            latency_ms=_elapsed_ms(started_at),
+                            outcome="failed",
+                            failure_mode="interpretation_contract_rejected",
+                        )
                         corrected = await self._self_corrected_response(
                             error=exc,
                             messages=messages,

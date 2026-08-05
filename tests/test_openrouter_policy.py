@@ -4103,3 +4103,70 @@ def test_json_content_prose_brace_before_real_fence_still_yields_body() -> None:
         assert (
             openrouter._json_content_without_code_fences(content) == '{"ok": true}'
         ), content
+
+
+def _empty_refine_response() -> LLMInterpretationResponse:
+    return LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        user_goal_summary="Change the date range.",
+        semantic_turn_act="refine_current_idea",
+        candidate_strategy_draft=LLMStrategyDraft(),
+    )
+
+
+def _active_card_request(message: str) -> InterpretationRequest:
+    return InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                date_range="past year",
+            )
+        ),
+        user=UserState(user_id="u1"),
+    )
+
+
+def test_contract_rejection_is_recorded_as_a_distinct_route_receipt(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        return _empty_refine_response()
+
+    monkeypatch.setattr(
+        llm_interpreter, "invoke_openrouter_json_schema", fake_direct_schema
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        _structured_model_candidates_with_fallback,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    token = openrouter.begin_openrouter_route_receipt_capture()
+    try:
+        result = interpreter(_active_card_request("Use the last 6 months instead."))
+    finally:
+        receipts = openrouter.end_openrouter_route_receipt_capture(token)
+
+    assert result is None
+    rejected = [
+        receipt
+        for receipt in receipts
+        if receipt.failure_mode == "interpretation_contract_rejected"
+    ]
+    # Both tiers rejected, and neither is invisible in telemetry any more.
+    assert {receipt.model for receipt in rejected} == {
+        "primary/model",
+        "fallback/model",
+    }
+    assert all(receipt.outcome == "failed" for receipt in rejected)
+    assert interpreter.last_failure_kind == "contract_rejected"
