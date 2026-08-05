@@ -1929,7 +1929,15 @@ def test_default_interpreter_retries_empty_refinement_candidate(
     )
 
     assert result is not None
-    assert calls == ["primary/model", "primary/model", "fallback/model"]
+    # The primary tier gets its own bounded self-correction pass before the
+    # fallback tier is tried, so an empty refinement is re-asked in place first.
+    assert calls == [
+        "primary/model",
+        "primary/model",
+        "primary/model",
+        "primary/model",
+        "fallback/model",
+    ]
     assert result.candidate_strategy_draft.date_range == "last 6 months"
 
 
