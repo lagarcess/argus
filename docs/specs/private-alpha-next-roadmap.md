@@ -354,6 +354,26 @@ parked for founder design discussion (#379 closed pending it; the dossier
 retest token chip is the candidate pattern). None are batch regressions;
 promotion proceeds on `70ba33cc`.
 
+### Production promotion complete — 2026-08-05
+
+Promotion shipped: `argus-api`, `argus-app`, and the `argus-backtests`
+workflow (version `wfv-d9p88253erlc73d3u8s0`) are live at `7ef89a90`, four
+migrations applied, env contract reconciled (three red-gate rounds fixed the
+contract itself: visitor secret + support email, then discovery/realism/
+PostHog, then the runbook secret checklist). Full evidence:
+[`docs/release-manifests/2026-08-05-main-production-promotion.md`](../release-manifests/2026-08-05-main-production-promotion.md).
+
+Recorded deviation: Turnstile correctly blocks headless browser automation in
+every widget mode, so the authoritative canary's browser phase cannot pass
+unattended. The journey was founder-operated in a real browser and verified
+server-side (job succeeded through `argus-backtests/run_backtest_job`,
++12.84% result, benchmark lag 13.30 points, cost ledger `$0.00015585` for the
+turn); the requested-signup denial was proven at the API layer. Issue #383
+holds the rework (API-layer denial probe, session-injected journey, staging
+testing sitekey). **Until #383 ships, the scheduled daily canary will stay
+red at its browser auth phase — an explained red, not a production alarm;
+the meaningful daily signal is the warmup and pre-browser gates.**
+
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
 active pointer.
