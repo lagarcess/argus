@@ -646,6 +646,13 @@ slices below describe delivered scope, not pending work.
 
 ### Design-Only Until Later
 
+- Guided first-run tour (alpha-user suggested, 2026-08-05): not a wizard; a
+  fluid one-click layer that makes Argus aware of where it is leading you.
+  Founder wants a worth-it brainstorm before any build.
+- Recency-aware suggestion context (2026-08-05): in-chat suggestions must
+  weight the latest run heavily (never re-suggest the asset just tested;
+  NVDA was suggested right after an NVDA backtest). Macro pattern spans chat
+  context, product memory, and the personalization-memory incubation lane.
 - Memory/data controls.
 - Voice-to-composer STT.
 - Public evidence excerpts.
