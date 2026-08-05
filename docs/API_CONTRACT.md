@@ -797,16 +797,12 @@ machine-readable fields alongside display labels:
   - `duration = { unit, count, approximate }`: the backend-derived natural
     duration descriptor rendered by the client; `unit` is `year`, `month`, or
     `day`.
-  - `same_period`: backend boolean truth. `same_period` compares the original
-    and provider-effective ranges, never the wall-clock candidate end. Clients
-    must not infer this value from today's date.
 
   The client renders the original-to-effective transformation and the natural
-  effective duration. When `same_period = true`, the existing Run action
-  changes only the Run action's `label` and `labelKey` to the localized
-  explicit acknowledgment (`Run anyway — no new data` in English). Run action
-  identity, `type`, `presentation`, and `payload` remain unchanged; there is no
-  second action, modal, toast, or client-owned execution state.
+  effective duration only after a dossier action has passed the pre-click
+  availability gate. Same-period Retest never reaches confirmation, so the Run
+  action always keeps its normal localized label. There is no second action,
+  modal, toast, or client-owned execution state.
 - `period_adjustment`: optional typed sidecar with
   `code = effective_window_adjusted`, `requested_date_range`, and
   `effective_date_range`. The frontend renders one localized, provider-neutral
@@ -3556,18 +3552,26 @@ and `decided_runs` are backend-owned full-lineage counts, not page totals.
   evidence-backed run dossier. It carries identity and policy only:
   `source_run_id`, a display-only `run_label`, the fixed
   `window_policy: "preserve_start_ending_latest_available"`, and
-  `contract_version: "argus_retest_run/v2"`. It carries no executable setup and
-  no generated prompt, so a client cannot supply canonical state. The backend
+  `contract_version: "argus_retest_run/v2"`, plus a required server-owned
+  `state` (`new_data_available`, `no_new_data`, or `cant_do_it`). It carries no
+  executable setup and no generated prompt, so a client cannot supply canonical state. The backend
   reloads every executable field from the owner-scoped stored run when the
   action is submitted, preserves the original start, and requests the current
   date only as the candidate end before provider coverage resolves the latest
   available bar. Eligibility and admission
   share one reconstruction, so the action is offered only when the backend can
-  faithfully materialize the confirmation - including under the
+  faithfully classify and materialize the action - including under the
   execution-realism kill switch, which would otherwise idealize a costed run.
-  If the stored facts are absent, conflicting, or unfaithful, the backend omits
-  the action instead of guessing. Submitting it reaches the normal Ready-to-run
-  confirmation and never directly executes a backtest.
+  `new_data_available` is enabled and reaches normal confirmation.
+  `no_new_data` is informational and disabled, so it creates no chat turn,
+  simulation request, job, or backtest row. `cant_do_it` requires a canonical
+  `reason_code`. History-start and Kraken-candle violations also require one
+  server-computed `repair = { kind: "clamp_start", start_date, end_date }`; that
+  guided action is enabled and admission applies the advertised repair before
+  preflight. A timeframe violation carries no repair and is disabled. If stored
+  facts are absent, conflicting, or unfaithful, the backend omits the action
+  instead of guessing. Submitting an enabled action reaches the normal
+  Ready-to-run confirmation and never directly executes a backtest.
 - `decision` targets the latest evidence artifact for that same latest run.
   Its optional state and note describe the current decision on that exact
   artifact. Its required `availability` is either `available` or

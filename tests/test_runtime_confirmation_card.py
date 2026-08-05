@@ -51,20 +51,11 @@ def _confirmation_result_with_draft_costs() -> dict[str, object]:
     }
 
 
-def _retest_confirmation_result(*, same_period: bool) -> dict[str, object]:
+def _retest_confirmation_result() -> dict[str, object]:
     original = {"start": "2024-01-01", "end": "2024-12-31"}
-    requested = {
-        "start": "2024-01-01",
-        "end": "2024-12-31" if same_period else "2026-07-31",
-    }
-    effective = (
-        dict(original) if same_period else {"start": "2024-01-01", "end": "2026-06-30"}
-    )
-    duration = (
-        {"unit": "year", "count": 1, "approximate": False}
-        if same_period
-        else {"unit": "year", "count": 2.5, "approximate": True}
-    )
+    requested = {"start": "2024-01-01", "end": "2026-07-31"}
+    effective = {"start": "2024-01-01", "end": "2026-06-30"}
+    duration = {"unit": "year", "count": 2.5, "approximate": True}
     return {
         "stage_outcome": "await_approval",
         "confirmation_payload": {
@@ -108,36 +99,15 @@ def _retest_confirmation_result(*, same_period: bool) -> dict[str, object]:
                 "original_date_range": original,
                 "requested_date_range": requested,
                 "effective_date_range": effective,
-                "duration_days": 365 if same_period else 911,
+                "duration_days": 911,
                 "duration": duration,
-                "same_period": same_period,
             },
         },
     }
 
 
-@pytest.mark.parametrize(
-    ("same_period", "expected_label", "expected_label_key"),
-    [
-        (
-            False,
-            "Run backtest",
-            "chat.confirmation.actions.run_backtest",
-        ),
-        (
-            True,
-            "Run anyway — no new data",
-            "chat.confirmation.actions.run_backtest_same_period",
-        ),
-    ],
-    ids=["extended-period", "same-period"],
-)
-def test_retest_confirmation_projects_typed_period_and_acknowledgment_run_label(
-    same_period: bool,
-    expected_label: str,
-    expected_label_key: str,
-) -> None:
-    result = _retest_confirmation_result(same_period=same_period)
+def test_retest_confirmation_projects_typed_period_and_normal_run_label() -> None:
+    result = _retest_confirmation_result()
 
     card = runtime_confirmation_card(result, confirmation_id="confirmation-retest")
 
@@ -146,17 +116,15 @@ def test_retest_confirmation_projects_typed_period_and_acknowledgment_run_label(
     run_action = next(
         action for action in card["actions"] if action["type"] == "run_backtest"
     )
-    assert run_action["label"] == expected_label
-    assert run_action["labelKey"] == expected_label_key
+    assert run_action["label"] == "Run backtest"
+    assert run_action["labelKey"] == "chat.confirmation.actions.run_backtest"
     assert run_action["payload"]["confirmation_id"] == "confirmation-retest"
     assert [(row["key"], row["value"]) for row in card["rows"]] == [
         ("strategy", "Buy and Hold"),
         ("assets", "AAPL"),
         (
             "period",
-            "January 1, 2024 - December 31, 2024"
-            if same_period
-            else "January 1, 2024 - June 30, 2026",
+            "January 1, 2024 - June 30, 2026",
         ),
         ("starting_capital", "$1,000"),
     ]

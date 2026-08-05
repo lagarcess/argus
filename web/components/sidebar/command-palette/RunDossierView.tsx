@@ -20,6 +20,7 @@ import {
 } from "@/lib/run-dossier-items";
 import type { GuestDossierDecisionResumeTarget } from "@/lib/guest-conversion";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { compactDateDisplay } from "@/lib/date-range-display";
 
 import { DecisionEditor } from "./DecisionEditor";
 import { DecisionNoteDisplay } from "./DecisionNoteDisplay";
@@ -221,6 +222,40 @@ export function RunDossierView({
 
   const conversationUnavailable =
     openConversationDisabled || dossier.result_message_id === null;
+  const retestRepair = retestAction?.repair ?? null;
+  const retestUnavailable =
+    retestAction?.state === "no_new_data" ||
+    (retestAction?.state === "cant_do_it" && retestRepair === null);
+  const retestButtonDisabled = retestDisabled || retestUnavailable;
+  const repairStart = compactDateDisplay(retestRepair?.start_date, locale);
+  const repairEnd = compactDateDisplay(retestRepair?.end_date, locale);
+  const retestLabel =
+    retestAction?.state === "no_new_data"
+      ? t("command_palette.retest_already_current", "Already up to date")
+      : retestRepair
+        ? t("command_palette.retest_available_dates", "Use available dates")
+        : retestAction?.state === "cant_do_it"
+          ? t("command_palette.retest_unavailable", "Retest unavailable")
+          : t("command_palette.retest_current_data", "Retest with current data");
+  const retestDetail =
+    retestAction?.state === "no_new_data"
+      ? t(
+          "command_palette.retest_no_new_data",
+          "No new market data is available since this run.",
+        )
+      : retestRepair && repairStart && repairEnd
+        ? t(
+            "command_palette.retest_repaired_period",
+            "Retest from {{start}} through {{end}}.",
+          )
+            .replace("{{start}}", repairStart)
+            .replace("{{end}}", repairEnd)
+        : retestAction?.reason_code === "provider_timeframe_unavailable"
+          ? t(
+              "command_palette.retest_timeframe_unavailable",
+              "This run’s timeframe is not available for this market.",
+            )
+          : null;
 
   return (
     <div
@@ -264,16 +299,25 @@ export function RunDossierView({
               <button
                 type="button"
                 data-retest-location="card-header"
-                disabled={retestDisabled}
+                disabled={retestButtonDisabled}
                 onClick={() => void onRetest(retestAction.source_run_id)}
                 className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 text-[11px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-white/[0.08]"
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                {t("command_palette.retest_current_data", "Retest with current data")}
+                {retestLabel}
               </button>
             </Tooltip>
           ) : null}
         </div>
+
+        {retestDetail ? (
+          <p
+            data-retest-state={retestAction?.state}
+            className="mt-2 text-[11px] leading-relaxed text-black/45 dark:text-white/45"
+          >
+            {retestDetail}
+          </p>
+        ) : null}
 
         <h3 className="mt-3 font-display text-[20px] font-medium leading-tight text-black dark:text-white">
           {dossier.run_label}

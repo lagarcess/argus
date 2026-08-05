@@ -358,7 +358,7 @@ function RetestPeriodDisclosure({
   return (
     <div
       className="mt-4 border-t border-[#c9c9cd]/22 pt-4 dark:border-white/[0.04]"
-      data-retest-period={period.samePeriod ? "same" : "extended"}
+      data-retest-period="extended"
     >
       <p className="whitespace-normal break-words text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76">
         {retestPeriodTransformationLabel(period, language)}
@@ -369,14 +369,6 @@ function RetestPeriodDisclosure({
           duration,
         })}
       </p>
-      {period.samePeriod && (
-        <p className="mt-2 text-[12px] font-medium leading-snug text-[#8a651d] dark:text-[#d3b36a]">
-          {t(
-            "chat.retest.same_period",
-            "No new data since the original run.",
-          )}
-        </p>
-      )}
     </div>
   );
 }

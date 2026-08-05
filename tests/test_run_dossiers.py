@@ -133,6 +133,9 @@ def test_project_run_dossier_keeps_every_fact_and_action_on_one_run() -> None:
         == "preserve_start_ending_latest_available"
     )
     assert dossier.actions[0].contract_version == "argus_retest_run/v2"
+    assert dossier.actions[0].state == "new_data_available"
+    assert dossier.actions[0].reason_code is None
+    assert dossier.actions[0].repair is None
     assert not hasattr(dossier.actions[0], "canonical_setup")
     assert not hasattr(dossier.actions[0], "send_text")
     assert dossier.actions[1].type == "decision"

@@ -400,8 +400,7 @@
           "day_other": "aproximadamente {{formattedCount}} días"
         }
       },
-      "updated_duration": "Duración actualizada: {{duration}}",
-      "same_period": "No hay datos nuevos desde la ejecución original."
+      "updated_duration": "Duración actualizada: {{duration}}"
     },
     "result_readout": {
       "quick_take": "Lectura rápida"
@@ -728,7 +727,6 @@
       },
       "actions": {
         "run_backtest": "Ejecutar backtest",
-        "run_backtest_same_period": "Ejecutar de todos modos — no hay datos nuevos",
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",
         "adjust_assumptions": "Ajustar supuestos",
@@ -1133,6 +1131,12 @@
     "result_count_other": "{{count}} resultados",
     "retest_current_data": "Volver a probar con datos actuales",
     "retest_tooltip": "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
+    "retest_already_current": "Ya está al día",
+    "retest_no_new_data": "No hay datos de mercado nuevos desde esta ejecución.",
+    "retest_available_dates": "Usar fechas disponibles",
+    "retest_repaired_period": "Volver a probar del {{start}} al {{end}}.",
+    "retest_unavailable": "No se puede volver a probar",
+    "retest_timeframe_unavailable": "El intervalo de esta ejecución no está disponible para este mercado.",
     "retry_load_more": "Intentar cargar más",
     "retry_search": "Intentar la búsqueda de nuevo",
     "save_decision": "Guardar decisión",

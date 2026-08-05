@@ -38,6 +38,9 @@ const retestAction = (
   run_label: runLabel,
   window_policy: "preserve_start_ending_latest_available",
   contract_version: "argus_retest_run/v2",
+  state: "new_data_available",
+  reason_code: null,
+  repair: null,
 });
 
 function dossier(runId: string, metric: number): RunDossier {

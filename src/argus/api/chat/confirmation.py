@@ -221,18 +221,13 @@ def runtime_confirmation_card(
         },
     ]
     if is_ready_to_run:
-        same_period = bool(retest_period and retest_period["same_period"])
         actions.insert(
             0,
             {
                 "id": "run-backtest",
                 "type": "run_backtest",
-                "label": ("Run anyway — no new data" if same_period else "Run backtest"),
-                "labelKey": (
-                    "chat.confirmation.actions.run_backtest_same_period"
-                    if same_period
-                    else "chat.confirmation.actions.run_backtest"
-                ),
+                "label": "Run backtest",
+                "labelKey": "chat.confirmation.actions.run_backtest",
                 "presentation": "confirmation",
                 "payload": action_payload,
             },
@@ -348,13 +343,11 @@ def _retest_period_from_confirmation_payload(
 
     duration_days = value.get("duration_days")
     duration = value.get("duration")
-    same_period = value.get("same_period")
     if (
         not isinstance(duration_days, int)
         or isinstance(duration_days, bool)
         or duration_days < 0
         or not isinstance(duration, dict)
-        or not isinstance(same_period, bool)
     ):
         return None
     unit = duration.get("unit")
@@ -371,7 +364,7 @@ def _retest_period_from_confirmation_payload(
     effective_days = (
         date.fromisoformat(effective["end"]) - date.fromisoformat(effective["start"])
     ).days
-    if duration_days != effective_days or same_period != (original == effective):
+    if duration_days != effective_days:
         return None
     return {
         "original_date_range": original,
@@ -383,7 +376,6 @@ def _retest_period_from_confirmation_payload(
             "count": count,
             "approximate": approximate,
         },
-        "same_period": same_period,
     }
 
 

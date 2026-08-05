@@ -261,14 +261,14 @@ def test_unknown_crossed_or_authoritative_envelopes_are_rejected(
 
 
 def test_invalid_source_run_ids_are_rejected_or_canonicalized() -> None:
-    assert retest_action_source_run_id({**_valid_envelope(), "source_run_id": " "}) is None
+    assert (
+        retest_action_source_run_id({**_valid_envelope(), "source_run_id": " "}) is None
+    )
     # A non-UUID id would reach Postgres and raise a cast error, breaking the
     # uniform invalid-state contract with a 500.
     for tampered in ("not-a-uuid", "1 OR 1=1", "8f14e45f-ea1c-4b3a-9d2f"):
         assert (
-            retest_action_source_run_id(
-                {**_valid_envelope(), "source_run_id": tampered}
-            )
+            retest_action_source_run_id({**_valid_envelope(), "source_run_id": tampered})
             is None
         ), tampered
     # Python's UUID parser accepts URN, braced, hyphenless, and uppercase forms
@@ -281,9 +281,7 @@ def test_invalid_source_run_ids_are_rejected_or_canonicalized() -> None:
         _SOURCE_RUN_ID.upper(),
     ):
         assert (
-            retest_action_source_run_id(
-                {**_valid_envelope(), "source_run_id": variant}
-            )
+            retest_action_source_run_id({**_valid_envelope(), "source_run_id": variant})
             == _SOURCE_RUN_ID
         ), variant
 
@@ -362,7 +360,6 @@ def test_receipt_carries_provider_effective_period_and_natural_duration(
         "effective_date_range": effective_date_range,
         "duration_days": 911,
         "duration": {"unit": "year", "count": 2.5, "approximate": True},
-        "same_period": False,
     }
 
 
@@ -411,7 +408,6 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
     }
     assert retest_period["requested_date_range"] == launch_payload["requested_date_range"]
     assert retest_period["effective_date_range"] == launch_payload["date_range"]
-    assert retest_period["same_period"] is False
     assert turn.receipt["effective_date_range"] == retest_period["effective_date_range"]
     assert turn.receipt["duration"] == retest_period["duration"]
 
@@ -655,10 +651,16 @@ def test_coverage_failure_returns_specific_code_without_persisting_confirmation(
     )
 
 
-def test_extended_currency_pair_window_returns_typed_violation_before_preflight(
+def test_extended_currency_pair_window_is_repaired_before_confirmation_without_run(
     stored_run: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
     config_snapshot = dict(stored_run.config_snapshot)
     config_snapshot["asset_class"] = "currency_pair"
     config_snapshot["symbols"] = ["EUR/USD"]
@@ -683,18 +685,113 @@ def test_extended_currency_pair_window_returns_typed_violation_before_preflight(
         }
     )
 
-    def _forbidden_preflight(*_: Any, **__: Any) -> Any:
-        raise AssertionError("window validation must run before provider preflight")
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    client, conversation_id, source_run = _client_with_owned_run(currency_pair_run)
+    run_ids_before = set(api_state.store.backtest_runs)
+    job_ids_before = set(api_state.store.backtest_jobs)
 
-    monkeypatch.setattr(
-        "argus.agent_runtime.retest_confirmation.prepare_confirmation_launch",
-        _forbidden_preflight,
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
     )
+
+    assert response.status_code == 200
+    [final] = _stream_payloads(response.text, "final")
+    assert final["confirmation_payload"]["launch_payload"]["date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-30",
+    }
+    assert set(api_state.store.backtest_runs) == run_ids_before
+    assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_same_period_retest_is_rejected_without_turn_job_or_backtest(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["date_range"] = {
+        "start": "2024-01-01",
+        "end": "2026-07-30",
+    }
+    current_run = stored_run.model_copy(update={"config_snapshot": config_snapshot})
     client, conversation_id, source_run = _client_with_owned_run(
-        currency_pair_run,
+        current_run,
         raise_server_exceptions=False,
     )
     messages_before = list(api_state.store.messages.get(conversation_id, []))
+    run_ids_before = set(api_state.store.backtest_runs)
+    job_ids_before = set(api_state.store.backtest_jobs)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
+    assert set(api_state.store.backtest_runs) == run_ids_before
+    assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_unavailable_timeframe_retest_is_rejected_without_turn_job_or_backtest(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "2h",
+    }
+    unavailable_run = stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+    client, conversation_id, source_run = _client_with_owned_run(
+        unavailable_run,
+        raise_server_exceptions=False,
+    )
+    messages_before = list(api_state.store.messages.get(conversation_id, []))
+    run_ids_before = set(api_state.store.backtest_runs)
+    job_ids_before = set(api_state.store.backtest_jobs)
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -709,8 +806,80 @@ def test_extended_currency_pair_window_returns_typed_violation_before_preflight(
     )
 
     assert response.status_code == 422
-    assert response.json()["code"] == "kraken_ohlc_window_exceeded"
+    assert response.json()["code"] == "provider_timeframe_unavailable"
     assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
+    assert set(api_state.store.backtest_runs) == run_ids_before
+    assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_equity_history_repair_is_applied_before_confirmation(
+    stored_run: Any,
+) -> None:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["date_range"] = {
+        "start": "2010-01-01",
+        "end": "2024-12-31",
+    }
+    repaired_run = stored_run.model_copy(update={"config_snapshot": config_snapshot})
+    api_state.store.backtest_runs[stored_run.id] = repaired_run
+
+    turn = prepare_retest_turn(
+        payload=_retest_request(_valid_envelope()),
+        request=_FakeRequest(),
+        user_id=_USER_ID,
+        conversation_id=_CONVERSATION_ID,
+        language="en",
+        today=_TODAY,
+        confirmation_id="confirmation-repair-equity",
+    )
+
+    assert turn is not None
+    assert turn.confirmation_payload["launch_payload"]["date_range"] == {
+        "start": "2016-01-01",
+        "end": "2026-07-30",
+    }
+
+
+def test_currency_pair_candle_repair_is_applied_before_confirmation(
+    stored_run: Any,
+) -> None:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "1D",
+    }
+    repaired_run = stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+    api_state.store.backtest_runs[stored_run.id] = repaired_run
+
+    turn = prepare_retest_turn(
+        payload=_retest_request(_valid_envelope()),
+        request=_FakeRequest(),
+        user_id=_USER_ID,
+        conversation_id=_CONVERSATION_ID,
+        language="en",
+        today=_TODAY,
+        confirmation_id="confirmation-repair-currency",
+    )
+
+    assert turn is not None
+    assert turn.confirmation_payload["launch_payload"]["date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-30",
+    }
 
 
 def test_provider_timeout_returns_typed_unavailable_without_persisting_turn(
@@ -774,9 +943,7 @@ def test_unusable_sources_reject_as_non_retryable_invalid_state(
     action_payload = (
         {**_valid_envelope(_SOURCE_RUN_ID), "symbols": ["NVDA"]}
         if case == "tampered_envelope"
-        else _valid_envelope(
-            _MISSING_RUN_ID if case == "unknown_run" else _SOURCE_RUN_ID
-        )
+        else _valid_envelope(_MISSING_RUN_ID if case == "unknown_run" else _SOURCE_RUN_ID)
     )
     if case == "unfinished_run":
         api_state.store.backtest_runs[stored_run.id] = stored_run.model_copy(

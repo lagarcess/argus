@@ -16,6 +16,7 @@ import { formatRunDossierSetup } from "../lib/run-dossier-items";
 import type {
   RunDossier,
   SearchDecisionAction,
+  SearchRetestAction,
 } from "../lib/run-dossier-contract";
 
 const decisionAction: SearchDecisionAction = {
@@ -64,6 +65,9 @@ const dossierWithWatchingDecisionAndMultilineNote: RunDossier = {
       run_label: "Weekly GLD pullback",
       window_policy: "preserve_start_ending_latest_available",
       contract_version: "argus_retest_run/v2",
+      state: "new_data_available",
+      reason_code: null,
+      repair: null,
     },
     decisionAction,
   ],
@@ -81,6 +85,77 @@ function visibleText(html: string): string {
 }
 
 describe("single-run dossier view", () => {
+  const renderRetestState = (action: SearchRetestAction) =>
+    renderToStaticMarkup(
+      <RunDossierView
+        dossier={{
+          ...dossierWithWatchingDecisionAndMultilineNote,
+          actions: [action, decisionAction],
+        }}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenConversation={() => {}}
+        onRetest={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+
+  test("offers a normal Retest only when new data is available", () => {
+    const html = renderRetestState({
+      ...(dossierWithWatchingDecisionAndMultilineNote
+        .actions[0] as SearchRetestAction),
+      state: "new_data_available",
+    });
+
+    expect(html).toContain("Retest with current data");
+    expect(html).not.toContain('data-retest-location="card-header" disabled=""');
+  });
+
+  test("shows same-period truth before click and disables Retest", () => {
+    const html = renderRetestState({
+      ...(dossierWithWatchingDecisionAndMultilineNote
+        .actions[0] as SearchRetestAction),
+      state: "no_new_data",
+    });
+
+    expect(html).toContain("Already up to date");
+    expect(html).toContain("No new market data is available since this run.");
+    expect(html).toContain('data-retest-location="card-header" disabled=""');
+  });
+
+  test("offers the exact server repair and leaves timeframe failures disabled", () => {
+    const repairable = renderRetestState({
+      ...(dossierWithWatchingDecisionAndMultilineNote
+        .actions[0] as SearchRetestAction),
+      state: "cant_do_it",
+      reason_code: "provider_history_start_unavailable",
+      repair: {
+        kind: "clamp_start",
+        start_date: "2016-01-01",
+        end_date: "2026-07-30",
+      },
+    });
+    const deadEnd = renderRetestState({
+      ...(dossierWithWatchingDecisionAndMultilineNote
+        .actions[0] as SearchRetestAction),
+      state: "cant_do_it",
+      reason_code: "provider_timeframe_unavailable",
+      repair: null,
+    });
+
+    expect(repairable).toContain("Use available dates");
+    expect(repairable).toContain("Jan 1, 2016");
+    expect(repairable).toContain("Jul 30, 2026");
+    expect(repairable).not.toContain(
+      'data-retest-location="card-header" disabled=""',
+    );
+    expect(deadEnd).toContain("Retest unavailable");
+    expect(deadEnd).toContain(
+      "This run’s timeframe is not available for this market.",
+    );
+    expect(deadEnd).toContain('data-retest-location="card-header" disabled=""');
+  });
+
   test("never inserts an empty strategy segment when a locale key is missing", () => {
     const missingTranslation = (() => "") as Parameters<
       typeof formatRunDossierSetup

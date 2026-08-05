@@ -375,10 +375,58 @@ def test_malformed_indicator_run_still_projects_a_dossier(
     assert project_retest_action(run=run, today=_TODAY) is None
 
 
-def test_impossible_currency_pair_window_is_not_offered_as_retest(
+def _finalized_run(run: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **run,
+        "conversation_result_card": {
+            **run["conversation_result_card"],
+            "evidence_artifact_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+            "idea_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3302",
+            "idea_version_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3303",
+        },
+    }
+
+
+def test_same_period_retest_is_projected_as_no_new_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Eligibility must not advertise a Retest that admission always rejects."""
+    from argus.domain.run_dossiers import project_retest_action
+
+    run = _finalized_run(_persisted_run(monkeypatch, _BUY_AND_HOLD))
+
+    action = project_retest_action(run=run, today=date(2024, 12, 31))
+
+    assert action is not None
+    assert action.state == "no_new_data"
+    assert action.reason_code is None
+    assert action.repair is None
+
+
+def test_equity_history_floor_projects_exact_one_step_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.run_dossiers import project_retest_action
+
+    run = _finalized_run(_persisted_run(monkeypatch, _BUY_AND_HOLD))
+    run["config_snapshot"]["date_range"] = {
+        "start": "2010-01-01",
+        "end": "2024-12-31",
+    }
+
+    action = project_retest_action(run=run, today=_TODAY)
+
+    assert action is not None
+    assert action.state == "cant_do_it"
+    assert action.reason_code == "provider_history_start_unavailable"
+    assert action.repair is not None
+    assert action.repair.kind == "clamp_start"
+    assert action.repair.start_date == date(2016, 1, 1)
+    assert action.repair.end_date == date(2026, 7, 30)
+
+
+def test_currency_pair_candle_cap_projects_exact_one_step_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from argus.domain.run_dossiers import project_retest_action
 
     run = _persisted_run(monkeypatch, _BUY_AND_HOLD)
@@ -403,13 +451,53 @@ def test_impossible_currency_pair_window_is_not_offered_as_retest(
             "symbols": ["EUR/USD"],
             "benchmark_symbol": "EUR/USD",
             "config_snapshot": config_snapshot,
-            "conversation_result_card": {
-                **run["conversation_result_card"],
-                "evidence_artifact_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
-                "idea_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3302",
-                "idea_version_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3303",
-            },
+            "conversation_result_card": _finalized_run(run)[
+                "conversation_result_card"
+            ],
         }
     )
 
-    assert project_retest_action(run=run, today=_TODAY) is None
+    action = project_retest_action(run=run, today=_TODAY)
+
+    assert action is not None
+    assert action.state == "cant_do_it"
+    assert action.reason_code == "kraken_ohlc_window_exceeded"
+    assert action.repair is not None
+    assert action.repair.kind == "clamp_start"
+    assert action.repair.start_date == date(2024, 8, 10)
+    assert action.repair.end_date == date(2026, 7, 30)
+
+
+def test_unavailable_currency_pair_timeframe_has_no_fake_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.run_dossiers import project_retest_action
+
+    run = _finalized_run(_persisted_run(monkeypatch, _BUY_AND_HOLD))
+    config_snapshot = dict(run["config_snapshot"])
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "2h",
+    }
+    run.update(
+        {
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+
+    action = project_retest_action(run=run, today=_TODAY)
+
+    assert action is not None
+    assert action.state == "cant_do_it"
+    assert action.reason_code == "provider_timeframe_unavailable"
+    assert action.repair is None

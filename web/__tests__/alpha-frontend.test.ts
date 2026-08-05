@@ -1586,7 +1586,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(palette).toContain("turnInFlight?: boolean");
     expect(palette).toContain("retestDisabled={turnInFlight}");
-    expect(dossier).toContain("disabled={retestDisabled}");
+    expect(dossier).toContain(
+      "retestButtonDisabled = retestDisabled || retestUnavailable",
+    );
+    expect(dossier).toContain("disabled={retestButtonDisabled}");
     expect(dossier).toContain("disabled:cursor-not-allowed");
     expect(dossier).toContain("disabled:opacity-50");
   });

@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from fastapi import Request
@@ -36,6 +36,8 @@ from argus.domain.retest_setup import (
     RETEST_WINDOW_POLICY,
     RetestSetup,
     has_finalized_evidence_identity,
+    repaired_retest_setup,
+    retest_dossier_availability,
     retest_setup_from_run,
 )
 
@@ -147,13 +149,27 @@ def prepare_retest_turn(
         if source_run_id is not None
         else None
     )
+    availability = retest_dossier_availability(setup) if setup is not None else None
+    if availability is not None and availability.state == "no_new_data":
+        raise problem(
+            request,
+            status_code=409,
+            code="artifact_action_invalid_state",
+            title="Action No Longer Active",
+            detail=recovery_message("artifact_action_invalid_state", language=language),
+        )
+    admitted_setup = (
+        repaired_retest_setup(setup, availability)
+        if setup is not None and availability is not None
+        else setup
+    )
     confirmation = (
         prepare_retest_confirmation_payload(
-            setup,
+            admitted_setup,
             language=language or "en",
             confirmation_id=confirmation_id,
         )
-        if setup is not None
+        if admitted_setup is not None
         else None
     )
     if confirmation is not None and confirmation.coverage_error_code is not None:
@@ -163,7 +179,7 @@ def prepare_retest_turn(
     confirmation_payload = (
         confirmation.confirmation_payload if confirmation is not None else None
     )
-    if setup is None or confirmation_payload is None:
+    if admitted_setup is None or confirmation_payload is None:
         raise problem(
             request,
             status_code=409,
@@ -171,17 +187,17 @@ def prepare_retest_turn(
             title="Action No Longer Active",
             detail=recovery_message("artifact_action_invalid_state", language=language),
         )
-    period = _retest_period(setup, confirmation_payload=confirmation_payload)
+    period = _retest_period(admitted_setup, confirmation_payload=confirmation_payload)
     confirmation_payload = {
         **confirmation_payload,
         "retest_period": period,
     }
     return RetestTurn(
-        source_run_id=setup.source_run_id,
-        setup=setup,
+        source_run_id=admitted_setup.source_run_id,
+        setup=admitted_setup,
         confirmation_payload=confirmation_payload,
         receipt=retest_receipt(
-            setup,
+            admitted_setup,
             confirmation_payload=confirmation_payload,
         ),
     )
@@ -226,16 +242,19 @@ def complete_retest_turn(
         metadata=metadata,
         settle_usage=settle_usage,
     )
-    return public_confirmation_projection(
-        {
-            "stage_outcome": "await_approval",
-            "message_id": assistant_message.id,
-            "confirmation": card,
-            "confirmation_payload": payload,
-            "active_confirmation_reference": reference,
-            "artifact_references": [reference],
-            "retest_receipt": dict(turn.receipt),
-        }
+    return cast(
+        dict[str, Any],
+        public_confirmation_projection(
+            {
+                "stage_outcome": "await_approval",
+                "message_id": assistant_message.id,
+                "confirmation": card,
+                "confirmation_payload": payload,
+                "active_confirmation_reference": reference,
+                "artifact_references": [reference],
+                "retest_receipt": dict(turn.receipt),
+            }
+        ),
     )
 
 
@@ -344,7 +363,6 @@ def _retest_period(
         "effective_date_range": effective,
         "duration_days": duration_days,
         "duration": _duration_descriptor(duration_days),
-        "same_period": original == effective,
     }
 
 

@@ -400,8 +400,7 @@
           "day_other": "about {{formattedCount}} days"
         }
       },
-      "updated_duration": "Updated span: {{duration}}",
-      "same_period": "No new data since the original run."
+      "updated_duration": "Updated span: {{duration}}"
     },
     "result_readout": {
       "quick_take": "Quick take"
@@ -728,7 +727,6 @@
       },
       "actions": {
         "run_backtest": "Run backtest",
-        "run_backtest_same_period": "Run anyway — no new data",
         "change_dates": "Change dates",
         "change_asset": "Change asset",
         "adjust_assumptions": "Adjust assumptions",
@@ -1133,6 +1131,12 @@
     "result_count_other": "{{count}} results",
     "retest_current_data": "Retest with current data",
     "retest_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    "retest_already_current": "Already up to date",
+    "retest_no_new_data": "No new market data is available since this run.",
+    "retest_available_dates": "Use available dates",
+    "retest_repaired_period": "Retest from {{start}} through {{end}}.",
+    "retest_unavailable": "Retest unavailable",
+    "retest_timeframe_unavailable": "This run’s timeframe is not available for this market.",
     "retry_load_more": "Try loading more",
     "retry_search": "Try searching again",
     "save_decision": "Save decision",

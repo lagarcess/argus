@@ -92,10 +92,10 @@ def test_api_contract_documents_backend_owned_retest_period_truth() -> None:
         "`effective_date_range`",
         "`duration_days`",
         "`duration = { unit, count, approximate }`",
-        "`same_period` compares the original and provider-effective ranges",
-        "never the wall-clock candidate end",
-        "changes only the Run action's `label` and `labelKey`",
-        "Run action identity, `type`, `presentation`, and `payload` remain unchanged",
+        "Same-period Retest never reaches confirmation",
+        "pre-click availability gate",
+        "Run action always keeps its normal localized label",
+        "There is no second action, modal, toast, or client-owned execution state",
     ):
         assert exact_rule in message_contract
 

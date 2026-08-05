@@ -39,7 +39,6 @@ const RECEIPT_METADATA = {
   effective_date_range: { start: "2024-01-01", end: "2026-06-30" },
   duration_days: 911,
   duration: { unit: "year", count: 2.5, approximate: true },
-  same_period: false,
 };
 const PERSISTED_ACTION = {
   type: "retest_run",
@@ -166,7 +165,6 @@ describe("retest receipt projection", () => {
         effectiveDateRange: { start: "2024-01-01", end: "2026-06-30" },
         durationDays: 911,
         duration: { unit: "year", count: 2.5, approximate: true },
-        samePeriod: false,
       },
     });
   });

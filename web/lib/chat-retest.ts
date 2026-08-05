@@ -19,7 +19,6 @@ export type RetestPeriodPayload = {
   effective_date_range: RetestDateRange;
   duration_days: number;
   duration: RetestDuration;
-  same_period: boolean;
 };
 export type RetestPeriod = {
   originalDateRange: RetestDateRange;
@@ -27,7 +26,6 @@ export type RetestPeriod = {
   effectiveDateRange: RetestDateRange;
   durationDays: number;
   duration: RetestDuration;
-  samePeriod: boolean;
 };
 
 /** Backend-owned display context; the transcript localizes it on render. */
@@ -108,7 +106,6 @@ export function retestPeriodFromValue(value: unknown): RetestPeriod | null {
   const effectiveDateRange = dateRangeOrNull(period?.effective_date_range);
   const durationDays = finiteNumberOrNull(period?.duration_days);
   const duration = durationOrNull(period?.duration);
-  const samePeriod = period?.same_period;
   if (
     !originalDateRange ||
     !requestedDateRange ||
@@ -116,9 +113,7 @@ export function retestPeriodFromValue(value: unknown): RetestPeriod | null {
     durationDays === null ||
     durationDays < 0 ||
     !Number.isInteger(durationDays) ||
-    !duration ||
-    typeof samePeriod !== "boolean" ||
-    samePeriod !== rangesEqual(originalDateRange, effectiveDateRange)
+    !duration
   ) {
     return null;
   }
@@ -128,12 +123,7 @@ export function retestPeriodFromValue(value: unknown): RetestPeriod | null {
     effectiveDateRange,
     durationDays,
     duration,
-    samePeriod,
   };
-}
-
-function rangesEqual(left: RetestDateRange, right: RetestDateRange): boolean {
-  return left.start === right.start && left.end === right.end;
 }
 
 /**

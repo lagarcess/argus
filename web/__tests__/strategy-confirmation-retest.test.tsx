@@ -19,7 +19,6 @@ type RetestPeriodFixture = {
     count: number;
     approximate: boolean;
   };
-  same_period: boolean;
 };
 
 type RetestConfirmationFixture = StrategyConfirmationPayload & {
@@ -32,16 +31,6 @@ const EXTENDED_PERIOD: RetestPeriodFixture = {
   effective_date_range: { start: "2024-01-01", end: "2026-06-30" },
   duration_days: 911,
   duration: { unit: "year", count: 2.5, approximate: true },
-  same_period: false,
-};
-
-const SAME_PERIOD: RetestPeriodFixture = {
-  original_date_range: { start: "2024-01-01", end: "2024-12-31" },
-  requested_date_range: { start: "2024-01-01", end: "2026-07-31" },
-  effective_date_range: { start: "2024-01-01", end: "2024-12-31" },
-  duration_days: 365,
-  duration: { unit: "year", count: 1, approximate: false },
-  same_period: true,
 };
 
 function confirmation(retestPeriod: RetestPeriodFixture): RetestConfirmationFixture {
@@ -73,12 +62,8 @@ function confirmation(retestPeriod: RetestPeriodFixture): RetestConfirmationFixt
     actions: [
       {
         id: "run-backtest-confirmation-retest-1",
-        label: retestPeriod.same_period
-          ? "Run anyway — no new data"
-          : "Run backtest",
-        labelKey: retestPeriod.same_period
-          ? "chat.confirmation.actions.run_backtest_same_period"
-          : "chat.confirmation.actions.run_backtest",
+        label: "Run backtest",
+        labelKey: "chat.confirmation.actions.run_backtest",
         type: "run_backtest",
         payload: { confirmation_id: "confirmation-retest-1" },
       },
@@ -151,26 +136,4 @@ describe("Retest confirmation period disclosure", () => {
     expect(html).not.toContain("Ejecutar de todos modos — no hay datos nuevos");
   });
 
-  test("makes the same-period disclosure and existing Run action explicit", async () => {
-    const html = await renderLocalized(confirmation(SAME_PERIOD), "en");
-
-    expect(html).toContain(
-      "Jan 1, 2024 – Dec 31, 2024 → Jan 1, 2024 – Dec 31, 2024",
-    );
-    expect(html).toContain("Updated span: 1 year");
-    expect(html).toContain("No new data since the original run.");
-    expect(html).toContain("Run anyway — no new data");
-    expect(html).not.toContain(">Run backtest<");
-  });
-
-  test("makes the same-period acknowledgment equally explicit in Spanish", async () => {
-    const html = await renderLocalized(confirmation(SAME_PERIOD), "es-419");
-
-    expect(html).toContain(
-      "1 ene 2024 – 31 dic 2024 → 1 ene 2024 – 31 dic 2024",
-    );
-    expect(html).toContain("Duración actualizada: 1 año");
-    expect(html).toContain("No hay datos nuevos desde la ejecución original.");
-    expect(html).toContain("Ejecutar de todos modos — no hay datos nuevos");
-  });
 });

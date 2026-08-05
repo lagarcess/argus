@@ -7,9 +7,19 @@ admission, and deterministic tests, so the two surfaces cannot drift apart.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Any, cast
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, timedelta
+from typing import Any, Literal, cast
+
+from argus.domain.market_data.capabilities import (
+    ALPACA_EQUITY_HISTORY_START,
+    KRAKEN_MAX_OHLC_CANDLES,
+    KRAKEN_OHLC_TIMEFRAME_MINUTES,
+    AssetClass,
+    latest_complete_data_adjustment,
+    market_data_window_violation,
+    validate_market_data_window,
+)
 
 RETEST_CONTRACT_VERSION = "argus_retest_run/v2"
 RETEST_WINDOW_POLICY = "preserve_start_ending_latest_available"
@@ -77,6 +87,114 @@ class RetestSetup:
     @property
     def duration_days(self) -> int:
         return (self.original_end - self.original_start).days
+
+
+RetestDossierState = Literal[
+    "new_data_available",
+    "no_new_data",
+    "cant_do_it",
+]
+RetestWindowViolationCode = Literal[
+    "provider_history_start_unavailable",
+    "kraken_ohlc_window_exceeded",
+    "provider_timeframe_unavailable",
+]
+
+
+@dataclass(frozen=True)
+class RetestWindowRepair:
+    kind: Literal["clamp_start"]
+    start_date: date
+    end_date: date
+
+
+@dataclass(frozen=True)
+class RetestDossierAvailability:
+    state: RetestDossierState
+    reason_code: RetestWindowViolationCode | None = None
+    repair: RetestWindowRepair | None = None
+
+
+def retest_dossier_availability(setup: RetestSetup) -> RetestDossierAvailability:
+    """Compute the dossier button state without provider or LLM work."""
+    effective_end = _latest_complete_retest_end(setup)
+    violation = market_data_window_violation(
+        asset_class=cast(AssetClass, setup.asset_class),
+        timeframe=setup.timeframe,
+        start_date=setup.start,
+        end_date=effective_end,
+    )
+    if violation is not None:
+        code = cast(RetestWindowViolationCode, violation.code)
+        return RetestDossierAvailability(
+            state="cant_do_it",
+            reason_code=code,
+            repair=_repair_for_violation(
+                setup,
+                code=code,
+                effective_end=effective_end,
+            ),
+        )
+    if effective_end <= setup.original_end:
+        return RetestDossierAvailability(state="no_new_data")
+    return RetestDossierAvailability(state="new_data_available")
+
+
+def repaired_retest_setup(
+    setup: RetestSetup,
+    availability: RetestDossierAvailability,
+) -> RetestSetup:
+    """Apply only the server-computed repair advertised by the dossier."""
+    repair = availability.repair
+    if repair is None:
+        return setup
+    return replace(setup, start=repair.start_date, end=repair.end_date)
+
+
+def _latest_complete_retest_end(setup: RetestSetup) -> date:
+    adjustment = latest_complete_data_adjustment(
+        asset_class=cast(AssetClass, setup.asset_class),
+        timeframe=setup.timeframe,
+        end_date=setup.end,
+        today=setup.end,
+    )
+    return adjustment.through if adjustment is not None else setup.end
+
+
+def _repair_for_violation(
+    setup: RetestSetup,
+    *,
+    code: RetestWindowViolationCode,
+    effective_end: date,
+) -> RetestWindowRepair | None:
+    if code == "provider_history_start_unavailable":
+        repaired_start = ALPACA_EQUITY_HISTORY_START
+    elif code == "kraken_ohlc_window_exceeded":
+        interval = KRAKEN_OHLC_TIMEFRAME_MINUTES.get(setup.timeframe)
+        if interval is None:
+            return None
+        maximum_span_minutes = KRAKEN_MAX_OHLC_CANDLES * interval - 24 * 60
+        repaired_start = effective_end - timedelta(
+            days=max(0, maximum_span_minutes // (24 * 60))
+        )
+    else:
+        return None
+    if repaired_start > effective_end:
+        return None
+    try:
+        validate_market_data_window(
+            asset_class=cast(AssetClass, setup.asset_class),
+            timeframe=setup.timeframe,
+            start_date=repaired_start,
+            end_date=effective_end,
+        )
+    except ValueError:
+        return None
+    return RetestWindowRepair(
+        kind="clamp_start",
+        start_date=repaired_start,
+        end_date=effective_end,
+    )
 
 
 EVIDENCE_IDENTITY_KEYS = ("evidence_artifact_id", "idea_id", "idea_version_id")
@@ -317,8 +435,7 @@ def _consistent_number(*values: object, allow_zero: bool = False) -> float | Non
     if not present:
         return None
     parsed = [
-        _nonnegative_number(value) if allow_zero else _number(value)
-        for value in present
+        _nonnegative_number(value) if allow_zero else _number(value) for value in present
     ]
     if any(value is None for value in parsed):
         return None

@@ -1361,6 +1361,118 @@ for (const testCase of [
 for (const testCase of [
   {
     language: "en" as const,
+    button: "Already up to date",
+    detail: "No new market data is available since this run.",
+    search: "Search",
+  },
+  {
+    language: "es-419" as const,
+    button: "Ya está al día",
+    detail: "No hay datos de mercado nuevos desde esta ejecución.",
+    search: "Buscar",
+  },
+]) {
+  test(`same-period dossier is truthful and spends no simulation (${testCase.language})`, async ({
+    page,
+  }) => {
+    const api = await mockChatApi(page, { language: testCase.language });
+    const mutationRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") mutationRequests.push(request.url());
+    });
+    await page.route("**/api/v1/search**", async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            {
+              type: "conversation",
+              id: CONVERSATION_ID,
+              title: "AAPL readiness",
+              archived: false,
+              matched_text: "Latest AAPL backtest",
+              updated_at: CREATED_AT,
+              conversation_id: CONVERSATION_ID,
+              match: {
+                layer: "run",
+                fragment: "AAPL buy and hold",
+                count: 1,
+                message_id: "msg-result",
+              },
+              decision_states: [],
+              total_runs: 1,
+              decided_runs: 0,
+              dossier: {
+                run_id: RUN_ID,
+                run_label: "AAPL buy and hold",
+                completed_at: CREATED_AT,
+                result_message_id: "msg-result",
+                tested: {
+                  symbols: ["AAPL"],
+                  strategy_family: "buy_and_hold",
+                  cadence: null,
+                  timeframe: "1D",
+                  start_date: "2025-01-01",
+                  end_date: "2026-07-30",
+                },
+                outcome: {
+                  run_label: "AAPL buy and hold",
+                  completed_at: CREATED_AT,
+                  benchmark_symbol: "SPY",
+                  quick_take: "AAPL finished below SPY.",
+                  metrics: [{ name: "total_return_pct", value: -8.5 }],
+                },
+                decision: null,
+                actions: [
+                  {
+                    type: "retest_run",
+                    source_run_id: RUN_ID,
+                    run_label: "AAPL buy and hold",
+                    window_policy: "preserve_start_ending_latest_available",
+                    contract_version: "argus_retest_run/v2",
+                    state: "no_new_data",
+                    reason_code: null,
+                    repair: null,
+                  },
+                ],
+              },
+            },
+          ],
+          next_cursor: null,
+        }),
+      }),
+    );
+
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+      waitUntil: "networkidle",
+    });
+    await page.getByRole("button", { name: testCase.search }).click();
+    const retest = page.getByRole("button", {
+      name: testCase.button,
+      exact: true,
+    });
+    await expect(retest).toBeVisible();
+    await expect(retest).toBeDisabled();
+    await expect(page.getByText(testCase.detail, { exact: true })).toBeVisible();
+
+    const streamCount = api.streamRequests.length;
+    const simulationMutations = mutationRequests.filter((url) =>
+      /chat\/stream|backtest|job/.test(url),
+    ).length;
+    await retest.evaluate((button: HTMLButtonElement) => button.click());
+    await page.waitForTimeout(300);
+
+    expect(api.streamRequests).toHaveLength(streamCount);
+    expect(
+      mutationRequests.filter((url) => /chat\/stream|backtest|job/.test(url)),
+    ).toHaveLength(simulationMutations);
+  });
+}
+
+for (const testCase of [
+  {
+    language: "en" as const,
     source: "LLM",
     request: TIMEFRAME_RECOVERY_REQUEST,
     prompt: TIMEFRAME_RECOVERY_PROMPTS.en,

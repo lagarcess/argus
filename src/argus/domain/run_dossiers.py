@@ -15,6 +15,7 @@ from argus.api.schemas import (
     SearchDossierMetric,
     SearchDossierOutcome,
     SearchRetestAction,
+    SearchRetestRepair,
 )
 from argus.domain.evidence import evidence_preview_from_payload
 from argus.domain.retest_setup import (
@@ -265,7 +266,10 @@ def project_retest_action(
     # and eligibility must not fork from the materializer it mirrors.
     from argus.agent_runtime.retest_confirmation import (
         retest_confirmation_payload,
-        retest_window_violation_code,
+    )
+    from argus.domain.retest_setup import (
+        repaired_retest_setup,
+        retest_dossier_availability,
     )
 
     if not has_finalized_evidence_identity(run.get("conversation_result_card")):
@@ -275,13 +279,24 @@ def project_retest_action(
     setup = retest_setup_from_run(run, today=today or date.today())
     if setup is None:
         return None
-    if retest_window_violation_code(setup) is not None:
-        return None
-    if retest_confirmation_payload(setup) is None:
+    availability = retest_dossier_availability(setup)
+    eligible_setup = repaired_retest_setup(setup, availability)
+    if retest_confirmation_payload(eligible_setup) is None:
         return None
     return SearchRetestAction(
         source_run_id=setup.source_run_id,
         run_label=run_label_for(run),
+        state=availability.state,
+        reason_code=availability.reason_code,
+        repair=(
+            SearchRetestRepair(
+                kind=availability.repair.kind,
+                start_date=availability.repair.start_date,
+                end_date=availability.repair.end_date,
+            )
+            if availability.repair is not None
+            else None
+        ),
     )
 
 
