@@ -47,6 +47,7 @@ def _offline_interpreter_unavailable_result(
     snapshot: TaskSnapshot | None = None,
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
+    retryable: bool = True,
 ) -> StageResult:
     pending_no_progress = _offline_pending_no_progress_result(
         user=user,
@@ -85,12 +86,15 @@ def _offline_interpreter_unavailable_result(
         recovery_state_stage_patch(
             "interpreter_unavailable",
             language=user.language_preference,
-            retryable=True,
+            retryable=retryable,
         )
     )
-    retry_last_turn = retry_last_turn_stage_patch(current_user_message)
-    if retry_last_turn is not None:
-        stage_patch.update(retry_last_turn)
+    # A deterministic rejection reproduces itself on every attempt, so offering
+    # to replay the turn would only repeat the same failure.
+    if retryable:
+        retry_last_turn = retry_last_turn_stage_patch(current_user_message)
+        if retry_last_turn is not None:
+            stage_patch.update(retry_last_turn)
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
