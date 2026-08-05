@@ -114,6 +114,21 @@ def test_equal_rank_is_deterministic_independent_of_input_order() -> None:
     assert select_peer([second, first]).selected_candidate_id == "peer:alpha"
 
 
+def test_equal_rank_still_prefers_direct_competitor() -> None:
+    credible = PeerCandidate("peer:credible", "credible_peer", 2)
+    direct = PeerCandidate("peer:direct", "direct_competitor", 2)
+
+    assert select_peer([credible, direct]).selected_candidate_id == "peer:direct"
+
+
+def test_empty_candidate_set_abstains() -> None:
+    assert select_peer([]) == PeerSelection(
+        selected_candidate_id=None,
+        decision="abstained",
+        decision_code="no_publishable_peer",
+    )
+
+
 def test_duplicate_candidate_identity_fails_closed() -> None:
     candidate = PeerCandidate("peer:same", "direct_competitor", 1)
 
@@ -130,6 +145,7 @@ def test_duplicate_candidate_identity_fails_closed() -> None:
         {"candidate_id": "", "relationship": "credible_peer", "retrieval_rank": 1},
         {"candidate_id": " peer ", "relationship": "credible_peer", "retrieval_rank": 1},
         {"candidate_id": "peer", "relationship": "related", "retrieval_rank": 1},
+        {"candidate_id": "peer", "relationship": [], "retrieval_rank": 1},
         {"candidate_id": "peer", "relationship": "credible_peer", "retrieval_rank": 0},
         {"candidate_id": "peer", "relationship": "credible_peer", "retrieval_rank": True},
         {
@@ -138,8 +154,23 @@ def test_duplicate_candidate_identity_fails_closed() -> None:
             "retrieval_rank": 1,
             "family_status": "unknown",
         },
+        {
+            "candidate_id": "peer",
+            "relationship": "credible_peer",
+            "retrieval_rank": 1,
+            "family_status": [],
+        },
     ],
-    ids=["empty-id", "dirty-id", "relationship", "zero-rank", "bool-rank", "family"],
+    ids=[
+        "empty-id",
+        "dirty-id",
+        "relationship",
+        "relationship-type",
+        "zero-rank",
+        "bool-rank",
+        "family",
+        "family-type",
+    ],
 )
 def test_malformed_candidate_is_rejected(kwargs: dict[str, object]) -> None:
     with pytest.raises(PeerSelectionContractError):

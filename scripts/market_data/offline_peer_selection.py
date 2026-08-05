@@ -30,7 +30,7 @@ class PeerCandidate:
             or self.candidate_id != self.candidate_id.strip()
         ):
             raise PeerSelectionContractError("candidate_id is invalid")
-        if self.relationship not in {
+        if not isinstance(self.relationship, str) or self.relationship not in {
             "direct_competitor",
             "credible_peer",
             "weak_match",
@@ -46,7 +46,11 @@ class PeerCandidate:
             raise PeerSelectionContractError("evidence_sufficient is invalid")
         if not isinstance(self.publishable, bool):
             raise PeerSelectionContractError("publishable is invalid")
-        if self.family_status not in {"clear", "collision", "ambiguous"}:
+        if not isinstance(self.family_status, str) or self.family_status not in {
+            "clear",
+            "collision",
+            "ambiguous",
+        }:
             raise PeerSelectionContractError("family_status is invalid")
 
 
