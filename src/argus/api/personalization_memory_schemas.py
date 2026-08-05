@@ -61,6 +61,10 @@ class MemoryProvenanceIn(BaseModel):
         )
 
 
+class MemoryAvailabilityResponse(BaseModel):
+    available: bool
+
+
 class MemoryEnableRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

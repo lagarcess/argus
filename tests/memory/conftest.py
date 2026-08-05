@@ -36,6 +36,7 @@ _AUTH_ENV_VARS = (
 @dataclass(frozen=True)
 class MemoryApiHarness:
     client: Any
+    gateway: Any
     guest_headers: dict[str, str]
     registered_headers: dict[str, str]
 
@@ -107,6 +108,9 @@ def memory_api(monkeypatch: pytest.MonkeyPatch):
     )
     gateway.private_alpha_email_allowed.return_value = True
     gateway.private_alpha_email_disabled.return_value = False
+    # Exposure default for the harness: a developer-role allowlist row. Role
+    # gate tests override this per case.
+    gateway.private_alpha_role_for_email.return_value = "developer"
 
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setattr(
@@ -119,6 +123,7 @@ def memory_api(monkeypatch: pytest.MonkeyPatch):
     try:
         yield MemoryApiHarness(
             client=TestClient(app),
+            gateway=gateway,
             guest_headers={"Authorization": f"Bearer {GUEST_TOKEN}"},
             registered_headers={"Authorization": f"Bearer {REGISTERED_TOKEN}"},
         )

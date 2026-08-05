@@ -13,9 +13,11 @@ from typing import TypeVar
 
 from fastapi import APIRouter, Depends, Request
 
-from argus.api.dependencies import problem
+from argus.api.dependencies import current_user, problem
+from argus.api.guest_access import account_context
 from argus.api.personalization_memory import (
     MemoryApiContext,
+    personalization_memory_exposed,
     personalization_memory_unavailable_problem,
     require_memory_api_context,
 )
@@ -24,6 +26,7 @@ from argus.api.personalization_memory_assessor import (
     candidate_content_for_assessment,
 )
 from argus.api.personalization_memory_schemas import (
+    MemoryAvailabilityResponse,
     MemoryCandidateOut,
     MemoryConfirmationResponse,
     MemoryConfirmRequest,
@@ -42,6 +45,7 @@ from argus.api.personalization_memory_schemas import (
     MemoryRetrieveRequest,
     RetrievedMemoryOut,
 )
+from argus.api.schemas import User
 from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryEdit,
@@ -97,6 +101,28 @@ def _run(request: Request, call: Callable[[], ResultT]) -> ResultT:
             title="Invalid Memory Request",
             detail="The request is not valid for personalization memory.",
         ) from None
+
+
+@router.get("/memory/availability", response_model=MemoryAvailabilityResponse)
+def personalization_memory_availability(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> MemoryAvailabilityResponse:
+    """Presentation probe: lets the client hide the surface entirely.
+
+    Never touches the memory subsystem; a guest is denied like everywhere
+    else and a non-exposed registered account simply sees available=false.
+    """
+    account = account_context(request)
+    if account.kind != "registered":
+        raise problem(
+            request,
+            status_code=403,
+            code="account_conversion_required",
+            title="Account Required",
+            detail="Create an account to use personalization memory.",
+        )
+    return MemoryAvailabilityResponse(available=personalization_memory_exposed(user))
 
 
 @router.post("/memory/enable", response_model=MemoryConsentSettingsResponse)
