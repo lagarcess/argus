@@ -115,13 +115,31 @@ def test_consumer_detection_covers_all_python_import_forms() -> None:
         )
 
 
-def test_no_production_module_consumes_argus_memory() -> None:
-    """Catches incubation code gaining a production consumer before promotion."""
-    consumers: list[tuple[str, str]] = []
+AUTHORIZED_API_CONSUMERS = frozenset(
+    {
+        "src/argus/api/personalization_memory.py",
+        "src/argus/api/personalization_memory_schemas.py",
+        "src/argus/api/routers/personalization_memory.py",
+    }
+)
+
+
+def test_only_authorized_api_modules_consume_argus_memory() -> None:
+    """Catches incubation code gaining an unauthorized consumer before promotion.
+
+    The registered-only API slice is the one authorized consumer seam; the
+    runtime, interpreter, gateway, and every other production surface must
+    still not import the memory package.
+    """
+    consumers: set[str] = set()
+    unauthorized: list[tuple[str, str]] = []
     for path in sorted(SOURCE_ROOT.rglob("*.py")):
         if MEMORY_ROOT in path.parents:
             continue
         for imported in _imports(path):
             if imported == "argus.memory" or imported.startswith("argus.memory."):
-                consumers.append((str(path), imported))
-    assert consumers == []
+                consumers.add(str(path))
+                if str(path) not in AUTHORIZED_API_CONSUMERS:
+                    unauthorized.append((str(path), imported))
+    assert unauthorized == []
+    assert consumers == set(AUTHORIZED_API_CONSUMERS)
