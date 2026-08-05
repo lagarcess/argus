@@ -18,6 +18,7 @@ const mappedCodes = [
   "guest_access_unavailable",
   "internal_error",
   "account_already_registered",
+  "account_exists_use_login",
   "guest_bootstrap_failed",
   "guest_identity_link_failed",
   "csrf_origin_rejected",

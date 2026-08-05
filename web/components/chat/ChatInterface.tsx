@@ -186,6 +186,7 @@ import {
 } from "./chat-message-projection";
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
+import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -201,7 +202,6 @@ import {
   resultActionRunId,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
-
 type View = "chat" | "strategies" | "settings";
 type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
 type SendSelection =
@@ -214,7 +214,6 @@ type GuestPendingSubmission = {
   actionArg?: ChatActionOption;
   options?: SendOptions;
 };
-
 function isStarterSelectionMetadata(
   selection: SendSelection | undefined,
 ): selection is StarterSelectionMetadata {
@@ -957,6 +956,7 @@ export default function ChatInterface() {
     requestGuestSignIn,
     requestNewChat,
     requestOmnisearch,
+    recoverGuestSimulationRejection,
     resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,
@@ -1180,8 +1180,12 @@ export default function ChatInterface() {
 
     const canApplyVisibleStreamUpdate = () =>
       requestSessions.canWriteVisible(requestSession);
-    const clearNeutralGuestSubmission = () => {
-      if (isDeferredGuestSubmission) setGuestSubmissionPending(false);
+    const clearNeutralGuestSubmission = () => { if (isDeferredGuestSubmission) setGuestSubmissionPending(false); };
+    const recoverQuotaRejectedRun = (failureCode: unknown) => {
+      if (!isGuestSimulationConversionRejection(failureCode, action) || !recoverGuestSimulationRejection(action)) return false;
+      void loadConversation(requestSession.identity.conversationId);
+      finishRequestTransport(requestSession);
+      return true;
     };
     const handleStreamEvent = (event: ChatStreamEvent) => {
       if (event.event === "stage_start") {
@@ -1214,13 +1218,13 @@ export default function ChatInterface() {
       if (event.event === "error") {
         if (!requestSessions.authorize(requestSession, "error")) return;
         clearNeutralGuestSubmission();
+        const errorPayload = event.data as typeof event.data & Record<string, unknown>;
+        if (recoverQuotaRejectedRun(errorPayload.code)) return;
         throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
         if (!canApplyVisibleStreamUpdate()) {
           finishRequestTransport(requestSession);
           return;
         }
-        const errorPayload = event.data as typeof event.data &
-          Record<string, unknown>;
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
         const errorStrategyPathContext =
@@ -1287,8 +1291,8 @@ export default function ChatInterface() {
         if (!identityAuthorized) return;
         clearNeutralGuestSubmission();
         setStreamStatus(null);
-        const finalPayload = event.data as typeof event.data &
-          Record<string, unknown>;
+        const finalPayload = event.data as typeof event.data & Record<string, unknown>;
+        if (recoverQuotaRejectedRun((finalPayload.final_response_payload as { code?: unknown } | undefined)?.code ?? finalPayload.code)) return;
         const finalText =
           event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;

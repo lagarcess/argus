@@ -38,6 +38,7 @@ def pending_date_answer_interpretation(
     selected_thread_metadata: dict[str, Any],
     today: date | None = None,
     require_explicit_range: bool = False,
+    allow_result_anchor: bool = False,
     reason_code: str = "pending_date_answer_route_repaired",
     user_goal_summary: str = (
         "User supplied the requested date range after structured interpretation "
@@ -49,7 +50,10 @@ def pending_date_answer_interpretation(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    if snapshot.latest_backtest_result_reference is not None:
+    if (
+        snapshot.latest_backtest_result_reference is not None
+        and not allow_result_anchor
+    ):
         return None
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":

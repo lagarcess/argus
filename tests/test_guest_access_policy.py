@@ -122,7 +122,7 @@ def test_verified_anonymous_auth_truth_owns_guest_status_and_capabilities(
         "expires_at": workspace.expires_at.isoformat().replace("+00:00", "Z"),
         "conversation_limit": 1,
         "message_limit": 10,
-        "simulation_limit": 1,
+        "simulation_limit": 2,
         "feedback_limit": 5,
     }
     assert payload["public_account_access_enabled"] is False

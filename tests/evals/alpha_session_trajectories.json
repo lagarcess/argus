@@ -151,10 +151,10 @@
             "stage_outcome": "ready_to_respond",
             "canonical_sse": true,
             "recovery_code": "discovery_unavailable",
-            "route_budget": {"max_calls": 2, "max_cost_usd": 0.05, "max_latency_ms": 12000},
+            "route_budget": {"max_calls": 1, "max_cost_usd": 0.05, "max_latency_ms": 12000},
             "typed_terminal": true,
             "checkpoints": {
-              "discovery.route_receipt_count": 2
+              "discovery.route_receipt_count": 1
             }
           }
         },

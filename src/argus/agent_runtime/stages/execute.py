@@ -20,6 +20,11 @@ from argus.agent_runtime.rule_specs import (
     opposite_moving_average_crossover_rule,
     strategy_rule,
 )
+from argus.agent_runtime.stages.execution_failure_transport import (
+    failed_final_response_payload,
+    public_failure_code,
+    runtime_failure_classification,
+)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -93,10 +98,11 @@ def execute_stage(
             )
 
         error_type = _as_optional_str(envelope.get("error_type"))
-        failure_classification = _runtime_failure_classification(error_type)
+        failure_classification = runtime_failure_classification(error_type)
         last_error_type = failure_classification
         retryable = bool(envelope.get("retryable"))
         capability_context = dict(envelope.get("capability_context") or {})
+        conversion_failure_code = public_failure_code(capability_context)
         if is_approved_window_drift(capability_context):
             return StageResult(
                 outcome="ready_for_confirmation",
@@ -123,7 +129,9 @@ def execute_stage(
                         "tool_call_records": records,
                         "failure_classification": failure_classification,
                         "assistant_prompt": assistant_prompt,
-                        "final_response_payload": {"error": assistant_prompt},
+                        "final_response_payload": failed_final_response_payload(
+                            assistant_prompt, conversion_failure_code
+                        ),
                         **_failed_action_reference_patch(
                             payload=payload,
                             failure_classification=failure_classification,
@@ -202,7 +210,9 @@ def execute_stage(
                     "tool_call_records": records,
                     "failure_classification": failure_classification,
                     "assistant_prompt": assistant_prompt,
-                    "final_response_payload": {"error": assistant_prompt},
+                    "final_response_payload": failed_final_response_payload(
+                        assistant_prompt, conversion_failure_code
+                    ),
                     **_failed_action_reference_patch(
                         payload=payload,
                         failure_classification=failure_classification,
@@ -770,23 +780,6 @@ def _normalize_scalar_field(value: Any) -> Any:
     return value
 
 
-def _runtime_failure_classification(error_type: str | None) -> str:
-    known_taxonomy = {
-        "parameter_validation_error",
-        "missing_required_input",
-        "unsupported_capability",
-        "tool_execution_error",
-        "upstream_dependency_error",
-        "ambiguous_user_intent",
-        "internal_system_error",
-    }
-    if error_type in known_taxonomy:
-        return str(error_type)
-    if error_type in {"service_overloaded", "rate_limited", "timeout"}:
-        return "upstream_dependency_error"
-    return "tool_execution_error"
-
-
 def _retry_exhausted_message(records: list[dict[str, Any]]) -> str:
     if not records:
         return "Retry limit reached"
@@ -795,7 +788,7 @@ def _retry_exhausted_message(records: list[dict[str, Any]]) -> str:
     if error_type:
         return (
             _fallback_prompt(
-                error_type=_runtime_failure_classification(error_type),
+                error_type=runtime_failure_classification(error_type),
                 error_message=None,
             )
             or "Retry limit reached"

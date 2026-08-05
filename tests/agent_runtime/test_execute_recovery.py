@@ -174,6 +174,33 @@ def test_execute_does_not_retry_when_corrected_payload_changes_protected_intent_
     assert metadata["launch_payload"]["symbol"] == "TSLA"
 
 
+def test_execute_exposes_only_the_safe_guest_conversion_failure_code() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "account_required",
+                "error_message": None,
+                "retryable": False,
+                "payload": None,
+                "capability_context": {
+                    "execution_status": "rejected",
+                    "failure_code": "account_conversion_required",
+                },
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.confirmation_payload = {"strategy": {"asset_universe": ["TSLA"]}}
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_failed_terminally"
+    assert result.patch["final_response_payload"]["code"] == (
+        "account_conversion_required"
+    )
+
+
 def test_execute_retries_only_for_retryable_transient_failure() -> None:
     tool = StubBacktestTool(
         responses=[

@@ -14,12 +14,16 @@ import {
   type GuestConversionMode,
   type GuestConversionReason,
 } from "@/lib/guest-conversion";
+import { formatAllowancePeriodEnd } from "@/lib/usage-allowance";
 
 type GuestConversionModalProps = {
   isOpen: boolean;
   reason: GuestConversionReason;
   initialMode: GuestConversionMode;
   publicAccountAccessEnabled: boolean;
+  resetAt?: string | null;
+  resetKind?: "daily" | "workspace";
+  locale?: "en-US" | "es-419";
   onClose: () => void;
   onAuthenticate: (
     submission: AuthFormSubmission,
@@ -31,6 +35,9 @@ export default function GuestConversionModal({
   reason,
   initialMode,
   publicAccountAccessEnabled,
+  resetAt = null,
+  resetKind = "daily",
+  locale = "en-US",
   onClose,
   onAuthenticate,
 }: GuestConversionModalProps) {
@@ -116,6 +123,22 @@ export default function GuestConversionModal({
         <p className="mb-2 pr-12 font-display text-[12px] font-semibold uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
           {t("guest.conversion.eyebrow", "Keep going with Argus")}
         </p>
+        {reason === "simulation_limit" && resetAt ? (
+          <p className="mb-5 pr-12 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
+            {t(
+              resetKind === "daily"
+                ? publicAccountAccessEnabled
+                  ? "guest.conversion.simulation_limit_reset"
+                  : "guest.conversion.simulation_limit_request_access"
+                : publicAccountAccessEnabled
+                  ? "guest.conversion.simulation_workspace_limit_reset"
+                  : "guest.conversion.simulation_workspace_limit_request_access",
+              {
+              date: formatAllowancePeriodEnd(resetAt, locale),
+              },
+            )}
+          </p>
+        ) : null}
         {mode === "request" ? (
           <RequestAccess
             headingId="guest-conversion-title"

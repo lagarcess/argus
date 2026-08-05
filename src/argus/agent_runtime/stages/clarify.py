@@ -277,15 +277,18 @@ async def clarify_stage_async(
             "requested_field": requested_field,
             "requested_fields": requested_fields,
         }
-        if generated.used_degraded_fallback:
-            stage_patch.update(
-                _clarification_sidecar_patch(
-                    state=state,
-                    response_intent=response_intent,
-                    requested_field=requested_field,
-                    prompt_source="degraded_fallback",
-                )
+        stage_patch.update(
+            _clarification_sidecar_patch(
+                state=state,
+                response_intent=response_intent,
+                requested_field=requested_field,
+                prompt_source=(
+                    "degraded_fallback"
+                    if generated.used_degraded_fallback
+                    else "llm_generated"
+                ),
             )
+        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch=stage_patch,

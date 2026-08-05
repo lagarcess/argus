@@ -1050,6 +1050,7 @@ class GuestBootstrapRequest(BaseModel):
 
 GuestConversionReason = Literal[
     "second_simulation",
+    "simulation_limit",
     "message_limit",
     "save_decision",
     "new_conversation",

@@ -10,6 +10,7 @@ from argus.api.dependencies import current_user
 from argus.api.guest_access import guest_account_context
 from argus.api.guest_observability import (
     emit_first_guest_message_event,
+    emit_first_guest_simulation_event,
     emit_guest_funnel_event,
 )
 from argus.api.main import app
@@ -180,7 +181,7 @@ def test_browser_guest_event_schema_accepts_only_ui_owned_facts() -> None:
             "event": "conversion_prompt_shown",
             "language": "es-419",
             "surface": "conversion_modal",
-            "conversion_reason": "second_simulation",
+            "conversion_reason": "simulation_limit",
             "terminal_outcome": "shown",
         }
     )
@@ -189,7 +190,7 @@ def test_browser_guest_event_schema_accepts_only_ui_owned_facts() -> None:
         "event": "conversion_prompt_shown",
         "language": "es-419",
         "surface": "conversion_modal",
-        "conversion_reason": "second_simulation",
+        "conversion_reason": "simulation_limit",
         "terminal_outcome": "shown",
     }
 
@@ -401,6 +402,36 @@ def test_first_useful_response_emits_only_at_the_first_settled_unit() -> None:
         capability_category="chat",
         terminal_outcome="completed",
     )
+
+
+def test_first_simulation_milestones_emit_only_for_the_first_usage_unit() -> None:
+    account = _guest_context()
+    with (
+        patch(
+            "argus.api.guest_observability.current_guest_usage_count",
+            side_effect=[1, 2, 1, 2],
+        ),
+        patch("argus.api.guest_observability.capture_guest_funnel_event") as capture,
+    ):
+        for kind, outcome in (
+            ("first_simulation_admitted", "admitted"),
+            ("first_simulation_admitted", "admitted"),
+            ("first_result_completed", "completed"),
+            ("first_result_completed", "completed"),
+        ):
+            emit_first_guest_simulation_event(
+                account=account,
+                kind=kind,
+                user_id=GUEST_USER_ID,
+                conversation_id="conversation-1",
+                job_id="job-1",
+                terminal_outcome=outcome,
+            )
+
+    assert [call.args[0] for call in capture.call_args_list] == [
+        "first_simulation_admitted",
+        "first_result_completed",
+    ]
 
 
 def test_registered_context_never_emits_a_guest_event() -> None:

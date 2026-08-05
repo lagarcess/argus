@@ -431,6 +431,7 @@ async def chat_stream(
         ),
     )
     runtime_fallback = RuntimeFallbackContext()
+    validated_result_action_run: BacktestRun | None = None
     validated_option_source = request_admission.admit_response_option()
     if validated_option_source is not None:
         runtime_fallback = validated_option_source.runtime_fallback
@@ -607,9 +608,16 @@ async def chat_stream(
         elif metadata_fallback is not None:
             runtime_fallback = metadata_fallback
     elif is_result_action(payload):
+        validated_result_action_run = run_for_result_action(
+            payload=payload,
+            user=user,
+            conversation_id=conversation.id,
+            require_run_id=True,
+        )
         result_fallback = latest_result_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
+            action_run=validated_result_action_run,
         )
         if result_fallback is not None:
             runtime_fallback = result_fallback
@@ -932,7 +940,7 @@ async def chat_stream(
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
-                result_action_run = None
+                result_action_run = validated_result_action_run
                 saved_strategy_id_for_naming: str | None = None
                 result_action_type = result_action_request_type(runtime_result)
                 if (
@@ -982,12 +990,13 @@ async def chat_stream(
                     runtime_result.pop("confirmation", None)
                     runtime_result.pop("confirmation_payload", None)
                     runtime_result.pop("active_confirmation_reference", None)
-                    result_action_run = run_for_result_action(
-                        payload=payload,
-                        user=user,
-                        conversation_id=conversation.id,
-                        require_run_id=True,
-                    )
+                    if result_action_run is None:
+                        result_action_run = run_for_result_action(
+                            payload=payload,
+                            user=user,
+                            conversation_id=conversation.id,
+                            require_run_id=True,
+                        )
                     if result_action_type == "show_breakdown":
                         yield sse_data({"type": "stage_start", "stage": "explain"})
                         breakdown_message = result_breakdown_message_with_metadata(

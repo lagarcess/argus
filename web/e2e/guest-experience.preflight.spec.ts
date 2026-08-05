@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { copyFileSync, mkdirSync } from "node:fs";
+import path from "node:path";
 import {
   BackendController,
   BrowserSafetyMonitor,
@@ -256,7 +258,7 @@ test("durable retry fixture hydrates without sending an interpreter turn", async
   }
 });
 
-test("second-simulation gate fixture rekeys one durable confirmation without work", async ({
+test("exhausted-simulation gate fixture rekeys one durable confirmation without work", async ({
   page,
 }) => {
   assertExactLocalCandidate();
@@ -349,6 +351,79 @@ test("second-simulation gate fixture rekeys one durable confirmation without wor
   }
 });
 
+for (const expectation of [
+  {
+    language: "en" as const,
+    runLabel: /Run backtest/i,
+    resetCopy: /temporary chat has reached today’s simulation limit\. It resets on/i,
+  },
+  {
+    language: "es-419" as const,
+    runLabel: /Ejecutar backtest/i,
+    resetCopy: /chat temporal alcanzó el límite de simulaciones de hoy\. Se restablece el/i,
+  },
+]) {
+  test(`exhausted guest simulation shows truthful conversion recovery in ${expectation.language}`, async ({
+    page,
+  }) => {
+    assertExactLocalCandidate();
+    assertZeroState();
+    const backend = new BackendController();
+    let guestOwner = "";
+    try {
+      await backend.start(false);
+      const guest = await freshGuest(page, {
+        language: expectation.language,
+        onBootstrapOwner(owner) {
+          guestOwner = owner;
+        },
+      });
+      guestOwner = guest.user.id;
+      const created = await apiJson<{ conversation: { id: string } }>(
+        page.context().request,
+        "/conversations",
+        { method: "POST", data: { title: null, language: expectation.language } },
+      );
+      expect(created.status).toBe(200);
+      seedGuestSimulationExhaustionFixture({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      });
+      seedGuestActiveConfirmationFixture({
+        userId: guestOwner,
+        conversationId: created.body.conversation.id,
+      });
+      await page.goto(`/chat?conversation=${created.body.conversation.id}`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.getByRole("button", { name: expectation.runLabel }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText(expectation.resetCopy)).toBeVisible();
+      if (process.env.ARGUS_GUEST_QA_CAPTURE_DURABLE_EVIDENCE === "true") {
+        const screenshot = await safeVisibleProductScreenshot(
+          page,
+          `issue-346-exhausted-${expectation.language}`,
+        );
+        const durableDirectory = path.join(
+          process.cwd(),
+          "../docs/reports/evidence/issue-346",
+        );
+        mkdirSync(durableDirectory, { recursive: true });
+        copyFileSync(
+          screenshot,
+          path.join(durableDirectory, `guest-quota-recovery-${expectation.language}.png`),
+        );
+      }
+    } finally {
+      await backend.stop();
+      if (guestOwner) await deleteDisposableIdentity(guestOwner);
+      purgeDisposableQaEvidence();
+      assertZeroState();
+    }
+  });
+}
+
 test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
   page,
 }) => {
@@ -435,7 +510,7 @@ test("issue 337 Guest recovery keeps the completed-backtest rail tick", async ({
     expect(ownerSnapshot(guestOwner)).toMatchObject({
       messages: 12,
       runs: 1,
-      simulation_units: 1,
+      simulation_units: 2,
       route_receipts: 0,
       cost_rows: 0,
     });

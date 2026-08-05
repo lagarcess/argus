@@ -45,7 +45,7 @@ type RunDossierViewProps = {
 };
 
 export type DecisionDraft = {
-  state: DecisionState;
+  state: DecisionState | null;
   note: string;
 };
 
@@ -176,7 +176,7 @@ export function RunDossierView({
   const startDecisionEdit = () => {
     if (!decisionAction) return;
     const nextDraft = {
-      state: decisionAction.decision_state ?? "watching",
+      state: decisionAction.decision_state ?? null,
       note: decisionAction.note ?? "",
     };
     if (decisionAction.availability === "account_conversion_required") {
@@ -339,7 +339,7 @@ export function RunDossierView({
             {metrics.length > 0 && (
               <dl
                 data-dossier-metrics-layout="compact"
-                className="mt-3 grid grid-cols-2 border-y border-black/[0.06] dark:border-white/[0.08]"
+                className="mt-3 grid grid-cols-2 border-t border-black/[0.06] dark:border-white/[0.08]"
               >
                 {metrics.map((metric, index) => {
                   const spansFullRow =
@@ -469,7 +469,7 @@ export function RunDossierView({
         )}
         disabled={conversationUnavailable}
         onClick={onOpenConversation}
-        className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/5 dark:text-white/35 dark:hover:text-white"
+        className="mt-auto flex min-h-11 shrink-0 items-center justify-between pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/35 dark:hover:text-white"
       >
         <span>
           {t(

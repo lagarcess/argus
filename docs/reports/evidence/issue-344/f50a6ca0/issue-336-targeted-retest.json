@@ -1,0 +1,219 @@
+{
+  "category_pass_rates": {
+    "messy_english": {
+      "expected_failed": 0,
+      "failed": 1,
+      "pass_rate": 0.0,
+      "passed": 0,
+      "skipped": 0,
+      "unexpected_pass": 0
+    }
+  },
+  "generated_at": "2026-08-03T16:56:43.617180+00:00",
+  "results": [
+    {
+      "category": "messy_english",
+      "expected_fail": null,
+      "failed_checks": [
+        "assets: expected ['AAPL'], got []",
+        "requested_field: expected 'date_range', got 'asset_universe'"
+      ],
+      "id": "messy_english_opening_apple_capital_missing_period_issue_336",
+      "prose_judge": null,
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:07.471904+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 2609,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 37,
+            "prompt_tokens": 782,
+            "total_tokens": 819
+          },
+          "usage_cost_usd": 0.0009356
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:24.860024+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 9772,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 702,
+            "prompt_tokens": 9133,
+            "total_tokens": 9835
+          },
+          "usage_cost_usd": 0.01296965
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:27.812341+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 2548,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "FocusedDateWindowExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1536,
+            "completion_tokens": 34,
+            "prompt_tokens": 1906,
+            "total_tokens": 1940
+          },
+          "usage_cost_usd": 0.0008547
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:31.630119+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 3817,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "FocusedStrategyExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 250,
+            "prompt_tokens": 3373,
+            "total_tokens": 3623
+          },
+          "usage_cost_usd": 0.00470685
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:35.832875+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 2484,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "FocusedDateWindowExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1792,
+            "completion_tokens": 34,
+            "prompt_tokens": 1831,
+            "total_tokens": 1865
+          },
+          "usage_cost_usd": 0.00049215
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:38.243534+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 2409,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "FocusedDateWindowExtraction",
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1792,
+            "completion_tokens": 34,
+            "prompt_tokens": 1831,
+            "total_tokens": 1865
+          },
+          "usage_cost_usd": 0.00049215
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-08-03T16:56:43.616075+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 3562,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ClarificationResponse",
+          "task": "clarification",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "completion_tokens": 55,
+            "prompt_tokens": 1937,
+            "total_tokens": 1992
+          },
+          "usage_cost_usd": 0.00028658
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": "equity",
+        "asset_discovery": null,
+        "assets": [],
+        "benchmark_symbol": "SPY",
+        "capability_verdict": "needs_clarification",
+        "capital_amount": 10000.0,
+        "clarification": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "strategy_drafting",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": "asset_universe",
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": "new_idea",
+        "slippage": null,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "strategy_type": "buy_and_hold"
+      }
+    }
+  ],
+  "schema_version": 1,
+  "totals": {
+    "expected_failed": 0,
+    "failed": 1,
+    "passed": 0,
+    "skipped": 0,
+    "unexpected_pass": 0
+  }
+}

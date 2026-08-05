@@ -6,10 +6,17 @@ Last reconciled: 2026-08-02
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
-Latest product change: PR #373 at `81e7a1ac`, which makes first-login guest
-claims succeed for brand-new accounts while preserving signup
-anti-enumeration for emails and adding serialized, typed username conflicts
-(issue #372). It follows PR #351 at `30af0dca` (immediate Recents refresh on
+Latest product change: PR #366 at `2b023576`, which makes grounded
+discovery's failures as honest as its successes — typed routing for current
+searches, working Retry for transient failures, non-retryable honesty with a
+forward path for configuration failures, and fail-closed citation evidence
+(issue #344). This completes the #347 checkpoint-gap batch for this cycle;
+the integration head is the promotion-freeze candidate. It follows PR #354
+at `4a6a237a` (truthful guest quota recovery, issue #346) and PR #358 at
+`7b3221a1` (all-or-retry compound edits, issue #339) and PR #359 at
+`a35bb29f` (recommendation continuity through the shared clarify contract,
+issue #345) and PR #373 at `81e7a1ac` (first-login guest
+claims with preserved anti-enumeration, issue #372) and PR #351 at `30af0dca` (immediate Recents refresh on
 claimed conversions, issue #342) and PR #374 at `d8c7070a` (robust activity timestamp parsing and
 exception retention, issue #371) and PR #370 at `c324f877` (typed first-page dossier
 cursors, issue #341), PR #360 at `42d96da7` (issue #349 verification
@@ -201,6 +208,47 @@ keep the provider's indistinguishable duplicate path. Three review rounds
 each removed a real regression (FK failure, email oracle, username oracle).
 No environment variable, deployment, schema, or migration requirement was
 added; `docs/API_CONTRACT.md` records the username semantics.
+PR #359 then closed issue #345 as `a35bb29f`: recommendation follow-ups
+inherit every still-applicable owned fact (assets, capital, window,
+timeframe, benchmark, modeled costs) unless the user changes them, with the
+historical result immutable and the new confirmation active — routed through
+the shared clarify contract with model voice and degraded fallback. Accepted
+at the full clean bar: live 40/40 with no waivers, strategy-diverse browser
+proof (weekly DCA with recurring contribution; SMA 50/200 inheritance), and
+full deterministic gates. No environment variable, deployment, API, schema,
+or migration requirement was added.
+PR #358 then closed issue #339 as `7b3221a1`: the artifact-edit planner
+derives required typed targets from the entire turn — any operation count
+over the full edit vocabulary — and only plans that provably materialize
+every target may claim ready_to_confirm, verified against the real
+application path; partial application retries or asks, and unsupported
+content declines to the normal flow. Six adversarial review rounds hardened
+coverage against faked completeness. The lane's 24/41 live report was
+independently diagnosed and lane-confirmed as the known root-.env
+synthetic-calendar misconfiguration, corroborated by #359's adjacent 40/40.
+Issue #335 is unblocked and stacked for the next cycle. No environment
+variable, deployment, API, schema, or migration requirement was added.
+PR #354 then closed issue #346 as `4a6a237a`: the guest quota-exhaustion
+message states the actual reset time and offers conversion; the guest
+allowance rises to two simulations via migration
+`20260802090000_raise_guest_simulation_allowance.sql` (landed in-repo and
+preview-proven; hosted application remains a promotion-runbook step);
+visitor prechecks use the daily reset horizon; first-admission
+classification is atomic; and the authoritative public-launch canary in
+`docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` now expects the two-simulation policy.
+`first_result_completed` idempotency is explicitly deferred to #376. The
+lane also fixed a real guest chat-stream cookie-auth gap its browser matrix
+exposed, and its dead-at-birth Supabase preview branch was deleted and
+recreated to prove the migration on hosted preview infrastructure.
+PR #366 then closed issue #344 as `2b023576`: recent-IPO, trending-crypto,
+multi-category, and escalation requests route through the typed discovery
+path with resolver-validated cited candidates; transient failures retry and
+genuinely recover; configuration failures stop honestly without dead-end
+affordances or wait-promises, redirecting to provider-free symbol testing;
+and citation fallback evidence is bounded and fail-closed. Sixteen per-SHA
+in-repo evidence sets with probe-vs-proof labeling; provider-mode breadth is
+parked as #377. This was the cycle's final landing before the promotion
+freeze.
 
 Current note: while the interim pivot is active, use
 `docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
@@ -230,6 +278,13 @@ deployed automatically.
 The private-alpha promotion path still uses the CI/CD SOTA gate in
 `docs/specs/private-alpha-ci-cd-sota.md` plus the operator instructions in
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+
+**Production promotion executed 2026-08-05:** the sixteen-landing checkpoint
+batch plus the acceptance-walk fixes shipped to production at `7ef89a90`
+(`argus-api`, `argus-app`, and workflow version `wfv-d9p88253erlc73d3u8s0`).
+Evidence: [`docs/release-manifests/2026-08-05-main-production-promotion.md`](../release-manifests/2026-08-05-main-production-promotion.md).
+`main` and `codex/private-alpha-next` were identical at that SHA; the branch
+resumes its staging-lane role for the next cycle from this baseline.
 
 Before testers are invited, the release captain must prove:
 

@@ -743,12 +743,12 @@ def test_guest_me_usage_returns_only_fixed_session_truth(
     assert messages["available_now"] is True
     backtests = allowances["backtests"]
     assert backtests["day"] == {
-        "limit": 1,
+        "limit": 2,
         "used": 1,
-        "remaining": 0,
+        "remaining": 1,
         "period_end": backtests["day"]["period_end"],
     }
-    assert backtests["available_now"] is False
+    assert backtests["available_now"] is True
     assert backtests["limiting_window"] == "day"
 
 
@@ -1108,7 +1108,7 @@ def test_exhausted_precheck_still_reports_same_key_collisions(
     assert response.json()["code"] == "idempotency_conflict"
 
 
-def test_guest_direct_exhaustion_requires_conversion_before_provider_access(
+def test_guest_third_direct_run_requires_conversion_before_provider_access(
     mock_gateway,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -1118,8 +1118,8 @@ def test_guest_direct_exhaustion_requires_conversion_before_provider_access(
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     _configure_guest_account(mock_gateway)
-    # The visitor already spent today's single run; renewal must not help.
-    mock_gateway.client = _FakeVisitorClient({"backtest_runs": 1})
+    # The visitor already spent today's two runs; renewal must not help.
+    mock_gateway.client = _FakeVisitorClient({"backtest_runs": 2})
 
     with patch("argus.api.backtest_service.prepare_run_from_payload") as prepare_run:
         response = client.post(
@@ -1133,7 +1133,7 @@ def test_guest_direct_exhaustion_requires_conversion_before_provider_access(
             },
             headers={
                 "Authorization": "Bearer guest-token",
-                "Idempotency-Key": "guest-second-run",
+                "Idempotency-Key": "guest-third-run",
             },
         )
 

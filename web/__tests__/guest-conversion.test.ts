@@ -46,7 +46,7 @@ describe("guest conversion contract", () => {
   test("keeps the five contextual reasons typed and localized", () => {
     const actions: GuestPendingAction[] = [
       {
-        reason: "second_simulation",
+        reason: "simulation_limit",
         conversationId: "conversation-1",
         actionId: "run-2",
         action: {
@@ -84,7 +84,7 @@ describe("guest conversion contract", () => {
     ];
 
     expect(actions.map((action) => guestConversionBenefitKey(action.reason))).toEqual([
-      "guest.conversion.second_simulation",
+      "guest.conversion.simulation_limit",
       "guest.conversion.message_limit",
       "guest.conversion.save_decision",
       "guest.conversion.new_conversation",
@@ -231,6 +231,48 @@ describe("guest conversion contract", () => {
     expect(modal).toContain("allowModeSwitch={publicAccountAccessEnabled}");
     expect(modal).toContain("<RequestAccess");
     expect(modal).toContain("mode={mode}");
+  });
+
+  test("uses the daily reset only for the renewed-workspace precheck", () => {
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const admission = experience.slice(
+      experience.indexOf("const admitSend"),
+      experience.indexOf("const recoverGuestSimulationRejection"),
+    );
+    const authoritativeRejection = experience.slice(
+      experience.indexOf("const recoverGuestSimulationRejection"),
+    );
+
+    // A renewed workspace receives its own allowance; the visitor's daily
+    // window, not the old workspace expiry, is the truthful precheck reset.
+    expect(admission).toContain("guestSimulationPrecheckResetAt(usage.allowances.backtests)");
+    // The server-only workspace ceiling still names the actual temporary
+    // workspace expiry after an authoritative rejection.
+    expect(authoritativeRejection).toContain(
+      "account.guest?.expires_at ?? null",
+    );
+  });
+
+  test("opens quota recovery for an authoritative workspace-limit rejection", () => {
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(experience).toContain("recoverGuestSimulationRejection");
+    expect(chat).toContain("isGuestSimulationConversionRejection");
+    expect(chat).toContain("errorPayload.code");
+    expect(chat).toContain("finalPayload.code");
+    expect(chat).toContain("finalPayload.final_response_payload");
+    expect(chat).toContain("loadConversation(requestSession.identity.conversationId)");
+    expect(chat.indexOf("errorPayload.code")).toBeLessThan(
+      chat.indexOf("throwIfAmbiguousRunSseError", chat.indexOf('event.event === "error"')),
+    );
+    expect(chat).toContain("recoverGuestSimulationRejection(action)");
   });
 
   test("derives the New-chat auth mode from server-owned public access truth", () => {

@@ -204,6 +204,29 @@ for brand-new accounts, email anti-enumeration is preserved through the
 obfuscated-response guard, and username conflicts are serialized and typed —
 three review rounds, three distinct real regressions caught and fixed.
 
+PR #359 then closed issue #345 as `a35bb29f`: recommendation continuity at
+the full clean bar — live 40/40 with no waivers (the 17-failure waiver era
+formally over) and strategy-diverse acceptance evidence per the standing
+rule (weekly DCA recurring contribution, SMA 50/200 inheritance).
+
+PR #358 then closed issue #339 as `7b3221a1`: compound edits are
+all-or-retry via required-target coverage over the full typed edit
+vocabulary — a general completeness invariant, not a two-field patch — after
+six adversarial review rounds. Issue #335 (inline confirmation-card editing)
+is unblocked and stacked for the next cycle.
+
+PR #354 then closed issue #346 as `4a6a237a`: truthful guest quota recovery
+with a two-simulation allowance, atomic first-admission classification, and
+the public-launch canary updated to the new policy — the stale cloud lane
+taken over locally and finished with bilingual in-repo browser evidence.
+Issue #294 keeps the funnel-data tuning mandate against this new baseline.
+
+PR #366 then closed issue #344 as `2b023576`: honest, recoverable grounded
+discovery — the sixteenth and final landing of the checkpoint-gap batch.
+**The integration head at this landing is the promotion-freeze candidate:
+everything after it stacks for the next cycle** (#335 inline editing, #332,
+#369, #377, the parked #363 design, and the allowance session).
+
 The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
 authoritative founder-outcome and live-QA source for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
@@ -274,6 +297,92 @@ the product. No vendor (Polygon, Tradier, ORATS, or otherwise) should be
 selected before there is a real, demonstrated user cohort asking for it —
 this is explicitly a wait-for-signal item, not a candidate for the next
 planning cycle.
+
+## Promotion Readiness — 2026-08-04
+
+The freeze holds: the product tip is unchanged at `2b023576` (PR #366).
+Everything landed after it is promotion housekeeping — env-template parity and
+the three-key OpenRouter policy, the real support address
+(`support@get-argus.com`, Cloudflare Email Routing to the founder's inbox),
+and the Render spend-discipline lock (AGENTS.md local-compute rule, runbook
+note, and a guard test pinning the mode scripts' dispatch posture). Promotion
+candidate tip: `58fe1049`, CI green at every step.
+
+Pre-flight is complete and its findings are the promotion agent's brief:
+
+- Hosted migration census: exactly four migrations apply, in order — avatar
+  theme, conversation-activity read states, guest allowance raise,
+  simulation-limit handoff reason. Ten older “missing” stamps are renumbering
+  artifacts of a past history squash — never re-apply them. The June
+  `MIGRATIONS_FAILED` branch status is dead signage.
+- Env truth is layered: render.yaml plus a dashboard-set layer. The ceremony
+  reconciles declared-vs-live; the discovery stack (provider, search model,
+  daily ceiling, Perplexity key) is the highest-risk gap and gets a hosted
+  probe. `ARGUS_VISITOR_KEY_SECRET` (fresh high-entropy value) and
+  `NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL` are already set on the services; the
+  deploy bakes them in. Hosted key identity must verify as the argus-prod
+  OpenRouter key.
+- The scheduled Private Alpha Canary has been red daily since 2026-07-13 for
+  one structural reason: GitHub executes main's copy of the workflow yml,
+  which predates the capture-path contract the integration scripts require
+  (`missing_capture_destination` at stage `capture`, before any product
+  check; the daily Render warmup passed throughout, so production stayed
+  healthy). Promotion itself heals it by updating main. **The closing
+  release gate is the first scheduled canary green after deploy.** That
+  first green also writes the first real per-run cost into
+  `cost_ledger_entries`; canary cadence (keep daily vs thin out) is a
+  founder decision made from that measured number.
+
+### Next-cycle boards — 2026-08-05
+
+The interim roadmap is complete (promotion executed; #228/#233 closed). The
+next cycle runs on two draft boards pending founder ranking:
+[`next-cycle-stabilization-roadmap.md`](next-cycle-stabilization-roadmap.md)
+(every open issue and PR, alpha-feedback root causes included) and
+[`next-cycle-product-roadmap.md`](next-cycle-product-roadmap.md) (mobile
+readiness spike first, then product memory, personalization, dev-cost
+accounting, sharing, broker handoff, plus the brainstorm-first ledger).
+
+### Acceptance walk amendment — 2026-08-04 evening
+
+A founder-witnessed acceptance walk on the local candidate stack (guest lane,
+conversion, signed-in journeys, adversarial Spanish) moved the candidate tip
+from `58fe1049` to **`70ba33cc`** (all CI-green). It found and fixed in place:
+the conversion resume 409 (stale idempotency key), two omnisearch dossier
+divider strays, the presumptuous default decision state (now unchosen
+end-to-end including the guest resume target), "public alpha" copy replaced
+with "early access" (en/es-419), existing-email re-signup now points to sign
+in on the conversion modal (409 `account_exists_use_login`; the public signup
+page stays deliberately opaque for anti-enumeration), and an em dash purge
+from all user-facing copy (rule locked in `.agent/rules/coding-standards.md`).
+Eyes-open guest metering postures are recorded in
+`GUEST_PUBLIC_LAUNCH_SAFETY.md`. Findings filed instead of fixed: pending-card
+NL edits ignored in any language (evidence on #335), reply language follows
+workspace not message language (#378), and the Run-backtest action's shape
+(fake English user bubble, message metering, no typed equivalent) which is
+parked for founder design discussion (#379 closed pending it; the dossier
+retest token chip is the candidate pattern). None are batch regressions;
+promotion proceeds on `70ba33cc`.
+
+### Production promotion complete — 2026-08-05
+
+Promotion shipped: `argus-api`, `argus-app`, and the `argus-backtests`
+workflow (version `wfv-d9p88253erlc73d3u8s0`) are live at `7ef89a90`, four
+migrations applied, env contract reconciled (three red-gate rounds fixed the
+contract itself: visitor secret + support email, then discovery/realism/
+PostHog, then the runbook secret checklist). Full evidence:
+[`docs/release-manifests/2026-08-05-main-production-promotion.md`](../release-manifests/2026-08-05-main-production-promotion.md).
+
+Recorded deviation: Turnstile correctly blocks headless browser automation in
+every widget mode, so the authoritative canary's browser phase cannot pass
+unattended. The journey was founder-operated in a real browser and verified
+server-side (job succeeded through `argus-backtests/run_backtest_job`,
++12.84% result, benchmark lag 13.30 points, cost ledger `$0.00015585` for the
+turn); the requested-signup denial was proven at the API layer. Issue #383
+holds the rework (API-layer denial probe, session-injected journey, staging
+testing sitekey). **Until #383 ships, the scheduled daily canary will stay
+red at its browser auth phase — an explained red, not a production alarm;
+the meaningful daily signal is the warmup and pre-browser gates.**
 
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
@@ -547,6 +656,13 @@ slices below describe delivered scope, not pending work.
 
 ### Design-Only Until Later
 
+- Guided first-run tour (alpha-user suggested, 2026-08-05): not a wizard; a
+  fluid one-click layer that makes Argus aware of where it is leading you.
+  Founder wants a worth-it brainstorm before any build.
+- Recency-aware suggestion context (2026-08-05): in-chat suggestions must
+  weight the latest run heavily (never re-suggest the asset just tested;
+  NVDA was suggested right after an NVDA backtest). Macro pattern spans chat
+  context, product memory, and the personalization-memory incubation lane.
 - Memory/data controls.
 - Voice-to-composer STT.
 - Public evidence excerpts.
@@ -555,6 +671,23 @@ slices below describe delivered scope, not pending work.
 - Broad Research Lab / deep-research product work. Bounded, source-backed event
   context required by the later A4 freshness arc is not a general news feed or
   a broad Research Lab implementation.
+- Allowance brainstorming session (founder-led): define what Guests versus
+  registered users can do, and identify which capability boundaries naturally
+  become tiers or plans once product-market fit is found. Today Argus stays
+  deliberately open at near-full data capability to learn capability truth;
+  every capability boundary added in the meantime (lookback windows,
+  simulation allowances, discovery quotas) must stay policy-owned values so
+  future tiering changes policy, not design. Session output feeds the
+  allowance/tier design; no implementation before it.
+- Current-data window truthfulness design (PENDING founder lock; PR #363 is
+  founder-parked on it). Direction under discussion, not yet decided:
+  feasibility-aware Retest disposition on the dossier button (ready /
+  feasible-with-repair / impossible, with tooltip), a guided repair turn that
+  pulses the affected confirmation-card input for manual editing, anchor-date
+  clamping to earliest available riding the existing
+  `effective_date_range`/`adjustment_reason` contract, a strict definition of
+  "truly impossible," and a reconciliation path so users are never
+  dead-ended. No lane resumes until the founder locks this design.
 
 ### P2 Board
 

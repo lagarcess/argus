@@ -19,6 +19,7 @@ import { getUsageAllowances } from "@/lib/argus-api";
 import {
   decideGuestMessageGate,
   decideGuestSimulationGate,
+  guestSimulationPrecheckResetAt,
   isExactGuestRunReplay,
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
@@ -123,16 +124,10 @@ export function useGuestExperience({
         await sendRef.current?.(action.text, action.mentions, undefined, {
           bypassGuestGate: true,
         });
-      } else if (action.reason === "second_simulation") {
+      } else if (action.reason === "simulation_limit") {
         await sendRef.current?.(
           action.action.label || action.action.value || "",
-          {
-            ...action.action,
-            payload: {
-              ...action.action.payload,
-              idempotency_key: action.actionId,
-            },
-          },
+          action.action,
           undefined,
           { bypassGuestGate: true },
         );
@@ -259,12 +254,18 @@ export function useGuestExperience({
             });
             if (decision.kind === "convert") {
               if (!conversationId) return false;
-              conversion.requestConversion(decision.reason, {
-                reason: "second_simulation",
-                conversationId,
-                actionId: crypto.randomUUID(),
-                action,
-              });
+              conversion.requestConversion(
+                decision.reason,
+                {
+                  reason: "simulation_limit",
+                  conversationId,
+                  actionId: crypto.randomUUID(),
+                  action,
+                },
+                "signup",
+                guestSimulationPrecheckResetAt(usage.allowances.backtests),
+                "daily",
+              );
               return false;
             }
           } else if (!action?.type) {
@@ -348,6 +349,32 @@ export function useGuestExperience({
     );
   }, [conversationId, conversion]);
 
+  const recoverGuestSimulationRejection = useCallback(
+    (action: ChatActionOption) => {
+      if (
+        account?.account_kind !== "guest" ||
+        !conversationId ||
+        action.type !== "run_backtest"
+      ) {
+        return false;
+      }
+      conversion.requestConversion(
+        "simulation_limit",
+        {
+          reason: "simulation_limit",
+          conversationId,
+          actionId: crypto.randomUUID(),
+          action,
+        },
+        "signup",
+        account.guest?.expires_at ?? null,
+        "workspace",
+      );
+      return true;
+    },
+    [account, conversationId, conversion],
+  );
+
   const clearResumeDecision = useCallback(
     () => setResumeDecisionTarget(null),
     [],
@@ -369,6 +396,7 @@ export function useGuestExperience({
   return {
     ...shell,
     admitSend,
+    recoverGuestSimulationRejection,
     requestGuestSearchUpgrade,
     resumeDecisionTarget,
     resumeDecisionArtifactId,

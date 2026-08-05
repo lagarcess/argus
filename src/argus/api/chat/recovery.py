@@ -543,26 +543,44 @@ def latest_result_fallback_context(
     *,
     user_id: str,
     conversation_id: str,
+    action_run: BacktestRun | None = None,
 ) -> RuntimeFallbackContext | None:
     lookup = _latest_completed_result_reference(
         user_id=user_id,
         conversation_id=conversation_id,
     )
+    action_reference = (
+        _result_reference_with_response_metadata(action_run)
+        if action_run is not None
+        and action_run.conversation_id == conversation_id
+        and action_run.status == "completed"
+        else None
+    )
     if lookup is None:
-        return None
-    reference, fallback_source = lookup
+        if action_reference is None:
+            return None
+        reference, fallback_source = action_reference, "action_run"
+    else:
+        reference, fallback_source = lookup
+    artifact_references = [reference]
+    if (
+        action_reference is not None
+        and action_reference.artifact_id != reference.artifact_id
+    ):
+        artifact_references.append(action_reference)
     return RuntimeFallbackContext(
         latest_task_snapshot=TaskSnapshot(
             latest_task_type="results_explanation",
             completed=True,
             latest_backtest_result_reference=reference,
+            artifact_references=artifact_references,
         ),
         selected_thread_metadata={
             "latest_task_type": "results_explanation",
             "last_stage_outcome": "ready_to_respond",
             "fallback_source": fallback_source,
         },
-        artifact_references=[reference],
+        artifact_references=artifact_references,
     )
 
 

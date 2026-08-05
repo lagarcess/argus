@@ -178,7 +178,7 @@ export default function ConversationActivityRail({
     const identity = [tick.symbols[0], tick.strategyTitle]
       .filter(Boolean)
       .join(" · ");
-    return identity ? `${label} — ${identity}` : label;
+    return identity ? `${label}: ${identity}` : label;
   };
 
   const errorBody = (tick: ConversationRailTick): string => {

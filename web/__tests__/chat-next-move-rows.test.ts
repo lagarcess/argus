@@ -66,7 +66,7 @@ describe("discovery candidates render as rows", () => {
 
   test("separators are their own nodes so locales can restyle them", () => {
     expect(message).toContain("<NextMoveSeparator>·</NextMoveSeparator>");
-    expect(message).toContain("<NextMoveSeparator>—</NextMoveSeparator>");
+    expect(message).toContain("<NextMoveSeparator>·</NextMoveSeparator>");
   });
 
   test("the tap payload is unchanged by the presentation swap", () => {

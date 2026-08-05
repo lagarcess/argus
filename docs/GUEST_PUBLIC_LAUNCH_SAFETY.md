@@ -137,6 +137,25 @@ proves they are necessary:
 These may be reconsidered if real traffic defeats the minimum controls or if
 Argus later promises a strict per-person benefit.
 
+## Eyes-Open Postures — 2026-08-04 Acceptance Walk
+
+Three accepted-risk behaviors of the guest metering design, recorded so
+support and monitoring recognize them instead of re-diagnosing:
+
+1. **Shared networks share guest caps.** The visitor key digests network
+   identity, so a household or office behind one address shares the guest
+   simulation and message allowances. Support signature: "limit reached but
+   I did not run anything." The response is education or an access
+   approval, not debugging.
+2. **Address rotation defeats visitor caps.** A rotating-IP visitor can farm
+   fresh guest workspaces. Standing mitigations: Turnstile on hosted guest
+   entry, allowlist-gated account creation, and guest backtests costing
+   in-process compute rather than provider spend. No further code owed at
+   alpha scale.
+3. **Account deletion is manual.** The delete-and-return loop is founder
+   gated. Acceptable at alpha scale; revisit when self-serve deletion
+   ships.
+
 ## Minimum Public-Launch Safety Bundle
 
 ### 1. Turnstile and anonymous Auth
@@ -218,7 +237,7 @@ Run this against the exact internet-facing canary SHA before opening traffic:
 - [ ] Clean incognito context: new identity only after the same challenge and
       velocity controls.
 - [ ] Eleventh useful response: conversion gate before provider work.
-- [ ] Second unique simulation: conversion gate before admission.
+- [ ] Third unique simulation: conversion gate before admission.
 - [ ] Sixth feedback submission: conversion-required response.
 - [ ] Copied conversation URL: zero cross-owner results.
 - [ ] Replayed expensive action: zero duplicate charge or computation.
@@ -275,6 +294,11 @@ expiry, or bounded cleanup; do not reverse migrations or bulk-delete anonymous
 users.
 
 ## Promotion Boundary
+
+**2026-08-05: production promotion executed at `7ef89a90`** (manifest in
+`docs/release-manifests/`); the guest surface is live behind Turnstile with
+the eyes-open postures above in effect. The boundary text below is preserved
+for future cycles.
 
 Merging the Guest implementation into the internal integration branch requires
 its normal code, database, Auth, frontend, and regression evidence. It does not

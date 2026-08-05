@@ -703,6 +703,32 @@ def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
     assert 'delete_render_env "$API_SERVICE_ID" RENDER_API_KEY' in dispatch_off_block
 
 
+def test_mode_scripts_pin_render_workflow_dispatch_off() -> None:
+    env_contract = ENV_CONTRACT.read_text()
+    dev_block = env_contract.split("argus_export_dev_mode() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+    qa_block = env_contract.split("argus_export_qa_mode() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+
+    # Dev mode: hard-off. Local iteration must never spend on Render.
+    assert "export ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false" in dev_block
+    assert "export ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false" in dev_block
+
+    # QA mode: default-off; ceremony runs opt in by exporting before qa.sh.
+    assert (
+        'ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED='
+        '"${ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED:-false}"' in qa_block
+    )
+    assert (
+        'ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED='
+        '"${ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED:-false}"' in qa_block
+    )
+
+
 def test_render_env_sync_separates_proof_and_real_api_modes() -> None:
     source = _source(".github/render-env-sync.sh")
     proof_block = source.split("sync_api_proof_shadow_on() {", maxsplit=1)[1].split(

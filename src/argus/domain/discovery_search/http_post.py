@@ -24,8 +24,13 @@ def post_json(
     except httpx.TimeoutException as exc:
         raise SearchUnavailableError(reason="timeout", detail=str(exc)) from exc
     except httpx.HTTPStatusError as exc:
+        reason = (
+            "authentication_failed"
+            if exc.response.status_code in (401, 403)
+            else "http_error"
+        )
         raise SearchUnavailableError(
-            reason="http_error", detail=f"status={exc.response.status_code}"
+            reason=reason, detail=f"status={exc.response.status_code}"
         ) from exc
     except httpx.HTTPError as exc:
         raise SearchUnavailableError(reason="http_error", detail=str(exc)) from exc

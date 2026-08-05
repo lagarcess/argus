@@ -55,7 +55,11 @@ def test_clarify_uses_generator_for_missing_required_fields() -> None:
     ]
     assert clarifier.requests[0].language == "en"
     assert "asset_universe" not in result.patch["assistant_prompt"]
-    assert "clarification" not in result.patch
+    assert result.patch["clarification"]["prompt_source"] == "llm_generated"
+    assert result.patch["clarification"]["requested_fields"] == [
+        "asset_universe",
+        "date_range",
+    ]
 
 
 def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
@@ -87,7 +91,8 @@ def test_clarify_confirmation_action_period_uses_llm_voice_in_spanish() -> None:
     assert clarifier.requests[0].response_intent["semantic_needs"] == ["period"]
     assert clarifier.requests[0].response_intent["facts"]["language"] == "es-419"
     assert "Which date" not in result.patch["assistant_prompt"]
-    assert "clarification" not in result.patch
+    assert result.patch["clarification"]["prompt_source"] == "llm_generated"
+    assert result.patch["clarification"]["requested_field"] == "date_range"
 
 
 def test_clarify_offline_fallback_uses_product_language() -> None:

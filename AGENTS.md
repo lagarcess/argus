@@ -174,6 +174,31 @@ Integration guardrails:
   review request can be truthful for minutes and stale on arrival; review
   responses may arrive as inline threads without a summary comment, so check
   the PR's unresolved-thread count, not just for a bot comment.
+- A review loop terminates when one review pass scoped to the latest fix's
+  delta returns clean and the PR's unresolved-thread count is zero. Do not
+  re-request review on an unchanged head, and do not let unchanged code
+  become a new source of findings to keep a loop alive. Findings that arrive
+  after the terminal state are either new scope — spin them out to an owned
+  issue — or declined with one line of rationale; neither reopens the loop.
+- Behavioral acceptance evidence for strategy-surface changes must span the
+  supported strategy-shape space, not one canonical shape. Include at least
+  one non-buy-and-hold strategy (for example DCA with an explicit
+  `recurring_contribution`, or an indicator-driven template) unless the
+  surface is provably strategy-agnostic. This is a macro rule: as new
+  strategy shapes ship, acceptance evidence diversifies with them instead of
+  standardizing on the oldest, fastest-to-drive shape. Facts most likely to
+  be dropped by a defect (contribution cadence, indicator parameters,
+  modeled costs) deserve evidence before facts that rarely break (dates,
+  capital).
+- Test suites must scale by construction, not duplication. Prefer shared
+  fixtures, factories, and pytest parametrization over copy-pasted cases
+  with hardcoded values; derive expected values from the same canonical
+  constants and builders the code under test uses instead of repeating magic
+  literals; use Faker for incidental data. Hardcoded fixture values that
+  encode convenient fictions — weekend trading days, always-present
+  fractional seconds, a single strategy shape — are how green suites hide
+  real breakage: fixture realism is part of test correctness. Style details
+  live in `.agent/rules/testing.md`; this bullet governs when suites grow.
 - After the founder merges a worker PR, the active agent should run
   `.agent/workflows/integration-landing.md` if its checkout and GitHub authority
   permit it. A cloud agent may perform that workflow; the local
@@ -442,6 +467,29 @@ manually juggle backend mode flags for normal work.
   `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` and no live provider
   keys. A clean mocked sweep should be seconds-scale; a run stretching into
   minutes means stop and check for leaked credentials or live provider paths.
+- Local compute rule: local and dev-agent backtests run in-process on the
+  developer machine. Never set `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`
+  or dispatch paid Render workflow tasks (`workflow_proof`,
+  `run_backtest_job`) from local work without explicit founder authorization.
+  Paid Render dispatch belongs to the hosted product, the scheduled canary,
+  and promotion ceremonies; the mode scripts pin it off (dev hard-off, QA
+  default-off with explicit pre-export opt-in).
+
+### Release Acceptance Environment Parity
+
+- Release-candidate acceptance runs on the local candidate stack: local
+  Supabase (Docker) reset to the candidate schema, env overlay layered over
+  untouched canonical files, real provider keys, captcha off. Never run
+  `scripts/qa/write-local-env.sh` in the canonical checkout; it overwrites
+  `.env` and `web/.env.local`.
+- Acceptance includes an environment-parity pass: `.env.example` must be at
+  par with every variable the code reads, and cross-checked against the
+  integration `.env`. Any variable intended live on hosted services must be
+  declared in the release contract (release profile, `render.yaml`, and the
+  `argus-env.sh` contract arrays) before promotion. The promotion agent
+  derives "what needs setting on hosted" from that contract; discovering
+  undeclared live variables at a promotion red gate means acceptance missed
+  this step.
 
 ### Worktree Environment Contract
 

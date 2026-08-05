@@ -112,6 +112,44 @@ describe("auth card consistency", () => {
     }
   });
 
+  test("simulation exhaustion names the authoritative reset time and conversion path", async () => {
+    const html = await renderLocalized(
+      createElement(GuestConversionModal, {
+        isOpen: true,
+        reason: "simulation_limit",
+        initialMode: "signup",
+        publicAccountAccessEnabled: true,
+        resetAt: "2026-08-09T00:00:00.000Z",
+        locale: "en-US",
+        onClose: () => undefined,
+        onAuthenticate: async () => undefined,
+      }),
+    );
+
+    match(html, /This temporary chat has reached today’s simulation limit/);
+    match(html, /It resets on/);
+    match(html, /Aug 9, 2026/);
+    match(html, /Create your account/);
+  });
+
+  test("simulation exhaustion does not promise signup when public access is disabled", async () => {
+    const html = await renderLocalized(
+      createElement(GuestConversionModal, {
+        isOpen: true,
+        reason: "simulation_limit",
+        initialMode: "signup",
+        publicAccountAccessEnabled: false,
+        resetAt: "2026-08-09T00:00:00.000Z",
+        locale: "en-US",
+        onClose: () => undefined,
+        onAuthenticate: async () => undefined,
+      }),
+    );
+
+    match(html, /Request access or sign in to continue/);
+    doesNotMatch(html, /Create an account to continue now/);
+  });
+
   test("forgot password uses the canonical 20px card radius", async () => {
     const html = await renderLocalized(createElement(ForgotPasswordPage));
 

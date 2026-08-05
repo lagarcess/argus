@@ -1598,7 +1598,7 @@ defaults to `true` and controls presentation only. The independent
   and server capabilities with the ordinary profile.
 
 The response includes `user`, `account_kind`, a nullable `guest` summary with
-expiry plus limits `1/10/1/5`, typed `capabilities`, and the
+expiry plus limits `1/10/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
@@ -1854,30 +1854,31 @@ create or increment a counter.
 }
 ```
 
-Guests receive the same typed resource keys with `hour` and `day` set to
-`null`. Their real fixed-lifetime counter is returned as `guest_session`; for
-example, message usage at 8/10 reports `used: 8`, `remaining: 2`, the workspace
-expiry as `period_end`, and `limiting_window: "guest_session"`. A 1/1 guest
-simulation counter reports `available_now: false`. Guest responses never
-fabricate registered hour/day windows.
+Guests receive the same typed resource keys with `hour` and `guest_session`
+set to `null`. Their visitor-owned UTC-day counter is returned as `day`; for
+example, message usage at 8/10 reports `used: 8`, `remaining: 2`, UTC midnight
+as `period_end`, and `limiting_window: "day"`. A 2/2 guest simulation counter
+reports `available_now: false`. The separate workspace-lifetime ceiling is
+enforced during admission and is not misrepresented as another UI reset
+window.
 
 **Allowance semantics:**
 - `messages` reports the `chat_messages` counters; `backtests` reports the
   `backtest_runs` counters charged by unique durable simulation admission.
 - Registered accounts receive both active UTC calendar windows. Guests receive
-  only the fixed `guest_session` window. Every populated window carries the
+  only the visitor-owned UTC `day` window. Every populated window carries the
   exact backend-owned `period_end`; clients may localize its display, but must
   not infer or replace it with a countdown, local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
   concurrent in-flight turns settle, and `remaining` clamps at zero.
 - `available_now` is backend-derived: for registered accounts it is true when
-  both calendar windows have capacity; for guests it follows the one fixed
-  session window.
+  both calendar windows have capacity; for guests it follows the visitor-owned
+  UTC `day` window. The separate workspace ceiling is admission-only.
 - `limiting_window` is backend-derived: registered accounts use the calendar
   window with the smaller remaining capacity (`day` on ties), while guests use
-  `guest_session`. The frontend must not compute, estimate, or hardcode quota
-  truth; it renders these derived fields.
+  `day`. The frontend must not compute, estimate, or hardcode quota truth; it
+  renders these derived fields.
 - The UI emphasizes the daily allowance and reveals the hourly window whenever
   `limiting_window` is `hour` or the hourly window is exhausted.
 
@@ -2460,7 +2461,10 @@ Contract rules:
   latest result; reload hydrates the response and this sidecar from persisted
   message metadata without re-querying any provider.
 - Typed discovery recovery uses the standard `recovery` object with codes
-  `discovery_unavailable`, `discovery_search_failed` (retryable),
+  `discovery_unavailable` (non-retryable when Search is disabled, missing its
+  configured credentials, or receives HTTP 401/403),
+  `discovery_search_failed` (retryable for temporary timeout, transport, other
+  HTTP, malformed-provider-response, extraction, or voicing failures),
   `discovery_no_verified_candidates`, `discovery_suggestions_unavailable`
   (retryable; the model-knowledge path failed), `discovery_limit_reached`
   (retained; an exhausted allowance now falls through to the model-knowledge
@@ -3088,6 +3092,20 @@ suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
 localized sentence a tap submits as an ordinary user turn). The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
+
+When the user selects `change_date_range` or `compare_buy_and_hold`, the web
+client submits a result-presented `refine_strategy` action whose payload carries
+the source `run_id` and `next_experiment_kind`. The backend seeds the follow-up
+from that owner-scoped canonical result draft. Buy-and-hold applies its typed
+patch immediately; a date-range row opens a date-only clarification and applies
+the user's bounded date answer to the anchored draft. All omitted,
+still-applicable owned facts carry forward, including modeled fees, slippage,
+and their provenance. Other Try next kinds keep the ordinary conversational
+turn path. The action label remains localized presentation copy; it is not the
+source of recommendation semantics. The date-only question follows the normal
+model-voiced clarification path with `prompt_source = llm_generated` when the
+clarifier succeeds. Deterministic copy is limited to the existing typed offline
+path and must declare `prompt_source = degraded_fallback`.
 
 ```json
 "next_experiments": {
