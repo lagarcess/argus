@@ -76,8 +76,10 @@ a grounded experiment.
 
 ## 4. Evidence preserved
 
-The strict offline development baseline evaluated 120 operating-equity
-sources:
+The frozen development baseline contains 120 operating-equity source cases.
+Source evidence was available and the pipeline completed for 110 cases; the
+remaining ten are recorded as missing-source-evidence abstentions. Of the 110
+completed cases, 16 suggestions displayed and 94 abstained:
 
 - 16 suggestions displayed: **13.3% coverage**;
 - 16/16 displayed suggestions graded credible-peer-or-better;
@@ -97,7 +99,9 @@ were not completed. It is therefore not preserved as a proven model adapter.
 
 The compact receipt at
 `docs/ops/try-next-peer-research-capsule-v1.json` is the authoritative evidence
-summary for this PR.
+summary for this PR. It retains the grade rubric and every source case's
+displayed grade or abstention disposition, so future probes can reproduce this
+benchmark without depending on the donor branch.
 
 ## 5. Reusable code preserved
 
@@ -128,8 +132,9 @@ wiring, persistence, or UI code.
 
 ## 7. Follow-up workstreams
 
-Each future probe must compare against the frozen 120-company evaluation set
-and preserve the direct-first, broader-credible-second product definition.
+Each future probe must compare against the frozen 120-company evaluation set in
+the capsule receipt and preserve the direct-first, broader-credible-second
+product definition.
 
 1. **Retrieval recall:** determine whether a credible peer appears in the top
    20/50 across a broad provider-resolved operating-equity universe.

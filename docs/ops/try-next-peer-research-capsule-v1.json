@@ -37,6 +37,41 @@
     {"source": "TTWO", "peer": "EA", "grade": 3},
     {"source": "XRAY", "peer": "NVST", "grade": 3}
   ],
+  "grade_rubric": {
+    "3": "direct operating competitor: materially substitutable principal products or services, the same customer buying decision, and material market overlap",
+    "2": "credible operating peer: trustworthy comparable business, but not proven direct competition",
+    "1": "broad neighbor: related but too weak to publish as a peer",
+    "0": "obvious mismatch",
+    "abstention": "no peer was displayed because the source had a conflicting or ambiguous assessment, an abstained shortlist, no eligible candidate, insufficient evidence, or missing source evidence"
+  },
+  "benchmark_case_dispositions": {
+    "displayed": [
+      {"source": "AFRM", "peer": "SEZL", "grade": 3},
+      {"source": "CEG", "peer": "VST", "grade": 3},
+      {"source": "CME", "peer": "CBOE", "grade": 3},
+      {"source": "EA", "peer": "TTWO", "grade": 3},
+      {"source": "EQIX", "peer": "DLR", "grade": 3},
+      {"source": "FSLR", "peer": "TE", "grade": 3},
+      {"source": "HDSN", "peer": "SOLS", "grade": 2},
+      {"source": "LFMD", "peer": "HIMS", "grade": 3},
+      {"source": "PLTR", "peer": "AI", "grade": 3},
+      {"source": "POWL", "peer": "SEI", "grade": 2},
+      {"source": "QCOM", "peer": "SWKS", "grade": 3},
+      {"source": "SMCI", "peer": "HPE", "grade": 3},
+      {"source": "SNPS", "peer": "SVCO", "grade": 3},
+      {"source": "TH", "peer": "CVEO", "grade": 3},
+      {"source": "TTWO", "peer": "EA", "grade": 3},
+      {"source": "XRAY", "peer": "NVST", "grade": 3}
+    ],
+    "abstained": {
+      "shortlist_abstained": ["ADBE", "ASLE", "FAST", "REGN", "RGLD", "ROP", "TEAM"],
+      "ambiguous_eligible_candidates": ["AAL", "ADP", "ARHS", "CDW", "CHTR", "CTSH", "DLTR", "DRVN", "ECPG", "ESQ", "EXC", "EXE", "FISV", "FTAI", "GILD", "HBAN", "HGV", "JAKK", "LOVE", "LULU", "LYTS", "MAR", "MCHP", "NCLH", "NDAQ", "NET", "RGTI", "RIVN", "RKLB", "SAIA", "TLN", "TSCO", "TXN", "UAL", "WLFC", "WMT", "XEL", "ZS"],
+      "conflicting_assessments": ["AAPL", "ABNB", "ADSK", "AMAT", "APP", "ARES", "BKNG", "BKR", "CMCSA", "COIN", "COST", "CPRT", "CRTO", "CSCO", "CTAS", "DDOG", "ENTG", "FELE", "FNKO", "GOOG", "HOOD", "IDXX", "INTU", "KHC", "LFUS", "LPLA", "MDLZ", "MELI", "MNRO", "MSTR", "MZTI", "NVST", "PINS", "PRAA", "PYPL", "ROST", "SOFI", "SSRM", "STGW", "TTD", "WBD", "WSC", "ZD"],
+      "insufficient_evidence": ["CDNS"],
+      "no_eligible_candidate": ["CLNE", "CVCO", "DAKT", "GRPN", "MDB"],
+      "missing_source_evidence": ["AMSC", "EXPE", "FANG", "INTC", "MPWR", "MSFT", "ODFL", "PGC", "SWBI", "TTGT"]
+    }
+  },
   "abstentions": {
     "conflicting_assessments": 43,
     "ambiguous_eligible_candidates": 38,
