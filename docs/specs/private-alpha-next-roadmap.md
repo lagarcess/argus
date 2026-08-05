@@ -333,6 +333,16 @@ Pre-flight is complete and its findings are the promotion agent's brief:
   `cost_ledger_entries`; canary cadence (keep daily vs thin out) is a
   founder decision made from that measured number.
 
+### Next-cycle boards — 2026-08-05
+
+The interim roadmap is complete (promotion executed; #228/#233 closed). The
+next cycle runs on two draft boards pending founder ranking:
+[`next-cycle-stabilization-roadmap.md`](next-cycle-stabilization-roadmap.md)
+(every open issue and PR, alpha-feedback root causes included) and
+[`next-cycle-product-roadmap.md`](next-cycle-product-roadmap.md) (mobile
+readiness spike first, then product memory, personalization, dev-cost
+accounting, sharing, broker handoff, plus the brainstorm-first ledger).
+
 ### Acceptance walk amendment — 2026-08-04 evening
 
 A founder-witnessed acceptance walk on the local candidate stack (guest lane,
