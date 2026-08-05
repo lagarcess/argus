@@ -326,10 +326,10 @@ from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa
     _supported_partial_draft_has_repairable_shape,
     _vague_strategy_start_as_guidance,
 )
+from argus.agent_runtime.interpreter import contract_recovery
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
     FocusedStrategyExtraction,
-    InterpretationContractError,
     LLMAssetMentionExtraction,
     LLMAmbiguousField,
     LLMDateRangeIntent,
@@ -427,59 +427,10 @@ class OpenRouterStructuredInterpreter:
         self.contract = contract
         self.model_name = model_name
         self.last_status: str | None = None
-        # Distinguishes a deterministic contract rejection from an outage, so
-        # the stage can decide whether a retry action could ever succeed.
         self.last_failure_kind: str | None = None
 
     def __call__(self, request: InterpretationRequest) -> StructuredInterpretation | None:
         return asyncio.run(self.ainvoke(request))
-
-    async def _self_corrected_response(
-        self,
-        *,
-        error: InterpretationContractError,
-        messages: list[BaseMessage],
-        candidate_model: str,
-        request: InterpretationRequest,
-        asset_resolution_context: str | None,
-    ) -> LLMInterpretationResponse | None:
-        """Re-ask the same tier once, with the rejection fed back.
-
-        Bounded to a single attempt: a second rejection means the tier cannot
-        satisfy the contract, and repeating it only reproduces the same failure.
-        """
-        corrective_messages = [
-            *_openrouter_wire_messages(messages),
-            {"role": "assistant", "content": "<rejected by runtime validation>"},
-            {"role": "user", "content": error.corrective_hint},
-        ]
-        try:
-            retried = await invoke_openrouter_json_schema(
-                task="interpretation",
-                messages=corrective_messages,
-                schema_model=LLMInterpretationResponse,
-                schema_name="LLMInterpretationResponse",
-                model_name=candidate_model,
-            )
-            if not isinstance(retried, LLMInterpretationResponse):
-                return None
-            return await _response_ready_for_runtime(
-                response=retried,
-                preferred_model=candidate_model,
-                request=request,
-                asset_resolution_context=asset_resolution_context,
-            )
-        except Exception as retry_exc:
-            log_openrouter_failure(
-                task="interpretation",
-                model_name=candidate_model,
-                exc=retry_exc,
-                message=(
-                    "LLM interpretation self-correction failed; "
-                    "trying next configured model"
-                ),
-            )
-            return None
 
     async def ainvoke(
         self, request: InterpretationRequest
@@ -507,7 +458,6 @@ class OpenRouterStructuredInterpreter:
         if self.model_name is None:
             candidate_models = candidate_models or []
             for index, candidate_model in enumerate(candidate_models):
-                started_at = time.perf_counter()
                 try:
                     response = await invoke_openrouter_json_schema(
                         task="interpretation",
@@ -527,45 +477,16 @@ class OpenRouterStructuredInterpreter:
                     self.last_status = "used" if index == 0 else "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
                 except Exception as exc:
-                    log_openrouter_failure(
-                        task="interpretation",
-                        model_name=candidate_model,
-                        exc=exc,
-                        message=(
-                            "Direct LLM interpretation candidate failed; "
-                            "trying next configured model"
-                        ),
+                    recovered = await contract_recovery.handle_candidate_failure(
+                        interpreter=self, exc=exc, is_primary=index == 0, request=request,
+                        candidate_model=candidate_model,
+                        wire_messages=_openrouter_wire_messages(messages),
+                        invoke_schema=invoke_openrouter_json_schema,
+                        ready_for_runtime=_response_ready_for_runtime,
+                        asset_resolution_context=asset_resolution_context,
                     )
-                    if isinstance(exc, InterpretationContractError):
-                        self.last_failure_kind = "contract_rejected"
-                        # The provider call already recorded its own succeeded
-                        # receipt, so without this the turn reads as green.
-                        # Transport and schema failures are not recorded here:
-                        # invoke_openrouter_json_schema already books those.
-                        record_openrouter_route_receipt(
-                            task="interpretation",
-                            model_name=candidate_model,
-                            mode="json_schema",
-                            schema_name="LLMInterpretationResponse",
-                            latency_ms=_elapsed_ms(started_at),
-                            outcome="failed",
-                            failure_mode="interpretation_contract_rejected",
-                        )
-                        corrected = await self._self_corrected_response(
-                            error=exc,
-                            messages=messages,
-                            candidate_model=candidate_model,
-                            request=request,
-                            asset_resolution_context=asset_resolution_context,
-                        )
-                        if corrected is not None:
-                            self.last_failure_kind = None
-                            self.last_status = (
-                                "used" if index == 0 else "fallback_used"
-                            )
-                            return self._to_runtime_interpretation(
-                                corrected, request=request
-                            )
+                    if recovered is not None:
+                        return recovered
             repaired_response = await _plan_pending_artifact_assumption_edit(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
@@ -2636,9 +2557,7 @@ async def _audited_response_ready_for_runtime(
                 preferred_model=preferred_model,
                 request=request,
             )
-        # This branch is only entered when the response already carries
-        # assistant text, so a failed upgrade to a runnable draft leaves the
-        # original answer usable rather than leaving the turn with nothing.
+        # Entered only when the response already carries assistant text.
         return _carry_asset_blocker(response, asset_resolution_context)
     if _response_needs_structured_strategy_repair(response=response):
         repaired_response = await _repair_incomplete_strategy_extraction(
@@ -2695,19 +2614,7 @@ async def _audited_response_ready_for_runtime(
         )
         if planned_response is not None:
             return _carry_asset_blocker(planned_response, asset_resolution_context)
-        raise InterpretationContractError(
-            "OpenRouter interpretation replayed the active artifact without a "
-            "material current-turn update",
-            corrective_hint=(
-                "Your previous response repeated the active strategy without "
-                "applying anything from the current user message. Read the "
-                "current message again and put what it changes into "
-                "candidate_strategy_draft. If the message answers a pending "
-                "question, set that field. If you genuinely cannot tell what it "
-                "changes, set requires_clarification true and ask one specific "
-                "question in assistant_response."
-            ),
-        )
+        raise contract_recovery.replay_without_update_error()
     audited_response = await _audit_stated_run_fields(
         response=response,
         preferred_model=preferred_model,
@@ -2766,17 +2673,7 @@ async def _audited_response_ready_for_runtime(
             preferred_model=preferred_model,
             request=request,
         )
-    raise InterpretationContractError(
-        _incomplete_response_reason(response=response, request=request),
-        corrective_hint=(
-            "Your previous response could not be acted on: it carried neither a "
-            "usable strategy draft nor any assistant_response to show the user. "
-            "Answer again. If the request is something you can express as a "
-            "strategy, fill candidate_strategy_draft. If it is a knowledge or "
-            "out-of-scope request, keep the draft empty and put the answer or "
-            "one specific question in assistant_response."
-        ),
-    )
+    raise contract_recovery.incomplete_response_error(response=response, request=request)
 
 
 async def _ready_active_artifact_edit_planned_response(
@@ -5049,31 +4946,6 @@ def _canonical_asset_universe_from_llm_extraction(
             symbols.append(symbol)
     resolved_asset_class = next(iter(asset_classes)) if len(asset_classes) == 1 else None
     return symbols, resolved_asset_class
-
-
-def _incomplete_response_reason(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> str:
-    # Naming the actual gap: a knowledge turn has no strategy draft to be
-    # incomplete, so reporting one sent readers looking in the wrong place.
-    if response.intent not in {"strategy_drafting", "backtest_execution"}:
-        return (
-            "OpenRouter interpretation returned no assistant response for a "
-            f"{response.intent} turn"
-        )
-    if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
-        return (
-            "OpenRouter interpretation returned a strategy draft the runtime "
-            "cannot execute"
-        )
-    if _request_has_active_strategy_context(request):
-        return (
-            "OpenRouter interpretation returned no update for the active "
-            "strategy and no assistant response"
-        )
-    return "OpenRouter interpretation returned an incomplete strategy draft"
 
 
 def _structured_interpretation_has_required_shape(

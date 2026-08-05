@@ -374,7 +374,8 @@ async def interpret_stage_async(
     if structured_action_result is not None:
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
-    if structured_interpreter is None:
+
+    async def _unavailable(*, retryable: bool = True) -> StageResult:
         return await _interpreter_unavailable_result(
             state=state,
             user=user,
@@ -382,7 +383,11 @@ async def interpret_stage_async(
             current_user_message=state.current_user_message,
             capability_contract=capability_contract,
             selected_thread_metadata=selected_metadata,
+            retryable=retryable,
         )
+
+    if structured_interpreter is None:
+        return await _unavailable()
 
     interpretation = await _call_structured_interpreter(
         structured_interpreter,
@@ -397,15 +402,7 @@ async def interpret_stage_async(
     if interpretation is None:
         logger.debug("Interpret stage structured interpreter returned no result")
         failure_kind = getattr(structured_interpreter, "last_failure_kind", None)
-        return await _interpreter_unavailable_result(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            current_user_message=state.current_user_message,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-            retryable=failure_kind != "contract_rejected",
-        )
+        return await _unavailable(retryable=failure_kind != "contract_rejected")
     pending_response_option_interpretation = (
         _pending_response_option_interpretation_from_typed_selection(
             state=state,

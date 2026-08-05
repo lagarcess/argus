@@ -12,11 +12,13 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.interpreter.contract_recovery import (
+    incomplete_response_error,
+)
 from argus.agent_runtime.llm_interpreter import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
-    _incomplete_response_reason,
     _response_ready_for_runtime,
 )
 from argus.agent_runtime.llm_interpreter_types import InterpretationContractError
@@ -187,9 +189,11 @@ def test_incomplete_reason_names_the_actual_gap() -> None:
         intent="unsupported_or_out_of_scope",
         semantic_turn_act="unsupported_request",
     )
-    reason = _incomplete_response_reason(
-        response=knowledge,
-        request=_bare_request("Ayúdame con estadísticas sobre el S&P 500"),
+    reason = str(
+        incomplete_response_error(
+            response=knowledge,
+            request=_bare_request("Ayúdame con estadísticas sobre el S&P 500"),
+        )
     )
 
     # A knowledge turn has no strategy draft, so it must not be blamed for one.
