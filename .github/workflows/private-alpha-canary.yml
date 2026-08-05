@@ -22,9 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Scheduled workflows start from the repository default branch. The
-          # private-alpha canary must instead validate the integration candidate.
-          ref: ${{ github.event_name == 'schedule' && 'codex/private-alpha-next' || github.sha }}
+          # Render promotes main, so scheduled canaries begin from that branch.
+          # The canary then requires the common deployed SHA to be an ancestor
+          # of this checkout, preserving a hard gate for partial deployments.
+          ref: ${{ github.event_name == 'schedule' && 'main' || github.sha }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5

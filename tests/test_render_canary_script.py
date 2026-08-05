@@ -69,8 +69,9 @@ def test_canary_keeps_browser_and_service_role_secrets_out_of_curl_argv() -> Non
     assert '-H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"' not in source
 
 
-def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
+def test_canary_requires_deployed_sha_ancestor_and_warmup_profile() -> None:
     source = _source(".github/canary-render.sh")
+    workflow_source = _source(".github/workflows/private-alpha-canary.yml")
 
     assert (
         'EXPECT_MODE="${ARGUS_CANARY_EXPECT_MODE:-${ARGUS_WARMUP_EXPECT_MODE:-real-workflow}}"'
@@ -85,9 +86,11 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert '"$SCRIPT_DIR/render-env-sync.sh" api-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" web-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" workflow-version-status' in source
-    assert 'fail_canary "deploy_status" "api_deploy_sha_mismatch"' in source
-    assert 'fail_canary "deploy_status" "web_deploy_sha_mismatch"' in source
-    assert 'fail_canary "deploy_status" "workflow_version_commit_mismatch"' in source
+    assert 'DEPLOYED_SHA="$API_DEPLOY_SHA"' in source
+    assert 'fail_canary "deploy_status" "api_web_deploy_sha_mismatch"' in source
+    assert 'fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"' in source
+    assert 'git merge-base --is-ancestor "$DEPLOYED_SHA" "$CANDIDATE_SHA"' in source
+    assert 'fail_canary "deploy_status" "deployed_sha_not_ancestor_of_candidate"' in source
     assert 'fail_canary "deploy_status" "workflow_version_id_mismatch"' in source
     assert 'fail_canary "release_profile" "release_profile_hash_mismatch"' in source
     assert "extract_warmup_value env_fingerprint" in source
@@ -96,6 +99,51 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert "extract_warmup_value workflow_runtime_proof" in source
     assert "canary_expected_sha=$CANDIDATE_SHA" in source
     assert "canary_checked_out_sha=$CHECKED_OUT_SHA" in source
+    assert "canary_deployed_sha=$DEPLOYED_SHA" in source
+    assert "ref: ${{ github.event_name == 'schedule' && 'main' || github.sha }}" in workflow_source
+    assert "fetch-depth: 0" in workflow_source
+
+
+def test_deployed_sha_ancestor_check_rejects_an_unrelated_deployment(tmp_path: Path) -> None:
+    def git(*args: str) -> str:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return completed.stdout.strip()
+
+    git("init", "--initial-branch=main")
+    git("config", "user.email", "canary@example.com")
+    git("config", "user.name", "Canary Test")
+    (tmp_path / "release.txt").write_text("deployed\n", encoding="utf-8")
+    git("add", "release.txt")
+    git("commit", "-m", "deployed release")
+    deployed_sha = git("rev-parse", "HEAD")
+
+    (tmp_path / "candidate.txt").write_text("canary harness\n", encoding="utf-8")
+    git("add", "candidate.txt")
+    git("commit", "-m", "candidate harness")
+    candidate_sha = git("rev-parse", "HEAD")
+    assert subprocess.run(
+        ["git", "merge-base", "--is-ancestor", deployed_sha, candidate_sha],
+        cwd=tmp_path,
+        check=False,
+    ).returncode == 0
+
+    git("checkout", "--orphan", "partial-deployment")
+    git("rm", "-rf", ".")
+    (tmp_path / "release.txt").write_text("unrelated deployment\n", encoding="utf-8")
+    git("add", "release.txt")
+    git("commit", "-m", "partial deployment")
+    unrelated_deployment_sha = git("rev-parse", "HEAD")
+    assert subprocess.run(
+        ["git", "merge-base", "--is-ancestor", unrelated_deployment_sha, candidate_sha],
+        cwd=tmp_path,
+        check=False,
+    ).returncode == 1
 
 
 def test_canary_language_and_inputs_are_profile_owned() -> None:

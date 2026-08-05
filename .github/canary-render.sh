@@ -116,6 +116,7 @@ WORKFLOW_TASK=""
 REAL_WORKFLOW_TASK=""
 API_DEPLOY_SHA=""
 WEB_DEPLOY_SHA=""
+DEPLOYED_SHA=""
 API_DEPLOY_STATUS=""
 WEB_DEPLOY_STATUS=""
 WORKFLOW_VERSION_COMMIT=""
@@ -236,6 +237,7 @@ build_release_evidence_json() {
   CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
   CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
   CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
+  CANARY_DEPLOYED_SHA="$DEPLOYED_SHA" \
   CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
   CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
   CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
@@ -286,6 +288,7 @@ payload = {
     "real_workflow_task": optional(os.environ["CANARY_REAL_WORKFLOW_TASK"]),
     "api_deploy_sha": optional(os.environ["CANARY_API_DEPLOY_SHA"]),
     "web_deploy_sha": optional(os.environ["CANARY_WEB_DEPLOY_SHA"]),
+    "deployed_sha": optional(os.environ["CANARY_DEPLOYED_SHA"]),
     "api_deploy_status": optional(os.environ["CANARY_API_DEPLOY_STATUS"]),
     "web_deploy_status": optional(os.environ["CANARY_WEB_DEPLOY_STATUS"]),
     "workflow_version_commit": optional(os.environ["CANARY_WORKFLOW_VERSION_COMMIT"]),
@@ -595,26 +598,29 @@ run_deploy_status_probe() {
   if [ "$WEB_DEPLOY_STATUS" != "live" ]; then
     fail_canary "deploy_status" "web_deploy_not_live"
   fi
-  if [ "$API_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
-    fail_canary "deploy_status" "api_deploy_sha_mismatch"
-  fi
-  if [ "$WEB_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
-    fail_canary "deploy_status" "web_deploy_sha_mismatch"
-  fi
   if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
     fail_canary "deploy_status" "workflow_version_not_ready"
   fi
-  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
-    fail_canary "deploy_status" "workflow_version_commit_mismatch"
-  fi
   if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
     fail_canary "deploy_status" "workflow_version_id_mismatch"
+  fi
+  if [ -z "$API_DEPLOY_SHA" ] || [ "$API_DEPLOY_SHA" != "$WEB_DEPLOY_SHA" ]; then
+    fail_canary "deploy_status" "api_web_deploy_sha_mismatch"
+  fi
+  if [ "$API_DEPLOY_SHA" != "$WORKFLOW_VERSION_COMMIT" ]; then
+    fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"
+  fi
+
+  DEPLOYED_SHA="$API_DEPLOY_SHA"
+  if ! git merge-base --is-ancestor "$DEPLOYED_SHA" "$CANDIDATE_SHA"; then
+    fail_canary "deploy_status" "deployed_sha_not_ancestor_of_candidate"
   fi
 
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
+  echo "canary_deployed_sha=$DEPLOYED_SHA"
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
   echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
