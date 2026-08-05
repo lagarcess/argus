@@ -34,8 +34,8 @@ def test_endpoint_matrix_covers_every_service_operation() -> None:
         for name, member in getmembers(MemoryService, predicate=isfunction)
         if not name.startswith("_")
     }
-    assert {call.operation for call in ENDPOINT_CALLS} == public_methods
-    assert len(ENDPOINT_CALLS) == len(public_methods)
+    covered = {call.operation for call in ENDPOINT_CALLS if call.operation is not None}
+    assert covered == public_methods
 
 
 def test_guest_is_denied_before_the_memory_subsystem_while_flag_is_on(

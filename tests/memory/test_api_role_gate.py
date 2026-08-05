@@ -42,6 +42,10 @@ def test_non_developer_roles_see_the_flag_off_state(
             json=call.json,
             headers=memory_api.registered_headers,
         )
+        if call.path.endswith("/availability"):
+            assert response.status_code == 200, (role, response.text)
+            assert response.json() == {"available": False}
+            continue
         assert response.status_code == 404, (call.operation, role, response.text)
         assert response.json()["code"] == "personalization_memory_unavailable"
 

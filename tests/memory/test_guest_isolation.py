@@ -141,6 +141,7 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
             limit=11,
         ),
         "explain": lambda: service.explain(subject, "record-1"),
+        "settings": lambda: service.settings(subject),
         "edit": lambda: service.edit(
             subject,
             "",
@@ -168,6 +169,7 @@ def test_guest_saved_decision_is_denied_before_dependencies() -> None:
         "propose_saved_decision",
         "reset",
         "retrieve",
+        "settings",
     )
     assert tuple(sorted(calls)) == expected_rows
     assert tuple(sorted(public_methods)) == expected_rows

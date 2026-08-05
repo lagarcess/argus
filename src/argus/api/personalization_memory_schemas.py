@@ -11,6 +11,7 @@ contract is deterministic.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -346,6 +347,17 @@ class MemoryExplanationResponse(BaseModel):
             consent_schema_version=explanation.consent_schema_version,
             confirmed_at=explanation.confirmed_at,
         )
+
+
+class MemoryExportDocument(BaseModel):
+    """Readable, portable snapshot of everything memory holds for one owner."""
+
+    format: Literal["argus.personalization-memory-export/v1"] = (
+        "argus.personalization-memory-export/v1"
+    )
+    exported_at: datetime
+    settings: MemoryConsentSettingsResponse
+    records: list[MemoryRecordOut]
 
 
 class MemoryControlResponse(BaseModel):

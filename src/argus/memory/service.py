@@ -579,6 +579,10 @@ class MemoryService:
         )
         return declined
 
+    def settings(self, subject: MemorySubject) -> MemoryConsentSettings:
+        owner = require_registered(subject)
+        return self._store.get_settings(owner)
+
     def inspect(self, subject: MemorySubject) -> tuple[MemoryRecord, ...]:
         owner = require_registered(subject)
         correlation_id = self._safe_correlation_id()

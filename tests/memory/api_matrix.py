@@ -18,7 +18,9 @@ REGISTERED_EMAIL = "registered-memory@example.com"
 
 @dataclass(frozen=True)
 class EndpointCall:
-    operation: str
+    # The MemoryService method this endpoint drives; None for composite or
+    # presentation endpoints that still require the full account gate.
+    operation: str | None
     method: str
     path: str
     json: dict[str, Any] | None = None
@@ -112,5 +114,20 @@ ENDPOINT_CALLS: tuple[EndpointCall, ...] = (
         operation="reset",
         method="POST",
         path="/api/v1/memory/reset",
+    ),
+    EndpointCall(
+        operation="settings",
+        method="GET",
+        path="/api/v1/memory/settings",
+    ),
+    EndpointCall(
+        operation=None,
+        method="GET",
+        path="/api/v1/memory/export",
+    ),
+    EndpointCall(
+        operation=None,
+        method="GET",
+        path="/api/v1/memory/availability",
     ),
 )

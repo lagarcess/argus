@@ -9,9 +9,10 @@ service are both required before the subsystem is reachable at all.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import TypeVar
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
@@ -36,6 +37,7 @@ from argus.api.personalization_memory_schemas import (
     MemoryEditRequest,
     MemoryEnableRequest,
     MemoryExplanationResponse,
+    MemoryExportDocument,
     MemoryProposalResponse,
     MemoryProposeRequest,
     MemoryProposeSavedDecisionRequest,
@@ -245,6 +247,34 @@ def decline_memory_candidate(
 ) -> MemoryDeclineResponse:
     declined = _run(request, lambda: ctx.service.decline(ctx.subject, candidate_id))
     return MemoryDeclineResponse(declined=declined)
+
+
+@router.get("/memory/settings", response_model=MemoryConsentSettingsResponse)
+def memory_settings(
+    request: Request,
+    ctx: MemoryApiContext = Depends(require_memory_api_context),  # noqa: B008
+) -> MemoryConsentSettingsResponse:
+    settings = _run(request, lambda: ctx.service.settings(ctx.subject))
+    return MemoryConsentSettingsResponse.from_domain(settings)
+
+
+@router.get("/memory/export", response_model=MemoryExportDocument)
+def export_memory(
+    request: Request,
+    response: Response,
+    ctx: MemoryApiContext = Depends(require_memory_api_context),  # noqa: B008
+) -> MemoryExportDocument:
+    """Data portability: everything memory holds, in one readable document."""
+    settings = _run(request, lambda: ctx.service.settings(ctx.subject))
+    records = _run(request, lambda: ctx.service.inspect(ctx.subject))
+    response.headers["Content-Disposition"] = (
+        'attachment; filename="argus-memory-export.json"'
+    )
+    return MemoryExportDocument(
+        exported_at=datetime.now(timezone.utc),
+        settings=MemoryConsentSettingsResponse.from_domain(settings),
+        records=[MemoryRecordOut.from_domain(record) for record in records],
+    )
 
 
 @router.get("/memory/records", response_model=MemoryRecordsResponse)

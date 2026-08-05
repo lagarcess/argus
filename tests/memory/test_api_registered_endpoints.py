@@ -49,6 +49,10 @@ def test_flag_off_keeps_every_endpoint_inert_for_registered_users(
             json=call.json,
             headers=memory_api.registered_headers,
         )
+        if call.path.endswith("/availability"):
+            assert response.status_code == 200, response.text
+            assert response.json() == {"available": False}
+            continue
         assert response.status_code == 404, (call.operation, response.text)
         assert response.json()["code"] == "personalization_memory_unavailable"
 
@@ -67,6 +71,10 @@ def test_flag_on_without_a_wired_service_stays_unavailable(
             json=call.json,
             headers=memory_api.registered_headers,
         )
+        if call.path.endswith("/availability"):
+            assert response.status_code == 200, response.text
+            assert response.json() == {"available": False}
+            continue
         assert response.status_code == 404, (call.operation, response.text)
         assert response.json()["code"] == "personalization_memory_unavailable"
 
@@ -158,6 +166,13 @@ def test_registered_lifecycle_end_to_end(
         "enabled_categories": ["workflow_preference"],
     }
 
+    settings = client.get("/api/v1/memory/settings", headers=headers)
+    assert settings.status_code == 200, settings.text
+    assert settings.json() == {
+        "enabled": True,
+        "enabled_categories": ["workflow_preference"],
+    }
+
     proposed = client.post(
         "/api/v1/memory/candidates",
         json={
@@ -242,6 +257,18 @@ def test_registered_lifecycle_end_to_end(
     assert edited.json()["changed"] is True
     assert edited.json()["record"]["revision"] == 2
     assert edited.json()["record"]["label"] == "Assumptions first, always"
+
+    exported = client.get("/api/v1/memory/export", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert exported.headers["content-disposition"] == (
+        'attachment; filename="argus-memory-export.json"'
+    )
+    export_document = exported.json()
+    assert export_document["format"] == "argus.personalization-memory-export/v1"
+    assert export_document["settings"]["enabled"] is True
+    assert [item["id"] for item in export_document["records"]] == [record["id"]]
+    assert export_document["records"][0]["label"] == "Assumptions first, always"
+    assert "owner_id" not in export_document["records"][0]
 
     deleted = client.delete(
         f"/api/v1/memory/records/{record['id']}",
