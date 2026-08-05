@@ -19,6 +19,10 @@ from argus.api.personalization_memory import (
     personalization_memory_unavailable_problem,
     require_memory_api_context,
 )
+from argus.api.personalization_memory_assessor import (
+    assess_memory_content,
+    candidate_content_for_assessment,
+)
 from argus.api.personalization_memory_schemas import (
     MemoryCandidateOut,
     MemoryConfirmationResponse,
@@ -43,17 +47,37 @@ from argus.memory.contracts import (
     MemoryEdit,
     MemoryProposalTrigger,
     SensitivityAssessment,
+    SensitivityStatus,
 )
+from argus.memory.service import SAVED_DECISION_FUTURE_BENEFIT
 from argus.memory.subject import PersonalizationMemoryUnavailable
 
 router = APIRouter(prefix="/api/v1", tags=["personalization-memory"])
 
 
-def _unassessed_sensitivity() -> SensitivityAssessment:
-    # Sensitivity is backend truth: no client claim is accepted, so every API
-    # entry is unassessed and policy fails closed until a backend proposal
-    # boundary assesses content.
-    return SensitivityAssessment()
+def _assessed_or_problem(request: Request, content: str) -> SensitivityAssessment:
+    # Sensitivity is backend truth: content is classified here, never claimed
+    # by the client, and an unavailable classifier fails closed as 503.
+    assessment = assess_memory_content(content)
+    if assessment.status is SensitivityStatus.UNASSESSED:
+        raise problem(
+            request,
+            status_code=503,
+            code="memory_assessment_unavailable",
+            title="Memory Assessment Unavailable",
+            detail="Argus could not review that content right now. Try again.",
+        )
+    return assessment
+
+
+def _restricted_content_problem(request: Request):
+    return problem(
+        request,
+        status_code=400,
+        code="memory_sensitivity_restricted",
+        title="Content Not Storable",
+        detail="Argus keeps sensitive details out of memory.",
+    )
 
 
 ResultT = TypeVar("ResultT")
@@ -98,6 +122,14 @@ def propose_memory(
     request: Request,
     ctx: MemoryApiContext = Depends(require_memory_api_context),  # noqa: B008
 ) -> MemoryProposalResponse:
+    sensitivity = _assessed_or_problem(
+        request,
+        candidate_content_for_assessment(
+            label=payload.label,
+            value=payload.value,
+            future_benefit=payload.future_benefit,
+        ),
+    )
     draft = MemoryCandidateDraft(
         category=payload.category,
         value=payload.value,
@@ -105,7 +137,7 @@ def propose_memory(
         future_benefit=payload.future_benefit,
         provenance=tuple(ref.to_domain() for ref in payload.provenance),
         trigger=MemoryProposalTrigger.EXPLICIT_REQUEST,
-        sensitivity=_unassessed_sensitivity(),
+        sensitivity=sensitivity,
     )
     result = _run(
         request,
@@ -128,12 +160,20 @@ def propose_saved_decision_memory(
     request: Request,
     ctx: MemoryApiContext = Depends(require_memory_api_context),  # noqa: B008
 ) -> MemoryProposalResponse:
+    sensitivity = _assessed_or_problem(
+        request,
+        candidate_content_for_assessment(
+            label=payload.label,
+            value=payload.value,
+            future_benefit=SAVED_DECISION_FUTURE_BENEFIT,
+        ),
+    )
     result = _run(
         request,
         lambda: ctx.service.propose_saved_decision(
             ctx.subject,
             payload.to_source(),
-            sensitivity=_unassessed_sensitivity(),
+            sensitivity=sensitivity,
             context=payload.context,
         ),
     )
@@ -155,12 +195,13 @@ def confirm_memory_candidate(
     request: Request,
     ctx: MemoryApiContext = Depends(require_memory_api_context),  # noqa: B008
 ) -> MemoryConfirmationResponse:
+    # No re-attestation: confirmation applies to exactly the assessed content
+    # that was proposed, and the service preflights the stored assessment.
     result = _run(
         request,
         lambda: ctx.service.confirm(
             ctx.subject,
             candidate_id,
-            sensitivity=_unassessed_sensitivity(),
             context=payload.context,
         ),
     )
@@ -240,10 +281,21 @@ def edit_memory_record(
     request: Request,
     ctx: MemoryApiContext = Depends(require_memory_api_context),  # noqa: B008
 ) -> MemoryControlResponse:
+    edited_parts = [
+        part
+        for part in (
+            f"label: {payload.label}" if payload.label is not None else None,
+            f"value: {payload.value}" if payload.value is not None else None,
+        )
+        if part is not None
+    ]
+    sensitivity = _assessed_or_problem(request, "\n".join(edited_parts))
+    if sensitivity.status is not SensitivityStatus.CLEAR:
+        raise _restricted_content_problem(request)
     edit = MemoryEdit(
         value=payload.value,
         label=payload.label,
-        sensitivity=_unassessed_sensitivity(),
+        sensitivity=sensitivity,
     )
     result = _run(request, lambda: ctx.service.edit(ctx.subject, record_id, edit))
     return MemoryControlResponse.from_domain(result)

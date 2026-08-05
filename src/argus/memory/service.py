@@ -37,7 +37,12 @@ from argus.memory.contracts import (
     SensitivityStatus,
     bind_sensitivity_assessment,
 )
-from argus.memory.policy import RESTRICTED_CONTEXTS, MemoryPolicy, PolicyOutcome
+from argus.memory.policy import (
+    RESTRICTED_CONTEXTS,
+    MemoryPolicy,
+    PolicyDecision,
+    PolicyOutcome,
+)
 from argus.memory.provider import (
     MemoryRetrievalProvider,
     NoOpMemoryProvider,
@@ -128,6 +133,9 @@ class MemoryServiceConfig(BaseModel):
     candidate_ttl: timedelta = Field(default=timedelta(days=1), gt=timedelta(0))
 
 
+SAVED_DECISION_FUTURE_BENEFIT = "Argus can revisit and compare this saved decision later."
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -177,7 +185,7 @@ class MemoryService:
             category=MemoryCategory.EXPLICIT_DECISION_NOTE,
             value=source.value,
             label=source.label,
-            future_benefit="Argus can revisit and compare this saved decision later.",
+            future_benefit=SAVED_DECISION_FUTURE_BENEFIT,
             provenance=(source.provenance,),
             trigger=MemoryProposalTrigger.SAVED_DECISION,
             sensitivity=sensitivity,
@@ -297,14 +305,27 @@ class MemoryService:
         subject: MemorySubject,
         candidate_id: str,
         *,
-        sensitivity: SensitivityAssessment,
+        sensitivity: SensitivityAssessment | None = None,
         context: MemoryOperationContext,
     ) -> ConfirmationResult:
         owner = require_registered(subject)
-        preflight = self._policy.preflight_context(
-            sensitivity=sensitivity,
-            context=context,
-        )
+        # None confirms exactly what was proposed: the stored candidate's own
+        # assessment is preflighted after load, so nothing skips the gate.
+        if sensitivity is not None:
+            preflight = self._policy.preflight_context(
+                sensitivity=sensitivity,
+                context=context,
+            )
+        elif context in RESTRICTED_CONTEXTS:
+            preflight = PolicyDecision(
+                allowed=False,
+                outcome=PolicyOutcome.SUPPRESSED_CONTEXT,
+            )
+        else:
+            preflight = PolicyDecision(
+                allowed=True,
+                outcome=PolicyOutcome.ALLOWED,
+            )
         correlation_id = self._safe_correlation_id()
         if not preflight.allowed:
             self._record_policy_trace(
@@ -362,9 +383,30 @@ class MemoryService:
             )
             return ConfirmationResult(created=False)
 
+        effective_sensitivity = sensitivity
+        if effective_sensitivity is None:
+            stored_preflight = self._policy.preflight_context(
+                sensitivity=candidate.sensitivity,
+                context=context,
+            )
+            if not stored_preflight.allowed:
+                self._record_policy_trace(
+                    correlation_id,
+                    MemoryOperation.CONFIRM,
+                    stored_preflight.outcome,
+                )
+                self._emit_event(
+                    correlation_id,
+                    MemoryOperation.CONFIRM,
+                    MemoryOutcome.SUPPRESSED,
+                    category=candidate.category,
+                )
+                return ConfirmationResult(created=False)
+            effective_sensitivity = candidate.sensitivity
+
         try:
             bound_sensitivity = bind_sensitivity_assessment(
-                sensitivity,
+                effective_sensitivity,
                 category=candidate.category,
                 label=candidate.source.label,
                 value=candidate.source.value,

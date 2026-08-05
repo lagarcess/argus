@@ -118,6 +118,7 @@ def test_consumer_detection_covers_all_python_import_forms() -> None:
 AUTHORIZED_API_CONSUMERS = frozenset(
     {
         "src/argus/api/personalization_memory.py",
+        "src/argus/api/personalization_memory_assessor.py",
         "src/argus/api/personalization_memory_schemas.py",
         "src/argus/api/routers/personalization_memory.py",
     }

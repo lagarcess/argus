@@ -26,6 +26,10 @@ _AUTH_ENV_VARS = (
     "NEXT_PUBLIC_GUEST_ACCESS_ENABLED",
     "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED",
     "ARGUS_ENABLE_PERSONALIZATION_MEMORY",
+    # Hermeticity: the default classifier must see no key so it skips, never
+    # calls the network, and the assessor fails closed unless a test injects
+    # a fake.
+    "OPENROUTER_API_KEY",
 )
 
 
@@ -43,6 +47,9 @@ def memory_api(monkeypatch: pytest.MonkeyPatch):
     from argus.api import state as api_state
     from argus.api.main import app
     from argus.api.personalization_memory import configure_memory_service
+    from argus.api.personalization_memory_assessor import (
+        configure_sensitivity_classifier,
+    )
     from argus.api.schemas import OnboardingState, User
     from argus.domain.guest_workspaces import GuestWorkspace
     from argus.domain.store import utcnow
@@ -108,6 +115,7 @@ def memory_api(monkeypatch: pytest.MonkeyPatch):
     )
 
     configure_memory_service(None)
+    configure_sensitivity_classifier(None)
     try:
         yield MemoryApiHarness(
             client=TestClient(app),
@@ -116,3 +124,4 @@ def memory_api(monkeypatch: pytest.MonkeyPatch):
         )
     finally:
         configure_memory_service(None)
+        configure_sensitivity_classifier(None)
