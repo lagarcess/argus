@@ -3623,15 +3623,18 @@ def test_search_actions_anchor_latest_run_without_generation_or_auto_execution(
         item for item in response.json()["items"] if item["type"] == "conversation"
     )
     retest, change_decision = conversation["dossier"]["actions"]
-    # The dossier projects identity and policy only. The executable setup and
-    # the old generated prompt are gone, so the obsolete send-the-prose path
-    # cannot be driven from this payload even if a client tried.
+    # The dossier projects identity, policy, and server-owned pre-click
+    # eligibility. The executable setup and old generated prompt are gone, so
+    # the obsolete send-the-prose path cannot be driven from this payload.
     assert retest == {
         "type": "retest_run",
         "source_run_id": run.id,
         "run_label": "Annual GLD buy and hold",
         "window_policy": "preserve_start_ending_latest_available",
         "contract_version": "argus_retest_run/v2",
+        "state": "new_data_available",
+        "reason_code": None,
+        "repair": None,
     }
     assert "canonical_setup" not in retest
     assert "send_text" not in retest

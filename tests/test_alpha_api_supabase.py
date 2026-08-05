@@ -3307,14 +3307,17 @@ def test_search_supabase_projects_localized_actions_without_generation(
     assert response.status_code == 200
     conversation = response.json()["items"][0]
     retest, decision = conversation["dossier"]["actions"]
-    # Localization no longer rides a generated prompt: the action is identity
-    # and policy only, and the confirmation card carries the localized copy.
+    # Localization no longer rides a generated prompt: the action carries
+    # identity, policy, and server-owned pre-click eligibility only.
     assert retest == {
         "type": "retest_run",
         "source_run_id": "run-action-es",
         "run_label": retest["run_label"],
         "window_policy": "preserve_start_ending_latest_available",
         "contract_version": "argus_retest_run/v2",
+        "state": "new_data_available",
+        "reason_code": None,
+        "repair": None,
     }
     assert decision == {
         "type": "decision",
