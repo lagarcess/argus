@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from scripts.market_data.offline_peer_selection import (
@@ -136,6 +138,31 @@ def test_duplicate_candidate_identity_fails_closed() -> None:
         selected_candidate_id=None,
         decision="abstained",
         decision_code="malformed_duplicate_candidate_id",
+    )
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        object(),
+        SimpleNamespace(
+            candidate_id="peer:invalid-rank",
+            relationship="direct_competitor",
+            retrieval_rank=0,
+            evidence_sufficient=True,
+            publishable=True,
+            family_status="clear",
+        ),
+    ],
+    ids=["non-candidate", "candidate-shaped-invalid-rank"],
+)
+def test_select_peer_abstains_for_non_candidate_boundary_input(
+    candidate: object,
+) -> None:
+    assert select_peer([candidate]) == PeerSelection(
+        selected_candidate_id=None,
+        decision="abstained",
+        decision_code="malformed_candidate",
     )
 
 

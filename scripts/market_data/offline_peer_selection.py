@@ -64,6 +64,9 @@ class PeerSelection:
 def select_peer(candidates: Sequence[PeerCandidate]) -> PeerSelection:
     """Prefer a direct competitor, using frozen retrieval rank within a class."""
 
+    if any(not isinstance(candidate, PeerCandidate) for candidate in candidates):
+        return PeerSelection(None, "abstained", "malformed_candidate")
+
     candidate_ids = [candidate.candidate_id for candidate in candidates]
     if len(candidate_ids) != len(set(candidate_ids)):
         return PeerSelection(
