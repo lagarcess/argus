@@ -187,6 +187,12 @@ import {
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
+import { memoryRecallsFromValue } from "@/lib/memory-recalls";
+import {
+  isConversationMemoryOptOut as readConversationMemoryOptOut,
+  memoryAvailable as fetchMemoryAvailable,
+  setConversationMemoryOptOut as persistConversationMemoryOptOut,
+} from "@/lib/memory-privacy";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -250,6 +256,8 @@ export default function ChatInterface() {
   }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [memoryControlsAvailable, setMemoryControlsAvailable] = useState(false);
+  const [conversationMemoryOptOut, setConversationMemoryOptOut] = useState(false);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -963,6 +971,33 @@ export default function ChatInterface() {
     clearResumeDecision,
   } = guestExperience;
 
+  // Memory chrome stays invisible unless the backend exposes it.
+  useEffect(() => {
+    if (isGuest) return;
+    let isCurrent = true;
+    void fetchMemoryAvailable().then((available) => {
+      if (isCurrent) setMemoryControlsAvailable(available);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [isGuest]);
+
+  useEffect(() => {
+    setConversationMemoryOptOut(
+      conversationId ? readConversationMemoryOptOut(conversationId) : false,
+    );
+  }, [conversationId]);
+
+  const handleToggleMemoryOptOut = useCallback(() => {
+    if (!conversationId) return;
+    setConversationMemoryOptOut((current) => {
+      const next = !current;
+      persistConversationMemoryOptOut(conversationId, next);
+      return next;
+    });
+  }, [conversationId]);
+
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
       action.labelKey
@@ -1310,6 +1345,9 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
+        const finalMemoryRecalls = memoryRecallsFromValue(
+          (finalPayload as Record<string, unknown>).memory_recalls,
+        );
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1393,6 +1431,7 @@ export default function ChatInterface() {
                   actions: resultActions,
                   nextExperiments: finalNextExperiments,
                   savedStrategyId: card.savedStrategyId,
+                  memoryRecalls: finalMemoryRecalls,
                 }),
               ),
             ),
@@ -1434,6 +1473,7 @@ export default function ChatInterface() {
                   strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
+                  memoryRecalls: finalMemoryRecalls,
                   contentPresentation:
                     action?.type === "show_breakdown"
                       ? "result_breakdown"
@@ -1453,6 +1493,7 @@ export default function ChatInterface() {
                 strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
+                memoryRecalls: finalMemoryRecalls,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"
@@ -2376,6 +2417,9 @@ export default function ChatInterface() {
                   onTogglePin={() => void handleToggleHeaderPin()}
                   isDeleting={isDeletingHeaderChat}
                   onRequestDelete={() => handleRequestHeaderDelete()}
+                  memoryControlsAvailable={memoryControlsAvailable}
+                  memoryOptOut={conversationMemoryOptOut}
+                  onToggleMemoryOptOut={handleToggleMemoryOptOut}
                 />
               ) : null}
               {strategiesEnabled && currentView === "strategies" && (
@@ -2470,6 +2514,9 @@ export default function ChatInterface() {
                             isLatest={isLatestAi}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
+                            memoryProposalEnabled={
+                              memoryControlsAvailable && !conversationMemoryOptOut
+                            }
                             nextMovesEnabled={nextMovesEnabled}
                             turnInFlight={turnInFlight}
                             isGuest={isGuest}

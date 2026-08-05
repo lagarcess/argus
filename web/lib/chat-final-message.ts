@@ -4,6 +4,7 @@ import type {
   Message,
 } from "@/components/chat/types";
 import type { RecoveryDisplay } from "./chat-recovery-display";
+import type { MemoryRecallItem } from "./memory-recalls";
 
 type MergeFinalTextOptions = {
   assistantId: string;
@@ -15,6 +16,7 @@ type MergeFinalTextOptions = {
   strategyPathContext?: Message["strategyPathContext"];
   assistantRecoveryCode?: string | null;
   discovery?: DiscoverySidecar | null;
+  memoryRecalls?: MemoryRecallItem[] | null;
 };
 
 export function mergeFinalTextMessage(
@@ -29,6 +31,7 @@ export function mergeFinalTextMessage(
     strategyPathContext,
     assistantRecoveryCode,
     discovery,
+    memoryRecalls,
   }: MergeFinalTextOptions,
 ): Message {
   if (message.id !== assistantId) {
@@ -46,5 +49,6 @@ export function mergeFinalTextMessage(
       strategyPathContext ?? message.strategyPathContext,
     assistantRecoveryCode: assistantRecoveryCode ?? message.assistantRecoveryCode,
     discovery: discovery ?? message.discovery,
+    memoryRecalls: memoryRecalls ?? message.memoryRecalls,
   };
 }

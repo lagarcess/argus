@@ -6,6 +6,7 @@ import type {
 } from "@/lib/argus-api";
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
+import type { MemoryRecallItem } from "@/lib/memory-recalls";
 
 export type StrategyResultMetric = {
   label: string;
@@ -276,6 +277,8 @@ export type Message = {
   assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;
+  /** Backend post-turn saved-decision recalls; rendered as context only. */
+  memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-owned structured context for a retest receipt turn. */
   retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
