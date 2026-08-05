@@ -85,9 +85,15 @@ def test_memory_modules_have_no_network_environment_or_shared_runtime_imports() 
         "dotenv",
         "os",
     }
+    # One deliberate exception: service.py reads a single default-off env var
+    # (ARGUS_ENABLE_PERSONALIZATION_MEMORY) as this subsystem's own activation
+    # kill switch. No other env, network, or shared-runtime coupling is allowed.
+    allowed_env_imports = {("src/argus/memory/service.py", "os")}
     violations: list[tuple[str, str]] = []
     for path in sorted(MEMORY_ROOT.rglob("*.py")):
         for imported in _imports(path):
+            if (str(path), imported) in allowed_env_imports:
+                continue
             if any(
                 imported == root or imported.startswith(f"{root}.")
                 for root in forbidden_roots

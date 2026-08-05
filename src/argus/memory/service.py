@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import re
 import time
 from collections.abc import Callable, Iterable, Mapping
@@ -109,10 +110,21 @@ class _ProviderCallOutcome(Generic[ProviderResultT]):
     reported_cost_usd: Decimal | None = None
 
 
+def _personalization_memory_feature_enabled() -> bool:
+    # Off by default; this subsystem has no app wiring yet, so a future
+    # caller must opt in explicitly once it integrates the service.
+    return os.getenv("ARGUS_ENABLE_PERSONALIZATION_MEMORY", "").strip().lower() in {
+        "true",
+        "1",
+        "on",
+        "yes",
+    }
+
+
 class MemoryServiceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    available: bool = False
+    available: bool = Field(default_factory=_personalization_memory_feature_enabled)
     candidate_ttl: timedelta = Field(default=timedelta(days=1), gt=timedelta(0))
 
 
