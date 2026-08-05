@@ -1405,6 +1405,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/memory/availability:
+    get:
+      tags:
+      - personalization-memory
+      description: 'Presentation probe: lets the client hide the surface entirely.
+
+
+        Never touches the memory subsystem; a guest is denied like everywhere
+
+        else and a non-exposed registered account simply sees available=false.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryAvailabilityResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/memory/candidates:
     post:
       tags:
@@ -1585,6 +1610,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/memory/export:
+    get:
+      tags:
+      - personalization-memory
+      description: 'Data portability: everything memory holds, in one readable document.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryExportDocument'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/memory/records:
     get:
       tags:
@@ -1744,6 +1789,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/settings:
+    get:
+      tags:
+      - personalization-memory
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryConsentSettingsResponse'
         '503':
           $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
@@ -2431,6 +2495,9 @@ components:
             - en
             - es-419
           - type: 'null'
+        memory_opt_out:
+          type: boolean
+          default: false
       type: object
       required:
       - conversation_id
@@ -3191,6 +3258,13 @@ components:
       - email
       - password
       - captcha_token
+    MemoryAvailabilityResponse:
+      properties:
+        available:
+          type: boolean
+      type: object
+      required:
+      - available
     MemoryCandidateOut:
       properties:
         id:
@@ -3388,6 +3462,27 @@ components:
       - consent_receipt_id
       - consent_schema_version
       - confirmed_at
+    MemoryExportDocument:
+      properties:
+        format:
+          type: string
+          const: argus.personalization-memory-export/v1
+          default: argus.personalization-memory-export/v1
+        exported_at:
+          type: string
+          format: date-time
+        settings:
+          $ref: '#/components/schemas/MemoryConsentSettingsResponse'
+        records:
+          items:
+            $ref: '#/components/schemas/MemoryRecordOut'
+          type: array
+      type: object
+      required:
+      - exported_at
+      - settings
+      - records
+      description: Readable, portable snapshot of everything memory holds for one owner.
     MemoryOperationContext:
       type: string
       enum:
