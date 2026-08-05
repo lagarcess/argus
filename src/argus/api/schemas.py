@@ -856,6 +856,9 @@ class ChatStreamRequest(BaseModel):
         max_length=CHAT_STREAM_MAX_MENTIONS,
     )
     language: Language | None = None
+    # Temporary chat: the client may opt a conversation out of memory. Opting
+    # out only ever disables recall and proposals; it grants nothing.
+    memory_opt_out: bool = False
 
     @model_validator(mode="after")
     def require_message_or_action(self) -> "ChatStreamRequest":

@@ -121,6 +121,9 @@ AUTHORIZED_API_CONSUMERS = frozenset(
         "src/argus/api/personalization_memory_assessor.py",
         "src/argus/api/personalization_memory_schemas.py",
         "src/argus/api/routers/personalization_memory.py",
+        # Post-turn recall annotation: the one authorized runtime-adjacent
+        # consumer; interpretation, routing, and simulation stay closed.
+        "src/argus/api/chat/memory_recall.py",
     }
 )
 
