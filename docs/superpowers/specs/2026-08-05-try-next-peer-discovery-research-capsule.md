@@ -215,3 +215,20 @@ Promotion-quality evidence remains:
 - The current grounded discovery path is the lowest-friction long-tail fallback
   because it already owns explicit peer discovery, provider verification,
   Guest parity, localization, and source presentation.
+
+## Addendum: 2026-08-05 founder lock — next pickup point
+
+- **Next step is section 7, item 1 (retrieval recall), not runtime work.** The
+  proven selector and the 120-company benchmark only establish that the final
+  choice logic is sound; they say nothing about whether a credible peer is
+  even retrievable at broader scale. Before any second-stage judge, abstention
+  calibration, frozen catalog, or runtime slice work starts, determine whether
+  a credible peer appears in the top 20/50 across a broad provider-resolved
+  operating-equity universe.
+- Items 2-6 in section 7 (second-stage judge, abstention calibration, frozen
+  catalog, runtime slice, product proof) remain explicitly sequenced after
+  item 1, in the order already written above — this addendum does not
+  reorder them, it only confirms item 1 is the pickup point.
+- This PR (#384) remains Draft and unmerged. It stays a research-only,
+  no-runtime-change evidence record; this addendum records the next pickup
+  point, not a scope or merge authorization.
