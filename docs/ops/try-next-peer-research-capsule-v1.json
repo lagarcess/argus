@@ -1,0 +1,60 @@
+{
+  "schema_version": "argus_try_next_peer_research_capsule/v1",
+  "recorded_at": "2026-08-05",
+  "integration_base": "54a18b733f10fbecbf750bafc7421fa36de90264",
+  "donor_head": "f464c0478e9d4fb5fe387ad3f37cab94d06df0c6",
+  "source_receipt": "docs/ops/offline-peer-joint-development-v2.json@f464c0478e9d4fb5fe387ad3f37cab94d06df0c6",
+  "classification": "research_signal_only",
+  "runtime_authorized": false,
+  "quality": {
+    "source_count": 120,
+    "displayed_count": 16,
+    "coverage_rate": 0.13333333333333333,
+    "credible_or_better_count": 16,
+    "credible_or_better_rate": 1.0,
+    "direct_competitor_count": 14,
+    "direct_competitor_rate": 0.875,
+    "broader_credible_peer_count": 2,
+    "obvious_mismatch_count": 0,
+    "independent_reviewer_count_per_pair": 2,
+    "reviewer_disagreement_count": 0
+  },
+  "displayed_pairs": [
+    {"source": "AFRM", "peer": "SEZL", "grade": 3},
+    {"source": "CEG", "peer": "VST", "grade": 3},
+    {"source": "CME", "peer": "CBOE", "grade": 3},
+    {"source": "EA", "peer": "TTWO", "grade": 3},
+    {"source": "EQIX", "peer": "DLR", "grade": 3},
+    {"source": "FSLR", "peer": "TE", "grade": 3},
+    {"source": "HDSN", "peer": "SOLS", "grade": 2},
+    {"source": "LFMD", "peer": "HIMS", "grade": 3},
+    {"source": "PLTR", "peer": "AI", "grade": 3},
+    {"source": "POWL", "peer": "SEI", "grade": 2},
+    {"source": "QCOM", "peer": "SWKS", "grade": 3},
+    {"source": "SMCI", "peer": "HPE", "grade": 3},
+    {"source": "SNPS", "peer": "SVCO", "grade": 3},
+    {"source": "TH", "peer": "CVEO", "grade": 3},
+    {"source": "TTWO", "peer": "EA", "grade": 3},
+    {"source": "XRAY", "peer": "NVST", "grade": 3}
+  ],
+  "abstentions": {
+    "conflicting_assessments": 43,
+    "ambiguous_eligible_candidates": 38,
+    "shortlist_abstained": 7,
+    "no_eligible_candidate": 5,
+    "insufficient_evidence": 1,
+    "missing_source_evidence": 10
+  },
+  "claim_limits": [
+    "The strict pipeline demonstrated precision on 16 displayed pairs, not production coverage.",
+    "The candidate-isolated contender was unit-tested but never quality-benchmarked.",
+    "No frozen catalog, runtime integration, Guest parity QA, localization QA, or live provider QA was completed."
+  ],
+  "excluded_from_capsule": [
+    "raw SEC filings and extracted filing bodies",
+    "local model and embedding caches",
+    "failed model-judge variants and response caches",
+    "unbenchmarked model adapters",
+    "runtime, UI, API, database, migration, and hosted changes"
+  ]
+}

@@ -646,6 +646,11 @@ slices below describe delivered scope, not pending work.
 
 ### Design-Only Until Later
 
+- Try next peer/discovery continuation (research capsule, 2026-08-05): preserve
+  a trusted frozen-peer fast path plus an explicit on-tap discovery fallback,
+  without restoring the retired deterministic prose block or integrating the
+  stale research branch. See
+  `docs/superpowers/specs/2026-08-05-try-next-peer-discovery-research-capsule.md`.
 - Guided first-run tour (alpha-user suggested, 2026-08-05): not a wizard; a
   fluid one-click layer that makes Argus aware of where it is leading you.
   Founder wants a worth-it brainstorm before any build.
