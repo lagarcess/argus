@@ -435,3 +435,29 @@ the `argus-qa` stack remain untouched.
   supplied the earlier incubation hypothesis and negative-test outline. Its
   unverified-freshness caveat is now resolved, while its implementation
   readiness claim is rejected in favor of current roadmap and Guest truth.
+
+## Addendum: 2026-08-05 founder lock — retrieval provider and next stage
+
+- **Retrieval provider decision (locked):** the semantic-recall/retrieval layer
+  behind the existing `MemoryProvider` protocol (`src/argus/memory/provider.py`)
+  will be **Mem0** (OSS/self-hosted), not a hand-built Supabase pgvector +
+  Perplexity embeddings pipeline. Mem0 owns fact extraction, deduplication,
+  conflict resolution, embedding generation (default OpenAI, swappable), and
+  user/agent/session-scoped retrieval internally; Argus is only responsible for
+  calling `.add()` on new confirmed content and `.search()`/`.get()` at
+  retrieval time. This matches `docs/specs/private-alpha-next-decision-memo.md`
+  §5.6's recommended architecture (Supabase product tables as canonical truth
+  -> Mem0/retrieval layer for semantic recall -> LangGraph runtime consuming
+  memories as context, never as source-of-truth) and requires no change to the
+  domain/service layer built in this persistence checkpoint — only a future
+  provider implementation behind the existing protocol seam.
+- **Next authorized stage:** `codex/personalization-memory-incubation-api-v1`,
+  fresh-ported from the then-current integration head at pickup time (per the
+  sequential incubation pattern above — not built on top of this branch).
+  Scope: auth-gated API endpoints deriving `RegisteredMemoryOwner` from a
+  verified session, wired to the existing `MemoryService`. Still closed at
+  that stage: live provider call (Mem0 wiring), runtime/UI hooks, Data
+  Controls surface, deployment, tester exposure.
+- This PR (#307) remains Draft and unmerged. Execution authority is still
+  none; this addendum records a design decision and the next pickup point,
+  not a merge or scope authorization.
