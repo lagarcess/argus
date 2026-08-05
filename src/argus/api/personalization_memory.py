@@ -92,6 +92,57 @@ class MemoryApiContext:
     subject: MemorySubject
 
 
+def start_personalization_memory(app) -> None:  # noqa: ANN001
+    """Construct the process service at startup; flag off constructs nothing.
+
+    Store choice follows persistence mode: the canonical Postgres adapter on
+    Supabase deployments, the deterministic in-memory store in dev memory
+    mode. Any construction failure leaves the surface unavailable instead of
+    blocking boot.
+    """
+
+    if not personalization_memory_enabled():
+        configure_memory_service(None)
+        return
+    try:
+        if api_state.PERSISTENCE_MODE == "supabase" and api_state.DATABASE_URL:
+            from psycopg_pool import ConnectionPool
+
+            from argus.memory.postgres_store import PostgresCanonicalMemoryStore
+
+            pool = ConnectionPool(
+                api_state.DATABASE_URL,
+                min_size=0,
+                max_size=4,
+                open=True,
+            )
+            app.state.personalization_memory_pool = pool
+            configure_memory_service(
+                MemoryService(store=PostgresCanonicalMemoryStore(pool))
+            )
+            return
+        from argus.memory.store import InMemoryCanonicalMemoryStore
+
+        configure_memory_service(MemoryService(store=InMemoryCanonicalMemoryStore()))
+    except Exception as exc:
+        logger.warning(
+            "Personalization memory service construction failed; surface stays off",
+            failure_mode=type(exc).__name__,
+        )
+        configure_memory_service(None)
+
+
+def stop_personalization_memory(app) -> None:  # noqa: ANN001
+    configure_memory_service(None)
+    pool = getattr(app.state, "personalization_memory_pool", None)
+    if pool is not None:
+        try:
+            pool.close()
+        except Exception:
+            logger.warning("Personalization memory pool close failed")
+        app.state.personalization_memory_pool = None
+
+
 def personalization_memory_unavailable_problem(request: Request) -> HTTPException:
     return problem(
         request,
