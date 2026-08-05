@@ -5,6 +5,8 @@ import os
 import stat
 import subprocess
 import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from scripts.ops.canary_capture_replay import replay_capture
@@ -176,7 +178,7 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
 
 def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     shell_source = _source(".github/canary-render.sh")
-    runner_source = _source(".github/canary-browser.sh")
+    probe_source = _source(".github/canary-requested-signup-denial.py")
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
 
     assert '"role": "requested"' in shell_source
@@ -193,14 +195,85 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
         "promote_requested_signup_allowlist"
     ) < main_body.index("run_browser_canary")
 
-    assert "ARGUS_CANARY_BROWSER_PHASE" in runner_source
-    assert "access-denial" in runner_source
-    assert "full" in runner_source
-    assert "env -u SUPABASE_SERVICE_ROLE_KEY" in runner_source
-    assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in runner_source
-    assert 'ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="' not in runner_source
-    assert "if ! env -u SUPABASE_SERVICE_ROLE_KEY" in shell_source
-    assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
+    assert "canary-requested-signup-denial.py" in shell_source
+    assert 'fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"' in shell_source
+    assert "TEST_CAPTCHA_TOKEN = \"XXXX.DUMMY.TOKEN.XXXX\"" in probe_source
+    assert "for attempt in (1, 2):" in probe_source
+    assert "auth_signup_failed" in probe_source
+
+
+def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass(
+    tmp_path: Path,
+) -> None:
+    requests: list[dict[str, object]] = []
+
+    class ProbeHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            length = int(self.headers["Content-Length"])
+            requests.append(
+                {
+                    "path": self.path,
+                    "payload": json.loads(self.rfile.read(length)),
+                }
+            )
+            if len(requests) == 1:
+                self.send_response(503)
+                self.end_headers()
+                self.wfile.write(b'{"code":"internal_error"}')
+                return
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b'{"code":"auth_signup_failed"}')
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), ProbeHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run(
+            [sys.executable, ".github/canary-requested-signup-denial.py"],
+            cwd=ROOT,
+            env={
+                **os.environ,
+                "CANARY_REQUESTED_SIGNUP_DENIAL_API_URL": (
+                    f"http://127.0.0.1:{server.server_port}"
+                ),
+                "CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL": "delivered@resend.dev",
+                "CANARY_REQUESTED_SIGNUP_DENIAL_PASSWORD": "not-a-real-password",
+                "CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE": "es-419",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "canary_probe=requested_signup_denial attempt=1 result=unexpected_response" in result.stdout
+    assert "canary_probe=requested_signup_denial attempt=2 result=passed" in result.stdout
+    assert [request["path"] for request in requests] == [
+        "/api/v1/auth/signup",
+        "/api/v1/auth/signup",
+    ]
+    assert [request["payload"] for request in requests] == [
+        {
+            "email": "delivered@resend.dev",
+            "password": "not-a-real-password",
+            "captcha_token": "XXXX.DUMMY.TOKEN.XXXX",
+            "language": "es-419",
+        },
+        {
+            "email": "delivered@resend.dev",
+            "password": "not-a-real-password",
+            "captcha_token": "XXXX.DUMMY.TOKEN.XXXX",
+            "language": "es-419",
+        },
+    ]
 
 
 def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:

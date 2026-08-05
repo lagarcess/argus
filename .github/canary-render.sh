@@ -690,28 +690,24 @@ validate_release_evidence_contract() {
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
 }
 
-run_browser_canary_phase() {
-  local phase="$1"
+run_browser_canary() {
   if ! env -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
     ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
-    ARGUS_CANARY_BROWSER_PHASE="$phase" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
     "$SCRIPT_DIR/canary-browser.sh"; then
-    return 1
-  fi
-}
-
-run_requested_signup_denial_canary() {
-  run_browser_canary_phase "access-denial"
-}
-
-run_browser_canary() {
-  if ! run_browser_canary_phase "full"; then
     BROWSER_CANARY_STATUS="failed"
     return 1
   fi
   BROWSER_CANARY_STATUS="passed"
+}
+
+run_requested_signup_denial_canary() {
+  CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_PASSWORD="$PASSWORD" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
 }
 
 verify_browser_identity_handoff() {
@@ -1485,10 +1481,10 @@ if ! prepare_signup_identity; then
   fail_canary "auth" "canary_signup_identity_setup_failed"
 fi
 if ! run_requested_signup_denial_canary; then
-  fail_canary "auth" "requested_signup_was_not_denied"
+  fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"
 fi
 if ! verify_no_signup_auth_identity; then
-  fail_canary "auth" "requested_signup_created_auth_identity"
+  fail_canary "requested_signup_denial" "requested_signup_created_auth_identity"
 fi
 if ! promote_requested_signup_allowlist; then
   fail_canary "auth" "requested_signup_promotion_failed"
