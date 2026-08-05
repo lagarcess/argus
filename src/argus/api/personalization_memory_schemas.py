@@ -1,8 +1,11 @@
 """API request and response models for personalization-memory endpoints.
 
-Requests accept only client-decidable fields; triggers, policy versions, and
-content digests are owned by the backend. Responses never echo owner ids and
-serialize category scopes as sorted lists so the contract is deterministic.
+Requests accept only client-decidable fields; triggers, sensitivity, policy
+versions, and content digests are owned by the backend. No request carries a
+sensitivity claim: every API entry is unassessed until a backend proposal
+boundary assesses content, and policy suppresses unassessed input. Responses
+never echo owner ids and serialize category scopes as sorted lists so the
+contract is deterministic.
 """
 
 from __future__ import annotations
@@ -58,24 +61,6 @@ class MemoryProvenanceIn(BaseModel):
         )
 
 
-class MemorySensitivityIn(BaseModel):
-    """Typed sensitivity claim; policy suppresses anything but a clear result."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    status: SensitivityStatus
-    flags: list[MemorySensitivityFlag] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def _validate_flags(self) -> "MemorySensitivityIn":
-        if self.flags and self.status is not SensitivityStatus.RESTRICTED:
-            raise ValueError("sensitivity flags require restricted status")
-        return self
-
-    def to_domain(self) -> SensitivityAssessment:
-        return SensitivityAssessment(status=self.status, flags=frozenset(self.flags))
-
-
 class MemoryEnableRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -96,7 +81,6 @@ class MemoryProposeRequest(BaseModel):
         max_length=MAX_MEMORY_FUTURE_BENEFIT_LENGTH,
     )
     provenance: list[MemoryProvenanceIn] = Field(min_length=1)
-    sensitivity: MemorySensitivityIn
     context: MemoryOperationContext = MemoryOperationContext.ORDINARY
 
 
@@ -106,7 +90,6 @@ class MemoryProposeSavedDecisionRequest(BaseModel):
     label: str = Field(min_length=1, max_length=120)
     value: str = Field(min_length=1, max_length=MAX_MEMORY_VALUE_LENGTH)
     provenance: MemoryProvenanceIn
-    sensitivity: MemorySensitivityIn
     context: MemoryOperationContext = MemoryOperationContext.ORDINARY
 
     def to_source(self) -> SavedDecisionSource:
@@ -120,7 +103,6 @@ class MemoryProposeSavedDecisionRequest(BaseModel):
 class MemoryConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    sensitivity: MemorySensitivityIn
     context: MemoryOperationContext = MemoryOperationContext.ORDINARY
 
 
@@ -142,7 +124,6 @@ class MemoryEditRequest(BaseModel):
         max_length=MAX_MEMORY_VALUE_LENGTH,
     )
     label: str | None = Field(default=None, min_length=1, max_length=120)
-    sensitivity: MemorySensitivityIn
 
     @field_validator("value", "label")
     @classmethod

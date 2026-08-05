@@ -42,10 +42,19 @@ from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryEdit,
     MemoryProposalTrigger,
+    SensitivityAssessment,
 )
 from argus.memory.subject import PersonalizationMemoryUnavailable
 
 router = APIRouter(prefix="/api/v1", tags=["personalization-memory"])
+
+
+def _unassessed_sensitivity() -> SensitivityAssessment:
+    # Sensitivity is backend truth: no client claim is accepted, so every API
+    # entry is unassessed and policy fails closed until a backend proposal
+    # boundary assesses content.
+    return SensitivityAssessment()
+
 
 ResultT = TypeVar("ResultT")
 
@@ -96,7 +105,7 @@ def propose_memory(
         future_benefit=payload.future_benefit,
         provenance=tuple(ref.to_domain() for ref in payload.provenance),
         trigger=MemoryProposalTrigger.EXPLICIT_REQUEST,
-        sensitivity=payload.sensitivity.to_domain(),
+        sensitivity=_unassessed_sensitivity(),
     )
     result = _run(
         request,
@@ -124,7 +133,7 @@ def propose_saved_decision_memory(
         lambda: ctx.service.propose_saved_decision(
             ctx.subject,
             payload.to_source(),
-            sensitivity=payload.sensitivity.to_domain(),
+            sensitivity=_unassessed_sensitivity(),
             context=payload.context,
         ),
     )
@@ -151,7 +160,7 @@ def confirm_memory_candidate(
         lambda: ctx.service.confirm(
             ctx.subject,
             candidate_id,
-            sensitivity=payload.sensitivity.to_domain(),
+            sensitivity=_unassessed_sensitivity(),
             context=payload.context,
         ),
     )
@@ -234,7 +243,7 @@ def edit_memory_record(
     edit = MemoryEdit(
         value=payload.value,
         label=payload.label,
-        sensitivity=payload.sensitivity.to_domain(),
+        sensitivity=_unassessed_sensitivity(),
     )
     result = _run(request, lambda: ctx.service.edit(ctx.subject, record_id, edit))
     return MemoryControlResponse.from_domain(result)

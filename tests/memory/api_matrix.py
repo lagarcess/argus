@@ -24,7 +24,6 @@ class EndpointCall:
     json: dict[str, Any] | None = None
 
 
-_CLEAR_SENSITIVITY = {"status": "clear"}
 _MESSAGE_PROVENANCE = {
     "source_kind": "message",
     "source_id": "message-api-test",
@@ -54,7 +53,6 @@ ENDPOINT_CALLS: tuple[EndpointCall, ...] = (
             "label": "Assumptions first",
             "future_benefit": "Argus can keep the preferred review order.",
             "provenance": [_MESSAGE_PROVENANCE],
-            "sensitivity": _CLEAR_SENSITIVITY,
         },
     ),
     EndpointCall(
@@ -65,14 +63,13 @@ ENDPOINT_CALLS: tuple[EndpointCall, ...] = (
             "label": "Keep the lower-drawdown version",
             "value": "The user rejected the higher-drawdown version.",
             "provenance": _DECISION_PROVENANCE,
-            "sensitivity": _CLEAR_SENSITIVITY,
         },
     ),
     EndpointCall(
         operation="confirm",
         method="POST",
         path="/api/v1/memory/candidates/candidate-1/confirm",
-        json={"sensitivity": _CLEAR_SENSITIVITY},
+        json={},
     ),
     EndpointCall(
         operation="decline",
@@ -99,7 +96,7 @@ ENDPOINT_CALLS: tuple[EndpointCall, ...] = (
         operation="edit",
         method="PATCH",
         path="/api/v1/memory/records/record-1",
-        json={"label": "Assumptions first, always", "sensitivity": _CLEAR_SENSITIVITY},
+        json={"label": "Assumptions first, always"},
     ),
     EndpointCall(
         operation="delete",

@@ -3239,15 +3239,11 @@ components:
       - past_session_anchor
     MemoryConfirmRequest:
       properties:
-        sensitivity:
-          $ref: '#/components/schemas/MemorySensitivityIn'
         context:
           $ref: '#/components/schemas/MemoryOperationContext'
           default: ordinary
       additionalProperties: false
       type: object
-      required:
-      - sensitivity
     MemoryConfirmationResponse:
       properties:
         created:
@@ -3347,12 +3343,8 @@ components:
             maxLength: 120
             minLength: 1
           - type: 'null'
-        sensitivity:
-          $ref: '#/components/schemas/MemorySensitivityIn'
       additionalProperties: false
       type: object
-      required:
-      - sensitivity
     MemoryEnableRequest:
       properties:
         categories:
@@ -3441,8 +3433,6 @@ components:
             $ref: '#/components/schemas/MemoryProvenanceIn'
           type: array
           minItems: 1
-        sensitivity:
-          $ref: '#/components/schemas/MemorySensitivityIn'
         context:
           $ref: '#/components/schemas/MemoryOperationContext'
           default: ordinary
@@ -3454,7 +3444,6 @@ components:
       - label
       - future_benefit
       - provenance
-      - sensitivity
       description: Explicit user request to remember something; the trigger is not client
         data.
     MemoryProposeSavedDecisionRequest:
@@ -3469,8 +3458,6 @@ components:
           minLength: 1
         provenance:
           $ref: '#/components/schemas/MemoryProvenanceIn'
-        sensitivity:
-          $ref: '#/components/schemas/MemorySensitivityIn'
         context:
           $ref: '#/components/schemas/MemoryOperationContext'
           default: ordinary
@@ -3480,7 +3467,6 @@ components:
       - label
       - value
       - provenance
-      - sensitivity
     MemoryProvenanceIn:
       properties:
         source_kind:
@@ -3604,19 +3590,6 @@ components:
       - employment
       - family
       - raw_conversation
-    MemorySensitivityIn:
-      properties:
-        status:
-          $ref: '#/components/schemas/SensitivityStatus'
-        flags:
-          items:
-            $ref: '#/components/schemas/MemorySensitivityFlag'
-          type: array
-      additionalProperties: false
-      type: object
-      required:
-      - status
-      description: Typed sensitivity claim; policy suppresses anything but a clear result.
     MemorySensitivityOut:
       properties:
         status:
