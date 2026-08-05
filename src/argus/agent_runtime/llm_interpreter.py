@@ -2553,9 +2553,10 @@ async def _audited_response_ready_for_runtime(
                 preferred_model=preferred_model,
                 request=request,
             )
-        raise ValueError(
-            "OpenRouter unsupported clarification omitted recoverable artifact context"
-        )
+        # This branch is only entered when the response already carries
+        # assistant text, so a failed upgrade to a runnable draft leaves the
+        # original answer usable rather than leaving the turn with nothing.
+        return _carry_asset_blocker(response, asset_resolution_context)
     if _response_needs_structured_strategy_repair(response=response):
         repaired_response = await _repair_incomplete_strategy_extraction(
             failed_response=response,
