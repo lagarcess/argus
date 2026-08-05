@@ -80,11 +80,14 @@ def _offline_interpreter_unavailable_result(
             current_user_message=current_user_message,
             selected_thread_metadata=selected_thread_metadata or {},
             language=user.language_preference,
+            retryable=retryable,
         ),
     }
     stage_patch.update(
         recovery_state_stage_patch(
-            "interpreter_unavailable",
+            "interpreter_unavailable"
+            if retryable
+            else "interpreter_unavailable_not_retryable",
             language=user.language_preference,
             retryable=retryable,
         )
@@ -180,6 +183,7 @@ def _offline_recovery_message(
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
     language: str = "en",
+    retryable: bool = True,
 ) -> str:
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         strategy = snapshot.pending_strategy_summary
@@ -213,7 +217,12 @@ def _offline_recovery_message(
             "latest_result_followup_unavailable",
             language=language,
         )
-    return recovery_message("interpreter_unavailable", language=language)
+    return recovery_message(
+        "interpreter_unavailable"
+        if retryable
+        else "interpreter_unavailable_not_retryable",
+        language=language,
+    )
 
 
 def _current_setup_phrase(strategy: StrategySummary) -> str:

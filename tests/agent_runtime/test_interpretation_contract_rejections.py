@@ -285,10 +285,25 @@ def _interpreter_unavailable_patch(failure_kind: str | None) -> dict[str, Any]:
 def test_contract_rejection_banner_is_not_retryable() -> None:
     patch = _interpreter_unavailable_patch("contract_rejected")
 
-    assert patch["recovery"]["code"] == "interpreter_unavailable"
+    # A distinct code, so the surface does not tell the user to retry when
+    # there is nothing to retry with.
+    assert patch["recovery"]["code"] == "interpreter_unavailable_not_retryable"
     assert patch["recovery"]["retryable"] is False
     # Nothing for the surface to render a replay action from.
     assert "retry_last_turn" not in patch
+    assert "retry" not in str(patch["assistant_response"]).lower()
+
+
+def test_both_interpreter_unavailable_codes_are_localized() -> None:
+    import json
+    from pathlib import Path
+
+    for locale in ("en", "es-419"):
+        catalog = json.loads(
+            Path(f"web/public/locales/{locale}/common.json").read_text()
+        )["chat"]["recovery"]
+        assert catalog["interpreter_unavailable_not_retryable"]
+        assert catalog["interpreter_unavailable"]
 
 
 def test_transient_unavailability_still_offers_retry() -> None:

@@ -275,6 +275,7 @@
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
     "recovery": {
       "interpreter_unavailable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Intenta de nuevo en un momento.",
+      "interpreter_unavailable_not_retryable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Enviarlo igual va a dar el mismo problema, así que intenta reformularlo, o dime el activo y el periodo que quieres.",
       "assumption_edit_unapplied": "Guardé tu respuesta, pero no pude aplicar ese cambio de supuesto con confianza, así que dejé la idea actual sin cambios. Intenta el cambio de nuevo en un momento.",
       "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
       "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
