@@ -36,7 +36,9 @@ The decision memo grounds each item:
   lane ends in an explicit user confirmation before anything durable exists.
 - Risk 3 (opaque memory users do not trust) motivates the visible retrieval
   step and in-chat controls; Risk 6 (privacy expectations rise with memory)
-  motivates the self-hosted embedder and the no-egress default.
+  shaped the embedder decision: the founder weighed egress against monolith
+  compute and approved transit-only vectorization through Perplexity, with
+  memory custody staying entirely in Argus infrastructure.
 
 Competitive synthesis from the same conversation: Claude is search-first,
 OpenAI is distillation-first, Argus is consent-first. This lane inherits
@@ -71,12 +73,15 @@ points, and everything here ships dark behind them.
 4. Mem0 (item 2), four parameters ratified: (a) index-only over confirmed
    records: `add()` at confirmation, `delete()` at delete, reset at reset,
    `search()` at retrieval; Mem0 never sees unconfirmed content and never
-   holds storage authority; (b) embeddings run self-hosted inside our
-   infrastructure so memory content never leaves it; OpenAI embeddings are
-   the documented fallback and require a separate founder data-processing
-   approval before use; (c) the vector store is pgvector in the existing
-   Supabase database, no new datastore service; (d) Mem0 runs in-process as
-   a library inside the API service, no new hosted service.
+   holds storage authority; (b) embeddings run through Perplexity's
+   embeddings API on the existing key; the founder approved memory text
+   transiting Perplexity for vectorization on 2026-08-06, transit only:
+   nothing is stored with the vendor, and vectors plus memories live only
+   in our Supabase; (c) the vector store is pgvector in the existing
+   Supabase database, no new datastore service; (d) Mem0 is the OSS
+   library running in-process inside the API service; the hosted Mem0
+   Platform is explicitly rejected because confirmed memories must stay in
+   Argus custody.
 5. Mem0 sits behind the existing `MemoryProvider` protocol with the
    fail-open semantics the persistence checkpoint built: provider down or
    erroring means canonical token-match fallback, never a failed turn and
@@ -136,6 +141,12 @@ points, and everything here ships dark behind them.
 - Mem0's extraction, dedup, and conflict-resolution pipeline -- explicitly
   unused; Argus owns extraction via its own task registry and owns storage
   via confirmation.
+- Self-hosted embeddings -- parked as post-PMF privacy hardening: removes
+  the last egress but puts model weight on the API service, which the
+  current Render compute posture cannot spare. Unparks if Perplexity
+  quality disappoints or the privacy bar rises.
+- OpenAI embeddings -- considered only if Perplexity recall quality proves
+  insufficient; a new vendor and key, so a founder decision either way.
 
 ## 4. Contract gates
 
@@ -174,8 +185,8 @@ points, and everything here ships dark behind them.
   - Bilingual EN and es-419 browser QA with screenshots: history answer with
     its visible retrieval state, recall-note chips and in-chat edit, both
     split toggles, and a digest proposal being confirmed and declined.
-  - Measured per-call cost for the digest task and the self-hosted embedder,
-    reported in the PR body.
+  - Measured per-call cost for the digest task and the Perplexity embedding
+    calls, reported in the PR body.
 - **Where it stops:** a Ready PR with CI green and review threads answered.
   The founder merges. Applying the digest migration (if any) to hosted
   databases and flipping any new flags remain founder promotion decisions,
@@ -188,17 +199,17 @@ points, and everything here ships dark behind them.
 - If item 1 cannot compose a history answer without feeding memory or chat
   history into interpreter input or routing, stop and report; do not bend
   S10 for answer quality.
-- If the self-hosted embedder cannot deliver acceptable recall quality or
-  latency, stop and report; switching to OpenAI embeddings is a founder
-  data-processing decision, not a builder fallback.
+- If Perplexity embeddings deliver poor recall quality or latency, stop and
+  report; switching vendors or self-hosting is a founder decision, not a
+  builder fallback.
 - If the digest cannot produce useful candidates without persisting
   transcript content beyond typed candidate fields, or without exceeding
   its spend ceiling, stop and report.
 - If any slice needs a durable table beyond digest bookkeeping, a change to
   guest, conversion, or handoff surfaces, or an `AccountCapabilities`
   field, stop and report.
-- If a hosted-secret-shaped variable becomes necessary (any new external
-  key), stop and report; the no-egress default is the point of decision 4b.
+- If a hosted-secret-shaped variable becomes necessary beyond the existing
+  Perplexity key (any new external vendor or key), stop and report.
 - If UI churn grows beyond the named surfaces (answer block with retrieval
   state, recall-note chips, header-menu toggles, digest proposal card),
   stop and report.
@@ -226,10 +237,6 @@ points, and everything here ships dark behind them.
 
 ### Inference
 
-- Treating the flag-plus-role gate as the accepted exposure control that
-  ends incubation mode is reasoned from the original contract's mode
-  rationale, not stated anywhere; if the founder disagrees, this lane
-  should route through the lane planner before kickoff.
 - The claim that history answering is the highest-value item rests on the
   PR #386 QA observation (correct memory shown under a "no record" answer),
   not on user data; digest acceptance rates and recall-note follow-up rates
