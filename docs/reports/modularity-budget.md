@@ -1,34 +1,34 @@
 # Modularity Budget Report
 
-Generated for the initial lightweight guardrail baseline.
+Generated for the lightweight, forward-only guardrail baseline.
 
 ## Guardrail behavior
 
-- The budget is intentionally narrow and non-refactoring: only explicitly watched large production files can fail CI.
+- The budget is intentionally forward-only and non-refactoring: only explicitly watched large files can fail CI.
 - Current watched-file line counts are recorded in `.agent/modularity_budget.json`.
 - CI fails only when a watched file grows by more than `75` lines beyond its recorded baseline.
-- The script also scans production source roots (`src`, `web`) and prints the top current large files so newly large files are visible without becoming surprise blockers.
-- Frontend tests, E2E tests, lockfiles, build output, and dependencies are excluded from the production-source offender scan.
+- The script scans `src`, `tests`, and `web` and prints the top current large files so newly large files are visible without becoming surprise blockers.
+- Every currently scanned Python, frontend-unit, and E2E test file at or above the configured `baseline_capture_minimum_lines` value (currently 1,000) has a current line-count baseline. Those files may grow by at most `75` lines before CI fails; no existing test needs an immediate rewrite.
+- Frontend tests and E2E tests are deliberately included. The only exclusions are dependencies, build output, and the frontend lockfile.
+- If a separately delivered change deletes a watched file, the checker skips that missing baseline. Deletion cannot block an unrelated change, and the stale entry can be removed during the normal follow-up.
 
 ## Current top offenders
 
 | Rank | File | Baseline lines | Allowed limit | Recommended follow-up issue |
 | ---: | --- | ---: | ---: | --- |
-| 1 | `src/argus/agent_runtime/llm_interpreter.py` | 5,279 | 5,354 | Split interpreter prompts, audit helpers, and repair orchestration behind existing `agent_runtime/interpreter/` modules. |
-| 2 | `src/argus/agent_runtime/stages/interpret.py` | 3,159 | 3,234 | Extract stage-specific merge, validation, and response-shaping helpers while preserving LangGraph as the single chat brain. |
-| 3 | `web/components/chat/ChatInterface.tsx` | 2,523 | 2,598 | Separate rendering shells, artifact lifecycle wiring, and chat-side effects into focused hooks/components without changing UX. |
-| 4 | `src/argus/domain/supabase_gateway.py` | 2,036 | 2,111 | Split product persistence gateways by durable artifact type: conversations, messages, runs, feedback, and preferences. |
-| 5 | `src/argus/agent_runtime/stages/explain.py` | 1,574 | 1,649 | Separate explanation state collection, deterministic fact formatting, and LLM budget invocation. |
-| 6 | `src/argus/api/routers/agent.py` | 1,393 | 1,468 | Keep the router thin by moving request/response assembly and persistence helpers into API service modules. |
-| 7 | `src/argus/agent_runtime/stages/interpret_internal/asset_resolution.py` | 1,302 | 1,377 | Split provider-backed lookup, candidate ranking, and user-facing ambiguity shaping. |
-| 8 | `src/argus/api/chat/breakdown.py` | 1,242 | 1,317 | Extract deterministic breakdown sections and LLM invocation policy into smaller helpers. |
-| 9 | `web/lib/argus-api.ts` | 1,179 | 1,254 | Split API clients by product surface while keeping the documented API contract as source of truth. |
-| 10 | `src/argus/agent_runtime/result_followups.py` | 1,138 | 1,213 | Separate supported next-experiment selection from user-facing follow-up copy. |
+| 1 | `tests/agent_runtime/test_interpret_stage.py` | 11,010 | 11,085 | Split cases by interpreter capability while preserving the shared harness. |
+| 2 | `tests/agent_runtime/test_conversational_contract_hardening.py` | 7,285 | 7,360 | Separate independent contract families into focused modules. |
+| 3 | `tests/test_chat_runtime_reload_guardrails.py` | 6,280 | 6,355 | Group reload scenarios by durable artifact ownership. |
+| 4 | `tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py` | 5,738 | 5,813 | Extract capability-repair scenarios by supported strategy shape. |
+| 5 | `tests/agent_runtime/test_llm_interpreter_semantic_contracts.py` | 5,292 | 5,367 | Split semantic contract assertions by owned field family. |
+| 6 | `tests/agent_runtime/test_llm_interpreter_date_window_repairs.py` | 4,693 | 4,768 | Separate date-window cases by repair path. |
+| 7 | `tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py` | 4,562 | 4,637 | Separate grounding and signal-rule scenarios. |
+| 8 | `tests/test_alpha_api_supabase.py` | 4,489 | 4,564 | Divide API coverage by durable artifact endpoint. |
+| 9 | `tests/test_alpha_api.py` | 4,335 | 4,410 | Divide API coverage by endpoint family. |
+| 10 | `tests/test_openrouter_policy.py` | 4,038 | 4,113 | Separate provider-key and request-policy scenarios. |
 
 ## Recommended issues
 
-1. **Interpreter decomposition spike** — define safe seams in `llm_interpreter.py` and `stages/interpret.py` that do not introduce regex gates or a second orchestrator.
-2. **Chat UI shell split** — move `ChatInterface.tsx` side effects and artifact rendering into focused hooks/components with screenshot-backed QA.
-3. **Persistence gateway boundaries** — split `supabase_gateway.py` by entity ownership while preserving RLS expectations and durable artifact semantics.
-4. **API thin-router cleanup** — move helper logic out of `agent.py` and keep FastAPI routes limited to auth, validation, transport, persistence, and error shaping.
-5. **Result explanation/follow-up modularity** — separate deterministic metrics truth from assistant voice surfaces for explain/breakdown/follow-up modules.
+1. **Interpreter test decomposition** — split the largest interpreter suites by capability or strategy shape while preserving shared fixtures and parametrization.
+2. **Chat-runtime test decomposition** — group reload and lifecycle scenarios by durable artifact ownership.
+3. **API test decomposition** — divide the large API suites by endpoint/artifact family without weakening contract coverage.
