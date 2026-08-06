@@ -13,7 +13,6 @@ const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
 const decisionNote = process.env.ARGUS_CANARY_BROWSER_DECISION_NOTE;
 const searchQuery = process.env.ARGUS_CANARY_BROWSER_SEARCH_QUERY;
 const identityHandoff = process.env.ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF;
-const browserPhase = process.env.ARGUS_CANARY_BROWSER_PHASE ?? "full";
 const labels = JSON.parse(
   process.env.ARGUS_CANARY_STATIC_LABELS_JSON ?? "{}",
 ) as StaticLabels;
@@ -55,7 +54,11 @@ async function writePrivateHandoff(
   await chmod(path, 0o600);
 }
 
-function isApiResponse(response: Response, suffix: string, method: string): boolean {
+function isApiResponse(
+  response: Response,
+  suffix: string,
+  method: string,
+): boolean {
   try {
     return (
       new URL(response.url()).pathname.endsWith(`/api/v1${suffix}`) &&
@@ -78,7 +81,9 @@ async function loginThroughRenderedUi(
     canarySignupEmail.trim().toLocaleLowerCase() ===
     canaryEmail.trim().toLocaleLowerCase()
   ) {
-    throw new Error("Dedicated signup identity must differ from login identity");
+    throw new Error(
+      "Dedicated signup identity must differ from login identity",
+    );
   }
 
   await page.addInitScript((nextLanguage) => {
@@ -127,10 +132,13 @@ async function loginThroughRenderedUi(
     }
     const signupUser = record(signupResponsePayload.user, "signup user");
     if (
-      String(signupUser.email ?? "").trim().toLocaleLowerCase() !==
-      canarySignupEmail.trim().toLocaleLowerCase()
+      String(signupUser.email ?? "")
+        .trim()
+        .toLocaleLowerCase() !== canarySignupEmail.trim().toLocaleLowerCase()
     ) {
-      throw new Error("Fresh signup response did not preserve its dedicated identity");
+      throw new Error(
+        "Fresh signup response did not preserve its dedicated identity",
+      );
     }
     const checkEmailState = page.getByTestId("auth-check-email");
     await expect(checkEmailState).toBeVisible();
@@ -152,8 +160,9 @@ async function loginThroughRenderedUi(
   await page.getByRole("button", { name: label("auth.login.submit") }).click();
 
   const loginResponse = await loginResponsePromise;
-  const loginRequestPayload =
-    loginResponse.request().postDataJSON() as JsonRecord;
+  const loginRequestPayload = loginResponse
+    .request()
+    .postDataJSON() as JsonRecord;
   const loginCaptchaToken = loginRequestPayload.captcha_token;
   if (
     typeof loginCaptchaToken !== "string" ||
@@ -164,7 +173,10 @@ async function loginThroughRenderedUi(
   }
   if (!loginResponse.ok()) throw new Error("Rendered login failed");
   const loginPayload = record(await loginResponse.json(), "login payload");
-  const userId = privateId(record(loginPayload.user, "login user").id, "user identity");
+  const userId = privateId(
+    record(loginPayload.user, "login user").id,
+    "user identity",
+  );
   const accessToken = privateId(
     record(loginPayload.session, "login session").access_token,
     "browser access token",
@@ -172,15 +184,21 @@ async function loginThroughRenderedUi(
 
   await page.waitForURL(/\/chat(?:\?|$)/, { timeout: 30_000 });
   const profileResponse = await profileResponsePromise;
-  if (!profileResponse.ok()) throw new Error("Rendered profile hydration failed");
-  const profilePayload = record(await profileResponse.json(), "profile payload");
+  if (!profileResponse.ok())
+    throw new Error("Rendered profile hydration failed");
+  const profilePayload = record(
+    await profileResponse.json(),
+    "profile payload",
+  );
   const profileUser = record(profilePayload.user, "hydrated profile");
   if (
     profileUser.id !== userId ||
     profileUser.language !== canaryLanguage ||
     profileUser.locale !== canaryLanguage
   ) {
-    throw new Error("Rendered profile hydration did not preserve Spanish identity");
+    throw new Error(
+      "Rendered profile hydration did not preserve Spanish identity",
+    );
   }
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
   return { userId, accessToken };
@@ -218,67 +236,18 @@ function successfulJobCapture(page: Page) {
       .then((value: unknown) => {
         const payload = record(value, "backtest job payload");
         const job = record(payload.job, "backtest job");
-        if (job.status === "succeeded" && payload.run) capture.payload = payload;
+        if (job.status === "succeeded" && payload.run)
+          capture.payload = payload;
       })
       .catch(() => undefined);
   });
   return capture;
 }
 
-test.describe("private-alpha requested-access denial canary", () => {
-  test.skip(
-    browserPhase !== "access-denial",
-    "Runs only before the shell promotes the requested access row.",
-  );
-
-  test("requested access cannot create an auth identity", async ({ page }) => {
-    test.setTimeout(90_000);
-    const canarySignupEmail = requireConfig(signupEmail, "signup email");
-    const canaryPassword = requireConfig(password, "password");
-    const canaryLanguage = requireConfig(language, "language");
-
-    await page.addInitScript((nextLanguage) => {
-      window.localStorage.setItem("i18nextLng", nextLanguage);
-    }, canaryLanguage);
-    await page.goto("/?auth=signup", { waitUntil: "networkidle" });
-
-    const signupResponsePromise = page.waitForResponse((response) =>
-      isApiResponse(response, "/auth/signup", "POST"),
-    );
-    await page.locator('input[type="text"]').fill("Argus Release Canary");
-    await page.locator('input[type="email"]').fill(canarySignupEmail);
-    await page.locator('input[type="password"]').fill(canaryPassword);
-    await page
-      .getByRole("button", { name: label("auth.signup.submit") })
-      .click();
-    const signupResponse = await signupResponsePromise;
-    const signupPayload = signupResponse.request().postDataJSON() as JsonRecord;
-    if (signupPayload.language !== canaryLanguage) {
-      throw new Error("Spanish denied signup omitted the canonical language");
-    }
-    const signupCaptchaToken = signupPayload.captcha_token;
-    if (
-      typeof signupCaptchaToken !== "string" ||
-      signupCaptchaToken.length < 1 ||
-      signupCaptchaToken.length > 4096
-    ) {
-      throw new Error("Denied signup CAPTCHA token was missing or unbounded");
-    }
-    expect(signupResponse.status()).toBe(400);
-    expect(record(await signupResponse.json(), "denied signup payload").code).toBe(
-      "auth_signup_failed",
-    );
-    await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
-  });
-});
-
 test.describe.serial("private-alpha rendered release canary", () => {
-  test.skip(
-    browserPhase !== "full",
-    "Runs only after the shell promotes the requested access row.",
-  );
-
-  test("deterministic/intercepted recovery is not deployed backend proof", async ({ page }) => {
+  test("deterministic/intercepted recovery is not deployed backend proof", async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     const retryPrompt = "Provocar recuperación tipada sin ejecutar un backtest";
     const fakeConversationId = "00000000-0000-4000-8000-000000000233";
@@ -328,7 +297,10 @@ test.describe.serial("private-alpha rendered release canary", () => {
       }
       const body = route.request().postDataJSON() as JsonRecord;
       const action = body.action;
-      if (action && record(action, "intercepted chat action").type === "run_backtest") {
+      if (
+        action &&
+        record(action, "intercepted chat action").type === "run_backtest"
+      ) {
         interceptedRunRequests += 1;
       }
       await route.fulfill({
@@ -353,12 +325,18 @@ test.describe.serial("private-alpha rendered release canary", () => {
 
     await page.getByTestId("chat-input").fill(retryPrompt);
     await page.getByTestId("chat-send").click();
-    await expect(page.getByText(label("chat.error_backtest"), { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: label("common.retry") })).toBeVisible();
+    await expect(
+      page.getByText(label("chat.error_backtest"), { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: label("common.retry") }),
+    ).toBeVisible();
     expect(interceptedRunRequests).toBe(0);
   });
 
-  test("browser owns the Spanish Golden Path and exports private identities", async ({ page }) => {
+  test("browser owns the Spanish Golden Path and exports private identities", async ({
+    page,
+  }) => {
     test.setTimeout(480_000);
     const canaryPrompt = requireConfig(prompt, "prompt");
     const canaryDecisionState = requireConfig(decisionState, "decision state");
@@ -400,7 +378,8 @@ test.describe.serial("private-alpha rendered release canary", () => {
     await page.getByTestId("chat-input").fill(canaryPrompt);
     await page.getByTestId("chat-send").click();
     const conversationResponse = await conversationResponsePromise;
-    if (!conversationResponse.ok()) throw new Error("Browser conversation creation failed");
+    if (!conversationResponse.ok())
+      throw new Error("Browser conversation creation failed");
     const conversationPayload = record(
       await conversationResponse.json(),
       "conversation payload",
@@ -409,8 +388,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
       record(conversationPayload.conversation, "conversation").id,
       "conversation identity",
     );
-    if (new URL(page.url()).searchParams.get("conversation") !== conversationId) {
-      throw new Error("Rendered conversation route did not preserve browser identity");
+    if (
+      new URL(page.url()).searchParams.get("conversation") !== conversationId
+    ) {
+      throw new Error(
+        "Rendered conversation route did not preserve browser identity",
+      );
     }
     await writePrivateHandoff(handoffPath, {
       schema_version: 1,
@@ -422,16 +405,22 @@ test.describe.serial("private-alpha rendered release canary", () => {
     });
 
     await expect(
-      page.getByText(label("chat.confirmation.status.ready_to_run"), { exact: true }),
+      page.getByText(label("chat.confirmation.status.ready_to_run"), {
+        exact: true,
+      }),
     ).toBeVisible({ timeout: 180_000 });
     await page
-      .getByRole("button", { name: label("chat.confirmation.actions.run_backtest") })
+      .getByRole("button", {
+        name: label("chat.confirmation.actions.run_backtest"),
+      })
       .click();
 
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
     ).toHaveCount(1, { timeout: 360_000 });
-    await expect.poll(() => jobCapture.payload !== null, { timeout: 30_000 }).toBe(true);
+    await expect
+      .poll(() => jobCapture.payload !== null, { timeout: 30_000 })
+      .toBe(true);
     expect(runBacktestRequests).toBe(1);
     await expect(
       page.getByText(label("chat.backtest_job.queued_title"), { exact: true }),
@@ -463,7 +452,9 @@ test.describe.serial("private-alpha rendered release canary", () => {
       job.result_run_id !== backtestRunId ||
       run.conversation_id !== conversationId
     ) {
-      throw new Error("Browser-captured job and run identities did not finalize together");
+      throw new Error(
+        "Browser-captured job and run identities did not finalize together",
+      );
     }
     await writePrivateHandoff(handoffPath, {
       schema_version: 1,
@@ -510,8 +501,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
       .getByRole("button", { name: label("chat.result_card.save_decision") })
       .click();
     const decisionResponse = await decisionResponsePromise;
-    if (!decisionResponse.ok()) throw new Error("Rendered decision capture failed");
-    const decisionPayload = record(await decisionResponse.json(), "decision payload");
+    if (!decisionResponse.ok())
+      throw new Error("Rendered decision capture failed");
+    const decisionPayload = record(
+      await decisionResponse.json(),
+      "decision payload",
+    );
     const decision = record(decisionPayload.decision, "decision");
     const decidedArtifact = record(
       decisionPayload.evidence_artifact,
@@ -527,22 +522,30 @@ test.describe.serial("private-alpha rendered release canary", () => {
       decidedArtifact.id !== evidenceArtifactId ||
       decidedArtifact.lifecycle !== "decided"
     ) {
-      throw new Error("Rendered decision did not preserve canonical artifact identity");
+      throw new Error(
+        "Rendered decision did not preserve canonical artifact identity",
+      );
     }
 
     await expect(
-      page.getByText(label(`chat.result_card.decision_states.${canaryDecisionState}`), {
-        exact: true,
-      }),
+      page.getByText(
+        label(`chat.result_card.decision_states.${canaryDecisionState}`),
+        {
+          exact: true,
+        },
+      ),
     ).toBeVisible();
     await page.reload();
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
     ).toHaveCount(1, { timeout: 60_000 });
     await expect(
-      page.getByText(label(`chat.result_card.decision_states.${canaryDecisionState}`), {
-        exact: true,
-      }),
+      page.getByText(
+        label(`chat.result_card.decision_states.${canaryDecisionState}`),
+        {
+          exact: true,
+        },
+      ),
     ).toBeVisible();
     await expect(
       page.getByText(label("chat.error_backtest"), { exact: true }),
@@ -560,17 +563,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
       page.getByText(label("chat.backtest_job.failed_title"), { exact: true }),
     ).toHaveCount(0);
 
-    await page
-      .getByRole("button", { name: label("chat.new_chat") })
-      .click();
+    await page.getByRole("button", { name: label("chat.new_chat") }).click();
     await expect
-      .poll(
-        () => !new URL(page.url()).searchParams.has("conversation"),
-        {
-          message: "New chat did not leave the source conversation",
-          timeout: 30_000,
-        },
-      )
+      .poll(() => !new URL(page.url()).searchParams.has("conversation"), {
+        message: "New chat did not leave the source conversation",
+        timeout: 30_000,
+      })
       .toBe(true);
     await expect
       .poll(
@@ -602,9 +600,15 @@ test.describe.serial("private-alpha rendered release canary", () => {
       .getByPlaceholder(label("command_palette.search_placeholder"))
       .fill(canarySearchQuery);
     const searchResponse = await searchResponsePromise;
-    if (!searchResponse.ok()) throw new Error("Rendered Omnisearch request failed");
-    const searchPayload = record(await searchResponse.json(), "Omnisearch payload");
-    const searchItems = Array.isArray(searchPayload.items) ? searchPayload.items : [];
+    if (!searchResponse.ok())
+      throw new Error("Rendered Omnisearch request failed");
+    const searchPayload = record(
+      await searchResponse.json(),
+      "Omnisearch payload",
+    );
+    const searchItems = Array.isArray(searchPayload.items)
+      ? searchPayload.items
+      : [];
     const matchingEvidence = searchItems
       .map((item) => record(item, "Omnisearch item"))
       .find(
@@ -615,10 +619,13 @@ test.describe.serial("private-alpha rendered release canary", () => {
           item.lifecycle === "decided",
       );
     if (!matchingEvidence) {
-      throw new Error("Omnisearch did not return the browser-created canonical evidence");
+      throw new Error(
+        "Omnisearch did not return the browser-created canonical evidence",
+      );
     }
     const evidenceTitle = String(matchingEvidence.title ?? "").trim();
-    if (!evidenceTitle) throw new Error("Omnisearch evidence omitted a rendered title");
+    if (!evidenceTitle)
+      throw new Error("Omnisearch evidence omitted a rendered title");
     await page
       .getByRole("button")
       .filter({ hasText: label("command_palette.type.evidence") })
@@ -628,8 +635,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
     ).toHaveCount(1, { timeout: 60_000 });
-    if (new URL(page.url()).searchParams.get("conversation") !== conversationId) {
-      throw new Error("Omnisearch did not reopen the canonical source conversation");
+    if (
+      new URL(page.url()).searchParams.get("conversation") !== conversationId
+    ) {
+      throw new Error(
+        "Omnisearch did not reopen the canonical source conversation",
+      );
     }
 
     const blockingOverlay = page.locator(

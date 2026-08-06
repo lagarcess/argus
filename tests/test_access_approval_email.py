@@ -363,6 +363,35 @@ def test_internal_approval_invalid_ops_token_is_route_indistinguishable_404(
     gateway.get_requested_private_alpha_access.assert_not_called()
 
 
+def test_internal_canary_denial_signal_requires_ops_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gateway = MagicMock()
+    gateway.private_alpha_email_allowed.return_value = False
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+
+    missing = client.post(
+        "/internal/canary/requested-signup-denial",
+        json={"email": "person@example.com"},
+    )
+    wrong = client.post(
+        "/internal/canary/requested-signup-denial",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+    authorized = client.post(
+        "/internal/canary/requested-signup-denial",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert missing.status_code == wrong.status_code == 404
+    assert authorized.status_code == 200
+    assert authorized.json() == {"denied": True}
+    gateway.private_alpha_email_allowed.assert_called_once_with("person@example.com")
+
+
 @pytest.mark.parametrize("authorization", [None, "Bearer wrong-token"])
 @pytest.mark.parametrize(
     "body",

@@ -26,50 +26,39 @@ reviewed once, and matches what the feature's own name implies.
    revisit only if real usage later shows people want the shifted-window
    behavior too (don't build the second interpretation ahead of that
    signal).
-2. **The chip and confirmation must disclose both periods clearly**,
-   per the evidence doc's own "Required truth regardless of the decision":
-   show the transformation, e.g. `<original period> → <updated period>`,
-   and describe duration naturally rather than only as an exact day count
-   (candidate language: "roughly two years," "~2 years" — exact wording
-   left to the agent, bounded by: clarity over false precision).
+2. **The existing Retest token chip remains identity-only.** When Retest is
+   available, the confirmation discloses the original-to-updated period and
+   natural duration. The dossier owns whether Retest can be started at all.
 3. **Every unrelated owned assumption must survive the transformation
    unchanged** — asset, capital, benchmark, execution costs, timeframe.
    Only the date window moves.
-4. **Same-period edge case: when the extended end date equals the
-   original run's date (no new data exists since the original run), don't
-   let Run silently consume a simulation on a result guaranteed identical
-   to one the user already has.** Founder-delegated design decision,
-   locked as follows:
-   - **Enhance the existing Ready-to-run confirmation checkpoint — do not
-     add a new modal, popup, or toast component.** Retest already produces
-     a confirmation card before Run; that's the existing guardrail. Adding
-     a second, separate interruption on top of it violates the roadmap's
-     own guardrail-ratchet principle ("do not add speculative strictness
-     that blocks the Golden Path" beyond what's needed).
-   - When the transformation is a no-op (updated period equals the
-     original), the confirmation card must explicitly disclose this —
-     e.g. "No new data since your original run" — not just show two
-     identical dates and rely on the user noticing.
-   - **The Run action itself must require an explicit acknowledgment in
-     this one case**, not just be clickable as normal. Change its copy/
-     framing (e.g. "Run anyway — no new data since original") so the user
-     can't consume a simulation on an accidental duplicate without
-     noticing. This mirrors the existing precedent for consequential
-     actions elsewhere in the product (Delete always requires
-     confirmation) rather than inventing a new interaction pattern.
-   - A passive toast is explicitly rejected for this case — it's easy to
-     miss, and this consumes a real, rate-limited simulation allowance
-     (PRODUCT.md's Usage allowance section), not a cosmetic action.
+4. **The dossier computes one of three server-owned states before click.**
+   The client renders this typed truth and never recomputes provider limits:
+   - `new_data_available`: enabled normal Retest. It enters the existing
+     confirmation and job-polling path; no exact delta is promised.
+   - `no_new_data`: disabled informational action. The dossier says that the
+     run is already current before click. It emits no chat turn, simulation
+     request, job, or backtest row. The old confirmation-card same-period
+     acknowledgment is removed completely.
+   - `cant_do_it`: carries one canonical violation code. For
+     `provider_history_start_unavailable` and `kraken_ohlc_window_exceeded`,
+     the server also carries one `clamp_start` repair with exact start/end
+     values. That guided action is enabled and admission applies the same
+     repair before preflight. `provider_timeframe_unavailable` has no repair
+     and renders as a disabled dead end.
+5. **Canonical window validation is shared.** Dossier eligibility and Retest
+   admission both use `market_data_window_violation`; a proposed clamp is
+   revalidated through `validate_market_data_window` before it is offered.
+   The repair preserves the provider-effective end and changes only start.
+6. **No new frontend state machine.** No modal, toast, checkbox, or second
+   confirmation is added. Post-click queued/running/completed status remains
+   owned by the existing chat job-polling flow.
 
-## Left to the agent's taste
+## Localized copy
 
-- Exact card copy for the same-period disclosure and the modified Run
-  button, in both EN/es-419.
-- Whether "no new data" is detected by comparing resolved dates directly,
-  or by checking against the data provider's actual latest-available-bar
-  timestamp (bounded by: it must be correct when the provider's latest
-  data lags behind "today," e.g. weekends/holidays/end-of-day settlement —
-  don't compare against wall-clock date alone if that would misfire).
+All dossier state and repair copy is present in English and es-419. Provider
+names stay internal. Dates come from the server repair and are formatted by the
+client locale; the client does not alter them.
 
 ## Stop and report if
 
@@ -84,9 +73,7 @@ reviewed once, and matches what the feature's own name implies.
 
 ## Where it stops
 
-One PR against `codex/private-alpha-next`. Gates: EN/es-419, hermetic
-suite, a focused test for the extended-window transformation, a focused
-test for the same-period edge case (confirms Run requires the
-acknowledged variant and that a normal Run still consumes exactly one
-simulation as before), and screenshot evidence of both the normal and
-same-period confirmation cards.
+One PR against `codex/private-alpha-next`. Gates: EN/es-419, hermetic backend
+and frontend suites, the owned `chat-action-recovery` browser spec, focused
+proof for all three dossier states and both repair codes, zero same-period
+simulation mutations, and the unchanged normal confirmation/job path.

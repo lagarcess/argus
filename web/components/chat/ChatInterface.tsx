@@ -76,7 +76,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
-import { applyRetestReceipt, retestReceiptFromFinalPayload } from "@/lib/chat-retest";
+import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
 import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
@@ -171,7 +171,7 @@ import {
   type StrategyConfirmationPayload,
 } from "./types";
 import {
-  chatActionRequestFromAction,
+  chatActionRequestFromAction, chatHttpErrorDisplay,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
   hasActiveArtifactActionSet,
@@ -1114,8 +1114,7 @@ export default function ChatInterface() {
 
     closeTransientSidebar();
     shouldAutoScrollRef.current = true;
-    const renderUserMessage =
-      options?.renderUserMessage ?? !isRetryAction(action);
+    const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -1124,6 +1123,7 @@ export default function ChatInterface() {
       content: action?.type ? actionDisplayLabel(action) : trimmed,
       mentions,
       selectedAction: action,
+      retestReceiptPending: action?.type === RETEST_ACTION_TYPE,
     };
     const assistantId = replacementAssistantId ?? crypto.randomUUID();
     const retryLastTurnAction = action?.type
@@ -1227,8 +1227,7 @@ export default function ChatInterface() {
         }
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
-        const errorStrategyPathContext =
-          strategyPathContextFromMetadata(errorPayload);
+        const errorStrategyPathContext = strategyPathContextFromMetadata(errorPayload);
         // Same gate the `final` frame applies: a retryable failure wears the
         const errorAssistantRecoveryCode = retryableAssistantRecoveryCode(
           errorPayload.recovery,
@@ -1251,7 +1250,7 @@ export default function ChatInterface() {
         setMessages((prev) =>
           normalizeDurableRetryActionHistory(
             settleOpenConfirmationsAfterStreamError(
-              prev.map((m) =>
+              applyRetestReceipt(prev, userMsg.id, null).map((m) =>
                 durableRetry && m.id === userMsg.id
                   ? {
                       ...m,
@@ -1501,6 +1500,7 @@ export default function ChatInterface() {
       if (event.event === "done") {
         if (!requestSessions.authorize(requestSession, "done")) return;
         clearNeutralGuestSubmission();
+        setMessages((prev) => applyRetestReceipt(prev, userMsg.id, null));
         terminalReadiness.finish(true); finishRequestTransport(requestSession);
       }
     };
@@ -1599,7 +1599,7 @@ export default function ChatInterface() {
           );
           if (requestSessions.authorize(requestSession, "ambiguity")) {
             if (canApplyVisibleStreamUpdate()) {
-              setMessages(view.messages);
+              setMessages((current) => settleRetestReceiptProjection(view.messages, current, userMsg.id));
             }
             terminalReadiness.finish(true);
             finishRequestTransport(requestSession);
@@ -1673,26 +1673,26 @@ export default function ChatInterface() {
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
+        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               settleConfirmationAfterActionTransportError(
-                prev.map((m) =>
+                applyRetestReceipt(prev, userMsg.id, null).map((m) =>
                   m.id === assistantId
                     ? {
                         ...m,
                         content: staleConfirmationRejected
                           ? ""
-                          : isRateLimit
-                            ? t("chat.rate_limit_error")
-                            : fallbackMessage,
+                          : isRateLimit ? t("chat.rate_limit_error") : httpErrorDisplay.content,
                         recoveryDisplay: staleConfirmationRejected
                           ? {
                               kind: "recovery_code" as const,
                               code: rejectionCode,
                             }
-                          : m.recoveryDisplay,
-                        actions: m.actions,
+                          : isRateLimit
+                            ? m.recoveryDisplay
+                            : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
                       }
                     : m,
                 ),

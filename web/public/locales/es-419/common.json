@@ -352,6 +352,9 @@
       "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
       "insufficient_common_data": "Los activos y la referencia comparten muy poco historial para una prueba confiable. Cambia las fechas, un activo o la referencia.",
       "market_data_unavailable": "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
+      "kraken_ohlc_window_exceeded": "Ese rango de fechas es demasiado largo para este mercado y marco temporal. Acorta las fechas o usa un marco temporal más amplio.",
+      "provider_history_start_unavailable": "El historial del mercado no está disponible desde una fecha tan antigua. Elige una fecha de inicio posterior.",
+      "provider_timeframe_unavailable": "Ese marco temporal no está disponible para este mercado. Elige un marco temporal compatible.",
       "actions": {
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",
@@ -379,7 +382,26 @@
         "month_other": "misma duración de {{count}} meses",
         "day_one": "misma duración de {{count}} día",
         "day_other": "misma duración de {{count}} días"
-      }
+      },
+      "effective_duration": {
+        "exact": {
+          "year_one": "{{formattedCount}} año",
+          "year_other": "{{formattedCount}} años",
+          "month_one": "{{formattedCount}} mes",
+          "month_other": "{{formattedCount}} meses",
+          "day_one": "{{formattedCount}} día",
+          "day_other": "{{formattedCount}} días"
+        },
+        "approximate": {
+          "year_one": "aproximadamente {{formattedCount}} año",
+          "year_other": "aproximadamente {{formattedCount}} años",
+          "month_one": "aproximadamente {{formattedCount}} mes",
+          "month_other": "aproximadamente {{formattedCount}} meses",
+          "day_one": "aproximadamente {{formattedCount}} día",
+          "day_other": "aproximadamente {{formattedCount}} días"
+        }
+      },
+      "updated_duration": "Duración actualizada: {{duration}}"
     },
     "result_readout": {
       "quick_take": "Lectura rápida"
@@ -1114,6 +1136,12 @@
     "result_count_other": "{{count}} resultados",
     "retest_current_data": "Volver a probar con datos actuales",
     "retest_tooltip": "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
+    "retest_already_current": "Ya está al día",
+    "retest_no_new_data": "No hay datos de mercado nuevos desde esta ejecución.",
+    "retest_available_dates": "Usar fechas disponibles",
+    "retest_repaired_period": "Volver a probar del {{start}} al {{end}}.",
+    "retest_unavailable": "No se puede volver a probar",
+    "retest_timeframe_unavailable": "El intervalo de esta ejecución no está disponible para este mercado.",
     "retry_load_more": "Intentar cargar más",
     "retry_search": "Intentar la búsqueda de nuevo",
     "save_decision": "Guardar decisión",

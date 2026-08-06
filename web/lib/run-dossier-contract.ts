@@ -8,8 +8,19 @@ export type SearchRetestAction = {
   type: "retest_run";
   source_run_id: string;
   run_label: string;
-  window_policy: "same_duration_ending_today";
-  contract_version: "argus_retest_run/v1";
+  window_policy: "preserve_start_ending_latest_available";
+  contract_version: "argus_retest_run/v2";
+  state: "new_data_available" | "no_new_data" | "cant_do_it";
+  reason_code:
+    | "provider_history_start_unavailable"
+    | "kraken_ohlc_window_exceeded"
+    | "provider_timeframe_unavailable"
+    | null;
+  repair: {
+    kind: "clamp_start";
+    start_date: string;
+    end_date: string;
+  } | null;
 };
 
 export type SearchDecisionAction = {

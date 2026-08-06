@@ -51,6 +51,92 @@ def _confirmation_result_with_draft_costs() -> dict[str, object]:
     }
 
 
+def _retest_confirmation_result() -> dict[str, object]:
+    original = {"start": "2024-01-01", "end": "2024-12-31"}
+    requested = {"start": "2024-01-01", "end": "2026-07-31"}
+    effective = {"start": "2024-01-01", "end": "2026-06-30"}
+    duration = {"unit": "year", "count": 2.5, "approximate": True}
+    return {
+        "stage_outcome": "await_approval",
+        "confirmation_payload": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "capital_amount": 1000.0,
+                "date_range": effective,
+            },
+            "optional_parameters": {
+                "timeframe": {
+                    "label": "Timeframe",
+                    "source": "user",
+                    "value": "1D",
+                },
+                "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                "slippage": {
+                    "label": "Slippage",
+                    "source": "default",
+                    "value": 0.0,
+                },
+            },
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": effective,
+                "requested_date_range": requested,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "position_size": None,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+            },
+            "validation": {"executable": True},
+            "retest_period": {
+                "original_date_range": original,
+                "requested_date_range": requested,
+                "effective_date_range": effective,
+                "duration_days": 911,
+                "duration": duration,
+            },
+        },
+    }
+
+
+def test_retest_confirmation_projects_typed_period_and_normal_run_label() -> None:
+    result = _retest_confirmation_result()
+
+    card = runtime_confirmation_card(result, confirmation_id="confirmation-retest")
+
+    assert card is not None
+    assert card["retest_period"] == result["confirmation_payload"]["retest_period"]
+    run_action = next(
+        action for action in card["actions"] if action["type"] == "run_backtest"
+    )
+    assert run_action["label"] == "Run backtest"
+    assert run_action["labelKey"] == "chat.confirmation.actions.run_backtest"
+    assert run_action["payload"]["confirmation_id"] == "confirmation-retest"
+    assert [(row["key"], row["value"]) for row in card["rows"]] == [
+        ("strategy", "Buy and Hold"),
+        ("assets", "AAPL"),
+        (
+            "period",
+            "January 1, 2024 - June 30, 2026",
+        ),
+        ("starting_capital", "$1,000"),
+    ]
+    assert card["assumptions"] == [
+        "$1,000 starting capital",
+        "Daily data",
+        "No fees",
+        "No slippage",
+        "Benchmark: SPY",
+    ]
+
+
 def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
