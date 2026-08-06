@@ -2524,7 +2524,7 @@ def test_password_auth_bounds_captcha_before_provider_call(
     mock_gateway.login.assert_not_called()
 
 
-def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
+def test_signup_returns_private_alpha_denial_before_supabase_creation_when_not_allowlisted(
     mock_gateway,
     monkeypatch,
 ):
@@ -2541,10 +2541,12 @@ def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
         },
     )
 
-    assert response.status_code == 400
-    assert response.json()["code"] == "auth_signup_failed"
-    assert response.json()["detail"] == "Signup failed. Please try again."
-    assert "private alpha" not in response.text.lower()
+    assert response.status_code == 403
+    assert response.json()["code"] == "private_alpha_access_required"
+    assert response.json()["detail"] == (
+        "Argus is in private alpha right now. Use the email that was invited, "
+        "or ask the Argus team for access."
+    )
     mock_gateway.signup.assert_not_called()
     mock_gateway.private_alpha_email_allowed.assert_called_once_with(
         "stranger@example.com"
@@ -2573,6 +2575,7 @@ def test_signup_sanitizes_provider_errors(mock_gateway, monkeypatch):
 
     assert response.status_code == 400
     assert response.json()["code"] == "auth_signup_failed"
+    assert response.json()["code"] != "private_alpha_access_required"
     assert response.json()["detail"] == "Signup failed. Please try again."
     assert "Supabase provider" not in response.text
 
@@ -2694,8 +2697,8 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
             },
             headers=headers,
         )
-        assert response.status_code == 400
-        assert response.json()["code"] == "auth_signup_failed"
+        assert response.status_code == 403
+        assert response.json()["code"] == "private_alpha_access_required"
 
     blocked = client.post(
         "/api/v1/auth/signup",

@@ -75,7 +75,7 @@ def main() -> int:
             continue
 
         code = payload.get("code")
-        if status == 400 and code == "auth_signup_failed":
+        if status == 403 and code == "private_alpha_access_required":
             print(f"canary_probe={PROBE} attempt={attempt} result=passed")
             return 0
         print(

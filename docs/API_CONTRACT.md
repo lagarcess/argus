@@ -1645,8 +1645,9 @@ Create account.
   signup path. The client must not depend on a second profile patch.
 - Omitted language may retain the canonical English fallback for compatible API
   clients, but omission is invalid for the private-alpha web signup contract.
-- Unsupported language returns `422`. Allowlist and provider failures retain
-  the generic private-alpha signup response below.
+- Unsupported language returns `422`. An allowlist denial returns the existing
+  private-alpha access response below; provider failures retain the generic
+  signup response.
 
 **Response:**
 ```json
@@ -1660,11 +1661,22 @@ Create account.
 session. It is `null` when email confirmation is required; the client must show
 the existing localized check-your-email state and must not redirect to chat.
 
-**Private-alpha blocked response:** signup intentionally returns the same
-generic `400 auth_signup_failed` shape used for provider signup failures, while
-still checking the allowlist before calling Supabase Auth signup. Public signup
-attempts must not distinguish unlisted/disabled private-alpha emails from
-listed emails that fail provider signup.
+**Private-alpha blocked response:** signup checks the allowlist before calling
+Supabase Auth. An unlisted or disabled email returns the existing
+`403 private_alpha_access_required` private-alpha access response; it does not
+create an Auth user or profile. Provider and unexpected signup failures retain
+the generic `400 auth_signup_failed` response below.
+
+```json
+{
+  "type": "https://api.argus.app/problems/private-alpha-access-required",
+  "title": "Private Alpha Access",
+  "status": 403,
+  "detail": "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
+  "code": "private_alpha_access_required",
+  "request_id": "uuid"
+}
+```
 
 When an optional username is supplied, the server trims and case-folds it and
 serializes same-email and same-username signup attempts before checking profile

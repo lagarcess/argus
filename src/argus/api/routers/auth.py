@@ -13,6 +13,7 @@ from argus.api.dependencies import (
     _session_cookie_secure,
     auth_response,
     current_user,
+    private_alpha_access_problem,
     problem,
 )
 from argus.api.guest_access import (
@@ -683,7 +684,17 @@ def _request_access_token(request: Request) -> str:
     return request.cookies.get("sb-auth-token", "").strip()
 
 
-@router.post("/auth/signup")
+@router.post(
+    "/auth/signup",
+    responses={
+        403: {
+            "description": "Private alpha access is required for this signup.",
+            "content": {
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
+            },
+        }
+    },
+)
 def signup(request: Request, body: SignupRequest) -> JSONResponse:
     if api_state.supabase_gateway is None:
         raise problem(
@@ -695,7 +706,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
         )
     _enforce_auth_attempt_limit(request, action="signup", email=body.email)
     if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
-        raise _signup_auth_problem(request)
+        raise private_alpha_access_problem(request)
     try:
         with serialized_username_signup(
             api_state.DATABASE_URL,

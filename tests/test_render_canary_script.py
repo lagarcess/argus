@@ -244,7 +244,7 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     assert 'fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"' in shell_source
     assert "TEST_CAPTCHA_TOKEN = \"XXXX.DUMMY.TOKEN.XXXX\"" in probe_source
     assert "for attempt in (1, 2):" in probe_source
-    assert "auth_signup_failed" in probe_source
+    assert "private_alpha_access_required" in probe_source
 
 
 def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass(
@@ -266,9 +266,9 @@ def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass
                 self.end_headers()
                 self.wfile.write(b'{"code":"internal_error"}')
                 return
-            self.send_response(400)
+            self.send_response(403)
             self.end_headers()
-            self.wfile.write(b'{"code":"auth_signup_failed"}')
+            self.wfile.write(b'{"code":"private_alpha_access_required"}')
 
         def log_message(self, format: str, *args: object) -> None:
             return

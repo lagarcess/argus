@@ -454,5 +454,6 @@ def test_public_account_mode_still_blocks_explicitly_disabled_identity(
             },
         )
 
-    assert response.status_code == 400
+    assert response.status_code == 403
+    assert response.json()["code"] == "private_alpha_access_required"
     gateway.signup.assert_not_called()

@@ -422,6 +422,20 @@ def test_password_auth_openapi_requires_bounded_captcha_tokens() -> None:
         }
 
 
+def test_signup_openapi_declares_private_alpha_access_denial() -> None:
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+
+    response = openapi["paths"]["/api/v1/auth/signup"]["post"]["responses"][
+        "403"
+    ]
+    assert "private alpha access" in response["description"].lower()
+    assert response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/Error"
+    }
+
+
 def test_authenticated_openapi_declares_session_verification_unavailable() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
 

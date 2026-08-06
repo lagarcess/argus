@@ -294,6 +294,12 @@ paths:
           content:
             application/json:
               schema: {}
+        '403':
+          description: Private alpha access is required for this signup.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Validation Error
           content:

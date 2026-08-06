@@ -52,6 +52,11 @@ const AUTH_ERROR_MESSAGE_BY_CODE: Readonly<
     fallback:
       "We couldn’t verify those account details. Check them and try again.",
   },
+  private_alpha_access_required: {
+    key: "auth.errors.private_alpha_access_required",
+    fallback:
+      "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
+  },
   auth_signup_failed: {
     key: "auth.errors.auth_signup_failed",
     fallback: "We couldn’t create the account. Please try again.",
