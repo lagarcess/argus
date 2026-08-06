@@ -143,6 +143,43 @@ def _client_with_owned_run(
     return client, conversation_id, source_run
 
 
+def _currency_pair_run(
+    stored_run: Any,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    timeframe: str = "1D",
+) -> Any:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["asset_class"] = "currency_pair"
+    config_snapshot["symbols"] = ["EUR/USD"]
+    config_snapshot["benchmark_symbol"] = "EUR/USD"
+    if start_date is not None and end_date is not None:
+        config_snapshot["date_range"] = {
+            "start": start_date,
+            "end": end_date,
+        }
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": timeframe,
+    }
+    return stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+
+
 @pytest.fixture
 def stored_run() -> Any:
     from argus.api.chat.persistence import build_runtime_backtest_run
@@ -661,29 +698,7 @@ def test_extended_currency_pair_window_is_repaired_before_confirmation_without_r
             return _TODAY
 
     monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
-    config_snapshot = dict(stored_run.config_snapshot)
-    config_snapshot["asset_class"] = "currency_pair"
-    config_snapshot["symbols"] = ["EUR/USD"]
-    config_snapshot["benchmark_symbol"] = "EUR/USD"
-    config_snapshot["resolved_strategy"] = {
-        **config_snapshot["resolved_strategy"],
-        "asset_class": "currency_pair",
-        "asset_universe": ["EUR/USD"],
-        "symbol": "EUR/USD",
-    }
-    config_snapshot["resolved_parameters"] = {
-        **config_snapshot["resolved_parameters"],
-        "benchmark_symbol": "EUR/USD",
-        "timeframe": "1D",
-    }
-    currency_pair_run = stored_run.model_copy(
-        update={
-            "asset_class": "currency_pair",
-            "symbols": ["EUR/USD"],
-            "benchmark_symbol": "EUR/USD",
-            "config_snapshot": config_snapshot,
-        }
-    )
+    currency_pair_run = _currency_pair_run(stored_run)
 
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
     client, conversation_id, source_run = _client_with_owned_run(currency_pair_run)
@@ -710,6 +725,53 @@ def test_extended_currency_pair_window_is_repaired_before_confirmation_without_r
     }
     assert set(api_state.store.backtest_runs) == run_ids_before
     assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_exact_currency_pair_candle_limit_offered_action_reaches_confirmation(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.run_dossiers import project_retest_action
+
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    currency_pair_run = _currency_pair_run(
+        stored_run,
+        start_date="2024-08-10",
+        end_date="2024-12-31",
+    )
+
+    action = project_retest_action(
+        run=currency_pair_run.model_dump(mode="python"),
+        today=_TODAY,
+    )
+
+    assert action is not None
+    assert action.state == "new_data_available"
+    assert action.repair is None
+    client, conversation_id, source_run = _client_with_owned_run(currency_pair_run)
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    [final] = _stream_payloads(response.text, "final")
+    assert final["confirmation_payload"]["launch_payload"]["date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-30",
+    }
 
 
 def test_same_period_retest_is_rejected_without_turn_job_or_backtest(

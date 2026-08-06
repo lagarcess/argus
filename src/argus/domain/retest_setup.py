@@ -117,7 +117,7 @@ class RetestDossierAvailability:
 
 def retest_dossier_availability(setup: RetestSetup) -> RetestDossierAvailability:
     """Compute the dossier button state without provider or LLM work."""
-    effective_end = _latest_complete_retest_end(setup)
+    effective_end = latest_complete_retest_end(setup)
     violation = market_data_window_violation(
         asset_class=cast(AssetClass, setup.asset_class),
         timeframe=setup.timeframe,
@@ -151,7 +151,8 @@ def repaired_retest_setup(
     return replace(setup, start=repair.start_date, end=repair.end_date)
 
 
-def _latest_complete_retest_end(setup: RetestSetup) -> date:
+def latest_complete_retest_end(setup: RetestSetup) -> date:
+    """Return the provider-complete end shared by eligibility and admission."""
     adjustment = latest_complete_data_adjustment(
         asset_class=cast(AssetClass, setup.asset_class),
         timeframe=setup.timeframe,

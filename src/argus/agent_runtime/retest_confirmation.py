@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from typing import Any, cast
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
@@ -22,7 +23,7 @@ from argus.domain.market_data.capabilities import (
     AssetClass,
     validate_market_data_window,
 )
-from argus.domain.retest_setup import RetestSetup
+from argus.domain.retest_setup import RetestSetup, latest_complete_retest_end
 
 _INDICATOR_PARAMETER_KEYS = (
     "indicator",
@@ -102,6 +103,20 @@ def prepare_retest_confirmation_payload(
     confirmation_id: str | None = None,
 ) -> RetestConfirmationPreparation:
     """Materialize a Retest card with provider-actual coverage truth."""
+    raw_violation_code = retest_window_violation_code(
+        setup,
+        end_date=setup.end,
+    )
+    effective_end = latest_complete_retest_end(setup)
+    window_violation_code = retest_window_violation_code(
+        setup,
+        end_date=effective_end,
+    )
+    # Keep normal provider coverage adjustment intact. Clamp before preflight
+    # only when an incomplete final candle creates the violation by itself.
+    if raw_violation_code is not None and window_violation_code is None:
+        setup = replace(setup, end=effective_end)
+
     payload = retest_confirmation_payload(
         setup,
         language=language,
@@ -110,7 +125,6 @@ def prepare_retest_confirmation_payload(
     if payload is None:
         return RetestConfirmationPreparation()
 
-    window_violation_code = retest_window_violation_code(setup)
     if window_violation_code is not None:
         return RetestConfirmationPreparation(
             coverage_error_code=window_violation_code,
@@ -155,14 +169,18 @@ def prepare_retest_confirmation_payload(
     )
 
 
-def retest_window_violation_code(setup: RetestSetup) -> str | None:
-    """Return the deterministic provider-window violation for a Retest."""
+def retest_window_violation_code(
+    setup: RetestSetup,
+    *,
+    end_date: date,
+) -> str | None:
+    """Return a provider-window violation for the supplied Retest end."""
     try:
         validate_market_data_window(
             asset_class=cast(AssetClass, setup.asset_class),
             timeframe=setup.timeframe,
             start_date=setup.start,
-            end_date=setup.end,
+            end_date=end_date,
         )
     except ValueError as exc:
         return str(exc)
