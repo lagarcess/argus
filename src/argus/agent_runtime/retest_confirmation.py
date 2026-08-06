@@ -168,11 +168,19 @@ def prepare_retest_confirmation_payload(
     if not strategy_can_be_approved(pending_strategy):
         return RetestConfirmationPreparation()
 
-    covered_payload["launch_payload"] = validation.launch_payload
+    validated_launch_payload = validation.launch_payload
+    if requested_date_range is not None:
+        coverage = dict(validated_launch_payload["coverage_preflight"])
+        coverage["adjustment_reason"] = "provider_coverage_adjustment"
+        validated_launch_payload = {
+            **validated_launch_payload,
+            "coverage_preflight": coverage,
+        }
+    covered_payload["launch_payload"] = validated_launch_payload
     covered_payload["validation"] = {
         "status": "ready_to_run",
         "executable": True,
-        "date_adjusted": _has_effective_window_adjustment(validation.launch_payload),
+        "date_adjusted": _has_effective_window_adjustment(validated_launch_payload),
     }
     return RetestConfirmationPreparation(
         confirmation_payload=covered_payload,

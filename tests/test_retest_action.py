@@ -780,9 +780,15 @@ def test_exact_currency_pair_candle_limit_offered_action_reaches_confirmation(
     }
     coverage = launch_payload["coverage_preflight"]
     assert coverage["outcome"] == "adjusted_coverage"
+    assert coverage["adjustment_reason"] == "provider_coverage_adjustment"
     assert coverage["requested_date_range"] == launch_payload["requested_date_range"]
     assert coverage["effective_date_range"] == launch_payload["date_range"]
     assert confirmation_payload["validation"]["date_adjusted"] is True
+    assert final["confirmation"]["period_adjustment"] == {
+        "code": "effective_window_adjusted",
+        "requested_date_range": launch_payload["requested_date_range"],
+        "effective_date_range": launch_payload["date_range"],
+    }
 
 
 def test_same_period_retest_is_rejected_without_turn_job_or_backtest(
