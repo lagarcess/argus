@@ -32,20 +32,28 @@ state). The actionable captures stop at hover and never click Retest.
 ## Retest receipt continuity
 
 The post-submit receipt was refreshed from the product code committed at
-`bae16dc751ba866356ce573e44954908a3c3a936`:
+`6300996c9de36c718bf7fd95101467d5aa9553d6`:
 
 - `en-retest-receipt-pending.png` and `en-retest-receipt-ready.png` show one
   English receipt shell before and after the backend-owned context arrives.
 - `es-419-retest-receipt-pending.png` and
   `es-419-retest-receipt-ready.png` show the equivalent Spanish transition.
+- `en-mobile-multi-retest-receipt-pending.png` and
+  `en-mobile-multi-retest-receipt-ready.png` cover the supported five-symbol
+  shape in a 390px English viewport.
+- `es-419-mobile-multi-retest-receipt-pending.png` and
+  `es-419-mobile-multi-retest-receipt-ready.png` cover that same narrow shape
+  with the longer Spanish label and context.
 
 The deterministic Chromium check rendered the real `ChatMessage` and
 `RetestReceipt` components, held the response in its optimistic state, and then
 supplied a literal structured receipt. In both locales it verified that the
-same DOM receipt node remained mounted, the context row remained present, and
-the shell height stayed exactly `82.296875px` before and after hydration
-(`0px` delta). The width is intentionally content-sized and expands when the
-trusted context replaces the quiet placeholder.
+same DOM receipt node remained mounted and the context row remained present.
+Desktop one-symbol receipts stayed `101.296875px` high before and after
+hydration. The five-symbol mobile receipt stayed `139.296875px` in English and
+`159.59375px` in Spanish, each with a `0px` height delta. Both narrow context
+rows measured `95px` with `scrollHeight == 95px`, so the supported content fit
+without clipping or overflow. Width remains intentionally content-sized.
 
 This receipt capture made no API, provider, LLM, simulation, or persistence
 call. Its development-only fixture was removed before the evidence commit.
