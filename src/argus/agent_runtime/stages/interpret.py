@@ -121,6 +121,7 @@ from argus.agent_runtime.stages.interpret_internal.answer_composition import (  
     _token_sequence_spans,
 )
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.knowledge_answer import knowledge_answer_stage_result
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # noqa: F401
     _USER_GROUNDED_CADENCE_SOURCES,
     _USER_GROUNDED_CAPITAL_SOURCES,
@@ -386,15 +387,13 @@ async def interpret_stage_async(
 
     if structured_interpreter is None:
         return await _unavailable()
-
     interpretation = await _call_structured_interpreter(
         structured_interpreter,
         InterpretationRequest(
             current_user_message=state.current_user_message,
             recent_thread_history=list(state.recent_thread_history),
             latest_task_snapshot=snapshot,
-            selected_thread_metadata=selected_metadata,
-            user=user,
+            selected_thread_metadata=selected_metadata, user=user,
         ),
     )
     if interpretation is None:
@@ -403,15 +402,19 @@ async def interpret_stage_async(
         return await _unavailable(retryable=failure_kind != "contract_rejected")
     pending_response_option_interpretation = (
         _pending_response_option_interpretation_from_typed_selection(
-            state=state,
-            user=user,
-            snapshot=snapshot,
+            state=state, user=user, snapshot=snapshot,
             current_user_message=state.current_user_message,
             selected_thread_metadata=selected_metadata,
         )
     )
     if pending_response_option_interpretation is not None:
         interpretation = pending_response_option_interpretation
+    knowledge_result = await knowledge_answer_stage_result(
+        interpretation=interpretation, state=state, user=user, snapshot=snapshot,
+        selected_thread_metadata=selected_metadata,
+    )
+    if knowledge_result is not None:
+        return knowledge_result
     logger.debug(
         "Interpret stage structured interpreter completed",
         intent=interpretation.intent,
@@ -419,11 +422,8 @@ async def interpret_stage_async(
         requires_clarification=interpretation.requires_clarification,
         missing_required_fields=interpretation.missing_required_fields,
     )
-
     return await _stage_result_from_interpretation(
-        state=state,
-        user=user,
-        snapshot=snapshot,
+        state=state, user=user, snapshot=snapshot,
         interpretation=interpretation,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_metadata,
