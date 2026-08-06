@@ -1221,7 +1221,6 @@
       "generic": "Something went wrong. Please try again.",
       "captcha_unavailable": "We couldn’t complete the security check. Please try again.",
       "unauthorized": "We couldn’t verify those account details. Check them and try again.",
-      "private_alpha_access_required": "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
       "auth_signup_failed": "We couldn’t create the account. Please try again.",
       "too_many_requests": "Too many attempts. Wait a moment and try again.",
       "guest_access_unavailable": "Guest access isn’t available right now.",

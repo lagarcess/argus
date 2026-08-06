@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import ValidationError
 
 from argus.api import state as api_state
+from argus.api.guest_access import permanent_account_access_allowed
 from argus.api.schemas import AccessApprovalRequest, AccessApprovalResponse, Language
 from argus.domain.access_approval_email import send_access_approval_email
 from argus.domain.market_data import warm_asset_universe
@@ -138,6 +139,25 @@ async def readiness(
     if payload.get("status") != "ready":
         response.status_code = 503
     return payload
+
+
+@router.post(
+    "/internal/canary/requested-signup-denial",
+    dependencies=[Depends(_require_ops_authorization)],
+)
+async def requested_signup_denial(request: Request) -> dict[str, bool]:
+    try:
+        body = AccessApprovalRequest.model_validate(await request.json())
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError):
+        raise HTTPException(status_code=422, detail="Invalid request body.") from None
+    if api_state.supabase_gateway is None:
+        raise HTTPException(status_code=503, detail="Canary probe is unavailable.")
+    return {
+        "denied": not permanent_account_access_allowed(
+            api_state.supabase_gateway,
+            body.email,
+        )
+    }
 
 
 def _approval_signup_url() -> str:

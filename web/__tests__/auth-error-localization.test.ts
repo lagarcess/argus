@@ -13,7 +13,6 @@ type AuthErrorResolver = (
 const mappedCodes = [
   "captcha_unavailable",
   "unauthorized",
-  "private_alpha_access_required",
   "auth_signup_failed",
   "too_many_requests",
   "guest_access_unavailable",
@@ -85,16 +84,6 @@ describe("auth error localization", () => {
     );
     expect(resolve(codedError("unauthorized"), translator(es419))).toBe(
       "No pudimos verificar los datos de la cuenta. Revísalos e inténtalo de nuevo.",
-    );
-    expect(
-      resolve(codedError("private_alpha_access_required"), translator(en)),
-    ).toBe(
-      "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
-    );
-    expect(
-      resolve(codedError("private_alpha_access_required"), translator(es419)),
-    ).toBe(
-      "Argus está en alfa privada. Usa el correo invitado o pide acceso al equipo de Argus.",
     );
     expect(resolve(codedError("guest_handoff_expired"), translator(en))).toBe(
       "The transfer expired. Start the sign-in flow again.",

@@ -612,8 +612,8 @@ run_deploy_status_probe() {
   fi
 
   DEPLOYED_SHA="$API_DEPLOY_SHA"
-  if ! git merge-base --is-ancestor "$DEPLOYED_SHA" "$CANDIDATE_SHA"; then
-    fail_canary "deploy_status" "deployed_sha_not_ancestor_of_candidate"
+  if [ "$CANDIDATE_SHA" != "$DEPLOYED_SHA" ]; then
+    fail_canary "deploy_status" "candidate_sha_does_not_match_deployed_sha"
   fi
 
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
@@ -711,8 +711,7 @@ run_browser_canary() {
 run_requested_signup_denial_canary() {
   CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
     CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_PASSWORD="$PASSWORD" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN="${ARGUS_OPS_TOKEN:-}" \
     python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
 }
 

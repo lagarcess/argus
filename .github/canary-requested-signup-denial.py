@@ -11,12 +11,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 PROBE = "requested_signup_denial"
-TEST_CAPTCHA_TOKEN = "XXXX.DUMMY.TOKEN.XXXX"
 REQUIRED_ENV = (
     "CANARY_REQUESTED_SIGNUP_DENIAL_API_URL",
     "CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL",
-    "CANARY_REQUESTED_SIGNUP_DENIAL_PASSWORD",
-    "CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE",
+    "CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN",
 )
 
 
@@ -38,16 +36,19 @@ def _response_payload(body: bytes) -> dict[str, Any]:
 
 def _request_denial(values: dict[str, str]) -> tuple[int, dict[str, Any]]:
     request = Request(
-        f"{values['CANARY_REQUESTED_SIGNUP_DENIAL_API_URL'].rstrip('/')}/api/v1/auth/signup",
+        f"{values['CANARY_REQUESTED_SIGNUP_DENIAL_API_URL'].rstrip('/')}/internal/canary/requested-signup-denial",
         data=json.dumps(
             {
                 "email": values["CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL"],
-                "password": values["CANARY_REQUESTED_SIGNUP_DENIAL_PASSWORD"],
-                "captcha_token": TEST_CAPTCHA_TOKEN,
-                "language": values["CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE"],
             }
         ).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": (
+                "Bearer "
+                f"{values['CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN']}"
+            ),
+        },
         method="POST",
     )
     try:
@@ -74,13 +75,12 @@ def main() -> int:
             )
             continue
 
-        code = payload.get("code")
-        if status == 403 and code == "private_alpha_access_required":
+        if status == 200 and payload.get("denied") is True:
             print(f"canary_probe={PROBE} attempt={attempt} result=passed")
             return 0
         print(
             f"canary_probe={PROBE} attempt={attempt} result=unexpected_response "
-            f"status={status} code={code if isinstance(code, str) else '<missing>'}"
+            f"status={status} denied={payload.get('denied')!r}"
         )
 
     print(f"canary_probe={PROBE} attempts=2 result=failed")

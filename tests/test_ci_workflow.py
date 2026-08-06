@@ -196,6 +196,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
         "ARGUS_OPS_TOKEN",
         "ARGUS_WORKFLOW_DATABASE_URL",
     }
+    assert secret_steps["Resolve deployed canary release"] == {"RENDER_API_KEY"}
     assert secret_steps["Run authoritative Spanish release canary"] == secret_names
     assert secret_steps["Upload human-safe canary evidence"] == set()
     assert secret_steps["Upload failed canary capture"] == set()
@@ -203,6 +204,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     for step in steps:
         if step["name"] in {
             "Check required secrets",
+            "Resolve deployed canary release",
             "Warm Render product path",
             "Run authoritative Spanish release canary",
         }:

@@ -69,7 +69,7 @@ def test_canary_keeps_browser_and_service_role_secrets_out_of_curl_argv() -> Non
     assert '-H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"' not in source
 
 
-def test_canary_requires_deployed_sha_ancestor_and_warmup_profile() -> None:
+def test_canary_requires_exact_deployed_sha_and_warmup_profile() -> None:
     source = _source(".github/canary-render.sh")
     workflow_source = _source(".github/workflows/private-alpha-canary.yml")
 
@@ -89,8 +89,7 @@ def test_canary_requires_deployed_sha_ancestor_and_warmup_profile() -> None:
     assert 'DEPLOYED_SHA="$API_DEPLOY_SHA"' in source
     assert 'fail_canary "deploy_status" "api_web_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"' in source
-    assert 'git merge-base --is-ancestor "$DEPLOYED_SHA" "$CANDIDATE_SHA"' in source
-    assert 'fail_canary "deploy_status" "deployed_sha_not_ancestor_of_candidate"' in source
+    assert 'fail_canary "deploy_status" "candidate_sha_does_not_match_deployed_sha"' in source
     assert 'fail_canary "deploy_status" "workflow_version_id_mismatch"' in source
     assert 'fail_canary "release_profile" "release_profile_hash_mismatch"' in source
     assert "extract_warmup_value env_fingerprint" in source
@@ -102,48 +101,60 @@ def test_canary_requires_deployed_sha_ancestor_and_warmup_profile() -> None:
     assert "canary_deployed_sha=$DEPLOYED_SHA" in source
     assert "ref: ${{ github.event_name == 'schedule' && 'main' || github.sha }}" in workflow_source
     assert "fetch-depth: 0" in workflow_source
+    assert "Resolve deployed canary release" in workflow_source
+    assert ".github/canary-deployed-sha.py" in workflow_source
+    assert 'git checkout --detach "$deployed_sha"' in workflow_source
+    assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in workflow_source
 
 
-def test_deployed_sha_ancestor_check_rejects_an_unrelated_deployment(tmp_path: Path) -> None:
-    def git(*args: str) -> str:
-        completed = subprocess.run(
-            ["git", *args],
-            cwd=tmp_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        return completed.stdout.strip()
+def test_deployed_sha_resolver_requires_all_services_to_match_exactly() -> None:
+    deployed_sha = "a" * 40
+    stale_sha = "b" * 40
+    api_status = f"status=live\ncommit={deployed_sha}\n"
+    web_status = f"status=live\ncommit={deployed_sha}\n"
+    workflow_status = (
+        f"status=ready\ncommit={deployed_sha}\n"
+        "workflow_version_id=workflow-version\n"
+        "expected_workflow_version_id=workflow-version\n"
+    )
 
-    git("init", "--initial-branch=main")
-    git("config", "user.email", "canary@example.com")
-    git("config", "user.name", "Canary Test")
-    (tmp_path / "release.txt").write_text("deployed\n", encoding="utf-8")
-    git("add", "release.txt")
-    git("commit", "-m", "deployed release")
-    deployed_sha = git("rev-parse", "HEAD")
-
-    (tmp_path / "candidate.txt").write_text("canary harness\n", encoding="utf-8")
-    git("add", "candidate.txt")
-    git("commit", "-m", "candidate harness")
-    candidate_sha = git("rev-parse", "HEAD")
-    assert subprocess.run(
-        ["git", "merge-base", "--is-ancestor", deployed_sha, candidate_sha],
-        cwd=tmp_path,
+    matched = subprocess.run(
+        [
+            sys.executable,
+            ".github/canary-deployed-sha.py",
+            "--api-status",
+            api_status,
+            "--web-status",
+            web_status,
+            "--workflow-status",
+            workflow_status,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
         check=False,
-    ).returncode == 0
-
-    git("checkout", "--orphan", "partial-deployment")
-    git("rm", "-rf", ".")
-    (tmp_path / "release.txt").write_text("unrelated deployment\n", encoding="utf-8")
-    git("add", "release.txt")
-    git("commit", "-m", "partial deployment")
-    unrelated_deployment_sha = git("rev-parse", "HEAD")
-    assert subprocess.run(
-        ["git", "merge-base", "--is-ancestor", unrelated_deployment_sha, candidate_sha],
-        cwd=tmp_path,
+    )
+    stale = subprocess.run(
+        [
+            sys.executable,
+            ".github/canary-deployed-sha.py",
+            "--api-status",
+            api_status,
+            "--web-status",
+            web_status,
+            "--workflow-status",
+            workflow_status.replace(deployed_sha, stale_sha),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
         check=False,
-    ).returncode == 1
+    )
+
+    assert matched.returncode == 0, matched.stderr
+    assert matched.stdout.strip() == deployed_sha
+    assert stale.returncode == 1
+    assert "workflow_commit_mismatch" in stale.stderr
 
 
 def test_canary_language_and_inputs_are_profile_owned() -> None:
@@ -245,9 +256,9 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
 
     assert "canary-requested-signup-denial.py" in shell_source
     assert 'fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"' in shell_source
-    assert "TEST_CAPTCHA_TOKEN = \"XXXX.DUMMY.TOKEN.XXXX\"" in probe_source
     assert "for attempt in (1, 2):" in probe_source
-    assert "private_alpha_access_required" in probe_source
+    assert "/internal/canary/requested-signup-denial" in probe_source
+    assert 'payload.get("denied") is True' in probe_source
 
 
 def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass(
@@ -261,6 +272,7 @@ def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass
             requests.append(
                 {
                     "path": self.path,
+                    "authorization": self.headers.get("Authorization"),
                     "payload": json.loads(self.rfile.read(length)),
                 }
             )
@@ -269,9 +281,9 @@ def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass
                 self.end_headers()
                 self.wfile.write(b'{"code":"internal_error"}')
                 return
-            self.send_response(403)
+            self.send_response(200)
             self.end_headers()
-            self.wfile.write(b'{"code":"private_alpha_access_required"}')
+            self.wfile.write(b'{"denied":true}')
 
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -289,8 +301,7 @@ def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass
                     f"http://127.0.0.1:{server.server_port}"
                 ),
                 "CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL": "delivered@resend.dev",
-                "CANARY_REQUESTED_SIGNUP_DENIAL_PASSWORD": "not-a-real-password",
-                "CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE": "es-419",
+                "CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN": "ops-token",
             },
             capture_output=True,
             text=True,
@@ -305,22 +316,16 @@ def test_requested_signup_denial_probe_retries_one_transient_failure_before_pass
     assert "canary_probe=requested_signup_denial attempt=1 result=unexpected_response" in result.stdout
     assert "canary_probe=requested_signup_denial attempt=2 result=passed" in result.stdout
     assert [request["path"] for request in requests] == [
-        "/api/v1/auth/signup",
-        "/api/v1/auth/signup",
+        "/internal/canary/requested-signup-denial",
+        "/internal/canary/requested-signup-denial",
+    ]
+    assert [request["authorization"] for request in requests] == [
+        "Bearer ops-token",
+        "Bearer ops-token",
     ]
     assert [request["payload"] for request in requests] == [
-        {
-            "email": "delivered@resend.dev",
-            "password": "not-a-real-password",
-            "captcha_token": "XXXX.DUMMY.TOKEN.XXXX",
-            "language": "es-419",
-        },
-        {
-            "email": "delivered@resend.dev",
-            "password": "not-a-real-password",
-            "captcha_token": "XXXX.DUMMY.TOKEN.XXXX",
-            "language": "es-419",
-        },
+        {"email": "delivered@resend.dev"},
+        {"email": "delivered@resend.dev"},
     ]
 
 

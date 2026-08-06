@@ -1221,7 +1221,6 @@
       "generic": "Algo salio mal. Intentalo de nuevo.",
       "captcha_unavailable": "No pudimos completar la verificación de seguridad. Inténtalo de nuevo.",
       "unauthorized": "No pudimos verificar los datos de la cuenta. Revísalos e inténtalo de nuevo.",
-      "private_alpha_access_required": "Argus está en alfa privada. Usa el correo invitado o pide acceso al equipo de Argus.",
       "auth_signup_failed": "No pudimos crear la cuenta. Inténtalo de nuevo.",
       "too_many_requests": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
       "guest_access_unavailable": "El acceso para invitados no está disponible en este momento.",
