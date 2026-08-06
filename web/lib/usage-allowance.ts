@@ -31,6 +31,27 @@ export type UsageAllowanceResponse = {
 };
 
 export type AllowanceState = "zero" | "active" | "hourly_limited" | "exhausted";
+export type AllowanceMeterTone = "teal" | "warning" | "danger";
+
+function normalizedRemaining(window: UsageWindow): number {
+  if (window.limit <= 0) return 0;
+  return Math.max(0, Math.min(1, window.remaining / window.limit));
+}
+
+export function allowanceMeterTone(
+  allowance: UsageAllowance,
+): AllowanceMeterTone {
+  const activeWindows = [allowance.hour, allowance.day].filter(
+    (window): window is UsageWindow => window !== null,
+  );
+  const remainingCapacity = Math.min(
+    ...activeWindows.map(normalizedRemaining),
+  );
+
+  if (remainingCapacity <= 0.1) return "danger";
+  if (remainingCapacity < 0.3) return "warning";
+  return "teal";
+}
 
 export function classifyAllowance(allowance: {
   available_now: boolean;
