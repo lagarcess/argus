@@ -135,9 +135,16 @@ Standing chore work, picked up alongside lanes rather than scheduled:
   service it tests. Add `tests` as a scan root with baselines captured from
   current reality so it binds future work without a mass rewrite.
 - **Strip the legacy Collections and Strategies code.** Dead ends and surfaces
-  no longer exposed, plus their environment variables including the
-  `ARGUS_ASSET_PROVIDER_MODE` alias. Follow the onboarding strip-out pattern:
-  remove the surface, keep legacy records read-safe, drop the env plumbing.
+  no longer exposed, plus any environment plumbing that only served them.
+  Follow the onboarding strip-out pattern: remove the surface, keep legacy
+  records read-safe, drop the env plumbing. **Not in scope:**
+  `ARGUS_ASSET_PROVIDER_MODE`. An earlier draft listed it as a dead alias; it
+  is live. It overrides `ARGUS_MARKET_DATA_PROVIDER_MODE` in
+  `src/argus/domain/market_data/assets.py` so tests can pin the asset catalog
+  independently of market data, and it is used by `tests/evals/` and
+  `tests/agent_runtime/`. Leave it. It is worth documenting rather than
+  removing, since a silent two-variable fallback chain is the same env-confound
+  shape that has produced fake test failures before.
 - **Implement the usage allowance meter colors.** `.agent/designs/argus/DESIGN.md`
   section 23 already specifies this completely and it was never built: teal
   above 50% remaining, `--rui-color-warning` between 20% and 50%,
