@@ -421,6 +421,7 @@
       "sources_panel_title": "Fuentes que Argus consultó",
       "sources_panel_note": "Argus las consultó al responder. No son lecturas recomendadas.",
       "sources_panel_close": "Cerrar fuentes",
+      "sources_panel_external_link_new_tab": "Se abre en una pestaña nueva",
       "allowance_banner": "Cupo de búsqueda con fuentes agotado",
       "allowance_banner_cta": "Inicia sesión para más búsquedas"
     },
