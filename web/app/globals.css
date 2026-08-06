@@ -1,6 +1,28 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Responsive scale is DESIGN.md section 8, not Tailwind defaults. Base is
+   Mobile Small; every stop above it is a named DESIGN.md range boundary.
+   Stops in rem so they track the browser font size: 25/45/64/80/120rem is
+   400/720/1024/1280/1920px at a 16px root. */
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-mobile: 25rem;
+  --breakpoint-tablet: 45rem;
+  --breakpoint-desktop: 64rem;
+  --breakpoint-large: 80rem;
+  --breakpoint-xlarge: 120rem;
+
+  /* Tailwind's default names alias the same five stops, position for position,
+     so existing markup keeps compiling until it migrates to the named stops. */
+  --breakpoint-sm: 25rem;
+  --breakpoint-md: 45rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 120rem;
+}
+
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
