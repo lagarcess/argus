@@ -1,10 +1,12 @@
-import { chmod, readFile, writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { expect, test, type Page, type Response } from "@playwright/test";
 
 type JsonRecord = Record<string, unknown>;
 type StaticLabels = Record<string, string>;
 
-const supabaseUrl = process.env.ARGUS_CANARY_BROWSER_SUPABASE_URL;
+const email = process.env.ARGUS_CANARY_BROWSER_EMAIL;
+const password = process.env.ARGUS_CANARY_BROWSER_PASSWORD;
+const signupEmail = process.env.ARGUS_CANARY_BROWSER_SIGNUP_EMAIL;
 const language = process.env.ARGUS_CANARY_BROWSER_LANGUAGE;
 const prompt = process.env.ARGUS_CANARY_BROWSER_PROMPT;
 const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
@@ -67,70 +69,120 @@ function isApiResponse(
   }
 }
 
-async function injectSessionFromHandoff(
+async function loginThroughRenderedUi(
   page: Page,
+  verifySignup = false,
 ): Promise<{ userId: string; accessToken: string }> {
-  const handoffPath = requireConfig(identityHandoff, "identity handoff");
+  const canaryEmail = requireConfig(email, "email");
+  const canaryPassword = requireConfig(password, "password");
+  const canarySignupEmail = requireConfig(signupEmail, "signup email");
   const canaryLanguage = requireConfig(language, "language");
-  const canarySupabaseUrl = requireConfig(supabaseUrl, "Supabase URL");
-  const canaryAppUrl = requireConfig(process.env.PLAYWRIGHT_BASE_URL, "app URL");
-  let handoff: JsonRecord;
-  try {
-    handoff = record(
-      JSON.parse(await readFile(handoffPath, "utf8")),
-      "session handoff",
+  if (
+    canarySignupEmail.trim().toLocaleLowerCase() ===
+    canaryEmail.trim().toLocaleLowerCase()
+  ) {
+    throw new Error(
+      "Dedicated signup identity must differ from login identity",
     );
-  } catch {
-    throw new Error("Browser canary session handoff is invalid");
-  }
-  if (
-    handoff.schema_version !== 2 ||
-    handoff.source !== "service_role_magiclink" ||
-    handoff.status !== "session_ready"
-  ) {
-    throw new Error("Browser canary session handoff contract is invalid");
-  }
-  const session = record(handoff.session, "session handoff session");
-  const userId = privateId(handoff.user_id, "session handoff user identity");
-  const accessToken = privateId(
-    session.access_token,
-    "session handoff access token",
-  );
-  privateId(session.refresh_token, "session handoff refresh token");
-  if (privateId(record(session.user, "session handoff user").id, "session user identity") !== userId) {
-    throw new Error("Browser canary session handoff user identities disagree");
-  }
-  const projectRef = new URL(canarySupabaseUrl).hostname.split(".")[0];
-  if (!projectRef) throw new Error("Browser canary Supabase project reference is missing");
-  const appOrigin = new URL(canaryAppUrl).origin;
-  const sessionCookieName = `sb-${projectRef}-auth-token`;
-  const sessionCookieValue = `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`;
-  await page.context().addCookies([
-    {
-      name: sessionCookieName,
-      value: sessionCookieValue,
-      url: appOrigin,
-      sameSite: "Lax",
-      secure: appOrigin.startsWith("https://"),
-    },
-  ]);
-  const storageState = await page.context().storageState();
-  if (
-    !storageState.cookies.some(
-      (cookie) => cookie.name === sessionCookieName && cookie.value === sessionCookieValue,
-    )
-  ) {
-    throw new Error("Browser canary session was not installed in storage state");
   }
 
   await page.addInitScript((nextLanguage) => {
     window.localStorage.setItem("i18nextLng", nextLanguage);
   }, canaryLanguage);
+
+  if (verifySignup) {
+    await page.goto("/?auth=signup", { waitUntil: "networkidle" });
+    await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
+    await expect(
+      page.getByRole("button", { name: label("auth.signup.submit") }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: label("landing.sign_up_email") }),
+    ).toHaveCount(0);
+
+    const signupResponsePromise = page.waitForResponse((response) =>
+      isApiResponse(response, "/auth/signup", "POST"),
+    );
+    await page.locator('input[type="text"]').fill("Argus Release Canary");
+    await page.locator('input[type="email"]').fill(canarySignupEmail);
+    await page.locator('input[type="password"]').fill(canaryPassword);
+    await page
+      .getByRole("button", { name: label("auth.signup.submit") })
+      .click();
+    const signupResponse = await signupResponsePromise;
+    const signupPayload = signupResponse.request().postDataJSON() as JsonRecord;
+    if (signupPayload.language !== canaryLanguage) {
+      throw new Error("Spanish signup request omitted the canonical language");
+    }
+    const signupCaptchaToken = signupPayload.captcha_token;
+    if (
+      typeof signupCaptchaToken !== "string" ||
+      signupCaptchaToken.length < 1 ||
+      signupCaptchaToken.length > 4096
+    ) {
+      throw new Error("Signup CAPTCHA token was missing or unbounded");
+    }
+    expect(signupResponse.status()).toBe(200);
+    const signupResponsePayload = record(
+      await signupResponse.json(),
+      "signup payload",
+    );
+    if (signupResponsePayload.session !== null) {
+      throw new Error("Fresh signup did not return a null session");
+    }
+    const signupUser = record(signupResponsePayload.user, "signup user");
+    if (
+      String(signupUser.email ?? "")
+        .trim()
+        .toLocaleLowerCase() !== canarySignupEmail.trim().toLocaleLowerCase()
+    ) {
+      throw new Error(
+        "Fresh signup response did not preserve its dedicated identity",
+      );
+    }
+    const checkEmailState = page.getByTestId("auth-check-email");
+    await expect(checkEmailState).toBeVisible();
+    await expect(checkEmailState.getByRole("heading")).toBeFocused();
+    await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
+  }
+
+  await page.goto("/?auth=login", { waitUntil: "networkidle" });
+  await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
+
+  const loginResponsePromise = page.waitForResponse((response) =>
+    isApiResponse(response, "/auth/login", "POST"),
+  );
   const profileResponsePromise = page.waitForResponse((response) =>
     isApiResponse(response, "/me", "GET"),
   );
-  await page.goto("/chat", { waitUntil: "networkidle" });
-  await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
+  await page.locator('input[type="email"]').fill(canaryEmail);
+  await page.locator('input[type="password"]').fill(canaryPassword);
+  await page.getByRole("button", { name: label("auth.login.submit") }).click();
+
+  const loginResponse = await loginResponsePromise;
+  const loginRequestPayload = loginResponse
+    .request()
+    .postDataJSON() as JsonRecord;
+  const loginCaptchaToken = loginRequestPayload.captcha_token;
+  if (
+    typeof loginCaptchaToken !== "string" ||
+    loginCaptchaToken.length < 1 ||
+    loginCaptchaToken.length > 4096
+  ) {
+    throw new Error("Login CAPTCHA token was missing or unbounded");
+  }
+  if (!loginResponse.ok()) throw new Error("Rendered login failed");
+  const loginPayload = record(await loginResponse.json(), "login payload");
+  const userId = privateId(
+    record(loginPayload.user, "login user").id,
+    "user identity",
+  );
+  const accessToken = privateId(
+    record(loginPayload.session, "login session").access_token,
+    "browser access token",
+  );
+
+  await page.waitForURL(/\/chat(?:\?|$)/, { timeout: 30_000 });
   const profileResponse = await profileResponsePromise;
   if (!profileResponse.ok())
     throw new Error("Rendered profile hydration failed");
@@ -202,7 +254,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
     const fakeAssistantId = "00000000-0000-4000-8000-000000000234";
     let interceptedRunRequests = 0;
 
-    await injectSessionFromHandoff(page);
+    await loginThroughRenderedUi(page, true);
     const mockedCorsHeaders = {
       "Access-Control-Allow-Credentials": "true",
       "Access-Control-Allow-Headers":
@@ -319,7 +371,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
       }
     });
 
-    const { userId, accessToken } = await injectSessionFromHandoff(page);
+    const { userId, accessToken } = await loginThroughRenderedUi(page);
     const conversationResponsePromise = page.waitForResponse((response) =>
       isApiResponse(response, "/conversations", "POST"),
     );

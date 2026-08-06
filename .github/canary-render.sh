@@ -41,9 +41,6 @@ fi
 
 BROWSER_IDENTITY_HANDOFF="$(mktemp)"
 BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
-BROWSER_SESSION_LINK_RESPONSE="$(mktemp)"
-BROWSER_SESSION_VERIFY_REQUEST="$(mktemp)"
-BROWSER_SESSION_VERIFY_RESPONSE="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
 SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
 SIGNUP_AUTH_USER_IDS="$(mktemp)"
@@ -61,7 +58,6 @@ IDEA_VERSION_ROWS="$(mktemp)"
 RECEIPT_ROWS="$(mktemp)"
 chmod 600 "$BROWSER_IDENTITY_HANDOFF"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
-chmod 600 "$BROWSER_SESSION_LINK_RESPONSE" "$BROWSER_SESSION_VERIFY_REQUEST" "$BROWSER_SESSION_VERIFY_RESPONSE"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
 chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
 printf 'header = "apikey: %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
@@ -81,9 +77,6 @@ cleanup() {
   rm -f "$BROWSER_IDENTITY_HANDOFF"
   rm -f "$BROWSER_AUTH_CURL_CONFIG"
   rm -f \
-    "$BROWSER_SESSION_LINK_RESPONSE" \
-    "$BROWSER_SESSION_VERIFY_REQUEST" \
-    "$BROWSER_SESSION_VERIFY_RESPONSE" \
     "$SERVICE_ROLE_CURL_CONFIG" \
     "$SIGNUP_AUTH_USERS_RESPONSE" \
     "$SIGNUP_AUTH_USER_IDS" \
@@ -706,101 +699,13 @@ validate_release_evidence_contract() {
 run_browser_canary() {
   if ! env -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
-    ARGUS_CANARY_BROWSER_SUPABASE_URL="$SUPABASE_URL" \
+    ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
     "$SCRIPT_DIR/canary-browser.sh"; then
     BROWSER_CANARY_STATUS="failed"
     return 1
   fi
   BROWSER_CANARY_STATUS="passed"
-}
-
-prepare_browser_session_handoff() {
-  local session_request
-  session_request="$(CANARY_BROWSER_EMAIL="$EMAIL" python3 - <<'PY'
-import json
-import os
-
-print(json.dumps({"type": "magiclink", "email": os.environ["CANARY_BROWSER_EMAIL"]}))
-PY
-  )" || return 1
-  if ! service_role_curl \
-    -X POST \
-    -H "Content-Type: application/json" \
-    --data-binary "$session_request" \
-    "${SUPABASE_URL}/auth/v1/admin/generate_link" \
-    > "$BROWSER_SESSION_LINK_RESPONSE"; then
-    return 1
-  fi
-  if ! CANARY_LINK_RESPONSE="$BROWSER_SESSION_LINK_RESPONSE" \
-    CANARY_VERIFY_REQUEST="$BROWSER_SESSION_VERIFY_REQUEST" \
-    python3 - <<'PY'
-import json
-import os
-import pathlib
-
-response = json.loads(pathlib.Path(os.environ["CANARY_LINK_RESPONSE"]).read_text(encoding="utf-8"))
-token_hash = response.get("hashed_token")
-verification_type = response.get("verification_type")
-if not isinstance(token_hash, str) or not token_hash or not isinstance(verification_type, str) or not verification_type:
-    raise SystemExit(1)
-path = pathlib.Path(os.environ["CANARY_VERIFY_REQUEST"])
-path.write_text(json.dumps({"token_hash": token_hash, "type": verification_type}), encoding="utf-8")
-path.chmod(0o600)
-PY
-  then
-    return 1
-  fi
-  if ! service_role_curl \
-    -X POST \
-    -H "Content-Type: application/json" \
-    --data-binary @"$BROWSER_SESSION_VERIFY_REQUEST" \
-    "${SUPABASE_URL}/auth/v1/verify" \
-    > "$BROWSER_SESSION_VERIFY_RESPONSE"; then
-    return 1
-  fi
-  CANARY_SESSION_RESPONSE="$BROWSER_SESSION_VERIFY_RESPONSE" \
-    CANARY_HANDOFF_PATH="$BROWSER_IDENTITY_HANDOFF" \
-    python3 - <<'PY'
-import json
-import os
-import pathlib
-import time
-
-response = json.loads(pathlib.Path(os.environ["CANARY_SESSION_RESPONSE"]).read_text(encoding="utf-8"))
-user = response.get("user")
-if not isinstance(user, dict):
-    raise SystemExit(1)
-user_id = user.get("id")
-access_token = response.get("access_token")
-refresh_token = response.get("refresh_token")
-expires_in = response.get("expires_in")
-expires_at = response.get("expires_at")
-if not isinstance(user_id, str) or not user_id or not isinstance(access_token, str) or not access_token or not isinstance(refresh_token, str) or not refresh_token:
-    raise SystemExit(1)
-if not isinstance(expires_at, int):
-    if not isinstance(expires_in, int) or expires_in <= 0:
-        raise SystemExit(1)
-    expires_at = int(time.time()) + expires_in
-session = {
-    "access_token": access_token,
-    "refresh_token": refresh_token,
-    "expires_in": expires_in if isinstance(expires_in, int) else max(expires_at - int(time.time()), 1),
-    "expires_at": expires_at,
-    "token_type": response.get("token_type") if isinstance(response.get("token_type"), str) else "bearer",
-    "user": user,
-}
-payload = {
-    "schema_version": 2,
-    "source": "service_role_magiclink",
-    "status": "session_ready",
-    "user_id": user_id,
-    "session": session,
-}
-path = pathlib.Path(os.environ["CANARY_HANDOFF_PATH"])
-path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-path.chmod(0o600)
-PY
 }
 
 run_requested_signup_denial_canary() {
@@ -1589,9 +1494,6 @@ if ! verify_no_signup_auth_identity; then
 fi
 if ! promote_requested_signup_allowlist; then
   fail_canary "auth" "requested_signup_promotion_failed"
-fi
-if ! prepare_browser_session_handoff; then
-  fail_canary "browser_identity" "browser_session_handoff_failed"
 fi
 
 if ! run_browser_canary; then

@@ -13,15 +13,17 @@ argus_load_root_env >/dev/null || true
 
 RELEASE_PROFILE_TOOL="$SCRIPT_DIR/private-alpha-release-profile.py"
 APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"
-SUPABASE_URL="${ARGUS_CANARY_BROWSER_SUPABASE_URL:-}"
+EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
+PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
+SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"
 IDENTITY_HANDOFF="${ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF:-}"
 
 if ! python3 "$RELEASE_PROFILE_TOOL" validate >/dev/null; then
   echo "ERROR: checked-in release profile is invalid."
   exit 1
 fi
-if [ -z "$SUPABASE_URL" ]; then
-  echo "ERROR: browser session Supabase URL is required."
+if [ -z "$EMAIL" ] || [ -z "$PASSWORD" ] || [ -z "$SIGNUP_EMAIL" ]; then
+  echo "ERROR: stable login and dedicated signup canary inputs are required."
   exit 1
 fi
 if [ -z "$IDENTITY_HANDOFF" ] || [ ! -f "$IDENTITY_HANDOFF" ]; then
@@ -44,7 +46,9 @@ echo "Running browser-owned Spanish release canary"
 cd web
 env -u SUPABASE_SERVICE_ROLE_KEY \
   -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
-  ARGUS_CANARY_BROWSER_SUPABASE_URL="$SUPABASE_URL" \
+  ARGUS_CANARY_BROWSER_EMAIL="$EMAIL" \
+  ARGUS_CANARY_BROWSER_PASSWORD="$PASSWORD" \
+  ARGUS_CANARY_BROWSER_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
   ARGUS_CANARY_BROWSER_LANGUAGE="$CANARY_LANGUAGE" \
   ARGUS_CANARY_STATIC_LABELS_JSON="$CANARY_STATIC_LABELS" \
   ARGUS_CANARY_BROWSER_PROMPT="$CANARY_PROMPT" \
