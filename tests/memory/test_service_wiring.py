@@ -47,6 +47,21 @@ def test_memory_mode_wires_the_deterministic_store(
     assert memory_service() is None
 
 
+def test_supabase_mode_without_database_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Durable mode must never silently degrade to the volatile store."""
+    monkeypatch.setenv("ARGUS_ENABLE_PERSONALIZATION_MEMORY", "true")
+    monkeypatch.setattr(api_state, "PERSISTENCE_MODE", "supabase")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "")
+
+    app = _app()
+    start_personalization_memory(app)
+
+    assert memory_service() is None
+    assert getattr(app.state, "personalization_memory_pool", None) is None
+
+
 def test_construction_failure_leaves_the_surface_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

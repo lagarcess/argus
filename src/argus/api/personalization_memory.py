@@ -105,7 +105,17 @@ def start_personalization_memory(app) -> None:  # noqa: ANN001
         configure_memory_service(None)
         return
     try:
-        if api_state.PERSISTENCE_MODE == "supabase" and api_state.DATABASE_URL:
+        if api_state.PERSISTENCE_MODE == "supabase":
+            # Durable mode never falls back to volatile storage: without a
+            # database the surface stays off rather than minting memories
+            # that vanish on restart.
+            if not api_state.DATABASE_URL:
+                logger.warning(
+                    "Personalization memory needs DATABASE_URL in supabase "
+                    "mode; surface stays off"
+                )
+                configure_memory_service(None)
+                return
             from psycopg_pool import ConnectionPool
 
             from argus.memory.postgres_store import PostgresCanonicalMemoryStore
