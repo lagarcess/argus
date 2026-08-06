@@ -54,17 +54,30 @@ _SEARCH_MAX_RESULTS = 5
 
 
 class VoicedAnswer(BaseModel):
-    """Voicing contract: the model writes content, the code owns layout."""
+    """Voicing contract: the model composes from a palette of blocks it may
+    use or skip; the code renders whatever arrived, so the answer is creative
+    in shape but always well formed."""
 
     lead: str
     bullets: list[str] = Field(default_factory=list)
+    note: str | None = None
 
     def as_markdown(self) -> str:
-        lead = self.lead.strip()
+        blocks: list[str] = []
+        lead = " ".join(self.lead.split())
+        if lead:
+            blocks.append(lead)
         lines = [
-            f"- {bullet.strip()}" for bullet in self.bullets if bullet.strip()
+            f"- {' '.join(bullet.split())}"
+            for bullet in self.bullets[:4]
+            if bullet.strip()
         ]
-        return f"{lead}\n\n" + "\n".join(lines) if lines else lead
+        if lines:
+            blocks.append("\n".join(lines))
+        note = " ".join((self.note or "").split())
+        if note:
+            blocks.append(note)
+        return "\n\n".join(blocks)
 
 
 class KnowledgeQueryExtraction(BaseModel):
@@ -363,14 +376,19 @@ async def _voiced_answer(
     prompt = (
         "Answer the user's question using ONLY these facts. Reply in the "
         f"user's language ({language or 'the language of the question'}). "
-        f"{audience} No advice, no invented data, no em dashes.\n"
-        "Fill the schema:\n"
-        "- lead: one short sentence answering the question, with the single "
-        "most important figure wrapped in **bold**.\n"
-        "- bullets: two or three short plain-words phrases, one remaining "
-        "figure per phrase, each figure wrapped in **bold**. Never repeat the "
-        "lead figure. If the facts include search results, put one source URL "
-        "in each bullet you draw from it.\n"
+        f"{audience} No advice, no invented data, no em dashes, no headings, "
+        "no tables.\n"
+        "Compose from this palette, choosing the shape that fits the answer "
+        "best; vary it, keep it airy and beautiful:\n"
+        "- lead (required): one short sentence that answers the question, "
+        "with the single most important figure in **bold**.\n"
+        "- bullets (optional, up to 4): short plain-words phrases, one figure "
+        "per phrase in **bold**; use them when several figures matter, skip "
+        "them when one figure tells the story.\n"
+        "- note (optional): one closing sentence in *italics*, a gloss, "
+        "caveat, or the window covered. Never repeat a figure already shown.\n"
+        "If the facts include search results, put one source URL in each "
+        "bullet you draw from it.\n"
         f"Question: {message}\nFacts:\n{fact_lines}"
     )
     # Voice over the direct JSON transport with the proven structured tier;
