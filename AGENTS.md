@@ -103,15 +103,20 @@ under "Standing release discipline".
 
 Tool-specific choices and sequencing live in
 `docs/specs/private-alpha-next-decision-memo.md`; the active execution board
-lives in `docs/specs/private-alpha-next-roadmap.md`.
+lives in `docs/specs/argus-active-roadmap.md`.
 
 # 🧭 Current Milestone: Private Alpha Next P1
 
 When working from `codex/private-alpha-next` or its clean reintegration lane,
-use `docs/specs/private-alpha-next-roadmap.md` as the active execution board
-after reading the mandatory canon docs above. That roadmap owns the current
-P0/P1 board, done/next/deferred labels, slice stop criteria, and integration
-criteria.
+use `docs/specs/argus-active-roadmap.md` as the active execution board after
+reading the mandatory canon docs above. It owns the current priorities, their
+execution order, the serial-versus-parallel rules, and what is deliberately not
+being built. `docs/specs/private-alpha-next-roadmap.md` is superseded P2 history
+and contract reference; read it for provenance, do not take work from it.
+
+Lanes are built production-ready end to end. There are no phases and no
+incubation branches: work that is not ready for users ships behind a default-off
+flag, not behind a staged branch.
 
 Use `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
 star and task-onboarding source for Private Alpha Next product work. Any
@@ -693,9 +698,10 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Canon docs**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
   `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and
   `.agent/designs/argus/DESIGN.md`. These define intended Alpha direction.
-- **Current active roadmap**: `docs/specs/private-alpha-next-roadmap.md` owns
-  the P0/P1 board, done/next/deferred labels, slice stop criteria, and
-  integration criteria.
+- **Current active roadmap**: `docs/specs/argus-active-roadmap.md` owns the
+  current priorities, execution order, serial-versus-parallel rules, operating
+  rules, and the deliberately-not-doing list. `docs/specs/private-alpha-next-roadmap.md`
+  is superseded P2 history and contract reference only.
 - **Current strategic source**:
   `docs/specs/private-alpha-next-decision-memo.md` is the north star for the
   Private Alpha Next product direction. Read the relevant memo sections and
