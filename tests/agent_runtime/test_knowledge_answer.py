@@ -88,7 +88,8 @@ def test_concept_question_falls_through_to_interpreter_prose(monkeypatch) -> Non
 
     monkeypatch.setattr(ka, "_classify_question", classify)
 
-    assert _run(_interpretation(), "¿Qué es un drawdown?") is None
+    concept = _interpretation(candidate_strategy_draft=StrategySummary())
+    assert _run(concept, "¿Qué es un drawdown?") is None
 
 
 def test_pending_reply_and_execution_turns_are_left_alone(monkeypatch) -> None:
@@ -154,7 +155,10 @@ def test_current_external_question_answers_with_citations(monkeypatch) -> None:
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
 
-    result = _run(_interpretation(), "¿Cómo va el S&P 500 hoy?")
+    result = _run(
+        _interpretation(candidate_strategy_draft=StrategySummary()),
+        "¿Qué pasó con los mercados hoy?",
+    )
 
     assert result is not None
     assert "https://example.com/spx" in result.stage_patch["assistant_response"]

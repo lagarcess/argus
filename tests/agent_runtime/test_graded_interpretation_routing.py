@@ -122,9 +122,10 @@ def test_knowledge_turn_with_resolved_asset_is_not_interrogated() -> None:
 
     assert result.decision.missing_required_fields == []
     assert "entry_logic" not in result.decision.missing_required_fields
-    assert result.stage_patch.get("assistant_response") == (
-        "Puedo mostrarte estadísticas del S&P 500 mediante SPY."
-    )
+    # The resolved asset routes the turn to the grounded answer instead of an
+    # interrogation or a bare admission.
+    assert result.decision.reason_codes == ["knowledge_answer_market_stats"]
+    assert "SPY" in str(result.stage_patch.get("assistant_response"))
 
 
 def test_strategy_intent_with_one_ticker_still_routes_to_strategy() -> None:

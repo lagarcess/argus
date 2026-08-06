@@ -381,6 +381,9 @@ export function hydrateMessagesFromApi(
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
         if (discovery) return { ...hydratedText, discovery };
+        // Grounded knowledge answers carry Try next rows on a plain message.
+        const nextExperiments = nextExperimentRowsFromMetadata(metadata);
+        if (nextExperiments) return { ...hydratedText, nextExperiments };
       }
       return hydratedText;
     });

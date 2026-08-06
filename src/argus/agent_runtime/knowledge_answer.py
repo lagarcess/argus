@@ -41,9 +41,8 @@ from argus.domain.discovery_search.config import discovery_search_config
 from argus.domain.discovery_search.contracts import SearchUnavailableError
 from argus.domain.discovery_search.selection import search_provider_for_config
 from argus.llm.openrouter import (
-    build_openrouter_model,
     invoke_openrouter_json_schema,
-    openrouter_task_timeout_seconds,
+    openrouter_structured_model_candidates,
 )
 
 _KNOWLEDGE_INTENTS = frozenset(
@@ -52,6 +51,12 @@ _KNOWLEDGE_INTENTS = frozenset(
 # Acts owned by other surfaces (discovery, results, cards) never route here.
 _KNOWLEDGE_ACTS = frozenset({"educational_question", "unsupported_request"})
 _SEARCH_MAX_RESULTS = 5
+
+
+class VoicedAnswer(BaseModel):
+    """Schema for voicing: the direct JSON transport is the proven path."""
+
+    answer: str
 
 
 class KnowledgeQueryExtraction(BaseModel):
@@ -83,10 +88,14 @@ async def knowledge_answer_stage_result(
         return None
     if strategy_has_execution_evidence(interpretation.candidate_strategy_draft):
         return None
-    query = await _classify_question(
-        message=state.current_user_message,
-        language=user.language_preference,
-    )
+    # A provider-resolved asset on a knowledge turn IS the interpreter's own
+    # classification: the user is asking about that asset. No second LLM call.
+    query = _query_from_interpretation(interpretation)
+    if query is None:
+        query = await _classify_question(
+            message=state.current_user_message,
+            language=user.language_preference,
+        )
     if query is None or query.question_kind in ("concept", "none"):
         return None
     answer: str | None = None
@@ -113,6 +122,27 @@ async def knowledge_answer_stage_result(
         interpretation=interpretation,
         query=query,
         user=user,
+    )
+
+
+def _query_from_interpretation(
+    interpretation: StructuredInterpretation,
+) -> KnowledgeQueryExtraction | None:
+    draft = interpretation.candidate_strategy_draft
+    symbols = [
+        str(symbol).strip().upper()
+        for symbol in draft.asset_universe or []
+        if str(symbol).strip()
+    ]
+    if not symbols:
+        return None
+    raw_window = draft.extra_parameters.get("date_range_raw_text")
+    return KnowledgeQueryExtraction(
+        question_kind="market_stats",
+        symbols=symbols,
+        date_range_raw_text=(
+            str(raw_window) if raw_window not in (None, "") else None
+        ),
     )
 
 
@@ -299,9 +329,6 @@ async def _voiced_answer(
     facts: dict[str, Any],
     fallback: str,
 ) -> str | None:
-    model = build_openrouter_model("knowledge_voicing")
-    if model is None:
-        return fallback
     fact_lines = "\n".join(f"{key}: {value}" for key, value in facts.items())
     prompt = (
         "Answer the user's question directly using ONLY these facts. Reply in "
@@ -310,16 +337,23 @@ async def _voiced_answer(
         "facts include search results, cite the source URLs you used.\n"
         f"Question: {message}\nFacts:\n{fact_lines}"
     )
-    try:
-        response = await asyncio.wait_for(
-            model.ainvoke([{"role": "user", "content": prompt}]),
-            timeout=openrouter_task_timeout_seconds("knowledge_voicing"),
-        )
-        text = str(getattr(response, "content", "") or "").strip()
-        return text or fallback
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("Knowledge answer voicing failed", error=str(exc))
-        return fallback
+    # Voice over the direct JSON transport with the proven structured tier;
+    # the numeric fallback keeps the answer honest when voicing cannot run.
+    for model_name in openrouter_structured_model_candidates():
+        try:
+            voiced = await invoke_openrouter_json_schema(
+                task="knowledge_voicing",
+                messages=[{"role": "user", "content": prompt}],
+                schema_model=VoicedAnswer,
+                schema_name="VoicedAnswer",
+                model_name=model_name,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Knowledge answer voicing failed error={exc!r}")
+            continue
+        if isinstance(voiced, VoicedAnswer) and voiced.answer.strip():
+            return voiced.answer.strip()
+    return fallback
 
 
 def _try_next_sidecar(
