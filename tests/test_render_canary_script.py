@@ -161,40 +161,35 @@ def test_canary_language_and_inputs_are_profile_owned() -> None:
     assert 'ARGUS_CANARY_BROWSER_SEARCH_QUERY="$CANARY_SEARCH_QUERY"' in runner_source
 
 
-def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
+def test_browser_injects_a_real_session_without_driving_captcha_auth() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    runner_source = _source(".github/canary-browser.sh")
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
-    assert "ARGUS_CANARY_BROWSER_SIGNUP_EMAIL" in browser_source
-    assert "Dedicated signup identity must differ from login identity" in browser_source
-    assert 'page.goto("/?auth=signup"' in browser_source
-    assert 'isApiResponse(response, "/auth/signup", "POST")' in browser_source
-    assert "signupPayload.language !== canaryLanguage" in browser_source
-    assert "signupPayload.captcha_token" in browser_source
-    assert "Signup CAPTCHA token was missing or unbounded" in browser_source
-    assert "expect(signupResponse.status()).toBe(200)" in browser_source
-    assert 'page.getByTestId("auth-check-email")' in browser_source
-    assert "signupResponsePayload.session !== null" in browser_source
-    assert "Fresh signup response did not preserve its dedicated identity" in browser_source
-    assert 'page.goto("/?auth=login"' in browser_source
-    assert "loginRequestPayload.captcha_token" in browser_source
-    assert "Login CAPTCHA token was missing or unbounded" in browser_source
-    assert "signupResponse.request().postDataJSON()).toMatchObject" not in browser_source
-    assert "Spanish signup request omitted the canonical language" in browser_source
-    assert "toBeFocused()" in browser_source
-    assert "page).not.toHaveURL(/\\/chat" in browser_source
-    assert "record(loginPayload.session, \"login session\")" in browser_source
-    assert "page.waitForURL(/\\/chat" in browser_source
+    assert "prepare_browser_session_handoff" in shell_source
+    assert 'source": "service_role_magiclink"' in shell_source
+    assert 'ARGUS_CANARY_BROWSER_SUPABASE_URL="$SUPABASE_URL"' in runner_source
+    assert "env -u SUPABASE_SERVICE_ROLE_KEY" in runner_source
+    assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in runner_source
+    assert "injectSessionFromHandoff" in browser_source
+    assert "page.context().addCookies" in browser_source
+    assert "page.context().storageState" in browser_source
+    assert "base64url" in browser_source
+    assert 'page.goto("/chat"' in browser_source
+    assert 'page.goto("/?auth=signup"' not in browser_source
+    assert 'page.goto("/?auth=login"' not in browser_source
+    assert "loginThroughRenderedUi" not in browser_source
+    assert 'isApiResponse(response, "/auth/signup", "POST")' not in browser_source
+    assert 'isApiResponse(response, "/auth/login", "POST")' not in browser_source
 
 
 def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     shell_source = _source(".github/canary-render.sh")
-    runner_source = _source(".github/canary-browser.sh")
 
     assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"' in (
         shell_source
     )
-    assert 'ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in shell_source
-    assert 'ARGUS_CANARY_BROWSER_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in runner_source
+    assert 'CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL"' in shell_source
     assert "signup_identity_is_safe" in shell_source
     assert "prepare_signup_identity" in shell_source
     assert "delete_signup_auth_identity" in shell_source
@@ -241,7 +236,9 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
         "run_requested_signup_denial_canary"
     ) < main_body.index("verify_no_signup_auth_identity") < main_body.index(
         "promote_requested_signup_allowlist"
-    ) < main_body.index("run_browser_canary")
+    ) < main_body.index("prepare_browser_session_handoff") < main_body.index(
+        "run_browser_canary"
+    )
 
     assert "canary-requested-signup-denial.py" in shell_source
     assert 'fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"' in shell_source
@@ -456,12 +453,17 @@ def test_browser_exports_private_identity_handoff_and_shell_deletes_it() -> None
         in shell_source
     )
     assert "verify_browser_identity_handoff" in shell_source
+    assert "prepare_browser_session_handoff" in shell_source
+    assert '"service_role_magiclink"' in shell_source
     assert "stat.S_IMODE(path.stat().st_mode) & 0o077" in shell_source
     assert "ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF" in runner_source
+    assert "ARGUS_CANARY_BROWSER_SUPABASE_URL" in runner_source
     assert "mode: 0o600" in browser_source
     assert 'source: "playwright"' in browser_source
     assert "schema_version: 1" in browser_source
     assert "access_token: accessToken" in browser_source
+    assert "refresh_token" in browser_source
+    assert "injectSessionFromHandoff" in browser_source
     assert '"access_token"' in shell_source
     assert 'BROWSER_ACCESS_TOKEN \\' in shell_source
     assert "BROWSER_IDENTITY_HANDOFF" not in workflow
