@@ -78,3 +78,29 @@ Mechanics, all model-grounded, no regex or language gates:
 `tests/agent_runtime/test_graded_interpretation_routing.py`,
 `tests/agent_runtime/test_interpretation_contract_rejections.py`, plus updated
 contracts in `tests/test_openrouter_policy.py`.
+
+## The answer router (founder-locked 2026-08-06)
+
+Level 3 is no longer an admission: a facts question gets an answer from the
+most authoritative source available, then the Try next surface.
+
+| Source | Owns | Mechanism |
+| --- | --- | --- |
+| Own market data | asset statistics | `agent_runtime/knowledge_answer.py`: resolved asset + window through `fetch_price_series`, computed return/drawdown/volatility, voiced over the direct JSON transport with a numeric fallback |
+| Discovery search provider | current external facts | existing `discovery_search` provider (perplexity_direct), cited sources, also the degrade path when market data cannot serve |
+| Interpreter prose | concepts | unchanged |
+
+Routing trusts the interpretation first: a provider-resolved asset on a
+knowledge turn is the classification, so the extra `knowledge_route` LLM call
+runs only for assetless external questions (the turn-call allowance made a
+late classifier unreliable). Every grounded answer carries `next_experiments`
+rows; the projection and `ChatMessage` render them on plain messages, and a
+row lands a ready-to-run card inheriting the answer's window.
+
+Live journey (2026-08-06, this branch): statistics question → computed SPY
+numbers → Try next → buy-and-hold card, Ready to run, window inherited.
+
+Known gaps, recorded not hidden: rows appear on hydrate, not yet during the
+live stream; voiced answers follow workspace language rather than message
+language (#378, its own item); demo numbers came from the synthetic fixture
+provider, the recipe this repo's QA uses.
