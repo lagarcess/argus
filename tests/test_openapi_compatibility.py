@@ -132,6 +132,7 @@ def test_exclusions_are_exactly_the_named_operations(checked: dict) -> None:
             ("get", "/health"),
             ("get", "/internal/readiness"),
             ("post", "/internal/access-requests/approve"),
+            ("post", "/internal/canary/requested-signup-denial"),
             ("post", "/api/v1/dev/reset"),
         }
     )
@@ -142,7 +143,7 @@ def test_exclusions_are_exactly_the_named_operations(checked: dict) -> None:
         )
 
 
-def test_access_request_is_public_but_approval_is_exactly_excluded(
+def test_access_request_is_public_but_internal_ops_routes_are_exactly_excluded(
     generated: dict,
     checked: dict,
 ) -> None:
@@ -150,6 +151,8 @@ def test_access_request_is_public_but_approval_is_exactly_excluded(
     assert "post" in checked["paths"]["/api/v1/auth/access-requests"]
     assert "post" in generated["paths"]["/internal/access-requests/approve"]
     assert checked.get("paths", {}).get("/internal/access-requests/approve") is None
+    assert "post" in generated["paths"]["/internal/canary/requested-signup-denial"]
+    assert checked.get("paths", {}).get("/internal/canary/requested-signup-denial") is None
 
 
 def test_access_request_contract_requires_acceptance_and_documents_failures(

@@ -2394,7 +2394,7 @@ def test_signup_retry_does_not_reveal_profile_creation_through_username(
     mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
 
 
-def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
+def test_signup_normalizes_taken_username_before_creating_auth_user_or_profile(
     mock_gateway,
     monkeypatch,
 ):
@@ -2420,9 +2420,9 @@ def test_signup_rejects_taken_username_before_creating_auth_user_or_profile(
             },
         )
 
-    assert response.status_code == 409
-    assert response.json()["code"] == "username_taken"
-    assert response.json()["detail"] == "That username is already taken."
+    assert response.status_code == 400
+    assert response.json()["code"] == "auth_signup_failed"
+    assert response.json()["detail"] == "Signup failed. Please try again."
     serialize_username.assert_called_once_with(
         api_state.DATABASE_URL,
         "fresh@example.com",
@@ -2524,57 +2524,108 @@ def test_password_auth_bounds_captcha_before_provider_call(
     mock_gateway.login.assert_not_called()
 
 
-def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
+def test_public_signup_allowlist_denial_matches_provider_failure(
     mock_gateway,
     monkeypatch,
 ):
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = False
+    headers = {"X-Request-Id": "signup-enumeration-regression"}
 
-    response = client.post(
+    allowlist_denied = client.post(
         "/api/v1/auth/signup",
         json={
             "email": "stranger@example.com",
             "password": "password123",
             "captcha_token": "captcha-proof",
         },
+        headers=headers,
     )
 
-    assert response.status_code == 400
-    assert response.json()["code"] == "auth_signup_failed"
-    assert response.json()["detail"] == "Signup failed. Please try again."
-    assert "private alpha" not in response.text.lower()
     mock_gateway.signup.assert_not_called()
     mock_gateway.private_alpha_email_allowed.assert_called_once_with(
         "stranger@example.com"
     )
-    assert "mark_private_alpha_signup_accepted" not in [
-        call[0] for call in mock_gateway.method_calls
-    ]
-
-
-def test_signup_sanitizes_provider_errors(mock_gateway, monkeypatch):
-    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
-    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.reset_mock()
     mock_gateway.private_alpha_email_allowed.return_value = True
-    mock_gateway.signup.side_effect = RuntimeError(
-        "Supabase provider leaked an internal auth reason"
-    )
+    mock_gateway.signup.side_effect = RuntimeError("provider rejected captcha")
 
-    response = client.post(
+    provider_failed = client.post(
         "/api/v1/auth/signup",
         json={
             "email": "alpha@example.com",
             "password": "password123",
             "captcha_token": "captcha-proof",
         },
+        headers=headers,
     )
 
-    assert response.status_code == 400
-    assert response.json()["code"] == "auth_signup_failed"
-    assert response.json()["detail"] == "Signup failed. Please try again."
-    assert "Supabase provider" not in response.text
+    assert allowlist_denied.status_code == provider_failed.status_code == 400
+    assert (
+        allowlist_denied.headers["X-Request-Id"]
+        == provider_failed.headers["X-Request-Id"]
+        == headers["X-Request-Id"]
+    )
+    assert allowlist_denied.json() == provider_failed.json() == {
+        "type": "https://api.argus.app/problems/auth-signup-failed",
+        "title": "Signup Failed",
+        "status": 400,
+        "detail": "Signup failed. Please try again.",
+        "code": "auth_signup_failed",
+        "request_id": "signup-enumeration-regression",
+    }
+    assert "provider rejected captcha" not in provider_failed.text
+
+
+def test_public_signup_allowlist_denial_matches_taken_username_precheck(
+    mock_gateway,
+    monkeypatch,
+):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    headers = {"X-Request-Id": "signup-username-enumeration-regression"}
+    mock_gateway.private_alpha_email_allowed.return_value = False
+
+    allowlist_denied = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "stranger@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+            "username": "takenname",
+        },
+        headers=headers,
+    )
+
+    mock_gateway.reset_mock()
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    with patch(
+        "argus.api.routers.auth.serialized_username_signup",
+        return_value=nullcontext(
+            UsernameSignupPrevalidation(
+                auth_user_exists=False,
+                username_available=False,
+            )
+        ),
+    ):
+        username_taken = client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "alpha@example.com",
+                "password": "password123",
+                "captcha_token": "captcha-proof",
+                "username": "takenname",
+            },
+            headers=headers,
+        )
+
+    assert allowlist_denied.status_code == username_taken.status_code == 400
+    assert allowlist_denied.json() == username_taken.json()
+    mock_gateway.signup.assert_not_called()
 
 
 def test_login_normalizes_private_alpha_access_failures(

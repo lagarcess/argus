@@ -34,6 +34,7 @@ EXCLUDED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
         ("get", "/health"),
         ("get", "/internal/readiness"),
         ("post", "/internal/access-requests/approve"),
+        ("post", "/internal/canary/requested-signup-denial"),
         ("post", "/api/v1/dev/reset"),
     }
 )
