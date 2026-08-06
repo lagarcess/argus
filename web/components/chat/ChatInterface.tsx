@@ -76,11 +76,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
-import {
-  RETEST_ACTION_TYPE,
-  applyRetestReceipt,
-  retestReceiptFromFinalPayload,
-} from "@/lib/chat-retest";
+import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload } from "@/lib/chat-retest";
 import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
@@ -1118,8 +1114,7 @@ export default function ChatInterface() {
 
     closeTransientSidebar();
     shouldAutoScrollRef.current = true;
-    const renderUserMessage =
-      options?.renderUserMessage ?? !isRetryAction(action);
+    const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -1232,8 +1227,7 @@ export default function ChatInterface() {
         }
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
-        const errorStrategyPathContext =
-          strategyPathContextFromMetadata(errorPayload);
+        const errorStrategyPathContext = strategyPathContextFromMetadata(errorPayload);
         // Same gate the `final` frame applies: a retryable failure wears the
         const errorAssistantRecoveryCode = retryableAssistantRecoveryCode(
           errorPayload.recovery,
@@ -1253,11 +1247,10 @@ export default function ChatInterface() {
                 assistantMessageId: persistedErrorMessageId,
               })
             : retryLastTurnAction);
-        setMessages((prev) => {
-          const settledMessages = applyRetestReceipt(prev, userMsg.id, null);
-          return normalizeDurableRetryActionHistory(
+        setMessages((prev) =>
+          normalizeDurableRetryActionHistory(
             settleOpenConfirmationsAfterStreamError(
-              settledMessages.map((m) =>
+              applyRetestReceipt(prev, userMsg.id, null).map((m) =>
                 durableRetry && m.id === userMsg.id
                   ? {
                       ...m,
@@ -1287,8 +1280,8 @@ export default function ChatInterface() {
               ),
               action,
             ),
-          );
-        });
+          ),
+        );
         if (!terminalReadiness.accept({ message_id: event.data.message_id, recovery: event.data.recovery ?? null, retry_last_turn: event.data.retry_last_turn ?? null }, true)) terminalReadiness.finish(true);
         finishRequestTransport(requestSession);
       }
@@ -1682,11 +1675,10 @@ export default function ChatInterface() {
             : t("chat.error_backtest");
         const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
         if (canApplyVisibleUpdate) {
-          setMessages((prev) => {
-            const settledMessages = applyRetestReceipt(prev, userMsg.id, null);
-            return normalizeDurableRetryActionHistory(
+          setMessages((prev) =>
+            normalizeDurableRetryActionHistory(
               settleConfirmationAfterActionTransportError(
-                settledMessages.map((m) =>
+                applyRetestReceipt(prev, userMsg.id, null).map((m) =>
                   m.id === assistantId
                     ? {
                         ...m,
@@ -1707,8 +1699,8 @@ export default function ChatInterface() {
                 action,
                 { rejectionCode },
               ),
-            );
-          });
+            ),
+          );
         }
         terminalReadiness.finish(requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);
