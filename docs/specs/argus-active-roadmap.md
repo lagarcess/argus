@@ -147,11 +147,11 @@ Standing chore work, picked up alongside lanes rather than scheduled:
   shape that has produced fake test failures before.
 - **Implement the usage allowance meter colors.** `.agent/designs/argus/DESIGN.md`
   section 23 already specifies this completely and it was never built: teal
-  above 50% remaining, `--rui-color-warning` between 20% and 50%,
-  `--rui-color-danger` at or below 20% including exhaustion, with the window
-  closest to exhaustion governing. Color stays supporting information only, so
-  the exact remaining count and truthful reset time must survive, with no
-  pulsing or terminal-style treatment. Today `UsageModal.tsx` and
+  at or above 30% remaining, `--rui-color-warning` above 10% and below 30%,
+  and `--rui-color-danger` at or below 10% including exhaustion, with the
+  lowest normalized active window governing. Color stays supporting information
+  only, so the exact remaining count and truthful reset time must survive, with
+  no pulsing or terminal-style treatment. Today `UsageModal.tsx` and
   `ProfileMenu.tsx` reference none of those tokens.
 
 ## Landed this cycle

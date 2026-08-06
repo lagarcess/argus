@@ -438,11 +438,12 @@ Argus is **NOT**:
 - Use the lowest normalized remaining capacity across the active hourly and
   daily allowance windows. The window closest to exhaustion governs the meter
   because it is the user's real near-term constraint.
-- **Green / Muted Teal** (`--rui-color-teal`): more than 50% remains.
-- **Amber / Dusty Gold** (`--rui-color-warning`): more than 20% and at most 50%
-  remains.
-- **Red / Muted Rose** (`--rui-color-danger`): 20% or less remains, including
-  exhaustion.
+- **Green / Muted Teal** (`--rui-color-teal`): at least 30% remains, including
+  exactly 30% (at most 70% consumed).
+- **Amber / Dusty Gold** (`--rui-color-warning`): more than 10% and less than
+  30% remains (more than 70% and less than 90% consumed).
+- **Red / Muted Rose** (`--rui-color-danger`): 10% or less remains, including
+  exhaustion (at least 90% consumed).
 - Color is supporting information only. Always retain the exact remaining
   count and truthful reset time, and use calm localized language with no pulse,
   flashing, or casino-terminal treatment.
