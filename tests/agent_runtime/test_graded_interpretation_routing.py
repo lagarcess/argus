@@ -25,7 +25,12 @@ from argus.agent_runtime.stages.interpret import (
     interpret_stage_async,
 )
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
-from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 
 USER = UserState(user_id="graded", language_preference="es")
 
@@ -184,3 +189,42 @@ def test_reference_only_unsupported_without_text_fails_required_shape() -> None:
         )
         is False
     )
+
+
+def test_pending_date_answer_rescue_beats_the_no_progress_menu() -> None:
+    # The live 2026-08-06 failure: both tiers rejected the period reply, and
+    # the recovery menu asked the user to re-provide the detail they just gave.
+    from datetime import date as _date
+
+    from argus.agent_runtime.stages.interpret_internal.pending_date_answer import (
+        pending_date_answer_interpretation,
+    )
+
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["SPY"],
+            asset_class="equity",
+        ),
+        pending_needs=["period"],
+    )
+    rescued = pending_date_answer_interpretation(
+        current_user_message="del ultimo año para aca",
+        language="es",
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        today=_date(2026, 8, 6),
+        reason_code="pending_date_answer_interpreter_unavailable_repaired",
+        user_goal_summary="probe",
+    )
+
+    assert rescued is not None
+    assert rescued.candidate_strategy_draft.date_range == {
+        "start": "2025-08-06",
+        "end": "2026-08-06",
+    }
+    assert rescued.semantic_turn_act == "answer_pending_need"
