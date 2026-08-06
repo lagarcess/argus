@@ -1,9 +1,17 @@
 # Private Alpha Next Roadmap
 
-Status: **INTERIM PRIVATE-ALPHA PIVOT ACTIVE.** P2.0 + P2.1 remain done, but
-the remaining P2 compounding loop is paused while the bounded
-[Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) runs after the
-latest `main` promotion checkpoint. The Gate A/B loop landed through
+Status: **SUPERSEDED 2026-08-06 — P2 history and contract reference, not the
+active board.** The active execution board is
+[`argus-active-roadmap.md`](argus-active-roadmap.md). The interim pivot that
+this document waited on completed with the 2026-08-05 production promotion and
+is archived at
+[`docs/archive/private-alpha-interim-roadmap.md`](../archive/private-alpha-interim-roadmap.md).
+The P2 compounding loop referenced below is now carried by the active board:
+A1b linked versions and A2 comparison are its product-memory item. Keep reading
+this document for P2 history, the execution-realism contract, and slice
+provenance. Do not take work from it.
+
+P2.0 + P2.1 remain done. The Gate A/B loop landed through
 2026-07-07: refine routing
 (#141/PR #148), Idea Ledger portfolio browse (#147), latest-result fact answers
 (#140/PR #153), messy company-name asset preservation (#142/PR #146), and the
@@ -227,8 +235,9 @@ discovery — the sixteenth and final landing of the checkpoint-gap batch.
 everything after it stacks for the next cycle** (#335 inline editing, #332,
 #369, #377, the parked #363 design, and the allowance session).
 
-The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
-authoritative founder-outcome and live-QA source for this pivot, with #213
+The [Private Alpha Interim Roadmap](../archive/private-alpha-interim-roadmap.md)
+(archived, complete) was the authoritative founder-outcome and live-QA source
+for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
 possible implementation material; they do not define the next slice or program
 completion. The retired issue dependency map and waves are preserved in
@@ -336,12 +345,12 @@ Pre-flight is complete and its findings are the promotion agent's brief:
 ### Next-cycle boards — 2026-08-05
 
 The interim roadmap is complete (promotion executed; #228/#233 closed). The
-next cycle runs on two draft boards pending founder ranking:
-[`next-cycle-stabilization-roadmap.md`](next-cycle-stabilization-roadmap.md)
-(every open issue and PR, alpha-feedback root causes included) and
-[`next-cycle-product-roadmap.md`](next-cycle-product-roadmap.md) (mobile
-readiness spike first, then product memory, personalization, dev-cost
-accounting, sharing, broker handoff, plus the brainstorm-first ledger).
+two next-cycle draft boards it pointed at were folded into the single active
+board on 2026-08-06: [`argus-active-roadmap.md`](argus-active-roadmap.md).
+Their drafts are archived at
+[`2026-08-05-next-cycle-stabilization-roadmap.md`](../archive/2026-08-05-next-cycle-stabilization-roadmap.md)
+and
+[`2026-08-05-next-cycle-product-roadmap.md`](../archive/2026-08-05-next-cycle-product-roadmap.md).
 
 ### Acceptance walk amendment — 2026-08-04 evening
 
@@ -453,7 +462,7 @@ Every agent starts here:
 5. `docs/DATA_MODEL.md`
 6. `.agent/designs/argus/DESIGN.md`
 7. This roadmap
-8. `docs/specs/private-alpha-interim-roadmap.md` for every current interim slice
+8. `docs/specs/argus-active-roadmap.md` for every current slice
 9. `docs/specs/private-alpha-next-decision-memo.md`
 10. `docs/specs/private-alpha-ci-cd-sota.md`
 11. `docs/PRIVATE_LAUNCH_RUNBOOK.md`

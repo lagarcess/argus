@@ -9,9 +9,13 @@ Audience: Founder, Codex, future product/spec work
 Scope: Strategic source for Private Alpha Next product work. It captures the
 full reasoning cycle triggered by the Robinhood/Alpaca/ChatGPT agentic trading
 discovery and translates it into product, architecture, leverage, and roadmap
-implications for Argus. Use `docs/specs/private-alpha-next-roadmap.md` for the
-current execution board and use this memo, including the addenda, for
-slice-specific onboarding before planning or implementation.
+implications for Argus. Use `docs/specs/argus-active-roadmap.md` for the current
+execution board and use this memo, including the addenda, for slice-specific
+onboarding before planning or implementation.
+
+**2026-08-06 pointer.** The active board pulls its five priorities from this
+memo; see section 18 for what the 2026-08-06 competitive review changed and
+what it did not.
 
 Related product-thesis trial: source context only; not required reading for specs.
 
@@ -3745,3 +3749,63 @@ The current engine launch adapter is sufficient. Argus continues to own
 canonical run/evidence contracts and must not leak engine-native output into
 product objects. A formal multi-engine interface remains deferred until a
 second validated engine or workflow demonstrates a concrete user-facing need.
+
+## 18. Founder Resolution Addendum - 2026-08-06
+
+A competitor review of [driven.ai](https://driven.ai) produced one finding that
+reordered execution without changing this memo's thesis. The active board is
+`docs/specs/argus-active-roadmap.md`; this section records what changed here.
+
+### 18.1 What The Review Found
+
+Driven sells an AI investment workspace: agents, skills, live data, persistent
+profiles, monitoring, portfolios, and paper trading. Its documented quickstart
+does not include backtesting, so it is not competing for the same job.
+
+But its entire first session is a research read, and that is the same first
+message Argus receives. Argus currently refuses it. Users are lost before
+reaching historical validation, which is the thing Argus is good at.
+
+The threat is not breadth. Breadth is Driven's onboarding tax: Google sign-in
+plus a multi-step setup before anything happens. Argus's guest entry, where a
+first completed backtest is activation rather than account creation, is a real
+advantage that this memo already argued for.
+
+### 18.2 What Changed
+
+Timing, not thesis. Section 5.6's layering, section 10.5's sequencing, section
+12.3's assisted-not-automatic rule, section 15.3's memory posture, and section
+16.1's P2 boundary all stand unchanged.
+
+Three sequencing consequences:
+
+1. **Answering an ordinary finance question is now the first priority.** This
+   memo's section 21 filter asks whether a change makes it easier for a normal
+   person to turn curiosity into a grounded experiment. Refusing the opening
+   question fails that filter at the first step. Research becomes an explicit
+   typed act that produces sources and candidate entities, then offers one to
+   three prebaked runnable test cards through the existing typed Try-next
+   surface. It does not become a research platform or a skill store.
+2. **Mobile readiness is a hard public-exposure gate**, not a decision spike.
+   Consistent with section 15.8's PMF gates: the loop must work where people
+   actually open it.
+3. **Product memory is promoted.** Section 16.1 holds that durable
+   Idea/IdeaVersion/EvidenceArtifact/DecisionNote recall is sufficient for P2.
+   The review sharpened why it is urgent: backtesting is copyable, an
+   accumulated record of a user's own decisions is not. It is the
+   differentiation this memo describes and the product has not yet proven.
+
+### 18.3 What Was Explicitly Refused
+
+No agent marketplace, model picker, multi-hundred-API integration story,
+autonomous monitoring, portfolio system, messaging channels, or trading
+workflow. No auth-gated marketing site between a visitor and their first test.
+Argus remains the pre-flight checklist, not an investment command center.
+
+### 18.4 Delivery Model Change
+
+Phased and incubation delivery is retired. A dispatched lane is built
+production-ready end to end, including tests, evidence, and docs. Work that is
+not ready for users ships behind a default-off flag rather than behind a staged
+branch. Personalization memory, delivered this way on 2026-08-06, is the
+reference example; its remaining decisions live in its own pull-request docs.

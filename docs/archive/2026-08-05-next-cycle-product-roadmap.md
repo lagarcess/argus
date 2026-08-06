@@ -1,5 +1,9 @@
 # Next-Cycle Product Roadmap
 
+Status: **ARCHIVED 2026-08-06 — superseded.** Folded into
+[`docs/specs/argus-active-roadmap.md`](../specs/argus-active-roadmap.md).
+Kept for the Mem0 and personalization-memory decision record.
+
 Feature triage for the cycle after the 2026-08-05 production promotion.
 Founder-ranked 2026-08-06. Companion board:
 [`next-cycle-stabilization-roadmap.md`](next-cycle-stabilization-roadmap.md).

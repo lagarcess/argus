@@ -1,5 +1,9 @@
 # Next-Cycle Stabilization Roadmap
 
+Status: **ARCHIVED 2026-08-06 — superseded.** Folded into
+[`docs/specs/argus-active-roadmap.md`](../specs/argus-active-roadmap.md).
+Kept for the issue triage and tier reasoning captured on 2026-08-05.
+
 Opened 2026-08-05, the day after the production promotion. Founder-ranked
 2026-08-06. Companion board:
 [`next-cycle-product-roadmap.md`](next-cycle-product-roadmap.md).
