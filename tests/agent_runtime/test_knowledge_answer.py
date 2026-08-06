@@ -187,3 +187,42 @@ def test_market_data_failure_degrades_to_search(monkeypatch) -> None:
 
     assert result is not None
     assert result.decision.reason_codes == ["knowledge_answer_current_external"]
+
+
+def test_palette_rendering_enforces_emphasis() -> None:
+    voiced = ka.VoicedAnswer(
+        lead="QQQ rose 16.57 % over the past year.",
+        bullets=["Biggest drop was 0.0 %", "Volatility was 0.03 % annualized"],
+        note="Window: 2025-08-06 to 2026-08-06",
+    )
+
+    rendered = voiced.as_markdown()
+
+    assert "**16.57 %**" in rendered
+    assert "**0.0 %**" in rendered
+    assert rendered.strip().endswith("*")
+    # Already-emphasized content is left alone.
+    assert ka.VoicedAnswer(lead="QQQ rose **16.57%**.").as_markdown() == (
+        "QQQ rose **16.57%**."
+    )
+
+
+def test_educational_turn_with_enriched_asset_uses_the_classifier(
+    monkeypatch,
+) -> None:
+    # "What is SPY?" can arrive with SPY attached by provider enrichment; the
+    # asset alone must not shortcut to statistics.
+    calls: list[str] = []
+
+    async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
+        calls.append("classified")
+        return ka.KnowledgeQueryExtraction(question_kind="concept")
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
+
+    educational = _interpretation(
+        intent="conversation_followup",
+        semantic_turn_act="educational_question",
+    )
+    assert _run(educational, "¿Qué es SPY?") is None
+    assert calls == ["classified"]

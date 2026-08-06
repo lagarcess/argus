@@ -439,7 +439,7 @@ class OpenRouterStructuredInterpreter:
         """
         Executes the interpretation turn.
         """
-        self.last_failure_kind = None
+        self.last_failure_kind, self.correction_attempted = None, False
         candidate_models: list[str] | None = None
         if self.model_name is None:
             candidate_models = openrouter_structured_model_candidates()

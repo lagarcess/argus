@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
+from loguru import logger
+
 from argus.agent_runtime.interpreter.draft_shape import (
     _request_has_active_strategy_context,
 )
@@ -21,6 +23,7 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+from argus.agent_runtime.turn_execution import active_turn_execution
 from argus.llm.openrouter import (
     log_openrouter_failure,
     record_openrouter_route_receipt,
@@ -111,9 +114,14 @@ async def handle_candidate_failure(
             "trying next configured model"
         ),
     )
+    # The banner classifies on the LATEST candidate's failure: a transient
+    # transport failure after a contract rejection must restore the retry
+    # affordance, because retrying that tier could genuinely succeed.
+    interpreter.last_failure_kind = (
+        "contract_rejected" if isinstance(exc, InterpretationContractError) else None
+    )
     if not isinstance(exc, InterpretationContractError):
         return None
-    interpreter.last_failure_kind = "contract_rejected"
     # The provider call already recorded its own succeeded receipt, so without
     # this the turn reads as green. Transport and schema failures are not
     # recorded here because invoke_openrouter_json_schema already books those.
@@ -127,6 +135,9 @@ async def handle_candidate_failure(
         outcome="failed",
         failure_mode="interpretation_contract_rejected",
     )
+    if not _correction_budget_allows_attempt(interpreter):
+        return None
+    interpreter.correction_attempted = True
     corrected = await self_corrected_response(
         error=exc,
         wire_messages=wire_messages,
@@ -141,6 +152,27 @@ async def handle_candidate_failure(
     interpreter.last_failure_kind = None
     interpreter.last_status = "used" if is_primary else "fallback_used"
     return interpreter._to_runtime_interpretation(corrected, request=request)
+
+
+# Focused repair plus the clarification primary/fallback pair must still fit
+# inside the calibrated turn allowance after a failed correction.
+_CORRECTION_RESERVED_CALLS = 3
+
+
+def _correction_budget_allows_attempt(interpreter: Any) -> bool:
+    """One correction per turn, and only with corridor headroom to spare."""
+    if getattr(interpreter, "correction_attempted", False):
+        return False
+    execution = active_turn_execution()
+    if execution is None:
+        return True
+    remaining = execution.call_allowance - execution.calls_reserved
+    if remaining <= _CORRECTION_RESERVED_CALLS:
+        logger.debug(
+            f"Skipping interpretation self-correction remaining_calls={remaining}"
+        )
+        return False
+    return True
 
 
 async def self_corrected_response(

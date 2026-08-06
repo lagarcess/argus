@@ -450,16 +450,19 @@ def _request_has_active_strategy_context(request: InterpretationRequest) -> bool
 
 _EXECUTION_EVIDENCE_FIELDS = (
     "strategy_type",
+    "requested_strategy_template",
     "entry_logic",
     "exit_logic",
     "entry_rule",
     "exit_rule",
     "rule_spec",
     "cadence",
+    "sizing_mode",
     "capital_amount",
     "total_capital",
     "initial_capital",
     "position_size",
+    "recurring_contribution",
     "risk_rules",
 )
 

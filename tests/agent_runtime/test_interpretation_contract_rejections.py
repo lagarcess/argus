@@ -311,3 +311,89 @@ def test_transient_unavailability_still_offers_retry() -> None:
 
     assert patch["recovery"]["retryable"] is True
     assert patch["retry_last_turn"]["message"]
+
+
+def test_transient_failure_after_contract_rejection_restores_retry() -> None:
+    from argus.agent_runtime.interpreter import contract_recovery
+
+    class _Interp:
+        last_failure_kind = None
+        correction_attempted = False
+
+    interp = _Interp()
+
+    async def _noop_invoke(**_kwargs: Any) -> None:
+        return None
+
+    async def _noop_ready(**_kwargs: Any) -> None:
+        return None
+
+    def _handle(exc: Exception) -> None:
+        asyncio.run(
+            contract_recovery.handle_candidate_failure(
+                interpreter=interp,
+                exc=exc,
+                candidate_model="primary/model",
+                is_primary=True,
+                wire_messages=[],
+                invoke_schema=_noop_invoke,
+                ready_for_runtime=_noop_ready,
+                request=_bare_request("del ultimo año para aca"),
+                asset_resolution_context=None,
+            )
+        )
+
+    _handle(
+        InterpretationContractError("rejected", corrective_hint="fix it")
+    )
+    assert interp.last_failure_kind == "contract_rejected"
+    # A later transient failure must win the classification: retry can help.
+    _handle(TimeoutError())
+    assert interp.last_failure_kind is None
+
+
+def test_correction_is_skipped_without_corridor_headroom() -> None:
+    from argus.agent_runtime import turn_execution
+    from argus.agent_runtime.interpreter import contract_recovery
+    from argus.agent_runtime.state.models import RunState
+
+    class _Interp:
+        last_failure_kind = None
+        correction_attempted = False
+
+    interp = _Interp()
+    attempts: list[str] = []
+
+    async def _counting_invoke(**_kwargs: Any) -> None:
+        attempts.append("correction_call")
+        return None
+
+    async def _noop_ready(**_kwargs: Any) -> None:
+        return None
+
+    with turn_execution.turn_execution_scope(
+        entry_state=RunState.new(
+            current_user_message="del ultimo año para aca",
+            recent_thread_history=[],
+        )
+    ) as execution:
+        execution.calls_reserved = execution.call_allowance - 2
+        asyncio.run(
+            contract_recovery.handle_candidate_failure(
+                interpreter=interp,
+                exc=InterpretationContractError(
+                    "rejected", corrective_hint="fix it"
+                ),
+                candidate_model="primary/model",
+                is_primary=True,
+                wire_messages=[],
+                invoke_schema=_counting_invoke,
+                ready_for_runtime=_noop_ready,
+                request=_bare_request("del ultimo año para aca"),
+                asset_resolution_context=None,
+            )
+        )
+
+    # No headroom left for repair + clarification, so no corrective call.
+    assert attempts == []
+    assert interp.correction_attempted is False

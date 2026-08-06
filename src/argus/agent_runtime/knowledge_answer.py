@@ -53,6 +53,30 @@ _KNOWLEDGE_ACTS = frozenset({"educational_question", "unsupported_request"})
 _SEARCH_MAX_RESULTS = 5
 
 
+def _with_bold_figure(text: str) -> str:
+    """Guarantee the first figure in a palette line is bold.
+
+    Presentation only: this walks tokens for a digit-bearing one, it does not
+    interpret language or route anything.
+    """
+    if not text or "**" in text:
+        return text
+    tokens = text.split(" ")
+    for index, token in enumerate(tokens):
+        if any(character.isdigit() for character in token):
+            core = token.rstrip(".,;:)")
+            suffix = token[len(core):]
+            if index + 1 < len(tokens) and tokens[index + 1].startswith("%"):
+                trailing = tokens[index + 1].rstrip(".,;:)")
+                rest = tokens[index + 1][len(trailing):]
+                tokens[index] = f"**{core} {trailing}**{rest or suffix}"
+                del tokens[index + 1]
+            else:
+                tokens[index] = f"**{core}**{suffix}"
+            return " ".join(tokens)
+    return text
+
+
 class VoicedAnswer(BaseModel):
     """Voicing contract: the model composes from a palette of blocks it may
     use or skip; the code renders whatever arrived, so the answer is creative
@@ -63,12 +87,15 @@ class VoicedAnswer(BaseModel):
     note: str | None = None
 
     def as_markdown(self) -> str:
+        # Rendering enforces the palette the prompt asks for, so a provider
+        # that follows the JSON schema but ignores prose instructions still
+        # produces the contracted emphasis.
         blocks: list[str] = []
-        lead = " ".join(self.lead.split())
+        lead = _with_bold_figure(" ".join(self.lead.split()))
         if lead:
             blocks.append(lead)
         lines = [
-            f"- {' '.join(bullet.split())}"
+            f"- {_with_bold_figure(' '.join(bullet.split()))}"
             for bullet in self.bullets[:4]
             if bullet.strip()
         ]
@@ -76,6 +103,8 @@ class VoicedAnswer(BaseModel):
             blocks.append("\n".join(lines))
         note = " ".join((self.note or "").split())
         if note:
+            if not (note.startswith("*") and note.endswith("*")):
+                note = f"*{note.strip('*_ ')}*"
             blocks.append(note)
         return "\n\n".join(blocks)
 
@@ -151,6 +180,14 @@ async def knowledge_answer_stage_result(
 def _query_from_interpretation(
     interpretation: StructuredInterpretation,
 ) -> KnowledgeQueryExtraction | None:
+    # A resolved asset alone does not establish market_stats: educational
+    # turns can receive one through provider-context enrichment ("What is
+    # SPY?"), and those must keep the interpreter's concept explanation. The
+    # shortcut applies only to unsupported_request turns, where the
+    # interpreter has already ruled the concept answer out; the ambiguous
+    # educational slice goes through the bounded classifier instead.
+    if interpretation.semantic_turn_act != "unsupported_request":
+        return None
     draft = interpretation.candidate_strategy_draft
     symbols = [
         str(symbol).strip().upper()
