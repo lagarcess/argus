@@ -384,6 +384,7 @@ non-product operations:
 - `GET /health`
 - `GET /internal/readiness`
 - `POST /internal/access-requests/approve`
+- `POST /internal/canary/requested-signup-denial`
 - `POST /api/v1/dev/reset`
 
 No public `/api/v1` product route may be hidden by a prefix or wildcard
@@ -1469,6 +1470,11 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   configuration, missing or disabled state, SMTP failure, and a compare-and-set
   miss do not return success. Missing or invalid ops authorization returns
   `404`.
+- `POST /internal/canary/requested-signup-denial` is an ops-token-protected,
+  non-product operation excluded from the public OpenAPI artifact by exact
+  method and path. It reports whether a supplied email would be denied by the
+  private-alpha allowlist, without calling Supabase Auth signup. Missing or
+  invalid ops authorization returns `404`.
 - The allowlist remains intentionally narrow: `email`, `role`, `language`,
   `disabled_at`, `created_at`, and `updated_at`. The approval notification does
   not pre-create an Auth user or create an invite/password-setup flow.
@@ -1685,9 +1691,10 @@ listed emails that fail provider signup.
 
 When an optional username is supplied, the server trims and case-folds it and
 serializes same-email and same-username signup attempts before checking profile
-availability and creating the Auth user. A conflict for an email that can
-create a new Auth user returns `409 username_taken`; the Auth provider and
-profile write are not called for the losing request. If the Auth email already
+availability and creating the Auth user. A pre-provider username conflict uses
+the same generic `400 auth_signup_failed` response, so it cannot distinguish
+allowlisted emails from unlisted, requested, or disabled ones. The Auth provider
+and profile write are not called for that conflict. If the Auth email already
 exists, Argus preserves Supabase's public duplicate-signup response instead of
 letting the username check reveal that account. An obfuscated response with an
 empty identity list never creates a profile.

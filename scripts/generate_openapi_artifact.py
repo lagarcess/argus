@@ -1,7 +1,7 @@
 """Regenerate docs/api/openapi.yaml from the canonical runtime document.
 
 The checked artifact is a compatibility artifact, not a second authority: it is
-produced from ``app.openapi()`` with the three approved non-product operations
+produced from ``app.openapi()`` with the four approved non-product operations
 removed and generation-noise keys (``summary``, ``operationId``) stripped.
 Structural equivalence is enforced by tests/test_openapi_compatibility.py.
 """

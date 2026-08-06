@@ -937,8 +937,8 @@ def test_signup_taken_username_creates_no_auth_user_or_profile(
                 },
             )
 
-        assert response.status_code == 409, response.json()
-        assert response.json()["code"] == "username_taken"
+        assert response.status_code == 400, response.json()
+        assert response.json()["code"] == "auth_signup_failed"
         with psycopg.connect(LOCAL_DATABASE_URL) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
@@ -1083,8 +1083,8 @@ def test_concurrent_same_username_signup_calls_auth_only_for_winner(
             second_response = second.result(timeout=10)
 
         assert first_response.status_code == 200, first_response.json()
-        assert second_response.status_code == 409, second_response.json()
-        assert second_response.json()["code"] == "username_taken"
+        assert second_response.status_code == 400, second_response.json()
+        assert second_response.json()["code"] == "auth_signup_failed"
         assert gateway.get_user(user_id=str(first_response.json()["user"]["id"]))
         with psycopg.connect(LOCAL_DATABASE_URL) as connection:
             with connection.cursor() as cursor:
