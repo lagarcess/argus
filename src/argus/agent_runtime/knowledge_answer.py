@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
 from argus.agent_runtime.next_experiments import (
-    NEXT_EXPERIMENTS_VERSION,
     NEXT_EXPERIMENT_ACTION_LABELS,
+    NEXT_EXPERIMENTS_VERSION,
     next_experiment_label_key,
 )
 from argus.agent_runtime.profile.response_profile import (
@@ -30,8 +30,12 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
-from argus.agent_runtime.state.models import TaskSnapshot
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.domain.discovery_search.config import discovery_search_config
 from argus.domain.discovery_search.contracts import SearchUnavailableError
