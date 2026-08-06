@@ -112,9 +112,15 @@ def prepare_retest_confirmation_payload(
         setup,
         end_date=effective_end,
     )
+    requested_date_range: dict[str, str] | None = None
     # Keep normal provider coverage adjustment intact. Clamp before preflight
-    # only when an incomplete final candle creates the violation by itself.
+    # only when an incomplete final candle creates the violation by itself,
+    # while retaining the raw request as durable coverage provenance.
     if raw_violation_code is not None and window_violation_code is None:
+        requested_date_range = {
+            "start": setup.start.isoformat(),
+            "end": setup.end.isoformat(),
+        }
         setup = replace(setup, end=effective_end)
 
     payload = retest_confirmation_payload(
@@ -124,6 +130,10 @@ def prepare_retest_confirmation_payload(
     )
     if payload is None:
         return RetestConfirmationPreparation()
+    if requested_date_range is not None:
+        launch_payload = dict(payload["launch_payload"])
+        launch_payload["requested_date_range"] = requested_date_range
+        payload = {**payload, "launch_payload": launch_payload}
 
     if window_violation_code is not None:
         return RetestConfirmationPreparation(

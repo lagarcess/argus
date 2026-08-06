@@ -768,10 +768,21 @@ def test_exact_currency_pair_candle_limit_offered_action_reaches_confirmation(
 
     assert response.status_code == 200
     [final] = _stream_payloads(response.text, "final")
-    assert final["confirmation_payload"]["launch_payload"]["date_range"] == {
+    confirmation_payload = final["confirmation_payload"]
+    launch_payload = confirmation_payload["launch_payload"]
+    assert launch_payload["requested_date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-31",
+    }
+    assert launch_payload["date_range"] == {
         "start": "2024-08-10",
         "end": "2026-07-30",
     }
+    coverage = launch_payload["coverage_preflight"]
+    assert coverage["outcome"] == "adjusted_coverage"
+    assert coverage["requested_date_range"] == launch_payload["requested_date_range"]
+    assert coverage["effective_date_range"] == launch_payload["date_range"]
+    assert confirmation_payload["validation"]["date_adjusted"] is True
 
 
 def test_same_period_retest_is_rejected_without_turn_job_or_backtest(
