@@ -436,15 +436,11 @@ describe("conversation activity viewport read proof", () => {
     );
     expect(
       chat.match(/beginConversationActivityTerminalReadiness\(/g),
-    ).toHaveLength(4);
-    expect(chat.match(/terminalReadiness\.accept\(/g)).toHaveLength(4);
+    ).toHaveLength(3);
+    expect(chat.match(/terminalReadiness\.accept\(/g)).toHaveLength(3);
     expect(chat.match(/terminalReadiness\.finish\(/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
     expect(chat).toContain("promoteCanonicalConversationActivityTranscript({");
 
-    const saveAction = chat.slice(
-      chat.indexOf("const handleSaveStrategyAction"),
-      chat.indexOf("const handleLogout"),
-    );
     const sendActionStart = chat.indexOf("const handleSend");
     const sendAction = chat.slice(
       sendActionStart,
@@ -454,9 +450,8 @@ describe("conversation activity viewport read proof", () => {
       chat.indexOf("const handleCancelConfirmationAction"),
       chat.indexOf("const handleAction"),
     );
-    expect(saveAction).toContain("synchronizeConversationViewRefs(");
     expect(cancelAction).toContain("synchronizeConversationViewRefs(");
-    for (const owner of [sendAction, saveAction, cancelAction]) {
+    for (const owner of [sendAction, cancelAction]) {
       expect(owner).toContain("beginConversationActivityTerminalReadiness(");
       expect(owner).toContain("terminalReadiness.accept(");
       expect(owner).toContain("terminalReadiness.finish(");

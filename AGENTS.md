@@ -640,8 +640,8 @@ versioned, manual QA should use `live_provider` so symbol recognition exercises
 the same provider-backed resolution path production will use.
 
 ### Feature Flags (All Private-Alpha)
-Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
-by default and should only be disabled for a targeted regression check:
+Omnisearch is enabled by default and should only be disabled for a targeted
+regression check:
 
 - Once the founder accepts and merges a feature as part of the normal Argus
   product shape, its runtime default is **on**. Retain its flag as an emergency
@@ -651,8 +651,6 @@ by default and should only be disabled for a targeted regression check:
   exact-SHA canary before tester exposure.
 
 ```bash
-NEXT_PUBLIC_STRATEGIES_ENABLED=false
-NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 NEXT_PUBLIC_OMNISEARCH_ENABLED=true
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 ```
@@ -667,8 +665,6 @@ For fast Dev Mode:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=true
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
-NEXT_PUBLIC_STRATEGIES_ENABLED=false
-NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 ```
 
@@ -676,8 +672,6 @@ For QA Mode with real Supabase auth:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=false
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
-NEXT_PUBLIC_STRATEGIES_ENABLED=false
-NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 ```
 

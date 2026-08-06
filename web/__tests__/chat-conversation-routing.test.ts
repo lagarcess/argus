@@ -171,7 +171,7 @@ describe("chat conversation route state", () => {
       shouldApplyConversationScopedUpdate({
         targetConversationId: "old-conversation",
         activeConversationId: "old-conversation",
-        currentView: "strategies",
+        currentView: "settings",
         routeState: activeConversationRouteStateFromUrl(
           "http://localhost:3000/chat?conversation=old-conversation",
         ),
@@ -202,7 +202,7 @@ describe("chat conversation route state", () => {
       shouldApplyConversationScopedUpdate({
         targetConversationId: "active-conversation",
         activeConversationId: "active-conversation",
-        currentView: "strategies",
+        currentView: "settings",
         routeState: activeConversationRouteStateFromUrl(
           "http://localhost:3000/chat?conversation=active-conversation",
         ),

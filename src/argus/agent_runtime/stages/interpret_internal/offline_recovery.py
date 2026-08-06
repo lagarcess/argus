@@ -4,7 +4,6 @@ Behavior-preserving relocation from stages/interpret.py (issue #131)."""
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
@@ -159,11 +158,6 @@ def _offline_pending_no_progress_result(
             "missing_required_fields": [requested_field],
         },
     )
-
-
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
 
 
 def _latest_result_save_requested(decision: InterpretDecision) -> bool:

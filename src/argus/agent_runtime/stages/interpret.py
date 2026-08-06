@@ -251,7 +251,6 @@ from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # 
     _offline_interpreter_unavailable_result,
     _offline_recovery_message,
     _pending_assumption_edit_was_not_applied,
-    _strategies_enabled,
 )
 from argus.agent_runtime.stages.interpret_internal.route_repair import (  # noqa: F401
     _repair_fresh_restatement_route_when_pending_need_is_active,
@@ -2854,7 +2853,7 @@ async def _latest_result_followup_recovery_if_applicable(
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     focus = decision.result_followup_focus or "general"
-    if save_requested and not _strategies_enabled():
+    if save_requested:
         response = await compose_private_alpha_save_response(
             metadata=metadata,
             user_message=current_user_message,
@@ -2877,13 +2876,13 @@ async def _latest_result_followup_recovery_if_applicable(
                 "latest_result_followup_unavailable",
                 language=user.language_preference,
             )
-    if save_requested and not _strategies_enabled():
+    if save_requested:
         used_recovery = False
     stage_patch: dict[str, Any] = {
         "assistant_response": response,
     }
     # Failure prose never wears result chrome; the recovery patch owns it.
-    if not (save_requested and not _strategies_enabled()) and not used_recovery:
+    if not save_requested and not used_recovery:
         stage_patch["response_intent"] = result_followup_response_intent(focus)
     if used_recovery:
         stage_patch.update(
@@ -2929,8 +2928,6 @@ async def _private_alpha_save_request_result_if_applicable(
     current_user_message: str,
 ) -> StageResult | None:
     if not _latest_result_save_requested(decision):
-        return None
-    if _strategies_enabled():
         return None
     if decision.artifact_target != "latest_result":
         return None

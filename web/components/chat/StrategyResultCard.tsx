@@ -8,7 +8,6 @@ import {
   FileText,
   ListTree,
   PencilLine,
-  Save,
   TrendingUp,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -24,13 +23,11 @@ import {
   displayResultActionLabel,
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
-import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
 import { degradedValueClass, inlineFailureTextClass } from "@/lib/failure-treatment";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
-import { strategiesEnabled } from "@/lib/private-alpha-flags";
 import {
   strategyDisplayLabel,
   strategyTypeFromResult,
@@ -98,19 +95,10 @@ export default function StrategyResultCard({
   const refineStrategyAction = resultActions.find(
     (action) => action.type === "refine_strategy",
   );
-  const saveAction = strategiesEnabled
-    ? resultActions.find((action) => action.type === "save_strategy")
-    : undefined;
   const orderedActions: ChatActionOption[] = [];
   if (showBreakdownAction) orderedActions.push(showBreakdownAction);
   if (refineStrategyAction) orderedActions.push(refineStrategyAction);
-  if (saveAction) orderedActions.push(saveAction);
-  const renderedActions =
-    result.savedStrategyId || result.savingStrategy
-      ? orderedActions.filter((action) => action.type !== "save_strategy")
-      : orderedActions;
-  const showSavedState =
-    strategiesEnabled && (result.savedStrategyId || result.savingStrategy);
+  const renderedActions = orderedActions;
   const visibleDecisionState =
     savedDecisionState ?? result.decisionState ?? null;
   const canAddDecision =
@@ -136,7 +124,6 @@ export default function StrategyResultCard({
   ]);
   const showActionRail =
     renderedActions.length > 0 ||
-    Boolean(showSavedState) ||
     canAddDecision ||
     Boolean(visibleDecisionState);
   const revealClass =
@@ -248,16 +235,6 @@ export default function StrategyResultCard({
               {displayResultActionLabel(action, { copy: resultCardCopy })}
             </button>
           ))}
-          {showSavedState && (
-            <button
-              type="button"
-              disabled
-              className={`inline-flex min-h-9 cursor-default items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium tracking-tight ${artifactStatusToneClassName("success")}`}
-            >
-              <Save className="h-3.5 w-3.5" />
-              {result.savedStrategyId ? t("chat.saved") : t("chat.saving")}
-            </button>
-          )}
           {visibleDecisionState && (
             <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.02] px-3 py-1.5 text-[12px] font-medium tracking-tight text-[#505a63] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#8d969e]">
               <FileText className="h-3.5 w-3.5" />
@@ -537,9 +514,6 @@ function ResultActionIcon({ action }: { action: ChatActionOption }) {
   if (action.type === "refine_strategy") {
     return <PencilLine className="h-3.5 w-3.5" />;
   }
-  if (action.type === "save_strategy") {
-    return <Save className="h-3.5 w-3.5" />;
-  }
   return null;
 }
 
@@ -576,7 +550,6 @@ function resultDisplayCopy(
     worstDropLabel: t("chat.result_card.worst_drop", "Worst drop"),
     explainResultAction: t("chat.result_card.explain_result", "Explain result"),
     refineIdeaAction: t("chat.result_card.refine_idea", "Refine idea"),
-    saveAction: t("chat.result_card.save", "Save"),
     unavailable: t("chat.result_card.unavailable", "Unavailable"),
     returnUnavailable: t(
       "chat.result_card.return_unavailable",

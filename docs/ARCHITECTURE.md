@@ -93,15 +93,10 @@ Mixed chronological feed of:
 - completed backtests
 - durable idea/evidence activity
 
-### Strategies
+### Legacy Strategy and Collection Records
 
-Flagged saved-executable-idea surface. Hidden under private-alpha defaults;
-durable idea/evidence recall currently lives in Omnisearch.
-
-### Collections
-
-Flagged organizational model. Hidden and indefinitely deferred from the
-private-alpha UI.
+Retained only for owner-scoped historical reads. No dedicated UI, API router,
+or write path remains; durable idea/evidence recall lives in Omnisearch.
 
 ### Settings
 
@@ -242,8 +237,6 @@ workflow-duration backtests.
 - Settings
 - CRUD operations
 - History
-- Collections
-- Strategies
 - Run requests
 - Detail fetches
 
@@ -272,8 +265,7 @@ Canonical state store.
 - Conversations
 - Messages
 - Durable chat-turn lifecycle records
-- Strategies
-- Collections
+- Legacy Strategy and Collection rows (read compatibility only)
 - Backtest jobs
 - Backtest history
 - Archived / deleted records
@@ -296,7 +288,9 @@ portfolio results, persistence, or quotas.
 
 ### API Layer
 
-Request in -> response out. Decomposed into focused routers (`api/routers/auth`, `conversations`, `strategies`, `collections`, `backtest`, `agent`). The `api/main.py` registers routers and contains no business logic.
+Request in -> response out. Decomposed into focused routers (`api/routers/auth`,
+`conversations`, `backtest`, `agent`, and supporting product routers). The
+`api/main.py` registers routers and contains no business logic.
 
 ### AI Orchestrator (Stateless Per Request)
 
@@ -644,15 +638,6 @@ need; that abstraction belongs to the later engine-leverage experiment.
 
 # 14. Search Architecture
 
-## Surface Search
-
-Scoped search.
-
-**Examples:**
-
-- Strategies page searches strategies
-- Collections page searches collections
-
 ## Global Search
 
 Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency + pin boost.
@@ -844,7 +829,6 @@ Never leave user confused.
 
 ### Layer 5: Polish Layer
 - Search
-- Collections
 - Feedback
 - Feature flags
 

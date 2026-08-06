@@ -13,7 +13,6 @@ from typing import get_args
 import pandas as pd
 import pytest
 from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
-from argus.api.chat.strategies import strategy_template_from_run
 from argus.api.schemas import StrategyTemplate
 from argus.domain import capability_registry as registry
 from argus.domain.backtesting.config import ALLOWED_TEMPLATES, validate_backtest_config
@@ -110,16 +109,6 @@ def test_api_strategy_template_is_single_sourced_from_registry() -> None:
 
 def test_launch_strategy_type_enum_matches_supported_strategy_types() -> None:
     assert set(get_args(LaunchStrategyType)) == registry.SUPPORTED_STRATEGY_TYPES
-
-
-def test_save_passthrough_uses_registry_executable_set() -> None:
-    for template in registry.EXECUTABLE_TEMPLATES:
-        run = SimpleNamespace(config_snapshot={"template": template})
-        assert strategy_template_from_run(run) == template  # type: ignore[arg-type]
-    # Draft / unknown templates fall back to buy_and_hold (never passed through).
-    for template in DRAFT_STRATEGIES | {"totally_unknown"}:
-        run = SimpleNamespace(config_snapshot={"template": template})
-        assert strategy_template_from_run(run) == "buy_and_hold"  # type: ignore[arg-type]
 
 
 # --- Indicator truth: computes vs reachable-via-template -------------------------------

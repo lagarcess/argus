@@ -50,7 +50,6 @@ from argus.api.chat.artifacts import (
     confirmation_id_for_runtime_card,
     result_fact_bank,
     result_followup_metadata_from_run,
-    saved_strategy_metadata,
 )
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
@@ -99,7 +98,6 @@ from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
 )
-from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
     runtime_result_card,
     runtime_result_envelope,
@@ -187,11 +185,6 @@ async def _runtime_events_with_keepalive(
 def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
     diagnostics = getattr(exc, "diagnostics", None)
     return dict(diagnostics) if isinstance(diagnostics, dict) else None
-
-
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
 
 
 async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
@@ -684,7 +677,6 @@ async def chat_stream(
             assistant_message: str | None,
             assistant_metadata: dict[str, Any] | None = None,
             current_run: BacktestRun | None = None,
-            saved_strategy_id: str | None = None,
             message_id: str | None = None,
         ) -> None:
             try:
@@ -693,7 +685,6 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     language=naming_language,
                     current_run=current_run,
-                    saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
                     assistant_metadata=assistant_metadata,
@@ -705,7 +696,6 @@ async def chat_stream(
                     "Artifact naming scheduling failed",
                     user_id=user.id,
                     conversation_id=conversation.id,
-                    saved_strategy_id=saved_strategy_id,
                 )
 
         if runtime_fallback.recovery_message:
@@ -941,7 +931,6 @@ async def chat_stream(
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
                 result_action_run = validated_result_action_run
-                saved_strategy_id_for_naming: str | None = None
                 result_action_type = result_action_request_type(runtime_result)
                 if (
                     result_action_type is None
@@ -1019,7 +1008,7 @@ async def chat_stream(
                                 action_type=result_action_type,
                                 language=runtime_user.language_preference,
                             )
-                        elif not _strategies_enabled():
+                        else:
                             assistant_text = await compose_private_alpha_save_response(
                                 metadata=result_followup_metadata_from_run(
                                     result_action_run
@@ -1030,16 +1019,6 @@ async def chat_stream(
                                 assistant_text = fallback_private_alpha_save_response(
                                     language=runtime_user.language_preference
                                 )
-                        else:
-                            strategy = save_strategy_from_run(
-                                user=user,
-                                run=result_action_run,
-                            )
-                            saved_strategy_id_for_naming = strategy.id
-                            metadata.update(
-                                saved_strategy_metadata(result_action_run, strategy.id)
-                            )
-                            assistant_text = f"Saved {strategy.name} to Strategies."
                     if assistant_text:
                         runtime_result["assistant_response"] = assistant_text
                     if result_action_run is not None:
@@ -1053,13 +1032,6 @@ async def chat_stream(
                         runtime_result["result_strategy_id"] = (
                             result_action_run.strategy_id
                         )
-                        if saved_strategy_id_for_naming is not None:
-                            runtime_result["saved_strategy_id"] = (
-                                saved_strategy_id_for_naming
-                            )
-                            runtime_result["result_strategy_id"] = (
-                                saved_strategy_id_for_naming
-                            )
                 for key in (
                     "latest_run_id",
                     "source_result_run_id",
@@ -1297,7 +1269,6 @@ async def chat_stream(
                     assistant_message=persisted_text,
                     assistant_metadata=metadata,
                     current_run=result_action_run or run,
-                    saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
                     ),

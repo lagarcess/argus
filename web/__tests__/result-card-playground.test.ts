@@ -76,7 +76,8 @@ describe("result card playground", () => {
     expect(productionCard).toContain("ExecutionDetails");
     expect(productionCard).toContain("StatRail");
     expect(productionCard).toContain("TrustRail");
-    expect(productionCard).toContain("strategiesEnabled");
+    expect(productionCard).not.toContain("strategiesEnabled");
+    expect(productionCard).not.toContain('action.type === "save_strategy"');
     expect(productionCard).not.toContain("function MetricBlock");
     expect(productionCard).not.toContain('bg-[#f4f4f4] px-4 py-4');
     expect(productionCard).not.toContain("shadow");

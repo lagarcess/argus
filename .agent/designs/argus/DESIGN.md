@@ -282,24 +282,20 @@ Result cards are the primary unit of "validation." They must be glanceable and h
   - *Example*: `Long-only • Equal weight • No fees/slippage • Benchmark: SPY`
 - **Visual Distinction**: Assumptions should be styled with muted slate typography to distinguish them from the "Result" without feeling like a warning.
 
-## 13. Strategy Surface Design
+## 13. Retired Strategy Surface
 
-The strategies surface is a flagged future/reference surface for rapid
-comparison and organization. It is hidden under private-alpha defaults; current
-saved-idea recall and decision-state browsing live in Omnisearch/Idea Ledger.
-- **Expandable Cards**: Use a "glance-first" card that expands to show symbol-level rows.
-- **Glanceable Metrics**: Support user-selected metrics from supported presets (Configurable rows).
-- **Headline Hints**: Use simple text labels like "Best performer" or "Needs review" to guide the eye.
-- **Binary Winners/Losers**: Use muted teal/rose for symbol rows to identify performers without terminal-style glare.
+The dedicated Strategies destination and result-card Save action are retired.
+Current saved-idea recall and decision-state browsing live in Omnisearch/Idea
+Ledger. Historical Strategy metadata may hydrate without rendering a new write
+control or destination.
 
-## 14. Recents, Collections, and Search
+## 14. Recents, Legacy Records, and Search
 
 - **Recents Feed**: A chronological continuity surface for chats and completed
   runs. Do not advertise hidden Strategies or Collections as current
   private-alpha destinations.
-- **Collections**: Lightweight organizational theme groupings remain a future
-  flagged model. They are hidden and indefinitely deferred from the
-  private-alpha UI.
+- **Legacy Collections**: Historical rows remain read-compatible, but no
+  navigation, picker, setting, empty state, or write action is rendered.
 - **Idea Recall**: Omnisearch/Idea Ledger is the active artifact-recall surface
   for Ideas, Evidence, Decisions, Backtests, and their source conversations.
 - **Fuzzy Search UI**: Global omni-search should support "Fuzzy Human Memory" with suggestion chips:

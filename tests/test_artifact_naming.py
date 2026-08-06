@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from argus.api import state as api_state
 from argus.api.message_store import create_message, memory_conversation
-from argus.api.schemas import BacktestRun, Strategy
+from argus.api.schemas import BacktestRun
 from argus.domain.store import utcnow
 
 
@@ -303,101 +303,3 @@ def test_conversation_title_generation_never_overwrites_user_renamed(
     assert (
         api_state.store.conversations[conversation.id].title_source == "user_renamed"
     )
-
-
-def test_saved_strategy_name_generation_updates_from_run_facts_without_mutating_card(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import artifact_naming
-
-    conversation = memory_conversation(
-        title="New idea",
-        title_source="system_default",
-        language="en",
-    )
-    strategy_id = api_state.store.new_id()
-    run = _completed_run(conversation_id=conversation.id, strategy_id=strategy_id)
-    api_state.store.backtest_runs[run.id] = run
-    api_state.store.backtest_run_owners[run.id] = _user_id()
-    strategy = Strategy(
-        id=strategy_id,
-        name="TSLA Buy and Hold",
-        name_source="ai_generated",
-        template="buy_and_hold",
-        asset_class="equity",
-        symbols=["TSLA"],
-        parameters=dict(run.config_snapshot),
-        metrics_preferences=["total_return_pct", "max_drawdown_pct"],
-        benchmark_symbol="SPY",
-        created_at=utcnow(),
-        updated_at=utcnow(),
-    )
-    api_state.store.strategies[strategy.id] = strategy
-    original_card_title = run.conversation_result_card["title"]
-    captured: dict[str, Any] = {}
-
-    def _suggest_entity_name(**kwargs: Any) -> str:
-        captured.update(kwargs)
-        return "Tesla SPY Hold Test"
-
-    monkeypatch.setattr(artifact_naming, "suggest_entity_name", _suggest_entity_name)
-
-    name = artifact_naming.maybe_generate_saved_strategy_name(
-        user_id=_user_id(),
-        strategy_id=strategy.id,
-        run=run,
-        language="en",
-    )
-
-    updated = api_state.store.strategies[strategy.id]
-    assert name == "Tesla SPY Hold Test"
-    assert updated.name == "Tesla SPY Hold Test"
-    assert updated.name_source == "ai_generated"
-    assert run.conversation_result_card["title"] == original_card_title
-    assert captured["entity_type"] == "strategy"
-    assert "TSLA" in captured["context"]
-    assert "SPY" in captured["context"]
-
-
-def test_saved_strategy_name_generation_never_overwrites_user_renamed(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import artifact_naming
-
-    conversation = memory_conversation(
-        title="New idea",
-        title_source="system_default",
-        language="en",
-    )
-    strategy_id = api_state.store.new_id()
-    run = _completed_run(conversation_id=conversation.id, strategy_id=strategy_id)
-    strategy = Strategy(
-        id=strategy_id,
-        name="My Tesla Strategy",
-        name_source="user_renamed",
-        template="buy_and_hold",
-        asset_class="equity",
-        symbols=["TSLA"],
-        parameters=dict(run.config_snapshot),
-        metrics_preferences=["total_return_pct"],
-        benchmark_symbol="SPY",
-        created_at=utcnow(),
-        updated_at=utcnow(),
-    )
-    api_state.store.strategies[strategy.id] = strategy
-
-    def _raise_if_called(**_: Any) -> str:
-        raise AssertionError("LLM naming should not run for user-renamed strategies")
-
-    monkeypatch.setattr(artifact_naming, "suggest_entity_name", _raise_if_called)
-
-    name = artifact_naming.maybe_generate_saved_strategy_name(
-        user_id=_user_id(),
-        strategy_id=strategy.id,
-        run=run,
-        language="en",
-    )
-
-    assert name is None
-    assert api_state.store.strategies[strategy.id].name == "My Tesla Strategy"
-    assert api_state.store.strategies[strategy.id].name_source == "user_renamed"

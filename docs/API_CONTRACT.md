@@ -822,12 +822,13 @@ Clients must use `status` and `rows[].key` for behavior. They must not infer
 card state from translated display labels. Result actions that mutate state must
 reference a canonical run id. `result_fact_bank` is a backend-provided,
 run-derived context object for result follow-ups; it is not a second metrics
-source of truth. `saved_strategy_id` marks a result artifact as already saved and
-must be treated as idempotent display state after reload.
+source of truth. Legacy `saved_strategy_id` metadata remains readable after
+reload, but clients must not use it to expose a new write action.
 
-## Strategy
+## Legacy Strategy Record
 
-A saved executable idea backed by a supported template.
+A retired saved-executable-idea record retained for owner-scoped historical
+reads and direct `backtests/run` compatibility. There is no Strategy CRUD API.
 
 ```json
 {
@@ -902,7 +903,7 @@ A saved executable idea backed by a supported template.
 }
 ```
 
-**Strategy constraints for Alpha:**
+**Legacy Strategy read constraints:**
 - One strategy may apply to one symbol or multiple symbols.
 - Maximum 5 symbols.
 - All symbols must be from the same asset class.
@@ -911,9 +912,10 @@ A saved executable idea backed by a supported template.
 - Strategy surface metric preferences apply only to strategy surface displays.
 - Symbol-level strategy surface rows should be derived from the most recent or selected run, represented by `as_of_run_id`.
 
-## Collection
+## Legacy Collection Record
 
-A lightweight grouping of related strategies.
+A retired grouping record retained for owner-scoped historical reads. There is
+no Collection CRUD or attachment API.
 
 ```json
 {
@@ -1137,10 +1139,10 @@ optional when reading older records. Requested and effective ranges remain
 independent provenance; consumers must not classify their difference with
 fixed day thresholds.
 
-`save_strategy` is a legacy/compatibility result action for Strategy persistence
-when that feature surface is enabled. It is separate from the P1 evidence
-lifecycle: completed runs are captured automatically as evidence, while user
-commitment is represented by an explicit `DecisionNote`.
+`save_strategy` is accepted only as a stale-action compatibility request. It
+never mutates Strategy records; Argus responds that the completed run remains
+available in conversation/history. Completed runs are captured automatically as
+evidence, while user commitment is represented by an explicit `DecisionNote`.
 
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
@@ -2301,10 +2303,9 @@ stores nothing and makes no LLM, provider, or market-data call.
 - A DCA draft that contains unsupported starting principal / total capital semantics must route to clarification or simplification, not to a confident `Ready to run` card for both amounts.
 - `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
-- `show_breakdown` and `save_strategy` require canonical result run context. In
-  private alpha, `save_strategy` must also respect server-side Strategies
-  gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
-  hidden saved-strategy object when the Strategies surface is disabled.
+- `show_breakdown` requires canonical result run context. A stale
+  `save_strategy` request also requires that context, but is non-mutating and
+  returns the historical-run continuity response.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
 - `select_response_option` is valid only for typed response-intent options. Its
   payload must include the durable assistant `message_id` that presented the
@@ -2615,7 +2616,7 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
     "assistant_response": "The strategy returned +23%...",
     "confirmation_payload": null,
     "run": { },
-    "next_actions": ["save_strategy", "refine_strategy", "show_breakdown"],
+    "next_actions": ["refine_strategy", "show_breakdown"],
     "message_id": "uuid"
   }
 }
@@ -2792,150 +2793,12 @@ data: [DONE]
 
 ---
 
-# 13. Strategies
+# 13-14. Retired Strategy and Collection APIs
 
-## `GET /strategies`
-
-**Query Params:**
-- `search`
-- `limit`
-- `cursor`
-- `pinned`
-- `deleted=false`
-
-**Response:**
-```json
-{
-  "items": [
-    {
-      "id": "uuid",
-      "name": "...",
-      "updated_at": "timestamp"
-    }
-  ],
-  "next_cursor": null
-}
-```
-
-*Note: The Strategies surface may request/list strategies with lightweight `strategy_surface_metrics`. This endpoint is optimized for glanceable comparison and should not return full backtest details unless explicitly needed.*
-
-## `POST /strategies`
-
-**Request:**
-```json
-{
-  "name": null,
-  "template": "buy_and_hold",
-  "asset_class": "equity",
-  "symbols": ["AAPL", "MSFT"],
-  "parameters": {},
-  "metrics_preferences": [
-    "total_return_pct",
-    "win_rate",
-    "max_drawdown_pct"
-  ],
-  "benchmark_symbol": "SPY"
-}
-```
-*Note: If name is not provided, AI-generated naming should be used where context exists.*
-
-## `PATCH /strategies/{id}`
-
-Rename, pin, metric preferences, update params, or restore a soft-deleted strategy.
-
-**Request:**
-```json
-{
-  "name": "Updated Name",
-  "pinned": true,
-  "deleted_at": null,
-  "metrics_preferences": [
-    "win_rate",
-    "sharpe_ratio"
-  ]
-}
-```
-*Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
-
-## `DELETE /strategies/{id}`
-
-Soft delete.
-
----
-
-# 14. Collections
-
-Private-alpha flag: collection endpoints remain part of the API contract and the
-tables remain in Supabase, but Collections are indefinitely deferred from the UI.
-Keep `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`; no visible private-alpha path
-should create, attach, manage, search, or explain Collections.
-
-## `GET /collections`
-
-**Query Params:**
-- `search`
-- `limit`
-- `cursor`
-- `pinned`
-- `deleted=false`
-
-**Response:**
-```json
-{
-  "items": [
-    {
-      "id": "uuid",
-      "name": "...",
-      "updated_at": "timestamp"
-    }
-  ],
-  "next_cursor": null
-}
-```
-
-## `POST /collections`
-
-**Request:**
-```json
-{
-  "name": null
-}
-```
-*Note: If name is not provided, AI-generated naming should be used where context exists.*
-
-## `PATCH /collections/{id}`
-
-Rename or pin.
-
-**Request:**
-```json
-{
-  "name": "Updated",
-  "pinned": true
-}
-```
-
-## `DELETE /collections/{id}`
-
-Soft delete.
-
-## `POST /collections/{id}/strategies`
-
-Attach strategies.
-
-Ownership hardening: the collection parent and every attached strategy must be
-owned by the current user before any `collection_strategies` upsert occurs.
-
-**Request:**
-```json
-{
-  "strategy_ids": ["uuid", "uuid"]
-}
-```
-
-## `DELETE /collections/{id}/strategies/{strategy_id}`
-
-Detach strategy.
+The dedicated Strategy and Collection CRUD/list/attachment endpoints are
+removed. Existing database rows remain owner-scoped and readable through legacy
+history compatibility. The direct backtest endpoint may still resolve an owned
+historical `strategy_id`; no endpoint creates or mutates those records.
 
 ---
 
@@ -2948,7 +2811,7 @@ Detach strategy.
   duplicate engine runs)
 - Missing or blank keys return `400 idempotency_key_required`.
 
-Run directly from saved strategy or inline config.
+Run from an owned historical strategy reference or inline config.
 
 Private-alpha chat execution should prefer the durable `backtest_jobs` flow
 instead of executing heavy backtests synchronously inside the API process. This

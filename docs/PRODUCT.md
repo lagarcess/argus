@@ -226,50 +226,26 @@ never message wording, client timers, or changes to recency ordering.
 
 Private-alpha launch keeps the visible product surface to Chat, Recents/history,
 completed result cards, and minimal account/settings/feedback. Dedicated
-Strategies and Collections surfaces are not visible under private-alpha defaults.
+Strategies and Collections surfaces have been retired. Historical records remain
+readable so older runs and history never break, but the product no longer creates
+or manages those legacy objects.
 
 ---
 
-# 8. Collections (MVP Replacement for Portfolios)
+# 8. Legacy Collections Compatibility
 
-Private-alpha note: collections remain a valid product object and database model,
-but Collections are indefinitely deferred from the private-alpha UI. Keep
-`NEXT_PUBLIC_COLLECTIONS_ENABLED=false` and hide collection navigation, pickers,
-actions, search results, settings links, and empty states. No visible
-private-alpha path should create, attach, or manage collections.
-
-Collections are lightweight saved groupings of related strategies.
-
-Examples:
-
-- Tech Momentum Ideas
-- Dividend Experiments
-- Crypto Setups
-- Retirement Concepts
-
-Collections exist to organize user thinking and repeat testing themes.
-
-Collections are **not** full portfolio simulations in Alpha MVP.
-
-Future portfolio systems may evolve naturally from Collections.
-
-> [!TIP]
-> **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
+Collections are retired product records. Their tables and owner-scoped history
+readers remain for compatibility with historical rows; there is no navigation,
+picker, setting, search result, CRUD endpoint, or new write path.
 
 ---
 
-# 9. Strategies Surface
+# 9. Legacy Strategies Compatibility
 
-Strategies are saved executable ideas backed by supported templates.
-
-The Strategies surface gives users a quick way to evaluate performance at a glance without requiring deep chart interaction.
-
-Strategies are saved from completed result state. The chat result card owns the Save Strategy control because a saved strategy should come from a real run, not an unexecuted confirmation draft.
-
-Private-alpha note: when `NEXT_PUBLIC_STRATEGIES_ENABLED=false`, hide the
-Strategies surface and the result-card Save action. Completed runs remain
-revisitable through conversation/history/Recents, while Refine idea remains
-available on the result card.
+The dedicated Strategies surface and result-card Save action are retired.
+Completed runs remain revisitable through conversation/history/Recents, while
+Refine idea remains available on the result card. Historical Strategy rows and
+direct run `strategy_id` reads remain owner-scoped and read-compatible.
 
 Saved-idea recall lives in Omnisearch, not a separate dashboard. Typed search
 results and right-panel previews cover Conversation, Backtest, Evidence,

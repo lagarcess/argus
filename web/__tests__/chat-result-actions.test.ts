@@ -54,7 +54,6 @@ describe("chat result actions", () => {
     expect(hydrated.map((action) => action.type)).toEqual([
       "show_breakdown",
       "refine_strategy",
-      "save_strategy",
     ]);
     expect(hydrated[0]?.labelKey).toBe("chat.result_card.explain_result");
     expect(hydrated.map((action) => action.label)).not.toContain("Try next");
@@ -84,7 +83,7 @@ describe("chat result actions", () => {
     ).toBe(true);
     expect(
       isVisibleResultAction({ label: "Save", type: "save_strategy" }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("hydrates evidence and decision metadata without parsing display prose", () => {

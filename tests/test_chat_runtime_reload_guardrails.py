@@ -5133,7 +5133,7 @@ def test_save_strategy_action_without_canonical_run_id_does_not_save_latest() ->
     assert response.status_code == 200
     text = _stream_payloads(response.text, "token")[0]["content"]
     assert "could not find" in text
-    assert client.get("/api/v1/strategies").json()["items"] == []
+    assert api_state.store.strategies == {}
 
 
 def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(

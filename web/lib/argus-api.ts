@@ -228,48 +228,6 @@ export type ApiMessage = {
   metadata?: Record<string, unknown> | null;
 };
 
-export type StrategySurfaceMetricRow = {
-  symbol: string;
-  asset_name: string;
-  values: Record<string, string>;
-};
-
-export type StrategySurfaceMetrics = {
-  display_mode: string;
-  as_of_run_id: string | null;
-  columns: Array<{ key: string; label: string }>;
-  rows: StrategySurfaceMetricRow[];
-  headline?: { label: string; value: string } | null;
-};
-
-export type Strategy = {
-  id: string;
-  name: string;
-  name_source: TitleSource;
-  template: string;
-  asset_class: AssetClass;
-  symbols: string[];
-  parameters: Record<string, unknown>;
-  metrics_preferences: string[];
-  benchmark_symbol: string;
-  pinned: boolean;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-  strategy_surface_metrics?: StrategySurfaceMetrics | null;
-};
-
-export type Collection = {
-  id: string;
-  name: string;
-  name_source: TitleSource;
-  pinned: boolean;
-  strategy_count: number;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 type HistoryItemBase = {
   type: HistoryItemType;
   id: string;
@@ -822,66 +780,6 @@ export async function listHistory(
   );
 }
 
-// ─── Strategies ───────────────────────────────────────────────────────────────
-
-export async function listStrategies(
-  params: { limit?: number; cursor?: string; deleted?: boolean } = {},
-) {
-  const { limit = 50, cursor, deleted } = params;
-  const searchParams = new URLSearchParams({ limit: String(limit) });
-  if (cursor) searchParams.append("cursor", cursor);
-  if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-
-  return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
-    `/strategies?${searchParams.toString()}`,
-  );
-}
-
-export async function createStrategy(payload: {
-  name?: string | null;
-  template: string;
-  asset_class: AssetClass;
-  symbols: string[];
-  parameters?: Record<string, unknown>;
-  metrics_preferences?: string[];
-  benchmark_symbol?: string | null;
-}) {
-  return apiFetch<{ strategy: Strategy }>("/strategies", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function patchStrategy(
-  strategyId: string,
-  patch: { name?: string; pinned?: boolean; deleted_at?: string | null },
-) {
-  return apiFetch<{ strategy: Strategy }>(`/strategies/${strategyId}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-}
-
-export async function deleteStrategy(strategyId: string) {
-  return apiFetch<{ success: boolean }>(`/strategies/${strategyId}`, {
-    method: "DELETE",
-  });
-}
-
-// ─── Collections ──────────────────────────────────────────────────────────────
-
-export async function listCollections(
-  params: number | { limit?: number; cursor?: string } = 50,
-) {
-  const limit = typeof params === "number" ? params : (params.limit ?? 50);
-  const cursor = typeof params === "number" ? undefined : params.cursor;
-  const searchParams = new URLSearchParams({ limit: String(limit) });
-  if (cursor) searchParams.append("cursor", cursor);
-  return apiFetch<{ items: Collection[]; next_cursor: string | null }>(
-    `/collections?${searchParams.toString()}`,
-  );
-}
-
 export async function searchGlobal(params: {
   q: string;
   limit?: number;
@@ -925,39 +823,6 @@ export async function createEvidenceDecision(
     method: "POST",
     body: JSON.stringify(payload),
   });
-}
-
-export async function createCollection(name?: string) {
-  return apiFetch<{ collection: Collection }>("/collections", {
-    method: "POST",
-    body: JSON.stringify({ name: name ?? null }),
-  });
-}
-
-export async function patchCollection(
-  collectionId: string,
-  patch: { name?: string; pinned?: boolean },
-) {
-  return apiFetch<{ collection: Collection }>(`/collections/${collectionId}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-}
-
-export async function deleteCollection(collectionId: string) {
-  return apiFetch<{ success: boolean }>(`/collections/${collectionId}`, {
-    method: "DELETE",
-  });
-}
-
-export async function attachStrategyToCollection(
-  collectionId: string,
-  strategyId: string,
-) {
-  return apiFetch<{ collection: Collection }>(
-    `/collections/${collectionId}/strategies`,
-    { method: "POST", body: JSON.stringify({ strategy_ids: [strategyId] }) },
-  );
 }
 
 // ─── Backtests ────────────────────────────────────────────────────────────────

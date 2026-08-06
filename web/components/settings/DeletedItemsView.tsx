@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  BarChart2,
   History,
-  Layers,
   Loader2,
   MessageSquare,
   RotateCcw,
@@ -15,7 +13,6 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import {
   listHistory,
   patchConversation,
-  patchStrategy,
   type HistoryItem,
 } from "@/lib/argus-api";
 
@@ -37,22 +34,13 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
 
   const handleRestore = async (item: HistoryItem) => {
     try {
-      if (item.type === "chat") {
-        await patchConversation(item.id, { deleted_at: null });
-      } else if (item.type === "strategy") {
-        await patchStrategy(item.id, { deleted_at: null });
-      }
+      if (item.type !== "chat") return;
+      await patchConversation(item.id, { deleted_at: null });
       setDeletedItems((prev) => prev.filter((i) => i.id !== item.id));
       onRestored?.();
     } catch (err) {
       console.error("Failed to restore", err);
     }
-  };
-
-  const typeIcon = (type: string) => {
-    if (type === "chat") return <MessageSquare className="w-4 h-4" />;
-    if (type === "strategy") return <BarChart2 className="w-4 h-4" />;
-    return <Layers className="w-4 h-4" />;
   };
 
   return (
@@ -101,14 +89,14 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {deletedItems.map((item) => (
+              {deletedItems.filter((item) => item.type === "chat").map((item) => (
                 <div
                   key={item.id}
                   className="group flex items-center justify-between p-4 bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 rounded-[16px]"
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-4">
                     <div className="shrink-0 w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40">
-                      {typeIcon(item.type)}
+                      <MessageSquare className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-[15px] font-medium text-black dark:text-white truncate">
