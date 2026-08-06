@@ -120,6 +120,7 @@ from argus.agent_runtime.stages.interpret_internal.answer_composition import (  
     _supported_strategy_family_token_spans,
     _token_sequence_spans,
 )
+from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # noqa: F401
     _USER_GROUNDED_CADENCE_SOURCES,
     _USER_GROUNDED_CAPITAL_SOURCES,
@@ -377,13 +378,10 @@ async def interpret_stage_async(
 
     async def _unavailable(*, retryable: bool = True) -> StageResult:
         return await _interpreter_unavailable_result(
-            state=state,
-            user=user,
-            snapshot=snapshot,
+            state=state, user=user, snapshot=snapshot,
             current_user_message=state.current_user_message,
             capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-            retryable=retryable,
+            selected_thread_metadata=selected_metadata, retryable=retryable,
         )
 
     if structured_interpreter is None:
@@ -497,8 +495,10 @@ async def _stage_result_from_interpretation(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
     ) or (
+        # A resolved asset or date alone names what the user is talking about;
+        # only execution evidence may pull a non-strategy turn onto this route.
         interpretation.semantic_turn_act != "result_followup"
-        and _candidate_strategy_has_backtest_shape(
+        and strategy_has_execution_evidence(
             interpretation.candidate_strategy_draft
         )
     )

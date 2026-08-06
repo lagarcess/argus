@@ -120,6 +120,7 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
 from argus.agent_runtime.interpreter.draft_shape import (  # noqa: F401
     _elapsed_ms,
     _refinement_reply_needs_full_interpretation,
+    strategy_has_execution_evidence,
     _llm_signal_strategy_is_underfilled,
     _llm_strategy_draft_has_executable_shape,
     _llm_strategy_draft_has_structural_execution_fields,
@@ -4969,9 +4970,9 @@ def _structured_interpretation_has_required_shape(
         response.intent == "unsupported_or_out_of_scope"
         and response.requires_clarification
         and not response.unsupported_constraints
-        and not _llm_strategy_draft_has_extractable_fields(
-            response.candidate_strategy_draft
-        )
+        # A reference-only draft (resolved asset, date) is not an answer; fail
+        # the shape without text so the corrective re-ask demands one.
+        and not strategy_has_execution_evidence(response.candidate_strategy_draft)
     ):
         return bool(response.assistant_response)
     if _response_underfills_pending_result_refinement(
