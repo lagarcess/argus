@@ -54,9 +54,17 @@ _SEARCH_MAX_RESULTS = 5
 
 
 class VoicedAnswer(BaseModel):
-    """Schema for voicing: the direct JSON transport is the proven path."""
+    """Voicing contract: the model writes content, the code owns layout."""
 
-    answer: str
+    lead: str
+    bullets: list[str] = Field(default_factory=list)
+
+    def as_markdown(self) -> str:
+        lead = self.lead.strip()
+        lines = [
+            f"- {bullet.strip()}" for bullet in self.bullets if bullet.strip()
+        ]
+        return f"{lead}\n\n" + "\n".join(lines) if lines else lead
 
 
 class KnowledgeQueryExtraction(BaseModel):
@@ -278,10 +286,10 @@ def _series_facts(
 
 def _numeric_fallback(facts: dict[str, Any]) -> str:
     return (
-        f"{facts['symbol']} {facts['start']} → {facts['end']}: "
-        f"total {facts['total_return_pct']:+.2f}%, "
-        f"max drawdown {facts['max_drawdown_pct']:.2f}%, "
-        f"volatility {facts['annualized_volatility_pct']:.2f}% (annualized)."
+        f"**{facts['symbol']}**, {facts['start']} → {facts['end']}:\n\n"
+        f"- Total return: **{facts['total_return_pct']:+.2f}%**\n"
+        f"- Max drawdown: **{facts['max_drawdown_pct']:.2f}%**\n"
+        f"- Volatility: **{facts['annualized_volatility_pct']:.2f}%** (annualized)"
     )
 
 
@@ -343,9 +351,9 @@ async def _voiced_answer(
     )
     if profile.effective_expertise_mode == "beginner":
         audience = (
-            "The reader is new to investing: lead with what the numbers mean in "
-            "plain words, keep at most two figures, and gloss any term like "
-            "drawdown or volatility in a few words. No jargon walls."
+            "The reader is new to investing: say what each number means in "
+            "plain words and gloss any term like drawdown or volatility in a "
+            "few words. No jargon walls."
         )
     else:
         audience = (
@@ -353,10 +361,16 @@ async def _voiced_answer(
             "concrete with the figures."
         )
     prompt = (
-        "Answer the user's question directly using ONLY these facts. Reply in "
-        f"the user's language ({language or 'the language of the question'}). "
-        f"{audience} 2-4 sentences, no advice, no invented data. If the "
-        "facts include search results, cite the source URLs you used.\n"
+        "Answer the user's question using ONLY these facts. Reply in the "
+        f"user's language ({language or 'the language of the question'}). "
+        f"{audience} No advice, no invented data, no em dashes.\n"
+        "Fill the schema:\n"
+        "- lead: one short sentence answering the question, with the single "
+        "most important figure wrapped in **bold**.\n"
+        "- bullets: two or three short plain-words phrases, one remaining "
+        "figure per phrase, each figure wrapped in **bold**. Never repeat the "
+        "lead figure. If the facts include search results, put one source URL "
+        "in each bullet you draw from it.\n"
         f"Question: {message}\nFacts:\n{fact_lines}"
     )
     # Voice over the direct JSON transport with the proven structured tier;
@@ -373,8 +387,8 @@ async def _voiced_answer(
         except Exception as exc:  # noqa: BLE001
             logger.debug(f"Knowledge answer voicing failed error={exc!r}")
             continue
-        if isinstance(voiced, VoicedAnswer) and voiced.answer.strip():
-            return voiced.answer.strip()
+        if isinstance(voiced, VoicedAnswer) and voiced.lead.strip():
+            return voiced.as_markdown()
     return fallback
 
 

@@ -72,7 +72,9 @@ def test_market_stats_question_gets_grounded_numbers(market_stats_route) -> None
     assert result is not None
     text = result.stage_patch["assistant_response"]
     assert "SPY" in text
-    assert "total" in text
+    assert "Total return" in text
+    # The degrade path is formatted chat markdown, not a raw sentence.
+    assert "**" in text
     assert result.decision.reason_codes == ["knowledge_answer_market_stats"]
     # The Try next surface rides along with a grounded answer.
     rows = result.stage_patch["next_experiments"]["rows"]
