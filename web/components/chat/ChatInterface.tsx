@@ -1422,6 +1422,10 @@ export default function ChatInterface() {
         } else if (finalText) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
+          // Grounded knowledge answers stream Try next rows on a plain
+          // message; without this they only appeared after a reload.
+          const finalTextNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1434,6 +1438,7 @@ export default function ChatInterface() {
                   strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
+                  nextExperiments: finalTextNextExperiments,
                   contentPresentation:
                     action?.type === "show_breakdown"
                       ? "result_breakdown"
@@ -1453,6 +1458,7 @@ export default function ChatInterface() {
                 strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
+                nextExperiments: finalTextNextExperiments,
                 contentPresentation:
                   action?.type === "show_breakdown"
                     ? "result_breakdown"

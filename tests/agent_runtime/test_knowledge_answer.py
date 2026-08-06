@@ -60,7 +60,7 @@ def market_stats_route(monkeypatch):
     monkeypatch.setattr(ka, "_classify_question", classify)
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
 
-    async def voice(*, message, language, facts, fallback):
+    async def voice(*, message, language, facts, fallback, user=None):
         return fallback
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
@@ -150,7 +150,7 @@ def test_current_external_question_answers_with_citations(monkeypatch) -> None:
         ka, "search_provider_for_config", lambda *, provider_id: _Provider()
     )
 
-    async def voice(*, message, language, facts, fallback):
+    async def voice(*, message, language, facts, fallback, user=None):
         return "El índice cerró al alza."
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
@@ -176,7 +176,7 @@ def test_market_data_failure_degrades_to_search(monkeypatch) -> None:
 
     monkeypatch.setattr(ka, "_market_stats_answer", broken_market)
 
-    async def external(*, message, language):
+    async def external(*, message, language, user=None):
         return "Respuesta con fuente https://example.com/spx"
 
     monkeypatch.setattr(ka, "_external_facts_answer", external)

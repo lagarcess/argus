@@ -106,12 +106,14 @@ async def knowledge_answer_stage_result(
             interpretation=interpretation,
             message=state.current_user_message,
             language=user.language_preference,
+            user=user,
         )
         reason_code = "knowledge_answer_market_stats"
     if answer is None and query.question_kind in ("market_stats", "current_external"):
         answer = await _external_facts_answer(
             message=state.current_user_message,
             language=user.language_preference,
+            user=user,
         )
         reason_code = "knowledge_answer_current_external"
     if answer is None:
@@ -185,6 +187,7 @@ async def _market_stats_answer(
     interpretation: StructuredInterpretation,
     message: str,
     language: str | None,
+    user: UserState | None = None,
 ) -> str | None:
     draft = interpretation.candidate_strategy_draft
     symbols = [
@@ -229,6 +232,7 @@ async def _market_stats_answer(
         language=language,
         facts=facts,
         fallback=_numeric_fallback(facts),
+        user=user,
     )
 
 
@@ -285,6 +289,7 @@ async def _external_facts_answer(
     *,
     message: str,
     language: str | None,
+    user: UserState | None = None,
 ) -> str | None:
     config = discovery_search_config()
     try:
@@ -314,6 +319,7 @@ async def _external_facts_answer(
         language=language,
         facts=facts,
         fallback=fallback,
+        user=user,
     )
     if voiced is None:
         return None
@@ -328,12 +334,28 @@ async def _voiced_answer(
     language: str | None,
     facts: dict[str, Any],
     fallback: str,
+    user: UserState | None = None,
 ) -> str | None:
     fact_lines = "\n".join(f"{key}: {value}" for key, value in facts.items())
+    profile = resolve_effective_response_profile(
+        user=user or UserState(user_id="anonymous"),
+        explicit_overrides=None,
+    )
+    if profile.effective_expertise_mode == "beginner":
+        audience = (
+            "The reader is new to investing: lead with what the numbers mean in "
+            "plain words, keep at most two figures, and gloss any term like "
+            "drawdown or volatility in a few words. No jargon walls."
+        )
+    else:
+        audience = (
+            "The reader is comfortable with market terms: be direct and "
+            "concrete with the figures."
+        )
     prompt = (
         "Answer the user's question directly using ONLY these facts. Reply in "
         f"the user's language ({language or 'the language of the question'}). "
-        "2-4 sentences, concrete numbers, no advice, no invented data. If the "
+        f"{audience} 2-4 sentences, no advice, no invented data. If the "
         "facts include search results, cite the source URLs you used.\n"
         f"Question: {message}\nFacts:\n{fact_lines}"
     )
