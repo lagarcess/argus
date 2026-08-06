@@ -26,8 +26,8 @@ from argus.nlp.natural_time import (
     resolve_calendar_year_intent_text,
     resolve_date_range_endpoint_patch,
     resolve_date_range_intent,
-    resolve_rolling_window_intent_text,
     resolve_date_range_text,
+    resolve_rolling_window_intent_text,
 )
 
 
