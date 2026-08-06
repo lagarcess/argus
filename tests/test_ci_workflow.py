@@ -257,7 +257,7 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     )
 
 
-def test_private_alpha_canary_schedule_uses_the_integration_candidate_sha() -> None:
+def test_private_alpha_canary_schedule_uses_main_as_the_deployment_candidate() -> None:
     workflow = _canary_workflow()
     steps_by_name = {step["name"]: step for step in workflow["jobs"]["canary"]["steps"]}
     checkout = steps_by_name["Checkout"]
@@ -266,7 +266,7 @@ def test_private_alpha_canary_schedule_uses_the_integration_candidate_sha() -> N
     )
 
     assert checkout["with"]["ref"] == (
-        "${{ github.event_name == 'schedule' && 'codex/private-alpha-next' || github.sha }}"
+        "${{ github.event_name == 'schedule' && 'main' || github.sha }}"
     )
     assert '.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"' in joined_steps
     assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in joined_steps
