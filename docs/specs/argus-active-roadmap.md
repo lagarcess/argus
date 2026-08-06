@@ -124,6 +124,36 @@ Distribution, once there is something worth spreading.
 fixing what breaks. This runs alongside every lane rather than waiting its turn,
 and it is how items 1 and 2 stay honest after they land.
 
+Standing chore work, picked up alongside lanes rather than scheduled:
+
+- **Extend the modularity budget to tests.** `.agent/modularity_budget.json`
+  scans only `src` and `web`, and explicitly excludes `web/__tests__/**` and
+  `web/e2e/**`. No Python test file is governed at all. The asymmetry is the
+  problem: the interpreter lane had to extract a module to change production
+  code by 13 lines, while a 2000-line test file lands with no friction. Six
+  `tests/memory/` files now exceed 1000 lines, the largest bigger than the
+  service it tests. Add `tests` as a scan root with baselines captured from
+  current reality so it binds future work without a mass rewrite.
+- **Strip the legacy Collections and Strategies code.** Dead ends and surfaces
+  no longer exposed, plus any environment plumbing that only served them.
+  Follow the onboarding strip-out pattern: remove the surface, keep legacy
+  records read-safe, drop the env plumbing. **Not in scope:**
+  `ARGUS_ASSET_PROVIDER_MODE`. An earlier draft listed it as a dead alias; it
+  is live. It overrides `ARGUS_MARKET_DATA_PROVIDER_MODE` in
+  `src/argus/domain/market_data/assets.py` so tests can pin the asset catalog
+  independently of market data, and it is used by `tests/evals/` and
+  `tests/agent_runtime/`. Leave it. It is worth documenting rather than
+  removing, since a silent two-variable fallback chain is the same env-confound
+  shape that has produced fake test failures before.
+- **Implement the usage allowance meter colors.** `.agent/designs/argus/DESIGN.md`
+  section 23 already specifies this completely and it was never built: teal
+  above 50% remaining, `--rui-color-warning` between 20% and 50%,
+  `--rui-color-danger` at or below 20% including exhaustion, with the window
+  closest to exhaustion governing. Color stays supporting information only, so
+  the exact remaining count and truthful reset time must survive, with no
+  pulsing or terminal-style treatment. Today `UsageModal.tsx` and
+  `ProfileMenu.tsx` reference none of those tokens.
+
 ## Landed this cycle
 
 - **Personalization memory** (PR #386) — complete loop behind a default-off flag
