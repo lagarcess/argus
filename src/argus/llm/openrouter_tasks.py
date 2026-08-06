@@ -22,6 +22,8 @@ OpenRouterTask = Literal[
     "discovery_extraction",
     "discovery_voicing",
     "discovery_model_knowledge",
+    "knowledge_route",
+    "knowledge_voicing",
 ]
 OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
 OpenRouterReasoningEffort = Literal[
@@ -94,6 +96,12 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "discovery_model_knowledge": OpenRouterProfile(
         "discovery_model_knowledge", temperature=0, max_tokens=1200, timeout_seconds=20
     ),
+    "knowledge_route": OpenRouterProfile(
+        "knowledge_route", temperature=0, max_tokens=350, timeout_seconds=12
+    ),
+    "knowledge_voicing": OpenRouterProfile(
+        "knowledge_voicing", temperature=0.2, max_tokens=600, timeout_seconds=18
+    ),
 }
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
@@ -109,4 +117,6 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "discovery_extraction": "structured",
     "discovery_voicing": "chat",
     "discovery_model_knowledge": "structured",
+    "knowledge_route": "structured",
+    "knowledge_voicing": "chat",
 }

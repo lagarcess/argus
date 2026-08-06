@@ -114,15 +114,38 @@ def test_resolves_language_agnostic_year_windows_to_rolling_intent() -> None:
         }
 
 
-def test_unparsed_spanish_singular_year_does_not_become_day_window() -> None:
+def test_spanish_singular_year_resolves_to_trailing_year_not_day_window() -> None:
+    # The hazard this guards: "último año" collapsing into a 1-day window via a
+    # bare dateparser hit. The idiom resolver now reads it as a trailing year.
     today = date(2026, 6, 16)
 
+    intent = resolve_rolling_window_intent_text(
+        "último año",
+        today=today,
+        languages=("es", "en"),
+    )
+
+    assert intent is not None
+    assert (intent["count"], intent["unit"]) == (1, "year")
+
+
+def test_trailing_window_idioms_anchor_on_today() -> None:
+    today = date(2026, 8, 6)
+
+    for text in (
+        "del ultimo año para aca",
+        "del último año para acá",
+        "last year to now",
+        "últimos 3 meses",
+    ):
+        intent = resolve_rolling_window_intent_text(text, today=today)
+        assert intent is not None, text
+        assert intent["anchor"] == "today"
+
+    # Calendar years and explicit ranges stay with their own resolvers.
+    assert resolve_rolling_window_intent_text("2023", today=today) is None
     assert (
-        resolve_rolling_window_intent_text(
-            "último año",
-            today=today,
-            languages=("es", "en"),
-        )
+        resolve_rolling_window_intent_text("enero 2024 a marzo 2024", today=today)
         is None
     )
 

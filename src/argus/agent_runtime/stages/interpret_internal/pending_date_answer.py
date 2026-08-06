@@ -27,6 +27,7 @@ from argus.nlp.natural_time import (
     resolve_date_range_endpoint_patch,
     resolve_date_range_intent,
     resolve_date_range_text,
+    resolve_rolling_window_intent_text,
 )
 
 
@@ -79,8 +80,24 @@ def pending_date_answer_interpretation(
     )
     date_range: dict[str, str] | None = None
     date_range_intent: dict[str, Any] | None = None
+    rolling_intent = resolve_rolling_window_intent_text(
+        text,
+        today=current_date,
+        languages=languages,
+    )
     if resolved_range is not None:
         date_range = resolved_range.payload
+    elif rolling_intent is not None:
+        # "del último año para acá" and kin: a trailing window anchored today,
+        # which the endpoint fallback below misread as a zero-day range.
+        intent_resolution = resolve_date_range_intent(
+            rolling_intent,
+            today=current_date,
+        )
+        if intent_resolution is None:
+            return None
+        date_range = intent_resolution.payload
+        date_range_intent = rolling_intent
     elif require_explicit_range:
         return None
     else:

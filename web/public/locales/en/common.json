@@ -275,6 +275,7 @@
     "error_generic": "Something went wrong. Try again.",
     "recovery": {
       "interpreter_unavailable": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+      "interpreter_unavailable_not_retryable": "I saved your message, but I could not turn it into a reliable test setup. Sending it again as written will hit the same problem, so try rewording it, or tell me the asset and the period you want.",
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",

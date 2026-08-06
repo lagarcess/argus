@@ -120,6 +120,7 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
 from argus.agent_runtime.interpreter.draft_shape import (  # noqa: F401
     _elapsed_ms,
     _refinement_reply_needs_full_interpretation,
+    strategy_has_execution_evidence,
     _llm_signal_strategy_is_underfilled,
     _llm_strategy_draft_has_executable_shape,
     _llm_strategy_draft_has_structural_execution_fields,
@@ -326,6 +327,7 @@ from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa
     _supported_partial_draft_has_repairable_shape,
     _vague_strategy_start_as_guidance,
 )
+from argus.agent_runtime.interpreter import contract_recovery
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
     FocusedStrategyExtraction,
@@ -426,6 +428,7 @@ class OpenRouterStructuredInterpreter:
         self.contract = contract
         self.model_name = model_name
         self.last_status: str | None = None
+        self.last_failure_kind: str | None = None
 
     def __call__(self, request: InterpretationRequest) -> StructuredInterpretation | None:
         return asyncio.run(self.ainvoke(request))
@@ -436,6 +439,7 @@ class OpenRouterStructuredInterpreter:
         """
         Executes the interpretation turn.
         """
+        self.last_failure_kind, self.correction_attempted = None, False
         candidate_models: list[str] | None = None
         if self.model_name is None:
             candidate_models = openrouter_structured_model_candidates()
@@ -474,15 +478,16 @@ class OpenRouterStructuredInterpreter:
                     self.last_status = "used" if index == 0 else "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
                 except Exception as exc:
-                    log_openrouter_failure(
-                        task="interpretation",
-                        model_name=candidate_model,
-                        exc=exc,
-                        message=(
-                            "Direct LLM interpretation candidate failed; "
-                            "trying next configured model"
-                        ),
+                    recovered = await contract_recovery.handle_candidate_failure(
+                        interpreter=self, exc=exc, is_primary=index == 0, request=request,
+                        candidate_model=candidate_model,
+                        wire_messages=_openrouter_wire_messages(messages),
+                        invoke_schema=invoke_openrouter_json_schema,
+                        ready_for_runtime=_response_ready_for_runtime,
+                        asset_resolution_context=asset_resolution_context,
                     )
+                    if recovered is not None:
+                        return recovered
             repaired_response = await _plan_pending_artifact_assumption_edit(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
@@ -2553,9 +2558,8 @@ async def _audited_response_ready_for_runtime(
                 preferred_model=preferred_model,
                 request=request,
             )
-        raise ValueError(
-            "OpenRouter unsupported clarification omitted recoverable artifact context"
-        )
+        # Entered only when the response already carries assistant text.
+        return _carry_asset_blocker(response, asset_resolution_context)
     if _response_needs_structured_strategy_repair(response=response):
         repaired_response = await _repair_incomplete_strategy_extraction(
             failed_response=response,
@@ -2611,10 +2615,7 @@ async def _audited_response_ready_for_runtime(
         )
         if planned_response is not None:
             return _carry_asset_blocker(planned_response, asset_resolution_context)
-        raise ValueError(
-            "OpenRouter interpretation replayed the active artifact without a "
-            "material current-turn update"
-        )
+        raise contract_recovery.replay_without_update_error()
     audited_response = await _audit_stated_run_fields(
         response=response,
         preferred_model=preferred_model,
@@ -2673,7 +2674,7 @@ async def _audited_response_ready_for_runtime(
             preferred_model=preferred_model,
             request=request,
         )
-    raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+    raise contract_recovery.incomplete_response_error(response=response, request=request)
 
 
 async def _ready_active_artifact_edit_planned_response(
@@ -4969,9 +4970,9 @@ def _structured_interpretation_has_required_shape(
         response.intent == "unsupported_or_out_of_scope"
         and response.requires_clarification
         and not response.unsupported_constraints
-        and not _llm_strategy_draft_has_extractable_fields(
-            response.candidate_strategy_draft
-        )
+        # A reference-only draft (resolved asset, date) is not an answer; fail
+        # the shape without text so the corrective re-ask demands one.
+        and not strategy_has_execution_evidence(response.candidate_strategy_draft)
     ):
         return bool(response.assistant_response)
     if _response_underfills_pending_result_refinement(

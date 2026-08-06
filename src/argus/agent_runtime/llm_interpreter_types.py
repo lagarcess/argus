@@ -15,6 +15,20 @@ from argus.agent_runtime.state.models import ResponseProfileOverrides
 from argus.domain.capability_registry import RegisteredStrategyTemplate
 
 
+class InterpretationContractError(ValueError):
+    """A model response the runtime cannot act on.
+
+    Distinct from a transport or schema failure: the provider answered, and this
+    rejection is a pure function of (response, request), so repeating the same
+    call reproduces it exactly.
+    """
+
+    def __init__(self, reason: str, *, corrective_hint: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.corrective_hint = corrective_hint
+
+
 class LLMRiskRule(BaseModel):
     type: str
     value_pct: float | None = None
