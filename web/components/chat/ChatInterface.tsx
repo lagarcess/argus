@@ -10,7 +10,6 @@ import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardS
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import ConversationActivityAnnouncement from "@/components/chat/ConversationActivityAnnouncement";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
@@ -166,7 +165,6 @@ import ConversationRetrievalState, {
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import {
   type ChatActionOption,
-  type ChatMention,
   type Message,
   type StrategyConfirmationPayload,
 } from "./types";
@@ -187,12 +185,13 @@ import {
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
-import { memoryRecallsFromValue } from "@/lib/memory-recalls";
+import { memoryRecallsFromFinalPayload, useMemoryChrome } from "./memory-chrome";
 import {
-  isConversationMemoryOptOut as readConversationMemoryOptOut,
-  memoryAvailable as fetchMemoryAvailable,
-  setConversationMemoryOptOut as persistConversationMemoryOptOut,
-} from "@/lib/memory-privacy";
+  isStarterSelectionMetadata,
+  type GuestPendingSubmission,
+  type SendOptions,
+  type SendSelection,
+} from "./chat-send-selection";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -209,28 +208,6 @@ import {
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
 type View = "chat" | "strategies" | "settings";
-type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
-type SendSelection =
-  | ChatMention[]
-  | ChatActionOption
-  | StarterSelectionMetadata;
-type GuestPendingSubmission = {
-  text: string;
-  mentionsOrAction?: SendSelection;
-  actionArg?: ChatActionOption;
-  options?: SendOptions;
-};
-function isStarterSelectionMetadata(
-  selection: SendSelection | undefined,
-): selection is StarterSelectionMetadata {
-  return (
-    !Array.isArray(selection) &&
-    typeof selection === "object" &&
-    selection !== null &&
-    "strategy_category" in selection &&
-    !("type" in selection)
-  );
-}
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -256,8 +233,6 @@ export default function ChatInterface() {
   }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [memoryControlsAvailable, setMemoryControlsAvailable] = useState(false);
-  const [conversationMemoryOptOut, setConversationMemoryOptOut] = useState(false);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -971,32 +946,7 @@ export default function ChatInterface() {
     clearResumeDecision,
   } = guestExperience;
 
-  // Memory chrome stays invisible unless the backend exposes it.
-  useEffect(() => {
-    if (isGuest) return;
-    let isCurrent = true;
-    void fetchMemoryAvailable().then((available) => {
-      if (isCurrent) setMemoryControlsAvailable(available);
-    });
-    return () => {
-      isCurrent = false;
-    };
-  }, [isGuest]);
-
-  useEffect(() => {
-    setConversationMemoryOptOut(
-      conversationId ? readConversationMemoryOptOut(conversationId) : false,
-    );
-  }, [conversationId]);
-
-  const handleToggleMemoryOptOut = useCallback(() => {
-    if (!conversationId) return;
-    setConversationMemoryOptOut((current) => {
-      const next = !current;
-      persistConversationMemoryOptOut(conversationId, next);
-      return next;
-    });
-  }, [conversationId]);
+  const memoryChrome = useMemoryChrome(isGuest, conversationId);
 
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
@@ -1345,9 +1295,7 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
-        const finalMemoryRecalls = memoryRecallsFromValue(
-          (finalPayload as Record<string, unknown>).memory_recalls,
-        );
+        const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -2417,9 +2365,7 @@ export default function ChatInterface() {
                   onTogglePin={() => void handleToggleHeaderPin()}
                   isDeleting={isDeletingHeaderChat}
                   onRequestDelete={() => handleRequestHeaderDelete()}
-                  memoryControlsAvailable={memoryControlsAvailable}
-                  memoryOptOut={conversationMemoryOptOut}
-                  onToggleMemoryOptOut={handleToggleMemoryOptOut}
+                  memoryChrome={memoryChrome}
                 />
               ) : null}
               {strategiesEnabled && currentView === "strategies" && (
@@ -2514,9 +2460,7 @@ export default function ChatInterface() {
                             isLatest={isLatestAi}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
-                            memoryProposalEnabled={
-                              memoryControlsAvailable && !conversationMemoryOptOut
-                            }
+                            memoryProposalEnabled={memoryChrome.proposalEnabled}
                             nextMovesEnabled={nextMovesEnabled}
                             turnInFlight={turnInFlight}
                             isGuest={isGuest}
