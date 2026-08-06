@@ -419,7 +419,7 @@
       "sources_panel_open_one": "{{count}} fuente ›",
       "sources_panel_open_other": "{{count}} fuentes ›",
       "sources_panel_title": "Fuentes que Argus consultó",
-      "sources_panel_note": "Argus las consultó al responder. No son lecturas recomendadas.",
+      "sources_panel_note": "Fuentes usadas para fundamentar esta respuesta. Los enlaces se abren en una pestaña nueva.",
       "sources_panel_close": "Cerrar fuentes",
       "sources_panel_external_link_new_tab": "Se abre en una pestaña nueva",
       "allowance_banner": "Cupo de búsqueda con fuentes agotado",
