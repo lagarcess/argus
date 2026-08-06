@@ -336,6 +336,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sendCatch).toContain(
       'requestSessions.authorize(requestSession, "ambiguity")',
     );
+    expect(sendCatch).toContain(
+      "settleRetestReceiptProjection(view.messages, current, userMsg.id)",
+    );
     expect(sendCatch).toContain("finishRequestTransport(requestSession)");
     expect(sendCatch).not.toContain("conversationActivity.settleRequest");
     expect(chat).not.toContain("cancelOrdinaryTransportReconciliation();");

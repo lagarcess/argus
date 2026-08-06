@@ -61,6 +61,11 @@ const READY_RECEIPT: RetestReceipt = {
   },
 };
 
+const MULTI_SYMBOL_RECEIPT: RetestReceipt = {
+  ...READY_RECEIPT,
+  symbols: ["EUR/USD", "GBP/USD", "USD/JPY", "AUD/USD", "USD/CAD"],
+};
+
 type PendingRetestMessage = Message & { retestReceiptPending?: boolean };
 
 function retestMessage(
@@ -116,5 +121,19 @@ describe("Retest receipt visual continuity", () => {
     expect(pending).toContain("Volver a probar con datos actuales");
     expect(pending).toContain('data-retest-receipt-state="pending"');
     expect(pending).not.toContain("GLD");
+  });
+
+  test("pending and five-symbol ready receipts reserve the supported wrapped height", () => {
+    const pending = renderMessage(retestMessage({ retestReceiptPending: true }));
+    const ready = renderMessage(
+      retestMessage({ retestReceipt: MULTI_SYMBOL_RECEIPT }),
+    );
+
+    for (const markup of [pending, ready]) {
+      expect(markup).toContain("min-h-[95px]");
+      expect(markup).toContain("sm:min-h-[57px]");
+      expect(markup).toContain('data-retest-receipt-context-row="true"');
+    }
+    expect(ready).toContain("EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CAD");
   });
 });

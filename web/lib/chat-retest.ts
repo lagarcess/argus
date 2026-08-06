@@ -273,10 +273,7 @@ export function retestReceiptContextLine(
     .join(" · ");
 }
 
-/**
- * The receipt is backend truth, so the optimistic action bubble stays a
- * one-liner until the turn's own response supplies it.
- */
+/** Settle only the matched optimistic Retest turn with backend-owned truth. */
 export function applyRetestReceipt(
   messages: Message[],
   userMessageId: string,
@@ -301,4 +298,13 @@ export function applyRetestReceipt(
   return messages.map((candidate, index) =>
     index === messageIndex ? settledMessage : candidate,
   );
+}
+
+export function settleRetestReceiptProjection(
+  projection: Message[] | ((current: Message[]) => Message[]),
+  current: Message[],
+  userMessageId: string,
+): Message[] {
+  const projected = typeof projection === "function" ? projection(current) : projection;
+  return applyRetestReceipt(projected, userMessageId, null);
 }

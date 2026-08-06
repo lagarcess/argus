@@ -43,21 +43,24 @@ export function RetestReceipt({
       {(pending || contextLine) && (
         <p
           data-retest-receipt-context-row="true"
-          className="mt-0.5 min-h-[38px] pl-[22px] text-[13px] leading-[1.45] text-black/55 dark:text-white/55"
+          className="mt-0.5 flex min-h-[95px] items-center pl-[22px] text-[13px] leading-[1.45] text-black/55 sm:min-h-[57px] dark:text-white/55"
         >
           {pending ? (
             <span
               aria-hidden="true"
-              className="flex h-[38px] flex-col justify-center gap-2"
+              className="flex h-[95px] w-full flex-col justify-center gap-2 sm:h-[57px]"
             >
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-14 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none dark:bg-white/10" />
                 <span className="h-1.5 w-24 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none dark:bg-white/10" />
               </span>
-              <span className="h-1.5 w-20 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none dark:bg-white/10" />
+              <span className="h-1.5 w-4/5 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none dark:bg-white/10" />
+              <span className="h-1.5 w-3/5 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none dark:bg-white/10" />
+              <span className="h-1.5 w-2/3 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none sm:hidden dark:bg-white/10" />
+              <span className="h-1.5 w-2/5 animate-pulse rounded-full bg-black/10 motion-reduce:animate-none sm:hidden dark:bg-white/10" />
             </span>
           ) : (
-            contextLine
+            <span>{contextLine}</span>
           )}
         </p>
       )}

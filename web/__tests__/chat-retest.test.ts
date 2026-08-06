@@ -12,6 +12,7 @@ import {
   retestReceiptContextLine,
   retestReceiptFromFinalPayload,
   retestReceiptFromMetadata,
+  settleRetestReceiptProjection,
 } from "../lib/chat-retest";
 import { hydrateMessagesFromApi } from "../components/chat/chat-message-projection";
 import { omnisearchActionHandlers } from "../components/chat/omnisearch-actions";
@@ -279,6 +280,38 @@ describe("retest receipt projection", () => {
     ];
 
     expect(applyRetestReceipt(unrelated, "user-action-1", null)).toBe(unrelated);
+  });
+
+  test("transport-ambiguity fallback settles the preserved optimistic Retest turn", () => {
+    const optimistic: Message[] = [
+      {
+        id: "user-retest-1",
+        role: "user",
+        kind: "action",
+        content: "Retest with current data",
+        selectedAction: retestActionOption("run-42"),
+        retestReceiptPending: true,
+      },
+      { id: "assistant-local", role: "ai", kind: "text", content: "" },
+    ];
+    const fallback: Message = {
+      id: "load-failure",
+      role: "ai",
+      kind: "text",
+      content: "Could not load.",
+    };
+
+    const settled = settleRetestReceiptProjection(
+      (current) => [
+        ...current.filter((message) => message.id !== "assistant-local"),
+        fallback,
+      ],
+      optimistic,
+      "user-retest-1",
+    );
+
+    expect(settled[0].retestReceiptPending).toBeFalse();
+    expect(settled[1]).toEqual(fallback);
   });
 });
 

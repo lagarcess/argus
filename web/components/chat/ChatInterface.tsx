@@ -76,7 +76,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
-import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload } from "@/lib/chat-retest";
+import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
 import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
@@ -1599,7 +1599,7 @@ export default function ChatInterface() {
           );
           if (requestSessions.authorize(requestSession, "ambiguity")) {
             if (canApplyVisibleStreamUpdate()) {
-              setMessages(view.messages);
+              setMessages((current) => settleRetestReceiptProjection(view.messages, current, userMsg.id));
             }
             terminalReadiness.finish(true);
             finishRequestTransport(requestSession);
