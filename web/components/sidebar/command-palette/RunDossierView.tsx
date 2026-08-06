@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ChevronRight, PencilLine, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -118,6 +118,7 @@ export function RunDossierView({
   retestDisabled = false,
 }: RunDossierViewProps) {
   const { t, i18n } = useTranslation();
+  const retestDetailId = useId();
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const decisionAction = dossier.actions.find(
     (action): action is SearchDecisionAction => action.type === "decision",
@@ -256,6 +257,19 @@ export function RunDossierView({
               "This run’s timeframe is not available for this market.",
             )
           : null;
+  const retestButton = retestAction ? (
+    <button
+      type="button"
+      data-retest-location="card-header"
+      aria-describedby={retestDetail ? retestDetailId : undefined}
+      disabled={retestButtonDisabled}
+      onClick={() => void onRetest(retestAction.source_run_id)}
+      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 text-[11px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-white/[0.08]"
+    >
+      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+      {retestLabel}
+    </button>
+  ) : null;
 
   return (
     <div
@@ -287,7 +301,9 @@ export function RunDossierView({
               </span>
             )}
           </div>
-          {retestAction ? (
+          {retestButton &&
+          retestAction?.state === "new_data_available" &&
+          !retestButtonDisabled ? (
             <Tooltip
               content={t(
                 "command_palette.retest_tooltip",
@@ -296,22 +312,16 @@ export function RunDossierView({
               side="bottom"
               delay={150}
             >
-              <button
-                type="button"
-                data-retest-location="card-header"
-                disabled={retestButtonDisabled}
-                onClick={() => void onRetest(retestAction.source_run_id)}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 text-[11px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-white/[0.08]"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                {retestLabel}
-              </button>
+              {retestButton}
             </Tooltip>
-          ) : null}
+          ) : (
+            retestButton
+          )}
         </div>
 
         {retestDetail ? (
           <p
+            id={retestDetailId}
             data-retest-state={retestAction?.state}
             className="mt-2 text-[11px] leading-relaxed text-black/45 dark:text-white/45"
           >
