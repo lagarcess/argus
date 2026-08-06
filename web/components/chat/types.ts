@@ -279,6 +279,8 @@ export type Message = {
   discovery?: DiscoverySidecar | null;
   /** Backend-owned structured context for a retest receipt turn. */
   retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
+  /** Ephemeral optimistic presentation; never hydrated or persisted. */
+  retestReceiptPending?: boolean;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
 };
 

@@ -282,10 +282,23 @@ export function applyRetestReceipt(
   userMessageId: string,
   receipt: RetestReceipt | null,
 ): Message[] {
-  if (!receipt) return messages;
-  return messages.map((message) =>
-    message.id === userMessageId && message.role === "user"
-      ? { ...message, retestReceipt: receipt }
-      : message,
+  const messageIndex = messages.findIndex(
+    (message) =>
+      message.id === userMessageId &&
+      message.role === "user" &&
+      message.selectedAction?.type === RETEST_ACTION_TYPE,
+  );
+  if (messageIndex < 0) return messages;
+
+  const message = messages[messageIndex];
+  const settledMessage: Message = {
+    ...message,
+    retestReceiptPending: false,
+    ...(receipt || message.retestReceipt
+      ? { retestReceipt: receipt ?? message.retestReceipt }
+      : {}),
+  };
+  return messages.map((candidate, index) =>
+    index === messageIndex ? settledMessage : candidate,
   );
 }

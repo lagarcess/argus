@@ -76,7 +76,11 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
-import { applyRetestReceipt, retestReceiptFromFinalPayload } from "@/lib/chat-retest";
+import {
+  RETEST_ACTION_TYPE,
+  applyRetestReceipt,
+  retestReceiptFromFinalPayload,
+} from "@/lib/chat-retest";
 import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
@@ -1124,6 +1128,7 @@ export default function ChatInterface() {
       content: action?.type ? actionDisplayLabel(action) : trimmed,
       mentions,
       selectedAction: action,
+      retestReceiptPending: action?.type === RETEST_ACTION_TYPE,
     };
     const assistantId = replacementAssistantId ?? crypto.randomUUID();
     const retryLastTurnAction = action?.type
@@ -1248,10 +1253,11 @@ export default function ChatInterface() {
                 assistantMessageId: persistedErrorMessageId,
               })
             : retryLastTurnAction);
-        setMessages((prev) =>
-          normalizeDurableRetryActionHistory(
+        setMessages((prev) => {
+          const settledMessages = applyRetestReceipt(prev, userMsg.id, null);
+          return normalizeDurableRetryActionHistory(
             settleOpenConfirmationsAfterStreamError(
-              prev.map((m) =>
+              settledMessages.map((m) =>
                 durableRetry && m.id === userMsg.id
                   ? {
                       ...m,
@@ -1281,8 +1287,8 @@ export default function ChatInterface() {
               ),
               action,
             ),
-          ),
-        );
+          );
+        });
         if (!terminalReadiness.accept({ message_id: event.data.message_id, recovery: event.data.recovery ?? null, retry_last_turn: event.data.retry_last_turn ?? null }, true)) terminalReadiness.finish(true);
         finishRequestTransport(requestSession);
       }
@@ -1501,6 +1507,7 @@ export default function ChatInterface() {
       if (event.event === "done") {
         if (!requestSessions.authorize(requestSession, "done")) return;
         clearNeutralGuestSubmission();
+        setMessages((prev) => applyRetestReceipt(prev, userMsg.id, null));
         terminalReadiness.finish(true); finishRequestTransport(requestSession);
       }
     };
@@ -1675,10 +1682,11 @@ export default function ChatInterface() {
             : t("chat.error_backtest");
         const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
         if (canApplyVisibleUpdate) {
-          setMessages((prev) =>
-            normalizeDurableRetryActionHistory(
+          setMessages((prev) => {
+            const settledMessages = applyRetestReceipt(prev, userMsg.id, null);
+            return normalizeDurableRetryActionHistory(
               settleConfirmationAfterActionTransportError(
-                prev.map((m) =>
+                settledMessages.map((m) =>
                   m.id === assistantId
                     ? {
                         ...m,
@@ -1699,8 +1707,8 @@ export default function ChatInterface() {
                 action,
                 { rejectionCode },
               ),
-            ),
-          );
+            );
+          });
         }
         terminalReadiness.finish(requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);

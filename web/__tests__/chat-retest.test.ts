@@ -227,20 +227,58 @@ describe("retest receipt projection", () => {
     expect(messages[0].selectedAction?.labelKey).toBe(RETEST_ACTION_LABEL_KEY);
   });
 
-  test("the turn's own response supplies the optimistic receipt", () => {
-    const optimistic: Message[] = [
-      { id: "user-retest-1", role: "user", kind: "action", content: "Retest with current data" },
-    ];
+  test("a terminal response settles optimistic presentation without inventing facts", () => {
+    const optimistic = [
+      {
+        id: "user-retest-1",
+        role: "user",
+        kind: "action",
+        content: "Retest with current data",
+        selectedAction: retestActionOption("run-42"),
+        retestReceiptPending: true,
+      },
+    ] as Array<Message & { retestReceiptPending?: boolean }>;
 
-    const unchanged = applyRetestReceipt(optimistic, "user-retest-1", null);
+    const settled = applyRetestReceipt(optimistic, "user-retest-1", null);
+
+    expect(settled[0].retestReceiptPending).toBeFalse();
+    expect(settled[0].retestReceipt).toBeUndefined();
+  });
+
+  test("the turn's own response supplies the optimistic receipt", () => {
+    const optimistic = [
+      {
+        id: "user-retest-1",
+        role: "user",
+        kind: "action",
+        content: "Retest with current data",
+        selectedAction: retestActionOption("run-42"),
+        retestReceiptPending: true,
+      },
+    ] as Array<Message & { retestReceiptPending?: boolean }>;
+
     const patched = applyRetestReceipt(
       optimistic,
       "user-retest-1",
       retestReceiptFromFinalPayload({ retest_receipt: RECEIPT_METADATA }),
     );
 
-    expect(unchanged).toBe(optimistic);
+    expect(patched[0].retestReceiptPending).toBeFalse();
     expect(patched[0].retestReceipt?.symbols).toEqual(["GLD"]);
+  });
+
+  test("receipt settlement leaves unrelated action turns byte-for-byte unchanged", () => {
+    const unrelated: Message[] = [
+      {
+        id: "user-action-1",
+        role: "user",
+        kind: "action",
+        content: "Explain result",
+        selectedAction: { label: "Explain result", type: "show_breakdown" },
+      },
+    ];
+
+    expect(applyRetestReceipt(unrelated, "user-action-1", null)).toBe(unrelated);
   });
 });
 
