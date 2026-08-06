@@ -29,5 +29,26 @@ The focused accessibility refresh completed with 4/4 Chromium checks (two
 locales for the actionable tooltip and two locales for the same-period disabled
 state). The actionable captures stop at hover and never click Retest.
 
+## Retest receipt continuity
+
+The post-submit receipt was refreshed from the product code committed at
+`bae16dc751ba866356ce573e44954908a3c3a936`:
+
+- `en-retest-receipt-pending.png` and `en-retest-receipt-ready.png` show one
+  English receipt shell before and after the backend-owned context arrives.
+- `es-419-retest-receipt-pending.png` and
+  `es-419-retest-receipt-ready.png` show the equivalent Spanish transition.
+
+The deterministic Chromium check rendered the real `ChatMessage` and
+`RetestReceipt` components, held the response in its optimistic state, and then
+supplied a literal structured receipt. In both locales it verified that the
+same DOM receipt node remained mounted, the context row remained present, and
+the shell height stayed exactly `82.296875px` before and after hydration
+(`0px` delta). The width is intentionally content-sized and expands when the
+trusted context replaces the quiet placeholder.
+
+This receipt capture made no API, provider, LLM, simulation, or persistence
+call. Its development-only fixture was removed before the evidence commit.
+
 The capture-only Playwright fixture was removed after the evidence was written;
 only these durable artifacts are part of PR #363.
