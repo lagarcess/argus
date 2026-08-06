@@ -5,6 +5,11 @@ import { getMemoryAvailability } from "./memory-api";
 // conversation, so a lost entry fails safe.
 const MEMORY_OPT_OUT_STORAGE_KEY = "argus.memoryOptOutConversations.v1";
 
+// Session truth: the toggle the user sees must be the toggle the transport
+// sends, even when persistence is blocked. localStorage only carries the
+// choice across reloads, best effort.
+const sessionOptOut = new Map<string, boolean>();
+
 function readOptOutIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -30,6 +35,8 @@ function writeOptOutIds(ids: Set<string>): void {
 }
 
 export function isConversationMemoryOptOut(conversationId: string): boolean {
+  const held = sessionOptOut.get(conversationId);
+  if (held !== undefined) return held;
   return readOptOutIds().has(conversationId);
 }
 
@@ -37,6 +44,7 @@ export function setConversationMemoryOptOut(
   conversationId: string,
   optOut: boolean,
 ): void {
+  sessionOptOut.set(conversationId, optOut);
   const ids = readOptOutIds();
   if (optOut) {
     ids.add(conversationId);
