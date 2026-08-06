@@ -206,7 +206,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
     const mockedCorsHeaders = {
       "Access-Control-Allow-Credentials": "true",
       "Access-Control-Allow-Headers":
-        "authorization, content-type, idempotency-key, x-request-id",
+        "authorization, content-type, idempotency-key, x-request-id, x-argus-client-capabilities",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Origin": new URL(page.url()).origin,
       Vary: "Origin",

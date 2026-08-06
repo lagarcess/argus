@@ -602,7 +602,7 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     assert "route.fulfill" in browser_source
     assert '"Access-Control-Allow-Origin": new URL(page.url()).origin' in browser_source
     assert (
-        '"authorization, content-type, idempotency-key, x-request-id"'
+        '"authorization, content-type, idempotency-key, x-request-id, x-argus-client-capabilities"'
         in browser_source
     )
     conversations_mock = browser_source.split(
