@@ -24,22 +24,83 @@ const STORAGE_SELECTORS = [
   },
 ];
 
-// Cookie WRITES only. Reading cookies is ordinary work and stays free; it is
-// setting one that adds browser state the disclosure has to cover.
-const COOKIE_SELECTORS = [
-  {
-    selector:
-      "MemberExpression[property.name='set'][object.property.name='cookies']",
-    message:
-      "Route cookie writes through lib/supabase-server.ts, which asserts against COOKIE_DISCLOSURE_RULES first.",
+/**
+ * Cookie WRITES only, alias-aware.
+ *
+ * A selector cannot see that `const store = await cookies()` makes `store` a
+ * cookie store, so the ordinary Next.js form slipped past pure selectors. The
+ * obvious patch is to ban the `next/headers` import, which is what an earlier
+ * revision did, but that blocks *reading* cookies to prevent *writing* them:
+ * rigidity charged against ordinary work to catch a rare mistake.
+ *
+ * This tracks the binding instead. It reports `.set`/`.delete` on anything
+ * known to be a cookie store, however that store was reached, and says nothing
+ * about reads.
+ */
+const MESSAGE =
+  "Cookie writes belong in lib/supabase-server.ts, the one adapter the disclosure covers. Reading cookies anywhere is fine.";
+
+const noUnroutedCookieWrite = {
+  meta: {
+    type: "problem",
+    schema: [],
+    messages: { write: MESSAGE },
   },
-  {
-    selector:
-      "CallExpression[callee.callee.name='cookies'][callee.property.name='set']",
-    message:
-      "Route cookie writes through lib/supabase-server.ts, which asserts against COOKIE_DISCLOSURE_RULES first.",
+  create(context) {
+    const stores = new Set();
+
+    const unwrap = (node) =>
+      node && node.type === "AwaitExpression" ? node.argument : node;
+
+    // `cookies()` from next/headers, or any `.cookies` accessor such as
+    // NextResponse.cookies / response.cookies.
+    const isCookieStore = (node) => {
+      const value = unwrap(node);
+      if (!value) return false;
+      if (
+        value.type === "CallExpression" &&
+        value.callee.type === "Identifier" &&
+        value.callee.name === "cookies"
+      ) {
+        return true;
+      }
+      return (
+        value.type === "MemberExpression" &&
+        value.property.type === "Identifier" &&
+        value.property.name === "cookies"
+      );
+    };
+
+    return {
+      VariableDeclarator(node) {
+        if (node.id.type === "Identifier" && isCookieStore(node.init)) {
+          stores.add(node.id.name);
+        }
+      },
+      AssignmentExpression(node) {
+        if (node.left.type === "Identifier" && isCookieStore(node.right)) {
+          stores.add(node.left.name);
+        }
+      },
+      "CallExpression > MemberExpression"(node) {
+        if (
+          node.property.type !== "Identifier" ||
+          (node.property.name !== "set" && node.property.name !== "delete")
+        ) {
+          return;
+        }
+        const target = unwrap(node.object);
+        const aliased =
+          target.type === "Identifier" && stores.has(target.name);
+        if (aliased || isCookieStore(target)) {
+          context.report({ node, messageId: "write" });
+        }
+      },
+    };
   },
-];
+};
+
+const argusPlugin = { rules: { "no-unrouted-cookie-write": noUnroutedCookieWrite } };
 
 
 // Tests, e2e fixtures, and build config drive the real APIs on purpose and
@@ -67,16 +128,17 @@ const eslintConfig = defineConfig([
   {
     files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],
     ignores: [...NON_SHIPPING, "lib/browser-storage.ts", "lib/supabase-server.ts"],
+    plugins: { argus: argusPlugin },
     rules: {
-      "no-restricted-syntax": ["error", ...STORAGE_SELECTORS, ...COOKIE_SELECTORS],
+      "no-restricted-syntax": ["error", ...STORAGE_SELECTORS],
+      "argus/no-unrouted-cookie-write": "error",
     },
   },
   // The one sanctioned storage handle. Cookie rules still apply to it.
   {
     files: ["lib/browser-storage.ts"],
-    rules: {
-      "no-restricted-syntax": ["error", ...COOKIE_SELECTORS],
-    },
+    plugins: { argus: argusPlugin },
+    rules: { "argus/no-unrouted-cookie-write": "error" },
   },
   // The one sanctioned cookie writer; it asserts before every set. Storage
   // rules still apply to it.
