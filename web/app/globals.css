@@ -14,13 +14,16 @@
   --breakpoint-large: 80rem;
   --breakpoint-xlarge: 120rem;
 
-  /* Tailwind's default names alias the same five stops, position for position,
-     so existing markup keeps compiling until it migrates to the named stops. */
-  --breakpoint-sm: 25rem;
-  --breakpoint-md: 45rem;
+  /* Tailwind's default names, at Tailwind's default widths, because clearing
+     the defaults above would otherwise drop them. Aliasing them onto the named
+     stops position for position looked tidy and silently moved 60 existing
+     `sm:` classes from 640px to 400px, so every one of them started firing on
+     phones they were never written for. New work uses the named stops. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
   --breakpoint-lg: 64rem;
   --breakpoint-xl: 80rem;
-  --breakpoint-2xl: 120rem;
+  --breakpoint-2xl: 96rem;
 }
 
 @theme inline {

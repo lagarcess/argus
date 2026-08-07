@@ -98,7 +98,7 @@ export default function GuestSettingsMenu({
           className={
             isDrawerPlacement
               ? "absolute bottom-full left-0 mb-2 w-[min(280px,calc(100vw-3rem))] rounded-[18px] border border-black/8 bg-white p-2.5 text-black shadow-[0_16px_44px_rgba(15,23,42,0.13)] dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
-              : "absolute left-1/2 top-full mt-2 w-[min(244px,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[18px] border border-black/8 bg-white p-2.5 text-black shadow-[0_16px_44px_rgba(15,23,42,0.13)] sm:left-auto sm:right-0 sm:translate-x-0 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
+              : "absolute left-1/2 top-full mt-2 w-[min(244px,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[18px] border border-black/8 bg-white p-2.5 text-black shadow-[0_16px_44px_rgba(15,23,42,0.13)] mobile:left-auto mobile:right-0 mobile:translate-x-0 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
           }
           role="menu"
           aria-label={t("guest.shell.settings", "Guest settings")}

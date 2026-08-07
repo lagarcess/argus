@@ -12,9 +12,15 @@ describe("guest modal viewport fit", () => {
     );
 
     expect(source).toContain("p-3 sm:p-6");
-    expect(source).toContain("max-h-[calc(100dvh-1.5rem)]");
+    // Full height minus 12px read as a broken page rather than a dialog, and a
+    // bug report is tall enough to hit the cap on every phone.
+    expect(source).toContain("max-h-[88dvh]");
     expect(source).toContain("sm:max-h-[82dvh]");
     expect(source).toContain("flex-1 overflow-y-auto");
+    // The actions are pinned outside the scrolling body, so a long form cannot
+    // push Submit off the bottom of the screen.
+    expect(source).toContain("flex shrink-0 justify-end gap-3 border-t");
+    expect(source).toContain("form={formId}");
   });
 
   test("keeps both Omnisearch layouts inside a quieter viewport footprint", () => {

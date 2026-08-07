@@ -100,11 +100,11 @@ export default function ChatHeaderMenu({
             role="menuitem"
             disabled={isReadMutationPending}
             onClick={handleToggleUnread}
-            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-3 md:py-2 md:text-[15px]"
+            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/5 tablet:mx-1 tablet:w-[calc(100%-0.5rem)] tablet:px-3 tablet:py-2 tablet:text-[15px]"
           >
             {isUnread
-              ? <MailOpen className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-              : <Mail className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />}
+              ? <MailOpen className="h-[18px] w-[18px] text-black/60 dark:text-white/60 tablet:h-4 tablet:w-4" />
+              : <Mail className="h-[18px] w-[18px] text-black/60 dark:text-white/60 tablet:h-4 tablet:w-4" />}
             {isUnread
               ? t("chat.activity.mark_read", "Mark as read")
               : t("chat.activity.mark_unread", "Mark as unread")}
@@ -114,9 +114,9 @@ export default function ChatHeaderMenu({
             role="menuitem"
             disabled={isPinning}
             onClick={onTogglePin}
-            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-3 md:py-2 md:text-[15px]"
+            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 tablet:mx-1 tablet:w-[calc(100%-0.5rem)] tablet:px-3 tablet:py-2 tablet:text-[15px]"
           >
-            <Pin className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+            <Pin className="h-[18px] w-[18px] text-black/60 dark:text-white/60 tablet:h-4 tablet:w-4" />
             {pinned
               ? t('chat.unpin_chat', 'Unpin chat')
               : t('chat.pin_chat', 'Pin chat')}
@@ -125,9 +125,9 @@ export default function ChatHeaderMenu({
             type="button"
             role="menuitem"
             onClick={onStartRename}
-            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-3 md:py-2 md:text-[15px]"
+            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 tablet:mx-1 tablet:w-[calc(100%-0.5rem)] tablet:px-3 tablet:py-2 tablet:text-[15px]"
           >
-            <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+            <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 tablet:h-4 tablet:w-4" />
             {t('chat.rename_chat', 'Rename chat')}
           </button>
           {memoryChrome?.controlsAvailable ? (
@@ -136,9 +136,9 @@ export default function ChatHeaderMenu({
               role="menuitemcheckbox"
               aria-checked={memoryChrome.optOut}
               onClick={memoryChrome.onToggleOptOut}
-              className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-3 md:py-2 md:text-[15px]"
+              className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 tablet:mx-1 tablet:w-[calc(100%-0.5rem)] tablet:px-3 tablet:py-2 tablet:text-[15px]"
             >
-              <EyeOff className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+              <EyeOff className="h-[18px] w-[18px] text-black/60 dark:text-white/60 tablet:h-4 tablet:w-4" />
               {memoryChrome.optOut
                 ? t("chat.memory.private_on", "Private chat: on")
                 : t("chat.memory.private_off", "Private chat")}
@@ -150,9 +150,9 @@ export default function ChatHeaderMenu({
             role="menuitem"
             disabled={isDeleting}
             onClick={onRequestDelete}
-            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-3 md:py-2 md:text-[15px]"
+            className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 tablet:mx-1 tablet:w-[calc(100%-0.5rem)] tablet:px-3 tablet:py-2 tablet:text-[15px]"
           >
-            <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
+            <Trash2 className="h-[18px] w-[18px] tablet:h-4 tablet:w-4" />
             {t('chat.delete_chat', 'Delete')}
           </button>
         </div>

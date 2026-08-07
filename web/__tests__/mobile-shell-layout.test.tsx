@@ -625,9 +625,10 @@ describe("activity rail and starter pills", () => {
       join(import.meta.dir, "../components/chat/ConversationActivityRail.tsx"),
       "utf-8",
     );
-    expect(rail).toContain("hidden md:block");
-    // md aliases the tablet stop, so "hidden md:block" is exactly the 720 rule.
-    expect(globalsCss).toContain("--breakpoint-md: 45rem;");
+    // Spec section 6 removes the rail below 720. `md:` is Tailwind's 768, so
+    // the named stop is the only one that states the rule the spec wrote.
+    expect(rail).toContain("hidden tablet:block");
+    expect(globalsCss).toContain("--breakpoint-tablet: 45rem;");
   });
 
   test("starter pills scroll with a peek on narrow screens", () => {

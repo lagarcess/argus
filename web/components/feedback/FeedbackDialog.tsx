@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -47,6 +48,9 @@ export default function FeedbackDialog({
   context,
 }: FeedbackDialogProps) {
   const { t } = useTranslation();
+  // The actions sit outside the form so they can stay pinned, so they submit
+  // it by name instead of by containment.
+  const formId = useId();
   const [type, setType] = useState<FeedbackType>(initialType);
   const [message, setMessage] = useState("");
   const [bugTitle, setBugTitle] = useState("");
@@ -235,7 +239,7 @@ export default function FeedbackDialog({
         aria-label="Close feedback"
       />
 
-      <div className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f5f5f5] dark:border-white/10 dark:bg-[#1c1f24] sm:max-h-[82dvh]">
+      <div className="relative flex max-h-[88dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f5f5f5] dark:border-white/10 dark:bg-[#1c1f24] sm:max-h-[82dvh]">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/5 px-5 py-5 dark:border-white/5 sm:px-6">
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2 text-black/45 dark:text-white/45">
@@ -272,7 +276,11 @@ export default function FeedbackDialog({
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <form
+              id={formId}
+              onSubmit={handleSubmit}
+              className="flex flex-col gap-6"
+            >
               {!isRating && (
                 <div className="relative">
                   <label className="mb-2 block text-[13px] font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
@@ -535,29 +543,38 @@ export default function FeedbackDialog({
                 </button>
               </p>
 
-              <div className="mt-2 flex justify-end gap-3 border-t border-black/5 pt-4 dark:border-white/5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-full border border-black/10 px-6 py-2.5 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
-                >
-                  {t("common.cancel", "Cancel")}
-                </button>
-                <button
-                  type="submit"
-                  disabled={!canSubmit() || isSubmitting}
-                  className="flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40 dark:bg-white dark:text-black"
-                >
-                  {isSubmitting ? (
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    t("feedback.submit", "Submit feedback")
-                  )}
-                </button>
-              </div>
             </form>
           )}
         </div>
+
+        {/*
+          Pinned, not the last row of the form. A bug report is long enough to
+          push Submit past the bottom of a phone, and nothing about the cut-off
+          content said there was an action down there to scroll to.
+        */}
+        {isSuccess ? null : (
+          <div className="flex shrink-0 justify-end gap-3 border-t border-black/5 px-5 py-4 dark:border-white/5 sm:px-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-11 rounded-full border border-black/10 px-6 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+            >
+              {t("common.cancel", "Cancel")}
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              disabled={!canSubmit() || isSubmitting}
+              className="flex min-h-11 items-center gap-2 rounded-full bg-black px-6 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40 dark:bg-white dark:text-black"
+            >
+              {isSubmitting ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                t("feedback.submit", "Submit feedback")
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -28,12 +28,15 @@ const DESIGN_SCALE = {
   "--breakpoint-xlarge": "120rem",
 } as const;
 
+// Tailwind's own widths, not the DESIGN.md stops. Clearing the defaults means
+// these have to be redeclared, and redeclaring them at different widths would
+// silently move every `sm:` and `md:` class already in the codebase.
 const LEGACY_ALIASES = {
-  "--breakpoint-sm": "25rem",
-  "--breakpoint-md": "45rem",
+  "--breakpoint-sm": "40rem",
+  "--breakpoint-md": "48rem",
   "--breakpoint-lg": "64rem",
   "--breakpoint-xl": "80rem",
-  "--breakpoint-2xl": "120rem",
+  "--breakpoint-2xl": "96rem",
 } as const;
 
 describe("responsive breakpoints", () => {
@@ -54,7 +57,7 @@ describe("responsive breakpoints", () => {
     expect(declared["--breakpoint-desktop"]).toBe("64rem");
   });
 
-  test("aliases the Tailwind default names position for position", () => {
+  test("redeclares the Tailwind default names at their own widths", () => {
     const declared = declaredBreakpoints();
     for (const [name, value] of Object.entries(LEGACY_ALIASES)) {
       expect(declared[name]).toBe(value);
