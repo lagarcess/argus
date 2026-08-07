@@ -119,6 +119,10 @@ AUTHORIZED_API_CONSUMERS = frozenset(
     {
         "src/argus/api/personalization_memory.py",
         "src/argus/api/personalization_memory_assessor.py",
+        # Mem0 index adapter: the vendor client and its environment switches
+        # live in the composition layer so the domain package stays
+        # deterministic and network-free.
+        "src/argus/api/personalization_memory_index.py",
         "src/argus/api/personalization_memory_schemas.py",
         "src/argus/api/routers/personalization_memory.py",
         # Post-turn recall annotation: the one authorized runtime-adjacent
