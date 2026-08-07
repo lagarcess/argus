@@ -1,3 +1,4 @@
+import { LANGUAGE_STORAGE_KEY } from './browser-storage';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
@@ -25,6 +26,9 @@ i18n
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
+      // Declared rather than inherited, so the key the detector persists is
+      // one the storage registry knows about.
+      lookupLocalStorage: LANGUAGE_STORAGE_KEY,
     },
   });
 
