@@ -196,7 +196,8 @@
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
-    "input_placeholder": "Describe una idea de inversión...",
+    "input_placeholder": "Pregunta sobre cualquier empresa o idea",
+    "input_placeholder_prerail": "Describe una idea de inversión...",
     "followup_placeholder": "Haz una pregunta de seguimiento...",
     "message_empty": "El mensaje está vacío",
     "send_message": "Enviar mensaje",
@@ -204,18 +205,12 @@
     "disclaimer": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
-    "placeholder_prompts": [
-      "¿Cómo le ha ido a Apple contra SPY en lo que va del año?",
-      "¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
-      "Explícame un término del mercado en palabras simples.",
-      "¿Qué pasa si mantengo Nvidia durante los últimos 12 meses?",
-      "Compara Ethereum y Bitcoin durante los últimos 12 meses.",
-      "Prueba comprar SPY en lo que va del año.",
-      "¿Cómo funciona comprar acciones fuertes?",
-      "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?",
-      "Prueba una idea simple de comprar y mantener Solana en los últimos 6 meses.",
-      "¿Por qué la gente compara una acción con SPY?"
-    ],
+    "greeting": {
+      "early": "Madrugaste hoy. ¿Qué miramos?",
+      "day": "¿Qué probamos hoy?",
+      "evening": "¿Qué exploramos esta noche?",
+      "night": "Hola, noctámbulo. ¿Qué te da curiosidad?"
+    },
     "view_history": "Ver historial",
     "chat_options": "Opciones de chat",
     "jump_to_latest": "Ir a lo más reciente",
@@ -259,9 +254,27 @@
       }
     },
     "example_queries": {
-      "q1": "¿Y si comprara Apple en caídas importantes?",
-      "q2": "Prueba una estrategia de ruptura de impulso en Bitcoin.",
-      "q3": "¿Cómo funcionaría una estrategia DCA simple en Tesla?"
+      "q1": "¿Cómo gana dinero Netflix?",
+      "q2": "Compara Costco con Walmart y Target",
+      "q3": "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?"
+    },
+    "research_job": {
+      "queued": {
+        "title": "Investigación en espera",
+        "body": "Argus está preparando una mirada más profunda. Puedes seguir conversando; la respuesta aparecerá aquí."
+      },
+      "running": {
+        "title": "Investigando",
+        "body": "Argus está leyendo datos financieros y fuentes para esta pregunta. La respuesta aparecerá aquí."
+      },
+      "succeeded": {
+        "title": "Investigación lista",
+        "body": "La respuesta completa está abajo."
+      },
+      "failed": {
+        "title": "La investigación no terminó",
+        "body": "Argus no pudo completar esta investigación. Pregunta de nuevo, o prueba la idea directamente."
+      }
     },
     "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
     "error_offline": "Argus no puede conectarse con su servicio en este momento. Revisa tu conexión e inténtalo de nuevo en un momento.",
@@ -702,6 +715,9 @@
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
+      "assets_added": "Agregué {{added}}. Ahora es una prueba distinta que compara {{symbols}}.",
+      "peer_offers_label": "Agrega desde tu investigación",
+      "peer_add_failed": "No se pudo agregar ese activo a esta prueba. El resto de la tarjeta no cambió.",
       "status": {
         "ready_to_run": "Listo para ejecutar",
         "needs_change": "Necesita ajuste",
@@ -1341,7 +1357,8 @@
     },
     "shell": {
       "value_title": "Prueba una idea de inversión con datos históricos.",
-      "input_placeholder": "¿Qué quieres probar?",
+      "input_placeholder": "Pregunta sobre cualquier empresa o idea",
+      "input_placeholder_prerail": "¿Qué quieres probar?",
       "sign_in": "Iniciar sesión",
       "settings": "Ajustes de invitado",
       "language": "Idioma",

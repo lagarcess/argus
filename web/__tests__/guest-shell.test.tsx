@@ -204,8 +204,16 @@ describe("guest shell contract", () => {
       ).toBeString();
     }
 
-    expect(en.guest.shell.input_placeholder).toBe("What do you want to test?");
-    expect(es.guest.shell.input_placeholder).toBe("¿Qué quieres probar?");
+    // Spec 2026-08-07 section 10b: the guest empty-state placeholder invites
+    // questions; the pre-rail string stays behind the flag-off path.
+    expect(en.guest.shell.input_placeholder).toBe("Ask about any company or idea");
+    expect(es.guest.shell.input_placeholder).toBe(
+      "Pregunta sobre cualquier empresa o idea",
+    );
+    expect(en.guest.shell.input_placeholder_prerail).toBe(
+      "What do you want to test?",
+    );
+    expect(es.guest.shell.input_placeholder_prerail).toBe("¿Qué quieres probar?");
     expect(en.guest.shell.temporary_until).toBe(
       "Temporary chat · available until {{date}}",
     );

@@ -229,34 +229,42 @@ describe("Argus Alpha frontend contract", () => {
     const en = JSON.parse(enSource);
     const es = JSON.parse(esSource);
 
-    expect(flags).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED");
-    expect(flags).toContain("chatExploratorySuggestionsEnabled");
-    expect(envExample).toContain(
-      "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false",
+    // The research rail replaced the exploratory-suggestions flag and retired
+    // the composer typewriter; suggestions ship behind the rail flag instead.
+    expect(flags).toContain("NEXT_PUBLIC_RESEARCH_RAIL_ENABLED");
+    expect(flags).toContain("researchRailEnabled");
+    expect(flags).not.toContain("chatExploratorySuggestionsEnabled");
+    expect(envExample).toContain("NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false");
+    expect(envExample).not.toContain(
+      "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED",
     );
-    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled");
+    expect(emptyChat).toContain("researchRailEnabled");
     expect(emptyChat).toContain("showSuggestions");
     expect(starterActions).toContain("chat.starter_actions.tsla.value");
     expect(starterActions).toContain("chat.starter_actions.btc.value");
     expect(starterActions).toContain("chat.starter_actions.dca.value");
+    expect(starterActions).toContain("chat.example_queries");
     expect(emptyChat).toContain("<StarterActions");
-    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled && showSuggestions &&");
-    expect(input).toContain("chatExploratorySuggestionsEnabled");
-    expect(input).toContain(
-      "const prompts = chatExploratorySuggestionsEnabled",
-    );
+    expect(input).not.toContain("placeholder_prompts");
+    expect(input).not.toContain("animState");
     expect(input).toContain("placeholder");
     expect(chat).toContain("chat.followup_placeholder");
+    expect(en.chat.placeholder_prompts).toBeUndefined();
+    expect(es.chat.placeholder_prompts).toBeUndefined();
 
     const starterAndPlaceholderText = [
-      ...en.chat.placeholder_prompts,
-      ...es.chat.placeholder_prompts,
       en.chat.starter_actions.tsla.value,
       en.chat.starter_actions.btc.value,
       en.chat.starter_actions.dca.value,
       es.chat.starter_actions.tsla.value,
       es.chat.starter_actions.btc.value,
       es.chat.starter_actions.dca.value,
+      en.chat.example_queries.q1,
+      en.chat.example_queries.q2,
+      en.chat.example_queries.q3,
+      es.chat.example_queries.q1,
+      es.chat.example_queries.q2,
+      es.chat.example_queries.q3,
     ].join("\n");
 
     expect(starterAndPlaceholderText).not.toContain("2024");

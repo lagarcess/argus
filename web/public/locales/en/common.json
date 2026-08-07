@@ -196,7 +196,8 @@
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
-    "input_placeholder": "Describe an investing idea",
+    "input_placeholder": "Ask about any company or idea",
+    "input_placeholder_prerail": "Describe an investing idea",
     "followup_placeholder": "Add a follow-up",
     "message_empty": "Message is empty",
     "send_message": "Send message",
@@ -204,18 +205,12 @@
     "disclaimer": "Argus can make mistakes. For education only. Not financial advice.",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
-    "placeholder_prompts": [
-      "How has Apple performed against SPY this year so far?",
-      "What if I bought Bitcoin this year so far?",
-      "Explain a market term in simple words.",
-      "What happens if I hold Nvidia over the last 12 months?",
-      "Compare Ethereum and Bitcoin over the last 12 months.",
-      "Test buying SPY this year so far.",
-      "How does buying strong stocks work?",
-      "What if I bought $250 of Nvidia every week over the last 12 months?",
-      "Try a simple Solana buy-and-hold idea over the last 6 months.",
-      "Why do people compare a stock to SPY?"
-    ],
+    "greeting": {
+      "early": "Hey, early bird. What should we look at?",
+      "day": "What should we try today?",
+      "evening": "What should we look into tonight?",
+      "night": "Hello, night owl. What are you curious about?"
+    },
     "view_history": "View history",
     "chat_options": "Chat options",
     "jump_to_latest": "Jump to latest",
@@ -259,9 +254,27 @@
       }
     },
     "example_queries": {
-      "q1": "What if I bought Apple after big drops?",
-      "q2": "What if I bought Bitcoin when it starts rising?",
-      "q3": "What if I bought Tesla every month?"
+      "q1": "How does Netflix make money?",
+      "q2": "Compare Costco against Walmart and Target",
+      "q3": "What if I had bought Coca-Cola every month for five years?"
+    },
+    "research_job": {
+      "queued": {
+        "title": "Research queued",
+        "body": "Argus is lining up a deeper look. You can keep chatting; the answer will appear here."
+      },
+      "running": {
+        "title": "Researching",
+        "body": "Argus is reading financial data and sources for this one. The answer will appear here."
+      },
+      "succeeded": {
+        "title": "Research ready",
+        "body": "The full answer is below."
+      },
+      "failed": {
+        "title": "Research didn't finish",
+        "body": "Argus couldn't complete this research run. Ask again, or test the idea directly."
+      }
     },
     "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
     "error_offline": "Argus can’t reach its service right now. Check your connection and try again in a moment.",
@@ -702,6 +715,9 @@
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
       "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
+      "assets_added": "Added {{added}}. This is now a different test comparing {{symbols}}.",
+      "peer_offers_label": "Add from your research",
+      "peer_add_failed": "Couldn't add that asset to this test. The rest of the card is unchanged.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",
@@ -1341,7 +1357,8 @@
     },
     "shell": {
       "value_title": "Test an investing idea against history.",
-      "input_placeholder": "What do you want to test?",
+      "input_placeholder": "Ask about any company or idea",
+      "input_placeholder_prerail": "What do you want to test?",
       "sign_in": "Sign in",
       "settings": "Guest settings",
       "language": "Language",

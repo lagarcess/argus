@@ -37,6 +37,7 @@ import {
   type GuestResumeSend,
 } from "@/components/guest/useGuestExperience";
 import {
+  addConfirmationPeerAssets,
   createConversation,
   deleteConversation,
   getBacktestRun,
@@ -54,7 +55,7 @@ import {
   type SearchConversationItem,
 } from "@/lib/argus-api";
 import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";
-import { omnisearchEnabled } from "@/lib/private-alpha-flags";
+import { omnisearchEnabled, researchRailEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -264,7 +265,7 @@ export default function ChatInterface() {
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
   // First paint waits for the authenticated profile language so a fresh
   // browser cannot send starter prompts in the wrong language.
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(researchRailEnabled);
   const { toast, showToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
@@ -1788,6 +1789,12 @@ export default function ChatInterface() {
       void handleCancelConfirmationAction(action);
       return;
     }
+    if (action.type === "add_confirmation_peer") {
+      // No turn is spent: the typed endpoint patches the pending card
+      // deterministically and returns the superseding card message.
+      void handleAddConfirmationPeer(action);
+      return;
+    }
     if (value === "/action:new-chat") {
       requestNewChat();
       return;
@@ -1839,6 +1846,55 @@ export default function ChatInterface() {
     }
     void handleSend(action.label || value, action.type ? action : undefined);
   };
+
+  async function handleAddConfirmationPeer(action: ChatActionOption): Promise<void> {
+    const payload = action.payload ?? {};
+    const confirmationId = String(payload.confirmation_id ?? "");
+    const symbols = Array.isArray(payload.symbols)
+      ? payload.symbols.map((symbol) => String(symbol)).filter(Boolean)
+      : [];
+    const targetConversationId = activeConversationIdRef.current;
+    if (!targetConversationId || !confirmationId || symbols.length === 0) {
+      return;
+    }
+    try {
+      const created = await addConfirmationPeerAssets(
+        targetConversationId,
+        confirmationId,
+        symbols,
+      );
+      const hydrated = hydrateMessagesFromApi([created]).messages;
+      if (hydrated.length === 0) {
+        return;
+      }
+      setMessages((prev) => [
+        // The new card supersedes the old one; mirror the reload projection
+        // instead of leaving two active cards on screen.
+        ...prev.map((message) =>
+          message.confirmation &&
+          message.confirmation.confirmation_state !== "cancelled" &&
+          message.confirmation.confirmation_id !== hydrated[0].confirmation?.confirmation_id
+            ? {
+                ...message,
+                confirmation: {
+                  ...message.confirmation,
+                  confirmation_state: "superseded" as const,
+                },
+              }
+            : message,
+        ),
+        ...hydrated,
+      ]);
+    } catch {
+      showToast(
+        t(
+          "chat.confirmation.peer_add_failed",
+          "Couldn't add that asset to this test. The rest of the card is unchanged.",
+        ),
+        "error",
+      );
+    }
+  }
 
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
@@ -1968,9 +2024,20 @@ export default function ChatInterface() {
     messages,
     isStreamingResponse,
   );
+  // Spec 10b: both empty-state placeholders carry the same invitation once the
+  // rail ships; the pre-rail strings stay behind the flag so flag-off behavior
+  // is unchanged. The follow-up placeholder is deliberately untouched.
   const chatInputPlaceholder =
     messages.length === 0
-      ? t(isGuest ? "guest.shell.input_placeholder" : "chat.input_placeholder")
+      ? t(
+          isGuest
+            ? researchRailEnabled
+              ? "guest.shell.input_placeholder"
+              : "guest.shell.input_placeholder_prerail"
+            : researchRailEnabled
+              ? "chat.input_placeholder"
+              : "chat.input_placeholder_prerail",
+        )
       : t("chat.followup_placeholder", "Ask a follow-up...");
   const showEmptyChatSurface = conversationId === null && messages.length === 0;
   const conversationComposerUnavailable =

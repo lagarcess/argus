@@ -172,6 +172,8 @@ export type BacktestJob = {
   conversation_id: string;
   request_message_id?: string | null;
   confirmation_message_id?: string | null;
+  // Absent on legacy rows; treat missing as a backtest job.
+  operation_scope?: "chat.run_backtest" | "backtests.run" | "chat.research" | null;
   status: BacktestJobStatus;
   result_run_id?: string | null;
   failure_code?: string | null;
@@ -707,6 +709,24 @@ export async function getConversationMessages(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
     { signal: options.signal },
   );
+}
+
+export async function addConfirmationPeerAssets(
+  conversationId: string,
+  confirmationId: string,
+  symbols: string[],
+) {
+  // Deterministic basket growth: no chat turn, no allowance spend. The
+  // backend re-validates every symbol against the offers on the active card.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    },
+  );
+  return response.message;
 }
 
 export async function patchConversation(

@@ -48,6 +48,7 @@ import {
   type StrategyConfirmationStatus,
 } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import NextMoveRow, { NextMoveTitle } from "./NextMoveRow";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
@@ -108,9 +109,31 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
     canShowActions &&
     confirmation.capabilities?.execution_costs_editable === true;
   const StatusIcon = displayState.icon;
+  const peerOffers = confirmation.research_peers?.offers ?? [];
+  const peerSet = confirmation.research_peers?.set ?? null;
+  const assetsAdded = confirmation.assets_adjustment;
+  const assetsAddedLine =
+    assetsAdded && assetsAdded.added.length > 0
+      ? t("chat.confirmation.assets_added", {
+          defaultValue:
+            "Added {{added}}. This is now a different test comparing {{symbols}}.",
+          added: assetsAdded.added
+            .map((item) => `${item.name} [${item.symbol}]`)
+            .join(", "),
+          symbols: assetsAdded.symbols.join(", "),
+        })
+      : null;
 
   return (
     <section className="argus-card-reveal argus-confirmation-reveal w-full overflow-hidden rounded-[20px] border border-[#c9c9cd] bg-white text-[#191c1f] dark:border-white/12 dark:bg-[#1d2023] dark:text-white">
+      {assetsAddedLine && (
+        <p
+          className="border-b border-[#c9c9cd]/22 px-4 py-2.5 text-[13px] leading-snug tracking-[0.16px] text-black/65 dark:border-white/[0.04] dark:text-white/65 sm:px-5"
+          data-testid="confirmation-assets-adjustment"
+        >
+          {assetsAddedLine}
+        </p>
+      )}
       <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -211,6 +234,53 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
               {displayConfirmationActionLabel(action, t)}
             </button>
           ))}
+        </div>
+      )}
+
+      {canShowActions && peerOffers.length > 0 && (
+        <div
+          className="border-t border-[#c9c9cd]/22 px-4 pb-3 pt-2.5 dark:border-white/[0.04] sm:px-5"
+          data-testid="confirmation-peer-offers"
+        >
+          <p className="argus-result-section-label">
+            {t("chat.confirmation.peer_offers_label", "Add from your research")}
+          </p>
+          <div className="flex flex-col">
+            {peerOffers.map((offer) => (
+              <NextMoveRow
+                key={offer.symbol}
+                onClick={() =>
+                  onAction?.({
+                    type: "add_confirmation_peer",
+                    label: offer.label,
+                    payload: {
+                      confirmation_id: confirmation.confirmation_id,
+                      symbols: [offer.symbol],
+                    },
+                  })
+                }
+              >
+                <NextMoveTitle>{offer.label}</NextMoveTitle>
+              </NextMoveRow>
+            ))}
+            {peerSet && (
+              <NextMoveRow
+                key="peer-set"
+                onClick={() =>
+                  onAction?.({
+                    type: "add_confirmation_peer",
+                    label: peerSet.label,
+                    payload: {
+                      confirmation_id: confirmation.confirmation_id,
+                      symbols: peerSet.symbols,
+                    },
+                  })
+                }
+              >
+                <NextMoveTitle>{peerSet.label}</NextMoveTitle>
+              </NextMoveRow>
+            )}
+          </div>
         </div>
       )}
     </section>

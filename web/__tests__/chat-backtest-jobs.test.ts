@@ -1101,7 +1101,9 @@ describe("chat backtest jobs", () => {
     expect(chat).toContain('kind: "backtest_job"');
     expect(chat).toContain("applyBacktestJobUpdate(");
     expect(polling).toContain("pendingBacktestJobKey");
-    expect(polling).toContain("response.job.status === \"succeeded\" && !response.run");
+    expect(polling).toContain(
+      'response.job.status === "succeeded" &&\n          !response.run &&\n          response.job.operation_scope !== "chat.research"',
+    );
     expect(polling).toContain("response.job.status === \"running\"");
     expect(chat).not.toContain('workflow_proof');
   });

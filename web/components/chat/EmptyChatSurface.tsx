@@ -3,12 +3,13 @@
 import { useTranslation } from "react-i18next";
 import ChatInput from "./ChatInput";
 import ChatLegalNotice from "./ChatLegalNotice";
+import EmptyChatGreeting from "./EmptyChatGreeting";
 import EmptyChatHeading from "./EmptyChatHeading";
 import StarterActions, {
   type StarterSelectionMetadata,
 } from "./StarterActions";
 import type { ChatMention } from "./types";
-import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
+import { researchRailEnabled } from "@/lib/private-alpha-flags";
 
 type EmptyChatSurfaceProps = {
   isGuest: boolean;
@@ -46,9 +47,15 @@ export default function EmptyChatSurface({
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
+  const showSignedInGreeting = researchRailEnabled && !isGuest;
+
   return (
     <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-      <EmptyChatHeading isGuest={isGuest} />
+      {showSignedInGreeting ? (
+        <EmptyChatGreeting />
+      ) : (
+        <EmptyChatHeading isGuest={isGuest} />
+      )}
 
       <div aria-busy={guestSubmissionPending} className="w-full max-w-2xl">
         <ChatInput
@@ -95,40 +102,20 @@ export default function EmptyChatSurface({
         />
       </div>
 
-      <StarterActions disabled={disabled} onSelect={onSend} />
+      {(!showSignedInGreeting || showSuggestions) && (
+        <StarterActions disabled={disabled} onSelect={onSend} />
+      )}
 
-      {chatExploratorySuggestionsEnabled && (
+      {showSignedInGreeting && (
         <div className="mt-4">
           <button
             onClick={onToggleSuggestions}
-            className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+            className="min-h-11 rounded-full px-3 text-[14px] font-medium text-black/60 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white/60 dark:hover:text-white dark:focus-visible:ring-white/25"
           >
             {showSuggestions
               ? t("chat.hide_suggestions")
               : t("chat.show_suggestions")}
           </button>
-        </div>
-      )}
-
-      {chatExploratorySuggestionsEnabled && showSuggestions && (
-        <div className="mt-8 flex flex-col items-center gap-4 text-center">
-          {(["q1", "q2", "q3"] as const).map((queryKey) => {
-            const fallback = {
-              q1: "What if I bought Apple after big drops?",
-              q2: "What if I bought Bitcoin when it starts rising?",
-              q3: "What if I bought Tesla every month?",
-            }[queryKey];
-            const prompt = t(`chat.example_queries.${queryKey}`, fallback);
-            return (
-              <button
-                key={queryKey}
-                onClick={() => onSend(prompt)}
-                className="text-[14px] text-black/50 transition-colors hover:text-black hover:underline dark:text-white/50 dark:hover:text-white"
-              >
-                {prompt}
-              </button>
-            );
-          })}
         </div>
       )}
     </div>

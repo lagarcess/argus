@@ -88,7 +88,8 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.sidebar.collapsed": "Solo iconos",
     "settings.sidebar.hover": "Al pasar el cursor",
     "settings.sidebar.close": "Cerrar modal de preferencias de la barra lateral",
-    "guest.shell.input_placeholder": "¿Qué quieres probar?",
+    "guest.shell.input_placeholder": "Pregunta sobre cualquier empresa o idea",
+    "guest.shell.input_placeholder_prerail": "¿Qué quieres probar?",
     "guest.shell.language": "Idioma",
     "guest.shell.temporary_until": "Chat temporal · disponible hasta {{date}}",
   };

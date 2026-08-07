@@ -30,6 +30,11 @@ export function backtestJobCardCopy(
   job: BacktestJob,
   options: BacktestJobCardCopyOptions = {},
 ): BacktestJobCardCopy {
+  // Research jobs ride the same lifecycle card with their own words; legacy
+  // rows without a scope are backtests.
+  if (job.operation_scope === "chat.research") {
+    return researchJobCardCopy(job);
+  }
   if (job.status === "failed") {
     const canShowRetryCopy = job.retryable && options.canRetry === true;
     return {
@@ -101,6 +106,66 @@ export function backtestJobCardCopy(
     statusLabelKey: "chat.backtest_job.queued_status",
     titleFallback: "Backtest queued",
     titleKey: "chat.backtest_job.queued_title",
+    tone: "info",
+  };
+}
+
+function researchJobCardCopy(job: BacktestJob): BacktestJobCardCopy {
+  if (job.status === "failed" || job.status === "canceled" || job.status === "expired") {
+    return {
+      bodyFallback:
+        "Argus couldn't complete this research run. Ask again, or test the idea directly.",
+      bodyKey: "chat.research_job.failed.body",
+      detailFallback: "The conversation is saved, and this status will stay here.",
+      detailKey: "chat.backtest_job.failed_detail",
+      icon: "alert",
+      statusLabelFallback: "Not completed",
+      statusLabelKey: "chat.backtest_job.expired_status",
+      titleFallback: "Research didn't finish",
+      titleKey: "chat.research_job.failed.title",
+      tone: "danger",
+    };
+  }
+  if (job.status === "succeeded") {
+    return {
+      bodyFallback: "The full answer is below.",
+      bodyKey: "chat.research_job.succeeded.body",
+      detailFallback: "",
+      detailKey: "chat.research_job.succeeded.detail",
+      icon: "check",
+      statusLabelFallback: "Ready",
+      statusLabelKey: "chat.research_job.succeeded.title",
+      titleFallback: "Research ready",
+      titleKey: "chat.research_job.succeeded.title",
+      tone: "neutral",
+    };
+  }
+  if (job.status === "running") {
+    return {
+      bodyFallback:
+        "Argus is reading financial data and sources for this one. The answer will appear here.",
+      bodyKey: "chat.research_job.running.body",
+      detailFallback: "You can leave this chat and come back; progress is saved.",
+      detailKey: "chat.backtest_job.running_detail",
+      icon: "loader",
+      statusLabelFallback: "Running",
+      statusLabelKey: "chat.backtest_job.running_status",
+      titleFallback: "Researching",
+      titleKey: "chat.research_job.running.title",
+      tone: "info",
+    };
+  }
+  return {
+    bodyFallback:
+      "Argus is lining up a deeper look. You can keep chatting; the answer will appear here.",
+    bodyKey: "chat.research_job.queued.body",
+    detailFallback: "You can leave this chat and come back; progress is saved.",
+    detailKey: "chat.backtest_job.queued_detail",
+    icon: "clock",
+    statusLabelFallback: "Queued",
+    statusLabelKey: "chat.backtest_job.queued_status",
+    titleFallback: "Research queued",
+    titleKey: "chat.research_job.queued.title",
     tone: "info",
   };
 }

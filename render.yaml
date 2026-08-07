@@ -78,6 +78,10 @@ services:
         value: "true"
       - key: ARGUS_ENABLE_PERSONALIZATION_MEMORY
         value: "false"
+      - key: ARGUS_RESEARCH_RAIL_ENABLED
+        value: "false"
+      - key: ARGUS_RESEARCH_GLOBAL_DAILY_CEILING
+        value: "5000"
       - key: ARGUS_DISCOVERY_SEARCH_PROVIDER
         value: perplexity_direct
       - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD
@@ -157,5 +161,5 @@ services:
         value: support@get-argus.com
       - key: NEXT_PUBLIC_OMNISEARCH_ENABLED
         value: "true"
-      - key: NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED
+      - key: NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
         value: "false"

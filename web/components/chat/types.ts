@@ -92,7 +92,8 @@ export type ChatActionOption = {
     | "select_discovery_candidate"
     | "retry_last_turn"
     | "retry_load_conversation"
-    | "retest_run";
+    | "retest_run"
+    | "add_confirmation_peer";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -223,9 +224,31 @@ export type StrategyConfirmationPayload = {
   retest_period?: import("@/lib/chat-retest").RetestPeriodPayload | null;
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
+  assets_adjustment?: StrategyConfirmationAssetsAdjustment;
+  research_peers?: StrategyConfirmationResearchPeers;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
+};
+
+export type StrategyConfirmationAssetsAdjustment = {
+  code: string;
+  added: { symbol: string; name: string }[];
+  previous_symbols: string[];
+  symbols: string[];
+};
+
+export type StrategyConfirmationResearchPeerOffer = {
+  symbol: string;
+  name: string;
+  asset_class?: string;
+  label: string;
+};
+
+export type StrategyConfirmationResearchPeers = {
+  schema_version: string;
+  offers: StrategyConfirmationResearchPeerOffer[];
+  set?: { symbols: string[]; label: string } | null;
 };
 
 export type StrategyConfirmationCapabilities = {
