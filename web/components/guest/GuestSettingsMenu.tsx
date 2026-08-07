@@ -13,13 +13,19 @@ import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import LanguageModal from "@/components/settings/LanguageModal";
 
+/** Top bar on desktop; the drawer bottom below the mobile threshold (spec section 10). */
+export type GuestSettingsPlacement = "top-bar" | "drawer";
+
 export default function GuestSettingsMenu({
   feedbackEnabled,
   onFeedback,
+  placement = "top-bar",
 }: {
   feedbackEnabled: boolean;
   onFeedback: () => void;
+  placement?: GuestSettingsPlacement;
 }) {
+  const isDrawerPlacement = placement === "drawer";
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -67,22 +73,33 @@ export default function GuestSettingsMenu({
   ] as const;
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={menuRef} data-guest-settings-placement={placement}>
       <button
         ref={gearButtonRef}
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
+        className={
+          isDrawerPlacement
+            ? "flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-[14px] font-medium transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
+            : "flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
+        }
         aria-label={t("guest.shell.settings", "Guest settings")}
         aria-haspopup="menu"
         aria-expanded={isOpen}
       >
-        <Settings className="h-[18px] w-[18px]" />
+        <Settings className="h-[18px] w-[18px] shrink-0" />
+        {isDrawerPlacement ? (
+          <span className="truncate">{t("common.settings", "Settings")}</span>
+        ) : null}
       </button>
 
       {isOpen ? (
         <div
-          className="absolute left-1/2 top-full mt-2 w-[min(244px,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[18px] border border-black/8 bg-white p-2.5 text-black shadow-[0_16px_44px_rgba(15,23,42,0.13)] sm:left-auto sm:right-0 sm:translate-x-0 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
+          className={
+            isDrawerPlacement
+              ? "absolute bottom-full left-0 mb-2 w-[min(280px,calc(100vw-3rem))] rounded-[18px] border border-black/8 bg-white p-2.5 text-black shadow-[0_16px_44px_rgba(15,23,42,0.13)] dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
+              : "absolute left-1/2 top-full mt-2 w-[min(244px,calc(100vw-1.5rem))] -translate-x-1/2 rounded-[18px] border border-black/8 bg-white p-2.5 text-black shadow-[0_16px_44px_rgba(15,23,42,0.13)] sm:left-auto sm:right-0 sm:translate-x-0 dark:border-white/10 dark:bg-[#1f2225] dark:text-white dark:shadow-[0_16px_44px_rgba(0,0,0,0.3)]"
+          }
           role="menu"
           aria-label={t("guest.shell.settings", "Guest settings")}
         >

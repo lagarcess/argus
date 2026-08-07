@@ -48,7 +48,7 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${inter.variable} min-h-full flex flex-col font-sans transition-colors duration-200`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           storageKey="argus-theme"
           enableSystem
           disableTransitionOnChange

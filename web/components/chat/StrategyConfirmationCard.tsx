@@ -87,7 +87,7 @@ const CONFIRMATION_STATUS_ICON_STATE = {
 } satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>;
 
 const actionClassName =
-  "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
+  "inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 bg-black/[0.03] px-3.5 py-1.5 text-[13px] font-medium tracking-tight tablet:min-h-9 tablet:px-3 tablet:text-[12px] text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
 
 const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "could_not_run",

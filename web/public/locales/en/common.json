@@ -38,7 +38,8 @@
     "learn_more": "Learn more",
     "and": "and",
     "or": "or",
-    "tap_to_cancel": "Tap elsewhere to cancel"
+    "tap_to_cancel": "Tap elsewhere to cancel",
+    "navigation": "Navigation"
   },
   "legal": {
     "eyebrow": "Private Alpha Legal",
@@ -768,6 +769,19 @@
         "lost_to_benchmark": "Lagged the benchmark by {{points}} points",
         "beat_benchmark": "Beat the benchmark by {{points}} points",
         "deep_drawdown": "Worst drop was {{drawdown}}%"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Other cadence",
+        "adjust_indicator_thresholds": "Other thresholds",
+        "adjust_signal_periods": "Other signal periods",
+        "change_date_range": "Different dates",
+        "compare_buy_and_hold": "Compare with holding",
+        "recurring_monthly_buys": "Monthly buys",
+        "same_rule_peer_asset": "Same rule, similar asset",
+        "same_setup_peer_asset": "Similar asset",
+        "supported_ma_crossover": "SMA/EMA crossover",
+        "supported_rsi_or_ma_rule": "Simplify the rule",
+        "supported_rsi_threshold": "Supported RSI rule"
       }
     },
     "memory": {
@@ -1148,7 +1162,9 @@
       "idea": "Idea",
       "run": "Run",
       "strategy": "Strategy"
-    }
+    },
+    "row_actions": "Conversation actions",
+    "close_dossier": "Close dossier"
   },
   "auth": {
     "captcha": {

@@ -139,7 +139,8 @@ export function CommandPaletteFooter({
   isFiltering: boolean;
   isLedgerMode: boolean;
   layoutMode: "expanded" | "collapsed";
-  onToggleLayout: () => void;
+  /** Absent below the mobile threshold, where the layout is collapsed-only. */
+  onToggleLayout?: () => void;
   shortcutLegendVisible: boolean;
   usesCommandKey: boolean;
 }) {
@@ -186,6 +187,7 @@ export function CommandPaletteFooter({
             usesCommandKey={usesCommandKey}
           />
         )}
+        {onToggleLayout ? (
         <button
           type="button"
           onClick={onToggleLayout}
@@ -203,6 +205,7 @@ export function CommandPaletteFooter({
             </>
           )}
         </button>
+        ) : null}
       </div>
     </div>
   );

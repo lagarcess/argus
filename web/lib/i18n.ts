@@ -25,6 +25,11 @@ i18n
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
+      // Language comes from what the user actually set, not from geography.
+      // navigator.language of es-MX or es-ES is still Spanish, so it resolves
+      // to the one Spanish Argus ships.
+      convertDetectedLanguage: (language: string) =>
+        language.toLowerCase().startsWith('es') ? 'es-419' : language,
     },
   });
 

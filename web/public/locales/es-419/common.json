@@ -38,7 +38,8 @@
     "learn_more": "Más información",
     "and": "y",
     "or": "o",
-    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
+    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar",
+    "navigation": "Navegación"
   },
   "legal": {
     "eyebrow": "Legal de alfa privada",
@@ -768,6 +769,19 @@
         "lost_to_benchmark": "Quedó {{points}} puntos por debajo de la referencia",
         "beat_benchmark": "Superó la referencia por {{points}} puntos",
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_indicator_thresholds": "Otros umbrales",
+        "adjust_signal_periods": "Otros períodos",
+        "change_date_range": "Otras fechas",
+        "compare_buy_and_hold": "Comparar con mantener",
+        "recurring_monthly_buys": "Compras mensuales",
+        "same_rule_peer_asset": "Misma regla, activo similar",
+        "same_setup_peer_asset": "Activo similar",
+        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_rsi_or_ma_rule": "Simplificar la regla",
+        "supported_rsi_threshold": "Regla RSI compatible"
       }
     },
     "memory": {
@@ -1148,7 +1162,9 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    }
+    },
+    "row_actions": "Acciones de la conversación",
+    "close_dossier": "Cerrar el expediente"
   },
   "auth": {
     "captcha": {

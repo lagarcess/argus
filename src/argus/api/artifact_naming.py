@@ -21,6 +21,7 @@ def maybe_generate_conversation_title(
     current_run: BacktestRun | None = None,
     user_message: str | None = None,
     assistant_message: str | None = None,
+    viewport: str | None = None,
 ) -> str | None:
     """Generate a conversation title as durable polish, never runtime truth."""
 
@@ -54,6 +55,7 @@ def maybe_generate_conversation_title(
             entity_type="conversation",
             context=context,
             language=language or conversation.language,
+            viewport=viewport,
         )
     )
     if candidate is None:

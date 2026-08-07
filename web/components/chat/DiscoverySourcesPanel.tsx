@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { ExternalLink, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import type { DiscoverySidecar } from "./types";
 
 type DiscoverySourcesPanelProps = {
@@ -44,10 +46,18 @@ export default function DiscoverySourcesPanel({
   anchorIndex = null,
 }: DiscoverySourcesPanelProps) {
   const { t, i18n } = useTranslation();
+  const { isBelowTablet } = useResponsiveLayout();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    if (isBelowTablet) {
+      // BottomSheet owns focus, Escape, and focus restore for the sheet form.
+      panelRef.current
+        ?.querySelector(`[data-source-index="${anchorIndex}"]`)
+        ?.scrollIntoView({ block: "start" });
+      return;
+    }
     restoreFocusRef.current = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     panel?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
@@ -84,11 +94,80 @@ export default function DiscoverySourcesPanel({
       document.removeEventListener("keydown", handleKeyDown, true);
       restoreFocusRef.current?.focus?.();
     };
-  }, [onClose, anchorIndex]);
+  }, [onClose, anchorIndex, isBelowTablet]);
 
   const title = t("chat.discovery_results.sources_panel_title", {
     defaultValue: "Sources Argus read",
   });
+  const note = t("chat.discovery_results.sources_panel_note", {
+    defaultValue: "Argus read these while answering. Not recommended reading.",
+  });
+  const closeLabel = t("chat.discovery_results.sources_panel_close", {
+    defaultValue: "Close sources",
+  });
+
+  const sourceList = (
+    <ul className="flex-1 overflow-y-auto px-4 py-2">
+      {sidecar.sources.map((source, index) => {
+        const date = formattedSourceDate(source.source_date, i18n.language);
+        return (
+          <li
+            key={source.url}
+            data-source-index={index}
+            className={`border-b border-black/6 py-3 last:border-b-0 dark:border-white/6 ${
+              index === anchorIndex
+                ? "-mx-2 rounded-lg bg-[#5ba897]/[0.08] px-2"
+                : ""
+            }`}
+          >
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group/source flex min-h-11 flex-col gap-1 text-start"
+            >
+              {source.title ? (
+                <span className="text-[14px] leading-[1.45] tracking-tight text-black/80 [overflow-wrap:anywhere] group-hover/source:underline dark:text-white/80">
+                  {source.title}
+                </span>
+              ) : null}
+              <span className="inline-flex items-center gap-1 text-[13px] font-medium leading-[1.5] text-black/70 [overflow-wrap:anywhere] dark:text-white/70">
+                <span>
+                  {source.domain}
+                  {date ? ` · ${date}` : ""}
+                </span>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="sr-only">
+                  {t(
+                    "chat.discovery_results.sources_panel_external_link_new_tab",
+                    { defaultValue: "Opens in a new tab" },
+                  )}
+                </span>
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  // Below the mobile threshold the evidence trail is a sheet, not a side panel.
+  if (isBelowTablet) {
+    return (
+      <BottomSheet
+        isOpen
+        height="tall"
+        title={title}
+        description={note}
+        closeLabel={closeLabel}
+        onClose={onClose}
+      >
+        <div ref={panelRef} className="flex h-full flex-col">
+          {sourceList}
+        </div>
+      </BottomSheet>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="presentation">
@@ -110,67 +189,21 @@ export default function DiscoverySourcesPanel({
               {title}
             </p>
             <p className="mt-0.5 text-[12px] leading-[1.5] text-black/50 dark:text-white/50">
-              {t("chat.discovery_results.sources_panel_note", {
-                defaultValue:
-                  "Argus read these while answering. Not recommended reading.",
-              })}
+              {note}
             </p>
           </div>
           <button
             type="button"
             data-autofocus
             onClick={onClose}
-            aria-label={t("chat.discovery_results.sources_panel_close", {
-              defaultValue: "Close sources",
-            })}
+            aria-label={closeLabel}
             className="-me-2 -mt-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-black/60 transition-colors hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <ul className="flex-1 overflow-y-auto px-4 py-2">
-          {sidecar.sources.map((source, index) => {
-            const date = formattedSourceDate(source.source_date, i18n.language);
-            return (
-              <li
-                key={source.url}
-                data-source-index={index}
-                className={`border-b border-black/6 py-3 last:border-b-0 dark:border-white/6 ${
-                  index === anchorIndex
-                    ? "-mx-2 rounded-lg bg-[#5ba897]/[0.08] px-2"
-                    : ""
-                }`}
-              >
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group/source flex min-h-11 flex-col gap-1 text-start"
-                >
-                  {source.title ? (
-                    <span className="text-[14px] leading-[1.45] tracking-tight text-black/80 [overflow-wrap:anywhere] group-hover/source:underline dark:text-white/80">
-                      {source.title}
-                    </span>
-                  ) : null}
-                  <span className="inline-flex items-center gap-1 text-[13px] font-medium leading-[1.5] text-black/70 [overflow-wrap:anywhere] dark:text-white/70">
-                    <span>
-                      {source.domain}
-                      {date ? ` · ${date}` : ""}
-                    </span>
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span className="sr-only">
-                      {t(
-                        "chat.discovery_results.sources_panel_external_link_new_tab",
-                        { defaultValue: "Opens in a new tab" },
-                      )}
-                    </span>
-                  </span>
-                </a>
-              </li>
-            );
-          })}
-        </ul>
+        {sourceList}
       </div>
     </div>
   );

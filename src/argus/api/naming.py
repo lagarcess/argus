@@ -39,11 +39,22 @@ def get_starter_prompts(language: str | None = None) -> list[str]:
     return STARTER_PROMPTS[resolve_language(language)]
 
 
+# A phone header shows roughly this much before it truncates, so the narrow
+# budget is a generation rule rather than a clip applied after the fact.
+NARROW_TITLE_MAX_WORDS = 3
+WIDE_TITLE_MAX_WORDS = 6
+
+
+def title_word_budget(viewport: str | None) -> int:
+    return NARROW_TITLE_MAX_WORDS if viewport == "narrow" else WIDE_TITLE_MAX_WORDS
+
+
 def suggest_entity_name(
     *,
     entity_type: Literal["conversation"],
     context: str,
     language: str | None,
+    viewport: str | None = None,
 ) -> str | None:
     try:
         resolved = resolve_language(language)
@@ -56,7 +67,8 @@ def suggest_entity_name(
                     "role": "system",
                     "content": (
                         "Generate a concise user-facing name for Argus Alpha. "
-                        "Max 6 words. No punctuation-only output. "
+                        f"Max {title_word_budget(viewport)} words. "
+                        "No punctuation-only output. "
                         f"Entity type: {entity_type}. Language: {resolved}."
                     ),
                 },

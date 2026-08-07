@@ -329,6 +329,38 @@ body {
   touch-action: none;
 }
 
+@keyframes argus_drawer_enter {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.argus-drawer-enter {
+  animation: argus_drawer_enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.argus-drawer-scrim {
+  animation: argus_sheet_scrim_enter 200ms ease-out both;
+}
+
+/* The panel owns the dismiss drag; vertical scrolling inside it still works. */
+.argus-drawer-panel {
+  touch-action: pan-y;
+}
+
+/* The trailing fade is what makes the next starter pill read as a peek. */
+.argus-starter-peek {
+  mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 2rem),
+    transparent 100%
+  );
+}
+
 /* DESIGN.md section 17 floor. Callers may only raise it, never lower it. */
 .argus-sheet :is(input, select, textarea) {
   font-size: max(1rem, var(--argus-sheet-input-font-size, 1rem));
@@ -336,7 +368,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .argus-sheet-enter,
-  .argus-sheet-scrim {
+  .argus-sheet-scrim,
+  .argus-drawer-enter,
+  .argus-drawer-scrim {
     animation: none;
   }
 }
@@ -638,4 +672,19 @@ body {
 
 .dark .argus-result-breakdown.prose strong {
   color: rgba(255, 255, 255, 0.88);
+}
+
+/*
+ * Safety net only. The backend supplies a short form for narrow screens, so
+ * this clamp should rarely engage; two lines, never a single-line ellipsis,
+ * because one clipped line reads as broken rather than as abbreviated.
+ */
+@media (max-width: 44.99rem) {
+  .argus-next-move-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
 }

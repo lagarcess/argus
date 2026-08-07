@@ -86,7 +86,7 @@ describe("guest shell contract", () => {
     const chat = source("components/chat/ChatInterface.tsx");
 
     expect(chat).toMatch(
-      /<ChatSidebar[\s\S]{0,2200}isGuest=\{guestExperience\.isEstablishedGuest\}/,
+      /<ChatSidebar[\s\S]{0,3200}isGuest=\{guestExperience\.isEstablishedGuest\}/,
     );
     expect(sidebar).toContain("item.expires_at");
     expect(sidebar).toContain('"guest.history.keep_history"');

@@ -11,6 +11,7 @@ import {
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
+import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
 
 /** Detents from the mobile shell spec: run dossier, sources pane, capital editor. */
 export type BottomSheetHeight = "full" | "tall" | "short";
@@ -120,11 +121,14 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const headingId = useId();
   const descriptionId = useId();
+  const overlayId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const dragOriginRef = useRef<{ y: number; at: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
+
+  useOverlayBackDismiss({ isOpen, overlayId, onDismiss: onClose });
 
   const focusableElements = useCallback((): HTMLElement[] => {
     const panel = panelRef.current;
