@@ -3,10 +3,10 @@ New chat
 Search
 Recents
 Settings
-Rejected volatile idea discussion
+Rejected Volatile Idea Inquiry
 cual idea rechace por ser demasiado volatil?
 
-I don't have any record of rejected ideas or volatility-based decisions from our conversation so far.
+I don't have a record of any rejected ideas in this conversation. If you want to explore a new investment idea or run a backtest, describe it and I'll help.
 
 FROM YOUR MEMORY
 

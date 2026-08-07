@@ -23,7 +23,7 @@ Rejected the higher drawdown Apple momentum variant and kept the steadier buy an
 | Query | Token overlap with the memory | Canonical token match | With the index |
 | --- | --- | --- | --- |
 | `which idea did I turn down for being too volatile?` | none | cannot answer | `provider_ranked`, score 0.3101 |
-| `cual idea rechace por ser demasiado volatil?` | none | cannot answer | `provider_ranked`, score 0.3044 |
+| `cual idea rechace por ser demasiado volatil?` | none | cannot answer | `provider_ranked`, score 0.3330 |
 
 The canonical fallback ranks by `len(query_tokens & record_tokens)` over tokens
 longer than two characters and returns nothing when that intersection is empty.
@@ -96,31 +96,43 @@ for the same turn.
 
 ## Flag-off byte identity
 
-Cross-commit, base `635d5ee8` versus lane head, flags off, two runs per side:
+Cross-commit, flags off, two runs per side. The harness hashes the OpenAPI
+document, the profile payload, conversation create and list, three chat turns
+including every SSE event, message hydration, and history. Volatile ids,
+timestamps, durations, and opaque pagination cursors are normalized by the
+harness, which lives outside the code under test so both sides normalize
+identically. Floats are hashed at full precision.
 
-| Surface | Digest |
-| --- | --- |
-| openapi | `eda3956313dbec420294f1d07e053dba039274fba29149be78470089a6136bc0` |
-| profile | `6497c3c43c7e192ff4d9ea5f94415cf41f67a804fffb3b8452520dd3c131f98e` |
-| conversation_create | `e78cb2bad6443f771a9220d49aa19b1e9f77724500edd447a8e7422863a27187` |
-| conversation_list | `bf475d4caf61de82d6cade3ad232c7fec021cc9d2f45ebf2d0ad74e3513c9693` |
-| chat_turns | `d555df71677996de5fc95bcc510279ec58f3aa6a1063c28701c140de046d7acc` |
-| hydration | `fc1fd90b0ba71cbb576b19c7aa8fee96b201f4d1555e1fabad9dba5e03e3694b` |
-| history | `5c52971eb5bb38dccbb6121735420638074d1eb79ed117bf93297ae6e8c74e8f` |
-| **combined** | **`287720c2147be1d6a81467b5c3b1b97f7d32e4ddb56d4bb6684651b1ea0647f1`** |
+Measured twice, because integration moved mid-lane:
 
-Identical on both sides and stable across repeated runs, so the match is a
-result rather than a coincidence of timing.
+| Comparison | Combined digest | Result |
+| --- | --- | --- |
+| base `635d5ee8` vs lane code | `287720c2147be1d6a81467b5c3b1b97f7d32e4ddb56d4bb6684651b1ea0647f1` | identical |
+| base `778f32c6` vs merged head | `14ee29def1bdc5a29ed2885159e553e3f0f1de22ab5f77f5ad32ed0839303c62` | identical |
+
+The digest differs between the two rows because the integration branch itself
+changed underneath, which is the point: each row compares a base against a head
+built on that base. Both sides were run twice and were stable, so the match is
+a result rather than a coincidence of timing.
 
 ## Screenshots
+
+Captured at the merged lane head against the local Supabase stack, real
+OpenRouter runtime, real Perplexity embeddings.
 
 | File | What it shows |
 | --- | --- |
 | `en-01-signed-in.png` | Signed-in surface, English |
-| `en-02-recall-note.png` | English recall note answering a zero-token-overlap query |
+| `en-02-backtest-result.png` | The real backtest the decision is saved from |
+| `en-03-memory-proposal.png` | The proposal asking before anything is stored |
+| `en-04-recall-note.png` | English recall note answering a zero-token-overlap query |
 | `es-419-01-signed-in.png` | Signed-in surface, es-419 |
 | `es-419-02-recall-note.png` | es-419 recall note answering the Spanish query |
 | `en-page-text.txt`, `es-419-page-text.txt` | Captured page text for both locales |
+
+The English run is the whole journey: backtest, save decision, confirm the
+memory proposal, then ask. The es-419 run asks only, against the memory the
+English run confirmed, which is what makes it a cross-language recall.
 
 ## Two honest observations
 
