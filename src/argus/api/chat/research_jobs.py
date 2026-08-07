@@ -75,9 +75,7 @@ def start_research_job(
             sync_spec = spec.model_copy(update={"timeout_seconds": 110.0})
             packet = client.run_research(prompt, sync_spec)
         except ResearchUnavailableError as exc:
-            logger.warning(
-                "Synchronous thorough research failed", reason=exc.reason
-            )
+            logger.warning("Synchronous thorough research failed", reason=exc.reason)
             return None, None
         return None, packet
     try:
@@ -90,9 +88,10 @@ def start_research_job(
         "research_request": job_request,
         "perplexity_background_id": background_id,
     }
-    payload_hash = "sha256:" + hashlib.sha256(
-        json.dumps(launch_payload, sort_keys=True).encode()
-    ).hexdigest()
+    payload_hash = (
+        "sha256:"
+        + hashlib.sha256(json.dumps(launch_payload, sort_keys=True).encode()).hexdigest()
+    )
     try:
         job = api_state.supabase_gateway.create_backtest_job(
             user_id=user_id,
@@ -164,9 +163,7 @@ async def _poll_and_finalize(
         while True:
             await asyncio.sleep(BACKGROUND_POLL_INTERVAL_SECONDS)
             try:
-                poll = await asyncio.to_thread(
-                    client.poll_background, background_id
-                )
+                poll = await asyncio.to_thread(client.poll_background, background_id)
             except ResearchUnavailableError as exc:
                 if time.monotonic() > deadline:
                     _fail_job(
@@ -316,9 +313,7 @@ def _fail_job(
             user_id=user_id,
             conversation_id=conversation_id,
             role="assistant",
-            content=research_failure_note(
-                str(job_request.get("language") or "en")
-            ),
+            content=research_failure_note(str(job_request.get("language") or "en")),
             metadata={"conversation_mode": "guide"},
             settle_usage=None,
         )

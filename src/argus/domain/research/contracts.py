@@ -69,9 +69,7 @@ class ResearchPacket(BaseModel):
     sources: tuple[str, ...] = ()
     name_pairs: tuple[ResearchNamePair, ...] = ()
     usage: ResearchUsage = Field(default_factory=ResearchUsage)
-    retrieved_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    retrieved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     background_id: str | None = None
 
 

@@ -61,9 +61,7 @@ def peer_added_confirmation_preparation(
             continue
         if str(peer.get("asset_class") or base_class) != base_class:
             return BasketGrowthPreparation(error_code="asset_class_mismatch")
-        additions.append(
-            {"symbol": symbol, "name": str(peer.get("name") or symbol)}
-        )
+        additions.append({"symbol": symbol, "name": str(peer.get("name") or symbol)})
     if not additions:
         return BasketGrowthPreparation(error_code="no_new_assets")
     merged = [*current_symbols, *(peer["symbol"] for peer in additions)]
@@ -150,9 +148,7 @@ def remaining_peer_offers(
             continue
         if basket_asset_class is not None and peer_class != basket_asset_class:
             continue
-        offers.append(
-            {"symbol": symbol, "name": name, "asset_class": peer_class}
-        )
+        offers.append({"symbol": symbol, "name": name, "asset_class": peer_class})
         taken.add(symbol)
         if len(offers) >= slots:
             break

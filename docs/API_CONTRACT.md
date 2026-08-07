@@ -2793,6 +2793,85 @@ removed. Existing database rows remain owner-scoped and readable through legacy
 history compatibility. The direct backtest endpoint may still resolve an owned
 historical `strategy_id`; no endpoint creates or mutates those records.
 
+### Research Responses
+
+Behind `ARGUS_RESEARCH_RAIL_ENABLED` (default off; flag-off behavior is
+byte-identical to the pre-rail router), a question turn the interpreter
+classifies as a finance question is grounded through the Perplexity Agent
+API's `finance_search` tool, selected by question shape with no user-visible
+mode. The assistant message may carry an additive `research` sidecar in its
+final payload and persisted metadata:
+
+```json
+{
+  "research": {
+    "schema_version": "argus_research/v1",
+    "capability_class": "fast_quote",
+    "shape": "fast",
+    "sources": ["https://example.com/filing"],
+    "retrieved_at": "2026-08-07T15:04:05Z",
+    "peers": [
+      {"symbol": "DIS", "name": "The Walt Disney Company", "asset_class": "equity"}
+    ],
+    "usage": {"invocations": 1, "latency_ms": 640, "cost_usd": 0.005, "cache_status": "miss"},
+    "degraded": {"code": "asset_class_not_covered"}
+  }
+}
+```
+
+Contract rules:
+
+- **Truth boundary (same standing as the S10 memory lock):** research informs
+  the reader; Argus providers execute the simulation. No `finance_search`
+  value may reach a backtest; a test launched from a research answer
+  re-grounds through Argus market-data providers, and research turns never
+  write strategy, confirmation, or execution state.
+- `capability_class` is one of `fast_quote`, `balanced_lookup`,
+  `thorough_research`, `screening`, `peer_expansion`, recorded per research
+  turn on the cost ledger even for cache hits and degraded turns.
+- Every `peers[]` entry passed provider-backed asset resolution before
+  emission; unresolvable names never become actionable anywhere.
+- Crypto and currency pairs never route to `finance_search` (probe-verified
+  misresolution and empty-quote behavior); they answer from Argus's own data
+  with `degraded.code = "asset_class_not_covered"` and still offer a runnable
+  next step.
+- Runnable next steps ride the existing typed `next_experiments` surface.
+  Provider identity is absent from prose and sidecars; route receipts and the
+  cost ledger own provenance.
+- Thorough-shape questions run in provider background mode through the
+  existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
+  `operation_scope` is `"chat.research"`, and the finalized answer arrives as
+  a new assistant message referenced by the succeeded job's
+  `execution_metadata.research_result_message_id`. A succeeded research job
+  has a null `result_run_id` by design; clients refresh the transcript on
+  terminal research jobs instead of fetching a run.
+- The active confirmation card may carry additive `research_peers`
+  (backend-labeled one-tap add offers bounded by free asset slots) and
+  `assets_adjustment` (typed disclosure of a material basket change:
+  `{code: "assets_added", added, previous_symbols, symbols}`).
+
+## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets`
+
+Adds researched peers to the active confirmation **without spending a turn**:
+no message allowance, no interpretation, no LLM call. Available only while
+`ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
+
+**Request:** `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must be an
+offer on the active card's `research_peers`, so nothing outside the
+resolver-verified offer set is addable, whoever asks).
+
+**Response:** `{"message": Message}` where the message is a new assistant
+confirmation message carrying the superseding card (new `confirmation_id`,
+`assets_adjustment` disclosure, recomputed provider coverage, remaining peer
+offers). The previous card supersedes by ordinary latest-active projection.
+
+**Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
+non-active confirmation and for non-offered symbols;
+`422 asset_maximum_reached | asset_class_mismatch | no_common_data_window |
+insufficient_common_data` for baskets that cannot run as one test;
+`503 market_data_unavailable` when the coverage preflight cannot reach
+provider data. Failures persist nothing.
+
 ---
 
 # 15. Backtests

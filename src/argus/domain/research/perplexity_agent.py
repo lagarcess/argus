@@ -77,7 +77,9 @@ class PerplexityAgentClient:
         )
         status = str(response.get("status") or "").strip() or "in_progress"
         if status not in _TERMINAL_STATUSES:
-            return BackgroundPoll(status="in_progress" if status != "queued" else "queued")
+            return BackgroundPoll(
+                status="in_progress" if status != "queued" else "queued"
+            )
         if status != "completed":
             error = response.get("error")
             detail = json.dumps(error)[:500] if error else None
@@ -127,7 +129,9 @@ class PerplexityAgentClient:
         except httpx.HTTPError as exc:
             raise ResearchUnavailableError("transport", str(exc)) from exc
         if response.status_code in (401, 403):
-            raise ResearchUnavailableError("not_configured", f"http {response.status_code}")
+            raise ResearchUnavailableError(
+                "not_configured", f"http {response.status_code}"
+            )
         if response.status_code >= 400:
             logger.warning(
                 "Research provider returned an error status",

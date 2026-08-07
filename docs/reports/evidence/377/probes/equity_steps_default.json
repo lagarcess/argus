@@ -1,0 +1,85 @@
+{
+  "probe": "equity_steps_default",
+  "http_status": 200,
+  "elapsed_s": 6.9,
+  "response": {
+    "background": false,
+    "completed_at": 1786099508,
+    "created_at": 1786099508,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_ab091a4b-b394-44c7-80e7-e4f28194b145",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": null,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "I can\u2019t access live market-price data right now, so I can\u2019t reliably provide AAPL\u2019s latest closing price.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_36a53f6d-8b78-47d7-a77c-0d9f176e1844",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.00616,
+        "cache_read_cost": 0.00391,
+        "currency": "USD",
+        "input_cost": 0.00039,
+        "output_cost": 0.00516,
+        "total_cost": 0.01562
+      },
+      "input_tokens": 8889,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 985,
+        "cache_read_input_tokens": 7826,
+        "cached_tokens": 7826
+      },
+      "output_tokens": 172,
+      "output_tokens_details": {
+        "reasoning_tokens": 122
+      },
+      "total_tokens": 9061
+    },
+    "user": null
+  }
+}

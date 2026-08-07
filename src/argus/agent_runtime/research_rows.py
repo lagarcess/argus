@@ -120,7 +120,9 @@ def research_next_experiment_rows(
             _row(
                 kind="research_test_versus",
                 label=(
-                    f"Probar {names} entre sí" if spanish else f"Test {names} against each other"
+                    f"Probar {names} entre sí"
+                    if spanish
+                    else f"Test {names} against each other"
                 ),
                 send_text=(
                     f"Prueba comprar y mantener {symbols} durante los últimos tres años"

@@ -86,7 +86,9 @@ def background_deadline_seconds() -> float:
     return value
 
 
-def capability_class_for_shape(shape: QuestionShape, *, screening: bool) -> CapabilityClass:
+def capability_class_for_shape(
+    shape: QuestionShape, *, screening: bool
+) -> CapabilityClass:
     if shape == "fast":
         return "fast_quote"
     if shape == "balanced":

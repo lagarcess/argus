@@ -68,7 +68,9 @@ from argus.llm.openrouter import invoke_openrouter_json_schema
 
 RESEARCH_SCHEMA_VERSION = "argus_research/v1"
 
-_RESEARCH_KINDS = frozenset({"live_quote", "company_lookup", "cross_company", "screening"})
+_RESEARCH_KINDS = frozenset(
+    {"live_quote", "company_lookup", "cross_company", "screening"}
+)
 
 
 class ResearchQueryExtraction(BaseModel):
@@ -322,8 +324,12 @@ async def _grounded_result(
         client = _client()
         if client is None:
             return _unavailable_result(
-                query=query, subjects=subjects, interpretation=interpretation,
-                state=state, user=user, reason="not_configured",
+                query=query,
+                subjects=subjects,
+                interpretation=interpretation,
+                state=state,
+                user=user,
+                reason="not_configured",
             )
         try:
             packet = await asyncio.to_thread(client.run_research, prompt, spec)
@@ -332,8 +338,12 @@ async def _grounded_result(
                 "Research provider unavailable", reason=exc.reason, shape=shape
             )
             return _unavailable_result(
-                query=query, subjects=subjects, interpretation=interpretation,
-                state=state, user=user, reason=exc.reason,
+                query=query,
+                subjects=subjects,
+                interpretation=interpretation,
+                state=state,
+                user=user,
+                reason=exc.reason,
             )
         cache_put(
             key,
@@ -342,9 +352,7 @@ async def _grounded_result(
                 capability_class, closed_period=query.period_is_closed_window
             ),
         )
-    peers = verified_peers(
-        packet.name_pairs, exclude={s["symbol"] for s in subjects}
-    )
+    peers = verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
@@ -380,9 +388,7 @@ def _thorough_job_result(
     capability_class = capability_class_for_shape(
         "thorough", screening=query.question_kind == "screening"
     )
-    subject_labels = ", ".join(
-        f"{s['name']} [{s['symbol']}]" for s in subjects[:3]
-    )
+    subject_labels = ", ".join(f"{s['name']} [{s['symbol']}]" for s in subjects[:3])
     if language == "es-419":
         working = (
             "Estoy investigando esto a fondo"
@@ -505,9 +511,7 @@ async def _exhausted_result(
         answer = note
     else:
         answer = f"{answer}\n\n*{note}*"
-    rows = research_next_experiment_rows(
-        subjects=subjects, peers=[], language=language
-    )
+    rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     packet = ResearchPacket(answer_markdown=answer)
     return _research_stage_result(
         answer=answer,
@@ -539,9 +543,7 @@ def _unavailable_result(
     del state
     language = _language_tag(user.language_preference)
     note = _unavailable_note(language)
-    rows = research_next_experiment_rows(
-        subjects=subjects, peers=[], language=language
-    )
+    rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     if not rows:
         note = f"{note}\n\n{honest_no_next_line(language)}"
     packet = ResearchPacket(answer_markdown=note)
@@ -725,9 +727,7 @@ def compose_completed_research(
         for s in job_request.get("subjects") or []
         if isinstance(s, dict) and s.get("symbol")
     ]
-    peers = _peers(
-        packet.name_pairs, exclude={s["symbol"] for s in subjects}
-    )
+    peers = _peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
     rows = _rows(subjects=subjects, peers=peers, language=language)
     answer = packet.answer_markdown
     if not rows:
