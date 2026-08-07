@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -11,27 +12,41 @@ type AlphaLegalPageProps = {
   supportEmail: string;
 };
 
-const LEGAL_SECTIONS: Record<LegalPageKind, string[]> = {
+// A "list" section renders an intro, labelled entries, then a closing note.
+// Storage disclosure is only readable when each category is named separately.
+type LegalSection = {
+  key: string;
+  variant?: "list";
+};
+
+const LEGAL_SECTIONS: Record<LegalPageKind, LegalSection[]> = {
   terms: [
-    "no_investment_advice",
-    "no_brokerage",
-    "historical_simulations",
-    "alpha_changes",
-    "eligibility",
-    "acceptable_use",
-    "third_party_services",
-    "account_support",
+    { key: "no_investment_advice" },
+    { key: "no_brokerage" },
+    { key: "historical_simulations" },
+    { key: "early_access_changes" },
+    { key: "eligibility" },
+    { key: "acceptable_use" },
+    { key: "third_party_services" },
+    { key: "account_support" },
   ],
   privacy: [
-    "data_collect",
-    "data_use",
-    "ai_market_data",
-    "infrastructure",
-    "access_retention",
-    "your_controls",
-    "sale_personal_info",
+    { key: "data_collect" },
+    { key: "data_use" },
+    { key: "ai_market_data" },
+    { key: "infrastructure" },
+    { key: "cookies", variant: "list" },
+    { key: "access_retention" },
+    { key: "your_controls" },
+    { key: "sale_personal_info" },
   ],
 };
+
+const LIST_SECTION_ITEMS: Record<string, readonly string[]> = {
+  cookies: ["sign_in", "security", "preferences"],
+};
+
+const BODY_CLASS = "text-[15px] leading-7 text-black/65 dark:text-white/65";
 
 export default function AlphaLegalPage({
   kind,
@@ -42,6 +57,7 @@ export default function AlphaLegalPage({
   const alternateLabel = t(
     kind === "terms" ? "legal.privacy.title" : "legal.terms.title",
   );
+  const backLabel = t("legal.back_to_argus");
 
   return (
     <main className="min-h-[100dvh] bg-white text-[#191c1f] dark:bg-[#191c1f] dark:text-white">
@@ -49,9 +65,17 @@ export default function AlphaLegalPage({
         <header className="flex items-center justify-between gap-4 border-b border-black/10 pb-5 dark:border-white/10">
           <Link
             href="/"
-            className="font-display text-[18px] font-medium tracking-[0] text-black dark:text-white"
+            aria-label={backLabel}
+            title={backLabel}
+            className="group inline-flex items-center gap-2 text-black dark:text-white"
           >
-            argus
+            <ArrowLeft
+              aria-hidden="true"
+              className="h-4 w-4 text-black/40 transition-all group-hover:-translate-x-0.5 group-hover:text-black dark:text-white/40 dark:group-hover:text-white"
+            />
+            <span className="font-display text-[18px] font-medium tracking-[0]">
+              argus
+            </span>
           </Link>
           <Link
             href={alternateHref}
@@ -77,14 +101,18 @@ export default function AlphaLegalPage({
         </section>
 
         <div className="mt-12 space-y-10 border-t border-black/10 pt-10 dark:border-white/10">
-          {LEGAL_SECTIONS[kind].map((sectionKey) => (
-            <section key={sectionKey}>
+          {LEGAL_SECTIONS[kind].map((section) => (
+            <section key={section.key}>
               <h2 className="font-display text-[24px] font-medium tracking-[0]">
-                {t(`legal.${kind}.sections.${sectionKey}.title`)}
+                {t(`legal.${kind}.sections.${section.key}.title`)}
               </h2>
-              <p className="mt-3 text-[15px] leading-7 text-black/65 dark:text-white/65">
-                {renderLegalBody(t, kind, sectionKey, supportEmail)}
-              </p>
+              {section.variant === "list" ? (
+                <LegalSectionList t={t} kind={kind} sectionKey={section.key} />
+              ) : (
+                <p className={`mt-3 ${BODY_CLASS}`}>
+                  {renderLegalBody(t, kind, section.key, supportEmail)}
+                </p>
+              )}
             </section>
           ))}
         </div>
@@ -95,11 +123,43 @@ export default function AlphaLegalPage({
             href="/"
             className="font-medium text-black/70 transition-colors hover:text-black dark:text-white/70 dark:hover:text-white"
           >
-            {t("legal.back_to_argus")}
+            {backLabel}
           </Link>
         </footer>
       </div>
     </main>
+  );
+}
+
+function LegalSectionList({
+  t,
+  kind,
+  sectionKey,
+}: {
+  t: TFunction;
+  kind: LegalPageKind;
+  sectionKey: string;
+}) {
+  const key = `legal.${kind}.sections.${sectionKey}`;
+  const items = LIST_SECTION_ITEMS[sectionKey] ?? [];
+
+  return (
+    <>
+      <p className={`mt-3 ${BODY_CLASS}`}>{t(`${key}.body`)}</p>
+      <dl className="mt-5 space-y-4 border-l border-black/10 pl-5 dark:border-white/10">
+        {items.map((item) => (
+          <div key={item}>
+            <dt className="text-[15px] font-medium text-black dark:text-white">
+              {t(`${key}.items.${item}.label`)}
+            </dt>
+            <dd className={`mt-1 ${BODY_CLASS}`}>
+              {t(`${key}.items.${item}.body`)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className={`mt-5 ${BODY_CLASS}`}>{t(`${key}.body_after`)}</p>
+    </>
   );
 }
 
