@@ -34,6 +34,14 @@ export const COOKIE_DISCLOSURE_RULES: readonly CookieRule[] = [
     writer: "@supabase/ssr",
   },
   {
+    // The PKCE verifier auth-js derives as `${storageKey}-code-verifier`. It
+    // is written during sign-in and password reset and discarded once the
+    // exchange completes, so it is short-lived but genuinely set on a browser.
+    pattern: /^sb-[a-z0-9-]+-auth-token-code-verifier(\.\d+)?$/,
+    concept: "sign_in",
+    writer: "@supabase/auth-js (PKCE)",
+  },
+  {
     pattern: /^sb-(auth|refresh)-token$/,
     concept: "sign_in",
     writer: "argus.api.browser_cookies",

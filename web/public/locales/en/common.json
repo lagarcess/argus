@@ -110,7 +110,7 @@
           "items": {
             "sign_in": {
               "label": "Sign-in cookies",
-              "body": "These keep you signed in as you move between pages. Supabase authentication sets them, and Argus refreshes them while you keep using the product. They stay after you close the browser, and signing out clears them. If you block them, signing in will not work."
+              "body": "These keep you signed in as you move between pages. Supabase authentication sets them, and Argus refreshes them while you keep using the product. They stay after you close the browser, and signing out clears them. Signing in or resetting your password also sets a short-lived cookie that completes the exchange securely, discarded once it finishes. If you block them, signing in will not work."
             },
             "guest_handoff": {
               "label": "Guest handoff cookies",

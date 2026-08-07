@@ -62,7 +62,7 @@ const NON_SHIPPING = [
   "__tests__/**",
   "e2e/**",
   "scripts/**",
-  "*.config.{ts,mts,mjs,js}",
+  "*.config.{ts,mts,cts,mjs,cjs,js,jsx}",
   "*.d.ts",
 ];
 
@@ -79,7 +79,7 @@ const eslintConfig = defineConfig([
   // browser like anything else, so the scope is every source file with named
   // exemptions rather than four folders.
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],
     ignores: [...NON_SHIPPING, "lib/browser-storage.ts", "lib/supabase-server.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...STORAGE_SELECTORS, ...COOKIE_SELECTORS],

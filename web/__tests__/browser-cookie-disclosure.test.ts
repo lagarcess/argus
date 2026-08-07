@@ -105,6 +105,42 @@ describe("web cookie disclosure rules", () => {
     }
   });
 
+  test("accepts every name shape the auth libraries can derive", () => {
+    // Enumerated from the packages rather than guessed: @supabase/ssr chunks
+    // with `${key}.${i}`, and @supabase/auth-js derives
+    // `${storageKey}-code-verifier` for PKCE. Missing the verifier made
+    // assertDisclosedCookie throw inside the password-reset flow, which is a
+    // broken feature and not only a disclosure gap.
+    const base = supabaseCookieName("https://lgdhvepyrzbnscqssgqq.supabase.co");
+    for (const name of [
+      base,
+      `${base}.0`,
+      `${base}-code-verifier`,
+      `${base}-code-verifier.0`,
+    ]) {
+      expect(disclosedCookieConcept(name), name).toBe("sign_in");
+      expect(() => assertDisclosedCookie(name), name).not.toThrow();
+    }
+  });
+
+  test("the password-reset path can write its cookies through the adapter", () => {
+    // app/api/auth/recovery/route.ts calls createClient() from the gated
+    // adapter, then resetPasswordForEmail, which writes the PKCE verifier.
+    // Every name that flow produces has to pass the gate or recovery breaks in
+    // development and CI, where the assertion throws.
+    const route = readFileSync(
+      join(import.meta.dir, "..", "app", "api", "auth", "recovery", "route.ts"),
+      "utf-8",
+    );
+    expect(route).toContain("@/lib/supabase-server");
+
+    const configured =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ??
+      "https://lgdhvepyrzbnscqssgqq.supabase.co";
+    const verifier = `${supabaseCookieName(configured)}-code-verifier`;
+    expect(() => assertDisclosedCookie(verifier)).not.toThrow();
+  });
+
   test("no code customizes the Supabase cookie name behind the registry's back", () => {
     // cookieOptions.name would replace the derived name entirely, so the
     // patterns above would stop describing reality. If this ever becomes
