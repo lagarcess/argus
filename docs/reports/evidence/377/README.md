@@ -56,5 +56,8 @@ The digests are identical.
 
 ## Browser QA (`browser/`)
 
-Bilingual screenshots captured at the final head; see the PR body for the
-walk-through.
+Bilingual screenshots; see the PR body for the walk-through. The peer flow
+frames (04-06) use a server-seeded pending card so the offers exist
+deterministically; every render and interaction in them is the real UI
+against the real endpoint. 00 is the flag-off entry surface, byte-identical
+to integration. The organic journeys (01-03, 06-09) are live provider turns.

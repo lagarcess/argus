@@ -372,6 +372,10 @@ export function hydrateMessagesFromApi(
             message.id,
           ),
           actions: confirmation.actions ?? [],
+          // Researched peer adds ride the ordinary Try-next surface below
+          // the card's turn (research rail, spec section 6).
+          nextExperiments:
+            nextExperimentRowsFromMetadata(metadata) ?? undefined,
         };
       }
       const hydratedText = hydrateTextMessageFromApi(message, {

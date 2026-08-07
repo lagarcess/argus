@@ -227,6 +227,12 @@ export default function ChatInterface() {
     return nextAccount;
   }, [i18n]);
   const [messages, setMessages] = useState<Message[]>([]);
+  // Long-lived handlers (the undo toast) need the current transcript, not
+  // the render that created them.
+  const latestMessagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -1287,6 +1293,10 @@ export default function ChatInterface() {
           const confirmation = event.data
             .confirmation as StrategyConfirmationPayload;
           const finalAssistantId = finalMessageId ?? assistantId;
+          // Researched peer adds ride the ordinary Try-next surface below
+          // the card's turn (research rail, spec section 6).
+          const confirmationNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1298,6 +1308,7 @@ export default function ChatInterface() {
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
+                  nextExperiments: confirmationNextExperiments,
                 }),
               ),
             ),
@@ -1849,8 +1860,11 @@ export default function ChatInterface() {
   };
 
   function activeConfirmationIdFromMessages(): string | null {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const candidate = messages[index]?.confirmation;
+    // Read through the ref: the undo toast's handler outlives the render
+    // that created it, and a stale closure would undo the wrong card.
+    const current = latestMessagesRef.current;
+    for (let index = current.length - 1; index >= 0; index -= 1) {
+      const candidate = current[index]?.confirmation;
       if (!candidate) continue;
       if (candidate.confirmation_state === "active" || !candidate.confirmation_state) {
         return candidate.confirmation_id ?? null;

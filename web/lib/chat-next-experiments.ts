@@ -73,17 +73,14 @@ export function nextExperimentRowsFromMetadata(
   return rows.length > 0 ? rows : null;
 }
 
-const RESEARCH_ADD_PEER_KINDS = new Set([
-  "research_add_peer",
-  "research_add_peer_set",
-]);
+const RESEARCH_ADD_PEER_KIND_PREFIX = "research_add_peer";
 
 export function nextExperimentAction(
   row: NextExperimentRow,
   localizedLabel?: string,
   sourceRunId?: string,
 ): ChatActionOption {
-  if (RESEARCH_ADD_PEER_KINDS.has(row.kind)) {
+  if (row.kind.startsWith(RESEARCH_ADD_PEER_KIND_PREFIX)) {
     // No turn is spent: the typed endpoint patches the pending card with the
     // resolver-verified symbols the row's why payload carries.
     const symbols = Array.isArray(row.why?.params?.symbols)

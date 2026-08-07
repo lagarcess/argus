@@ -228,7 +228,8 @@ def test_restore_previous_undoes_the_latest_add() -> None:
     offered = sorted(
         symbol
         for row in rows
-        if row["kind"] == "research_add_peer"
+        if row["kind"].startswith("research_add_peer")
+        and not row["kind"].endswith("_set")
         for symbol in row["why"]["params"]["symbols"]
     )
     assert offered == ["AAPL", "MSFT"]

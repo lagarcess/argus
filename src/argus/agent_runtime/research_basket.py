@@ -311,7 +311,9 @@ def peer_add_rows(
         named = f"{offer['name']} [{offer['symbol']}]"
         rows.append(
             {
-                "kind": "research_add_peer",
+                # The kind doubles as the row's render identity, so each add
+                # row carries its symbol to stay unique within the group.
+                "kind": f"research_add_peer:{offer['symbol']}",
                 "label": (
                     f"Agregar {named} a esta prueba"
                     if spanish
