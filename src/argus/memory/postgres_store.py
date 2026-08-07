@@ -1936,11 +1936,14 @@ class PostgresCanonicalMemoryStore:
         self,
         owner: RegisteredMemoryOwner,
     ) -> frozenset[str]:
-        """Records whose projection is current, not merely present.
+        """Records whose projection represents their current content.
 
-        A record with pending cleanup still holds the pointer from before its
-        last edit, so the index carries superseded text for it. Treating that
-        as covered would let an empty search bury the newly confirmed value.
+        Compared by reconciliation generation rather than by cleanup state.
+        A newer generation exists from the moment an edit commits, which is
+        before any provider call, so the projection stops being authoritative
+        immediately and stays that way if the process never gets to reconcile.
+        Obsolete refs still awaiting deletion do not make a current projection
+        stale, since the record already points at the right content.
         """
 
         with self._confirmation_transaction(owner) as (cursor, owner_id):
@@ -1951,10 +1954,10 @@ class PostgresCanonicalMemoryStore:
                  where projection.owner_id = %s
                    and not exists (
                      select 1
-                       from public.memory_provider_cleanup as cleanup
-                      where cleanup.owner_id = projection.owner_id
-                        and cleanup.record_id = projection.record_id
-                        and cleanup.status = 'pending'
+                       from public.memory_reconciliations as reconciliation
+                      where reconciliation.owner_id = projection.owner_id
+                        and reconciliation.record_id = projection.record_id
+                        and reconciliation.generation > projection.generation
                    )
                 """,
                 (owner_id,),

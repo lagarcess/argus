@@ -1093,7 +1093,7 @@ def test_service_cleanup_reservation_prevents_deleting_reassigned_live_ref(
     assert result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
 
 
-def test_settled_projection_ids_exclude_records_awaiting_cleanup(
+def test_settled_projection_ids_track_the_current_generation(
     database: dict[str, Any],
 ) -> None:
     """Catches the bulk projection read drifting from per-record truth.
@@ -1127,14 +1127,25 @@ def test_settled_projection_ids_exclude_records_awaiting_cleanup(
     # Agrees with the per-record read it replaces in bulk.
     assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
 
-    # An edit whose projection failed leaves the old pointer in place and the
-    # old ref queued for cleanup. The row is still there, but it now describes
-    # superseded text, so it must stop counting as coverage.
+    # An obsolete ref queued for deletion does not make a current projection
+    # stale: the record already points at the right content.
     assert store.track_provider_cleanup_target(
         owner,
         record_id,
         "projected-bulk-read",
     )
+    assert store.settled_projection_record_ids(owner) == frozenset({record_id})
+
+    # Committing a newer reconciliation generation does, and it does so before
+    # any provider call, which is the window an edit opens.
+    mutation = store.edit_record(
+        owner,
+        record_id,
+        value="Superseding text the index has never seen.",
+        label=None,
+    )
+    assert mutation is not None
 
     assert store.settled_projection_record_ids(owner) == frozenset()
+    # Still projected, just no longer describing current content.
     assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"

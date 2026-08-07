@@ -317,6 +317,9 @@ class InMemoryCanonicalMemoryStore:
         self._receipts: dict[str, dict[str, ConfirmedMemoryConsentReceipt]] = {}
         self._records: dict[str, dict[str, MemoryRecord]] = {}
         self._provider_refs: dict[str, dict[str, str]] = {}
+        # Which reconciliation generation each live projection represents, so
+        # a projection can be recognised as describing superseded content.
+        self._provider_ref_generations: dict[tuple[str, str], int] = {}
         self._cleanup_targets: dict[tuple[str, str], set[str]] = {}
         self._reconciliation_generations: dict[tuple[str, str], int] = {}
         self._inflight_reconciliations: dict[tuple[str, str], set[int]] = {}
@@ -1026,6 +1029,11 @@ class InMemoryCanonicalMemoryStore:
             ):
                 return False
             current_provider_ref = owner_refs.get(record_id)
+            key = (owner.owner_id, record_id)
+            self._provider_ref_generations[key] = self._reconciliation_generations.get(
+                key,
+                0,
+            )
             if current_provider_ref == provider_ref:
                 return True
             if current_provider_ref is not None:
@@ -1048,18 +1056,22 @@ class InMemoryCanonicalMemoryStore:
         self,
         owner: RegisteredMemoryOwner,
     ) -> frozenset[str]:
-        """Records whose projection is current, not merely present.
+        """Records whose projection represents their current content.
 
-        A record awaiting cleanup still holds the pointer from before its last
-        edit, so the index carries superseded text for it. Treating that as
-        covered would let an empty search bury the newly confirmed value.
+        Compared by reconciliation generation rather than by cleanup state.
+        A newer generation exists from the moment an edit commits, which is
+        before any provider call, so the projection stops being authoritative
+        immediately and stays that way if the process never gets to reconcile.
+        Obsolete refs still awaiting deletion do not make a current projection
+        stale, since the record already points at the right content.
         """
 
         with self._lock:
             return frozenset(
                 record_id
                 for record_id in self._provider_refs.get(owner.owner_id, {})
-                if not self._cleanup_targets.get((owner.owner_id, record_id))
+                if self._provider_ref_generations.get((owner.owner_id, record_id), 0)
+                >= self._reconciliation_generations.get((owner.owner_id, record_id), 0)
             )
 
     def compare_and_set_provider_ref(
@@ -1116,6 +1128,9 @@ class InMemoryCanonicalMemoryStore:
                     current_provider_ref
                 )
             self._provider_refs.setdefault(owner.owner_id, {})[record_id] = provider_ref
+            self._provider_ref_generations[reconciliation_key] = (
+                reconciliation_claim.generation
+            )
             return True
 
     def finish_reconciliation_claim(

@@ -87,6 +87,7 @@ class _Mem0Double:
         search_results: list[dict] | None = None,
         add_failure: Exception | None = None,
         search_failure: Exception | None = None,
+        delete_failure: Exception | None = None,
         indexed: bool = False,
         post_embed_delay: float = 0.0,
     ) -> None:
@@ -94,6 +95,7 @@ class _Mem0Double:
         self._search_results = search_results or []
         self._add_failure = add_failure
         self._search_failure = search_failure
+        self._delete_failure = delete_failure
         self._indexed = indexed
         self._post_embed_delay = post_embed_delay
         self._adapter = langchain_embeddings_adapter(embedder)
@@ -130,6 +132,8 @@ class _Mem0Double:
 
     def delete(self, memory_id):  # noqa: ANN001
         del memory_id
+        if self._delete_failure is not None:
+            raise self._delete_failure
 
     def delete_all(self, user_id=None):  # noqa: ANN001
         del user_id
@@ -638,3 +642,67 @@ def test_an_edit_whose_projection_failed_does_not_certify_an_empty_answer() -> N
 
     assert [item.record.id for item in retrieved] == [record_id]
     assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
+
+
+def test_an_edit_stops_certifying_before_any_provider_call() -> None:
+    """Catches the window between committing an edit and projecting it.
+
+    The canonical value and its pending reconciliation land before any
+    provider I/O. A search racing that window, or arriving after a crash in
+    it, must not be told the index is authoritative, because the index still
+    holds the pre-edit text and no cleanup target exists yet to signal that.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder, memory=_Mem0Double(embedder=embedder)
+    )
+    record_id = _confirm_one(_service(store, provider))
+    assert store.settled_projection_record_ids(OWNER) == frozenset({record_id})
+
+    # Commit the edit exactly as the service does, and stop before projecting.
+    mutation = store.edit_record(
+        OWNER,
+        record_id,
+        value="Now about gentler declines instead.",
+        label=None,
+        clock=lambda: NOW,
+    )
+
+    assert mutation is not None
+    # No cleanup target exists yet; only the generation reveals the staleness.
+    assert store.list_provider_cleanup_targets(OWNER, record_id) == ()
+    assert store.get_provider_ref(OWNER, record_id) is not None
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
+
+
+def test_an_obsolete_ref_awaiting_deletion_does_not_block_a_current_projection() -> None:
+    """Catches one failed delete permanently demoting an account to token match.
+
+    A successful edit points the record at current content. If deleting the
+    superseded ref fails, that cleanup can stay pending indefinitely, and
+    treating it as staleness would make every empty search for this owner fall
+    back forever.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder,
+        memory=_Mem0Double(
+            embedder=embedder,
+            delete_failure=RuntimeError("index delete refused"),
+        ),
+    )
+    service = _service(store, provider)
+    record_id = _confirm_one(service)
+
+    edited = service.edit(
+        SUBJECT,
+        record_id,
+        MemoryEdit(value="Now about gentler declines instead.", sensitivity=CLEAR),
+    )
+
+    assert edited.changed is True
+    # The projection is current even though the old ref is still queued.
+    assert store.list_provider_cleanup_targets(OWNER, record_id) != ()
+    assert store.settled_projection_record_ids(OWNER) == frozenset({record_id})
