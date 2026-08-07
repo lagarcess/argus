@@ -27,12 +27,14 @@ from argus.llm.memory_embedding import (
 from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryCategory,
+    MemoryEdit,
     MemoryOperationContext,
     MemoryProposalTrigger,
     MemoryProvenance,
     MemorySelectionReason,
     MemorySourceKind,
     MemoryUsePurpose,
+    ProviderReconciliationStatus,
     SensitivityAssessment,
     SensitivityStatus,
 )
@@ -96,6 +98,9 @@ class _Mem0Double:
         self._post_embed_delay = post_embed_delay
         self._adapter = langchain_embeddings_adapter(embedder)
         self.added: list[dict] = []
+
+    def fail_next_add(self, failure: Exception) -> None:
+        self._add_failure = failure
 
     def add(self, *, messages, user_id, metadata, infer):  # noqa: ANN001
         if self._add_failure is not None:
@@ -528,7 +533,7 @@ def test_authority_is_per_eligible_set_not_per_owner() -> None:
         source_id="decision-later",
     )
 
-    owner_refs = store.projected_record_ids(OWNER)
+    owner_refs = store.settled_projection_record_ids(OWNER)
     retrieved = _service(store, provider).retrieve(
         SUBJECT,
         QUERY,
@@ -592,3 +597,44 @@ def test_usage_is_attributed_to_the_call_that_produced_it() -> None:
     # Every call embedded exactly once, so each answer must carry a distinct
     # counter. A shared slot collapses or duplicates them.
     assert reported == list(range(1, 9))
+
+
+def test_an_edit_whose_projection_failed_does_not_certify_an_empty_answer() -> None:
+    """Catches a stale projection being counted as coverage.
+
+    The record stays projected under its pre-edit text when the edit's
+    projection fails, so the index cannot match the value the user just
+    confirmed. Coverage that only asks whether a projection row exists would
+    certify an empty answer and bury the edit until reconciliation succeeds.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    mem0 = _Mem0Double(embedder=embedder, search_results=[])
+    provider = Mem0MemoryProvider(embedder=embedder, memory=mem0)
+    service = _service(store, provider)
+    record_id = _confirm_one(service)
+
+    # Projected and settled: an empty answer is believable here.
+    assert store.settled_projection_record_ids(OWNER) == frozenset({record_id})
+
+    mem0.fail_next_add(RuntimeError("index write refused"))
+    edited = service.edit(
+        SUBJECT,
+        record_id,
+        MemoryEdit(value="Now about gentler declines instead.", sensitivity=CLEAR),
+    )
+
+    assert edited.changed is True
+    assert edited.provider_status is ProviderReconciliationStatus.RECONCILIATION_REQUIRED
+    # Still projected, but under the superseded text.
+    assert store.get_provider_ref(OWNER, record_id) is not None
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
+
+    retrieved = _service(store, provider).retrieve(
+        SUBJECT,
+        "gentler declines",
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
+
+    assert [item.record.id for item in retrieved] == [record_id]
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH

@@ -1093,7 +1093,7 @@ def test_service_cleanup_reservation_prevents_deleting_reassigned_live_ref(
     assert result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
 
 
-def test_projected_record_ids_reports_exactly_what_the_database_holds(
+def test_settled_projection_ids_exclude_records_awaiting_cleanup(
     database: dict[str, Any],
 ) -> None:
     """Catches the bulk projection read drifting from per-record truth.
@@ -1106,7 +1106,7 @@ def test_projected_record_ids_reports_exactly_what_the_database_holds(
     owner = database["owner"]
     record_id = database["record_id"]
 
-    assert store.projected_record_ids(owner) == frozenset()
+    assert store.settled_projection_record_ids(owner) == frozenset()
 
     record = store.get_record(owner, record_id)
     assert record is not None
@@ -1121,8 +1121,20 @@ def test_projected_record_ids_reports_exactly_what_the_database_holds(
         provider_ref="projected-bulk-read",
     )
 
-    projected = store.projected_record_ids(owner)
+    projected = store.settled_projection_record_ids(owner)
 
     assert projected == frozenset({record_id})
     # Agrees with the per-record read it replaces in bulk.
+    assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
+
+    # An edit whose projection failed leaves the old pointer in place and the
+    # old ref queued for cleanup. The row is still there, but it now describes
+    # superseded text, so it must stop counting as coverage.
+    assert store.track_provider_cleanup_target(
+        owner,
+        record_id,
+        "projected-bulk-read",
+    )
+
+    assert store.settled_projection_record_ids(owner) == frozenset()
     assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"

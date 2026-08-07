@@ -657,8 +657,12 @@ class MemoryService:
 
         # Read projection state before searching. A projection committed after
         # this point can only widen coverage, so a search is never credited
-        # with authority over a record it could not have seen.
-        index_covers_eligible = records.keys() <= self._store.projected_record_ids(owner)
+        # with authority over a record it could not have seen. Only settled
+        # projections count: a record awaiting cleanup is indexed under its
+        # pre-edit text, which an empty answer must not be allowed to certify.
+        index_covers_eligible = records.keys() <= self._store.settled_projection_record_ids(
+            owner
+        )
 
         provider_result = self._search_provider(
             owner,

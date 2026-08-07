@@ -239,7 +239,7 @@ class CanonicalMemoryStore(Protocol):
         record_id: str,
     ) -> str | None: ...
 
-    def projected_record_ids(
+    def settled_projection_record_ids(
         self,
         owner: RegisteredMemoryOwner,
     ) -> frozenset[str]: ...
@@ -1044,12 +1044,23 @@ class InMemoryCanonicalMemoryStore:
         with self._lock:
             return self._provider_refs.get(owner.owner_id, {}).get(record_id)
 
-    def projected_record_ids(
+    def settled_projection_record_ids(
         self,
         owner: RegisteredMemoryOwner,
     ) -> frozenset[str]:
+        """Records whose projection is current, not merely present.
+
+        A record awaiting cleanup still holds the pointer from before its last
+        edit, so the index carries superseded text for it. Treating that as
+        covered would let an empty search bury the newly confirmed value.
+        """
+
         with self._lock:
-            return frozenset(self._provider_refs.get(owner.owner_id, {}))
+            return frozenset(
+                record_id
+                for record_id in self._provider_refs.get(owner.owner_id, {})
+                if not self._cleanup_targets.get((owner.owner_id, record_id))
+            )
 
     def compare_and_set_provider_ref(
         self,

@@ -1932,16 +1932,30 @@ class PostgresCanonicalMemoryStore:
             row = cursor.fetchone()
             return None if row is None else row[0]
 
-    def projected_record_ids(
+    def settled_projection_record_ids(
         self,
         owner: RegisteredMemoryOwner,
     ) -> frozenset[str]:
+        """Records whose projection is current, not merely present.
+
+        A record with pending cleanup still holds the pointer from before its
+        last edit, so the index carries superseded text for it. Treating that
+        as covered would let an empty search bury the newly confirmed value.
+        """
+
         with self._confirmation_transaction(owner) as (cursor, owner_id):
             cursor.execute(
                 """
-                select record_id
-                  from public.memory_provider_projections
-                 where owner_id = %s
+                select projection.record_id
+                  from public.memory_provider_projections as projection
+                 where projection.owner_id = %s
+                   and not exists (
+                     select 1
+                       from public.memory_provider_cleanup as cleanup
+                      where cleanup.owner_id = projection.owner_id
+                        and cleanup.record_id = projection.record_id
+                        and cleanup.status = 'pending'
+                   )
                 """,
                 (owner_id,),
             )
