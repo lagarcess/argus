@@ -2404,16 +2404,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain(
       "Request permanent deletion of your Argus account. Support will follow up by email.",
     );
-    expect(en).toContain(
-      "Support handles account deletion during private alpha.",
-    );
+    expect(en).toContain("Support handles account deletion. We'll verify");
     expect(en).toContain("Request sent. We'll follow up by email.");
     expect(es).toContain("Solicitar eliminación de cuenta");
     expect(es).toContain(
       "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
     );
     expect(es).toContain(
-      "Soporte gestiona la eliminación de cuentas durante la alfa privada.",
+      "Soporte gestiona la eliminación de cuentas. Verificaremos",
     );
     expect(es).toContain(
       "Solicitud enviada. Te contactaremos por correo electrónico.",

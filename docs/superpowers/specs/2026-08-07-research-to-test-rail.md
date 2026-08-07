@@ -338,6 +338,82 @@ assisted-not-automatic.
 Everything already locked still holds: user confirmation before anything
 durable, guest denial, the never-store classes, and S10.
 
+## 11b. Amendment 2026-08-07: one rail, not two
+
+**This amendment is binding and supersedes anything above that conflicts with
+it.** It exists because the original spec named grounded discovery only in its
+Sources list and never stated the relationship between them. That omission
+produced two parallel systems.
+
+### The defect
+
+`src/argus/domain/discovery_search/` and `src/argus/domain/research/` both call
+Perplexity, both answer question-shaped input, both produce candidate assets,
+and `research_answer.py` imports nothing from discovery. They carry separate
+caches, separate metering, and separate routing.
+
+The consequence is user-visible: a comparison question such as "Compare Costco
+against Walmart and Target", one of this spec's own starter chips, is claimed by
+the discovery taxonomy and never reaches the rail. The peer flow could not be
+demonstrated from an organic question for the same reason.
+
+Section 2 requires that the user types naturally and the interpreter decides the
+shape. That requires **one decision point**. Two systems means two decision
+points with a taxonomy arbitrating between them, which is the failure.
+
+### Required
+
+1. **One provider layer for Perplexity**, covering both the direct search path
+   and the Agent API with `finance_search`. Not two clients.
+2. **One router.** A single classifier owns question shape for everything that
+   was previously split between discovery and research. Discovery's
+   asset-finding becomes an operation of the rail, alongside quotes,
+   fundamentals, peers, screening, and market stats. It is not a sibling
+   system.
+3. **One cache.** The per-class TTL table in section 7 governs every Perplexity
+   result, including anything discovery previously cached separately.
+4. **One meter.** The capability classes in section 9 cover every call. The
+   separate discovery allowance and its global ceiling fold into that scheme
+   rather than running beside it.
+5. **Existing discovery behavior must not regress.** Source-backed results,
+   resolver and asset-class gating, Guest parity, English and es-419, and the
+   typed action contract all survive. This is absorption, not replacement, and
+   the user-visible discovery experience should be unchanged or better.
+6. **Prove the routing.** Each starter chip, and each question shape in the
+   taxonomy, reaches the rail from an organic user question. The peer flow must
+   be demonstrated end to end without a server-seeded card.
+
+### Also required, found in the same review
+
+- **Thorough path parity.** The background path is currently second-class: it
+  drops `operation_scope` so a completed research job cannot be recognized as
+  research, it bypasses the cache entirely with `cache_status` hardcoded to
+  miss, and completed jobs return peers that never persist to the checkpoint.
+  Caching matters most on the most expensive tier, so this is backwards. Fix as
+  one theme, not three patches.
+- **Trigger reliability.** At the default turn-call allowance the research
+  classifier can be starved by interpreter audit calls and silently fall back to
+  pre-rail routing. The rail must fire reliably at default configuration, not
+  only with a raised knob.
+- **ETF constituents and weights.** Named in section 2, absent from the
+  implementation. This is the capability that addresses the exposure-resolution
+  limitation accepted in the discovery lane, where true ticker collisions
+  dropped exposure ETFs.
+- **Memory producer seam.** Section 11 requires memory to record research
+  subjects, open threads, and comparison sets. The rail must **emit** those in a
+  typed form the memory lane can consume, even though consumption ships
+  separately. Without the producer the follow-up lane has to retrofit it.
+
+### Acceptance for this amendment
+
+- No second Perplexity client, cache, meter, or router remains.
+- Every starter chip reaches the rail from an organic question, proven in
+  browser evidence rather than by seeding.
+- Discovery journeys that worked before still work, in both languages, for
+  Guest and registered.
+- The rail fires at default configuration with no knob raised.
+- Research subjects and open threads are emitted in a typed, consumable shape.
+
 ## 12. Non-goals
 
 No skill store, model picker, agent marketplace, autonomous monitoring,
