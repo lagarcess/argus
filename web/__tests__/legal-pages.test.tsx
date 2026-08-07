@@ -81,23 +81,38 @@ function backendCookieWriters(): CookieWriter[] {
   return found;
 }
 
-// Keys the scan can find in web/, mapped to the concept the "Preferences you
-// set" item discloses. Every one of these must still be discovered, so a
+// The phrase each concept must actually say in the shipped copy. Mapping a key
+// to a bare label proves nothing on its own: the label has to be findable in
+// what the reader sees, in every locale, or the map is decoration.
+const STORAGE_CONCEPTS = {
+  language: { en: "language", "es-419": "idioma" },
+  appearance: { en: "appearance", "es-419": "apariencia" },
+  layout: { en: "layout", "es-419": "diseño" },
+  tips: { en: "tips you dismissed", "es-419": "avisos que descartaste" },
+  temporary: {
+    en: "conversations you marked temporary",
+    "es-419": "conversaciones que marcaste como temporales",
+  },
+} as const;
+
+type StorageConcept = keyof typeof STORAGE_CONCEPTS;
+
+// Keys the scan can find in web/. Every one must still be discovered, so a
 // refactor that hides a key fails rather than shrinking the inventory.
-const DISCLOSED_STORAGE_KEYS: Record<string, string> = {
+const DISCLOSED_STORAGE_KEYS: Record<string, StorageConcept> = {
   "argus-theme": "appearance",
   "argus:sidebar_mode": "layout",
   "argus:command_palette_layout": "layout",
-  "argus:guest-hint:confirmation:v1": "dismissed tips",
-  "argus:guest-hint:result:v1": "dismissed tips",
-  "argus.memoryOptOutConversations.v1": "temporary conversations",
+  "argus:guest-hint:confirmation:v1": "tips",
+  "argus:guest-hint:result:v1": "tips",
+  "argus.memoryOptOutConversations.v1": "temporary",
 };
 
 // Keys a dependency writes under its own default, which never appear in our
 // source at all. No scan can find these; they are disclosed by hand and listed
 // here so the gap is visible instead of silent. Adding a storage-writing
 // dependency means adding its key here.
-const LIBRARY_DEFAULT_STORAGE_KEYS: Record<string, string> = {
+const LIBRARY_DEFAULT_STORAGE_KEYS: Record<string, StorageConcept> = {
   // i18next-browser-languagedetector, caches: ["localStorage"] in lib/i18n.ts
   i18nextLng: "language",
 };
@@ -149,6 +164,20 @@ function browserStorageWriters(): StorageWriter[] {
       );
       push(constant?.[1] ?? null);
     };
+
+    // Same evasion the cookie scan had: rebinding the handle hides every later
+    // call behind a name this scan cannot predict, so the binding is the
+    // failure. Covers `const s = window.localStorage` and `const { localStorage
+    // } = window`.
+    for (const match of source.matchAll(
+      /(?:(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:(?:window|globalThis)\s*\.\s*)?(?:localStorage|sessionStorage)\b(?!\s*\.)|\{[^}]*\b(?:localStorage|sessionStorage)\b[^}]*\}\s*=\s*(?:window|globalThis))/g,
+    )) {
+      found.push({
+        origin: `${relative}:${lineOf(match.index)}`,
+        argument: `alias ${match[1] ?? "destructured"} = ...Storage`,
+        key: null,
+      });
+    }
 
     for (const match of source.matchAll(
       /(?:localStorage|sessionStorage)\s*\.\s*(?:setItem|getItem|removeItem)\s*\(\s*([^,)]+?)\s*[,)]/g,
@@ -276,11 +305,31 @@ describe("legal page cookie and storage disclosure", () => {
     }
   });
 
-  test("names appearance among the preferences it discloses", async () => {
-    // argus-theme is set by next-themes, so it never appears as a
-    // localStorage call in our source and was missed by the first inventory.
-    expect(await renderLegal("en", "privacy")).toContain("appearance");
-    expect(await renderLegal("es-419", "privacy")).toContain("apariencia");
+  test("says every mapped concept out loud, in both locales", async () => {
+    // Mapping a key to a concept is worthless unless the concept is findable
+    // in what the reader actually sees. Drop a phrase from the copy and this
+    // fails, which the key-to-concept map alone could never detect.
+    const concepts = new Set<StorageConcept>([
+      ...Object.values(DISCLOSED_STORAGE_KEYS),
+      ...Object.values(LIBRARY_DEFAULT_STORAGE_KEYS),
+    ]);
+    expect(concepts.size).toBe(Object.keys(STORAGE_CONCEPTS).length);
+
+    for (const locale of ["en", "es-419"] as const) {
+      const preferences = CATALOGS[locale].legal.privacy.sections.cookies.items
+        .preferences.body;
+      const rendered = await renderLegal(locale, "privacy");
+      for (const concept of concepts) {
+        const phrase = STORAGE_CONCEPTS[concept][locale];
+        expect(
+          preferences,
+          `${locale}: preferences copy never mentions "${concept}" ("${phrase}")`,
+        ).toContain(phrase);
+        expect(rendered, `${locale}: "${phrase}" is not rendered`).toContain(
+          phrase,
+        );
+      }
+    }
   });
 
   test("does not claim sign-in cookies expire with the browser session", async () => {
