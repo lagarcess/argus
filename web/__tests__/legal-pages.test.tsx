@@ -28,8 +28,11 @@ const DISCLOSED_BACKEND_COOKIES: Record<string, string> = {
 
 type CookieWriter = { origin: string; argument: string; name: string | null };
 
-// Walk the whole backend rather than a file list: a cookie added in a module
-// nobody thought to enumerate is exactly the miss this guard exists to catch.
+// This scan is static and therefore best effort. It cannot follow a name
+// through an arbitrary call graph, so it is built to fail loudly on anything
+// it cannot resolve rather than to look complete. Treat an unresolvable hit as
+// an undisclosed cookie, not as noise to filter out.
+//
 // Only set_cookie counts. A delete can only target a cookie some set_cookie
 // already created, so it cannot introduce undisclosed browser state.
 function backendCookieWriters(): CookieWriter[] {
@@ -40,7 +43,9 @@ function backendCookieWriters(): CookieWriter[] {
 
   for (const relative of files) {
     const source = readFileSync(join(BACKEND_ROOT, relative), "utf-8");
-    if (!/set_cookie\s*\(/.test(source)) continue;
+    // Deliberately not `set_cookie\(`: `writer = response.set_cookie` binds the
+    // method without ever calling it by name, and that file must still be read.
+    if (!source.includes("set_cookie")) continue;
 
     // Module-level string constants, so a name passed by reference resolves.
     const constants = new Map<string, string>();
@@ -48,15 +53,112 @@ function backendCookieWriters(): CookieWriter[] {
       constants.set(match[1], match[2]);
     }
 
+    const lineOf = (index: number) => source.slice(0, index).split("\n").length;
+
+    // An alias hides every later call behind a name this scan cannot predict,
+    // so the binding itself is the failure, not the calls downstream of it.
+    for (const match of source.matchAll(
+      /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[A-Za-z_][A-Za-z0-9_.]*\.set_cookie\s*$/gm,
+    )) {
+      found.push({
+        origin: `${relative}:${lineOf(match.index)}`,
+        argument: `alias ${match[1]} = ...set_cookie`,
+        name: null,
+      });
+    }
+
     for (const match of source.matchAll(/set_cookie\s*\(\s*([^,)\s]+)/g)) {
       const argument = match[1];
-      const line = source.slice(0, match.index).split("\n").length;
       const literal = argument.match(/^"([^"]*)"$/);
       found.push({
-        origin: `${relative}:${line}`,
+        origin: `${relative}:${lineOf(match.index)}`,
         argument,
         name: literal ? literal[1] : (constants.get(argument) ?? null),
       });
+    }
+  }
+
+  return found;
+}
+
+// Keys the scan can find in web/, mapped to the concept the "Preferences you
+// set" item discloses. Every one of these must still be discovered, so a
+// refactor that hides a key fails rather than shrinking the inventory.
+const DISCLOSED_STORAGE_KEYS: Record<string, string> = {
+  "argus-theme": "appearance",
+  "argus:sidebar_mode": "layout",
+  "argus:command_palette_layout": "layout",
+  "argus:guest-hint:confirmation:v1": "dismissed tips",
+  "argus:guest-hint:result:v1": "dismissed tips",
+  "argus.memoryOptOutConversations.v1": "temporary conversations",
+};
+
+// Keys a dependency writes under its own default, which never appear in our
+// source at all. No scan can find these; they are disclosed by hand and listed
+// here so the gap is visible instead of silent. Adding a storage-writing
+// dependency means adding its key here.
+const LIBRARY_DEFAULT_STORAGE_KEYS: Record<string, string> = {
+  // i18next-browser-languagedetector, caches: ["localStorage"] in lib/i18n.ts
+  i18nextLng: "language",
+};
+
+type StorageWriter = { origin: string; argument: string; key: string | null };
+
+// Symmetric to the cookie scan, and for the same reason: the first inventory
+// counted explicit localStorage calls and missed the key a library sets.
+function browserStorageWriters(): StorageWriter[] {
+  const found: StorageWriter[] = [];
+
+  const files = readdirSync(join(import.meta.dir, ".."), {
+    recursive: true,
+    encoding: "utf-8",
+  }).filter(
+    (entry) =>
+      (entry.endsWith(".ts") || entry.endsWith(".tsx")) &&
+      !entry.startsWith("node_modules") &&
+      !entry.startsWith(".next") &&
+      !entry.startsWith("__tests__") &&
+      !entry.startsWith("e2e"),
+  );
+
+  for (const relative of files) {
+    const source = readFileSync(join(import.meta.dir, "..", relative), "utf-8");
+    const lineOf = (index: number) => source.slice(0, index).split("\n").length;
+
+    const record = (index: number, argument: string) => {
+      const origin = `${relative}:${lineOf(index)}`;
+      const push = (key: string | null) => found.push({ origin, argument, key });
+
+      const literal = argument.match(/^["'`]([^"'`]*)["'`]$/);
+      if (literal) return push(literal[1]);
+
+      // An indexed lookup reaches every value in the map, so every value has
+      // to be disclosed, not just the branch this call site happens to take.
+      const indexed = argument.match(/^([A-Za-z_$][\w$]*)\s*\[/);
+      if (indexed) {
+        const table = source.match(
+          new RegExp(`\\b${indexed[1]}\\s*[:=][^={]*=?\\s*\\{([^}]*)\\}`),
+        );
+        const values = [...(table?.[1] ?? "").matchAll(/["'`]([^"'`]+)["'`]/g)];
+        if (!values.length) return push(null);
+        return values.forEach((value) => push(value[1]));
+      }
+
+      const constant = source.match(
+        new RegExp(`\\b${argument}\\s*=\\s*["'\`]([^"'\`]*)["'\`]`),
+      );
+      push(constant?.[1] ?? null);
+    };
+
+    for (const match of source.matchAll(
+      /(?:localStorage|sessionStorage)\s*\.\s*(?:setItem|getItem|removeItem)\s*\(\s*([^,)]+?)\s*[,)]/g,
+    )) {
+      record(match.index, match[1].trim());
+    }
+
+    // Keys a dependency owns, declared where we configure it.
+    for (const match of source.matchAll(/storageKey\s*=\s*["'{]+([^"'}]+)["'}]*/g)) {
+      record(match.index, `"${match[1]}"`);
     }
   }
 
@@ -149,6 +251,36 @@ describe("legal page cookie and storage disclosure", () => {
         known,
       );
     }
+  });
+
+  test("covers every browser storage key web/ writes", () => {
+    const writers = browserStorageWriters();
+
+    for (const writer of writers) {
+      expect(
+        writer.key,
+        `${writer.origin}: storage key "${writer.argument}" could not be resolved to a literal, so its disclosure cannot be checked`,
+      ).not.toBeNull();
+      const key = writer.key as string;
+      expect(
+        DISCLOSED_STORAGE_KEYS[key] ?? LIBRARY_DEFAULT_STORAGE_KEYS[key],
+        `${writer.origin}: storage key "${key}" is written but not covered by the preferences item`,
+      ).toBeDefined();
+    }
+
+    const keys = new Set(writers.map((writer) => writer.key));
+    for (const known of Object.keys(DISCLOSED_STORAGE_KEYS)) {
+      expect(keys, `scan no longer finds the known key "${known}"`).toContain(
+        known,
+      );
+    }
+  });
+
+  test("names appearance among the preferences it discloses", async () => {
+    // argus-theme is set by next-themes, so it never appears as a
+    // localStorage call in our source and was missed by the first inventory.
+    expect(await renderLegal("en", "privacy")).toContain("appearance");
+    expect(await renderLegal("es-419", "privacy")).toContain("apariencia");
   });
 
   test("does not claim sign-in cookies expire with the browser session", async () => {
