@@ -3,9 +3,9 @@
 Draft 2026-08-07. **Partial spec.** Sections 1 through 6 are settled by canon or
 clear practice, and §7.2, the viewer path, is decided.
 
-**Open decisions remain in §7 and this must not be dispatched until they are
-answered:** attribution, abuse posture, what is shareable, the revoked-link page,
-and expiry. The viewer path (§7.2) and search indexing (§7.3) are decided.
+**All §7 decisions are now made.** This spec is complete and dispatchable when
+the pillar comes up, subject to the standing rule that it ships last of the
+five.
 
 Board pillar 5. Deliberately last of the five: sharing a broken loop spreads a
 bad impression faster than a good one.
@@ -119,15 +119,24 @@ the app shell.
 None of this can be built until these are answered. They are product and
 posture calls, not engineering ones.
 
-### 7.1 Attribution
+### 7.1 Attribution — DECIDED 2026-08-07
 
-Does a receipt name its creator?
+**Anonymous. A receipt never names its creator, and there is no opt-in toggle.**
 
-Options: anonymous always, optional attribution the owner opts into, or always
-attributed. This shapes what sharing socially *is*: a private artifact you
-happen to send, or something with your name on it. It also has privacy weight,
-since an attributed receipt tied to a real name is a public statement about
-someone's investing interest.
+Investing interest is sensitive personal information. An attributed receipt is a
+public statement about someone's risk appetite, wealth, or a position that could
+conflict with their employment. That is a poor default for a product whose users
+are testing ideas privately.
+
+An opt-in toggle is worse than either extreme, and for the same reason a
+discoverability toggle failed at ChatGPT: it places an irreversible decision
+behind a control read once, and the consequence lands long after the click.
+
+Attribution also serves the sharer more than the viewer. A viewer cares about
+the idea, not who produced it.
+
+If attribution is ever wanted, it is a deliberate later design with its own
+consent flow, never a checkbox added to this surface.
 
 ### 7.2 What the viewer can do — DECIDED 2026-08-07
 
@@ -198,29 +207,53 @@ warning.
 Any future discovery channel is a deliberate, separately designed surface that
 Argus curates. It is never a byproduct of a user sharing a link with a friend.
 
-### 7.4 Abuse posture
+### 7.4 Abuse posture — DECIDED 2026-08-07
 
-Public URLs invite misuse: receipts shared to mislead, screenshots presented as
-Argus endorsing a position, or volume-created links.
+**No creation gate beyond the existing allowlist. Rate-limit creation. Add a
+report path before public exposure, not now. Mark the artifact so a screenshot
+carries its own context.**
 
-Needed: whether creation is gated at all, whether there is a report path, and
-what takedown looks like. A private alpha with an allowlist has low exposure
-today, which is the argument for deciding it now rather than at public launch.
+The worst class of sharing abuse, publishing arbitrary user content, is already
+prevented structurally: a receipt is a sanitized artifact with a closed payload,
+not a transcript. That is the difference between this design and the ones that
+had incidents.
 
-### 7.5 What is shareable
+The misleading-results risk is real but it belongs to backtesting, not to
+sharing. A receipt showing a large return is honest about what happened
+historically. The mitigation is the framing in §4, which is deliberately
+stronger in public than in the app.
 
-A completed backtest result is the obvious case.
+Two things worth building:
 
-Also a comparison? Also a research answer? Each widens the leak surface
-differently, and a research answer in particular carries third-party sources
-into a page Argus publishes, which raises attribution and correctness questions
-the other two do not.
+- **Rate-limit receipt creation**, so a compromised or careless account cannot
+  generate links at volume.
+- **A visible "tested with Argus" mark in the rendered receipt and its preview
+  image**, so a screenshot carries its own provenance. Screenshots travel
+  further than links, and an unmarked screenshot of Argus numbers is the easiest
+  way for someone to imply an endorsement Argus never made.
 
-An earlier draft narrowed this by requiring the artifact be re-runnable. That
-constraint came from a viewer path that preloaded the setup, which 7.2 rejected.
-Nothing is carried now, so re-runnability no longer bounds the answer.
+Creation is gated by the allowlist today, which is the real control while the
+alpha is closed. A report path and takedown flow are required before public
+exposure and are not needed at current scale.
 
-Recommend starting with results only and widening once the funnel is measured.
+### 7.5 What is shareable — DECIDED 2026-08-07
+
+**Completed backtest results only. Comparisons second, once the funnel is
+measured. Research answers not at all.**
+
+A result is the clean case: frozen numbers, closed payload, and it is what people
+actually want to show someone.
+
+A comparison is a reasonable second because its members are also frozen
+artifacts, but it references several runs and widens the surface. Wait until
+there is evidence anyone wants it.
+
+**Research answers are excluded on a different basis, not merely deferred.** They
+carry third-party claims into a page Argus publishes under its own domain,
+permanently, with no correction path once frozen. If a provider was wrong, Argus
+is the publisher of that error. That is a different risk class from publishing
+your own simulation results, and the sharing value is lower anyway: the
+interesting artifact is what would have happened, not what an article said.
 
 ### 7.6 Revocation semantics — partially decided
 
@@ -231,19 +264,44 @@ a trap, and it is avoidable by making revocation follow deletion automatically.
 
 **Decided:** revocation takes effect immediately on Argus's side.
 
-**Still open:** whether a revoked link returns 404 or an honest "no longer
-available" page. A tombstone does not look broken, but it confirms the link once
-existed, which is itself a small disclosure.
+**Decided: an honest tombstone, not a 404.** The concern with a tombstone is
+that it confirms the link once existed, but the person opening it already holds
+the link and knows someone sent it. With unguessable ids there is no enumeration
+risk, so the tombstone discloses nothing the viewer does not already have.
+
+A 404 reads as broken and makes the sender look careless. The tombstone says the
+receipt is no longer available and still offers Try Argus, since a visitor who
+followed a link has already shown intent.
 
 **Honest limit to state in the product, not just here:** social platforms cache
 preview cards. A revoked receipt can survive as a preview in a message thread
 after the page is gone. Argus cannot fix that, so it should not imply otherwise
 when someone revokes.
 
-### 7.7 Expiry
+### 7.7 Expiry — DECIDED 2026-08-07
 
-Do receipts live forever by default, or expire? Permanent links are better for
-distribution and worse for control.
+**No automatic expiry. Owner-revocable, and the owner can see everything they
+have shared.**
+
+A receipt is a frozen historical record. Unlike a conversation it does not decay
+in accuracy, so time-based expiry would break saved links without making anything
+safer. Both ChatGPT and Claude also ship without expiry; that part of the norm is
+fine.
+
+**The part they got wrong, and the actual requirement here:** users could not
+easily audit what they had shared. That is a large reason the ChatGPT exposure
+was as bad as it was, with people surprised by links they had forgotten
+creating.
+
+So a receipt list is not a nicety, it is the control that makes owner-revocable
+meaningful:
+
+- every receipt the user has created, in one place
+- when it was created and what it shows
+- revoke from that list, in one action
+- reachable from Data Controls, where the rest of the user's data controls live
+
+Without it, "owner-revocable" is true in the API and false in practice.
 
 ## 8. Acceptance, once §7 is answered
 

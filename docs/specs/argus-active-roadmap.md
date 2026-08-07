@@ -202,11 +202,9 @@ reliable versioning and a way to read them back.
 
 Distribution, once there is something worth spreading.
 
-**Partial spec written:**
+**Spec is written and founder-locked:**
 [`2026-08-07-sharing-evidence-receipts.md`](../superpowers/specs/2026-08-07-sharing-evidence-receipts.md).
-Settled by canon: the pipeline, the payload, the never-expose list, the framing.
-**Blocked on seven founder decisions in its section 7** and must not be
-dispatched until they are answered.
+Complete, all decisions made, dispatchable when the pillar comes up.
 
 - An immutable, sanitized evidence receipt frozen at creation. Not a shared chat
   transcript, and never a live view.
@@ -219,8 +217,11 @@ dispatched until they are answered.
 - Deliberately last of the five: sharing a broken loop spreads a bad
   impression faster than a good one.
 
-The decision that determines whether this pillar produces growth or just
-produces links is 7.2, what a stranger can do after opening the link.
+Decided from prior art rather than preference: never indexable with no
+discoverability toggle, anonymous with no attribution, results only, no expiry
+but a receipt list so revocation is real. ChatGPT exposed roughly 100,000 shared
+conversations through a toggle users misread, and Claude shipped share links
+with no noindex at all.
 
 ## Continuous, not a lane
 
