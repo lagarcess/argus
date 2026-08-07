@@ -48,9 +48,15 @@ export default function EmptyChatSurface({
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
+  // The tall top inset belongs to tablet and up. Expressing it as a min-width
+  // variant rather than overriding a base value keeps `sm:` from winning the
+  // cascade between 400 and 719px, where most phones actually sit.
   return (
-    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-      <div className="order-1 flex w-full flex-col items-center">
+    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 tablet:pb-8 tablet:pt-[28vh]">
+      {/* The heading absorbs the free space below the mobile threshold, which
+          settles the pills and the composer onto the bottom edge where a thumb
+          rests. Above it, the surface keeps its centered composition. */}
+      <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
         <EmptyChatHeading isGuest={isGuest} />
       </div>
 
@@ -104,7 +110,7 @@ export default function EmptyChatSurface({
 
       {/* Thumb-reachable above the composer on narrow screens, and in its
           familiar place under the composer from tablet up. */}
-      <div className="order-2 w-full max-w-2xl tablet:order-3">
+      <div className="order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3">
         <StarterActions
           disabled={disabled}
           onSelect={onSend}

@@ -408,9 +408,25 @@ describe("activity rail and starter pills", () => {
     // One instance, placed by flex order: pills before the composer on narrow,
     // after it from tablet up.
     expect(surface.match(/<StarterActions/g)?.length).toBe(1);
-    expect(surface).toContain('className="order-2 w-full max-w-2xl tablet:order-3"');
+    expect(surface).toContain("order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3");
     expect(surface).toContain('className="order-3 w-full max-w-2xl tablet:order-2"');
     expect(surface).toContain('layout={isBelowTablet ? "scroll" : "wrap"}');
+  });
+
+  test("the composer and pills settle on the bottom edge below the threshold", () => {
+    const surface = readFileSync(
+      join(import.meta.dir, "../components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
+    // The heading absorbs the free space, which pushes the pair to the bottom.
+    expect(surface).toContain("max-tablet:flex-1 max-tablet:justify-center");
+    // The home indicator must not sit on top of the composer.
+    expect(surface).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
+    // The tall inset is a min-width variant, never a base value a `sm:` rule
+    // could win back between 400 and 719px.
+    expect(surface).toContain("tablet:pt-[28vh]");
+    expect(surface).not.toContain("sm:pt-[28vh]");
+    expect(surface).not.toContain("pt-[24vh]");
   });
 
   test("suggestion rows clamp to two lines, never one", () => {
