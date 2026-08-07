@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { disclosedCookieConcept } from "../lib/browser-cookies";
 import { STORAGE_REGISTRY } from "../lib/browser-storage";
 
 /**
@@ -96,4 +97,39 @@ test("every key a real session keeps is a disclosed key", async ({ page }) => {
   // read as full coverage.
   expect(written.size).toBeGreaterThan(0);
   expect(remaining.length).toBeGreaterThan(0);
+});
+
+/**
+ * Cookies the web tier writes never pass through the backend registry: the
+ * Supabase browser client writes document.cookie itself, and the server
+ * adapter forwards dependency-chosen names. This observes whatever actually
+ * landed in the jar, so a dependency-added cookie fails here even though no
+ * Argus code named it.
+ *
+ * Bound worth stating: this journey does not sign in, so Supabase auth cookies
+ * are not exercised here. Their naming is pinned by a unit test that derives
+ * the name the way the library does, and the server adapter refuses an
+ * undisclosed name at the door.
+ */
+test("every cookie a real session leaves is a disclosed cookie", async ({
+  page,
+  context,
+}) => {
+  for (const path of ["/", "/privacy", "/terms"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+  }
+
+  const cookies = await context.cookies();
+  const undisclosed = cookies
+    .map((cookie) => cookie.name)
+    .filter((name) => !disclosedCookieConcept(name))
+    .sort();
+
+  expect(
+    undisclosed,
+    `cookies present but not covered by COOKIE_DISCLOSURE_RULES: ${undisclosed.join(
+      ", ",
+    )}. Add a rule and disclose them in the privacy copy.`,
+  ).toEqual([]);
 });
