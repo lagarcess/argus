@@ -175,8 +175,8 @@ the first successful backtest is the meaningful onboarding milestone.
 - Omnisearch and Idea Ledger recall
 - Settings / Account
 
-Strategies and Collections remain valid flagged product objects, but they are
-not visible private-alpha surfaces.
+Legacy Strategy and Collection records remain valid read-compatibility objects
+only. No current flag, navigation surface, or writer creates or manages them.
 
 ---
 
@@ -260,18 +260,18 @@ from personalization memory. Automatic or user-confirmed cross-conversation
 personalization memory remains post-PMF and must not be required for the P2
 idea/evidence/comparison loop.
 
-## Surface Goals
+## Legacy Compatibility Goals
 
-If the flagged Strategies surface is reactivated later, its goals are:
+- keep historical Strategy and Collection rows owner-scoped and readable
+- preserve old `strategy_id` links without creating or mutating legacy records
+- route current recall through conversations, Recents, Omnisearch, and the Idea
+  Ledger instead of rebuilding a retired dashboard
 
-- scan saved strategies quickly
-- compare ideas rapidly
-- reopen or rerun with low friction
-- edit organization state
+## Result Metrics
 
-## Metric Cards
-
-Users may configure visible high-level metrics from supported presets.
+Current result cards render canonical high-level metrics. Historical
+`metrics_preferences` fields may remain readable on legacy Strategy rows, but no
+current UI configures them.
 
 Examples:
 
@@ -296,23 +296,11 @@ Users should be able to manage their workspace cleanly.
 - archive
 - delete
 
-## Strategies
+## Legacy Strategy and Collection Records
 
-Hidden under private-alpha defaults.
-
-- rename
-- pin / unpin
-- delete
-
-## Collections
-
-Hidden and indefinitely deferred from the private-alpha UI.
-
-- rename
-- pin / unpin
-- delete
-
-Deleted and archived surfaces should remain accessible where supported.
+Historical rows and links remain read-compatible. There is no current rename,
+pin, delete, restore, organization, search, or browse surface for either legacy
+record type.
 
 ---
 
@@ -372,22 +360,12 @@ This ensures reliability and benchmark coherence.
 
 Search should reduce friction and help users resume intent instantly.
 
-## Surface Search
-
-Scoped search within each surface:
-
-- Strategies search strategies
-- Collections search collections
-
 ## Global Search
 
-Navigation search should evolve toward omni-search across:
-
-- chats
-- strategies
-- collections
-
-Future semantic search is strongly aligned with product direction.
+Omnisearch covers the current Conversation, Backtest, Evidence, Decision, and
+Idea record types. Search must not expose legacy Strategy or Collection rows as
+current product surfaces. Alpha uses typed and text search; vector or semantic
+search remains deferred until a concrete later need exists.
 
 ---
 

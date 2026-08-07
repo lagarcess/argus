@@ -555,7 +555,9 @@ creates, patches, restores, or deletes Strategy rows.
 - **Note**: Strategies may target multiple symbols but only within the same `asset_class`.
 
 > [!TIP]
-> **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
+> **Global Rule**: Historical Collection rows may contain mixed asset classes.
+> Backtest runs may not mix asset classes operationally, and no current flow
+> creates or manages Collections.
 
 ### Notes
 - Existing rows may still parent an owner-scoped direct backtest through
@@ -582,8 +584,8 @@ Legacy groupings retained only for owner-scoped historical reads.
 - No active product path creates, patches, restores, deletes, attaches, or
   detaches Collection records.
 - Collections do **not** perform aggregate portfolio simulations.
-- **Asset Mixing**: Collections may contain Equity, Crypto, and Currency Pair
-  strategies, but they cannot be executed as a mixed-asset batch.
+- **Historical asset mixing**: Existing rows may contain Equity, Crypto, and
+  Currency Pair strategies, but they cannot be executed as a mixed-asset batch.
 ---
 
 # 11. collection_strategies
@@ -1250,9 +1252,9 @@ Recents is a mixed-type feed displaying activity across the platform.
 
 ### Supported Types
 - `chat`
-- `strategy`
-- `collection`
 - `run`
+- `strategy` (legacy read compatibility only)
+- `collection` (legacy read compatibility only)
 
 ### Standard History Shape
 ```json

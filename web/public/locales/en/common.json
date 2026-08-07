@@ -277,7 +277,7 @@
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
       "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
-      "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
+      "private_alpha_save_unavailable": "The legacy Strategies library and Save action have been retired. This completed run remains available in this chat and Recents, and you can use Refine idea to continue testing it.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
       "confirmation_action_missing_identity": "That confirmation action is missing its card identity. Use the latest card action before continuing.",

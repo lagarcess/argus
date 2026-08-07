@@ -381,9 +381,12 @@ Argus does not have one canonical object. It has multiple first-class objects.
 - **User**: Identity + preferences.
 - **Conversation**: A thread representing one isolated idea journey.
 - **Message**: A unit inside a conversation.
-- **Strategy**: A supported executable template + parameters.
+- **Strategy definition**: A supported executable template + parameters used in
+  conversational drafts and immutable run configuration, not a saved-record
+  surface.
 - **Backtest Run**: Immutable simulation result.
-- **Collection**: User grouping of strategies.
+- **Legacy Strategy / Collection record**: Owner-scoped historical data kept
+  read-compatible without a current create, manage, or navigation surface.
 - **Asset**: Supported symbol/instrument metadata (includes `asset_class`).
 
 Authenticated profile language is product state, not browser state. Signup
@@ -416,7 +419,9 @@ Each conversation is isolated.
 *AI should not depend on unrelated thread memory.*
 
 > [!TIP]
-> **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
+> **Global Rule**: Historical Collection rows may contain mixed asset classes.
+> Backtest runs may not mix asset classes operationally, and no current flow
+> creates or manages Collections.
 
 ## Conversational Runtime Architecture
 
