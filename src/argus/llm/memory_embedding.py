@@ -57,13 +57,20 @@ class EmbeddingUsage:
         self.reported_cost_usd = reported_cost_usd
 
 
+# The API accepts up to 512 inputs per request, so a bulk projection costs one
+# round trip instead of one per record.
+MAX_EMBEDDING_BATCH = 512
+
+
 class MemoryEmbedder(Protocol):
-    """Turns one memory text into one vector; never stores anything."""
+    """Turns memory text into vectors; never stores anything."""
 
     @property
     def dimensions(self) -> int: ...
 
     def embed(self, text: str) -> list[float]: ...
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
 
     def last_usage(self) -> EmbeddingUsage: ...
 
@@ -97,27 +104,40 @@ class PerplexityMemoryEmbedder:
         return self._last_usage
 
     def embed(self, text: str) -> list[float]:
+        return self.embed_batch([text])[0]
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Vectorize many texts in as few round trips as the API allows."""
+
         if not self._api_key:
             raise MemoryEmbeddingUnavailable("not_configured")
-        content = text.strip()
-        if not content:
+        contents = [text.strip() for text in texts]
+        if not contents or any(not content for content in contents):
             raise MemoryEmbeddingUnavailable("empty_input")
+        vectors: list[list[float]] = []
+        for start in range(0, len(contents), MAX_EMBEDDING_BATCH):
+            batch = contents[start : start + MAX_EMBEDDING_BATCH]
+            vectors.extend(self._embed_one_request(batch))
+        return vectors
+
+    def _embed_one_request(self, batch: list[str]) -> list[list[float]]:
         payload = self._post(
             {
                 "model": self._model,
-                "input": [content],
+                "input": batch,
                 "dimensions": self._dimensions,
                 "encoding_format": EMBEDDING_ENCODING_FORMAT,
             }
         )
-        vector = _first_vector(payload)
-        if len(vector) != self._dimensions:
-            raise MemoryEmbeddingUnavailable(
-                "malformed_response",
-                detail=f"expected {self._dimensions} dimensions, got {len(vector)}",
-            )
+        vectors = _vectors_in_order(payload, expected=len(batch))
+        for vector in vectors:
+            if len(vector) != self._dimensions:
+                raise MemoryEmbeddingUnavailable(
+                    "malformed_response",
+                    detail=f"expected {self._dimensions} dimensions, got {len(vector)}",
+                )
         self._last_usage = _usage_from(payload)
-        return vector
+        return vectors
 
     def _post(self, body: dict[str, Any]) -> Any:
         try:
@@ -156,16 +176,34 @@ class PerplexityMemoryEmbedder:
             ) from exc
 
 
-def _first_vector(payload: Any) -> list[float]:
+def _vectors_in_order(payload: Any, *, expected: int) -> list[list[float]]:
+    """Decode every embedding, restored to request order by its index."""
+
     if not isinstance(payload, dict):
         raise MemoryEmbeddingUnavailable("malformed_response", detail="not_an_object")
     data = payload.get("data")
-    if not isinstance(data, list) or not data:
+    if not isinstance(data, list) or len(data) != expected:
         raise MemoryEmbeddingUnavailable("malformed_response", detail="no_data")
-    first = data[0]
-    if not isinstance(first, dict):
-        raise MemoryEmbeddingUnavailable("malformed_response", detail="no_embedding")
-    return _decode_embedding(first.get("embedding"))
+    ordered: list[list[float] | None] = [None] * expected
+    for position, entry in enumerate(data):
+        if not isinstance(entry, dict):
+            raise MemoryEmbeddingUnavailable(
+                "malformed_response",
+                detail="no_embedding",
+            )
+        index = entry.get("index")
+        slot = (
+            index if isinstance(index, int) and not isinstance(index, bool) else position
+        )
+        if not 0 <= slot < expected or ordered[slot] is not None:
+            raise MemoryEmbeddingUnavailable(
+                "malformed_response",
+                detail="unusable_index",
+            )
+        ordered[slot] = _decode_embedding(entry.get("embedding"))
+    if any(vector is None for vector in ordered):
+        raise MemoryEmbeddingUnavailable("malformed_response", detail="no_data")
+    return [vector for vector in ordered if vector is not None]
 
 
 def _decode_embedding(raw: Any) -> list[float]:

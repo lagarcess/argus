@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import struct
 from decimal import Decimal
 
@@ -11,6 +12,7 @@ import pytest
 from argus.llm.memory_embedding import (
     DEFAULT_EMBEDDING_MODEL,
     EMBEDDING_ENCODING_FORMAT,
+    MAX_EMBEDDING_BATCH,
     PERPLEXITY_EMBEDDINGS_URL,
     MemoryEmbeddingUnavailable,
     PerplexityMemoryEmbedder,
@@ -211,3 +213,95 @@ def test_env_factory_uses_the_existing_perplexity_key(
 
     assert embedder is not None
     assert embedder.dimensions == 1024
+
+
+def test_a_batch_is_one_request_not_one_per_text() -> None:
+    """Catches a bulk projection fanning out into a request per record."""
+    requests: list[list[str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.read())
+        requests.append(body["input"])
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": position, "embedding": _encoded([position, 1, 2, 3])}
+                    for position in range(len(body["input"]))
+                ],
+                "usage": {"total_tokens": 9},
+            },
+        )
+
+    vectors = _embedder(handler).embed_batch(["one", "two", "three"])
+
+    assert len(requests) == 1
+    assert requests[0] == ["one", "two", "three"]
+    assert [vector[0] for vector in vectors] == [0.0, 1.0, 2.0]
+
+
+def test_batches_split_at_the_documented_ceiling() -> None:
+    """Catches exceeding the 512-input limit in a single request."""
+    sizes: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.read())
+        sizes.append(len(body["input"]))
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": position, "embedding": _encoded([1, 2, 3, 4])}
+                    for position in range(len(body["input"]))
+                ]
+            },
+        )
+
+    _embedder(handler).embed_batch([f"text-{index}" for index in range(700)])
+
+    assert sizes == [MAX_EMBEDDING_BATCH, 700 - MAX_EMBEDDING_BATCH]
+
+
+def test_vectors_come_back_in_request_order() -> None:
+    """Catches an out-of-order response silently mismatching text to vector."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": 1, "embedding": _encoded([9, 9, 9, 9])},
+                    {"index": 0, "embedding": _encoded([1, 1, 1, 1])},
+                ]
+            },
+        )
+
+    vectors = _embedder(handler).embed_batch(["first", "second"])
+
+    assert vectors[0][0] == 1.0
+    assert vectors[1][0] == 9.0
+
+
+def test_a_short_response_is_rejected_rather_than_misaligned() -> None:
+    """Catches a dropped embedding shifting every later text onto a wrong vector."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            json={"data": [{"index": 0, "embedding": _encoded([1, 2, 3, 4])}]},
+        )
+
+    with pytest.raises(MemoryEmbeddingUnavailable):
+        _embedder(handler).embed_batch(["one", "two"])
+
+
+def test_single_embed_still_returns_one_vector() -> None:
+    """Catches the batch refactor changing the single-text contract."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(200, json=_ok_payload([5, 6, 7, 8]))
+
+    assert _embedder(handler).embed("anything") == [5.0, 6.0, 7.0, 8.0]

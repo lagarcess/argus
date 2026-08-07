@@ -661,16 +661,24 @@ class MemoryService:
             limit,
             correlation_id,
         )
-        if (
+        result: tuple[RetrievedMemory, ...] = ()
+        answered = (
             provider_result is not None
             and provider_result.status is ProviderSearchStatus.ANSWERED
-        ):
+        )
+        if answered:
+            assert provider_result is not None
             result = self._rehydrate_provider_hits(
                 records,
                 provider_result,
                 limit=limit,
             )
-        else:
+        # Ranked ids that resolve to nothing are not an answer. Stale, deleted,
+        # or out-of-scope hits would otherwise hide memories the canonical
+        # match can still find.
+        if not answered or (
+            provider_result is not None and provider_result.hits and not result
+        ):
             result = self._canonical_fallback(
                 records.values(),
                 normalized_query,

@@ -298,3 +298,125 @@ def test_unassessed_content_is_suppressed_before_storage_or_indexing() -> None:
     assert proposal is None
     assert store.list_records(OWNER) == ()
     assert mem0.added == []
+
+
+def test_empty_index_falls_back_instead_of_answering_nothing() -> None:
+    """Catches records confirmed before the index existed losing their recall.
+
+    Projection only happens at confirmation, so enabling semantic recall on an
+    account with older memories leaves the collection empty for that owner. A
+    definitive empty answer there would suppress the canonical match and drop
+    recall that already worked.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    record_id = _confirm_one(_service(store))
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder,
+        memory=_Mem0Double(embedder=embedder, search_results=[]),
+    )
+
+    retrieved = _service(store, provider).retrieve(
+        SUBJECT,
+        QUERY,
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
+
+    assert [item.record.id for item in retrieved] == [record_id]
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
+
+
+def test_hits_that_resolve_to_nothing_fall_back() -> None:
+    """Catches stale or out-of-scope ranked ids hiding a findable memory."""
+    store = InMemoryCanonicalMemoryStore()
+    record_id = _confirm_one(_service(store))
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder,
+        memory=_Mem0Double(
+            embedder=embedder,
+            search_results=[
+                {
+                    "id": "mem0-1",
+                    "score": 0.9,
+                    "metadata": {RECORD_ID_METADATA_KEY: "deleted-record"},
+                }
+            ],
+        ),
+    )
+
+    retrieved = _service(store, provider).retrieve(
+        SUBJECT,
+        QUERY,
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
+
+    assert [item.record.id for item in retrieved] == [record_id]
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
+
+
+def test_recall_runs_off_the_event_loop() -> None:
+    """Catches blocking vendor I/O stalling every other stream on one worker."""
+    import asyncio
+    import threading
+
+    from argus.api.chat.memory_recall import memory_recalls_for_turn_async
+
+    calling_threads: list[int] = []
+
+    class _BlockingService:
+        def retrieve(self, *args: object, **kwargs: object) -> object:
+            calling_threads.append(threading.get_ident())
+            raise RuntimeError("vendor down")
+
+    import os
+    import typing
+
+    from argus.api import state as api_state
+    from argus.api.guest_access import registered_account_context
+    from argus.api.personalization_memory import configure_memory_service
+    from argus.api.schemas import OnboardingState, User
+
+    previous_flag = os.environ.get("ARGUS_ENABLE_PERSONALIZATION_MEMORY")
+    previous_gateway = api_state.supabase_gateway
+    os.environ["ARGUS_ENABLE_PERSONALIZATION_MEMORY"] = "true"
+    api_state.supabase_gateway = None
+    configure_memory_service(typing.cast(MemoryService, _BlockingService()))
+    now = datetime.now(timezone.utc)
+    user = User(
+        id=OWNER_ID,
+        email="qa@example.test",
+        username=None,
+        display_name=None,
+        language="en",
+        locale="en-US",
+        theme="dark",
+        is_admin=False,
+        onboarding=OnboardingState(),
+        created_at=now,
+        updated_at=now,
+    )
+
+    async def _drive() -> tuple[int, object]:
+        loop_thread = threading.get_ident()
+        result = await memory_recalls_for_turn_async(
+            user=user,
+            account=registered_account_context(OWNER_ID),
+            user_message="what did I decide",
+            memory_opt_out=False,
+        )
+        return loop_thread, result
+
+    try:
+        loop_thread, result = asyncio.run(_drive())
+    finally:
+        configure_memory_service(None)
+        api_state.supabase_gateway = previous_gateway
+        if previous_flag is None:
+            os.environ.pop("ARGUS_ENABLE_PERSONALIZATION_MEMORY", None)
+        else:
+            os.environ["ARGUS_ENABLE_PERSONALIZATION_MEMORY"] = previous_flag
+
+    assert result is None
+    assert calling_threads, "retrieval never ran"
+    assert calling_threads[0] != loop_thread

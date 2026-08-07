@@ -193,7 +193,7 @@ def _embeddings_adapter_class() -> type:
                 self._embedder = embedder
 
             def embed_documents(self, texts: list[str]) -> list[list[float]]:
-                return [self._embedder.embed(text) for text in texts]
+                return self._embedder.embed_batch(list(texts))
 
             def embed_query(self, text: str) -> list[float]:
                 return self._embedder.embed(text)
@@ -274,7 +274,14 @@ class Mem0MemoryProvider:
         query: str,
         limit: int,
     ) -> ProviderSearchResult:
-        """Answer with ranked canonical record ids; never with content."""
+        """Answer with ranked canonical record ids; never with content.
+
+        No hits means unavailable, not "nothing matches". The index only holds
+        records confirmed since it was installed, so an empty answer is far
+        more likely to mean this owner was never projected than to mean the
+        owner has nothing relevant. Claiming a definitive empty answer would
+        suppress the canonical fallback and lose recall that already worked.
+        """
 
         raw = self._memory.search(
             query,
@@ -282,9 +289,12 @@ class Mem0MemoryProvider:
             filters={"user_id": owner.owner_id},
             threshold=self._search_threshold,
         )
+        hits = _hits_from(raw, limit=limit)
+        if not hits:
+            return ProviderSearchResult(status=ProviderSearchStatus.UNAVAILABLE)
         return ProviderSearchResult(
             status=ProviderSearchStatus.ANSWERED,
-            hits=_hits_from(raw, limit=limit),
+            hits=hits,
             **self._usage_fields(),
         )
 
