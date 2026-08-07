@@ -815,7 +815,7 @@
       "title": "Perfil",
       "request_deletion": {
         "title": "Solicitar eliminación de cuenta",
-        "body": "Soporte gestiona la eliminación de cuentas durante la alfa privada. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
+        "body": "Soporte gestiona la eliminación de cuentas. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
         "contact_support": "Contactar soporte",
         "submitting": "Enviando...",
         "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
@@ -1182,7 +1182,7 @@
       }
     },
     "signup": {
-      "subtitle": "Crea tu cuenta de alpha privada",
+      "subtitle": "Crea tu cuenta de Argus",
       "name_placeholder": "Nombre",
       "submit": "Registrarse",
       "loading": "Creando cuenta...",

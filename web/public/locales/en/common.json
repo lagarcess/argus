@@ -815,7 +815,7 @@
       "title": "Profile",
       "request_deletion": {
         "title": "Request account deletion",
-        "body": "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+        "body": "Support handles account deletion. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
         "contact_support": "Contact support",
         "submitting": "Sending...",
         "success": "Request sent. We'll follow up by email.",
@@ -1182,7 +1182,7 @@
       }
     },
     "signup": {
-      "subtitle": "Create your private alpha account",
+      "subtitle": "Create your Argus account",
       "name_placeholder": "Name",
       "submit": "Sign up",
       "loading": "Creating account...",
