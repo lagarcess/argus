@@ -56,9 +56,12 @@ the answer into something runnable.
   closed candidates; it may not mint symbols, strategies, or asks. Every
   candidate passes resolver, asset-class, and coverage checks before it is
   tappable.
-- Start with exactly two jobs: a single-company read, and a competitor
-  comparison. No fundamentals suite, no screener, no valuation product, no
-  skill store.
+- Cover the full question range the founder asked for on 2026-08-07: live
+  quotes, single-company reads, cross-company comparison, screening, and market
+  stats. An earlier draft of this line restricted the lane to two jobs; that was
+  a recommendation the founder overruled the same day, and it should never have
+  survived here. No skill store, no menu, no picker: the range is reached
+  through natural language, never a capability list.
 - **Spec is written and founder-locked:**
   [`2026-08-07-research-to-test-rail.md`](../superpowers/specs/2026-08-07-research-to-test-rail.md).
   It supersedes the narrow competitor-comparison framing: Argus is no longer
