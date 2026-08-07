@@ -1,8 +1,11 @@
 # Sharing: Evidence Receipts
 
-Draft 2026-08-07. **Partial spec.** Sections 1 through 6 are settled by existing
-canon or by clear practice. Section 7 lists what needs founder decisions before
-this can be built. Do not dispatch until section 7 is answered.
+Draft 2026-08-07. **Partial spec.** Sections 1 through 6 are settled by canon or
+clear practice, and §7.2, the viewer path, is decided.
+
+**Open decisions remain in §7 and this must not be dispatched until they are
+answered:** attribution, abuse posture, what is shareable, the revoked-link page,
+and expiry. The viewer path (§7.2) and search indexing (§7.3) are decided.
 
 Board pillar 5. Deliberately last of the five: sharing a broken loop spreads a
 bad impression faster than a good one.
@@ -103,9 +106,10 @@ comparison, never a bundle of links.
 carried research context, that context is frozen into the snapshot at creation
 with its sources, never fetched at view time.
 
-**To guest mode.** The viewer path is where sharing meets acquisition. See §7.2,
-which is the decision that determines whether this pillar produces growth or
-just produces links.
+**To guest mode.** The viewer lands on the standard guest entry with nothing
+carried across (§7.2). Sharing adds no new entry state and no new parameter to
+that surface; it is an ordinary first visit that happened to arrive from a
+link.
 
 **To mobile.** The public view owns its own responsive layout and does not share
 the app shell.
@@ -127,49 +131,72 @@ someone's investing interest.
 
 ### 7.2 What the viewer can do — DECIDED 2026-08-07
 
-**Read-only, with a "test this yourself" path straight into guest chat with the
-setup preloaded.**
+**Read-only receipt, one "Try Argus" call to action, landing on the standard
+guest entry.** Nothing is carried across.
 
-No wall. A stranger sees the receipt, and one tap puts them in Argus with the
-experiment ready. This is the acquisition mechanic and it fits the guest-first
-stance: a completed first backtest is activation, not account creation.
+No wall, no sign-up gate, no preloaded state.
 
-Four things follow from this, and they are requirements rather than options.
+**Why nothing is carried.** Prefilling the receipt's own question was considered
+and rejected: the receipt already answered it. Replaying it makes a newcomer's
+first Argus experience a reproduction of something they just read, teaches them
+nothing, and spends a guest run doing it.
 
-**It lands on a confirmation card. It never auto-runs.** Argus never auto-runs
-anywhere, and a shared link is the worst place to start: the viewer did not
-build this experiment and has not seen its assumptions. They arrive at the card,
-read what it will do, and choose.
+The question a viewer actually arrives with is not "run that again", it is "can
+it do something for me". The standard guest entry answers exactly that. Its
+starter chips span learn, compare, and test, they are proven runnable, and they
+show range instead of replaying one example.
 
-**The setup re-grounds on arrival, and the receipt is honest that it will
-differ.** The receipt is frozen; a run happens now. Dates may clamp, coverage may
-have changed, an asset may have moved. So the handoff re-validates through
-Argus's own providers, exactly as a research-launched test does, and the receipt
-says plainly that it was tested on its original date and that running it now
-uses current data.
+This also removes every problem the alternatives created. Nothing goes stale,
+because nothing is carried. No re-grounding, because nothing is resolved. No
+honesty caveat about frozen numbers versus a fresh run. No extra parameterization
+of the entry surface.
 
-Without that line the viewer expects to reproduce the number they just read and
-gets a different one. That reads as Argus being wrong rather than time having
-passed, and it is the single most likely way this surface destroys trust.
+**Consequences that still hold:**
 
-**A viewer's run spends their guest allowance.** A widely shared receipt sends
-many strangers into guest chat, each consuming allowance against limits sized
-for organic traffic. Confirm the ceilings hold for viral volume before this is
-enabled broadly, and make exhaustion an honest message rather than a broken
-first impression.
+- **Viewer runs spend guest allowance**, sized for organic rather than viral
+  traffic. Confirm ceilings hold before enabling broadly, and make exhaustion an
+  honest message rather than a broken first impression.
+- **The path is instrumented as the acquisition funnel it is:** receipt created,
+  receipt viewed, Try Argus tapped, first result completed. Decision memo
+  section 10.6 asks this of the loop, and this is the first surface where it is
+  fully observable end to end.
+- **Nothing auto-runs**, which is trivially satisfied since the viewer lands on
+  an ordinary empty entry.
 
-**The whole path is instrumented as the acquisition funnel it is:** receipt
-created, receipt viewed, test-this-yourself tapped, confirmation reached, first
-result completed. Decision memo section 10.6 asks exactly this of the loop, and
-this is the first surface where the funnel is fully observable.
+**Deliberately deferred, do not build:** letting the receipt influence which
+starter chip leads, so a comparison reader sees a comparison chip about a
+different set. It carries the shape without the subject or the redundancy. The
+chips already span the range, so this buys little and the priority now is signal
+rather than features.
 
-### 7.3 Search indexing
+### 7.3 Search indexing — DECIDED 2026-08-07 by prior art
 
-Should receipts be crawlable?
+**Never indexable. `noindex, nofollow` by default, permanently, with no
+user-facing toggle that can change it.**
 
-Indexing creates a discovery channel and compounds over time. It also means
-someone's shared idea is permanently findable, which changes the privacy posture
-of every previous decision, and it interacts with attribution.
+This is not a preference. Both market leaders shipped conversation sharing
+without it and both had a public privacy incident inside the last year.
+
+- **ChatGPT** shipped a "make discoverable" toggle. Roughly 100,000 shared
+  conversations were exposed through search engines. Users did not understand
+  what the toggle meant.
+- **Claude** shipped share links with no noindex tag at all. Shared chats
+  surfaced in Google and Bing results, some containing API keys and personal
+  data. Anthropic's position was that it worked as intended.
+
+A discoverability toggle is the specific failure. It puts an irreversible
+decision behind a control the user reads once, and indexing cannot be undone:
+caches and archives persist long after the page is revoked.
+
+Argus is structurally safer because a receipt is a sanitized structured artifact
+rather than a transcript, so there is no free-text channel for a user to
+accidentally publish a credential. **The one exception is the optional owner
+note in §2**, which is genuinely free text. Treat it as the only place this
+class of accident can happen, and consider whether it needs a length bound or a
+warning.
+
+Any future discovery channel is a deliberate, separately designed surface that
+Argus curates. It is never a byproduct of a user sharing a link with a friend.
 
 ### 7.4 Abuse posture
 
@@ -180,29 +207,38 @@ Needed: whether creation is gated at all, whether there is a report path, and
 what takedown looks like. A private alpha with an allowlist has low exposure
 today, which is the argument for deciding it now rather than at public launch.
 
-### 7.5 What is shareable — narrowed by 7.2, still open
+### 7.5 What is shareable
 
-7.2 constrains this: if the viewer's action is "test this yourself", the shared
-thing must be **re-runnable**. That makes a completed backtest result the clear
-case, and a comparison plausible since its members are re-runnable.
+A completed backtest result is the obvious case.
 
-A research answer is not re-runnable in the same way, and it carries
-third-party sources into a page Argus publishes. It would need a different call
-to action, which means a second viewer path.
+Also a comparison? Also a research answer? Each widens the leak surface
+differently, and a research answer in particular carries third-party sources
+into a page Argus publishes, which raises attribution and correctness questions
+the other two do not.
 
-**Still needs a decision:** results only, results plus comparisons, or research
-answers too with their own path. Recommend starting with results only and
-widening once the funnel is measured.
+An earlier draft narrowed this by requiring the artifact be re-runnable. That
+constraint came from a viewer path that preloaded the setup, which 7.2 rejected.
+Nothing is carried now, so re-runnability no longer bounds the answer.
 
-### 7.6 Revocation semantics
+Recommend starting with results only and widening once the funnel is measured.
 
-Owner-revocable is locked. The behavior is not.
+### 7.6 Revocation semantics — partially decided
 
-Does a revoked link 404, or show an honest "no longer available" page? A
-tombstone is kinder and does not look broken, but it confirms the link once
-existed, which is itself a disclosure. Also: social platforms cache previews, so
-a revoked receipt can survive in a preview card after the page is gone. Whether
-that is acceptable needs saying.
+**Decided, from prior art:** deleting the underlying idea or run must revoke the
+receipt. ChatGPT's failure mode is that deleting the source chat leaves the
+public page live, so a user who believes they removed something has not. That is
+a trap, and it is avoidable by making revocation follow deletion automatically.
+
+**Decided:** revocation takes effect immediately on Argus's side.
+
+**Still open:** whether a revoked link returns 404 or an honest "no longer
+available" page. A tombstone does not look broken, but it confirms the link once
+existed, which is itself a small disclosure.
+
+**Honest limit to state in the product, not just here:** social platforms cache
+preview cards. A revoked receipt can survive as a preview in a message thread
+after the page is gone. Argus cannot fix that, so it should not imply otherwise
+when someone revokes.
 
 ### 7.7 Expiry
 
