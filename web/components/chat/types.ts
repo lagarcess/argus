@@ -220,6 +220,7 @@ export type StrategyConfirmationPayload = {
   display_facts?: ConfirmationDisplayFacts;
   capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
+  retest_period?: import("@/lib/chat-retest").RetestPeriodPayload | null;
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
   rows: StrategyConfirmationRow[];
@@ -281,6 +282,8 @@ export type Message = {
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-owned structured context for a retest receipt turn. */
   retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
+  /** Ephemeral optimistic presentation; never hydrated or persisted. */
+  retestReceiptPending?: boolean;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
 };
 

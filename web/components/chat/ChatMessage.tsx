@@ -11,6 +11,7 @@ import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
 import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
+import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
@@ -281,12 +282,17 @@ export default function ChatMessage({
     const actionText =
       displayContent ||
       (message.selectedAction ? actionLabel(message.selectedAction) : "");
+    const showRetestReceipt =
+      Boolean(message.retestReceipt) ||
+      (message.selectedAction?.type === RETEST_ACTION_TYPE &&
+        message.retestReceiptPending === true);
     return (
       <div className="flex w-full flex-col items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {message.retestReceipt ? (
+        {showRetestReceipt ? (
           <RetestReceipt
-            receipt={message.retestReceipt}
+            receipt={message.retestReceipt ?? null}
             actionLabel={actionText}
+            pending={message.retestReceiptPending === true}
           />
         ) : (
           <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
@@ -606,12 +612,12 @@ export default function ChatMessage({
             />
           ) : null}
 
-          {/* The result's own Try next rows are the sanctioned next-move
-              surface; only mid-turn composition suppresses them. */}
+          {/* Try next rows are the sanctioned next-move surface for any
+              message that carries them (results, grounded knowledge answers);
+              only mid-turn composition suppresses them. */}
           {shouldShowAssistantFooter &&
             Boolean(isLatest) &&
             !turnInFlight &&
-            message.kind === "strategy_result" &&
             (message.nextExperiments?.length ?? 0) > 0 && (
               <section
                 aria-label={t("chat.next_experiments.section", "Try next")}

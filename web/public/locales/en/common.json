@@ -275,6 +275,7 @@
     "error_generic": "Something went wrong. Try again.",
     "recovery": {
       "interpreter_unavailable": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+      "interpreter_unavailable_not_retryable": "I saved your message, but I could not turn it into a reliable test setup. Sending it again as written will hit the same problem, so try rewording it, or tell me the asset and the period you want.",
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
@@ -351,6 +352,9 @@
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
       "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
       "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "kraken_ohlc_window_exceeded": "That date range is too long for this market and timeframe. Shorten the dates or use a wider timeframe.",
+      "provider_history_start_unavailable": "Market history is not available that far back. Choose a later start date.",
+      "provider_timeframe_unavailable": "That timeframe is not available for this market. Choose a supported timeframe.",
       "actions": {
         "change_dates": "Change dates",
         "change_asset": "Change asset",
@@ -378,7 +382,26 @@
         "month_other": "same {{count}}-month duration",
         "day_one": "same {{count}}-day duration",
         "day_other": "same {{count}}-day duration"
-      }
+      },
+      "effective_duration": {
+        "exact": {
+          "year_one": "{{formattedCount}} year",
+          "year_other": "{{formattedCount}} years",
+          "month_one": "{{formattedCount}} month",
+          "month_other": "{{formattedCount}} months",
+          "day_one": "{{formattedCount}} day",
+          "day_other": "{{formattedCount}} days"
+        },
+        "approximate": {
+          "year_one": "about {{formattedCount}} year",
+          "year_other": "about {{formattedCount}} years",
+          "month_one": "about {{formattedCount}} month",
+          "month_other": "about {{formattedCount}} months",
+          "day_one": "about {{formattedCount}} day",
+          "day_other": "about {{formattedCount}} days"
+        }
+      },
+      "updated_duration": "Updated span: {{duration}}"
     },
     "result_readout": {
       "quick_take": "Quick take"
@@ -1167,6 +1190,12 @@
     "result_count_other": "{{count}} results",
     "retest_current_data": "Retest with current data",
     "retest_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    "retest_already_current": "Already up to date",
+    "retest_no_new_data": "No new market data is available since this run.",
+    "retest_available_dates": "Use available dates",
+    "retest_repaired_period": "Retest from {{start}} through {{end}}.",
+    "retest_unavailable": "Retest unavailable",
+    "retest_timeframe_unavailable": "This run’s timeframe is not available for this market.",
     "retry_load_more": "Try loading more",
     "retry_search": "Try searching again",
     "save_decision": "Save decision",

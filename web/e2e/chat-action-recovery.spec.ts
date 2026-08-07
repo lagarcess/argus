@@ -7,6 +7,8 @@ const CREATED_AT = "2026-06-16T12:00:00Z";
 const COVERAGE_RECOVERY_REQUEST = "Test AAPL coverage recovery";
 const COVERAGE_RECOVERY_PROMPT =
   "AAPL and SPY do not share enough history for one trustworthy test. Which part should we change?";
+const WINDOW_REJECTION_BACKEND_DETAIL =
+  "Kraken OHLC returns only the latest 720 candles.";
 const TIMEFRAME_RECOVERY_REQUEST = "Test AAPL with five-minute bars";
 const DEGRADED_TIMEFRAME_RECOVERY_REQUEST =
   "Test AAPL with five-minute bars while clarification is unavailable";
@@ -52,6 +54,8 @@ type MockChatApi = {
 
 type MockChatApiOptions = {
   language?: "en" | "es-419";
+  initialConfirmation?: boolean;
+  rejectRunWithWindowViolation?: boolean;
 };
 
 type MockDateRange = {
@@ -395,6 +399,13 @@ async function mockChatApi(
     );
   };
 
+  if (options.initialConfirmation) {
+    upsertConfirmationMessages(
+      "Buy and hold AAPL with SPY in early 2025.",
+      "msg-confirmation-initial",
+    );
+  }
+
   const upsertResultMessages = (runAction: StreamRequest["action"]) => {
     messages.splice(
       0,
@@ -526,6 +537,24 @@ async function mockChatApi(
   await page.route("**/api/v1/chat/stream", async (route) => {
     const body = route.request().postDataJSON() as StreamRequest;
     streamRequests.push(body);
+
+    if (
+      options.rejectRunWithWindowViolation &&
+      body.action?.type === "run_backtest"
+    ) {
+      return route.fulfill({
+        status: 422,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "https://api.argus.app/problems/market-data-window-violation",
+          title: "Market Data Window Violation",
+          status: 422,
+          detail: WINDOW_REJECTION_BACKEND_DETAIL,
+          code: "kraken_ohlc_window_exceeded",
+          request_id: "browser-window-rejection",
+        }),
+      });
+    }
 
     if (body.message === retryPrompt) {
       retryAttempts += 1;
@@ -1280,6 +1309,166 @@ test("successful LLM coverage recovery preserves exact voice and actions after r
   await page.reload({ waitUntil: "networkidle" });
   await expectCoverageRecovery();
 });
+
+for (const testCase of [
+  {
+    language: "en" as const,
+    localized:
+      "That date range is too long for this market and timeframe. Shorten the dates or use a wider timeframe.",
+  },
+  {
+    language: "es-419" as const,
+    localized:
+      "Ese rango de fechas es demasiado largo para este mercado y marco temporal. Acorta las fechas o usa un marco temporal más amplio.",
+  },
+]) {
+  test(`Retest window rejection is localized in the rendered chat (${testCase.language})`, async ({
+    page,
+  }) => {
+    const api = await mockChatApi(page, {
+      language: testCase.language,
+      initialConfirmation: true,
+      rejectRunWithWindowViolation: true,
+    });
+
+    const runLabel =
+      testCase.language === "es-419" ? "Ejecutar backtest" : "Run backtest";
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+      waitUntil: "networkidle",
+    });
+    await expect(page.getByRole("button", { name: runLabel })).toBeVisible();
+    const requestCountBeforeRun = api.streamRequests.length;
+    await page.getByRole("button", { name: runLabel }).click();
+    await expect.poll(() => api.streamRequests.length).toBe(requestCountBeforeRun + 1);
+
+    await expect(page.getByText(testCase.localized, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(WINDOW_REJECTION_BACKEND_DETAIL, { exact: true }),
+    ).toHaveCount(0);
+    await page.waitForTimeout(300);
+    expect(api.streamRequests).toHaveLength(requestCountBeforeRun + 1);
+
+    const evidenceDir = process.env.ARGUS_EVIDENCE_DIR;
+    if (evidenceDir) {
+      await page.screenshot({
+        path: `${evidenceDir}/localized-window-rejection-${testCase.language}.png`,
+        fullPage: true,
+      });
+    }
+  });
+}
+
+for (const testCase of [
+  {
+    language: "en" as const,
+    button: "Already up to date",
+    detail: "No new market data is available since this run.",
+    search: "Search",
+  },
+  {
+    language: "es-419" as const,
+    button: "Ya está al día",
+    detail: "No hay datos de mercado nuevos desde esta ejecución.",
+    search: "Buscar",
+  },
+]) {
+  test(`same-period dossier is truthful and spends no simulation (${testCase.language})`, async ({
+    page,
+  }) => {
+    const api = await mockChatApi(page, { language: testCase.language });
+    const mutationRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") mutationRequests.push(request.url());
+    });
+    await page.route("**/api/v1/search**", async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [
+            {
+              type: "conversation",
+              id: CONVERSATION_ID,
+              title: "AAPL readiness",
+              archived: false,
+              matched_text: "Latest AAPL backtest",
+              updated_at: CREATED_AT,
+              conversation_id: CONVERSATION_ID,
+              match: {
+                layer: "run",
+                fragment: "AAPL buy and hold",
+                count: 1,
+                message_id: "msg-result",
+              },
+              decision_states: [],
+              total_runs: 1,
+              decided_runs: 0,
+              dossier: {
+                run_id: RUN_ID,
+                run_label: "AAPL buy and hold",
+                completed_at: CREATED_AT,
+                result_message_id: "msg-result",
+                tested: {
+                  symbols: ["AAPL"],
+                  strategy_family: "buy_and_hold",
+                  cadence: null,
+                  timeframe: "1D",
+                  start_date: "2025-01-01",
+                  end_date: "2026-07-30",
+                },
+                outcome: {
+                  run_label: "AAPL buy and hold",
+                  completed_at: CREATED_AT,
+                  benchmark_symbol: "SPY",
+                  quick_take: "AAPL finished below SPY.",
+                  metrics: [{ name: "total_return_pct", value: -8.5 }],
+                },
+                decision: null,
+                actions: [
+                  {
+                    type: "retest_run",
+                    source_run_id: RUN_ID,
+                    run_label: "AAPL buy and hold",
+                    window_policy: "preserve_start_ending_latest_available",
+                    contract_version: "argus_retest_run/v2",
+                    state: "no_new_data",
+                    reason_code: null,
+                    repair: null,
+                  },
+                ],
+              },
+            },
+          ],
+          next_cursor: null,
+        }),
+      }),
+    );
+
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
+      waitUntil: "networkidle",
+    });
+    await page.getByRole("button", { name: testCase.search }).click();
+    const retest = page.getByRole("button", {
+      name: testCase.button,
+      exact: true,
+    });
+    await expect(retest).toBeVisible();
+    await expect(retest).toBeDisabled();
+    await expect(page.getByText(testCase.detail, { exact: true })).toBeVisible();
+
+    const streamCount = api.streamRequests.length;
+    const simulationMutations = mutationRequests.filter((url) =>
+      /chat\/stream|backtest|job/.test(url),
+    ).length;
+    await retest.evaluate((button: HTMLButtonElement) => button.click());
+    await page.waitForTimeout(300);
+
+    expect(api.streamRequests).toHaveLength(streamCount);
+    expect(
+      mutationRequests.filter((url) => /chat\/stream|backtest|job/.test(url)),
+    ).toHaveLength(simulationMutations);
+  });
+}
 
 for (const testCase of [
   {

@@ -86,16 +86,6 @@ def _signup_auth_problem(request: Request) -> HTTPException:
     )
 
 
-def _username_taken_problem(request: Request) -> HTTPException:
-    return problem(
-        request,
-        status_code=409,
-        code="username_taken",
-        title="Username Taken",
-        detail="That username is already taken.",
-    )
-
-
 def _enforce_auth_attempt_limit(
     request: Request,
     *,
@@ -707,7 +697,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
                 and not prevalidation.auth_user_exists
                 and not prevalidation.username_available
             ):
-                raise _username_taken_problem(request)
+                raise _signup_auth_problem(request)
             result = api_state.supabase_gateway.signup(
                 email=body.email,
                 password=body.password,

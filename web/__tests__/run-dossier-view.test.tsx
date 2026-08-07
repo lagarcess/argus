@@ -16,6 +16,7 @@ import { formatRunDossierSetup } from "../lib/run-dossier-items";
 import type {
   RunDossier,
   SearchDecisionAction,
+  SearchRetestAction,
 } from "../lib/run-dossier-contract";
 
 const decisionAction: SearchDecisionAction = {
@@ -62,12 +63,24 @@ const dossierWithWatchingDecisionAndMultilineNote: RunDossier = {
       type: "retest_run",
       source_run_id: "run-7",
       run_label: "Weekly GLD pullback",
-      window_policy: "same_duration_ending_today",
-      contract_version: "argus_retest_run/v1",
+      window_policy: "preserve_start_ending_latest_available",
+      contract_version: "argus_retest_run/v2",
+      state: "new_data_available",
+      reason_code: null,
+      repair: null,
     },
     decisionAction,
   ],
 };
+
+const baseRetestAction = dossierWithWatchingDecisionAndMultilineNote
+  .actions[0] as SearchRetestAction;
+
+function retestAction(
+  overrides: Partial<SearchRetestAction>,
+): SearchRetestAction {
+  return { ...baseRetestAction, ...overrides };
+}
 
 function visibleText(html: string): string {
   return html
@@ -80,7 +93,140 @@ function visibleText(html: string): string {
     .trim();
 }
 
+function retestButtonMarkup(html: string): string {
+  return (
+    html.match(
+      /<button[^>]*data-retest-location="card-header"[^>]*>[\s\S]*?<\/button>/,
+    )?.[0] ?? ""
+  );
+}
+
+function retestDetailId(html: string): string | null {
+  return (
+    html.match(
+      /<p[^>]*id="([^"]+)"[^>]*data-retest-state="(?:no_new_data|cant_do_it)"/,
+    )?.[1] ?? null
+  );
+}
+
 describe("single-run dossier view", () => {
+  const renderRetestState = (action: SearchRetestAction) =>
+    renderToStaticMarkup(
+      <RunDossierView
+        dossier={{
+          ...dossierWithWatchingDecisionAndMultilineNote,
+          actions: [action, decisionAction],
+        }}
+        totalRuns={7}
+        decidedRuns={5}
+        onOpenConversation={() => {}}
+        onRetest={() => {}}
+        onSaveDecision={async () => {}}
+      />,
+    );
+
+  test("offers a normal Retest only when new data is available", () => {
+    const html = renderRetestState(retestAction({
+      state: "new_data_available",
+    }));
+
+    expect(html).toContain("Retest with current data");
+    expect(html).not.toContain('data-retest-location="card-header" disabled=""');
+  });
+
+  test("shows same-period truth before click and disables Retest", () => {
+    const html = renderRetestState(retestAction({
+      state: "no_new_data",
+    }));
+
+    expect(html).toContain("Already up to date");
+    expect(html).toContain("No new market data is available since this run.");
+    expect(retestButtonMarkup(html)).toContain('disabled=""');
+  });
+
+  test("offers the exact server repair and leaves timeframe failures disabled", () => {
+    const repairable = renderRetestState(retestAction({
+      state: "cant_do_it",
+      reason_code: "provider_history_start_unavailable",
+      repair: {
+        kind: "clamp_start",
+        start_date: "2016-01-01",
+        end_date: "2026-07-30",
+      },
+    }));
+    const deadEnd = renderRetestState(retestAction({
+      state: "cant_do_it",
+      reason_code: "provider_timeframe_unavailable",
+      repair: null,
+    }));
+
+    expect(repairable).toContain("Use available dates");
+    expect(repairable).toContain("Jan 1, 2016");
+    expect(repairable).toContain("Jul 30, 2026");
+    expect(retestButtonMarkup(repairable)).not.toContain('disabled=""');
+    expect(deadEnd).toContain("Retest unavailable");
+    expect(deadEnd).toContain(
+      "This run’s timeframe is not available for this market.",
+    );
+    expect(retestButtonMarkup(deadEnd)).toContain('disabled=""');
+  });
+
+  test("reserves generic hover help for the actionable current-data state", () => {
+    const normal = renderRetestState(retestAction({
+      state: "new_data_available",
+    }));
+    const samePeriod = renderRetestState(retestAction({
+      state: "no_new_data",
+    }));
+    const repairable = renderRetestState(retestAction({
+      state: "cant_do_it",
+      reason_code: "kraken_ohlc_window_exceeded",
+      repair: {
+        kind: "clamp_start",
+        start_date: "2024-08-01",
+        end_date: "2026-07-30",
+      },
+    }));
+    const unavailable = renderRetestState(retestAction({
+      state: "cant_do_it",
+      reason_code: "provider_timeframe_unavailable",
+      repair: null,
+    }));
+
+    expect(retestButtonMarkup(normal)).toContain('style="cursor:pointer"');
+    expect(retestButtonMarkup(samePeriod)).not.toContain("cursor:pointer");
+    expect(retestButtonMarkup(repairable)).not.toContain("cursor:pointer");
+    expect(retestButtonMarkup(unavailable)).not.toContain("cursor:pointer");
+  });
+
+  test("connects every visible Retest reason to its button", () => {
+    const samePeriod = renderRetestState(retestAction({
+      state: "no_new_data",
+    }));
+    const repairable = renderRetestState(retestAction({
+      state: "cant_do_it",
+      reason_code: "provider_history_start_unavailable",
+      repair: {
+        kind: "clamp_start",
+        start_date: "2016-01-01",
+        end_date: "2026-07-30",
+      },
+    }));
+    const unavailable = renderRetestState(retestAction({
+      state: "cant_do_it",
+      reason_code: "provider_timeframe_unavailable",
+      repair: null,
+    }));
+
+    for (const html of [samePeriod, repairable, unavailable]) {
+      const detailId = retestDetailId(html);
+      expect(detailId).not.toBeNull();
+      expect(retestButtonMarkup(html)).toContain(
+        `aria-describedby="${detailId}"`,
+      );
+    }
+  });
+
   test("never inserts an empty strategy segment when a locale key is missing", () => {
     const missingTranslation = (() => "") as Parameters<
       typeof formatRunDossierSetup

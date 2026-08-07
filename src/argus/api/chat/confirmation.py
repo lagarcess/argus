@@ -171,12 +171,18 @@ def runtime_confirmation_card(
         fallback=confirmation_id or f"confirmation-{uuid4()}",
     )
     execution_validation = validate_confirmation_execution_payload(payload)
-    is_ready_to_run = execution_validation.executable
+    retest_period = _retest_period_from_confirmation_payload(payload)
+    has_retest_period = "retest_period" in payload
+    is_ready_to_run = execution_validation.executable and (
+        not has_retest_period or retest_period is not None
+    )
     owner_conversation_id = conversation_id.strip() if conversation_id else None
     action_payload = {
         "confirmation_id": active_confirmation_id,
         "artifact_id": active_confirmation_id,
-        "launch_payload_hash": stable_payload_hash(execution_validation.launch_payload),
+        "launch_payload_hash": stable_payload_hash(
+            execution_validation.launch_payload
+        ),
     }
     if owner_conversation_id:
         action_payload["conversation_id"] = owner_conversation_id
@@ -229,9 +235,7 @@ def runtime_confirmation_card(
     card: dict[str, Any] = {
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
-        "launch_payload_hash": stable_payload_hash(
-            execution_validation.launch_payload
-        ),
+        "launch_payload_hash": stable_payload_hash(execution_validation.launch_payload),
         "canonical_launch_payload_hash": canonical_payload_hash(
             execution_validation.launch_payload
         ),
@@ -258,6 +262,8 @@ def runtime_confirmation_card(
         card["asset_class"] = asset_class
     if canonical_date_range is not None:
         card["date_range"] = canonical_date_range
+    if retest_period is not None:
+        card["retest_period"] = retest_period
     period_adjustment = _period_adjustment_from_launch_payload(launch_payload)
     if period_adjustment is not None:
         card["period_adjustment"] = period_adjustment
@@ -321,6 +327,70 @@ def _date_range_payload(value: Any) -> dict[str, str] | None:
     ):
         return None
     return {"start": value["start"], "end": value["end"]}
+
+
+def _retest_period_from_confirmation_payload(
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    value = payload.get("retest_period")
+    if not isinstance(value, dict):
+        return None
+    original = _validated_retest_date_range(value.get("original_date_range"))
+    requested = _validated_retest_date_range(value.get("requested_date_range"))
+    effective = _validated_retest_date_range(value.get("effective_date_range"))
+    if original is None or requested is None or effective is None:
+        return None
+
+    duration_days = value.get("duration_days")
+    duration = value.get("duration")
+    if (
+        not isinstance(duration_days, int)
+        or isinstance(duration_days, bool)
+        or duration_days < 0
+        or not isinstance(duration, dict)
+    ):
+        return None
+    unit = duration.get("unit")
+    count = duration.get("count")
+    approximate = duration.get("approximate")
+    if (
+        unit not in {"year", "month", "day"}
+        or not isinstance(count, int | float)
+        or isinstance(count, bool)
+        or count < 0
+        or not isinstance(approximate, bool)
+    ):
+        return None
+    effective_days = (
+        date.fromisoformat(effective["end"]) - date.fromisoformat(effective["start"])
+    ).days
+    if duration_days != effective_days:
+        return None
+    return {
+        "original_date_range": original,
+        "requested_date_range": requested,
+        "effective_date_range": effective,
+        "duration_days": duration_days,
+        "duration": {
+            "unit": unit,
+            "count": count,
+            "approximate": approximate,
+        },
+    }
+
+
+def _validated_retest_date_range(value: Any) -> dict[str, str] | None:
+    date_range = _date_range_payload(value)
+    if date_range is None:
+        return None
+    try:
+        start = date.fromisoformat(date_range["start"])
+        end = date.fromisoformat(date_range["end"])
+    except ValueError:
+        return None
+    if start > end:
+        return None
+    return {"start": start.isoformat(), "end": end.isoformat()}
 
 
 def _confirmation_asset_class(strategy: dict[str, Any]) -> str | None:

@@ -642,6 +642,20 @@ class SearchDossierOutcome(BaseModel):
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
 
 
+RetestDossierState = Literal["new_data_available", "no_new_data", "cant_do_it"]
+RetestWindowViolationCode = Literal[
+    "provider_history_start_unavailable",
+    "kraken_ohlc_window_exceeded",
+    "provider_timeframe_unavailable",
+]
+
+
+class SearchRetestRepair(BaseModel):
+    kind: Literal["clamp_start"] = "clamp_start"
+    start_date: date
+    end_date: date
+
+
 class SearchRetestAction(BaseModel):
     """Bounded typed retest envelope (spec 2.2).
 
@@ -653,10 +667,29 @@ class SearchRetestAction(BaseModel):
     type: Literal["retest_run"] = "retest_run"
     source_run_id: str
     run_label: str = Field(max_length=160)
-    window_policy: Literal["same_duration_ending_today"] = (
-        "same_duration_ending_today"
+    window_policy: Literal["preserve_start_ending_latest_available"] = (
+        "preserve_start_ending_latest_available"
     )
-    contract_version: Literal["argus_retest_run/v1"] = "argus_retest_run/v1"
+    contract_version: Literal["argus_retest_run/v2"] = "argus_retest_run/v2"
+    state: RetestDossierState
+    reason_code: RetestWindowViolationCode | None = None
+    repair: SearchRetestRepair | None = None
+
+    @model_validator(mode="after")
+    def validate_state_shape(self) -> SearchRetestAction:
+        if self.state != "cant_do_it":
+            if self.reason_code is not None or self.repair is not None:
+                raise ValueError("Only cant_do_it may carry a reason or repair")
+            return self
+        if self.reason_code is None:
+            raise ValueError("cant_do_it requires a reason_code")
+        repairable = self.reason_code in {
+            "provider_history_start_unavailable",
+            "kraken_ohlc_window_exceeded",
+        }
+        if repairable != (self.repair is not None):
+            raise ValueError("Retest repair must match the reason_code")
+        return self
 
 
 class SearchDecisionAction(BaseModel):

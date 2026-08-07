@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import threading
 from datetime import date
 from typing import Any
 
 import pytest
+from argus.agent_runtime.retest_confirmation import retest_confirmation_payload
 from argus.api import state as api_state
 from argus.api.chat.actions import chat_display_message, persisted_chat_action
 from argus.api.chat.recovery import _recent_messages_for_conversation
@@ -18,20 +22,21 @@ from argus.api.chat.retest import (
     sanitized_retest_action,
 )
 from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
+from argus.api.main import app
 from argus.api.message_store import create_message, prepare_message
 from argus.api.schemas import ChatActionPayload, ChatStreamRequest
-from argus.domain.retest_setup import (
-    RETEST_CONTRACT_VERSION,
-    RETEST_WINDOW_POLICY,
-    retest_setup_from_run,
-)
+from argus.domain.backtesting.coverage import MarketDataCoverageError
+from argus.domain.retest_setup import retest_setup_from_run
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 _USER_ID = "retest-owner"
 _OTHER_USER_ID = "retest-intruder"
 _CONVERSATION_ID = "retest-conversation"
 _TODAY = date(2026, 7, 31)
 _SOURCE_RUN_ID = "8f14e45f-ea1c-4b3a-9d2f-1a2b3c4d5e6f"
+_ALIAS_SOURCE_RUN_ID = "2e9c6f17-9eaf-4d40-bd20-a628714b4ad8"
 _MISSING_RUN_ID = "00000000-0000-4000-8000-000000000000"
 _BUY_AND_HOLD = {
     "strategy_type": "buy_and_hold",
@@ -59,8 +64,16 @@ class _FakeRequest:
 def _valid_envelope(source_run_id: str = _SOURCE_RUN_ID) -> dict[str, Any]:
     return {
         "source_run_id": source_run_id,
-        "window_policy": RETEST_WINDOW_POLICY,
-        "contract_version": RETEST_CONTRACT_VERSION,
+        "window_policy": "preserve_start_ending_latest_available",
+        "contract_version": "argus_retest_run/v2",
+    }
+
+
+def _legacy_envelope(source_run_id: str = _SOURCE_RUN_ID) -> dict[str, Any]:
+    return {
+        "source_run_id": source_run_id,
+        "window_policy": "same_duration_ending_today",
+        "contract_version": "argus_retest_run/v1",
     }
 
 
@@ -87,6 +100,83 @@ def _retest_request(
         action=action,
         mentions=[],
         language=language,
+    )
+
+
+def _stream_payloads(stream: str, event_type: str) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            continue
+        event = json.loads(raw)
+        if event.get("type") == event_type:
+            payloads.append(event.get("payload", event))
+    return payloads
+
+
+def _client_with_owned_run(
+    stored_run: Any,
+    *,
+    raise_server_exceptions: bool = True,
+) -> tuple[TestClient, str, Any]:
+    client = TestClient(app, raise_server_exceptions=raise_server_exceptions)
+    assert client.post("/api/v1/dev/reset").status_code == 200
+    conversation_response = client.post(
+        "/api/v1/conversations",
+        json={"language": "en"},
+    )
+    assert conversation_response.status_code == 200
+    conversation_id = str(conversation_response.json()["conversation"]["id"])
+    user_response = client.get("/api/v1/me")
+    assert user_response.status_code == 200
+    user_id = str(user_response.json()["user"]["id"])
+    source_run = stored_run.model_copy(update={"conversation_id": conversation_id})
+    api_state.store.backtest_runs[source_run.id] = source_run
+    api_state.store.backtest_run_owners[source_run.id] = user_id
+    return client, conversation_id, source_run
+
+
+def _currency_pair_run(
+    stored_run: Any,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    timeframe: str = "1D",
+) -> Any:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["asset_class"] = "currency_pair"
+    config_snapshot["symbols"] = ["EUR/USD"]
+    config_snapshot["benchmark_symbol"] = "EUR/USD"
+    if start_date is not None and end_date is not None:
+        config_snapshot["date_range"] = {
+            "start": start_date,
+            "end": end_date,
+        }
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": timeframe,
+    }
+    return stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
     )
 
 
@@ -123,6 +213,34 @@ def stored_run() -> Any:
     api_state.store.backtest_run_owners.pop(run.id, None)
 
 
+@pytest.fixture
+def alias_benchmark_run(stored_run: Any) -> Any:
+    config_snapshot = dict(stored_run.config_snapshot)
+    resolved_strategy = dict(config_snapshot["resolved_strategy"])
+    resolved_strategy["asset_universe"] = ["ETH"]
+    resolved_strategy["symbol"] = "ETH"
+    resolved_parameters = dict(config_snapshot["resolved_parameters"])
+    resolved_parameters["benchmark_symbol"] = "BTC/USD"
+    config_snapshot["symbols"] = ["ETH"]
+    config_snapshot["benchmark_symbol"] = "BTC/USD"
+    config_snapshot["resolved_strategy"] = resolved_strategy
+    config_snapshot["resolved_parameters"] = resolved_parameters
+    run = stored_run.model_copy(
+        update={
+            "id": _ALIAS_SOURCE_RUN_ID,
+            "asset_class": "crypto",
+            "symbols": ["ETH"],
+            "benchmark_symbol": "BTC/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = _USER_ID
+    yield run
+    api_state.store.backtest_runs.pop(run.id, None)
+    api_state.store.backtest_run_owners.pop(run.id, None)
+
+
 def _lifecycle_hooks() -> ChatTurnLifecycleHooks:
     request_message = create_message(
         user_id=_USER_ID,
@@ -143,33 +261,51 @@ def _lifecycle_hooks() -> ChatTurnLifecycleHooks:
     )
 
 
-def test_only_the_bounded_v1_envelope_is_accepted() -> None:
+def test_exact_legacy_and_current_envelopes_are_accepted() -> None:
     assert retest_action_source_run_id(_valid_envelope()) == _SOURCE_RUN_ID
-    assert retest_action_source_run_id({**_valid_envelope(), "symbols": ["NVDA"]}) is None
+    assert retest_action_source_run_id(_legacy_envelope()) == _SOURCE_RUN_ID
+
+
+@pytest.mark.parametrize(
+    "action_payload",
+    [
+        {**_valid_envelope(), "symbols": ["NVDA"]},
+        {**_valid_envelope(), "date_range": {"start": "2020-01-01"}},
+        {**_valid_envelope(), "window_policy": "since_ipo"},
+        {**_valid_envelope(), "contract_version": "argus_retest_run/v3"},
+        {
+            **_valid_envelope(),
+            "contract_version": "argus_retest_run/v1",
+        },
+        {
+            **_legacy_envelope(),
+            "contract_version": "argus_retest_run/v2",
+        },
+    ],
+    ids=[
+        "extra-symbol-authority",
+        "extra-date-authority",
+        "unknown-policy",
+        "unknown-version",
+        "legacy-version-current-policy",
+        "current-version-legacy-policy",
+    ],
+)
+def test_unknown_crossed_or_authoritative_envelopes_are_rejected(
+    action_payload: dict[str, Any],
+) -> None:
+    assert retest_action_source_run_id(action_payload) is None
+
+
+def test_invalid_source_run_ids_are_rejected_or_canonicalized() -> None:
     assert (
-        retest_action_source_run_id(
-            {**_valid_envelope(), "date_range": {"start": "2020-01-01"}}
-        )
-        is None
+        retest_action_source_run_id({**_valid_envelope(), "source_run_id": " "}) is None
     )
-    assert (
-        retest_action_source_run_id({**_valid_envelope(), "window_policy": "since_ipo"})
-        is None
-    )
-    assert (
-        retest_action_source_run_id(
-            {**_valid_envelope(), "contract_version": "argus_retest_run/v2"}
-        )
-        is None
-    )
-    assert retest_action_source_run_id({**_valid_envelope(), "source_run_id": " "}) is None
     # A non-UUID id would reach Postgres and raise a cast error, breaking the
     # uniform invalid-state contract with a 500.
     for tampered in ("not-a-uuid", "1 OR 1=1", "8f14e45f-ea1c-4b3a-9d2f"):
         assert (
-            retest_action_source_run_id(
-                {**_valid_envelope(), "source_run_id": tampered}
-            )
+            retest_action_source_run_id({**_valid_envelope(), "source_run_id": tampered})
             is None
         ), tampered
     # Python's UUID parser accepts URN, braced, hyphenless, and uppercase forms
@@ -182,16 +318,21 @@ def test_only_the_bounded_v1_envelope_is_accepted() -> None:
         _SOURCE_RUN_ID.upper(),
     ):
         assert (
-            retest_action_source_run_id(
-                {**_valid_envelope(), "source_run_id": variant}
-            )
+            retest_action_source_run_id({**_valid_envelope(), "source_run_id": variant})
             == _SOURCE_RUN_ID
         ), variant
 
 
-def test_client_display_copy_never_reaches_storage() -> None:
+@pytest.mark.parametrize(
+    "action_payload",
+    [_valid_envelope(), _legacy_envelope()],
+    ids=["current", "legacy"],
+)
+def test_client_display_copy_never_reaches_storage(
+    action_payload: dict[str, Any],
+) -> None:
     payload = _retest_request(
-        _valid_envelope(_SOURCE_RUN_ID),
+        action_payload,
         label="Delete everything",
         label_key="chat.result_card.save",
     )
@@ -201,7 +342,11 @@ def test_client_display_copy_never_reaches_storage() -> None:
         "type": "retest_run",
         "label": None,
         "labelKey": RETEST_ACTION_LABEL_KEY,
-        "payload": _valid_envelope(_SOURCE_RUN_ID),
+        "payload": {
+            "source_run_id": _SOURCE_RUN_ID,
+            "window_policy": "preserve_start_ending_latest_available",
+            "contract_version": "argus_retest_run/v2",
+        },
         "presentation": None,
     }
     assert chat_display_message(payload, language="en") == "Retest with current data"
@@ -211,32 +356,61 @@ def test_client_display_copy_never_reaches_storage() -> None:
     )
 
 
-def test_receipt_carries_structured_values_not_prose(stored_run: Any) -> None:
+def test_receipt_carries_provider_effective_period_and_natural_duration(
+    stored_run: Any,
+) -> None:
     setup = retest_setup_from_run(
         stored_run.model_dump(mode="python"),
         today=_TODAY,
     )
     assert setup is not None
+    confirmation_payload = retest_confirmation_payload(setup)
+    assert confirmation_payload is not None
+    effective_date_range = {"start": "2024-01-01", "end": "2026-06-30"}
+    requested_date_range = {"start": "2024-01-01", "end": "2026-07-31"}
+    confirmation_payload["strategy"]["date_range"] = dict(effective_date_range)
+    confirmation_payload["launch_payload"]["date_range"] = dict(effective_date_range)
+    confirmation_payload["launch_payload"]["requested_date_range"] = dict(
+        requested_date_range
+    )
+    confirmation_payload["launch_payload"]["coverage_preflight"] = {
+        "schema_version": "market_data_coverage_v1",
+        "outcome": "adjusted_coverage",
+        "requested_date_range": dict(requested_date_range),
+        "effective_date_range": dict(effective_date_range),
+    }
 
-    receipt = retest_receipt(setup)
+    receipt = retest_receipt(
+        setup,
+        confirmation_payload=confirmation_payload,
+    )
 
     assert receipt == {
-        "contract_version": RETEST_CONTRACT_VERSION,
-        "window_policy": RETEST_WINDOW_POLICY,
+        "contract_version": "argus_retest_run/v2",
+        "window_policy": "preserve_start_ending_latest_available",
         "source_run_id": _SOURCE_RUN_ID,
         "symbols": ["TSLA"],
         "strategy_family": "buy_and_hold",
         "timeframe": "1D",
-        "duration_days": 365,
-        "duration": {"unit": "year", "count": 1},
+        "original_date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        "requested_date_range": requested_date_range,
+        "effective_date_range": effective_date_range,
+        "duration_days": 911,
+        "duration": {"unit": "year", "count": 2.5, "approximate": True},
     }
 
 
+@pytest.mark.parametrize(
+    "action_payload",
+    [_valid_envelope(), _legacy_envelope()],
+    ids=["current", "legacy"],
+)
 def test_admission_reloads_canonical_truth_from_the_owned_run(
     stored_run: Any,
+    action_payload: dict[str, Any],
 ) -> None:
     turn = prepare_retest_turn(
-        payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
+        payload=_retest_request(action_payload),
         request=_FakeRequest(),
         user_id=_USER_ID,
         conversation_id=_CONVERSATION_ID,
@@ -246,9 +420,583 @@ def test_admission_reloads_canonical_truth_from_the_owned_run(
     )
 
     assert turn is not None
+    assert turn.setup.start == date(2024, 1, 1)
     assert turn.setup.end == _TODAY
     assert turn.confirmation_payload["confirmation_id"] == "confirmation-retest"
-    assert turn.confirmation_payload["launch_payload"]["symbols"] == ["TSLA"]
+    launch_payload = turn.confirmation_payload["launch_payload"]
+    assert launch_payload["symbols"] == ["TSLA"]
+    assert launch_payload["requested_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2026-07-31",
+    }
+    coverage = launch_payload["coverage_preflight"]
+    assert coverage["schema_version"] == "market_data_coverage_v1"
+    assert coverage["requested_date_range"] == launch_payload["requested_date_range"]
+    assert coverage["effective_date_range"] == launch_payload["date_range"]
+    assert coverage["preflight_id"].startswith("sha256:")
+    assert (
+        turn.confirmation_payload["strategy"]["date_range"]
+        == launch_payload["date_range"]
+    )
+    retest_period = turn.confirmation_payload["retest_period"]
+    assert retest_period["original_date_range"] == {
+        "start": "2024-01-01",
+        "end": "2024-12-31",
+    }
+    assert retest_period["requested_date_range"] == launch_payload["requested_date_range"]
+    assert retest_period["effective_date_range"] == launch_payload["date_range"]
+    assert turn.receipt["effective_date_range"] == retest_period["effective_date_range"]
+    assert turn.receipt["duration"] == retest_period["duration"]
+
+
+def test_current_retest_run_action_reaches_canonical_approval(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    client, conversation_id, source_run = _client_with_owned_run(stored_run)
+
+    retest_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert retest_response.status_code == 200
+    [retest_final] = _stream_payloads(retest_response.text, "final")
+    confirmation = retest_final["confirmation"]
+    confirmation_payload = retest_final["confirmation_payload"]
+    confirmation_id = confirmation["confirmation_id"]
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
+    assert run_action["payload"]["confirmation_id"] == confirmation_id
+    assert confirmation_payload["confirmation_id"] == confirmation_id
+
+    run_response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": confirmation_id},
+        json={
+            "conversation_id": conversation_id,
+            "action": run_action,
+            "language": "en",
+        },
+    )
+
+    assert run_response.status_code == 200
+    stage_outcomes = _stream_payloads(run_response.text, "stage_outcome")
+    assert any(
+        outcome.get("outcome") == "approved_for_execution" for outcome in stage_outcomes
+    )
+    assert not any(
+        outcome.get("outcome") in {"ready_for_confirmation", "await_approval"}
+        for outcome in stage_outcomes
+    )
+    assert isinstance(
+        confirmation_payload["launch_payload"]["coverage_preflight"],
+        dict,
+    )
+    [run_final] = _stream_payloads(run_response.text, "final")
+    assert run_final.get("recovery", {}).get("code") not in {
+        "confirmation_action_stale_card",
+        "confirmation_state_lost",
+    }
+    persisted = client.get(f"/api/v1/conversations/{conversation_id}/messages").json()[
+        "items"
+    ]
+    assert not any(
+        message.get("metadata", {}).get("recovery", {}).get("code")
+        == "confirmation_action_stale_card"
+        for message in persisted
+    )
+
+
+@pytest.mark.asyncio
+async def test_retest_coverage_does_not_block_an_unrelated_async_request(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.backtesting import coverage as coverage_module
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    original_prepare_market_data = coverage_module.prepare_market_data
+    coverage_started = threading.Event()
+    release_coverage = threading.Event()
+
+    def blocking_prepare_market_data(*args: Any, **kwargs: Any) -> Any:
+        coverage_started.set()
+        if not release_coverage.wait(timeout=5):
+            raise AssertionError("coverage preflight was not released")
+        return original_prepare_market_data(*args, **kwargs)
+
+    monkeypatch.setattr(
+        coverage_module,
+        "prepare_market_data",
+        blocking_prepare_market_data,
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        assert (await client.post("/api/v1/dev/reset")).status_code == 200
+        conversation_response = await client.post(
+            "/api/v1/conversations",
+            json={"language": "en"},
+        )
+        assert conversation_response.status_code == 200
+        conversation_id = str(conversation_response.json()["conversation"]["id"])
+        user_response = await client.get("/api/v1/me")
+        assert user_response.status_code == 200
+        user_id = str(user_response.json()["user"]["id"])
+        source_run = stored_run.model_copy(update={"conversation_id": conversation_id})
+        api_state.store.backtest_runs[source_run.id] = source_run
+        api_state.store.backtest_run_owners[source_run.id] = user_id
+
+        release_timer = threading.Timer(2, release_coverage.set)
+        release_timer.start()
+        try:
+            retest_task = asyncio.create_task(
+                client.post(
+                    "/api/v1/chat/stream",
+                    json={
+                        "conversation_id": conversation_id,
+                        "action": {
+                            "type": "retest_run",
+                            "payload": _valid_envelope(source_run.id),
+                        },
+                        "language": "en",
+                    },
+                )
+            )
+            assert await asyncio.to_thread(coverage_started.wait, 2)
+
+            unrelated_response = await client.get("/api/v1/me")
+            unrelated_completed_while_coverage_blocked = not release_coverage.is_set()
+            release_coverage.set()
+            retest_response = await retest_task
+        finally:
+            release_coverage.set()
+            release_timer.cancel()
+
+    assert unrelated_response.status_code == 200
+    assert unrelated_completed_while_coverage_blocked
+    assert retest_response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "action_payload_factory",
+    [_valid_envelope, _legacy_envelope],
+    ids=["current-v2", "legacy-v1"],
+)
+def test_alias_benchmark_retest_remains_eligible_and_reaches_approval(
+    alias_benchmark_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    action_payload_factory: Any,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    setup = retest_setup_from_run(
+        alias_benchmark_run.model_dump(mode="python"),
+        today=_TODAY,
+    )
+    assert setup is not None
+    assert setup.benchmark_symbol == "BTC/USD"
+    assert retest_confirmation_payload(setup) is not None
+
+    client, conversation_id, source_run = _client_with_owned_run(alias_benchmark_run)
+
+    retest_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": action_payload_factory(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert retest_response.status_code == 200
+    [retest_final] = _stream_payloads(retest_response.text, "final")
+    confirmation = retest_final["confirmation"]
+    confirmation_payload = retest_final["confirmation_payload"]
+    assert confirmation["display_facts"]["benchmark_symbol"] == "BTC"
+    assert confirmation_payload["strategy"]["comparison_baseline"] == "BTC"
+    assert confirmation_payload["launch_payload"]["benchmark_symbol"] == "BTC"
+    run_action = next(
+        action for action in confirmation["actions"] if action["type"] == "run_backtest"
+    )
+
+    run_response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": confirmation["confirmation_id"]},
+        json={
+            "conversation_id": conversation_id,
+            "action": run_action,
+            "language": "en",
+        },
+    )
+
+    assert run_response.status_code == 200
+    assert any(
+        outcome.get("outcome") == "approved_for_execution"
+        for outcome in _stream_payloads(run_response.text, "stage_outcome")
+    )
+
+
+@pytest.mark.parametrize(
+    "failure_code",
+    [
+        "market_data_unavailable",
+        "no_common_data_window",
+        "insufficient_common_data",
+    ],
+)
+def test_coverage_failure_returns_specific_code_without_persisting_confirmation(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_code: str,
+) -> None:
+    def _coverage_failure(*_: Any, **__: Any) -> Any:
+        raise MarketDataCoverageError(failure_code)
+
+    monkeypatch.setattr(
+        "argus.domain.backtesting.coverage.prepare_market_data",
+        _coverage_failure,
+    )
+    messages_before = list(api_state.store.messages.get(_CONVERSATION_ID, []))
+
+    with pytest.raises(HTTPException) as excinfo:
+        prepare_retest_turn(
+            payload=_retest_request(_valid_envelope(_SOURCE_RUN_ID)),
+            request=_FakeRequest(),
+            user_id=_USER_ID,
+            conversation_id=_CONVERSATION_ID,
+            language="en",
+            today=_TODAY,
+        )
+
+    assert excinfo.value.detail["code"] == failure_code
+    assert list(api_state.store.messages.get(_CONVERSATION_ID, [])) == messages_before
+    assert not any(
+        isinstance(message.metadata.get("confirmation_payload"), dict)
+        for message in messages_before
+    )
+
+
+def test_extended_currency_pair_window_is_repaired_before_confirmation_without_run(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    currency_pair_run = _currency_pair_run(stored_run)
+
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    client, conversation_id, source_run = _client_with_owned_run(currency_pair_run)
+    run_ids_before = set(api_state.store.backtest_runs)
+    job_ids_before = set(api_state.store.backtest_jobs)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    [final] = _stream_payloads(response.text, "final")
+    assert final["confirmation_payload"]["launch_payload"]["date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-30",
+    }
+    assert set(api_state.store.backtest_runs) == run_ids_before
+    assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_exact_currency_pair_candle_limit_offered_action_reaches_confirmation(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.run_dossiers import project_retest_action
+
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    currency_pair_run = _currency_pair_run(
+        stored_run,
+        start_date="2024-08-10",
+        end_date="2024-12-31",
+    )
+
+    action = project_retest_action(
+        run=currency_pair_run.model_dump(mode="python"),
+        today=_TODAY,
+    )
+
+    assert action is not None
+    assert action.state == "new_data_available"
+    assert action.repair is None
+    client, conversation_id, source_run = _client_with_owned_run(currency_pair_run)
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    [final] = _stream_payloads(response.text, "final")
+    confirmation_payload = final["confirmation_payload"]
+    launch_payload = confirmation_payload["launch_payload"]
+    assert launch_payload["requested_date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-31",
+    }
+    assert launch_payload["date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-30",
+    }
+    coverage = launch_payload["coverage_preflight"]
+    assert coverage["outcome"] == "adjusted_coverage"
+    assert coverage["adjustment_reason"] == "provider_coverage_adjustment"
+    assert coverage["requested_date_range"] == launch_payload["requested_date_range"]
+    assert coverage["effective_date_range"] == launch_payload["date_range"]
+    assert confirmation_payload["validation"]["date_adjusted"] is True
+    assert final["confirmation"]["period_adjustment"] == {
+        "code": "effective_window_adjusted",
+        "requested_date_range": launch_payload["requested_date_range"],
+        "effective_date_range": launch_payload["date_range"],
+    }
+
+
+def test_same_period_retest_is_rejected_without_turn_job_or_backtest(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["date_range"] = {
+        "start": "2024-01-01",
+        "end": "2026-07-30",
+    }
+    current_run = stored_run.model_copy(update={"config_snapshot": config_snapshot})
+    client, conversation_id, source_run = _client_with_owned_run(
+        current_run,
+        raise_server_exceptions=False,
+    )
+    messages_before = list(api_state.store.messages.get(conversation_id, []))
+    run_ids_before = set(api_state.store.backtest_runs)
+    job_ids_before = set(api_state.store.backtest_jobs)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "artifact_action_invalid_state"
+    assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
+    assert set(api_state.store.backtest_runs) == run_ids_before
+    assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_unavailable_timeframe_retest_is_rejected_without_turn_job_or_backtest(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return _TODAY
+
+    monkeypatch.setattr("argus.api.chat.retest.date", _FixedDate)
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "2h",
+    }
+    unavailable_run = stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+    client, conversation_id, source_run = _client_with_owned_run(
+        unavailable_run,
+        raise_server_exceptions=False,
+    )
+    messages_before = list(api_state.store.messages.get(conversation_id, []))
+    run_ids_before = set(api_state.store.backtest_runs)
+    job_ids_before = set(api_state.store.backtest_jobs)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "provider_timeframe_unavailable"
+    assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
+    assert set(api_state.store.backtest_runs) == run_ids_before
+    assert set(api_state.store.backtest_jobs) == job_ids_before
+
+
+def test_equity_history_repair_is_applied_before_confirmation(
+    stored_run: Any,
+) -> None:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["date_range"] = {
+        "start": "2010-01-01",
+        "end": "2024-12-31",
+    }
+    repaired_run = stored_run.model_copy(update={"config_snapshot": config_snapshot})
+    api_state.store.backtest_runs[stored_run.id] = repaired_run
+
+    turn = prepare_retest_turn(
+        payload=_retest_request(_valid_envelope()),
+        request=_FakeRequest(),
+        user_id=_USER_ID,
+        conversation_id=_CONVERSATION_ID,
+        language="en",
+        today=_TODAY,
+        confirmation_id="confirmation-repair-equity",
+    )
+
+    assert turn is not None
+    assert turn.confirmation_payload["launch_payload"]["date_range"] == {
+        "start": "2016-01-01",
+        "end": "2026-07-30",
+    }
+
+
+def test_currency_pair_candle_repair_is_applied_before_confirmation(
+    stored_run: Any,
+) -> None:
+    config_snapshot = dict(stored_run.config_snapshot)
+    config_snapshot["resolved_strategy"] = {
+        **config_snapshot["resolved_strategy"],
+        "asset_class": "currency_pair",
+        "asset_universe": ["EUR/USD"],
+        "symbol": "EUR/USD",
+    }
+    config_snapshot["resolved_parameters"] = {
+        **config_snapshot["resolved_parameters"],
+        "benchmark_symbol": "EUR/USD",
+        "timeframe": "1D",
+    }
+    repaired_run = stored_run.model_copy(
+        update={
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "benchmark_symbol": "EUR/USD",
+            "config_snapshot": config_snapshot,
+        }
+    )
+    api_state.store.backtest_runs[stored_run.id] = repaired_run
+
+    turn = prepare_retest_turn(
+        payload=_retest_request(_valid_envelope()),
+        request=_FakeRequest(),
+        user_id=_USER_ID,
+        conversation_id=_CONVERSATION_ID,
+        language="en",
+        today=_TODAY,
+        confirmation_id="confirmation-repair-currency",
+    )
+
+    assert turn is not None
+    assert turn.confirmation_payload["launch_payload"]["date_range"] == {
+        "start": "2024-08-10",
+        "end": "2026-07-30",
+    }
+
+
+def test_provider_timeout_returns_typed_unavailable_without_persisting_turn(
+    stored_run: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _provider_timeout(*_: Any, **__: Any) -> Any:
+        raise TimeoutError("provider connection timed out")
+
+    monkeypatch.setattr(
+        "argus.domain.backtesting.coverage.prepare_market_data",
+        _provider_timeout,
+    )
+    client, conversation_id, source_run = _client_with_owned_run(
+        stored_run,
+        raise_server_exceptions=False,
+    )
+    messages_before = list(api_state.store.messages.get(conversation_id, []))
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation_id,
+            "action": {
+                "type": "retest_run",
+                "payload": _valid_envelope(source_run.id),
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "market_data_unavailable"
+    assert list(api_state.store.messages.get(conversation_id, [])) == messages_before
+    assert not any(
+        isinstance(message.metadata.get("confirmation_payload"), dict)
+        for message in messages_before
+    )
 
 
 @pytest.mark.parametrize(
@@ -274,9 +1022,7 @@ def test_unusable_sources_reject_as_non_retryable_invalid_state(
     action_payload = (
         {**_valid_envelope(_SOURCE_RUN_ID), "symbols": ["NVDA"]}
         if case == "tampered_envelope"
-        else _valid_envelope(
-            _MISSING_RUN_ID if case == "unknown_run" else _SOURCE_RUN_ID
-        )
+        else _valid_envelope(_MISSING_RUN_ID if case == "unknown_run" else _SOURCE_RUN_ID)
     )
     if case == "unfinished_run":
         api_state.store.backtest_runs[stored_run.id] = stored_run.model_copy(
@@ -349,6 +1095,14 @@ def test_completed_turn_persists_a_ready_to_run_confirmation(
     assert final_payload["stage_outcome"] == "await_approval"
     assert final_payload["confirmation"]["status"] == "ready_to_run"
     assert final_payload["retest_receipt"]["symbols"] == ["TSLA"]
+    assert (
+        final_payload["confirmation"]["retest_period"]
+        == (final_payload["confirmation_payload"]["retest_period"])
+    )
+    assert (
+        final_payload["retest_receipt"]["effective_date_range"]
+        == (final_payload["confirmation"]["retest_period"]["effective_date_range"])
+    )
     assert "run" not in final_payload and "result_card" not in final_payload
     # Private durable identity stays out of transport.
     assert "canonical_launch_payload_hash" not in final_payload["confirmation"]
@@ -362,7 +1116,14 @@ def test_completed_turn_persists_a_ready_to_run_confirmation(
         if message.id == final_payload["message_id"]
     )
     assert persisted.metadata["confirmation_card"]["status"] == "ready_to_run"
-    assert persisted.metadata["retest_receipt"]["duration_days"] == 365
+    assert (
+        persisted.metadata["retest_receipt"]["duration_days"]
+        == (final_payload["confirmation"]["retest_period"]["duration_days"])
+    )
+    assert (
+        persisted.metadata["confirmation_card"]["retest_period"]
+        == (final_payload["confirmation"]["retest_period"])
+    )
     assert persisted.metadata["chat_action"]["labelKey"] == RETEST_ACTION_LABEL_KEY
     assert persisted.metadata["confirmation_payload"]["launch_payload"]["symbols"] == [
         "TSLA"

@@ -1,6 +1,8 @@
 # Private Alpha Interim Roadmap
 
-Status: **ACTIVE — founder-outcome and live-QA execution source**
+Status: **ARCHIVED 2026-08-06 — COMPLETE.** The interim private-alpha pivot
+finished with the 2026-08-05 production promotion. Active board is
+[`docs/specs/argus-active-roadmap.md`](../specs/argus-active-roadmap.md).
 
 Original roadmap date: 2026-07-16
 

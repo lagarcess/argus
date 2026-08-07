@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -404,13 +405,16 @@ async def chat_stream(
         stale_confirmation_message=stale_confirmation_message,
         language=language,
     )
-    retest_turn = prepare_retest_turn(
-        payload=payload,
-        request=request,
-        user_id=user.id,
-        conversation_id=conversation.id,
-        language=language,
-    )
+    retest_turn = None
+    if is_retest_action(payload):
+        retest_turn = await asyncio.to_thread(
+            prepare_retest_turn,
+            payload=payload,
+            request=request,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            language=language,
+        )
     request_admission = prepare_chat_request_admission(
         payload=payload,
         request=request,

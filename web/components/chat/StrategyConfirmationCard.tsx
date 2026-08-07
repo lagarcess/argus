@@ -32,6 +32,12 @@ import {
 } from "@/lib/confirmation-cost-edit";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
+  retestEffectiveDurationLabel,
+  retestPeriodFromValue,
+  retestPeriodTransformationLabel,
+  type RetestPeriod,
+} from "@/lib/chat-retest";
+import {
   strategyDisplayLabel,
   strategyTypeFromConfirmation,
 } from "@/lib/strategy-display";
@@ -141,6 +147,14 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
                 </div>
               ))}
             </dl>
+          )}
+
+          {viewModel.retestPeriod && (
+            <RetestPeriodDisclosure
+              period={viewModel.retestPeriod}
+              language={i18n.language}
+              t={t}
+            />
           )}
 
           {viewModel.detailRows.length > 0 && (
@@ -327,7 +341,36 @@ function confirmationCardViewModel(
       promotedValues,
       t,
     }),
+    retestPeriod: retestPeriodFromValue(confirmation.retest_period),
   };
+}
+
+function RetestPeriodDisclosure({
+  period,
+  language,
+  t,
+}: {
+  period: RetestPeriod;
+  language: string;
+  t: TFunction;
+}) {
+  const duration = retestEffectiveDurationLabel(period.duration, t, language);
+  return (
+    <div
+      className="mt-4 border-t border-[#c9c9cd]/22 pt-4 dark:border-white/[0.04]"
+      data-retest-period="extended"
+    >
+      <p className="whitespace-normal break-words text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76">
+        {retestPeriodTransformationLabel(period, language)}
+      </p>
+      <p className="mt-1 text-[12px] leading-snug text-[#8d969e]">
+        {t("chat.retest.updated_duration", {
+          defaultValue: "Updated span: {{duration}}",
+          duration,
+        })}
+      </p>
+    </div>
+  );
 }
 
 function displayConfirmationRowValue(
