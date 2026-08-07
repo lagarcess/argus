@@ -55,6 +55,7 @@ export default function ProfileDeleteRequestDialog({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
       <button
+        tabIndex={-1}
         className="absolute inset-0"
         onClick={() => {
           if (state !== "submitting") {

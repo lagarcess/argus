@@ -775,6 +775,7 @@ export default function ProfileMenu({
       <>
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
           <button
+        tabIndex={-1}
             className="absolute inset-0"
             onClick={closeProfileModal}
             aria-label={t("settings.profile.close", "Close profile")}

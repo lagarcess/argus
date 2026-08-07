@@ -45,6 +45,7 @@ export default function AppearanceModal({ onClose }: AppearanceModalProps) {
   return (
     <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center">
       <button
+        tabIndex={-1}
         className="absolute inset-0"
         aria-label="Close appearance modal"
         onClick={onClose}

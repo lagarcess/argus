@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { consumeOverlayEntriesForNavigation } from "@/components/layout/useOverlayBackDismiss";
 import {
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
@@ -46,7 +45,6 @@ export default function CommandPaletteDossierSheet({
             // The transcript route replaces the URL on the entry this sheet
             // pushed, so that entry belongs to the destination now. Popping it
             // would restore the conversation the user just left.
-            consumeOverlayEntriesForNavigation();
             onClose();
             onOpenConversation();
           }}

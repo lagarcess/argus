@@ -89,6 +89,7 @@ export default function LanguageModal({
       aria-label={t("guest.shell.language", "Language")}
     >
       <button
+        tabIndex={-1}
         className="absolute inset-0"
         aria-label={t("settings.app.close_language_modal", "Close language modal")}
         onClick={() => {

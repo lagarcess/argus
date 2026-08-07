@@ -60,6 +60,7 @@ export default function ArchivedChatsView({ onClose, onRestored }: ArchivedChats
   return (
     <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
       <button
+        tabIndex={-1}
         className="absolute inset-0"
         aria-label="Close archived chats"
         onClick={onClose}

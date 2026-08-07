@@ -438,6 +438,7 @@ export default function MemoryControlsModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/25 p-4 backdrop-blur-sm sm:items-center dark:bg-black/60">
       <button
+        tabIndex={-1}
         className="absolute inset-0"
         aria-label={t("settings.data.personalization.close", "Close memory")}
         onClick={onClose}

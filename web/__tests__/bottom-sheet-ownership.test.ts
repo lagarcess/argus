@@ -152,6 +152,31 @@ describe("bottom sheet ownership", () => {
     expect([...UNMANAGED_MODAL_DEBT].sort()).toEqual(stillUnmanaged.sort());
   });
 
+  test("no backdrop is a tab stop", () => {
+    /*
+     * A full-bleed dismiss button is a pointer affordance. Left in the tab
+     * order it is the first thing a focus trap hands the user, because it is
+     * rendered before the panel, and Enter on it closes the surface they were
+     * trying to read. Every modal here has a visible close control and Escape.
+     *
+     * This shipped three times, in the language modal, the deletion dialog, and
+     * Omnisearch, each caught separately and each fixed by pointing a container
+     * ref somewhere else. That is discipline rather than a rule, so the rule is
+     * here instead: thirteen of these existed and none opted out.
+     */
+    const offenders: string[] = [];
+    for (const file of FILES) {
+      for (const match of file.source.matchAll(
+        /<button\b[\s\S]{0,400}?className="absolute inset-0"/g,
+      )) {
+        if (!match[0].includes("tabIndex={-1}")) {
+          offenders.push(file.path);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test("the chat header menu goes through the primitive below the threshold", () => {
     const menu = FILES.find(
       (file) => file.path === "components/chat/ChatHeaderMenu.tsx",

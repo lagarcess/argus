@@ -30,6 +30,7 @@ export default function SidebarPreferenceModal({
   return (
     <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
       <button
+        tabIndex={-1}
         className="absolute inset-0"
         aria-label={t("settings.sidebar.close")}
         onClick={onClose}

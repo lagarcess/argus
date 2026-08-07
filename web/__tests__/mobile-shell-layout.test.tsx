@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import i18next from "i18next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import {
   effectivePaletteLayout,
   paletteRowActionVariant,
@@ -51,6 +51,28 @@ import { sidebarDrawerDragOutcome } from "../components/sidebar/SidebarDrawer";
 import ChatShellMenuTrigger from "../components/chat/ChatShellMenuTrigger";
 import SidebarHeader from "../components/sidebar/SidebarHeader";
 import SidebarShell from "../components/sidebar/SidebarShell";
+
+/** Every source file under a web subdirectory, for whole-class sweeps. */
+function sourceFilesUnder(root: string): { path: string; source: string }[] {
+  const found: { path: string; source: string }[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
+        found.push({
+          path: relative(join(import.meta.dir, ".."), full),
+          source: readFileSync(full, "utf-8"),
+        });
+      }
+    }
+  };
+  walk(join(import.meta.dir, "..", root));
+  return found;
+}
 
 const globalsCss = readFileSync(
   join(import.meta.dir, "../app/globals.css"),
@@ -503,7 +525,7 @@ describe("omnisearch below threshold", () => {
     expect(isProgrammaticPop(new Event("popstate"))).toBe(false);
 
     const source = readFileSync(
-      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      join(import.meta.dir, "../lib/overlay-history.ts"),
       "utf-8",
     );
     // The safety net is a timeout, not a rendering deadline.
@@ -629,31 +651,49 @@ describe("omnisearch below threshold", () => {
     expect(hasOverlayAbove("b")).toBe(true);
   });
 
-  test("a navigation keeps its entry instead of popping it", () => {
-    // Popping would restore the URL the overlay opened over, so the address bar
-    // would point at the conversation the user just left.
-    const source = readFileSync(
-      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+  test("every URL rewrite spends the entries, not every caller", () => {
+    // Navigating rewrites the URL onto whatever entry is current, and with an
+    // overlay open that is the entry the overlay pushed. Popping it on teardown
+    // put the previous conversation back in the address bar while the new one
+    // was on screen.
+    //
+    // This used to be one call at one navigation site, which held only for the
+    // path somebody remembered. Both writers of the conversation URL spend the
+    // entries now, so every path through them is covered including the ones
+    // nobody has written yet.
+    const routing = readFileSync(
+      join(import.meta.dir, "../lib/chat-conversation-routing.ts"),
       "utf-8",
     );
-    expect(source).toContain("export function consumeOverlayEntriesForNavigation");
-    const sheet = readFileSync(
-      join(
-        import.meta.dir,
-        "../components/sidebar/command-palette/CommandPaletteDossierSheet.tsx",
-      ),
+    const writes = [
+      ...routing.matchAll(/window\.history\.replaceState/g),
+    ].map((match) => match.index ?? -1);
+    expect(writes.length).toBeGreaterThan(0);
+    for (const at of writes) {
+      const before = routing.slice(0, at);
+      expect(before.lastIndexOf("consumeOverlayEntriesForNavigation()")).
+        toBeGreaterThan(before.lastIndexOf("export function"));
+    }
+    // And it lives beside the history state it guards rather than in a
+    // component, so the routing layer can reach it without importing upward.
+    const registry = readFileSync(
+      join(import.meta.dir, "../lib/overlay-history.ts"),
       "utf-8",
     );
-    const handler = sheet.slice(
-      sheet.indexOf('data-testid="dossier-sheet-open-conversation"'),
+    expect(registry).toContain(
+      "export function consumeOverlayEntriesForNavigation",
     );
-    // Consumed before the close, so the deferred pop finds nothing to undo.
-    expect(handler.indexOf("consumeOverlayEntriesForNavigation")).toBeLessThan(
-      handler.indexOf("onClose()"),
+  });
+
+  test("no navigation site carries its own entry bookkeeping", () => {
+    // A per-caller call is a rule someone has to remember. The chokepoint
+    // means a new navigation path cannot get this wrong by omission.
+    const callers = sourceFilesUnder("components").filter(
+      (file) =>
+        file.source.includes("consumeOverlayEntriesForNavigation") &&
+        !file.path.endsWith("useOverlayBackDismiss.ts"),
     );
-    expect(handler.indexOf("onClose()")).toBeLessThan(
-      handler.indexOf("onOpenConversation()"),
-    );
+    expect(callers.map((file) => file.path)).toEqual([]);
   });
 
   test("row actions stay reachable wherever a coarse pointer exists", () => {
