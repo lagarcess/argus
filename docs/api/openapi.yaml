@@ -804,6 +804,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets:
+    post:
+      tags:
+      - conversations
+      description: 'Add researched peers to the active confirmation without spending a turn.
+
+
+        Deterministic by construction: no LLM call, no message allowance, no
+
+        interpretation. Only peers the active card offered are addable, and the
+
+        patched draft re-passes the same execution and coverage validation every
+
+        confirmation passes. The result is a new superseding card that discloses
+
+        the material change.'
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: confirmation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmationPeerAssetsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmationPeerAssetsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/messages:
     get:
       tags:
@@ -2146,6 +2200,30 @@ components:
       type: object
       required:
       - conversation_id
+    ConfirmationPeerAssetsRequest:
+      properties:
+        symbols:
+          items:
+            type: string
+          type: array
+          maxItems: 4
+          minItems: 1
+      type: object
+      required:
+      - symbols
+      description: 'Add researched peers to the pending confirmation without a turn.
+
+
+        Only symbols the active card offered as research peers are addable; the
+
+        backend re-verifies each against the resolver and coverage gates.'
+    ConfirmationPeerAssetsResponse:
+      properties:
+        message:
+          $ref: '#/components/schemas/Message'
+      type: object
+      required:
+      - message
     Conversation:
       properties:
         id:

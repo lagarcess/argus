@@ -390,6 +390,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "next_experiments",
         "research",
         "research_job_request",
+        "research_peers",
     }
     serialized = {
         key: _serialize_public_value(key, value)

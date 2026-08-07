@@ -270,7 +270,82 @@ def runtime_confirmation_card(
     benchmark_adjustment = _benchmark_adjustment_from_strategy(strategy)
     if benchmark_adjustment is not None:
         card["benchmark_adjustment"] = benchmark_adjustment
+    assets_adjustment = payload.get("assets_adjustment")
+    if isinstance(assets_adjustment, dict):
+        # Adding an asset changed the experiment materially; the card owns
+        # disclosing exactly what changed (spec section 6).
+        card["assets_adjustment"] = dict(assets_adjustment)
+    research_peers = _research_peer_offer_block(
+        runtime_result.get("research_peers"),
+        basket_symbols=symbols,
+        basket_asset_class=asset_class,
+        language=language,
+    )
+    if research_peers is not None:
+        card["research_peers"] = research_peers
     return card
+
+
+def _research_peer_offer_block(
+    state_peers: Any,
+    *,
+    basket_symbols: list[str],
+    basket_asset_class: str | None,
+    language: str,
+) -> dict[str, Any] | None:
+    """Researched peers still outside the basket become one-tap add offers.
+
+    Never a browsable list: each offer is a runnable add bound to this card,
+    already resolver-verified when it entered the research sidecar, and capped
+    by the run's free asset slots.
+    """
+    from argus.domain.research.config import research_rail_enabled
+
+    if not research_rail_enabled():
+        return None
+    if not isinstance(state_peers, dict):
+        return None
+    from argus.agent_runtime.research_basket import remaining_peer_offers
+
+    offers = remaining_peer_offers(
+        state_peers.get("peers"),
+        basket_symbols=basket_symbols,
+        basket_asset_class=basket_asset_class or "equity",
+    )
+    if not offers:
+        return None
+    spanish = str(language or "").lower().startswith("es")
+    rows = []
+    for offer in offers:
+        named = f"{offer['name']} [{offer['symbol']}]"
+        rows.append(
+            {
+                **offer,
+                "label": (
+                    f"Agregar {named} a esta prueba"
+                    if spanish
+                    else f"Add {named} to this test"
+                ),
+            }
+        )
+    block: dict[str, Any] = {
+        "schema_version": "argus_research_peers/v1",
+        "offers": rows,
+    }
+    if len(rows) > 1:
+        names = [f"{offer['name']} [{offer['symbol']}]" for offer in offers]
+        joined = (
+            (", ".join(names[:-1]) + (" y " if spanish else " and ") + names[-1])
+            if len(names) > 1
+            else names[0]
+        )
+        block["set"] = {
+            "symbols": [offer["symbol"] for offer in offers],
+            "label": (
+                f"Agregar {joined}" if spanish else f"Add {joined}"
+            ),
+        }
+    return block
 
 
 def _benchmark_adjustment_from_strategy(

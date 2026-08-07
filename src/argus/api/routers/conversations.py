@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -32,6 +33,8 @@ from argus.api.message_store import (
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
+    ConfirmationPeerAssetsRequest,
+    ConfirmationPeerAssetsResponse,
     Conversation,
     ConversationCreate,
     ConversationPatch,
@@ -803,3 +806,182 @@ def list_messages(
         last = page_items[-1]
         next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedMessages(items=page_items, next_cursor=next_cursor)
+
+
+@router.post(
+    "/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets",
+    response_model=ConfirmationPeerAssetsResponse,
+)
+def add_confirmation_peer_assets(
+    conversation_id: str,
+    confirmation_id: str,
+    payload: ConfirmationPeerAssetsRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConfirmationPeerAssetsResponse:
+    """Add researched peers to the active confirmation without spending a turn.
+
+    Deterministic by construction: no LLM call, no message allowance, no
+    interpretation. Only peers the active card offered are addable, and the
+    patched draft re-passes the same execution and coverage validation every
+    confirmation passes. The result is a new superseding card that discloses
+    the material change.
+    """
+    from argus.agent_runtime.research_basket import (
+        peer_added_confirmation_preparation,
+    )
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.api.chat.recovery import _recent_messages_for_conversation
+    from argus.api.chat.research_evidence import record_research_turn_evidence
+    from argus.api.message_store import create_message
+    from argus.domain.research.config import research_rail_enabled
+
+    if not research_rail_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
+    invalid_state = problem(
+        request,
+        status_code=409,
+        code="artifact_action_invalid_state",
+        title="Conflict",
+        detail="The confirmation is no longer active.",
+    )
+    messages = _recent_messages_for_conversation(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    active_id = latest_active_confirmation_id(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        recent_messages=messages,
+    )
+    if active_id is None or active_id != confirmation_id:
+        raise invalid_state
+    source_card: dict[str, Any] | None = None
+    source_payload: dict[str, Any] | None = None
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        card = message.metadata.get("confirmation_card")
+        if (
+            isinstance(card, dict)
+            and str(card.get("confirmation_id") or "") == confirmation_id
+        ):
+            source_card = card
+            candidate_payload = message.metadata.get("confirmation_payload")
+            if isinstance(candidate_payload, dict):
+                source_payload = candidate_payload
+            break
+    if source_card is None or source_payload is None:
+        raise invalid_state
+    peer_block = source_card.get("research_peers")
+    offers = peer_block.get("offers") if isinstance(peer_block, dict) else None
+    offered: dict[str, dict[str, str]] = {}
+    for offer in offers or []:
+        if isinstance(offer, dict) and offer.get("symbol"):
+            offered[str(offer["symbol"]).upper()] = {
+                "symbol": str(offer["symbol"]).upper(),
+                "name": str(offer.get("name") or offer["symbol"]),
+                "asset_class": str(offer.get("asset_class") or "equity"),
+            }
+    requested = [str(symbol).strip().upper() for symbol in payload.symbols]
+    # Every candidate passed the resolver before it became an offer; anything
+    # else is not addable, whoever asks.
+    if not requested or any(symbol not in offered for symbol in requested):
+        raise invalid_state
+    added = [offered[symbol] for symbol in dict.fromkeys(requested)]
+    language = str(getattr(user, "language", None) or "en")
+    preparation = peer_added_confirmation_preparation(
+        source_payload,
+        added=added,
+        language=language,
+    )
+    if preparation.confirmation_payload is None:
+        error_code = preparation.error_code or "confirmation_not_executable"
+        if error_code == "market_data_unavailable":
+            raise problem(
+                request,
+                status_code=503,
+                code="market_data_unavailable",
+                title="Service Unavailable",
+                detail="Market data is unavailable for the expanded basket.",
+            )
+        if error_code in {
+            "no_common_data_window",
+            "insufficient_common_data",
+            "asset_maximum_reached",
+            "asset_class_mismatch",
+        }:
+            raise problem(
+                request,
+                status_code=422,
+                code=error_code,
+                title="Validation Error",
+                detail="The expanded basket cannot run as one test.",
+            )
+        raise invalid_state
+    new_payload = preparation.confirmation_payload
+    remaining_peers = [
+        offer for symbol, offer in offered.items() if symbol not in set(requested)
+    ]
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": new_payload,
+            "research_peers": {"peers": remaining_peers},
+        },
+        confirmation_id=str(new_payload.get("confirmation_id")),
+        conversation_id=conversation_id,
+        language=language,
+    )
+    if card is None:
+        raise invalid_state
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+
+    reference = confirmation_artifact_reference(
+        confirmation_id=str(card.get("confirmation_id")),
+        confirmation_payload=new_payload,
+        confirmation_card=card,
+    )
+    metadata: dict[str, Any] = {
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "await_approval",
+        "confirmation_card": card,
+        "confirmation_payload": new_payload,
+        "active_confirmation_reference": reference.model_dump(mode="python"),
+        "artifact_references": [reference.model_dump(mode="python")],
+    }
+    created = create_message(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        role="assistant",
+        content=str(card.get("summary") or ""),
+        metadata=metadata,
+        settle_usage=None,
+    )
+    record_research_turn_evidence(
+        research={
+            "capability_class": "peer_expansion",
+            "shape": None,
+            "usage": {
+                "cache_status": "bypass",
+                "cost_usd": 0.0,
+                "invocations": 0,
+                "latency_ms": 0,
+            },
+        },
+        user_id=user.id,
+        conversation_id=conversation_id,
+        message_id=created.id,
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return ConfirmationPeerAssetsResponse(message=created)

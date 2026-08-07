@@ -844,6 +844,20 @@ class ChatStreamRequest(BaseModel):
         raise ValueError("message_or_action_required")
 
 
+class ConfirmationPeerAssetsRequest(BaseModel):
+    """Add researched peers to the pending confirmation without a turn.
+
+    Only symbols the active card offered as research peers are addable; the
+    backend re-verifies each against the resolver and coverage gates.
+    """
+
+    symbols: list[str] = Field(min_length=1, max_length=4)
+
+
+class ConfirmationPeerAssetsResponse(BaseModel):
+    message: Message
+
+
 def _validate_chat_action_payload_value(value: Any, *, depth: int) -> None:
     if isinstance(value, dict):
         if depth > CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH:
