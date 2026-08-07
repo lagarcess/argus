@@ -36,10 +36,6 @@ import {
   type MemoryRecord,
   type MemorySettings,
 } from "@/lib/memory-api";
-import { dialogTabTarget } from "@/lib/dialog-focus";
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type MemoryControlsModalProps = {
   locale: "en-US" | "es-419";
@@ -318,7 +314,13 @@ export default function MemoryControlsModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const overlayId = useId();
   // Reachable from the drawer, so it owns Escape, focus, and system back.
-  useModalSurface({ isOpen: true, overlayId, containerRef: dialogRef, onDismiss: onClose });
+  useModalSurface({
+    isOpen: true,
+    overlayId,
+    containerRef: dialogRef,
+    onDismiss: onClose,
+    returnFocusRef,
+  });
   const [settings, setSettings] = useState<MemorySettings | null>(null);
   const [records, setRecords] = useState<MemoryRecord[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -332,60 +334,19 @@ export default function MemoryControlsModal({
     setRequestVersion((current) => current + 1);
   }, []);
 
+  // Focus is the shared hook's job. Running a second Tab handler beside it
+  // advanced focus twice per press and skipped a control each time, and its
+  // cleanup fought the same hook over where focus returned.
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const returnFocusRoot = returnFocusRef?.current ?? null;
-    const fallbackReturnFocus = returnFocusRoot?.matches(FOCUSABLE_SELECTOR)
-      ? returnFocusRoot
-      : returnFocusRoot?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-    const focusableElements = () =>
-      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-
-    (focusableElements()[0] ?? dialog).focus();
-
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !hasOverlayAbove(overlayId)) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = focusableElements();
-      if (focusable.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-      const target = dialogTabTarget(
-        focusable,
-        document.activeElement as HTMLElement | null,
-        event.shiftKey,
-      );
-      if (target) {
-        event.preventDefault();
-        target.focus();
-      }
+      if (event.key !== "Escape") return;
+      if (hasOverlayAbove(overlayId)) return;
+      event.preventDefault();
+      onClose();
     };
-
     document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      const previousFocusIsPageRoot =
-        previousFocus === document.body ||
-        previousFocus === document.documentElement;
-      const returnTarget =
-        previousFocus?.isConnected && !previousFocusIsPageRoot
-          ? previousFocus
-          : fallbackReturnFocus;
-      returnTarget?.focus();
-    };
-  }, [onClose, overlayId, returnFocusRef]);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose, overlayId]);
 
   useEffect(() => {
     let isCurrent = true;

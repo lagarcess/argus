@@ -17,6 +17,8 @@ import {
 import {
   OVERLAY_HISTORY_KEY,
   claimOverlayEntry,
+  isProgrammaticPop,
+  markProgrammaticPop,
   openOverlayEntries,
   overlayHistoryState,
   recordOverlayEntry,
@@ -157,13 +159,11 @@ describe("system back closes overlays", () => {
     expect(openOverlayEntries()).toEqual(["sheet-a"]);
   });
 
-  test("one rule, so a missing popstate cannot swallow the next real back", () => {
-    // The old counter went stale whenever an expected popstate never arrived.
+  test("entry ownership is what decides a dismissal", () => {
     const source = readFileSync(
       join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
       "utf-8",
     );
-    expect(source).not.toContain("pendingProgrammaticPops");
     expect(source).toContain("if (!claimOverlayEntry(overlayId)) return;");
   });
 });
@@ -449,20 +449,51 @@ describe("omnisearch below threshold", () => {
     expect(overlayStackIds()).toEqual([]);
   });
 
-  test("a programmatic pop reaches nobody", () => {
+  test("a programmatic pop reaches nobody, however late it lands", () => {
     // A closing overlay spends its entry with back(). That event reaches every
     // listener, including the parent underneath, which by then is topmost and
     // would read it as a real back press: dismissing a language modal closed
     // the drawer behind it.
-    const back = readFileSync(
+    resetOverlayEntries();
+    markProgrammaticPop();
+
+    // Nothing guarantees popstate arrives inside a frame. Suppression used to
+    // expire on one, so a late event went through unsuppressed and the parent
+    // closed too, at random. Every listener for the one event must agree.
+    const traversal = new Event("popstate");
+    expect(isProgrammaticPop(traversal)).toBe(true);
+    expect(isProgrammaticPop(traversal)).toBe(true);
+    expect(isProgrammaticPop(traversal)).toBe(true);
+
+    // The next event is a real press and must not be swallowed by the same mark.
+    expect(isProgrammaticPop(new Event("popstate"))).toBe(false);
+  });
+
+  test("two overlays closing together spend one suppression each", () => {
+    resetOverlayEntries();
+    markProgrammaticPop();
+    markProgrammaticPop();
+
+    expect(isProgrammaticPop(new Event("popstate"))).toBe(true);
+    expect(isProgrammaticPop(new Event("popstate"))).toBe(true);
+    expect(isProgrammaticPop(new Event("popstate"))).toBe(false);
+  });
+
+  test("a traversal that never arrives cannot swallow a later real back", () => {
+    // back() at the start of session history sends nothing at all, so the mark
+    // has to expire on its own or the next real press is eaten forever.
+    resetOverlayEntries();
+    markProgrammaticPop();
+    resetOverlayEntries();
+    expect(isProgrammaticPop(new Event("popstate"))).toBe(false);
+
+    const source = readFileSync(
       join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
       "utf-8",
     );
-    expect(back).toContain("markProgrammaticPop();");
-    expect(back).toContain("if (isProgrammaticPop()) return;");
-    // Cleared on a frame rather than by the first reader, so it suppresses the
-    // whole event and cannot poison a later press.
-    expect(back).toContain("requestAnimationFrame(clear)");
+    // The safety net is a timeout, not a rendering deadline.
+    expect(source).toContain("PROGRAMMATIC_POP_TIMEOUT_MS");
+    expect(source).not.toContain("requestAnimationFrame");
   });
 
   test("a parent trap and a parent back listener both stand down", () => {

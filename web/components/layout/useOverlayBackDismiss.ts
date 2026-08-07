@@ -19,50 +19,78 @@ export const OVERLAY_HISTORY_KEY = "argusOverlay";
 /**
  * Overlays that pushed a history entry and have not yet spent it.
  *
- * This is the single source of truth for who owns an entry, for two reasons.
- * It cannot live in `history.state`, because Next's App Router calls
- * `replaceState` with its own routing tree and drops foreign keys. And a
- * separate "programmatic pop" counter could go stale whenever a `popstate` it
- * expected never arrived, after which the next real back press was swallowed.
+ * Ownership cannot live in `history.state`: Next's App Router calls
+ * `replaceState` with its own routing tree and drops foreign keys, so the
+ * marker was always gone by the time a `popstate` arrived.
  *
- * One rule instead: whoever claims the id first wins. A `popstate` that finds
- * the id already claimed is the echo of our own `history.back()`, so it is
- * ignored; one that still finds it is a user pressing back.
+ * Whoever claims the id first wins. A `popstate` that finds the id already
+ * claimed is the echo of our own `history.back()`, so it is ignored; one that
+ * still finds it is a user pressing back.
  */
 let unconsumedOverlays: string[] = [];
 
 /**
- * Whether the `popstate` currently being handled came from our own
- * `history.back()` rather than from the user.
+ * Traversals we asked for and are still waiting on.
  *
  * A closing overlay spends its entry by calling back(), and the resulting event
  * reaches every listener, including the parent underneath, which by then is
  * topmost and would read it as a real back press. That is how dismissing a
  * language modal closed the drawer behind it.
  *
- * The flag is cleared on the next frame rather than by the first reader, so it
- * suppresses every listener for that one event and cannot poison a later press
- * if the expected `popstate` never arrives.
+ * Suppression used to expire on the next animation frame. Nothing guarantees
+ * `popstate` arrives inside a frame, and Chromium can run the frame first, so
+ * the parent saw an unsuppressed event and closed as well, at random. Waiting
+ * for the traversal itself is the only deadline that means anything.
+ *
+ * The count only ever falls when the event we were waiting for shows up, and
+ * `handledPops` makes that decision once per event so every listener for it
+ * agrees. The timeout is a safety net, not the mechanism: `back()` at the start
+ * of session history is a no-op that sends nothing, and without it that would
+ * swallow the user's next real press forever.
  */
-let programmaticPop = false;
+let pendingProgrammaticPops = 0;
+let programmaticPopExpiry: ReturnType<typeof setTimeout> | null = null;
+let handledPops = new WeakSet<Event>();
 
-export function markProgrammaticPop(): void {
-  programmaticPop = true;
-  const clear = () => {
-    programmaticPop = false;
-  };
-  if (typeof requestAnimationFrame === "function") requestAnimationFrame(clear);
-  else setTimeout(clear, 0);
+/** Far longer than any real traversal; only reached when none is coming. */
+const PROGRAMMATIC_POP_TIMEOUT_MS = 2000;
+
+function clearProgrammaticPopExpiry(): void {
+  if (programmaticPopExpiry === null) return;
+  clearTimeout(programmaticPopExpiry);
+  programmaticPopExpiry = null;
 }
 
-export function isProgrammaticPop(): boolean {
-  return programmaticPop;
+export function markProgrammaticPop(): void {
+  pendingProgrammaticPops += 1;
+  clearProgrammaticPopExpiry();
+  programmaticPopExpiry = setTimeout(() => {
+    programmaticPopExpiry = null;
+    pendingProgrammaticPops = 0;
+  }, PROGRAMMATIC_POP_TIMEOUT_MS);
+}
+
+/**
+ * Whether this `popstate` is the echo of a back() we asked for.
+ *
+ * Classification is per event, not per caller: the first listener to ask spends
+ * one pending traversal, and the rest read the same answer back out.
+ */
+export function isProgrammaticPop(event: Event): boolean {
+  if (handledPops.has(event)) return true;
+  if (pendingProgrammaticPops === 0) return false;
+  pendingProgrammaticPops -= 1;
+  handledPops.add(event);
+  if (pendingProgrammaticPops === 0) clearProgrammaticPopExpiry();
+  return true;
 }
 
 /** Test seam: reset document-level state between cases. */
 export function resetOverlayEntries(): void {
   unconsumedOverlays = [];
-  programmaticPop = false;
+  pendingProgrammaticPops = 0;
+  handledPops = new WeakSet<Event>();
+  clearProgrammaticPopExpiry();
 }
 
 export function claimOverlayEntry(overlayId: string): boolean {
@@ -140,10 +168,10 @@ export function useOverlayBackDismiss({
       );
     }
 
-    const handlePopState = () => {
+    const handlePopState = (event: PopStateEvent) => {
       // An overlay closing above us spends its entry with back(); that event is
       // not a user pressing back and must reach nobody.
-      if (isProgrammaticPop()) return;
+      if (isProgrammaticPop(event)) return;
       // One press, one level. Every nested listener hears the same event, so
       // without this each would claim its own id and dismiss together.
       if (hasOverlayAbove(overlayId)) return;

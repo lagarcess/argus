@@ -27,9 +27,21 @@ export default function LanguageModal({
 }: LanguageModalProps) {
   const overlayId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // Reachable from the drawer, so it must own Escape, focus, and system back
   // or dismissing it takes the drawer underneath with it.
-  useModalSurface({ isOpen: true, overlayId, containerRef: panelRef, onDismiss: onClose });
+  //
+  // The container is the full-screen wrapper, whose first focusable child is
+  // the invisible backdrop dismiss button. Without naming the field, keyboard
+  // users opened straight onto an undisclosed close control where Enter shut
+  // the modal.
+  useModalSurface({
+    isOpen: true,
+    overlayId,
+    containerRef: panelRef,
+    onDismiss: onClose,
+    initialFocusRef: searchInputRef,
+  });
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const lang = i18n.language || "en";
@@ -93,6 +105,7 @@ export default function LanguageModal({
         <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
           <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
           <input
+            ref={searchInputRef}
             type="text"
             autoFocus
             placeholder={t("settings.search_language")}

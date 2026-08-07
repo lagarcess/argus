@@ -132,7 +132,9 @@ describe("bottom sheet keyboard handling", () => {
       join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
       "utf-8",
     );
-    expect(trap).toContain("restoreFocusRef.current?.focus()");
+    expect(trap).toContain("opener.focus()");
+    // And somewhere durable when the opener went away with the drawer.
+    expect(trap).toContain("returnFocusRef");
   });
 });
 

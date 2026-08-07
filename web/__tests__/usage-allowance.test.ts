@@ -242,9 +242,14 @@ describe("private-alpha usage allowance", () => {
       join(root, "components/settings/UsageModal.tsx"),
       "utf-8",
     );
-    expect(modal).toContain("dialogTabTarget");
-    expect(modal).toContain('event.key === "Escape"');
-    expect(modal).toContain("returnFocusRef");
+    // Tab containment belongs to the shared hook now. Running a private copy
+    // beside it moved focus twice per press and skipped a control each time.
+    expect(modal).not.toContain("dialogTabTarget");
+    expect(modal).toContain("useModalSurface");
+    expect(modal).toContain('event.key !== "Escape"');
+    // The opener can be gone by the time this closes, so the fallback is
+    // handed to the hook rather than managed here.
+    expect(modal).toContain("returnFocusRef,");
   });
 
   test("uses flat styling and mobile-sized Usage controls", () => {

@@ -44,6 +44,7 @@ export function useModalFocusTrap({
   overlayId,
   containerRef,
   initialFocusRef,
+  returnFocusRef,
 }: {
   isOpen: boolean;
   /** Identity in the overlay stack, so a parent trap can stand down. */
@@ -51,6 +52,13 @@ export function useModalFocusTrap({
   containerRef: RefObject<HTMLElement | null>;
   /** Where focus lands on open; the first focusable child otherwise. */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * Where focus lands on close when the opener is gone.
+   *
+   * Closing a modal opened from the drawer can unmount the drawer with it, and
+   * restoring to a detached node drops focus to the body.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }): void {
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -71,10 +79,21 @@ export function useModalFocusTrap({
     const target = initialFocusRef?.current ?? focusableElements()[0] ?? null;
     target?.focus();
     return () => {
-      restoreFocusRef.current?.focus();
+      const opener = restoreFocusRef.current;
       restoreFocusRef.current = null;
+      const openerIsPageRoot =
+        opener === document.body || opener === document.documentElement;
+      if (opener?.isConnected && !openerIsPageRoot) {
+        opener.focus();
+        return;
+      }
+      const root = returnFocusRef?.current ?? null;
+      const fallback = root?.matches(FOCUSABLE_SELECTOR)
+        ? root
+        : root?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      fallback?.focus();
     };
-  }, [focusableElements, initialFocusRef, isOpen]);
+  }, [focusableElements, initialFocusRef, isOpen, returnFocusRef]);
 
   useEffect(() => {
     if (!isOpen) return;

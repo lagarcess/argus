@@ -24,6 +24,7 @@ export function useModalSurface({
   containerRef,
   onDismiss,
   initialFocusRef,
+  returnFocusRef,
 }: {
   isOpen: boolean;
   /** Stable per instance; `useId()` at the call site. */
@@ -32,8 +33,15 @@ export function useModalSurface({
   /** Runs for system back. Escape stays with the caller, which may have its own rules. */
   onDismiss: () => void;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }): void {
   useOverlayStackEntry(isOpen, overlayId);
   useOverlayBackDismiss({ isOpen, overlayId, onDismiss });
-  useModalFocusTrap({ isOpen, overlayId, containerRef, initialFocusRef });
+  useModalFocusTrap({
+    isOpen,
+    overlayId,
+    containerRef,
+    initialFocusRef,
+    returnFocusRef,
+  });
 }
