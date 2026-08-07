@@ -124,6 +124,54 @@ So it is in scope here, and it constrains the fix:
 - **Nondeterminism means the test must be able to fail.** A single passing run
   proves nothing here. Reproduce the loss deliberately before claiming a fix.
 
+### 3.5b Dates: the LLM interprets, deterministic code computes (#332)
+
+`argus.nlp.natural_time.parse_date_text` mishandles fractional durations. It
+reads the digit after the decimal point as the whole quantity and discards the
+integer part. Probed against reference date 2026-08-01:
+
+| input | resolves to | equivalent to |
+| --- | --- | --- |
+| `8.5 months ago` | 2026-03-01 | 5 months ago |
+| `3.5 months ago` | 2026-03-01 | 5 months ago |
+| `2.5 months ago` | 2026-03-01 | 5 months ago |
+| `5 months ago` | 2026-03-01 | correct |
+| `2 months ago` | 2026-06-01 | correct |
+
+Every `N.5` collapses to the same date regardless of N. Integer durations are
+correct, so the defect is specific to fractional parsing. Asking for 8.5 months
+returns 5, a 41 percent shortfall; asking for 2.5 months also returns 5, double
+the request.
+
+**Do not patch the fractional case.** The defect is the pattern, not the digit.
+
+This repo forbids regex, hardcoded language gates, and shortcut routing ahead of
+LLM interpretation. A deterministic parser guessing at date prose is a second
+interpreter competing with the real one, and it will keep losing on phrasings
+nobody enumerated. Fractional months are simply the instance that surfaced.
+
+**The macro pattern:**
+
+> The LLM interprets language into a typed value. Deterministic code validates
+> and computes from that value. Deterministic code never parses prose.
+
+Concretely, interpretation emits something typed, a unit and a quantity that may
+be fractional, and date math runs from that. Arithmetic is exactly what
+deterministic code is good at; turning "the last 8.5 months" into a number is
+language, and it belongs to the interpreter.
+
+Where prose parsing remains for a legitimate reason, say why and bound it.
+Silent prose parsing is the thing being removed.
+
+**This is an editing concern** because changing dates is the most common edit on
+the card, and because the failure is the same harm as section 3.2: the user
+silently gets a different experiment than the one they asked for. A dropped
+compound edit and a misparsed duration land the user in the same wrong place.
+
+Nondeterminism note: verify by probing the parser directly, as above, rather
+than through a full turn. LLM interpretation runs first and normalizes some
+phrasings, so a passing journey proves nothing about the parser.
+
 ### 3.6 Versioning: mint on run, never on edit
 
 A confirmed run mints exactly one `IdeaVersion`. Edits to a pending card mint
