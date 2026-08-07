@@ -23,7 +23,6 @@ export type ResultCardDisplayCopy = {
   worstDropLabel: string;
   explainResultAction: string;
   refineIdeaAction: string;
-  saveAction: string;
   unavailable: string;
   returnUnavailable: string;
   changeNoun: string;
@@ -75,7 +74,6 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   worstDropLabel: "Worst drop",
   explainResultAction: "Explain result",
   refineIdeaAction: "Refine idea",
-  saveAction: "Save",
   unavailable: "Unavailable",
   returnUnavailable: "return unavailable",
   changeNoun: "change",
@@ -222,9 +220,6 @@ export function displayResultActionLabel(
   }
   if (action.type === "refine_strategy") {
     return copy.refineIdeaAction;
-  }
-  if (action.type === "save_strategy") {
-    return copy.saveAction;
   }
   return action.label ?? "";
 }

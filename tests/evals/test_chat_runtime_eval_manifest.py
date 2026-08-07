@@ -73,6 +73,48 @@ def test_chat_runtime_eval_manifest_has_judge_and_hard_checks() -> None:
             assert step["hard_checks"]
 
 
+def test_result_action_eval_manifest_matches_current_and_stale_action_contracts() -> None:
+    manifest = _load_manifest()
+    scenarios = {scenario["qa_id"]: scenario for scenario in manifest["scenarios"]}
+
+    qa_8 = scenarios["QA 8"]
+    assert qa_8["action_checks"] == [
+        "show_breakdown and refine_strategy use the latest run id"
+    ]
+
+    qa_9 = scenarios["QA 9"]
+    visible_actions = [
+        step["action_type"]
+        for step in qa_9["conversation_steps"]
+        if step["actor"] == "action"
+    ]
+    assert visible_actions == ["show_breakdown", "refine_strategy"]
+
+    stale_actions = [
+        step
+        for step in qa_9["conversation_steps"]
+        if step["actor"] == "stale_action"
+    ]
+    assert stale_actions == [
+        {
+            "actor": "stale_action",
+            "action_type": "save_strategy",
+            "semantic_target": "return_non_mutating_legacy_save_continuity",
+            "hard_checks": [
+                "reports that the legacy save surface is retired",
+                "keeps the completed run reachable in conversation and Recents",
+                "does not create or mutate Strategy records",
+            ],
+        }
+    ]
+
+    assert not any(
+        step.get("action_type") == "save_strategy" and step["actor"] == "action"
+        for scenario in manifest["scenarios"]
+        for step in scenario["conversation_steps"]
+    )
+
+
 def test_chat_runtime_eval_manifest_separates_hard_checks_from_llm_judgment() -> None:
     manifest = _load_manifest()
     assert manifest["scoring"]["must_pass"].startswith("Hard runtime")

@@ -82,7 +82,7 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
 def test_api_contract_documents_backend_owned_retest_period_truth() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
     message_start = contract.index("\n## Message\n")
-    message_end = contract.index("\n## Strategy\n", message_start)
+    message_end = contract.index("\n## Legacy Strategy Record\n", message_start)
     message_contract = " ".join(contract[message_start:message_end].split())
 
     for exact_rule in (
@@ -320,10 +320,11 @@ def test_active_openapi_uses_alpha_contract_names() -> None:
         "/api/v1/conversations",
         "/api/v1/chat/stream",
         "/api/v1/backtests/run",
-        "/api/v1/collections",
         "/api/v1/history",
     ):
         assert path in text
+    assert "/api/v1/collections" not in text
+    assert "/api/v1/strategies" not in text
     assert "conversation_result_card" in text
     assert "backtest_runs" in text
     assert "portfolios" not in text.lower()

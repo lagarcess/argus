@@ -10,7 +10,6 @@ from argus.api.routers import (
     analytics,
     auth,
     backtest,
-    collections,
     conversation_activity,
     conversations,
     dev,
@@ -22,7 +21,6 @@ from argus.api.routers import (
     personalization_memory,
     profile,
     search,
-    strategies,
 )
 
 cors_allow_origins = app_setup.cors_allow_origins
@@ -45,8 +43,6 @@ for api_router in (
     profile.router,
     conversations.router,
     conversation_activity.router,
-    strategies.router,
-    collections.router,
     backtest.router,
     evidence.router,
     agent.router,

@@ -29,8 +29,6 @@ def test_required_api_router_modules_exist() -> None:
         "auth",
         "profile",
         "conversations",
-        "strategies",
-        "collections",
         "backtest",
         "agent",
         "history",
@@ -43,6 +41,12 @@ def test_required_api_router_modules_exist() -> None:
         path = ROOT / "src" / "argus" / "api" / "routers" / f"{name}.py"
         assert path.exists(), f"missing router {name}"
         assert "router = APIRouter(" in path.read_text(encoding="utf-8")
+
+    for retired_name in ("strategies", "collections"):
+        retired_path = (
+            ROOT / "src" / "argus" / "api" / "routers" / f"{retired_name}.py"
+        )
+        assert not retired_path.exists()
 
 
 def test_shared_dependencies_are_not_in_main() -> None:

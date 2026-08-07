@@ -3395,7 +3395,7 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     assert result.decision.artifact_target == "latest_result"
 
 
-def test_latest_result_save_request_is_history_preserved_when_strategies_disabled(
+def test_latest_result_save_request_is_history_preserved_without_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def unexpected_compose_result_followup_response(**kwargs: Any) -> str:
@@ -3408,7 +3408,6 @@ def test_latest_result_save_request_is_history_preserved_when_strategies_disable
         composed_save_response.update(kwargs)
         return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
 
-    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "false")
     monkeypatch.setattr(
         "argus.agent_runtime.stages.interpret.compose_result_followup_response",
         unexpected_compose_result_followup_response,

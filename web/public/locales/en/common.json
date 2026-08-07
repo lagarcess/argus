@@ -7,11 +7,8 @@
     "history": "History",
     "settings": "Settings",
     "conversation": "Conversation",
-    "strategies": "Strategies",
-    "collections": "Collections",
     "recents": "Recents",
     "run_simulation": "Run simulation",
-    "add_to_collection": "Add to collection",
     "rename": "Rename",
     "delete": "Delete",
     "pin": "Pin",
@@ -280,7 +277,7 @@
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
       "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
-      "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
+      "private_alpha_save_unavailable": "The legacy Strategies library and Save action have been retired. This completed run remains available in this chat and Recents, and you can use Refine idea to continue testing it.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
       "confirmation_action_missing_identity": "That confirmation action is missing its card identity. Use the latest card action before continuing.",
@@ -508,7 +505,6 @@
     "past_sessions": "Past sessions",
     "archive_chat": "Archive chat",
     "no_past_sessions": "No past sessions yet.",
-    "added_to_collection": "Added to \"{{name}}\"",
     "good_response": "Good response",
     "poor_response": "Poor response",
     "more_actions": "More Actions",
@@ -518,8 +514,6 @@
     "copy_failed": "Copy failed",
     "report_issue": "Report Issue",
     "rename_failed": "Could not rename this chat. Try again.",
-    "saved": "Saved",
-    "saving": "Saving",
     "simulation_complete": "Simulation Complete",
     "activity_rail": {
       "aria_label": "Conversation activity",
@@ -570,7 +564,6 @@
         "rejected": "Rejected",
         "revisit_later": "Revisit later"
       },
-      "save": "Save",
       "unavailable": "Unavailable",
       "return_unavailable": "return unavailable",
       "change": "change",
@@ -790,74 +783,6 @@
       "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
     }
   },
-  "strategies": {
-    "empty_state": "Strategies you save from chat will appear here.",
-    "no_match": "No strategies match your search.",
-    "error_load": "Could not load strategies. Make sure the API is running.",
-    "search_placeholder": "Search strategies...",
-    "metrics": {
-      "overall_profit": "overall profit",
-      "max_drawdown": "max drawdown",
-      "win_rate": "win rate"
-    },
-    "unexecuted_hint": "Run this strategy to see performance",
-    "run_hint": "Run this strategy to see how {{symbols}} would have performed.",
-    "best_performer": "Best performer",
-    "suggestions": [
-      {
-        "title": "RSI Threshold",
-        "desc": "Buy or sell when RSI reaches chosen levels.",
-        "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
-      },
-      {
-        "title": "10% Stop-Loss",
-        "desc": "Protect your capital with an automated exit rule.",
-        "prompt": "I want a strategy that buys any stock in my list and automatically sells if the price drops 10% from my entry."
-      },
-      {
-        "title": "Trend Follower",
-        "desc": "Ride the momentum while the price is above the 50-day MA.",
-        "prompt": "Create a strategy that buys whenever the price is above the 50-day moving average on QQQ."
-      },
-      {
-        "title": "Monthly DCA",
-        "desc": "Build positions steadily with fixed recurring buys.",
-        "prompt": "Create a simple monthly DCA strategy that buys SPY on the first trading day of each month."
-      }
-    ]
-  },
-  "collections": {
-    "empty_state": "Add strategy to collection or save from chat to see them here.",
-    "no_match": "No collections match your search.",
-    "error_load": "Could not load collections. Make sure the API is running.",
-    "search_placeholder": "Search collections",
-    "new_collection": "New collection",
-    "no_strategies": "No strategies yet",
-    "strategy_count_one": "{{count}} strategy",
-    "strategy_count_other": "{{count}} strategies",
-    "suggestions": [
-      {
-        "title": "Tech Giants",
-        "desc": "Group FAANG or top semiconductor companies in one place.",
-        "prompt": "I want to create a collection of the top 5 tech giants like AAPL, MSFT, and NVDA."
-      },
-      {
-        "title": "Energy Transition",
-        "desc": "Climate-focused ideas and clean energy plays.",
-        "prompt": "I want to start a collection for energy transition and solar power ideas."
-      },
-      {
-        "title": "Dividend Kings",
-        "desc": "Safe, consistent yield plays for a defensive portfolio.",
-        "prompt": "How should I structure a collection for long-term dividend growth stocks?"
-      },
-      {
-        "title": "Crypto HODL",
-        "desc": "Store your Bitcoin and Ethereum dip-buying logic.",
-        "prompt": "Create a collection for my long-term crypto accumulation strategies."
-      }
-    ]
-  },
   "settings": {
     "title": "Settings",
     "profile": {
@@ -978,7 +903,6 @@
       "deleted_item_note": "Currently restorable.",
       "no_deleted_items": "No recently deleted items",
       "chat_item": "Chat",
-      "strategy_item": "Strategy",
       "delete_all_conversations": "Delete all conversations",
       "delete_all_confirm": {
         "title": "Delete all conversations?",

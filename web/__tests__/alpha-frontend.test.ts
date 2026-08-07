@@ -84,7 +84,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(result.chart?.kind).toBe("portfolio_equity");
   });
 
-  test("collections are indefinitely deferred from private-alpha UI", () => {
+  test("legacy collections and strategies surfaces are removed", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -106,7 +106,8 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(flags).toContain("NEXT_PUBLIC_COLLECTIONS_ENABLED");
+    expect(flags).not.toContain("NEXT_PUBLIC_COLLECTIONS_ENABLED");
+    expect(flags).not.toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(chat).not.toContain("collectionsEnabled");
     expect(chat).toContain("useRecentConversations");
     expect(chat).not.toContain("trigger_create_collection");
@@ -115,10 +116,19 @@ describe("Argus Alpha frontend contract", () => {
     expect(sidebar).not.toContain("Collections");
     expect(settings).not.toContain("collection");
     expect(settings).toContain("items.filter(isDeletedItemVisible)");
-    expect(settings).toContain("strategiesEnabled");
+    expect(settings).not.toContain("strategy");
     expect(settings).not.toContain("<Layers");
     expect(settings).not.toContain("{item.type}");
     expect(palette).toContain("item.canManageConversation");
+    expect(
+      existsSync(join(root, "components/views/CollectionsView.tsx")),
+    ).toBe(false);
+    expect(
+      existsSync(join(root, "components/chat/CollectionPicker.tsx")),
+    ).toBe(false);
+    expect(
+      existsSync(join(root, "components/views/StrategiesView.tsx")),
+    ).toBe(false);
   });
 
   test("chat header keeps the history options affordance", () => {
@@ -538,15 +548,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain("<ResultEquityChart");
     expect(card).toContain('presentation="heroDeltaEvidence"');
     expect(card).toContain("appearanceOverride={appearance}");
-    expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
-    expect(card).toContain("const saveAction = strategiesEnabled");
-    expect(card).toContain('action.type !== "save_strategy"');
+    expect(flags).not.toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
+    expect(card).not.toContain("strategiesEnabled");
+    expect(card).not.toContain('action.type === "save_strategy"');
     expect(labelHelper).toContain('"Explain result"');
     expect(labelHelper).toContain('"Refine idea"');
-    expect(card).toContain('action.type === "save_strategy"');
-    expect(card).toContain("<Save");
-    expect(chat).toContain("if (!strategiesEnabled)");
-    expect(chat).toContain("chat.private_alpha_result_kept");
+    expect(card).not.toContain("<Save");
+    expect(chat).not.toContain("handleSaveStrategyAction");
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
     expect(chart).toContain("buildVisibleSeriesMarkers");
@@ -1162,7 +1170,7 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
-  test("result cards render artifact scoped actions and saved state", () => {
+  test("result cards render only active artifact scoped actions", () => {
     const card = readFileSync(
       join(root, "components/chat/StrategyResultCard.tsx"),
       "utf-8",
@@ -1171,36 +1179,27 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/chat-result-actions.ts"),
       "utf-8",
     );
-    const locale = readFileSync(
-      join(root, "public/locales/en/common.json"),
-      "utf-8",
-    );
-
     expect(card).toContain('action.type === "show_breakdown"');
     expect(card).toContain('action.type === "refine_strategy"');
-    expect(card).toContain('action.type === "save_strategy"');
+    expect(card).not.toContain('action.type === "save_strategy"');
     expect(card).toContain("isVisibleResultAction");
     expect(resultActions).toContain("VISIBLE_RESULT_ACTION_TYPES");
     expect(resultActions).toContain("isVisibleResultAction");
     expect(card).not.toContain("...resultActions.filter(");
     expect(resultActions).not.toContain("next_experiment");
     expect(resultActions).not.toContain("try_next");
-    expect(card).toContain("result.savedStrategyId");
-    expect(card).toContain("chat.saved");
-    expect(locale).toContain('"saved": "Saved"');
+    expect(resultActions).not.toContain('"save_strategy"');
   });
 
-  test("chat updates saved state from save strategy final payloads", () => {
+  test("legacy saved strategy metadata remains read-safe without a write action", () => {
     const chat = readChatImplementationSource();
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
 
     expect(types).toContain("savedStrategyId?: string | null");
-    expect(chat).toContain("handleSaveStrategyAction");
     expect(chat).toContain("hiddenSaveActionMessageIdsFromApi");
-    expect(chat).toContain("markResultCardSaved");
     expect(chat).toContain("saved_strategy_id");
-    expect(chat).toContain("result_strategy_id");
-    expect(chat).toContain('action.type === "save_strategy"');
+    expect(chat).not.toContain("handleSaveStrategyAction");
+    expect(chat).not.toContain("markResultCardSaved");
   });
 
   test("saved result state is not inferred from plain result strategy linkage", () => {
@@ -2780,7 +2779,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(settings).toContain("{showSubscriptionSection && (");
   });
 
-  test("sidebar keeps strategies flagged while omnisearch is enabled by default", () => {
+  test("sidebar keeps omnisearch enabled without legacy strategy navigation", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -2794,7 +2793,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
+    expect(flags).not.toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(flags).toContain("NEXT_PUBLIC_OMNISEARCH_ENABLED");
     expect(flags).toContain(
       'process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false"',
@@ -2802,26 +2801,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toMatch(
       /omnisearchEnabled &&\s*\(!isGuest \|\| canUseOmnisearch\) &&\s*searchOverlayOpen/,
     );
-    expect(sidebar).toContain("strategiesEnabled");
+    expect(sidebar).not.toContain("strategiesEnabled");
     expect(sidebar).toContain("omnisearchEnabled");
     expect(sidebar).toContain("{omnisearchEnabled && (");
-    expect(sidebar).toContain("{strategiesEnabled && (");
+    expect(sidebar).not.toContain('onNavigate("strategies")');
     expect(sidebar).toContain("common.recents");
   });
 
-  test("strategies surface renders dynamic metrics based on preferences", () => {
-    const file = readFileSync(
-      join(root, "components/views/StrategiesView.tsx"),
-      "utf-8",
-    );
-    expect(file).toContain("strategy.columns.map(");
-    expect(file).toContain("asset.pills.map(");
-    expect(file).not.toContain(
-      'className="grid grid-cols-4 gap-2 items-end pb-2 sticky top-[-1px]',
-    );
-    expect(file).toContain(
-      "style={{ gridTemplateColumns: `repeat(${strategy.columns.length + 1}, minmax(0, 1fr))` }}",
-    );
+  test("strategies view is no longer shipped", () => {
+    expect(
+      existsSync(join(root, "components/views/StrategiesView.tsx")),
+    ).toBe(false);
   });
 
   test("no shadow utility classes are used in chat input", () => {

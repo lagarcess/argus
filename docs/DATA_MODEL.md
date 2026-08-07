@@ -17,8 +17,8 @@ The data model must support:
 - multi-chat conversations
 - persistent user preferences
 - AI-generated titles/names
-- saved strategies
-- strategy collections
+- legacy saved strategies (read compatibility only)
+- legacy strategy collections (read compatibility only)
 - reproducible backtest runs
 - symbol-level and aggregate metrics
 - soft deletion and archive behavior
@@ -62,9 +62,9 @@ profiles
 conversations
 messages
 chat_turn_lifecycles
-strategies
-collections
-collection_strategies
+strategies                         # legacy read compatibility; no new writes
+collections                        # legacy read compatibility; no new writes
+collection_strategies               # legacy read compatibility; no new writes
 backtest_jobs
 backtest_runs
 ideas
@@ -539,7 +539,9 @@ message, job, Run, artifact, or sort timestamps.
 
 # 9. strategies
 
-Represents a saved, executable strategy idea backed by an engine template.
+Legacy saved executable-idea record. The table remains owner-scoped and readable
+so historical runs and history entries do not break; no active product path
+creates, patches, restores, or deletes Strategy rows.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -566,16 +568,19 @@ Represents a saved, executable strategy idea backed by an engine template.
 - **Note**: Strategies may target multiple symbols but only within the same `asset_class`.
 
 > [!TIP]
-> **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
+> **Global Rule**: Historical Collection rows may contain mixed asset classes.
+> Backtest runs may not mix asset classes operationally, and no current flow
+> creates or manages Collections.
 
 ### Notes
-- Strategies can be created directly or derived from a chat conversation.
-- Display metrics are derived from the most recent `backtest_runs`, not stored statically here.
+- Existing rows may still parent an owner-scoped direct backtest through
+  `backtest_runs.strategy_id` compatibility.
+- Display metrics on old rows remain readable; there is no Strategies surface.
 ---
 
 # 10. collections
 
-Collections grouping related strategies. These serve as lightweight organizational themes in Alpha.
+Legacy groupings retained only for owner-scoped historical reads.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -589,10 +594,11 @@ Collections grouping related strategies. These serve as lightweight organization
 - `updated_at`: `timestamptz`
 
 ### Notes
-- Collections do **not** perform aggregate portfolio simulations in Alpha.
-- They help users organize strategies by theme (e.g., "Tech Growth", "Crypto Dips").
-- **Asset Mixing**: Collections may contain Equity, Crypto, and Currency Pair
-  strategies, but they cannot be executed as a mixed-asset batch.
+- No active product path creates, patches, restores, deletes, attaches, or
+  detaches Collection records.
+- Collections do **not** perform aggregate portfolio simulations.
+- **Historical asset mixing**: Existing rows may contain Equity, Crypto, and
+  Currency Pair strategies, but they cannot be executed as a mixed-asset batch.
 ---
 
 # 11. collection_strategies
@@ -664,7 +670,8 @@ Represents an immutable result of a simulation. Every run is reproducible from i
   `conversation_result_card.execution_costs` stores structured result evidence:
   `fee_bps`, `slippage_bps`, gross/net total return, return drag, and benchmark
   cost treatment. Idealized runs omit this object.
-- Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
+- Historical `strategy_id` linkage must be read from canonical stored records,
+  never reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from
   `config_snapshot` or equivalent canonical run metadata. A user's partial
   change request may update the relevant field, but omitted run fields such as
@@ -1355,7 +1362,9 @@ private-alpha support requests such as account deletion requests.
 # 16. Soft Delete & Archive Rules
 
 ### Soft Delete
-Used for **conversations**, **strategies**, and **collections**. These items should be filtered out by default but remain in the DB for "Recently Deleted" recovery.
+Used for **conversations** and retained on legacy **strategies** and
+**collections** rows. Legacy rows remain filtered/read-safe, but only
+conversation recovery is exposed in the current product.
 
 ### Archive
 Used specifically for **conversations** to hide them from the primary sidebar without deleting the data.
@@ -1367,9 +1376,9 @@ Recents is a mixed-type feed displaying activity across the platform.
 
 ### Supported Types
 - `chat`
-- `strategy`
-- `collection`
 - `run`
+- `strategy` (legacy read compatibility only)
+- `collection` (legacy read compatibility only)
 
 ### Standard History Shape
 ```json
@@ -1396,13 +1405,15 @@ types. It is not stored on the conversation and does not affect History order.
 Alpha supports keyword-based search across core entities.
 
 ### Scope
-- **Surface Search**: Filter-by-type search (e.g., searching only Strategies).
-- **Global Search**: Omni-search spanning Conversations, Strategies, and Collections.
+- **Global Search**: Omni-search spanning current Conversation, Run, Idea,
+  Evidence, and Decision artifacts.
 
 ### Future
 Semantic search using embeddings is deferred until post-Alpha.
 - Do not add embedding or pgvector tables for the production readiness chat/backtest branch.
-- Use structured Supabase records, run metadata, saved strategies, and keyword search until Argus needs semantic recall across large histories.
+- Use structured Supabase records, run metadata, Idea/Evidence/Decision
+  artifacts, and keyword search until Argus needs semantic recall across large
+  histories.
 
 ---
 
@@ -1507,7 +1518,8 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 
 # 21. Naming & Title Defaults
 
-AI-generated names and titles are the default for conversations, strategies, and collections.
+AI-generated titles are the default for conversations. Historical Strategy and
+Collection names are read-only compatibility data.
 
 ### Source Tracking
 - `system_default`: The initial placeholder before AI processing.

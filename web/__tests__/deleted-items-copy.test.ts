@@ -36,4 +36,17 @@ describe("Recently Deleted neutral restore copy", () => {
     expect(view).not.toContain("Eligible for permanent deletion soon");
     expect(view).not.toContain("retention_expires_at");
   });
+
+  test("legacy compatibility rows cannot suppress the chat-only empty state", () => {
+    const view = readFileSync(
+      join(root, "components/settings/DeletedItemsView.tsx"),
+      "utf-8",
+    );
+
+    expect(view).toContain(
+      "setDeletedItems(items.filter(isDeletedItemVisible))",
+    );
+    expect(view).toContain("deletedItems.map((item) =>");
+    expect(view).not.toContain("deletedItems.filter((item)");
+  });
 });

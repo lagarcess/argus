@@ -7,7 +7,7 @@ from loguru import logger
 from argus.api import state as api_state
 from argus.api.message_store import load_runtime_thread_history
 from argus.api.naming import suggest_entity_name
-from argus.api.schemas import BacktestRun, Conversation, Strategy
+from argus.api.schemas import BacktestRun, Conversation
 from argus.domain.store import utcnow
 
 MAX_ARTIFACT_NAME_CHARS = 80
@@ -71,45 +71,6 @@ def maybe_generate_conversation_title(
     return candidate
 
 
-def maybe_generate_saved_strategy_name(
-    *,
-    user_id: str,
-    strategy_id: str,
-    run: BacktestRun,
-    language: str | None,
-) -> str | None:
-    """Upgrade fallback saved strategy names without touching run evidence."""
-
-    strategy = _get_strategy(user_id=user_id, strategy_id=strategy_id)
-    if strategy is None or strategy.name_source == "user_renamed":
-        return None
-
-    context = _strategy_name_context_from_run(run)
-    if not context.strip():
-        return None
-
-    candidate = _clean_name(
-        suggest_entity_name(
-            entity_type="strategy",
-            context=context,
-            language=language,
-        )
-    )
-    if candidate is None:
-        return None
-
-    refreshed = _get_strategy(user_id=user_id, strategy_id=strategy_id)
-    if refreshed is None or refreshed.name_source == "user_renamed":
-        return None
-
-    _patch_strategy_name(
-        user_id=user_id,
-        strategy_id=strategy_id,
-        name=candidate,
-    )
-    return candidate
-
-
 def _get_conversation(*, user_id: str, conversation_id: str) -> Conversation | None:
     if api_state.supabase_gateway is not None:
         try:
@@ -124,22 +85,6 @@ def _get_conversation(*, user_id: str, conversation_id: str) -> Conversation | N
                 conversation_id=conversation_id,
             )
     return api_state.store.conversations.get(conversation_id)
-
-
-def _get_strategy(*, user_id: str, strategy_id: str) -> Strategy | None:
-    if api_state.supabase_gateway is not None:
-        try:
-            return api_state.supabase_gateway.get_strategy(
-                user_id=user_id,
-                strategy_id=strategy_id,
-            )
-        except Exception:
-            logger.opt(exception=True).warning(
-                "Strategy read failed during artifact naming",
-                user_id=user_id,
-                strategy_id=strategy_id,
-            )
-    return api_state.store.strategies.get(strategy_id)
 
 
 def _latest_completed_run_for_conversation(
@@ -207,51 +152,12 @@ def _patch_conversation_title(
         )
 
 
-def _patch_strategy_name(
-    *,
-    user_id: str,
-    strategy_id: str,
-    name: str,
-) -> None:
-    patch = {"name": name, "name_source": "ai_generated"}
-    if api_state.supabase_gateway is not None:
-        try:
-            api_state.supabase_gateway.patch_strategy(
-                user_id=user_id,
-                strategy_id=strategy_id,
-                patch=dict(patch),
-            )
-            return
-        except Exception:
-            logger.opt(exception=True).warning(
-                "Strategy name patch failed during artifact naming",
-                user_id=user_id,
-                strategy_id=strategy_id,
-            )
-
-    strategy = api_state.store.strategies.get(strategy_id)
-    if strategy is not None:
-        api_state.store.strategies[strategy_id] = strategy.model_copy(
-            update={**patch, "updated_at": utcnow()}
-        )
-
-
 def _conversation_title_context_from_run(run: BacktestRun) -> str:
     return "\n".join(
         [
             "Name this Argus conversation from the most relevant completed run.",
             _run_fact_context(run),
             "Prefer the user's tested idea over generic result labels.",
-        ]
-    )
-
-
-def _strategy_name_context_from_run(run: BacktestRun) -> str:
-    return "\n".join(
-        [
-            "Name this saved Argus strategy from canonical run facts.",
-            _run_fact_context(run),
-            "Use a reusable strategy-style name, not a sentence.",
         ]
     )
 

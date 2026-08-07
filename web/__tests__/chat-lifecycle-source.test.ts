@@ -373,7 +373,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
   });
 
-  test("successful durable result actions invalidate the owning transcript cache", () => {
+  test("successful durable decisions invalidate the owning transcript cache", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -401,24 +401,6 @@ describe("chat archive/delete lifecycle source contract", () => {
       decisionSuccessStart,
       decisionSuccessEnd,
     );
-    const saveActionStart = chat.indexOf(
-      "const handleSaveStrategyAction = async",
-    );
-    const saveActionEnd = chat.indexOf(
-      "const handleLogout = async",
-      saveActionStart,
-    );
-    const saveAction = chat.slice(saveActionStart, saveActionEnd);
-    const savedStrategyStart = saveAction.indexOf("if (savedStrategyId)");
-    const savedStrategyEnd = saveAction.indexOf(
-      "} else if",
-      savedStrategyStart,
-    );
-    const savedStrategySuccess = saveAction.slice(
-      savedStrategyStart,
-      savedStrategyEnd,
-    );
-
     expect(decisionSuccessStart).toBeGreaterThan(-1);
     expect(decisionSuccessEnd).toBeGreaterThan(decisionSuccessStart);
     expect(decisionSuccess).toContain(
@@ -435,9 +417,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
     expect(message).toContain("onDecisionSaved={onDecisionSaved}");
     expect(chat).toContain("onDecisionSaved={(decisionState) =>");
-    expect(savedStrategySuccess).toContain("invalidateTranscriptForMutation(");
-    expect(savedStrategySuccess).toContain("targetConversationId");
-    expect(savedStrategySuccess).toContain('"durable_result_action"');
+    expect(chat).toContain(
+      'invalidateTranscriptForMutation(conversationId, "durable_result_action")',
+    );
     expect(cache).toContain('| "durable_result_action"');
   });
 
