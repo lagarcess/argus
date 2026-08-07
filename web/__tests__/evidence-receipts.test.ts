@@ -1,0 +1,131 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  RECEIPT_OWNER_NOTE_MAX_LENGTH,
+  receiptFailureReason,
+  receiptUrl,
+  type EvidenceReceipt,
+} from "../lib/evidence-receipts";
+import { evidenceReceiptSharingEnabled } from "../lib/private-alpha-flags";
+
+const WEB_ROOT = join(import.meta.dir, "..");
+const SHARE_ACTION = join(WEB_ROOT, "components/chat/ShareReceiptAction.tsx");
+const RECEIPT_LIST = join(WEB_ROOT, "components/settings/SharedReceiptsView.tsx");
+const RESULT_CARD = join(WEB_ROOT, "components/chat/StrategyResultCard.tsx");
+const PROFILE_MENU = join(WEB_ROOT, "components/sidebar/ProfileMenu.tsx");
+
+function source(path: string): string {
+  return readFileSync(path, "utf8");
+}
+
+const RECEIPT: EvidenceReceipt = {
+  id: "receipt-1",
+  public_id: "abcdefghijklmnopqrstuvwx",
+  path: "/r/abcdefghijklmnopqrstuvwx",
+  title: "AAPL buy and hold",
+  symbols: ["AAPL"],
+  date_range_display: "Jan 2, 2024 to Mar 1, 2024",
+  created_at: "2026-08-07T12:00:00Z",
+  revoked_at: null,
+  revocation_reason: null,
+};
+
+describe("the sharing flag", () => {
+  test("is off unless the environment says exactly true", () => {
+    // The lane must not enable itself by landing.
+    expect(evidenceReceiptSharingEnabled).toBe(false);
+    const flags = source(join(WEB_ROOT, "lib/private-alpha-flags.ts"));
+    expect(flags).toContain(
+      'process.env.NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED === "true"',
+    );
+  });
+
+  test("gates every owner surface", () => {
+    expect(source(RESULT_CARD)).toContain("evidenceReceiptSharingEnabled &&");
+    expect(source(PROFILE_MENU)).toContain("evidenceReceiptSharingEnabled");
+  });
+});
+
+describe("receipt urls", () => {
+  test("compose from the current origin, so the backend owns no origin config", () => {
+    expect(receiptUrl(RECEIPT)).toBe(RECEIPT.path);
+    expect(source(join(WEB_ROOT, "lib/evidence-receipts.ts"))).toContain(
+      "window.location.origin",
+    );
+  });
+
+  test("fall back to the public id when the server omits a path", () => {
+    expect(receiptUrl({ ...RECEIPT, path: "" })).toBe(
+      `/r/${RECEIPT.public_id}`,
+    );
+  });
+});
+
+describe("failure reasons", () => {
+  test("map the note rejection, the rate limit, and everything else", () => {
+    expect(receiptFailureReason({ code: "receipt_note_rejected" })).toBe(
+      "note_rejected",
+    );
+    expect(receiptFailureReason({ status: 429 })).toBe("rate_limited");
+    expect(receiptFailureReason({ status: 500 })).toBe("unavailable");
+    expect(receiptFailureReason(null)).toBe("unavailable");
+  });
+});
+
+describe("copy link is the primary action", () => {
+  test("no native share sheet anywhere on the owner surfaces", () => {
+    for (const path of [SHARE_ACTION, RECEIPT_LIST]) {
+      const body = source(path);
+      expect(body).not.toContain("navigator.share");
+      expect(body).toContain("copyReceiptLink");
+    }
+  });
+});
+
+describe("the owner note", () => {
+  test("is bounded in the input, matching the backend bound", () => {
+    expect(RECEIPT_OWNER_NOTE_MAX_LENGTH).toBe(280);
+    expect(source(SHARE_ACTION)).toContain(
+      "maxLength={RECEIPT_OWNER_NOTE_MAX_LENGTH}",
+    );
+  });
+
+  test("warns that it is public before the owner types into it", () => {
+    const body = source(SHARE_ACTION);
+    const warningIndex = body.indexOf("note_public_warning");
+    const textareaIndex = body.indexOf("<textarea");
+    expect(warningIndex).toBeGreaterThan(-1);
+    expect(textareaIndex).toBeGreaterThan(-1);
+    // Rendered directly under the field, so it is read with it, not after.
+    expect(warningIndex).toBeGreaterThan(textareaIndex);
+  });
+});
+
+describe("the receipt list", () => {
+  test("offers revoke in one action per row", () => {
+    const body = source(RECEIPT_LIST);
+    expect(body).toContain("revokeEvidenceReceipt");
+    expect(body).toContain("receipt.list.confirm_revoke");
+  });
+
+  test("states the cached-preview limit rather than implying links vanish", () => {
+    expect(source(RECEIPT_LIST)).toContain("receipt.list.cache_note");
+  });
+
+  test("shows why a receipt was revoked when the source went away", () => {
+    expect(source(RECEIPT_LIST)).toContain("source_deleted");
+  });
+
+  test("names no source conversation or run", () => {
+    const body = source(RECEIPT_LIST).toLowerCase();
+    for (const forbidden of [
+      "source_conversation",
+      "source_run",
+      "evidence_artifact_id",
+      "owner_id",
+    ]) {
+      expect(body).not.toContain(forbidden);
+    }
+  });
+});
