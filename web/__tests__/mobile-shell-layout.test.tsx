@@ -4,6 +4,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  effectivePaletteLayout,
+  paletteRowActionVariant,
+} from "../components/sidebar/command-palette/paletteLayout";
 
 import {
   BELOW_DESKTOP_QUERY,
@@ -349,9 +353,9 @@ describe("mobile top bar", () => {
 
 describe("omnisearch below threshold", () => {
   test("is collapsed-only", () => {
-    expect(commandPalette).toContain(
-      'const effectiveLayoutMode: LayoutMode = isBelowTablet ? "collapsed" : layoutMode;',
-    );
+    expect(commandPalette).toContain("effectivePaletteLayout(layoutMode, isBelowTablet)");
+    expect(effectivePaletteLayout("expanded", true)).toBe("collapsed");
+    expect(effectivePaletteLayout("expanded", false)).toBe("expanded");
   });
 
   test("hides the layout toggle where the band forces collapsed", () => {
@@ -383,9 +387,9 @@ describe("omnisearch below threshold", () => {
   test("row actions are explicit at every width a touch device is likely to use", () => {
     // Hover reveal cannot be the only affordance where hover does not exist, so
     // the whole band below the desktop stop gets the visible menu.
-    expect(commandPalette).toContain(
-      'const rowActionVariant = isBelowDesktop ? "menu" : "hover";',
-    );
+    expect(commandPalette).toContain("paletteRowActionVariant(isBelowDesktop)");
+    expect(paletteRowActionVariant(true)).toBe("menu");
+    expect(paletteRowActionVariant(false)).toBe("hover");
   });
 
   test("row actions read like Recents and announce the object they act on", () => {

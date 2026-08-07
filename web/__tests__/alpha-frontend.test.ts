@@ -10,6 +10,7 @@ import {
   type ChatStreamEvent,
 } from "../lib/argus-api";
 import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
+import { effectivePaletteLayout } from "../components/sidebar/command-palette/paletteLayout";
 
 const root = join(import.meta.dir, "..");
 
@@ -2083,9 +2084,8 @@ describe("Argus Alpha frontend contract", () => {
     // mouse machine gets the mobile one.
     expect(palette).not.toContain('window.matchMedia("(pointer: coarse)")');
     expect(palette).toContain("useResponsiveLayout()");
-    expect(palette).toContain(
-      'const effectiveLayoutMode: LayoutMode = isBelowTablet ? "collapsed" : layoutMode;',
-    );
+    expect(palette).toContain("effectivePaletteLayout(layoutMode, isBelowTablet)");
+    expect(effectivePaletteLayout("expanded", true)).toBe("collapsed");
     expect(palette).toContain("text-[16px]");
     expect(palette).toContain("min-h-11");
   });

@@ -89,6 +89,11 @@ import {
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
 import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
+import {
+  effectivePaletteLayout,
+  paletteRowActionVariant,
+  type LayoutMode,
+} from "./command-palette/paletteLayout";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type ChatCommandPaletteProps = {
@@ -111,7 +116,6 @@ type ChatCommandPaletteProps = {
   onConversationRemoved?: (conversationId: string) => void;
 };
 
-type LayoutMode = "expanded" | "collapsed";
 type SearchReadError = "history" | "search" | "ledger" | null;
 type DateDisplayGroup = {
   id: string;
@@ -284,13 +288,8 @@ export default function ChatCommandPalette({
   const paletteOverlayId = useId();
   const paletteRef = useRef<HTMLDivElement>(null);
   const [isDossierSheetOpen, setIsDossierSheetOpen] = useState(false);
-  // Below the mobile threshold Omnisearch is collapsed-only: there is no room
-  // for a second pane, and the dossier arrives as a sheet instead.
-  const effectiveLayoutMode: LayoutMode = isBelowTablet ? "collapsed" : layoutMode;
-  // Hover reveal only works where hover exists. Every width below the desktop
-  // stop gets the explicit menu, and the hover variant stays visible under
-  // `@media (hover: none)` so a touch screen at desktop width is covered too.
-  const rowActionVariant = isBelowDesktop ? "menu" : "hover";
+  const effectiveLayoutMode = effectivePaletteLayout(layoutMode, isBelowTablet);
+  const rowActionVariant = paletteRowActionVariant(isBelowDesktop);
   const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
     DEFAULT_DOSSIER_PANE_STATE,
