@@ -1370,6 +1370,10 @@ export default function ChatInterface() {
         } else if (finalText) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
+          const finalTextNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
+          const finalTextPresentation =
+            action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1382,10 +1386,8 @@ export default function ChatInterface() {
                   strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
-                  contentPresentation:
-                    action?.type === "show_breakdown"
-                      ? "result_breakdown"
-                      : undefined,
+                  nextExperiments: finalTextNextExperiments,
+                  contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
@@ -1401,10 +1403,8 @@ export default function ChatInterface() {
                 strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
-                contentPresentation:
-                  action?.type === "show_breakdown"
-                    ? "result_breakdown"
-                    : undefined,
+                nextExperiments: finalTextNextExperiments,
+                contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
               },
             );

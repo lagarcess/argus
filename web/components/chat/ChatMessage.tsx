@@ -605,12 +605,12 @@ export default function ChatMessage({
             />
           ) : null}
 
-          {/* The result's own Try next rows are the sanctioned next-move
-              surface; only mid-turn composition suppresses them. */}
+          {/* Try next rows are the sanctioned next-move surface for any
+              message that carries them (results, grounded knowledge answers);
+              only mid-turn composition suppresses them. */}
           {shouldShowAssistantFooter &&
             Boolean(isLatest) &&
             !turnInFlight &&
-            message.kind === "strategy_result" &&
             (message.nextExperiments?.length ?? 0) > 0 && (
               <section
                 aria-label={t("chat.next_experiments.section", "Try next")}
