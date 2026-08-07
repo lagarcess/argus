@@ -84,8 +84,20 @@ and inherits every rule in section 3.
 **Mobile first, unlike the rest of Argus.** Shared links are opened
 overwhelmingly on phones, from messaging apps. The public view should be
 designed for a phone and scale up, which is the inverse of the app's current
-posture. It also means the public view does not wait on the mobile PWA lane;
-it is a separate surface with its own layout.
+posture.
+
+The receipt view is a standalone public route with its own layout, no app shell,
+so it can be **built** independently of the mobile PWA lane.
+
+**Enabling it is a separate matter and requires founder approval.** The Try
+Argus call to action lands on guest entry, which is not yet good on phones; that
+is exactly why mobile is the public-exposure gate. Enabling sharing before that
+means a stranger opens a receipt on a phone, it looks right, they tap through,
+and they land somewhere that does not work. That spends a good first impression
+to deliver a bad one, which is worse than not sharing at all.
+
+So: build whenever, ship behind a default-off flag, and **the founder decides
+when it turns on**. Nothing about this surface enables itself by landing.
 
 **Copy link is the primary action.** Not a native share sheet, which behaves
 inconsistently and buries the URL.
