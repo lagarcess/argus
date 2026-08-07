@@ -903,6 +903,7 @@ export default function ChatSidebar({
             onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
             anchorRef={profileButtonRef}
             sidebarCollapsed={!isOpen}
+            placement={variant}
           />
           <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
             <SidebarNavButton

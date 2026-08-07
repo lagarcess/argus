@@ -123,7 +123,13 @@ export default function SidebarDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex" data-testid="sidebar-drawer">
+    /*
+     * The drawer sits above page chrome and below every dialog, because
+     * everything it hosts opens on top of it. At z-100 it outranked the six
+     * settings modals and the profile dialogs, which all live at 70 to 80, so
+     * Settings opened behind the panel that launched it. Keep this under 70.
+     */
+    <div className="fixed inset-0 z-[68] flex" data-testid="sidebar-drawer">
       <div
         aria-hidden="true"
         onClick={onClose}

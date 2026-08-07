@@ -1,7 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
+import { useModalSurface } from "../layout/useModalSurface";
+import { hasOverlayAbove } from "../layout/overlayStack";
+import {
+  profileMenuClass,
+  profileSubmenuClass,
+} from "./profileMenuPlacement";
 import {
   Activity,
   Archive,
@@ -67,6 +80,11 @@ type ProfileMenuProps = {
   anchorRef: React.RefObject<HTMLElement | null>;
   /** Whether the sidebar is collapsed (affects menu position) */
   sidebarCollapsed?: boolean;
+  /**
+   * Where the menu is opening from. The rail can afford a detached popover that
+   * flies its submenus out to the right; a drawer cannot.
+   */
+  placement?: "rail" | "drawer";
 };
 
 type ActiveModal =
@@ -121,8 +139,11 @@ export default function ProfileMenu({
   onOpenKeyboardShortcuts,
   anchorRef,
   sidebarCollapsed = false,
+  placement = "rail",
 }: ProfileMenuProps) {
   const { t, i18n } = useTranslation();
+  const isDrawerPlacement = placement === "drawer";
+  const menuOverlayId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
   const avatarTriggerRef = useRef<HTMLButtonElement>(null);
@@ -239,15 +260,36 @@ export default function ProfileMenu({
     return () => document.removeEventListener("mousedown", handler);
   }, [isOpen, onClose, anchorRef]);
 
+  // Opened from the drawer this is a modal surface, not a detached popover: it
+  // owns system back ahead of the drawer, and Tab has to reach it.
+  useModalSurface({
+    isOpen: isOpen && isDrawerPlacement,
+    overlayId: menuOverlayId,
+    containerRef: menuRef,
+    onDismiss: onClose,
+  });
+
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (!isDrawerPlacement) {
+        onClose();
+        return;
+      }
+      if (hasOverlayAbove(menuOverlayId)) return;
+      // Stacked in the drawer a submenu is the shallower thing on screen, so it
+      // answers first instead of both levels closing on one press.
+      if (activeSubmenu) {
+        setActiveSubmenu(null);
+        return;
+      }
+      onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [isOpen, onClose]);
+  }, [activeSubmenu, isDrawerPlacement, isOpen, menuOverlayId, onClose]);
 
   useEffect(() => {
     if (!activeModal) return;
@@ -303,11 +345,15 @@ export default function ProfileMenu({
     }
   }, [isOpen]);
 
+  // A tap emits mouseenter as well as click, so hover-to-open and tap-to-toggle
+  // cancelled each other out and no submenu ever appeared in the drawer. Touch
+  // has no hover to express intent with, so the tap is the only opener there.
   const handleSubmenuEnter = useCallback((menu: SubMenu) => {
+    if (isDrawerPlacement) return;
     if (!canOpenSubmenu) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
     setActiveSubmenu(menu);
-  }, [canOpenSubmenu]);
+  }, [canOpenSubmenu, isDrawerPlacement]);
 
   const handleSubmenuToggle = useCallback((menu: SubMenu) => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -315,9 +361,10 @@ export default function ProfileMenu({
   }, []);
 
   const handleSubmenuLeave = useCallback(() => {
+    if (isDrawerPlacement) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
     submenuTimeoutRef.current = setTimeout(() => setActiveSubmenu(null), 250);
-  }, []);
+  }, [isDrawerPlacement]);
 
   const handleSubmenuKeepAlive = useCallback(() => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -1180,14 +1227,18 @@ export default function ProfileMenu({
 
   // ── Menu rendering ──────────────────────────────────────────────────────
 
-  // Position: detached from sidebar, consistently to the right
-  const menuLeft = sidebarCollapsed ? "68px" : "16px";
+  const { className: menuClassName, left: menuLeft } = profileMenuClass(
+    placement,
+    sidebarCollapsed,
+  );
+  const submenuSurfaceClass = (railSizeClass: string) =>
+    profileSubmenuClass(placement, railSizeClass);
 
   const menu = (
     <div
       ref={menuRef}
       data-profile-menu-surface
-      className="fixed bottom-16 z-[60] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>div>button]:mx-1 [&>div>button]:my-0.5 [&>div>button]:w-[calc(100%-0.5rem)] [&>div>button]:rounded-[10px]"
+      className={menuClassName}
       style={{
         left: menuLeft,
         boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
@@ -1224,7 +1275,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "data" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-h-[294px] min-w-[304px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
+            className={submenuSurfaceClass("min-h-[294px] min-w-[304px]")}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1339,7 +1390,7 @@ export default function ProfileMenu({
         {activeSubmenu === "settings" && (
           <div
             aria-label={t("settings.preferences.title", "Preferences")}
-            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
+            className={submenuSurfaceClass("min-w-[248px]")}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1404,7 +1455,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "help" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>a]:mx-1 [&>a]:my-0.5 [&>a]:w-[calc(100%-0.5rem)] [&>a]:rounded-[10px]"
+            className={`${submenuSurfaceClass("min-w-[248px]")} [&>a]:mx-1 [&>a]:my-0.5 [&>a]:w-[calc(100%-0.5rem)] [&>a]:rounded-[10px]`}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1459,7 +1510,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "feedback" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
+            className={submenuSurfaceClass("min-w-[248px]")}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1536,10 +1587,14 @@ export default function ProfileMenu({
     </div>
   );
 
-  return typeof document !== "undefined" ? (
+  if (typeof document === "undefined") return null;
+
+  return (
     <>
-      {createPortal(menu, document.body)}
-      {deleteRequestDialog ? createPortal(deleteRequestDialog, document.body) : null}
+      {isDrawerPlacement ? menu : createPortal(menu, document.body)}
+      {deleteRequestDialog
+        ? createPortal(deleteRequestDialog, document.body)
+        : null}
     </>
-  ) : null;
+  );
 }

@@ -30,10 +30,11 @@ const DRAWER = "components/sidebar/SidebarDrawer.tsx";
  * ProfileMenu, and Language, Usage, and Memory open from there, so dismissing
  * one closed the drawer underneath it. Those are fixed and off the list.
  *
+ * `ProfileMenu` came off next, for the same reason it went on: it is what the
+ * drawer's Settings entry opens, and it needed system back and a focus trap of
+ * its own before that entry worked at all.
+ *
  * What remains is genuinely not reachable from a surface this lane changed.
- * `ProfileMenu` stays because its own two panels need care its budget does not
- * currently allow; the modals it opens are managed, so the leak that mattered
- * is closed.
  *
  * Shrink this list; never add to it.
  */
@@ -42,7 +43,6 @@ const UNMANAGED_MODAL_DEBT = new Set([
   "components/chat/DiscoverySourcesPanel.tsx",
   "components/guest/GuestConversionModal.tsx",
   "components/guest/GuestNewConversationDialog.tsx",
-  "components/sidebar/ProfileMenu.tsx",
   "components/sidebar/RecentsQuickPeek.tsx",
 ]);
 
