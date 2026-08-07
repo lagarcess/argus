@@ -209,6 +209,52 @@ context, or safe defaults. A suggestion that fails when tapped is worse than no
 suggestion. Prebake for retention, engagement, and conversion, but only what
 truly runs.
 
+## 10b. Entry surface copy
+
+The current entry under-promises now that Argus is not bounded to backtesting.
+
+**Composer placeholder.** `chat.input_placeholder` is "Describe an investing
+idea". It instructs rather than invites: "describe" assumes the user already has
+an idea, and "investing idea" excludes questions. That tells every arriving user
+they must show up with a strategy, which is the exact barrier this rail removes.
+
+Widen it to state both halves in one line, for example "Ask about a company, or
+describe an idea to test". Final wording is a copy decision; the requirement is
+that it communicates answering and testing without listing features.
+
+**Starter chips.** `chat.example_queries` currently holds three backtests
+(q1-q3), which implies backtesting is all Argus does. Keep three chips, but span
+the range, so breadth is inferred from variety rather than from a list:
+
+- a learn-shaped question
+- a compare-shaped question
+- a test-shaped question
+
+**Phrase every chip as something a user would say, never as a capability name.**
+"Compare Costco against Walmart and Target" teaches capability implicitly.
+"Competitor Analysis" is a feature label, and labeling capabilities builds the
+menu this spec refuses. This is the line that keeps Argus distinct.
+
+Pick companies that are widely recognizable and non-intimidating, in service of
+the simplicity bar that someone who knows nothing about investing must
+understand the example. Avoid names lifted from a competitor's marketing.
+**Prefer evergreen recognizability over trending names**, because hardcoded
+copy decays and a stale "trending" example ages badly.
+
+**Animation.** One animated element per screen. The typewriter belongs on the
+signed-in greeting, not the composer placeholder. Two competing animations read
+as noise, animated placeholders fight users mid-thought, and they degrade
+screen-reader behavior. Retire the old composer typewriter rather than reviving
+it.
+
+**Audience.** This is primarily a guest concern. Signed-in users get
+memory-driven suggestions and already know what Argus does; guests form a first
+impression with no memory at all.
+
+**Sequencing.** This copy ships with the rail, never ahead of it. A compare
+chip that fails on tap is worse than the underwhelming backtest chip it
+replaces.
+
 ## 11. Memory scope expansion
 
 This changes what personalization memory is for, and the in-flight recall-loop
