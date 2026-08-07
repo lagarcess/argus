@@ -21,18 +21,20 @@ from argus.api.personalization_memory_index import (
     extraction_disabled_chat_model,
     import_mem0_memory,
 )
-from argus.llm.memory_embedding import EmbeddingUsage
+from argus.llm.memory_embedding import EmbeddingResult, EmbeddingUsage
 
 
 class _StubEmbedder:
     dimensions = 1024
 
     def embed(self, text: str) -> list[float]:
-        del text
-        return [0.0] * 1024
+        return self.embed_batch([text])[0]
 
-    def last_usage(self) -> EmbeddingUsage:
-        return EmbeddingUsage()
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_batch_with_usage(texts).vectors
+
+    def embed_batch_with_usage(self, texts: list[str]) -> EmbeddingResult:
+        return EmbeddingResult([[0.0] * 1024 for _ in texts], EmbeddingUsage())
 
 
 class _StubPool:

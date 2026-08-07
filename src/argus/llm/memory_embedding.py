@@ -57,6 +57,20 @@ class EmbeddingUsage:
         self.reported_cost_usd = reported_cost_usd
 
 
+class EmbeddingResult:
+    """Vectors and the usage of the one call that produced them.
+
+    Usage travels with its vectors rather than sitting on the embedder,
+    because one embedder instance is shared by every concurrent request.
+    """
+
+    __slots__ = ("vectors", "usage")
+
+    def __init__(self, vectors: list[list[float]], usage: EmbeddingUsage) -> None:
+        self.vectors = vectors
+        self.usage = usage
+
+
 # The API accepts up to 512 inputs per request, so a bulk projection costs one
 # round trip instead of one per record.
 MAX_EMBEDDING_BATCH = 512
@@ -72,7 +86,7 @@ class MemoryEmbedder(Protocol):
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
 
-    def last_usage(self) -> EmbeddingUsage: ...
+    def embed_batch_with_usage(self, texts: list[str]) -> EmbeddingResult: ...
 
 
 class PerplexityMemoryEmbedder:
@@ -94,19 +108,18 @@ class PerplexityMemoryEmbedder:
         self._timeout_seconds = timeout_seconds
         self._transport = transport
         self._endpoint = endpoint
-        self._last_usage = EmbeddingUsage()
 
     @property
     def dimensions(self) -> int:
         return self._dimensions
 
-    def last_usage(self) -> EmbeddingUsage:
-        return self._last_usage
-
     def embed(self, text: str) -> list[float]:
         return self.embed_batch([text])[0]
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_batch_with_usage(texts).vectors
+
+    def embed_batch_with_usage(self, texts: list[str]) -> EmbeddingResult:
         """Vectorize many texts in as few round trips as the API allows."""
 
         if not self._api_key:
@@ -115,12 +128,20 @@ class PerplexityMemoryEmbedder:
         if not contents or any(not content for content in contents):
             raise MemoryEmbeddingUnavailable("empty_input")
         vectors: list[list[float]] = []
+        total_tokens: int | None = None
+        total_cost: Decimal | None = None
         for start in range(0, len(contents), MAX_EMBEDDING_BATCH):
             batch = contents[start : start + MAX_EMBEDDING_BATCH]
-            vectors.extend(self._embed_one_request(batch))
-        return vectors
+            result = self._embed_one_request(batch)
+            vectors.extend(result.vectors)
+            total_tokens = _add(total_tokens, result.usage.total_tokens)
+            total_cost = _add(total_cost, result.usage.reported_cost_usd)
+        return EmbeddingResult(
+            vectors,
+            EmbeddingUsage(total_tokens=total_tokens, reported_cost_usd=total_cost),
+        )
 
-    def _embed_one_request(self, batch: list[str]) -> list[list[float]]:
+    def _embed_one_request(self, batch: list[str]) -> EmbeddingResult:
         payload = self._post(
             {
                 "model": self._model,
@@ -136,8 +157,7 @@ class PerplexityMemoryEmbedder:
                     "malformed_response",
                     detail=f"expected {self._dimensions} dimensions, got {len(vector)}",
                 )
-        self._last_usage = _usage_from(payload)
-        return vectors
+        return EmbeddingResult(vectors, _usage_from(payload))
 
     def _post(self, body: dict[str, Any]) -> Any:
         try:
@@ -177,7 +197,14 @@ class PerplexityMemoryEmbedder:
 
 
 def _vectors_in_order(payload: Any, *, expected: int) -> list[list[float]]:
-    """Decode every embedding, restored to request order by its index."""
+    """Decode every embedding, restored to request order by its index.
+
+    A batched response must carry an explicit index on every entry. Guessing
+    order from position would let a response that is both missing indices and
+    reordered pass every other check while each vector attaches to the wrong
+    text, which persists silently under the wrong memory record. Position is
+    only trustworthy when a single input makes order unambiguous.
+    """
 
     if not isinstance(payload, dict):
         raise MemoryEmbeddingUnavailable("malformed_response", detail="not_an_object")
@@ -192,18 +219,30 @@ def _vectors_in_order(payload: Any, *, expected: int) -> list[list[float]]:
                 detail="no_embedding",
             )
         index = entry.get("index")
-        slot = (
-            index if isinstance(index, int) and not isinstance(index, bool) else position
-        )
-        if not 0 <= slot < expected or ordered[slot] is not None:
+        if isinstance(index, bool) or not isinstance(index, int):
+            if expected > 1:
+                raise MemoryEmbeddingUnavailable(
+                    "malformed_response",
+                    detail="missing_index",
+                )
+            index = position
+        if not 0 <= index < expected or ordered[index] is not None:
             raise MemoryEmbeddingUnavailable(
                 "malformed_response",
                 detail="unusable_index",
             )
-        ordered[slot] = _decode_embedding(entry.get("embedding"))
+        ordered[index] = _decode_embedding(entry.get("embedding"))
     if any(vector is None for vector in ordered):
         raise MemoryEmbeddingUnavailable("malformed_response", detail="no_data")
     return [vector for vector in ordered if vector is not None]
+
+
+def _add(current: Any, extra: Any) -> Any:
+    """Sum optional counters, preserving None when nothing was reported."""
+
+    if extra is None:
+        return current
+    return extra if current is None else current + extra
 
 
 def _decode_embedding(raw: Any) -> list[float]:

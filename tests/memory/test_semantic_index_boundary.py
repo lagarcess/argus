@@ -52,12 +52,18 @@ CLEAR = SensitivityAssessment(status=SensitivityStatus.CLEAR)
 class _RecordingMem0:
     """Stands in for the Mem0 client and records everything it is handed."""
 
-    def __init__(self, search_results: list[dict] | None = None) -> None:
+    def __init__(
+        self,
+        search_results: list[dict] | None = None,
+        *,
+        indexed: bool | None = None,
+    ) -> None:
         self.added: list[dict] = []
         self.searched: list[dict] = []
         self.deleted: list[str] = []
         self.reset_calls: list[str] = []
         self._search_results = search_results or []
+        self._indexed = indexed
 
     def add(self, *, messages, user_id, metadata, infer):  # noqa: ANN001
         self.added.append(
@@ -81,6 +87,11 @@ class _RecordingMem0:
         )
         return {"results": self._search_results}
 
+    def get_all(self, *, filters, top_k):  # noqa: ANN001
+        del filters, top_k
+        present = self._indexed if self._indexed is not None else bool(self.added)
+        return {"results": [{"id": "row"}] if present else []}
+
     def delete(self, memory_id):  # noqa: ANN001
         self.deleted.append(memory_id)
 
@@ -95,10 +106,13 @@ class _StubEmbedder:
         del text
         return [0.0, 0.0, 0.0, 0.0]
 
-    def last_usage(self):
-        from argus.llm.memory_embedding import EmbeddingUsage
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_batch_with_usage(texts).vectors
 
-        return EmbeddingUsage()
+    def embed_batch_with_usage(self, texts: list[str]):
+        from argus.llm.memory_embedding import EmbeddingResult, EmbeddingUsage
+
+        return EmbeddingResult([self.embed(text) for text in texts], EmbeddingUsage())
 
 
 def _ids() -> Iterator[str]:

@@ -28,7 +28,10 @@ pytest.importorskip("mem0")
 from argus.api.personalization_memory_index import (  # noqa: E402
     Mem0MemoryProvider,
 )
-from argus.llm.memory_embedding import EmbeddingUsage  # noqa: E402
+from argus.llm.memory_embedding import (  # noqa: E402
+    EmbeddingResult,
+    EmbeddingUsage,
+)
 from argus.memory.contracts import (  # noqa: E402
     MemoryCategory,
     MemoryConsentActionReceipt,
@@ -37,6 +40,7 @@ from argus.memory.contracts import (  # noqa: E402
     MemorySourceKind,
     ProviderReconciliationStatus,
 )
+from argus.memory.provider import ProviderSearchStatus  # noqa: E402
 from argus.memory.subject import RegisteredMemoryOwner  # noqa: E402
 
 DIMENSIONS = 32
@@ -68,8 +72,14 @@ class _DeterministicEmbedder:
         norm = math.sqrt(sum(component * component for component in vector)) or 1.0
         return [component / norm for component in vector]
 
-    def last_usage(self) -> EmbeddingUsage:
-        return EmbeddingUsage(total_tokens=7)
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_batch_with_usage(texts).vectors
+
+    def embed_batch_with_usage(self, texts: list[str]) -> EmbeddingResult:
+        return EmbeddingResult(
+            [self.embed(text) for text in texts],
+            EmbeddingUsage(total_tokens=7),
+        )
 
 
 def _record(owner_id: str, *, record_id: str, label: str, value: str) -> MemoryRecord:
@@ -230,3 +240,31 @@ def test_the_index_stores_no_row_for_a_refused_record(
 
     assert result.status is ProviderReconciliationStatus.NOT_APPLICABLE
     assert provider.search(OWNER_A, ETH_VALUE, 5).hits == ()
+
+
+def test_an_owner_with_no_rows_cannot_speak(provider: Mem0MemoryProvider) -> None:
+    """Catches a never-projected owner being answered as authoritatively empty."""
+    answer = provider.search(OWNER_A, "anything at all", 3)
+
+    assert answer.status is ProviderSearchStatus.UNAVAILABLE
+    assert answer.hits == ()
+
+
+def test_a_populated_owner_answers_on_its_own_authority(
+    provider: Mem0MemoryProvider,
+) -> None:
+    """Catches a real populated index being downgraded to unavailable.
+
+    Same provider, same database, same query. The only difference is whether
+    the owner has rows, which is exactly the distinction the answer carries.
+    The hit count is not asserted: the test embedder is a small hashed vector,
+    so its similarity floor is an artifact of the double, not the product.
+    """
+    query = "zzzz qqqq vvvv unrelated tokens"
+    before = provider.search(OWNER_A, query, 3)
+
+    _seed(provider)
+    after = provider.search(OWNER_A, query, 3)
+
+    assert before.status is ProviderSearchStatus.UNAVAILABLE
+    assert after.status is ProviderSearchStatus.ANSWERED

@@ -26,12 +26,13 @@ quality and never costs a memory.
 from __future__ import annotations
 
 import os
+from contextvars import ContextVar
 from decimal import Decimal
 from typing import Any
 
 from loguru import logger
 
-from argus.llm.memory_embedding import MemoryEmbedder
+from argus.llm.memory_embedding import EmbeddingUsage, MemoryEmbedder
 from argus.memory.contracts import MemoryRecord, ProviderReconciliationStatus
 from argus.memory.index_policy import index_eligibility, index_text
 from argus.memory.provider import (
@@ -58,6 +59,16 @@ RECORD_ID_METADATA_KEY = "argus_record_id"
 DEFAULT_SEARCH_THRESHOLD = 0.1
 
 _FALSE_VALUES = frozenset(("false", "0", "no", "off"))
+
+# Usage of the embedding call made during the current provider operation. One
+# embedder instance serves every concurrent request, so usage cannot live on it
+# without one request billing another. A context variable is per-call under
+# both threads and tasks, and `asyncio.to_thread` copies the context, so each
+# recall gets its own slot.
+_CALL_EMBEDDING_USAGE: ContextVar[EmbeddingUsage | None] = ContextVar(
+    "argus_memory_embedding_usage",
+    default=None,
+)
 
 
 class Mem0ExtractionAttempted(AssertionError):
@@ -193,10 +204,12 @@ def _embeddings_adapter_class() -> type:
                 self._embedder = embedder
 
             def embed_documents(self, texts: list[str]) -> list[list[float]]:
-                return self._embedder.embed_batch(list(texts))
+                result = self._embedder.embed_batch_with_usage(list(texts))
+                _CALL_EMBEDDING_USAGE.set(result.usage)
+                return result.vectors
 
             def embed_query(self, text: str) -> list[float]:
-                return self._embedder.embed(text)
+                return self.embed_documents([text])[0]
 
         _ADAPTER_CLASS = _Adapter
     return _ADAPTER_CLASS
@@ -250,6 +263,7 @@ class Mem0MemoryProvider:
             return ProviderProjectionResult(
                 status=ProviderReconciliationStatus.NOT_APPLICABLE
             )
+        _CALL_EMBEDDING_USAGE.set(None)
         result = self._memory.add(
             messages=[{"role": "user", "content": index_text(record)}],
             user_id=owner.owner_id,
@@ -276,13 +290,20 @@ class Mem0MemoryProvider:
     ) -> ProviderSearchResult:
         """Answer with ranked canonical record ids; never with content.
 
-        No hits means unavailable, not "nothing matches". The index only holds
-        records confirmed since it was installed, so an empty answer is far
-        more likely to mean this owner was never projected than to mean the
-        owner has nothing relevant. Claiming a definitive empty answer would
-        suppress the canonical fallback and lose recall that already worked.
+        Zero hits is two different situations and they need opposite answers.
+        The index only holds records projected since it was installed, so for
+        an owner it has never seen it cannot speak at all, and claiming a
+        definitive empty answer would suppress the canonical fallback and drop
+        recall that already worked. For an owner it does hold, zero hits is a
+        real finding, and falling back would let a coincidental token match
+        surface something semantic search deliberately rejected.
+
+        The two are separated by asking whether this owner has any indexed
+        rows, which is a filtered read on the existing pool with no embedding
+        and no vendor call, and only on the path that already found nothing.
         """
 
+        _CALL_EMBEDDING_USAGE.set(None)
         raw = self._memory.search(
             query,
             top_k=limit,
@@ -290,13 +311,23 @@ class Mem0MemoryProvider:
             threshold=self._search_threshold,
         )
         hits = _hits_from(raw, limit=limit)
-        if not hits:
+        if not hits and not self._owner_is_indexed(owner):
             return ProviderSearchResult(status=ProviderSearchStatus.UNAVAILABLE)
         return ProviderSearchResult(
             status=ProviderSearchStatus.ANSWERED,
             hits=hits,
             **self._usage_fields(),
         )
+
+    def _owner_is_indexed(self, owner: RegisteredMemoryOwner) -> bool:
+        """Whether the index holds anything at all for this owner."""
+
+        listed = self._memory.get_all(
+            filters={"user_id": owner.owner_id},
+            top_k=1,
+        )
+        entries = listed.get("results") if isinstance(listed, dict) else listed
+        return bool(isinstance(entries, list) and entries)
 
     def delete(
         self,
@@ -312,7 +343,11 @@ class Mem0MemoryProvider:
         return ProviderCleanupResult(status=ProviderReconciliationStatus.SYNCHRONIZED)
 
     def _usage_fields(self) -> dict[str, Any]:
-        usage = self._embedder.last_usage()
+        """Usage of this operation's own embedding call, or nothing."""
+
+        usage = _CALL_EMBEDDING_USAGE.get()
+        if usage is None:
+            return {}
         fields: dict[str, Any] = {}
         if isinstance(usage.total_tokens, int) and usage.total_tokens >= 0:
             fields["usage_units"] = usage.total_tokens

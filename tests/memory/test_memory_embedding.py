@@ -78,8 +78,7 @@ def test_reports_usage_and_cost_from_the_vendor_response() -> None:
         return httpx.Response(200, json=_ok_payload([1, 2, 3, 4], cost=0.000012))
 
     embedder = _embedder(handler)
-    embedder.embed("anything")
-    usage = embedder.last_usage()
+    usage = embedder.embed_batch_with_usage(["anything"]).usage
 
     assert usage.total_tokens == 12
     assert usage.reported_cost_usd == Decimal("0.000012")
@@ -305,3 +304,69 @@ def test_single_embed_still_returns_one_vector() -> None:
         return httpx.Response(200, json=_ok_payload([5, 6, 7, 8]))
 
     assert _embedder(handler).embed("anything") == [5.0, 6.0, 7.0, 8.0]
+
+
+def test_a_batched_response_missing_indices_is_rejected() -> None:
+    """Catches the exact silent corruption: missing index and reordered.
+
+    Both entries are well formed, the count matches, there are no duplicate
+    indices and both vectors are the right width, so every other check passes.
+    Only refusing to guess order catches it, and guessing here would persist
+    each vector under the wrong memory record.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"embedding": _encoded([9, 9, 9, 9])},
+                    {"embedding": _encoded([1, 1, 1, 1])},
+                ]
+            },
+        )
+
+    with pytest.raises(MemoryEmbeddingUnavailable) as failure:
+        _embedder(handler).embed_batch(["first", "second"])
+
+    assert failure.value.detail == "missing_index"
+
+
+def test_a_single_input_may_still_rely_on_position() -> None:
+    """Catches over-tightening: one input makes order unambiguous."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        del request
+        return httpx.Response(200, json={"data": [{"embedding": _encoded([2, 3, 4, 5])}]})
+
+    assert _embedder(handler).embed("only") == [2.0, 3.0, 4.0, 5.0]
+
+
+def test_batched_usage_sums_across_requests() -> None:
+    """Catches a multi-request batch reporting only its last chunk's usage."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.read())
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": position, "embedding": _encoded([1, 2, 3, 4])}
+                    for position in range(len(body["input"]))
+                ],
+                "usage": {
+                    "total_tokens": 10,
+                    "cost": {"total_cost": 0.000002, "currency": "USD"},
+                },
+            },
+        )
+
+    result = _embedder(handler).embed_batch_with_usage(
+        [f"text-{index}" for index in range(700)]
+    )
+
+    assert len(result.vectors) == 700
+    # Two requests at 10 tokens each, not one request's worth.
+    assert result.usage.total_tokens == 20
+    assert result.usage.reported_cost_usd == Decimal("0.000004")

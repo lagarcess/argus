@@ -8,6 +8,8 @@ shown.
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Iterator
 from datetime import datetime, timezone
 
@@ -15,8 +17,13 @@ import pytest
 from argus.api.personalization_memory_index import (
     RECORD_ID_METADATA_KEY,
     Mem0MemoryProvider,
+    langchain_embeddings_adapter,
 )
-from argus.llm.memory_embedding import EmbeddingUsage, MemoryEmbeddingUnavailable
+from argus.llm.memory_embedding import (
+    EmbeddingResult,
+    EmbeddingUsage,
+    MemoryEmbeddingUnavailable,
+)
 from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryCategory,
@@ -29,6 +36,7 @@ from argus.memory.contracts import (
     SensitivityAssessment,
     SensitivityStatus,
 )
+from argus.memory.provider import ProviderSearchStatus
 from argus.memory.service import MemoryService, MemoryServiceConfig
 from argus.memory.store import InMemoryCanonicalMemoryStore
 from argus.memory.subject import MemoryAccountKind, MemorySubject, RegisteredMemoryOwner
@@ -58,8 +66,14 @@ class _StubEmbedder:
             raise self._failure
         return [0.1, 0.2, 0.3, 0.4]
 
-    def last_usage(self) -> EmbeddingUsage:
-        return EmbeddingUsage()
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_batch_with_usage(texts).vectors
+
+    def embed_batch_with_usage(self, texts: list[str]) -> EmbeddingResult:
+        return EmbeddingResult(
+            [self.embed(text) for text in texts],
+            EmbeddingUsage(),
+        )
 
 
 class _Mem0Double:
@@ -72,27 +86,43 @@ class _Mem0Double:
         search_results: list[dict] | None = None,
         add_failure: Exception | None = None,
         search_failure: Exception | None = None,
+        indexed: bool = False,
+        post_embed_delay: float = 0.0,
     ) -> None:
         self._embedder = embedder
         self._search_results = search_results or []
         self._add_failure = add_failure
         self._search_failure = search_failure
+        self._indexed = indexed
+        self._post_embed_delay = post_embed_delay
+        self._adapter = langchain_embeddings_adapter(embedder)
         self.added: list[dict] = []
 
     def add(self, *, messages, user_id, metadata, infer):  # noqa: ANN001
         if self._add_failure is not None:
             raise self._add_failure
-        # The real client embeds before writing, so the double does too.
-        self._embedder.embed(messages[0]["content"])
+        # The real client embeds through the configured adapter, so the double
+        # does too; that is what publishes per-call usage.
+        self._adapter.embed_documents([messages[0]["content"]])
         self.added.append({"user_id": user_id, "metadata": metadata, "infer": infer})
         return {"results": [{"id": f"mem0-{len(self.added)}"}]}
 
     def search(self, query, *, top_k, filters, threshold):  # noqa: ANN001
         if self._search_failure is not None:
             raise self._search_failure
-        self._embedder.embed(query)
+        self._adapter.embed_query(query)
+        # The real client queries pgvector after embedding, so usage sits
+        # published for a while before the provider reads it. That gap is
+        # where a shared slot gets overwritten by another request.
+        if self._post_embed_delay:
+            time.sleep(self._post_embed_delay)
         del top_k, filters, threshold
         return {"results": self._search_results}
+
+    def get_all(self, *, filters, top_k):  # noqa: ANN001
+        del filters, top_k
+        present = self._indexed or bool(self.added)
+        return {"results": [{"id": "row"}] if present else []}
 
     def delete(self, memory_id):  # noqa: ANN001
         del memory_id
@@ -420,3 +450,119 @@ def test_recall_runs_off_the_event_loop() -> None:
     assert result is None
     assert calling_threads, "retrieval never ran"
     assert calling_threads[0] != loop_thread
+
+
+def test_a_populated_index_that_finds_nothing_is_believed() -> None:
+    """Catches token fallback resurrecting what semantic search rejected.
+
+    This provider's own answer is asserted, not a generic one: an index that
+    holds rows for the owner and still returns nothing is authoritative, and a
+    coincidental token overlap must not override it.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    _confirm_one(_service(store))
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder,
+        memory=_Mem0Double(embedder=embedder, search_results=[], indexed=True),
+    )
+
+    answer = provider.search(OWNER, QUERY, 3)
+    retrieved = _service(store, provider).retrieve(
+        SUBJECT,
+        QUERY,
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
+
+    assert answer.status is ProviderSearchStatus.ANSWERED
+    assert answer.hits == ()
+    assert retrieved == ()
+
+
+def test_an_unprojected_owner_is_not_treated_as_authoritative() -> None:
+    """Catches the never-projected case being answered as a real empty."""
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder,
+        memory=_Mem0Double(embedder=embedder, search_results=[], indexed=False),
+    )
+
+    answer = provider.search(OWNER, QUERY, 3)
+
+    assert answer.status is ProviderSearchStatus.UNAVAILABLE
+
+
+def test_the_projection_probe_costs_nothing_when_the_index_answers() -> None:
+    """Catches an extra read on every search rather than only the empty path."""
+    embedder = _StubEmbedder()
+    mem0 = _Mem0Double(
+        embedder=embedder,
+        search_results=[
+            {"id": "mem0-1", "score": 0.8, "metadata": {RECORD_ID_METADATA_KEY: "r"}}
+        ],
+        indexed=True,
+    )
+    probes: list[int] = []
+    original = mem0.get_all
+
+    def _counting(**kwargs: object) -> object:
+        probes.append(1)
+        return original(**kwargs)  # type: ignore[arg-type]
+
+    mem0.get_all = _counting  # type: ignore[assignment]
+
+    Mem0MemoryProvider(embedder=embedder, memory=mem0).search(OWNER, QUERY, 3)
+
+    assert probes == []
+
+
+def test_usage_is_attributed_to_the_call_that_produced_it() -> None:
+    """Catches concurrent recalls billing each other's tokens.
+
+    One embedder and one provider serve every request. Each call embeds with a
+    distinct token count, then waits where the pgvector round trip would be
+    before its usage is read. A process-wide slot loses the attribution in that
+    gap; a per-call one does not.
+    """
+    import concurrent.futures
+
+    class _CountingEmbedder:
+        dimensions = 4
+
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+            self._next = 0
+
+        def embed(self, text: str) -> list[float]:
+            return self.embed_batch([text])[0]
+
+        def embed_batch(self, texts: list[str]) -> list[list[float]]:
+            return self.embed_batch_with_usage(texts).vectors
+
+        def embed_batch_with_usage(self, texts: list[str]) -> EmbeddingResult:
+            with self._lock:
+                self._next += 1
+                tokens = self._next
+            return EmbeddingResult(
+                [[0.1, 0.2, 0.3, 0.4] for _ in texts],
+                EmbeddingUsage(total_tokens=tokens),
+            )
+
+    embedder = _CountingEmbedder()
+    mem0 = _Mem0Double(
+        embedder=embedder,  # type: ignore[arg-type]
+        search_results=[
+            {"id": "mem0-1", "score": 0.5, "metadata": {RECORD_ID_METADATA_KEY: "r"}}
+        ],
+        indexed=True,
+        post_embed_delay=0.05,
+    )
+    provider = Mem0MemoryProvider(embedder=embedder, memory=mem0)  # type: ignore[arg-type]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: provider.search(OWNER, QUERY, 3), range(8)))
+
+    reported = sorted(result.usage_units for result in results)
+    # Every call embedded exactly once, so each answer must carry a distinct
+    # counter. A shared slot collapses or duplicates them.
+    assert reported == list(range(1, 9))
