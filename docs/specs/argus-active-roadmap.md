@@ -82,7 +82,26 @@ The confirmation card carries exactly three actions: **Run backtest**,
 - Capital and dates additionally get in-place editing that spends no turn: an
   elegant drawer on the confirmation card, in the spirit of how the profile
   monogram is edited in profile settings. This is in addition to the
-  conversational path, never a replacement for it.
+  conversational path, never a replacement for it. On web the entry point is a
+  small dedicated row, in the shape of "edit costs". On mobile it reuses the
+  sheet primitive defined in the mobile spec, so both surfaces share one
+  pattern rather than inventing two.
+- **Consolidate the confirmation card from five actions to three.** Today it
+  shows Run backtest, change dates, change assets, adjust assumptions, and
+  Cancel. The end state is Run backtest, Change/edit assumptions, Cancel.
+
+  **This is gated on multi-edit working, and must not ship before it.** Change
+  dates and change assets are deterministic entry points that tell Argus
+  exactly which field is being edited. Removing them routes every edit through
+  the free-form conversational path, which is the path that currently drops
+  compound edits. Consolidating first would remove the working escape hatches
+  and leave only the broken one.
+
+  Motivating case, observed in alpha testing 2026-08-06: a user tapped change
+  dates, then broadened the request mid-sentence to include other changes while
+  Argus was waiting on a single field. The lesson is subtler than "fewer
+  buttons": even a scoped entry point must accept a broader edit gracefully
+  rather than holding the user to the button they pressed.
 
 Absorbs #335, the #141 macro, and the #237 umbrella.
 
@@ -90,10 +109,25 @@ Absorbs #335, the #141 macro, and the #237 umbrella.
 
 The public exposure gate. Nothing ships publicly while phones are broken.
 
-- Responsive by screen width, not device sniffing. Same site, different layout
-  below the breakpoint.
-- The sidebar and the run dossier currently consume space a phone does not
-  have. Sidebar collapses; the dossier becomes a sheet rather than a panel.
+**Spec is written and founder-locked:**
+[`2026-08-06-mobile-pwa-responsive-shell.md`](../superpowers/specs/2026-08-06-mobile-pwa-responsive-shell.md).
+No implementation authorized yet.
+
+Locked shape, in brief:
+
+- Responsive by screen width, not device sniffing, on custom breakpoints
+  matching DESIGN.md section 8 rather than Tailwind defaults.
+- Two thresholds: below 1024px the dossier becomes an overlay sheet, below
+  720px the full mobile treatment applies.
+- The sidebar becomes an off-canvas drawer behind a `=` trigger. Web is
+  unchanged.
+- One sheet primitive at three heights serves the dossier, the discovery
+  sources pane, and item 2's capital and dates editor.
+- Delivery is responsive PWA polish. The native-shell and full-native options
+  are closed, not deferred.
+- Prerequisite found while speccing: `layout.tsx` references a manifest that
+  does not exist, and there is no apple-touch-icon or theme-color, so
+  home-screen install does not look app-like today.
 - Desktop and laptop behavior must not regress; it is already strong.
 
 ### 4. Product memory (parallel, behind flag)

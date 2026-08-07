@@ -446,3 +446,36 @@ def _request_has_active_strategy_context(request: InterpretationRequest) -> bool
         or snapshot.confirmed_strategy_summary
         or snapshot.active_confirmation_reference
     )
+
+
+_EXECUTION_EVIDENCE_FIELDS = (
+    "strategy_type",
+    "requested_strategy_template",
+    "entry_logic",
+    "exit_logic",
+    "entry_rule",
+    "exit_rule",
+    "rule_spec",
+    "cadence",
+    "sizing_mode",
+    "capital_amount",
+    "total_capital",
+    "initial_capital",
+    "position_size",
+    "recurring_contribution",
+    "risk_rules",
+)
+
+
+def strategy_has_execution_evidence(strategy: Any) -> bool:
+    """Whether the draft shows intent to RUN something, not just name something.
+
+    Reference fields (asset_universe, asset_class, date_range, timeframe, and
+    comparison_baseline, which repairs inject as a default benchmark) say what
+    the user is talking about; only execution fields may pull a turn onto the
+    strategy route. Duck-typed over StrategySummary and LLMStrategyDraft.
+    """
+    return any(
+        getattr(strategy, field, None) not in (None, "", [], {})
+        for field in _EXECUTION_EVIDENCE_FIELDS
+    )
