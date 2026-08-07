@@ -1,17 +1,18 @@
 # Legacy surface removal browser evidence
 
-Captured on 2026-08-06 from the candidate working tree after merging
-`038a4e7750d49ad284d6d902b37b221496a70b16` and applying the four review
-follow-ups. The final commit does not change the rendered UI.
+Recaptured on 2026-08-07 from merge-forward candidate
+`21f02144c514509611419ba2ea2101db9ee667bf` after merging integration
+`946d4bb66d1ec63e35bc80a9f1631a5bf2f251e8` and preserving the completed
+review follow-ups.
 
 ## Method
 
-- Ran the local Next.js app at `http://127.0.0.1:3000/chat` with mock auth and
+- Ran the local Next.js app at `http://127.0.0.1:3200/chat` with mock auth and
   the repository's synthetic, memory-only development backend.
-- Used Playwright Chromium at a 1440 x 1000 desktop viewport.
+- Used headless Playwright Chromium at a 1440 x 1000 desktop viewport.
 - Asserted that `Strategies` and `Collections` were absent from the rendered
   chat and settings text.
-- Observed zero browser console errors during the successful settings run.
+- Observed zero browser console errors across the successful capture run.
 - Stopped the local preview after capture.
 
 No provider, LLM, Supabase, or hosted environment was called by this browser
