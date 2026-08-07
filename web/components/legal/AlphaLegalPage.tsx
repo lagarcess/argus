@@ -42,8 +42,10 @@ const LEGAL_SECTIONS: Record<LegalPageKind, LegalSection[]> = {
   ],
 };
 
+// Every browser-state writer gets its own entry. Both the frontend and the
+// backend set cookies, so this list is not derivable from web/ alone.
 const LIST_SECTION_ITEMS: Record<string, readonly string[]> = {
-  cookies: ["sign_in", "security", "preferences"],
+  cookies: ["sign_in", "guest_handoff", "security", "preferences"],
 };
 
 const BODY_CLASS = "text-[15px] leading-7 text-black/65 dark:text-white/65";

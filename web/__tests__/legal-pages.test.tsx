@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import i18next from "i18next";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
@@ -11,6 +13,24 @@ import es419 from "../public/locales/es-419/common.json";
 const SUPPORT_EMAIL = "support@get-argus.com";
 
 const CATALOGS = { en, "es-419": es419 } as const;
+
+const REPO_ROOT = join(import.meta.dir, "..", "..");
+
+// Backend files that write cookies. The disclosure is not derivable from web/
+// alone: the guest handoff and mirrored session cookies are set server-side.
+const BACKEND_COOKIE_SOURCES = [
+  "src/argus/api/dependencies.py",
+  "src/argus/api/routers/auth.py",
+];
+
+// Every cookie the backend sets, mapped to the section item that discloses it.
+// A new cookie with no entry here fails the coverage test by name.
+const DISCLOSED_BACKEND_COOKIES: Record<string, string> = {
+  "sb-auth-token": "sign_in",
+  "sb-refresh-token": "sign_in",
+  "argus-guest-handoff": "guest_handoff",
+  "argus-guest-handoff-id": "guest_handoff",
+};
 
 async function renderLegal(
   locale: keyof typeof CATALOGS,
@@ -55,12 +75,58 @@ describe("legal page cookie and storage disclosure", () => {
 
     expect(markup).toContain("Cookies and browser storage");
     expect(markup).toContain("Sign-in cookies");
+    expect(markup).toContain("Guest handoff cookies");
     expect(markup).toContain("Security cookies");
     expect(markup).toContain("Preferences you set");
-    // The three parties that actually set or hold browser state.
+    // The parties that actually set or hold browser state.
     expect(markup).toContain("Supabase authentication");
     expect(markup).toContain("Cloudflare Turnstile");
     expect(markup).toContain("local storage");
+  });
+
+  test("covers every cookie the backend sets", () => {
+    const declared = new Set<string>();
+    for (const relative of BACKEND_COOKIE_SOURCES) {
+      const source = readFileSync(join(REPO_ROOT, relative), "utf-8");
+      // Literal names passed to set_cookie, plus the constants they resolve to.
+      for (const match of source.matchAll(/set_cookie\(\s*"([^"]+)"/g)) {
+        declared.add(match[1]);
+      }
+      for (const match of source.matchAll(
+        /^_[A-Z_]*COOKIE[A-Z_]*\s*=\s*"([^"]+)"/gm,
+      )) {
+        declared.add(match[1]);
+      }
+    }
+
+    // Guard the scan itself: a rename that silently matches nothing would
+    // otherwise make this test pass by finding no cookies at all.
+    expect(declared.size).toBeGreaterThanOrEqual(4);
+
+    const items = en.legal.privacy.sections.cookies.items as Record<
+      string,
+      unknown
+    >;
+    for (const name of declared) {
+      const item = DISCLOSED_BACKEND_COOKIES[name];
+      expect(item, `cookie "${name}" is set but not mapped to a section item`).
+        toBeDefined();
+      expect(items, `section item "${item}" is missing`).toHaveProperty(item);
+    }
+  });
+
+  test("does not claim sign-in cookies expire with the browser session", async () => {
+    // @supabase/ssr defaults to a 400-day maxAge, so a session-only claim is
+    // false. This pins the correction rather than the wording around it.
+    for (const locale of ["en", "es-419"] as const) {
+      const signIn = CATALOGS[locale].legal.privacy.sections.cookies.items
+        .sign_in.body;
+      expect(signIn.toLowerCase(), locale).not.toContain("for your session");
+      expect(signIn.toLowerCase(), locale).not.toContain("lo que dura tu sesión");
+    }
+    expect(await renderLegal("en", "privacy")).toContain(
+      "They stay after you close the browser",
+    );
   });
 
   test("states the no-tracking position that keeps the consent banner unnecessary", async () => {
@@ -78,6 +144,7 @@ describe("legal page cookie and storage disclosure", () => {
 
     expect(spanish).toContain("Cookies y almacenamiento del navegador");
     expect(spanish).toContain("Cookies de inicio de sesión");
+    expect(spanish).toContain("Cookies de traspaso de invitado");
     expect(spanish).toContain("Cookies de seguridad");
     expect(spanish).toContain("Preferencias que tú eliges");
     expect(spanish).toContain("no muestra un aviso de consentimiento de cookies");
@@ -93,6 +160,7 @@ describe("legal page cookie and storage disclosure", () => {
         "title",
       ]);
       expect(Object.keys(cookies.items).sort()).toEqual([
+        "guest_handoff",
         "preferences",
         "security",
         "sign_in",

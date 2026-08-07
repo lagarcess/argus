@@ -110,7 +110,11 @@
           "items": {
             "sign_in": {
               "label": "Cookies de inicio de sesión",
-              "body": "Las crea la autenticación de Supabase para que sigas con la sesión iniciada al moverte entre páginas. Duran lo que dura tu sesión y se renuevan mientras sigas usando Argus. Si las bloqueas, no vas a poder iniciar sesión."
+              "body": "Mantienen tu sesión iniciada al moverte entre páginas. Las crea la autenticación de Supabase y Argus las renueva mientras sigas usando el producto. Se conservan aunque cierres el navegador, y cerrar sesión las elimina. Si las bloqueas, no vas a poder iniciar sesión."
+            },
+            "guest_handoff": {
+              "label": "Cookies de traspaso de invitado",
+              "body": "Si empiezas como invitado y luego creas una cuenta, Argus crea dos cookies de corta duración para trasladar tu conversación temporal a la cuenta nueva. Duran diez minutos, se limitan a las rutas de inicio de sesión y se eliminan apenas termina el traspaso."
             },
             "security": {
               "label": "Cookies de seguridad",

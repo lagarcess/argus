@@ -110,7 +110,11 @@
           "items": {
             "sign_in": {
               "label": "Sign-in cookies",
-              "body": "Supabase authentication sets these so you stay signed in as you move between pages. They last for your session and refresh while you keep using Argus. If you block them, signing in will not work."
+              "body": "These keep you signed in as you move between pages. Supabase authentication sets them, and Argus refreshes them while you keep using the product. They stay after you close the browser, and signing out clears them. If you block them, signing in will not work."
+            },
+            "guest_handoff": {
+              "label": "Guest handoff cookies",
+              "body": "If you start as a guest and then create an account, Argus sets two short-lived cookies so your temporary conversation can move onto the new account. They last ten minutes, are limited to the sign-in routes, and are cleared as soon as the handoff finishes."
             },
             "security": {
               "label": "Security cookies",
