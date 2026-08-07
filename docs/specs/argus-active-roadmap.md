@@ -174,18 +174,29 @@ Locked shape, in brief:
   home-screen install does not look app-like today.
 - Desktop and laptop behavior must not regress; it is already strong.
 
-### 4. Product memory (parallel, behind flag)
+### 4. Compare your own work (parallel, behind flag)
 
-The differentiation competitors cannot copy, and it is still unproven in the
-public product.
+Previously called "product memory". That name was wrong: none of it is a memory
+system. The records already exist and are already written; what was missing is
+reliable versioning and a way to read them back.
 
-- Canonical Idea, IdeaVersion, EvidenceArtifact, and DecisionNote recall: A1b
-  linked versions and A2 comparison.
-- Comparing your own past strategies is the same engine as comparing
-  competitors in item 1. Build them so they share it.
-- Distinct from memory. Product memory is canonical truth;
-  memory is an opt-in sidecar that may reference it and never
-  becomes an alternate source of truth.
+**Spec is written and founder-locked:**
+[`2026-08-07-compare-your-own-work.md`](../superpowers/specs/2026-08-07-compare-your-own-work.md).
+
+- Serves three real questions: which of my ideas did best, did my change help,
+  should I do A or B.
+- Spans three homes deliberately: versioning belongs to editing and mints on
+  confirmed run rather than on edit, comparison answers are another question
+  shape on the research rail's one router, and the only new surface is a
+  multi-select confirmation card.
+- **Works with memory off**, because reading your own runs is the product.
+  Memory is a pre-wired optional sharpener for conceptual phrasing and personal
+  success criteria, never the mechanism.
+- Candidate relevance is structured filtering, not semantic search. The set is a
+  bounded personal one, so exact beats fuzzy.
+- Grounded with market context that explains *why*, under a hard boundary:
+  numbers come from your evidence artifacts, Perplexity never restates a
+  simulation result.
 
 ### 5. Sharing (parallel, behind flag)
 
