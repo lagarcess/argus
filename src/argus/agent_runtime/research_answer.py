@@ -291,6 +291,27 @@ async def _legacy_kind_result(
     )
 
 
+def _cache_key_for(
+    *,
+    query: ResearchQueryExtraction,
+    subjects: list[dict[str, str]],
+    shape: QuestionShape,
+    capability_class: CapabilityClass,
+    message: str,
+    language: str,
+) -> str:
+    """One key recipe for every shape, so a packet stored by the thorough job
+    finalizer serves the same question asked inline later."""
+    return research_cache_key(
+        capability_class=capability_class,
+        shape=shape,
+        symbols=tuple(s["symbol"] for s in subjects),
+        period_key=(query.period_of_interest or "").strip().lower() or "current",
+        question_fingerprint=" ".join(message.lower().split()),
+        language=language,
+    )
+
+
 async def _grounded_result(
     *,
     query: ResearchQueryExtraction,
@@ -311,12 +332,12 @@ async def _grounded_result(
         period=query.period_of_interest,
         language=language,
     )
-    key = research_cache_key(
-        capability_class=capability_class,
+    key = _cache_key_for(
+        query=query,
+        subjects=subjects,
         shape=shape,
-        symbols=tuple(s["symbol"] for s in subjects),
-        period_key=(query.period_of_interest or "").strip().lower() or "current",
-        question_fingerprint=" ".join(state.current_user_message.lower().split()),
+        capability_class=capability_class,
+        message=state.current_user_message,
         language=language,
     )
     cache_status = "miss"
@@ -356,6 +377,32 @@ async def _grounded_result(
                 capability_class, closed_period=query.period_is_closed_window
             ),
         )
+    return _packet_stage_result(
+        packet=packet,
+        subjects=subjects,
+        shape=shape,
+        capability_class=capability_class,
+        language=language,
+        interpretation=interpretation,
+        user=user,
+        cache_status=cache_status,
+    )
+
+
+def _packet_stage_result(
+    *,
+    packet: ResearchPacket,
+    subjects: list[dict[str, str]],
+    shape: QuestionShape,
+    capability_class: CapabilityClass,
+    language: str,
+    interpretation: StructuredInterpretation,
+    user: UserState,
+    cache_status: str,
+) -> StageResult:
+    """Grounded packet to finished turn: verified peers, runnable rows, typed
+    sidecar. One composition whether the packet came from the provider or the
+    shared cache, for any shape."""
     peers = verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
@@ -387,11 +434,33 @@ def _thorough_job_result(
 ) -> StageResult:
     """Thorough runs never block chat: the stage returns a typed job request
     and the API layer owns submission, polling, and the follow-up message
-    through the existing job lifecycle."""
+    through the existing job lifecycle. The shared cache sits in front: a
+    packet stored by an earlier job finalizer answers the same question
+    inline, with no job, no wait, and no provider spend."""
     language = _language_tag(user.language_preference)
     capability_class = capability_class_for_shape(
         "thorough", screening=query.question_kind == "screening"
     )
+    key = _cache_key_for(
+        query=query,
+        subjects=subjects,
+        shape="thorough",
+        capability_class=capability_class,
+        message=message,
+        language=language,
+    )
+    cached = cache_get(key)
+    if cached is not None:
+        return _packet_stage_result(
+            packet=cached,
+            subjects=subjects,
+            shape="thorough",
+            capability_class=capability_class,
+            language=language,
+            interpretation=interpretation,
+            user=user,
+            cache_status="hit",
+        )
     subject_labels = ", ".join(f"{s['name']} [{s['symbol']}]" for s in subjects[:3])
     if language == "es-419":
         working = (
@@ -419,6 +488,10 @@ def _thorough_job_result(
                 "subjects": subjects,
                 "period_of_interest": query.period_of_interest,
                 "period_is_closed_window": query.period_is_closed_window,
+                # The exact key computed at classification time; completion
+                # paths store under it verbatim so later identical questions
+                # hit without recomputation drift.
+                "cache_key": key,
             },
         },
     )
@@ -703,6 +776,27 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
     )
 
 
+def store_research_packet_for_job(
+    job_request: dict[str, Any],
+    packet: ResearchPacket,
+) -> None:
+    """Store a completed thorough packet in the shared cache so the same
+    question answers inline for the six-hour class TTL (30 days when the
+    asked-about window is closed). Both completion paths call this."""
+    key = str(job_request.get("cache_key") or "")
+    if not key:
+        return
+    capability_class = str(job_request.get("capability_class") or "thorough_research")
+    cache_put(
+        key,
+        packet,
+        ttl_seconds=ttl_for(
+            capability_class,
+            closed_period=bool(job_request.get("period_is_closed_window")),
+        ),
+    )
+
+
 def compose_completed_research(
     *,
     job_request: dict[str, Any],
@@ -743,11 +837,14 @@ def compose_completed_research(
         "shape": "thorough",
         "sources": list(packet.sources),
         "retrieved_at": packet.retrieved_at.isoformat(),
+        "anchor_symbols": [s["symbol"] for s in subjects],
         "peers": peers,
         "usage": {
             "invocations": packet.usage.invocations,
             "latency_ms": packet.usage.latency_ms,
             "cost_usd": packet.usage.cost_usd,
+            # Composition only ever runs on a packet a provider run produced;
+            # cache hits answer inline and never reach a job.
             "cache_status": "miss",
         },
     }
@@ -755,11 +852,6 @@ def compose_completed_research(
         "answer": answer,
         "research": sidecar,
         "next_experiments": rows,
-        "research_peers": {
-            "anchor_symbols": [s["symbol"] for s in subjects],
-            "peers": peers,
-            "stored_at": packet.retrieved_at.isoformat(),
-        },
     }
 
 
@@ -822,6 +914,7 @@ def _research_stage_result(
         "shape": shape,
         "sources": list(packet.sources),
         "retrieved_at": packet.retrieved_at.isoformat(),
+        "anchor_symbols": [s["symbol"] for s in subjects],
         "peers": peers,
         "usage": {
             "invocations": packet.usage.invocations,
@@ -838,12 +931,6 @@ def _research_stage_result(
     }
     if rows is not None:
         stage_patch["next_experiments"] = rows
-    if peers or subjects:
-        stage_patch["research_peers"] = {
-            "anchor_symbols": [s["symbol"] for s in subjects],
-            "peers": peers,
-            "stored_at": packet.retrieved_at.isoformat(),
-        }
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,

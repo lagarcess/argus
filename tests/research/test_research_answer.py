@@ -85,9 +85,11 @@ def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
     assert sidecar["usage"]["cache_status"] == "miss"
     assert result.stage_patch["assistant_response"].startswith("Apple closed")
     assert result.decision.reason_codes == ["research_answer_fast_quote"]
-    # Runnable rows ride along; the state carries peers for later cards.
+    # Runnable rows ride along; the sidecar carries anchors and peers so the
+    # persisted transcript can serve later confirmation cards.
     assert result.stage_patch["next_experiments"]["rows"]
-    assert result.stage_patch["research_peers"]["anchor_symbols"] == ["AAPL"]
+    assert sidecar["anchor_symbols"] == ["AAPL"]
+    assert "research_peers" not in result.stage_patch
 
 
 def test_second_identical_question_serves_from_cache(monkeypatch) -> None:
@@ -140,7 +142,53 @@ def test_cross_company_returns_a_background_job_request(monkeypatch) -> None:
     assert job_request["capability_class"] == "thorough_research"
     assert job_request["question"] == "Compare Netflix and Apple over three years"
     assert [s["symbol"] for s in job_request["subjects"]] == ["NFLX", "AAPL"]
+    # The key computed at classification time rides the request so completion
+    # paths store the packet under the exact identity later turns look up.
+    assert job_request["cache_key"]
     assert "research" not in result.stage_patch
+
+
+def test_thorough_cache_hit_answers_inline_without_a_job(monkeypatch) -> None:
+    """An identical thorough question after a finalized job answers from the
+    shared cache: no job request, no provider call, no wait."""
+    _classify(monkeypatch, question_kind="cross_company", symbols=["NFLX", "AAPL"])
+    transport = _wire_client(monkeypatch, [])
+
+    first = _run("Compare Netflix and Apple over three years")
+    assert first is not None
+    job_request = first.stage_patch["research_job_request"]
+
+    from argus.domain.research.perplexity_agent import _packet_from_response
+
+    packet = _packet_from_response(
+        agent_response(
+            text="Thorough comparison of NFLX and AAPL.",
+            tickers=["NFLX", "AAPL"],
+            lookup_rows=[("Microsoft", "MSFT", "Microsoft Corporation")],
+        ),
+        latency_ms=1200,
+    )
+    ra.store_research_packet_for_job(job_request, packet)
+
+    second = _run("Compare Netflix and Apple over three years", user=SPANISH_USER)
+    assert second is not None
+    # The cache is keyed by language: the Spanish user misses and gets a job.
+    assert "research_job_request" in second.stage_patch
+
+    # A different user with the same question hits: shared by design.
+    third = _run(
+        "Compare Netflix and Apple over three years",
+        user=UserState(user_id="another-user", language_preference="en"),
+    )
+    assert third is not None
+    assert transport.requests == [], "a cache hit must not touch the provider"
+    assert "research_job_request" not in third.stage_patch
+    sidecar = third.stage_patch["research"]
+    assert sidecar["shape"] == "thorough"
+    assert sidecar["usage"]["cache_status"] == "hit"
+    assert "Thorough comparison" in third.stage_patch["assistant_response"]
+    # Verified peers from the cached packet still become runnable rows.
+    assert sidecar["peers"] and sidecar["peers"][0]["symbol"] == "MSFT"
 
 
 def test_screening_is_classed_screening(monkeypatch) -> None:

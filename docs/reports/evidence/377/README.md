@@ -53,7 +53,9 @@ payloads (volatile identifiers and timestamps canonicalized, all else exact).
   commit after it is this evidence refresh, which is docs-only), digest
   `55bb1b89ce5493c5e4f5c2374b5e043b24eb792e499676344c64f9dcef91b8b7`.
 
-The digests are identical.
+The digests are identical. Re-proven once more after the Codex review fixes
+(operation_scope serialization, thorough caching, sidecar-anchored peers):
+the harness reproduces the same digest at that head.
 
 ## Browser QA (`browser/`)
 

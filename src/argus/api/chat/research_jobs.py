@@ -64,6 +64,7 @@ def apply_research_job_request(
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
         research_failure_note,
+        store_research_packet_for_job,
     )
 
     job_request = runtime_result.pop("research_job_request", None)
@@ -79,9 +80,8 @@ def apply_research_job_request(
     if job is not None:
         return job
     if sync_packet is not None:
-        composed = compose_completed_research(
-            job_request=job_request, packet=sync_packet
-        )
+        store_research_packet_for_job(job_request, sync_packet)
+        composed = compose_completed_research(job_request=job_request, packet=sync_packet)
         runtime_result["assistant_response"] = composed["answer"]
         runtime_result["research"] = composed["research"]
         if composed.get("next_experiments") is not None:
@@ -274,9 +274,13 @@ def _finalize_success(
     conversation_id: str,
     request_id: str | None,
 ) -> None:
-    from argus.agent_runtime.research_answer import compose_completed_research
+    from argus.agent_runtime.research_answer import (
+        compose_completed_research,
+        store_research_packet_for_job,
+    )
     from argus.api.message_store import create_message
 
+    store_research_packet_for_job(job_request, packet)
     composed = compose_completed_research(job_request=job_request, packet=packet)
     metadata: dict[str, Any] = {
         "conversation_mode": "guide",

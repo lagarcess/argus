@@ -2810,6 +2810,7 @@ final payload and persisted metadata:
     "shape": "fast",
     "sources": ["https://example.com/filing"],
     "retrieved_at": "2026-08-07T15:04:05Z",
+    "anchor_symbols": ["NFLX"],
     "peers": [
       {"symbol": "DIS", "name": "The Walt Disney Company", "asset_class": "equity"}
     ],
@@ -2831,6 +2832,12 @@ Contract rules:
   turn on the cost ledger even for cache hits and degraded turns.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
+- `anchor_symbols` names the research subjects. The persisted sidecar is the
+  **only** cross-turn home for researched peers: inline turns, the dev
+  synchronous fallback, and the background job finalizer all persist it, and
+  a later confirmation card offers remaining peers by scanning the transcript
+  newest-first for the first sidecar whose anchors or peers overlap the
+  basket. No runtime state key carries peers.
 - Crypto and currency pairs never route to `finance_search` (probe-verified
   misresolution and empty-quote behavior); they answer from Argus's own data
   with `degraded.code = "asset_class_not_covered"` and still offer a runnable
@@ -2844,7 +2851,13 @@ Contract rules:
   a new assistant message referenced by the succeeded job's
   `execution_metadata.research_result_message_id`. A succeeded research job
   has a null `result_run_id` by design; clients refresh the transcript on
-  terminal research jobs instead of fetching a run.
+  terminal research jobs instead of fetching a run. `operation_scope` rides
+  every serialized job surface, including the polling
+  `GET /backtest-jobs/{job_id}` payload; absent means an ordinary backtest.
+- Thorough answers join the shared research cache like every other shape:
+  the finalized packet is stored under the requesting turn's key, and an
+  identical question within the class TTL answers inline with
+  `cache_status: "hit"`, no job, and no provider spend.
 - Researched peers still outside the active basket ride the ordinary
   `next_experiments` surface of the card-bearing message as
   `research_add_peer` / `research_add_peer_set` rows, bounded by free asset

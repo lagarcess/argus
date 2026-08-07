@@ -94,9 +94,6 @@ class WorkflowState(TypedDict, total=False):
     next_experiments: dict[str, Any]
     research: dict[str, Any]
     research_job_request: dict[str, Any]
-    # Cross-turn: researched peers survive until superseded so later
-    # confirmation cards can offer the remaining ones (spec section 6).
-    research_peers: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)

@@ -35,11 +35,11 @@ SENTINEL_PRICE = "987654.32"
 
 # The full set of keys a research turn may write. Anything outside this set,
 # especially pending_strategy / confirmation_payload / execute state, is a
-# truth-boundary breach.
+# truth-boundary breach. Peers ride the research sidecar; the transcript is
+# their only cross-turn home.
 ALLOWED_RESEARCH_PATCH_KEYS = {
     "assistant_response",
     "research",
-    "research_peers",
     "research_job_request",
     "next_experiments",
 }
@@ -132,7 +132,7 @@ def test_research_launched_test_regrounds_in_argus_providers(monkeypatch) -> Non
             "language": "en",
         },
     }
-    peers = result.stage_patch["research_peers"]["peers"]
+    peers = result.stage_patch["research"]["peers"]
     assert peers and peers[0]["symbol"] == "MSFT"
     preparation = peer_added_confirmation_preparation(
         source_payload, added=peers, language="en"

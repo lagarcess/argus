@@ -440,9 +440,8 @@ async def chat_stream(
             raise RuntimeError("Response-option admission returned no request.")
         request_message = accepted_option_request.content
         display_message = accepted_option_request.content
-        if (
-            payload.action is not None
-            and payload.action.payload.get("request_message_id")
+        if payload.action is not None and payload.action.payload.get(
+            "request_message_id"
         ):
             mention_provenance = []
     lifecycle_hooks = (
@@ -1115,6 +1114,8 @@ async def chat_stream(
                     attach_research_peer_rows(
                         runtime_result,
                         metadata,
+                        user_id=user.id,
+                        conversation_id=conversation.id,
                         language=runtime_user.language_preference or "en",
                     )
                 if result_card is not None:

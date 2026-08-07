@@ -89,7 +89,7 @@ def _plant_confirmation(
         "confirmation_payload": payload,
     }
     rows = research_peer_add_rows_for_confirmation(
-        {"peers": peers},
+        peers,
         confirmation_payload=payload,
         language="en",
     )
@@ -126,7 +126,7 @@ def test_peer_rows_ride_the_try_next_surface_not_the_card() -> None:
     assert "research_peers" not in card
 
     rows = research_peer_add_rows_for_confirmation(
-        {"peers": [*PEERS, {"symbol": "BTC", "name": "Bitcoin", "asset_class": "crypto"}]},
+        [*PEERS, {"symbol": "BTC", "name": "Bitcoin", "asset_class": "crypto"}],
         confirmation_payload=payload,
         language="en",
     )
@@ -142,7 +142,7 @@ def test_peer_rows_ride_the_try_next_surface_not_the_card() -> None:
         assert row["label_key"]
 
     spanish = research_peer_add_rows_for_confirmation(
-        {"peers": PEERS[:1]},
+        PEERS[:1],
         confirmation_payload=payload,
         language="es-419",
     )
@@ -153,7 +153,7 @@ def test_peer_rows_ride_the_try_next_surface_not_the_card() -> None:
 def test_rows_respect_the_five_asset_maximum() -> None:
     payload = _confirmation_payload(["NFLX", "AAPL", "MSFT", "GOOG", "AMZN"])
     rows = research_peer_add_rows_for_confirmation(
-        {"peers": PEERS},
+        PEERS,
         confirmation_payload=payload,
         language="en",
     )
@@ -163,11 +163,149 @@ def test_rows_respect_the_five_asset_maximum() -> None:
 def test_flag_off_emits_no_rows(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
     rows = research_peer_add_rows_for_confirmation(
-        {"peers": PEERS},
+        PEERS,
         confirmation_payload=_confirmation_payload(["NFLX"]),
         language="en",
     )
     assert rows is None
+
+
+def test_background_research_peers_reach_the_next_confirmation_card() -> None:
+    """A thorough job completes out of band; when the user taps the resulting
+    test row, the confirmation still offers the remaining researched peers.
+    The persisted sidecar is the one peer contract every completion path
+    honors, so the finalizer needs no runtime-state write."""
+    from argus.api.chat.confirmation import attach_research_peer_rows
+    from argus.api.chat.research_jobs import _finalize_success
+    from argus.domain.research.perplexity_agent import _packet_from_response
+
+    from tests.research.conftest import agent_response
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _mock_user_id(client)
+
+    packet = _packet_from_response(
+        agent_response(
+            text="Netflix, thoroughly.",
+            tickers=["NFLX"],
+            lookup_rows=[
+                ("Apple", "AAPL", "Apple Inc."),
+                ("Microsoft", "MSFT", "Microsoft Corporation"),
+            ],
+        ),
+        latency_ms=900,
+    )
+    _finalize_success(
+        job_id="job-research-1",
+        job_request={
+            "capability_class": "thorough_research",
+            "shape": "thorough",
+            "language": "en",
+            "question": "Break down Netflix against its rivals",
+            "subjects": [{"symbol": "NFLX", "name": "Netflix", "asset_class": "equity"}],
+        },
+        packet=packet,
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        request_id=None,
+    )
+
+    runtime_result: dict[str, Any] = {
+        "confirmation_payload": _confirmation_payload(["NFLX"])
+    }
+    metadata: dict[str, Any] = {}
+    attach_research_peer_rows(
+        runtime_result,
+        metadata,
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+    rows = metadata["next_experiments"]["rows"]
+    offered = sorted(
+        symbol
+        for row in rows
+        if not row["kind"].endswith("_set")
+        for symbol in row["why"]["params"]["symbols"]
+    )
+    assert offered == ["AAPL", "MSFT"]
+
+    # Tapping a peer row instead of the anchor still finds the research:
+    # the basket overlaps the sidecar's peers rather than its anchors.
+    peer_tap: dict[str, Any] = {"confirmation_payload": _confirmation_payload(["MSFT"])}
+    peer_metadata: dict[str, Any] = {}
+    attach_research_peer_rows(
+        peer_tap,
+        peer_metadata,
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        language="en",
+    )
+    peer_rows = peer_metadata["next_experiments"]["rows"]
+    assert [
+        row["why"]["params"]["symbols"]
+        for row in peer_rows
+        if not row["kind"].endswith("_set")
+    ] == [["AAPL"]], "the tapped peer leaves the basket's offers"
+
+
+def test_the_relevant_research_wins_over_the_latest() -> None:
+    """Newest-first with a relevance gate: research about other assets in
+    between neither hides the right peers nor leaks its own."""
+    from argus.api.chat.confirmation import research_peers_from_transcript
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _mock_user_id(client)
+
+    def _plant_research(anchors: list[str], peers: list[dict[str, str]]) -> None:
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            role="assistant",
+            content="research answer",
+            metadata={
+                "conversation_mode": "guide",
+                "research": {
+                    "schema_version": "argus_research/v1",
+                    "capability_class": "balanced_lookup",
+                    "shape": "balanced",
+                    "anchor_symbols": anchors,
+                    "peers": peers,
+                    "usage": {"cache_status": "miss"},
+                },
+            },
+            settle_usage=None,
+        )
+
+    _plant_research(["NFLX"], PEERS)
+    _plant_research(
+        ["GOOG"], [{"symbol": "META", "name": "Meta", "asset_class": "equity"}]
+    )
+
+    nflx_peers = research_peers_from_transcript(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        basket_symbols=["NFLX"],
+    )
+    assert [p["symbol"] for p in nflx_peers] == ["AAPL", "MSFT"]
+
+    goog_peers = research_peers_from_transcript(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        basket_symbols=["GOOG"],
+    )
+    assert [p["symbol"] for p in goog_peers] == ["META"]
+
+    assert (
+        research_peers_from_transcript(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+            basket_symbols=["AMZN"],
+        )
+        == []
+    ), "unrelated baskets get no researched peers"
 
 
 def test_add_peer_supersedes_without_narration_and_without_turn_spend() -> None:
@@ -176,9 +314,7 @@ def test_add_peer_supersedes_without_narration_and_without_turn_spend() -> None:
     _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
 
     usage_before = client.get("/api/v1/me/usage").json()
-    response = _add(
-        client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]}
-    )
+    response = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert response.status_code == 200, response.text
     message = response.json()["message"]
     assert message["role"] == "assistant"
@@ -206,17 +342,11 @@ def test_restore_previous_undoes_the_latest_add() -> None:
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
 
-    added = _add(
-        client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]}
-    )
+    added = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert added.status_code == 200, added.text
-    new_id = added.json()["message"]["metadata"]["confirmation_card"][
-        "confirmation_id"
-    ]
+    new_id = added.json()["message"]["metadata"]["confirmation_card"]["confirmation_id"]
 
-    restored = _add(
-        client, conversation["id"], new_id, {"restore_previous": True}
-    )
+    restored = _add(client, conversation["id"], new_id, {"restore_previous": True})
     assert restored.status_code == 200, restored.text
     message = restored.json()["message"]
     card = message["metadata"]["confirmation_card"]
@@ -251,9 +381,7 @@ def test_add_peer_rejects_symbols_that_were_never_offered() -> None:
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
 
-    response = _add(
-        client, conversation["id"], CONFIRMATION_ID, {"symbols": ["TSLA"]}
-    )
+    response = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["TSLA"]})
     assert response.status_code == 409
     assert response.json()["code"] == "artifact_action_invalid_state"
 
@@ -331,7 +459,5 @@ def test_add_peer_is_absent_with_the_flag_off(monkeypatch: pytest.MonkeyPatch) -
     _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
 
-    response = _add(
-        client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]}
-    )
+    response = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert response.status_code == 404

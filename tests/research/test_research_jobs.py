@@ -21,6 +21,8 @@ def _job_request() -> dict[str, Any]:
             {"symbol": "DIS", "name": "Walt Disney", "asset_class": "equity"},
         ],
         "period_of_interest": "last three years",
+        "period_is_closed_window": False,
+        "cache_key": "research-job-cache-key",
     }
 
 
@@ -184,8 +186,42 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
     message = created[0]
     assert message["role"] == "assistant"
     assert message["content"].startswith("Final research answer")
-    assert message["metadata"]["research"]["capability_class"] == "thorough_research"
+    sidecar = message["metadata"]["research"]
+    assert sidecar["capability_class"] == "thorough_research"
+    # The sidecar names its subjects so later confirmation cards can find
+    # this research in the transcript and offer its remaining peers.
+    assert sidecar["anchor_symbols"] == ["NFLX", "DIS"]
     assert recorded and recorded[0]["message_id"] == "answer-msg-1"
+    # The finalized packet enters the shared cache under the key the
+    # requesting turn computed, so the same question now answers inline.
+    from argus.domain.research.cache import cache_get
+
+    assert cache_get("research-job-cache-key") is packet
+
+
+def test_sync_fallback_composes_and_caches(monkeypatch) -> None:
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    packet = ResearchPacket(answer_markdown="Deep synchronous answer")
+
+    class SyncClient:
+        def run_research(self, prompt: str, spec: Any) -> ResearchPacket:
+            return packet
+
+    monkeypatch.setattr(research_jobs, "_client", lambda: SyncClient())
+    runtime_result: dict[str, Any] = {"research_job_request": _job_request()}
+    job = research_jobs.apply_research_job_request(
+        runtime_result,
+        user_id="u1",
+        conversation_id="c1",
+        request_message_id="m1",
+        request_id="r1",
+    )
+    assert job is None
+    assert runtime_result["assistant_response"].startswith("Deep synchronous answer")
+    assert runtime_result["research"]["anchor_symbols"] == ["NFLX", "DIS"]
+    from argus.domain.research.cache import cache_get
+
+    assert cache_get("research-job-cache-key") is packet
 
 
 def test_poller_failure_marks_the_job_and_posts_an_honest_note(monkeypatch) -> None:
@@ -227,6 +263,35 @@ def test_poller_failure_marks_the_job_and_posts_an_honest_note(monkeypatch) -> N
 
     assert gateway.failed == [("job-1", "research_failed")]
     assert created and "won't quote figures" in created[0]["content"]
+
+
+def test_job_status_endpoint_serializes_the_research_scope(monkeypatch) -> None:
+    """The polling REST surface must carry operation_scope: the client's
+    reconciliation treats a succeeded research job as terminal (no run to
+    wait for) only when the scope survives serialization."""
+    from argus.api.main import app
+    from fastapi.testclient import TestClient
+
+    gateway = _JobGateway()
+    gateway.create_backtest_job(
+        conversation_id="c1",
+        request_message_id="m1",
+        operation_scope="chat.research",
+        launch_payload={},
+        execution_metadata={},
+    )
+    gateway.rows["job-1"]["status"] = "succeeded"
+    gateway.rows["job-1"]["result_run_id"] = None
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/backtest-jobs/job-1")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["job"]["operation_scope"] == "chat.research"
+    assert payload["job"]["status"] == "succeeded"
+    assert payload["run"] is None
 
 
 def test_missing_key_yields_no_job_and_no_sync_packet(monkeypatch) -> None:
