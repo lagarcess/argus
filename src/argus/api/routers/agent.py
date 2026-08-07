@@ -224,13 +224,15 @@ def missing_result_action_run_message(
     if action_type == "save_strategy":
         if is_es:
             return (
-                "No pude encontrar el backtest completado para guardarlo. "
-                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
-                "tarjeta de resultado."
+                "La acción heredada Guardar se retiró. No pude encontrar el "
+                "backtest completado para esta solicitud antigua; continúa "
+                "desde una ejecución que siga disponible en este chat o en "
+                "Recientes."
             )
         return (
-            "I could not find the completed backtest to save. Run the strategy "
-            "again, then save it from the result card."
+            "The legacy Save action has been retired. I could not find the "
+            "completed backtest for this stale request; continue from a run "
+            "that is still available in this chat or Recents."
         )
     if is_es:
         return (
@@ -1014,6 +1016,7 @@ async def chat_stream(
                                     result_action_run
                                 ),
                                 user_message=request_message,
+                                language=runtime_user.language_preference,
                             )
                             if assistant_text is None:
                                 assistant_text = fallback_private_alpha_save_response(

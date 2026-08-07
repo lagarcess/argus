@@ -1487,8 +1487,14 @@ def test_show_breakdown_action_rejects_mismatched_conversation_context(
     assert "result_run_id" not in assistant["metadata"]
 
 
+@pytest.mark.parametrize(
+    ("language", "expected_request_message"),
+    [("en", "save this strategy"), ("es-419", "Guardar")],
+)
 def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
     monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    expected_request_message: str,
 ) -> None:
     from argus.api import state as api_state
 
@@ -1559,7 +1565,7 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
                     "conversation_id": conversation["id"],
                 },
             },
-            "language": "en",
+            "language": language,
         },
     )
 
@@ -1567,7 +1573,8 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
     text = _stream_payloads(response.text, "token")[0]["text"]
     assert "Saved" not in text
     assert "Strategy was saved" not in text
-    assert composed_save_response["user_message"] == "save this strategy"
+    assert composed_save_response["user_message"] == expected_request_message
+    assert composed_save_response["language"] == language
     assert composed_save_response["metadata"]["run_id"] == run_id
     assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
     assert composed_save_response["metadata"]["benchmark_symbol"] == "SPY"
@@ -1587,6 +1594,26 @@ def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
         "AAPL buy and hold"
     )
     assert api_state.store.strategies == {}
+
+
+@pytest.mark.parametrize(
+    ("language", "retired_text"),
+    [("en", "has been retired"), ("es-419", "se retiró")],
+)
+def test_missing_legacy_save_action_does_not_advertise_a_removed_control(
+    language: str,
+    retired_text: str,
+) -> None:
+    from argus.api.routers.agent import missing_result_action_run_message
+
+    response = missing_result_action_run_message(
+        action_type="save_strategy",
+        language=language,
+    )
+
+    assert retired_text in response
+    assert "result card" not in response
+    assert "tarjeta de resultado" not in response
 
 
 def test_chat_stream_requires_message_or_action() -> None:
