@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Edit2, Mail, MailOpen, MoreVertical, Pin, Trash2 } from "lucide-react";
+import {
+  Edit2,
+  EyeOff,
+  Mail,
+  MailOpen,
+  MoreVertical,
+  Pin,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { MemoryChrome } from "./memory-chrome";
 
 type ChatHeaderMenuProps = {
   isOpen: boolean;
@@ -23,6 +32,8 @@ type ChatHeaderMenuProps = {
   onTogglePin: () => void;
   isDeleting: boolean;
   onRequestDelete: () => void;
+  /** Memory controls stay invisible unless the backend exposes them. */
+  memoryChrome?: MemoryChrome;
 };
 
 /** Header owner menu for the active conversation. */
@@ -45,6 +56,7 @@ export default function ChatHeaderMenu({
   onTogglePin,
   isDeleting,
   onRequestDelete,
+  memoryChrome,
 }: ChatHeaderMenuProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -130,6 +142,20 @@ export default function ChatHeaderMenu({
                 <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                 {t('chat.rename_chat', 'Rename chat')}
               </button>
+              {memoryChrome?.controlsAvailable ? (
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={memoryChrome.optOut}
+                  onClick={memoryChrome.onToggleOptOut}
+                  className="mx-2 my-0.5 flex min-h-11 w-[calc(100%-1rem)] items-center gap-4 rounded-[10px] px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:mx-1 md:w-[calc(100%-0.5rem)] md:px-3 md:py-2 md:text-[15px]"
+                >
+                  <EyeOff className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                  {memoryChrome.optOut
+                    ? t("chat.memory.private_on", "Private chat: on")
+                    : t("chat.memory.private_off", "Private chat")}
+                </button>
+              ) : null}
               <div role="separator" className="my-1 h-px bg-black/5 dark:bg-white/5" />
               <button
                 type="button"

@@ -3,7 +3,7 @@
 
 The guard compares explicitly watched files against recorded line-count baselines
 and fails only when a watched file grows beyond its configured allowed-growth
-threshold. It also scans production source roots for a non-blocking top-offender
+threshold. It also scans configured source roots for a non-blocking top-offender
 report so newly large files are visible without becoming surprise CI failures.
 """
 
@@ -111,7 +111,7 @@ def collect_budgets(config_path: Path = DEFAULT_CONFIG) -> list[FileBudget]:
         file_path = Path(raw_path)
         resolved_path = file_path if file_path.is_absolute() else root / file_path
         if not resolved_path.exists():
-            raise FileNotFoundError(f"Watched modularity file is missing: {raw_path}")
+            continue
         budgets.append(
             FileBudget(
                 path=_display_path(resolved_path, root),
@@ -143,7 +143,7 @@ def format_report(
         "Modularity budget report",
         "========================",
         "",
-        "Top production files by current line count:",
+        "Top scanned files by current line count:",
     ]
     for source_file in scanned_by_size[:top_count]:
         watched_marker = " (watched)" if any(

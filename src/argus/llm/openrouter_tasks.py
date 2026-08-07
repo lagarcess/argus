@@ -24,11 +24,10 @@ OpenRouterTask = Literal[
     "discovery_model_knowledge",
     "knowledge_route",
     "knowledge_voicing",
+    "memory_sensitivity",
 ]
 OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
-OpenRouterReasoningEffort = Literal[
-    "xhigh", "high", "medium", "low", "minimal", "none"
-]
+OpenRouterReasoningEffort = Literal["xhigh", "high", "medium", "low", "minimal", "none"]
 
 
 @dataclass(frozen=True)
@@ -102,6 +101,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "knowledge_voicing": OpenRouterProfile(
         "knowledge_voicing", temperature=0.2, max_tokens=600, timeout_seconds=18
     ),
+    "memory_sensitivity": OpenRouterProfile(
+        "memory_sensitivity", temperature=0, max_tokens=300, timeout_seconds=15
+    ),
 }
 
 OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
@@ -119,4 +121,5 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "discovery_model_knowledge": "structured",
     "knowledge_route": "structured",
     "knowledge_voicing": "chat",
+    "memory_sensitivity": "utility",
 }

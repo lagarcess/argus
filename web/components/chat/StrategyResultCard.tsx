@@ -13,6 +13,12 @@ import {
 import { useTranslation } from "react-i18next";
 import { createEvidenceDecision, type DecisionState } from "@/lib/argus-api";
 import {
+  confirmMemoryCandidate,
+  declineMemoryCandidate,
+  proposeSavedDecisionMemory,
+  type MemoryCandidate,
+} from "@/lib/memory-api";
+import {
   DECISION_NOTE_MAX_LENGTH,
   decisionNoteCharacterCount,
   decisionNoteCountIsVisible,
@@ -44,6 +50,9 @@ type StrategyResultCardProps = {
   onDecisionSaved?: (decisionState: DecisionState) => void;
   resumeDecisionArtifactId?: string | null;
   onDecisionResumeHandled?: () => void;
+  /** Earned memory moment after a saved decision; backend policy still owns
+   * cooldowns, consent, and sensitivity. */
+  memoryProposalEnabled?: boolean;
 };
 
 const actionClassName =
@@ -65,9 +74,16 @@ export default function StrategyResultCard({
   onDecisionResumeHandled,
   onAction,
   result,
+  memoryProposalEnabled = false,
 }: StrategyResultCardProps) {
   const { t, i18n } = useTranslation();
   const [isDecisionOpen, setIsDecisionOpen] = useState(false);
+  const [memoryProposal, setMemoryProposal] = useState<MemoryCandidate | null>(
+    null,
+  );
+  const [memoryProposalState, setMemoryProposalState] = useState<
+    "idle" | "confirming" | "confirmed" | "failed"
+  >("idle");
   const [selectedDecisionState, setSelectedDecisionState] =
     useState<DecisionState>(result.decisionState ?? "watching");
   const [savedDecisionState, setSavedDecisionState] =
@@ -346,6 +362,37 @@ export default function StrategyResultCard({
                   );
                   setSavedDecisionState(response.decision.decision_state);
                   onDecisionSaved?.(response.decision.decision_state);
+                  if (memoryProposalEnabled) {
+                    // Earned moment (memo 15.3): ask only after a saved
+                    // decision, and only if backend policy admits it.
+                    const savedNote = decisionNote.trim();
+                    const stateLabel = decisionStateLabel(
+                      response.decision.decision_state,
+                      t,
+                    );
+                    try {
+                      const proposal = await proposeSavedDecisionMemory({
+                        label: `${result.strategyName}: ${stateLabel}`.slice(
+                          0,
+                          120,
+                        ),
+                        value:
+                          savedNote ||
+                          `${result.strategyName}: ${stateLabel}`.slice(0, 120),
+                        provenance: {
+                          source_kind: "decision_note",
+                          source_id: response.decision.id,
+                          source_version: response.decision.updated_at,
+                        },
+                      });
+                      if (proposal.created && proposal.candidate) {
+                        setMemoryProposal(proposal.candidate);
+                        setMemoryProposalState("idle");
+                      }
+                    } catch {
+                      // A quiet moment: proposal failures never surface here.
+                    }
+                  }
                   setDecisionNote("");
                   setIsDecisionOpen(false);
                 } catch {
@@ -362,6 +409,76 @@ export default function StrategyResultCard({
           </div>
         </div>
       )}
+      {memoryProposal && memoryProposalState !== "confirmed" ? (
+        <div className="mt-3 rounded-xl border border-black/[0.07] bg-black/[0.02] px-3.5 py-3 dark:border-white/[0.09] dark:bg-white/[0.03]">
+          <p className="text-[13px] font-medium text-black dark:text-white">
+            {t(
+              "chat.memory.proposal_title",
+              "Remember this saved decision?",
+            )}
+          </p>
+          <p className="mt-1 text-[12.5px] leading-snug text-black/55 dark:text-white/55">
+            {t("chat.memory.proposal_benefit", {
+              label: memoryProposal.label,
+              defaultValue:
+                "Argus would keep “{{label}}” so you can revisit and compare it later. You can inspect or remove it any time in Data Controls.",
+            })}
+          </p>
+          {memoryProposalState === "failed" ? (
+            <p
+              role="alert"
+              className="mt-1.5 text-[12px] text-[#b94c55] dark:text-[#e7a2a8]"
+            >
+              {t(
+                "chat.memory.proposal_error",
+                "Could not update memory. Try again.",
+              )}
+            </p>
+          ) : null}
+          <div className="mt-2.5 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={memoryProposalState === "confirming"}
+              onClick={() => {
+                const candidateId = memoryProposal.id;
+                setMemoryProposal(null);
+                void declineMemoryCandidate(candidateId).catch(() => null);
+              }}
+              className="inline-flex min-h-9 items-center rounded-full border border-black/10 px-3 py-1.5 text-[12px] font-medium text-[#505a63] transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-[#8d969e] dark:hover:bg-white/[0.05]"
+            >
+              {t("chat.memory.proposal_decline", "No thanks")}
+            </button>
+            <button
+              type="button"
+              disabled={memoryProposalState === "confirming"}
+              onClick={async () => {
+                setMemoryProposalState("confirming");
+                try {
+                  const confirmed = await confirmMemoryCandidate(
+                    memoryProposal.id,
+                  );
+                  setMemoryProposalState(
+                    confirmed.created ? "confirmed" : "failed",
+                  );
+                } catch {
+                  setMemoryProposalState("failed");
+                }
+              }}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#191c1f] px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
+            >
+              {t("chat.memory.proposal_confirm", "Remember")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {memoryProposalState === "confirmed" ? (
+        <p className="mt-3 text-[12px] text-black/50 dark:text-white/50">
+          {t(
+            "chat.memory.proposal_saved",
+            "Saved to memory. Manage it in Data Controls under Personalization.",
+          )}
+        </p>
+      ) : null}
     </section>
   );
 }

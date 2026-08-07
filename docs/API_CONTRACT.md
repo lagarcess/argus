@@ -3673,6 +3673,68 @@ Deferred surfaces:
 
 ---
 
+# 17.2 Personalization Memory (registered, role-gated)
+
+User-confirmed personalization memory for registered accounts. Assisted, not
+automatic: Argus proposes, the user confirms, and only confirmed content
+becomes a durable `MemoryRecord`. Memory never influences interpretation,
+routing, or simulation truth; it may only inform post-interpretation surfaces
+such as explanations and recall notes.
+
+Exposure model, checked in this order on every endpoint:
+
+1. Verified session required; a verified Guest receives
+   `403 account_conversion_required` before any memory code runs.
+2. The default-off `ARGUS_ENABLE_PERSONALIZATION_MEMORY` flag, a wired
+   process service, and a `private_alpha_allowlist` role of `admin` or
+   `developer` are all required. Any missing piece returns
+   `404 personalization_memory_unavailable`, so ordinary registered accounts
+   see exactly the flag-off state.
+
+`GET /memory/availability` is a presentation probe returning
+`{"available": bool}` so clients can hide the surface entirely; it never
+touches the memory subsystem.
+
+Sensitivity is backend truth:
+- No request accepts a sensitivity claim; any attempt is a 422.
+- The backend classifies candidate content with one structured LLM call
+  against the nine canonical sensitivity flags. Any flag forces restriction;
+  `broker_credential` and `raw_conversation` are never storable regardless of
+  claimed status or user confirmation.
+- Classifier failure returns `503 memory_assessment_unavailable` and nothing
+  is stored. Restricted edits return `400 memory_sensitivity_restricted`.
+
+Endpoints (all under `/api/v1`):
+
+- `POST /memory/enable` `{categories[], idempotency_key?}` -> consent settings.
+- `GET /memory/settings` -> `{enabled, enabled_categories[]}`.
+- `POST /memory/candidates` -> propose an explicit-request candidate;
+  `{created, candidate?}`; suppressed proposals return `created: false`.
+- `POST /memory/candidates/saved-decision` -> propose remembering a saved
+  decision (the first earned opt-in moment).
+- `POST /memory/candidates/{id}/confirm` `{context?}` -> mints one record and
+  one consent receipt from exactly the assessed content that was proposed.
+- `POST /memory/candidates/{id}/decline` -> `{declined}`.
+- `GET /memory/records` -> inspectable records with provenance and consent.
+- `GET /memory/records/{id}/explanation` -> why and where it was stored.
+- `PATCH /memory/records/{id}` `{label?, value?}` -> re-assessed edit.
+- `DELETE /memory/records/{id}` -> delete with provider reconciliation state.
+- `POST /memory/retrieval` `{query, purpose, limit?}` -> bounded recall.
+- `POST /memory/disable` -> off, existing records kept.
+- `POST /memory/reset` -> everything deleted.
+- `GET /memory/export` -> readable portable
+  `argus.personalization-memory-export/v1` document as an attachment.
+
+Chat integration:
+- Completed ordinary turns may carry `memory_recalls` (record id, label,
+  value, category) in the final stream payload and assistant message
+  metadata. It is an annotation added after the turn finishes; it never
+  feeds back into a request.
+- `POST /chat/stream` accepts optional `memory_opt_out: true` (private
+  chat). Opting out only disables recall and proposals for that turn.
+
+---
+
 # 18. Feedback
 
 ## `POST /feedback`

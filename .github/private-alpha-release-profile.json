@@ -15,6 +15,7 @@
         "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS": "15",
         "ARGUS_CHECKPOINTER_MODE": "postgres",
         "ARGUS_ENABLE_EXECUTION_REALISM": "true",
+        "ARGUS_ENABLE_PERSONALIZATION_MEMORY": "false",
         "ARGUS_DISCOVERY_SEARCH_PROVIDER": "perplexity_direct",
         "POSTHOG_REGION": "us",
         "ARGUS_MOCK_AUTH": "false",

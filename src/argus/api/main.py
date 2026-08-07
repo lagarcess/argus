@@ -18,6 +18,7 @@ from argus.api.routers import (
     feedback,
     history,
     ops,
+    personalization_memory,
     profile,
     search,
 )
@@ -48,6 +49,7 @@ for api_router in (
     history.router,
     search.router,
     discovery.router,
+    personalization_memory.router,
     feedback.router,
     ops.router,
     dev.router,

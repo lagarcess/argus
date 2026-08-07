@@ -24,6 +24,81 @@ type UsageShellOptions = {
   };
 };
 
+type ThresholdCase = {
+  tone: "teal" | "warning" | "danger";
+  expectedColor: string;
+  messageDay: UsageWindow;
+  backtestDay: UsageWindow;
+};
+
+const thresholdHourEnd = "2026-08-07T15:00:00Z";
+const thresholdDayEnd = "2026-08-08T00:00:00Z";
+const thresholdCases: ThresholdCase[] = [
+  {
+    tone: "teal",
+    expectedColor: "rgb(91, 168, 151)",
+    messageDay: {
+      limit: 200,
+      used: 140,
+      remaining: 60,
+      period_end: thresholdDayEnd,
+    },
+    backtestDay: {
+      limit: 50,
+      used: 35,
+      remaining: 15,
+      period_end: thresholdDayEnd,
+    },
+  },
+  {
+    tone: "warning",
+    expectedColor: "rgb(194, 164, 77)",
+    messageDay: {
+      limit: 200,
+      used: 142,
+      remaining: 58,
+      period_end: thresholdDayEnd,
+    },
+    backtestDay: {
+      limit: 50,
+      used: 36,
+      remaining: 14,
+      period_end: thresholdDayEnd,
+    },
+  },
+  {
+    tone: "danger",
+    expectedColor: "rgb(214, 109, 117)",
+    messageDay: {
+      limit: 200,
+      used: 180,
+      remaining: 20,
+      period_end: thresholdDayEnd,
+    },
+    backtestDay: {
+      limit: 50,
+      used: 45,
+      remaining: 5,
+      period_end: thresholdDayEnd,
+    },
+  },
+];
+
+function thresholdAllowance(day: UsageWindow, hourLimit: number): UsageAllowance {
+  return {
+    hour: {
+      limit: hourLimit,
+      used: 0,
+      remaining: hourLimit,
+      period_end: thresholdHourEnd,
+    },
+    day,
+    guest_session: null,
+    available_now: true,
+    limiting_window: "day",
+  };
+}
+
 function zeroAllowance(
   hourLimit: number,
   dayLimit: number,
@@ -122,6 +197,131 @@ async function openUsageDialog(
   await page.getByRole("button", { name: labels.usage }).focus();
   await page.keyboard.press("Enter");
   return settingsTrigger;
+}
+
+test("Usage colors message and backtest gauges independently", async ({
+  page,
+}) => {
+  const danger = thresholdCases.find(({ tone }) => tone === "danger");
+  const teal = thresholdCases.find(({ tone }) => tone === "teal");
+  expect(danger).toBeDefined();
+  expect(teal).toBeDefined();
+  if (!danger || !teal) return;
+
+  await mockUsageShell(page, {
+    allowances: {
+      messages: thresholdAllowance(danger.messageDay, 60),
+      backtests: thresholdAllowance(teal.backtestDay, 10),
+    },
+  });
+  await page.goto("/chat", { waitUntil: "networkidle" });
+  await openUsageDialog(page, {
+    settings: "Settings",
+    data: "Data Controls",
+    usage: "Usage",
+  });
+
+  const dialog = page.getByRole("dialog", { name: "Usage" });
+  const bars = dialog.getByRole("progressbar");
+  await expect(bars.nth(0).locator("div")).toHaveCSS(
+    "background-color",
+    danger.expectedColor,
+  );
+  await expect(bars.nth(1).locator("div")).toHaveCSS(
+    "background-color",
+    teal.expectedColor,
+  );
+  await expect(dialog).toContainText("20 left today");
+  await expect(dialog).toContainText("15 left today");
+  await expect(dialog.locator(`time[datetime="${thresholdDayEnd}"]`)).toHaveCount(
+    2,
+  );
+});
+
+for (const languageCase of [
+  {
+    language: "en" as const,
+    locale: "en-US" as const,
+    theme: "light" as const,
+    labels: {
+      settings: "Settings",
+      data: "Data Controls",
+      usage: "Usage",
+    },
+    remainingText: (count: number) => `${count} left today`,
+  },
+  {
+    language: "es-419" as const,
+    locale: "es-419" as const,
+    theme: "dark" as const,
+    labels: {
+      settings: "Ajustes",
+      data: "Controles de datos",
+      usage: "Uso",
+    },
+    remainingText: (count: number) => `Quedan ${count} hoy`,
+  },
+]) {
+  for (const thresholdCase of thresholdCases) {
+    test(`Usage captures ${thresholdCase.tone} in ${languageCase.language} ${languageCase.theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((theme) => {
+        window.localStorage.setItem("argus-theme", theme);
+      }, languageCase.theme);
+      await mockUsageShell(page, {
+        language: languageCase.language,
+        locale: languageCase.locale,
+        allowances: {
+          messages: thresholdAllowance(thresholdCase.messageDay, 60),
+          backtests: thresholdAllowance(thresholdCase.backtestDay, 10),
+        },
+      });
+      await page.goto("/chat", { waitUntil: "networkidle" });
+      await openUsageDialog(page, languageCase.labels);
+
+      const dialog = page.getByRole("dialog", {
+        name: languageCase.labels.usage,
+      });
+      const bars = dialog.getByRole("progressbar");
+      await expect(bars).toHaveCount(2);
+      for (const bar of await bars.all()) {
+        await expect(bar.locator("div")).toHaveCSS(
+          "background-color",
+          thresholdCase.expectedColor,
+        );
+      }
+      await expect(dialog).toContainText(
+        languageCase.remainingText(thresholdCase.messageDay.remaining),
+      );
+      await expect(dialog).toContainText(
+        languageCase.remainingText(thresholdCase.backtestDay.remaining),
+      );
+      await expect(
+        dialog.locator(`time[datetime="${thresholdDayEnd}"]`),
+      ).toHaveCount(2);
+      if (languageCase.theme === "dark") {
+        await expect(page.locator("html")).toHaveClass(/dark/);
+      } else {
+        await expect(page.locator("html")).not.toHaveClass(/dark/);
+      }
+
+      if (process.env.ARGUS_CAPTURE_USAGE_METER_EVIDENCE === "1") {
+        await page.evaluate(() => {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        });
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+        });
+        await dialog.screenshot({
+          path: `../docs/reports/evidence/usage-allowance-meter/${languageCase.language}-${languageCase.theme}-${thresholdCase.tone}.png`,
+          animations: "disabled",
+        });
+      }
+    });
+  }
 }
 
 test("Usage dialog traps focus and restores the Settings trigger", async ({

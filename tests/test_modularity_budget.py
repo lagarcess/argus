@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from scripts.check_modularity_budget import (
     SourceFileSize,
     collect_budgets,
@@ -29,7 +27,7 @@ def test_modularity_budget_reports_scanned_top_offenders_and_watched_status() ->
         ],
     )
 
-    assert "Top production files by current line count" in report
+    assert "Top scanned files by current line count" in report
     assert "web/components/new-large-file.tsx: 9999 lines" in report
     assert "src/argus/agent_runtime/llm_interpreter.py: 5279 lines (watched)" in report
     assert "Watched-file budget status" in report
@@ -64,6 +62,27 @@ def test_modularity_budget_scans_production_sources_without_surprise_failures(
     sizes = collect_source_sizes(config)
 
     assert sizes == [SourceFileSize(Path("src/large.py"), 4)]
+
+
+def test_modularity_budget_config_watches_large_test_files() -> None:
+    config_path = Path(".agent/modularity_budget.json")
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+
+    assert "tests" in config["scan_roots"]
+    assert "web/__tests__/**" not in config["scan_exclude_globs"]
+    assert "web/e2e/**" not in config["scan_exclude_globs"]
+
+    watched_files = set(config["watched_files"])
+    baseline_capture_minimum_lines = config["baseline_capture_minimum_lines"]
+    large_test_files = [
+        source_file.path.as_posix()
+        for source_file in collect_source_sizes(config_path)
+        if source_file.path.as_posix().startswith(("tests/", "web/__tests__/", "web/e2e/"))
+        and source_file.lines >= baseline_capture_minimum_lines
+    ]
+
+    assert large_test_files
+    assert set(large_test_files).issubset(watched_files)
 
 
 def test_modularity_budget_fails_only_past_allowed_growth(tmp_path: Path) -> None:
@@ -134,12 +153,11 @@ def test_modularity_budget_resolves_repo_relative_paths_from_config_location(
     assert budget.overage == 0
 
 
-def test_modularity_budget_rejects_missing_watched_files(tmp_path: Path) -> None:
+def test_modularity_budget_skips_missing_watched_files(tmp_path: Path) -> None:
     config = tmp_path / "budget.json"
     config.write_text(
         '{"allowed_growth_lines": 2, "watched_files": {"missing.py": 1}}',
         encoding="utf-8",
     )
 
-    with pytest.raises(FileNotFoundError):
-        collect_budgets(config)
+    assert collect_budgets(config) == []

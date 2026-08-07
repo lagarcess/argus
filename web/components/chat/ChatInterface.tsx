@@ -9,7 +9,6 @@ import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardS
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import ConversationActivityAnnouncement from "@/components/chat/ConversationActivityAnnouncement";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
@@ -162,7 +161,6 @@ import ConversationRetrievalState, {
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import {
   type ChatActionOption,
-  type ChatMention,
   type Message,
   type StrategyConfirmationPayload,
 } from "./types";
@@ -181,6 +179,13 @@ import {
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
+import { memoryRecallsFromFinalPayload, useMemoryChrome } from "./memory-chrome";
+import {
+  isStarterSelectionMetadata,
+  type GuestPendingSubmission,
+  type SendOptions,
+  type SendSelection,
+} from "./chat-send-selection";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -196,28 +201,6 @@ import {
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
 type View = "chat" | "settings";
-type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
-type SendSelection =
-  | ChatMention[]
-  | ChatActionOption
-  | StarterSelectionMetadata;
-type GuestPendingSubmission = {
-  text: string;
-  mentionsOrAction?: SendSelection;
-  actionArg?: ChatActionOption;
-  options?: SendOptions;
-};
-function isStarterSelectionMetadata(
-  selection: SendSelection | undefined,
-): selection is StarterSelectionMetadata {
-  return (
-    !Array.isArray(selection) &&
-    typeof selection === "object" &&
-    selection !== null &&
-    "strategy_category" in selection &&
-    !("type" in selection)
-  );
-}
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -942,6 +925,8 @@ export default function ChatInterface() {
     clearResumeDecision,
   } = guestExperience;
 
+  const memoryChrome = useMemoryChrome(isGuest, conversationId);
+
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
       action.labelKey
@@ -1268,6 +1253,7 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
+        const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1341,6 +1327,7 @@ export default function ChatInterface() {
                   actions: resultActions,
                   nextExperiments: finalNextExperiments,
                   savedStrategyId: card.savedStrategyId,
+                  memoryRecalls: finalMemoryRecalls,
                 }),
               ),
             ),
@@ -1386,6 +1373,7 @@ export default function ChatInterface() {
                   strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
+                  memoryRecalls: finalMemoryRecalls,
                   nextExperiments: finalTextNextExperiments,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
@@ -1403,6 +1391,7 @@ export default function ChatInterface() {
                 strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
+                memoryRecalls: finalMemoryRecalls,
                 nextExperiments: finalTextNextExperiments,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
@@ -2207,6 +2196,7 @@ export default function ChatInterface() {
                   onTogglePin={() => void handleToggleHeaderPin()}
                   isDeleting={isDeletingHeaderChat}
                   onRequestDelete={() => handleRequestHeaderDelete()}
+                  memoryChrome={memoryChrome}
                 />
               ) : null}
             </div>
@@ -2292,6 +2282,7 @@ export default function ChatInterface() {
                             isLatest={isLatestAi}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
+                            memoryProposalEnabled={memoryChrome.proposalEnabled}
                             nextMovesEnabled={nextMovesEnabled}
                             turnInFlight={turnInFlight}
                             isGuest={isGuest}
