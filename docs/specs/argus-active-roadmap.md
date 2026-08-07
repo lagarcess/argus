@@ -197,8 +197,8 @@ Standing chore work, picked up alongside lanes rather than scheduled:
 
   **Follow-up is specced and ready to dispatch, not pending decisions.** The
   recall loop is locked in
-  [`2026-08-06-personalization-memory-recall-loop.md`](../superpowers/specs/2026-08-06-personalization-memory-recall-loop.md)
-  on branch `codex/personalization-memory-recall-loop`. Four Mem0 parameters
+  [`2026-08-06-personalization-memory-recall-loop.md`](../superpowers/specs/2026-08-06-personalization-memory-recall-loop.md).
+  Four Mem0 parameters
   are ratified: index-only over confirmed content, so Mem0 never sees
   unconfirmed material; storage on the existing Supabase database with no new
   datastore service; Mem0 as the OSS library running in-process inside the API
