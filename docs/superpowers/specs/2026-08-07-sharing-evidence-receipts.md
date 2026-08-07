@@ -125,18 +125,43 @@ happen to send, or something with your name on it. It also has privacy weight,
 since an attributed receipt tied to a real name is a public statement about
 someone's investing interest.
 
-### 7.2 What the viewer can do
+### 7.2 What the viewer can do — DECIDED 2026-08-07
 
-A stranger opens the link. Then what?
+**Read-only, with a "test this yourself" path straight into guest chat with the
+setup preloaded.**
 
-Options: read-only with a sign-up call to action, read-only with a "test this
-yourself" path straight into guest chat with the setup preloaded, or a wall
-requiring sign-up to see anything.
+No wall. A stranger sees the receipt, and one tap puts them in Argus with the
+experiment ready. This is the acquisition mechanic and it fits the guest-first
+stance: a completed first backtest is activation, not account creation.
 
-**This is the most consequential decision in the pillar.** The third option
-kills the loop. The second is the strongest acquisition mechanic and fits the
-guest-first stance, since a first completed backtest is activation. The first
-is safest and slowest.
+Four things follow from this, and they are requirements rather than options.
+
+**It lands on a confirmation card. It never auto-runs.** Argus never auto-runs
+anywhere, and a shared link is the worst place to start: the viewer did not
+build this experiment and has not seen its assumptions. They arrive at the card,
+read what it will do, and choose.
+
+**The setup re-grounds on arrival, and the receipt is honest that it will
+differ.** The receipt is frozen; a run happens now. Dates may clamp, coverage may
+have changed, an asset may have moved. So the handoff re-validates through
+Argus's own providers, exactly as a research-launched test does, and the receipt
+says plainly that it was tested on its original date and that running it now
+uses current data.
+
+Without that line the viewer expects to reproduce the number they just read and
+gets a different one. That reads as Argus being wrong rather than time having
+passed, and it is the single most likely way this surface destroys trust.
+
+**A viewer's run spends their guest allowance.** A widely shared receipt sends
+many strangers into guest chat, each consuming allowance against limits sized
+for organic traffic. Confirm the ceilings hold for viral volume before this is
+enabled broadly, and make exhaustion an honest message rather than a broken
+first impression.
+
+**The whole path is instrumented as the acquisition funnel it is:** receipt
+created, receipt viewed, test-this-yourself tapped, confirmation reached, first
+result completed. Decision memo section 10.6 asks exactly this of the loop, and
+this is the first surface where the funnel is fully observable.
 
 ### 7.3 Search indexing
 
@@ -155,13 +180,19 @@ Needed: whether creation is gated at all, whether there is a report path, and
 what takedown looks like. A private alpha with an allowlist has low exposure
 today, which is the argument for deciding it now rather than at public launch.
 
-### 7.5 What is shareable
+### 7.5 What is shareable — narrowed by 7.2, still open
 
-A completed backtest result is the obvious case. Also a research answer? A
-comparison? An idea with no run?
+7.2 constrains this: if the viewer's action is "test this yourself", the shared
+thing must be **re-runnable**. That makes a completed backtest result the clear
+case, and a comparison plausible since its members are re-runnable.
 
-Each widens the leak surface differently, and a research answer in particular
-carries third-party sources into a page Argus publishes.
+A research answer is not re-runnable in the same way, and it carries
+third-party sources into a page Argus publishes. It would need a different call
+to action, which means a second viewer path.
+
+**Still needs a decision:** results only, results plus comparisons, or research
+answers too with their own path. Recommend starting with results only and
+widening once the funnel is measured.
 
 ### 7.6 Revocation semantics
 
