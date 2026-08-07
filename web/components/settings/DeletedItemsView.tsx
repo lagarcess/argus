@@ -21,6 +21,10 @@ type DeletedItemsViewProps = {
   onRestored?: () => void;
 };
 
+function isDeletedItemVisible(item: HistoryItem) {
+  return item.type === "chat";
+}
+
 export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsViewProps) {
   const { t } = useTranslation();
   const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
@@ -28,13 +32,13 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
 
   useEffect(() => {
     listHistory({ deleted: true })
-      .then(({ items }) => setDeletedItems(items))
+      .then(({ items }) => setDeletedItems(items.filter(isDeletedItemVisible)))
       .finally(() => setIsLoading(false));
   }, []);
 
   const handleRestore = async (item: HistoryItem) => {
     try {
-      if (item.type !== "chat") return;
+      if (!isDeletedItemVisible(item)) return;
       await patchConversation(item.id, { deleted_at: null });
       setDeletedItems((prev) => prev.filter((i) => i.id !== item.id));
       onRestored?.();
@@ -89,7 +93,7 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {deletedItems.filter((item) => item.type === "chat").map((item) => (
+              {deletedItems.map((item) => (
                 <div
                   key={item.id}
                   className="group flex items-center justify-between p-4 bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 rounded-[16px]"
