@@ -81,6 +81,15 @@ jobs:
       - name: Build frontend
         run: cd web && bun run build
 
+      # Observation backstop for the browser-storage disclosure. The chokepoint
+      # and the ESLint ban stop accidents; this catches a deliberate bypass by
+      # watching what a real browser actually keeps. One spec, not the suite.
+      - name: Install Playwright chromium
+        run: cd web && bunx playwright install --with-deps chromium
+
+      - name: Verify browser storage matches the privacy disclosure
+        run: cd web && bunx playwright test e2e/browser-storage-disclosure.spec.ts
+
   guest-release-gates:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false || github.event_name == 'push'
