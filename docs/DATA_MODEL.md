@@ -76,6 +76,19 @@ feedback
 usage_counters
 ```
 
+Incubation-only, with no API/runtime/UI consumer:
+```text
+memory_settings
+memory_candidates
+memory_consent_actions
+memory_records
+memory_provenance
+memory_prompt_history
+memory_reconciliations
+memory_provider_projections
+memory_provider_cleanup
+```
+
 Optional or later:
 ```
 - assets
@@ -978,6 +991,117 @@ Cost model notes:
 - Cost rows never store raw prompts, transcripts, credentials, balances,
   holdings, full audio, or frontend-only payloads.
 
+## 12.1.2 Personalization Memory Persistence Incubation
+
+Personalization memory is an isolated, no-consumer persistence checkpoint. It
+does not change P2 recall, Omnisearch, canonical Ideas, EvidenceArtifacts,
+DecisionNotes, conversations, backtests, LangGraph state, or ordinary Guest
+chat. Product exposure, API wiring, runtime retrieval, Data Controls, providers,
+analytics, and hosted-database application remain closed.
+
+Memory is registered-account-only and off by absence. Supabase Auth and
+`guest_workspaces` are the database-canonical eligibility boundary:
+
+- `auth.users.is_anonymous` must be false;
+- no same-identity Guest workspace may be `active` or `claiming`;
+- browser/Data API roles (`PUBLIC`, `anon`, `authenticated`, and
+  `service_role`) have no direct table or sequence privileges;
+- a fixed-search-path private predicate is called by every memory-table insert
+  and update trigger;
+- owner identity is immutable; forged JWT claims cannot replace Auth/workspace
+  truth.
+
+All memory tables have RLS enabled and forced, with no client policies. The
+private backend Postgres adapter is the only intended access path and must
+still derive a registered owner from a verified request before entering the
+store.
+
+### Canonical and derivative tables
+
+- `memory_settings`: one enabled category row per owner. No rows means memory is
+  disabled. Categories are closed to personalization preference, workflow
+  preference, explicit decision note, and past-session anchor.
+- `memory_candidates`: bounded pending proposal content, trigger/context,
+  exact opt-in scope, and sensitivity-policy digest. A candidate is not a
+  durable memory.
+- `memory_consent_actions`: immutable direct-enable or
+  candidate-confirmation evidence with exact requested, granted, and effective
+  scopes plus schema/policy versions and idempotency identity. Direct enable
+  has no candidate and grants a non-empty scope. Confirmation requires an
+  existing same-owner candidate whose category appears in the requested scope.
+- `memory_records`: confirmed canonical label/value state. The owner, candidate,
+  consent action, category, and creation identity are immutable. An edit may
+  change only label/value with the next positive revision and a later
+  `updated_at`.
+- `memory_provenance`: immutable, ordered owner-scoped pointers attached to
+  exactly one candidate or record. Source kinds are closed to Argus-owned
+  EvidenceArtifact, DecisionNote, Idea, IdeaVersion, Conversation, and Message
+  identities.
+- `memory_prompt_history`: category-scoped proactive-prompt and decline
+  timestamps used for durable cooldown/suppression decisions.
+- `memory_reconciliations`: positive, ordered provider-projection work
+  generations. Rows start pending, then move through an exact leased claim to
+  running before reaching immutable succeeded/failed terminal state. The claim
+  token, expiry, and attempt count make restart recovery inspectable: a live
+  lease cannot be stolen, an expired lease may be reclaimed with a new token,
+  and only the exact, unexpired current claim may commit a provider pointer or
+  terminal outcome. Terminal rows erase the bearer token and lease. Lower
+  unfinished generations cause a bounded, lock-free wait before later work for
+  the same record, while other owners remain independent. Unfinished work
+  restricts record deletion so derivative cleanup cannot disappear silently.
+  Owner-wide reset uses the reserved `operation = reset`, `record_id = ''`
+  sentinel. Record operations require a non-empty record id. Reset first
+  removes canonical and user-visible memory, snapshots every provider pointer
+  into cleanup, and retains one retryable reset generation. Failed attempts
+  remain terminal evidence; a retry appends the next generation, while a crash
+  before a terminal outcome reuses or reclaims the unfinished generation.
+  While reset metadata remains unresolved, fresh canonical memory may be
+  confirmed after a new opt-in but record-specific provider work cannot claim
+  a lease. A later reset recognizes the existing owner-reset history and
+  atomically supersedes that post-reset canonical work instead of waiting on
+  its intentionally blocked provider reconciliation. The first reset still
+  performs a bounded wait for genuine pre-reset provider work.
+- `memory_provider_projections`: the current derivative provider pointer and
+  positive generation for a canonical record. A provider pointer is unique per
+  owner but may be reused independently by another owner. Replacements are
+  atomic with a durable cleanup snapshot of the prior pointer.
+- `memory_provider_cleanup`: durable, owner-scoped cleanup targets that survive
+  canonical record deletion and process restarts. Rows begin pending, may move
+  only once to resolved, and never reopen; a successful resolution also removes
+  the matching same-record projection when it still exists. Bounded reads
+  return at most 100 unique pending targets in deterministic newest-first
+  order. Cleanup scheduling refuses a pointer currently projected by another
+  record for the same owner, preventing deletion of live reused provider state.
+  While any cleanup row remains pending, its `(owner_id, provider_ref)` is a
+  fail-closed reservation: neither application code nor direct SQL may assign
+  that pointer to a live projection. The reservation ends only when cleanup is
+  resolved.
+  Provider pointers are derivative identifiers, never canonical memory content.
+
+An owner reset calls any derivative provider only after the canonical
+transaction commits and only when cleanup exists. A synchronized provider
+result may clear cleanup, projections, and reset metadata only with the exact
+unexpired reset claim. Provider failure, malformed output, or
+`not_applicable` retains cleanup for retry. Completion never deletes canonical
+records created after the earlier reset.
+
+Composite foreign keys include `owner_id` at every live relationship so a
+candidate, consent action, record, provenance row, reconciliation, or provider
+projection cannot cross owners. Candidate-confirmation receipts survive
+candidate consumption; records link to the immutable receipt by owner,
+candidate identity, and receipt identity. Account deletion cascades the full
+owner state, including durable cleanup targets.
+
+### Guest conversion zero state
+
+Memory never enters the Guest transfer graph. A `BEFORE UPDATE` trigger on
+`guest_workspaces` counts all nine memory tables when an `active`/`claiming`
+workspace moves to `claimed`. Any row blocks both same-identity link and
+existing-account handoff, and the surrounding conversion transaction rolls
+back without transferring memory. A clean conversion carries zero memory,
+performs no retrospective extraction, and leaves personalization disabled until
+the registered user later completes a fresh scoped opt-in.
+
 ## 12.2 backtest_jobs
 
 Represents durable lifecycle state for a backtest execution job. Jobs bridge
@@ -1307,7 +1431,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
-  `usage_counters`, `guest_workspaces`.
+  `usage_counters`, `guest_workspaces`, `memory_settings`,
+  `memory_candidates`, `memory_consent_actions`, `memory_records`,
+  `memory_provenance`, `memory_prompt_history`, `memory_reconciliations`,
+  `memory_provider_projections`, `memory_provider_cleanup`.
 
 ### Guest ownership
 - Supabase anonymous identities use the `authenticated` role, so every guest
@@ -1315,6 +1442,8 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   authorization.
 - Expired guest identities cannot read or write product rows.
 - Another guest and a permanent user see zero guest workspace rows.
+- Guest memory state must be zero before either same-identity claim or
+  existing-account handoff. Memory rows are rejected rather than transferred.
 - `profiles.avatar_theme` is a registered-account preference. The database
   default keeps every row valid, but restrictive profile RLS policies use the
   trusted `is_anonymous` JWT claim so a guest cannot read or write it through
@@ -1362,6 +1491,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **usage_counters**: `(user_id, resource, period_start DESC)`
 - **usage_counters**: `(period_end)`
 - **usage_counters unique**: `(user_id, resource, period, period_start)`
+- **memory_candidates**: `(owner_id, created_at, id)`
+- **memory_consent_actions**: `(owner_id, recorded_at, id)`, unique confirmed
+  `(owner_id, candidate_id)`
+- **memory_records**: `(owner_id, created_at, id)`, covering
+  `(owner_id, consent_action_id, candidate_id)`, unique
+  `(owner_id, candidate_id)`
+- **memory_provenance**: unique ordered candidate and record indexes on
+  `(owner_id, parent_id, ordinal)`
+- **memory_reconciliations**: partial pending/running index on
+  `(owner_id, status, record_id, generation)`
+- **memory_provider_cleanup**: partial pending index on
+  `(owner_id, status, created_at, record_id)`
 ---
 
 # 21. Naming & Title Defaults

@@ -78,6 +78,8 @@ services:
         value: us
       - key: ARGUS_ENABLE_EXECUTION_REALISM
         value: "true"
+      - key: ARGUS_ENABLE_PERSONALIZATION_MEMORY
+        value: "false"
       - key: ARGUS_DISCOVERY_SEARCH_PROVIDER
         value: perplexity_direct
       - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD

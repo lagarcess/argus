@@ -136,6 +136,15 @@ def resolve_rolling_window_intent_text(
     if not raw:
         return None
     current_date = today or date.today()
+    idiom_window = _trailing_window_fields_from_idiom(raw)
+    if idiom_window is not None:
+        return {
+            "kind": "rolling_window",
+            **idiom_window,
+            "anchor": "today",
+            "confidence": confidence,
+            "evidence": raw,
+        }
     resolved = resolve_date_range_text(
         raw,
         today=current_date,
@@ -355,6 +364,86 @@ def _rolling_window_fields_from_range(
     if day_delta % 7 == 0:
         return {"count": day_delta // 7, "unit": "week"}
     return {"count": day_delta, "unit": "day"}
+
+
+_WINDOW_UNIT_TOKENS: dict[str, DateIntentUnit] = {
+    "day": "day", "days": "day", "dia": "day", "día": "day",
+    "dias": "day", "días": "day",
+    "week": "week", "weeks": "week", "semana": "week", "semanas": "week",
+    "month": "month", "months": "month", "mes": "month", "meses": "month",
+    "year": "year", "years": "year", "ano": "year", "año": "year",
+    "anos": "year", "años": "year",
+}
+_WINDOW_QUALIFIER_TOKENS = frozenset(
+    {
+        "last", "past", "trailing",
+        "ultimo", "último", "ultima", "última",
+        "ultimos", "últimos", "ultimas", "últimas",
+        "pasado", "pasada", "pasados", "pasadas",
+    }
+)
+_WINDOW_FILLER_TOKENS = frozenset(
+    {"del", "de", "desde", "el", "la", "los", "las", "the", "from", "este", "esta"}
+)
+# Trailing anchors: the phrase explicitly runs up to today.
+_WINDOW_ANCHOR_PHRASES = (
+    ("para", "aca"), ("para", "acá"),
+    ("hasta", "hoy"), ("hasta", "ahora"), ("hasta", "la", "fecha"),
+    ("a", "la", "fecha"), ("al", "dia", "de", "hoy"), ("al", "día", "de", "hoy"),
+    ("to", "now"), ("to", "date"), ("to", "today"),
+    ("until", "now"), ("until", "today"), ("till", "now"), ("till", "today"),
+    ("so", "far"),
+)
+_WINDOW_COUNT_WORDS = {"un": 1, "una": 1, "one": 1, "a": 1}
+
+
+def _trailing_window_fields_from_idiom(text: str) -> dict[str, Any] | None:
+    """Recognize "del último año para acá" / "last year to now" shaped spans.
+
+    dateparser resolves these idioms to a single calendar date, which downstream
+    turned into a zero-day window; the shape is deterministic, so read it as a
+    trailing window anchored on today.
+    """
+    tokens = [
+        token for token in text.casefold().replace(",", " ").split() if token
+    ]
+    tokens = [token.strip(".!?") for token in tokens if token.strip(".!?")]
+    if not tokens:
+        return None
+    anchored = False
+    for phrase in _WINDOW_ANCHOR_PHRASES:
+        size = len(phrase)
+        if len(tokens) > size and tuple(tokens[-size:]) == phrase:
+            tokens = tokens[:-size]
+            anchored = True
+            break
+    while tokens and tokens[0] in _WINDOW_FILLER_TOKENS:
+        tokens = tokens[1:]
+    qualified = False
+    if tokens and tokens[0] in _WINDOW_QUALIFIER_TOKENS:
+        qualified = True
+        tokens = tokens[1:]
+    count = 1
+    if tokens and (tokens[0].isdigit() or tokens[0] in _WINDOW_COUNT_WORDS):
+        count = int(tokens[0]) if tokens[0].isdigit() else _WINDOW_COUNT_WORDS[tokens[0]]
+        tokens = tokens[1:]
+    if not tokens or count <= 0:
+        return None
+    unit = _WINDOW_UNIT_TOKENS.get(tokens[0])
+    if unit is None or unit == "quarter":
+        return None
+    trailing = tokens[1:]
+    if trailing and not (
+        len(trailing) <= 1 and trailing[0] in _WINDOW_QUALIFIER_TOKENS
+    ):
+        return None
+    if trailing:
+        qualified = True
+    # A bare count+unit ("6 meses") is only a window when the phrase anchors
+    # or qualifies it; otherwise leave it to the general parser.
+    if not qualified and not anchored:
+        return None
+    return {"count": count, "unit": unit}
 
 
 def _rolling_window_fields_from_single_date_evidence(
