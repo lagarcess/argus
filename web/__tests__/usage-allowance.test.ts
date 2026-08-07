@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  allowanceMeterTone,
   classifyAllowance,
   formatAllowancePeriodEnd,
   showsHourlyWindow,
+  type UsageAllowance,
 } from "@/lib/usage-allowance";
 
 const root = join(import.meta.dir, "..");
@@ -16,6 +18,127 @@ function readLocale(locale: "en" | "es-419") {
 }
 
 describe("private-alpha usage allowance", () => {
+  test("colors each allowance from its lowest normalized active window", () => {
+    const allowanceAtThirtyPercent: UsageAllowance = {
+      hour: {
+        limit: 60,
+        used: 0,
+        remaining: 60,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 100,
+        used: 70,
+        remaining: 30,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "day",
+    };
+    const allowanceBelowThirtyPercent: UsageAllowance = {
+      ...allowanceAtThirtyPercent,
+      day: {
+        ...allowanceAtThirtyPercent.day,
+        used: 71,
+        remaining: 29,
+      },
+    };
+    const allowanceAtTenPercent: UsageAllowance = {
+      ...allowanceAtThirtyPercent,
+      day: {
+        ...allowanceAtThirtyPercent.day,
+        used: 90,
+        remaining: 10,
+      },
+    };
+    const allowanceExhausted: UsageAllowance = {
+      ...allowanceAtThirtyPercent,
+      day: {
+        ...allowanceAtThirtyPercent.day,
+        used: 100,
+        remaining: 0,
+      },
+      available_now: false,
+    };
+    const tighterHourlyWindow: UsageAllowance = {
+      hour: {
+        limit: 60,
+        used: 54,
+        remaining: 6,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 200,
+        used: 100,
+        remaining: 100,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "hour",
+    };
+    const guestDailyWindow: UsageAllowance = {
+      hour: null,
+      day: {
+        limit: 10,
+        used: 8,
+        remaining: 2,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "day",
+    };
+
+    expect(allowanceMeterTone(allowanceAtThirtyPercent)).toBe("teal");
+    expect(allowanceMeterTone(allowanceBelowThirtyPercent)).toBe("warning");
+    expect(allowanceMeterTone(allowanceAtTenPercent)).toBe("danger");
+    expect(allowanceMeterTone(allowanceExhausted)).toBe("danger");
+    expect(allowanceMeterTone(tighterHourlyWindow)).toBe("danger");
+    expect(allowanceMeterTone(guestDailyWindow)).toBe("warning");
+  });
+
+  test("classifies message and backtest gauges independently", () => {
+    const messageAllowance: UsageAllowance = {
+      hour: {
+        limit: 60,
+        used: 54,
+        remaining: 6,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 200,
+        used: 40,
+        remaining: 160,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "hour",
+    };
+    const backtestAllowance: UsageAllowance = {
+      hour: {
+        limit: 10,
+        used: 0,
+        remaining: 10,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 50,
+        used: 36,
+        remaining: 14,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "day",
+    };
+
+    expect(allowanceMeterTone(messageAllowance)).toBe("danger");
+    expect(allowanceMeterTone(backtestAllowance)).toBe("warning");
+  });
+
   test("classifies presentation state from backend-derived truth only", () => {
     expect(
       classifyAllowance({

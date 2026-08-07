@@ -11,9 +11,11 @@ import { ChevronDown, Loader2, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
+  allowanceMeterTone,
   classifyAllowance,
   formatAllowancePeriodEnd,
   showsHourlyWindow,
+  type AllowanceMeterTone,
   type UsageAllowance,
   type UsageAllowanceResponse,
 } from "@/lib/usage-allowance";
@@ -34,11 +36,18 @@ type AllowanceSectionProps = {
   locale: "en-US" | "es-419";
 };
 
+const METER_TONE_CLASS: Record<AllowanceMeterTone, string> = {
+  teal: "bg-[var(--rui-color-teal)]",
+  warning: "bg-[var(--rui-color-warning)]",
+  danger: "bg-[var(--rui-color-danger)]",
+};
+
 function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
   const { t } = useTranslation();
-  if (allowance.day === null || allowance.hour === null) return null;
   const state = classifyAllowance(allowance);
   const day = allowance.day;
+  const hour = allowance.hour;
+  const meterTone = allowanceMeterTone(allowance);
   const dayExhausted = state === "exhausted";
   const hourLimited = state === "hourly_limited";
   const progress =
@@ -76,9 +85,7 @@ function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
         aria-valuenow={Math.min(day.used, day.limit)}
       >
         <div
-          className={`h-full rounded-full transition-[width] ${
-            dayExhausted ? "bg-[#d66d75]" : "bg-[#5d7f72]"
-          }`}
+          className={`h-full rounded-full transition-[width] ${METER_TONE_CLASS[meterTone]}`}
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -88,7 +95,7 @@ function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
         <time dateTime={day.period_end}>{resetDisplay}</time>
       </p>
 
-      {showsHourlyWindow(allowance) ? (
+      {hour !== null && showsHourlyWindow(allowance) ? (
         <p
           className={`mt-1 text-[12px] ${
             hourLimited
@@ -97,11 +104,11 @@ function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
           }`}
         >
           {t("settings.data.usage_panel.hourly_available", {
-            count: allowance.hour.remaining,
+            count: hour.remaining,
             time: "",
           })}
-          <time dateTime={allowance.hour.period_end}>
-            {formatAllowancePeriodEnd(allowance.hour.period_end, locale)}
+          <time dateTime={hour.period_end}>
+            {formatAllowancePeriodEnd(hour.period_end, locale)}
           </time>
         </p>
       ) : null}
