@@ -518,217 +518,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/collections:
-    get:
-      tags:
-      - collections
-      parameters:
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          maximum: 100
-          minimum: 1
-          default: 20
-      - name: cursor
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedCollections'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-    post:
-      tags:
-      - collections
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CollectionCreate'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CollectionResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/collections/{collection_id}:
-    patch:
-      tags:
-      - collections
-      parameters:
-      - name: collection_id
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CollectionPatch'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CollectionResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-    delete:
-      tags:
-      - collections
-      parameters:
-      - name: collection_id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/collections/{collection_id}/strategies:
-    post:
-      tags:
-      - collections
-      parameters:
-      - name: collection_id
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CollectionAttach'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CollectionResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/collections/{collection_id}/strategies/{strategy_id}:
-    delete:
-      tags:
-      - collections
-      parameters:
-      - name: collection_id
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: strategy_id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
   /api/v1/conversations:
     get:
       tags:
@@ -1405,6 +1194,417 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/memory/availability:
+    get:
+      tags:
+      - personalization-memory
+      description: 'Presentation probe: lets the client hide the surface entirely.
+
+
+        Never touches the memory subsystem; a guest is denied like everywhere
+
+        else and a non-exposed registered account simply sees available=false.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryAvailabilityResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/candidates:
+    post:
+      tags:
+      - personalization-memory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryProposeRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryProposalResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/candidates/saved-decision:
+    post:
+      tags:
+      - personalization-memory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryProposeSavedDecisionRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryProposalResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/candidates/{candidate_id}/confirm:
+    post:
+      tags:
+      - personalization-memory
+      parameters:
+      - name: candidate_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryConfirmRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryConfirmationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/candidates/{candidate_id}/decline:
+    post:
+      tags:
+      - personalization-memory
+      parameters:
+      - name: candidate_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryDeclineResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/disable:
+    post:
+      tags:
+      - personalization-memory
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryControlResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/enable:
+    post:
+      tags:
+      - personalization-memory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryEnableRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryConsentSettingsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/export:
+    get:
+      tags:
+      - personalization-memory
+      description: 'Data portability: everything memory holds, in one readable document.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryExportDocument'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/records:
+    get:
+      tags:
+      - personalization-memory
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryRecordsResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/records/{record_id}:
+    patch:
+      tags:
+      - personalization-memory
+      parameters:
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryEditRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryControlResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - personalization-memory
+      parameters:
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryControlResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/records/{record_id}/explanation:
+    get:
+      tags:
+      - personalization-memory
+      parameters:
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryExplanationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/reset:
+    post:
+      tags:
+      - personalization-memory
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryControlResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/retrieval:
+    post:
+      tags:
+      - personalization-memory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryRetrieveRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryRetrievalResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/memory/settings:
+    get:
+      tags:
+      - personalization-memory
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryConsentSettingsResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/search:
     get:
       tags:
@@ -1489,150 +1689,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/strategies:
-    get:
-      tags:
-      - strategies
-      parameters:
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          maximum: 100
-          minimum: 1
-          default: 20
-      - name: cursor
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-      - name: deleted
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedStrategies'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-    post:
-      tags:
-      - strategies
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StrategyCreate'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StrategyResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/strategies/{strategy_id}:
-    patch:
-      tags:
-      - strategies
-      parameters:
-      - name: strategy_id
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StrategyPatch'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StrategyResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-    delete:
-      tags:
-      - strategies
-      parameters:
-      - name: strategy_id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
           description: An unexpected server error occurred.
           content:
@@ -2084,79 +2140,12 @@ components:
             - en
             - es-419
           - type: 'null'
+        memory_opt_out:
+          type: boolean
+          default: false
       type: object
       required:
       - conversation_id
-    Collection:
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        name_source:
-          type: string
-          enum:
-          - system_default
-          - ai_generated
-          - user_renamed
-        pinned:
-          type: boolean
-          default: false
-        strategy_count:
-          type: integer
-          default: 0
-        deleted_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-      type: object
-      required:
-      - id
-      - name
-      - name_source
-      - created_at
-      - updated_at
-    CollectionAttach:
-      properties:
-        strategy_ids:
-          items:
-            type: string
-          type: array
-      type: object
-      required:
-      - strategy_ids
-    CollectionCreate:
-      properties:
-        name:
-          anyOf:
-          - type: string
-          - type: 'null'
-      type: object
-    CollectionPatch:
-      properties:
-        name:
-          anyOf:
-          - type: string
-          - type: 'null'
-        pinned:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-      type: object
-    CollectionResponse:
-      properties:
-        collection:
-          $ref: '#/components/schemas/Collection'
-      type: object
-      required:
-      - collection
     Conversation:
       properties:
         id:
@@ -2844,6 +2833,462 @@ components:
       - email
       - password
       - captcha_token
+    MemoryAvailabilityResponse:
+      properties:
+        available:
+          type: boolean
+      type: object
+      required:
+      - available
+    MemoryCandidateOut:
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/MemoryCategory'
+        label:
+          type: string
+        value:
+          type: string
+        future_benefit:
+          type: string
+        provenance:
+          items:
+            $ref: '#/components/schemas/MemoryProvenanceOut'
+          type: array
+        trigger:
+          $ref: '#/components/schemas/MemoryProposalTrigger'
+        sensitivity:
+          $ref: '#/components/schemas/MemorySensitivityOut'
+        opt_in_scope:
+          items:
+            $ref: '#/components/schemas/MemoryCategory'
+          type: array
+        created_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - category
+      - label
+      - value
+      - future_benefit
+      - provenance
+      - trigger
+      - sensitivity
+      - opt_in_scope
+      - created_at
+    MemoryCategory:
+      type: string
+      enum:
+      - personalization_preference
+      - workflow_preference
+      - explicit_decision_note
+      - past_session_anchor
+    MemoryConfirmRequest:
+      properties:
+        context:
+          $ref: '#/components/schemas/MemoryOperationContext'
+          default: ordinary
+      additionalProperties: false
+      type: object
+    MemoryConfirmationResponse:
+      properties:
+        created:
+          type: boolean
+        record:
+          anyOf:
+          - $ref: '#/components/schemas/MemoryRecordOut'
+          - type: 'null'
+        consent_receipt:
+          anyOf:
+          - $ref: '#/components/schemas/MemoryConsentReceiptOut'
+          - type: 'null'
+      type: object
+      required:
+      - created
+    MemoryConsentReceiptOut:
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+          enum:
+          - direct_enable
+          - candidate_confirmation
+        candidate_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        requested_scope:
+          items:
+            $ref: '#/components/schemas/MemoryCategory'
+          type: array
+        granted_scope:
+          items:
+            $ref: '#/components/schemas/MemoryCategory'
+          type: array
+        effective_scope:
+          items:
+            $ref: '#/components/schemas/MemoryCategory'
+          type: array
+        recorded_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - action
+      - candidate_id
+      - requested_scope
+      - granted_scope
+      - effective_scope
+      - recorded_at
+    MemoryConsentSettingsResponse:
+      properties:
+        enabled:
+          type: boolean
+        enabled_categories:
+          items:
+            $ref: '#/components/schemas/MemoryCategory'
+          type: array
+      type: object
+      required:
+      - enabled
+      - enabled_categories
+    MemoryControlResponse:
+      properties:
+        changed:
+          type: boolean
+        record:
+          anyOf:
+          - $ref: '#/components/schemas/MemoryRecordOut'
+          - type: 'null'
+        provider_status:
+          $ref: '#/components/schemas/ProviderReconciliationStatus'
+      type: object
+      required:
+      - changed
+      - provider_status
+    MemoryDeclineResponse:
+      properties:
+        declined:
+          type: boolean
+      type: object
+      required:
+      - declined
+    MemoryEditRequest:
+      properties:
+        value:
+          anyOf:
+          - type: string
+            maxLength: 4096
+            minLength: 1
+          - type: 'null'
+        label:
+          anyOf:
+          - type: string
+            maxLength: 120
+            minLength: 1
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    MemoryEnableRequest:
+      properties:
+        categories:
+          items:
+            $ref: '#/components/schemas/MemoryCategory'
+          type: array
+          minItems: 1
+        idempotency_key:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - categories
+    MemoryExplanationResponse:
+      properties:
+        record_id:
+          type: string
+        category:
+          $ref: '#/components/schemas/MemoryCategory'
+        provenance:
+          items:
+            $ref: '#/components/schemas/MemoryProvenanceOut'
+          type: array
+        consent_receipt_id:
+          type: string
+        consent_schema_version:
+          type: string
+          const: argus.memory-consent/v1
+        confirmed_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - record_id
+      - category
+      - provenance
+      - consent_receipt_id
+      - consent_schema_version
+      - confirmed_at
+    MemoryExportDocument:
+      properties:
+        format:
+          type: string
+          const: argus.personalization-memory-export/v1
+          default: argus.personalization-memory-export/v1
+        exported_at:
+          type: string
+          format: date-time
+        settings:
+          $ref: '#/components/schemas/MemoryConsentSettingsResponse'
+        records:
+          items:
+            $ref: '#/components/schemas/MemoryRecordOut'
+          type: array
+      type: object
+      required:
+      - exported_at
+      - settings
+      - records
+      description: Readable, portable snapshot of everything memory holds for one owner.
+    MemoryOperationContext:
+      type: string
+      enum:
+      - ordinary
+      - broker
+      - export
+      - restricted_financial
+    MemoryProposalResponse:
+      properties:
+        created:
+          type: boolean
+        candidate:
+          anyOf:
+          - $ref: '#/components/schemas/MemoryCandidateOut'
+          - type: 'null'
+      type: object
+      required:
+      - created
+    MemoryProposalTrigger:
+      type: string
+      enum:
+      - saved_decision
+      - explicit_request
+      - assisted_stable_preference
+    MemoryProposeRequest:
+      properties:
+        category:
+          $ref: '#/components/schemas/MemoryCategory'
+        value:
+          type: string
+          maxLength: 4096
+          minLength: 1
+        label:
+          type: string
+          maxLength: 120
+          minLength: 1
+        future_benefit:
+          type: string
+          maxLength: 512
+          minLength: 1
+        provenance:
+          items:
+            $ref: '#/components/schemas/MemoryProvenanceIn'
+          type: array
+          minItems: 1
+        context:
+          $ref: '#/components/schemas/MemoryOperationContext'
+          default: ordinary
+      additionalProperties: false
+      type: object
+      required:
+      - category
+      - value
+      - label
+      - future_benefit
+      - provenance
+      description: Explicit user request to remember something; the trigger is not client
+        data.
+    MemoryProposeSavedDecisionRequest:
+      properties:
+        label:
+          type: string
+          maxLength: 120
+          minLength: 1
+        value:
+          type: string
+          maxLength: 4096
+          minLength: 1
+        provenance:
+          $ref: '#/components/schemas/MemoryProvenanceIn'
+        context:
+          $ref: '#/components/schemas/MemoryOperationContext'
+          default: ordinary
+      additionalProperties: false
+      type: object
+      required:
+      - label
+      - value
+      - provenance
+    MemoryProvenanceIn:
+      properties:
+        source_kind:
+          $ref: '#/components/schemas/MemorySourceKind'
+        source_id:
+          type: string
+          minLength: 1
+        source_version:
+          type: string
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - source_kind
+      - source_id
+      - source_version
+    MemoryProvenanceOut:
+      properties:
+        source_kind:
+          $ref: '#/components/schemas/MemorySourceKind'
+        source_id:
+          type: string
+        source_version:
+          type: string
+      type: object
+      required:
+      - source_kind
+      - source_id
+      - source_version
+    MemoryRecordOut:
+      properties:
+        id:
+          type: string
+        candidate_id:
+          type: string
+        category:
+          $ref: '#/components/schemas/MemoryCategory'
+        label:
+          type: string
+        value:
+          type: string
+        provenance:
+          items:
+            $ref: '#/components/schemas/MemoryProvenanceOut'
+          type: array
+        consent_receipt:
+          $ref: '#/components/schemas/MemoryConsentReceiptOut'
+        revision:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - candidate_id
+      - category
+      - label
+      - value
+      - provenance
+      - consent_receipt
+      - revision
+      - created_at
+      - updated_at
+    MemoryRecordsResponse:
+      properties:
+        records:
+          items:
+            $ref: '#/components/schemas/MemoryRecordOut'
+          type: array
+      type: object
+      required:
+      - records
+    MemoryRetrievalResponse:
+      properties:
+        memories:
+          items:
+            $ref: '#/components/schemas/RetrievedMemoryOut'
+          type: array
+      type: object
+      required:
+      - memories
+    MemoryRetrieveRequest:
+      properties:
+        query:
+          type: string
+          maxLength: 4096
+          minLength: 1
+        purpose:
+          $ref: '#/components/schemas/MemoryUsePurpose'
+        context:
+          $ref: '#/components/schemas/MemoryOperationContext'
+          default: ordinary
+        limit:
+          type: integer
+          maximum: 10.0
+          minimum: 1.0
+          default: 3
+      additionalProperties: false
+      type: object
+      required:
+      - query
+      - purpose
+    MemorySelectionReason:
+      type: string
+      enum:
+      - provider_ranked
+      - canonical_token_match
+    MemorySensitivityFlag:
+      type: string
+      enum:
+      - broker_credential
+      - account_balance
+      - exact_holdings
+      - tax_or_legal_status
+      - identifying_financial_detail
+      - health
+      - employment
+      - family
+      - raw_conversation
+    MemorySensitivityOut:
+      properties:
+        status:
+          $ref: '#/components/schemas/SensitivityStatus'
+        flags:
+          items:
+            $ref: '#/components/schemas/MemorySensitivityFlag'
+          type: array
+      type: object
+      required:
+      - status
+      - flags
+    MemorySourceKind:
+      type: string
+      enum:
+      - evidence_artifact
+      - decision_note
+      - idea
+      - idea_version
+      - conversation
+      - message
+    MemoryUsePurpose:
+      type: string
+      enum:
+      - revisit_saved_decision
+      - compare_saved_decisions
+      - explain_prior_decision
+      - inspect_memory
+      description: Closed purposes that cannot change canonical investing behavior.
     Message:
       properties:
         id:
@@ -2910,19 +3355,6 @@ components:
         old profile rows carry it and deployed clients may still read the `/me`
 
         shape during a rollout.'
-    PaginatedCollections:
-      properties:
-        items:
-          items:
-            $ref: '#/components/schemas/Collection'
-          type: array
-        next_cursor:
-          anyOf:
-          - type: string
-          - type: 'null'
-      type: object
-      required:
-      - items
     PaginatedConversations:
       properties:
         items:
@@ -3009,19 +3441,6 @@ components:
       type: object
       required:
       - items
-    PaginatedStrategies:
-      properties:
-        items:
-          items:
-            $ref: '#/components/schemas/Strategy'
-          type: array
-        next_cursor:
-          anyOf:
-          - type: string
-          - type: 'null'
-      type: object
-      required:
-      - items
     ProfilePatch:
       properties:
         display_name:
@@ -3062,6 +3481,30 @@ components:
           - slate
           default: ocean
       type: object
+    ProviderReconciliationStatus:
+      type: string
+      enum:
+      - synchronized
+      - not_applicable
+      - reconciliation_required
+    RetrievedMemoryOut:
+      properties:
+        record:
+          $ref: '#/components/schemas/MemoryRecordOut'
+        selection_reason:
+          $ref: '#/components/schemas/MemorySelectionReason'
+        score:
+          type: number
+        provenance:
+          items:
+            $ref: '#/components/schemas/MemoryProvenanceOut'
+          type: array
+      type: object
+      required:
+      - record
+      - selection_reason
+      - score
+      - provenance
     RunDossier:
       properties:
         run_id:
@@ -3438,6 +3881,12 @@ components:
       required:
       - start_date
       - end_date
+    SensitivityStatus:
+      type: string
+      enum:
+      - unassessed
+      - clear
+      - restricted
     SignupRequest:
       properties:
         email:
@@ -3476,157 +3925,6 @@ components:
       type: object
       required:
       - prompts
-    Strategy:
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        name_source:
-          type: string
-          enum:
-          - system_default
-          - ai_generated
-          - user_renamed
-        template:
-          type: string
-          enum:
-          - buy_and_hold
-          - buy_the_dip
-          - dca_accumulation
-          - moving_average_crossover
-          - rsi_mean_reversion
-        asset_class:
-          type: string
-          enum:
-          - equity
-          - crypto
-          - currency_pair
-        symbols:
-          items:
-            type: string
-          type: array
-        parameters:
-          additionalProperties: true
-          type: object
-        metrics_preferences:
-          items:
-            type: string
-          type: array
-        benchmark_symbol:
-          type: string
-        pinned:
-          type: boolean
-          default: false
-        deleted_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        strategy_surface_metrics:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-      type: object
-      required:
-      - id
-      - name
-      - name_source
-      - template
-      - asset_class
-      - symbols
-      - parameters
-      - metrics_preferences
-      - benchmark_symbol
-      - created_at
-      - updated_at
-    StrategyCreate:
-      properties:
-        name:
-          anyOf:
-          - type: string
-          - type: 'null'
-        template:
-          type: string
-          enum:
-          - buy_and_hold
-          - buy_the_dip
-          - dca_accumulation
-          - moving_average_crossover
-          - rsi_mean_reversion
-        asset_class:
-          type: string
-          enum:
-          - equity
-          - crypto
-          - currency_pair
-        symbols:
-          items:
-            type: string
-          type: array
-          maxItems: 5
-          minItems: 1
-        parameters:
-          additionalProperties: true
-          type: object
-        metrics_preferences:
-          items:
-            type: string
-          type: array
-        benchmark_symbol:
-          anyOf:
-          - type: string
-          - type: 'null'
-        conversation_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-      type: object
-      required:
-      - template
-      - asset_class
-      - symbols
-    StrategyPatch:
-      properties:
-        name:
-          anyOf:
-          - type: string
-          - type: 'null'
-        pinned:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-        metrics_preferences:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-        parameters:
-          anyOf:
-          - additionalProperties: true
-            type: object
-          - type: 'null'
-        deleted_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-      type: object
-    StrategyResponse:
-      properties:
-        strategy:
-          $ref: '#/components/schemas/Strategy'
-      type: object
-      required:
-      - strategy
     SuccessResponse:
       properties:
         success:

@@ -36,8 +36,6 @@ services:
         value: https://argus-app-suz5.onrender.com
       - key: ARGUS_APP_ORIGIN
         value: https://argus-app-suz5.onrender.com
-      - key: ARGUS_STRATEGIES_ENABLED
-        value: "false"
       - key: ARGUS_BACKTEST_JOBS_SHADOW_ENABLED
         value: "true"
       - key: ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED
@@ -78,6 +76,8 @@ services:
         value: us
       - key: ARGUS_ENABLE_EXECUTION_REALISM
         value: "true"
+      - key: ARGUS_ENABLE_PERSONALIZATION_MEMORY
+        value: "false"
       - key: ARGUS_DISCOVERY_SEARCH_PROVIDER
         value: perplexity_direct
       - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD
@@ -155,10 +155,6 @@ services:
         sync: false
       - key: NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL
         value: support@get-argus.com
-      - key: NEXT_PUBLIC_STRATEGIES_ENABLED
-        value: "false"
-      - key: NEXT_PUBLIC_COLLECTIONS_ENABLED
-        value: "false"
       - key: NEXT_PUBLIC_OMNISEARCH_ENABLED
         value: "true"
       - key: NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED

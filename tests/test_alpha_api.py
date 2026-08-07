@@ -977,26 +977,9 @@ def test_backtest_rejects_unknown_symbol() -> None:
 
 
 def test_draft_strategy_templates_have_no_api_path() -> None:
-    """Containment by construction: draft templates are rejected at the API boundary.
-
-    StrategyTemplate is derived from the capability registry's executable set, so the
-    two draft strategies (momentum_breakout, trend_follow) cannot be saved or run via a
-    direct API call outside the chat UI.
-    """
+    """Draft templates stay rejected at the direct backtest boundary."""
     client = _client()
     for template in ("momentum_breakout", "trend_follow"):
-        created = client.post(
-            "/api/v1/strategies",
-            json={
-                "name": "Draft probe",
-                "template": template,
-                "asset_class": "equity",
-                "symbols": ["AAPL"],
-                "parameters": {},
-            },
-        )
-        assert created.status_code == 422, f"{template} accepted by POST /strategies"
-
         ran = client.post(
             "/api/v1/backtests/run",
             headers={"Idempotency-Key": f"draft-{template}"},
@@ -1007,73 +990,6 @@ def test_draft_strategy_templates_have_no_api_path() -> None:
             },
         )
         assert ran.status_code == 422, f"{template} accepted by POST /backtests/run"
-
-
-def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> None:
-    client = _client()
-    equity_strategy = client.post(
-        "/api/v1/strategies",
-        json={
-            "name": "Tesla dips",
-            "template": "rsi_mean_reversion",
-            "asset_class": "equity",
-            "symbols": ["TSLA"],
-            "parameters": {},
-        },
-    ).json()["strategy"]
-    crypto_strategy = client.post(
-        "/api/v1/strategies",
-        json={
-            "name": "Bitcoin buy and hold",
-            "template": "buy_and_hold",
-            "asset_class": "crypto",
-            "symbols": ["BTC"],
-            "parameters": {},
-        },
-    ).json()["strategy"]
-    collection = client.post(
-        "/api/v1/collections", json={"name": "Ideas to revisit"}
-    ).json()["collection"]
-
-    attached = client.post(
-        f"/api/v1/collections/{collection['id']}/strategies",
-        json={"strategy_ids": [equity_strategy["id"], crypto_strategy["id"]]},
-    )
-
-    assert attached.status_code == 200
-    assert attached.json()["collection"]["strategy_count"] == 2
-
-
-def test_collection_attach_rejects_unowned_memory_strategy() -> None:
-    client = _client()
-    now = utcnow()
-    collection = client.post(
-        "/api/v1/collections", json={"name": "Ideas to revisit"}
-    ).json()["collection"]
-    other_strategy = Strategy(
-        id="other-strategy",
-        name="Other user's strategy",
-        name_source="user_renamed",
-        template="buy_and_hold",
-        asset_class="equity",
-        symbols=["AAPL"],
-        parameters={},
-        metrics_preferences=["total_return_pct"],
-        benchmark_symbol="SPY",
-        created_at=now,
-        updated_at=now,
-    )
-    api_state.store.strategies[other_strategy.id] = other_strategy
-    api_state.store.strategy_owners[other_strategy.id] = "other-user"
-
-    response = client.post(
-        f"/api/v1/collections/{collection['id']}/strategies",
-        json={"strategy_ids": [other_strategy.id]},
-    )
-
-    assert response.status_code == 404
-    assert response.json()["code"] == "not_found"
-    assert api_state.store.collection_strategies[collection["id"]] == set()
 
 
 def test_chat_stream_persists_messages_and_emits_contract_events() -> None:

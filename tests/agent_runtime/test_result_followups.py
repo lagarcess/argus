@@ -10,6 +10,7 @@ from argus.agent_runtime.result_followups import (
     coerce_result_followup_draft,
     compose_private_alpha_save_response,
     compose_result_followup_response,
+    fallback_private_alpha_save_response,
     render_private_alpha_save_draft,
     render_result_followup_draft,
     result_followup_fact_bank,
@@ -119,6 +120,18 @@ async def test_private_alpha_save_response_uses_llm_fact_contract() -> None:
     assert "Answer in Spanish" in calls[0]["messages"][0]["content"]
     assert "save_surface_status" in calls[0]["messages"][1]["content"]
     assert "retrieval_path" in calls[0]["messages"][1]["content"]
+    assert "retired" in calls[0]["messages"][1]["content"]
+    assert "Refine idea" in calls[0]["messages"][1]["content"]
+
+
+def test_private_alpha_save_fallback_names_retired_surface_and_continuity() -> None:
+    response = fallback_private_alpha_save_response(language="en")
+
+    assert response == (
+        "The legacy Strategies library and Save action have been retired. "
+        "This completed run remains available in this chat and Recents, and you "
+        "can use Refine idea to continue testing it."
+    )
 
 
 def test_private_alpha_save_response_rejects_hidden_strategy_claims() -> None:

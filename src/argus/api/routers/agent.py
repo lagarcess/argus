@@ -50,7 +50,6 @@ from argus.api.chat.artifacts import (
     confirmation_id_for_runtime_card,
     result_fact_bank,
     result_followup_metadata_from_run,
-    saved_strategy_metadata,
 )
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
@@ -69,6 +68,7 @@ from argus.api.chat.discovery_evidence import (
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
+from argus.api.chat.memory_recall import memory_recalls_for_turn
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -99,7 +99,6 @@ from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
 )
-from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
     runtime_result_card,
     runtime_result_envelope,
@@ -189,11 +188,6 @@ def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
     return dict(diagnostics) if isinstance(diagnostics, dict) else None
 
 
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
 async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
     from argus.agent_runtime.result_followups import (
         compose_private_alpha_save_response as _compose_private_alpha_save_response,
@@ -231,13 +225,15 @@ def missing_result_action_run_message(
     if action_type == "save_strategy":
         if is_es:
             return (
-                "No pude encontrar el backtest completado para guardarlo. "
-                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
-                "tarjeta de resultado."
+                "La acción heredada Guardar se retiró. No pude encontrar el "
+                "backtest completado para esta solicitud antigua; continúa "
+                "desde una ejecución que siga disponible en este chat o en "
+                "Recientes."
             )
         return (
-            "I could not find the completed backtest to save. Run the strategy "
-            "again, then save it from the result card."
+            "The legacy Save action has been retired. I could not find the "
+            "completed backtest for this stale request; continue from a run "
+            "that is still available in this chat or Recents."
         )
     if is_es:
         return (
@@ -684,7 +680,6 @@ async def chat_stream(
             assistant_message: str | None,
             assistant_metadata: dict[str, Any] | None = None,
             current_run: BacktestRun | None = None,
-            saved_strategy_id: str | None = None,
             message_id: str | None = None,
         ) -> None:
             try:
@@ -693,7 +688,6 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     language=naming_language,
                     current_run=current_run,
-                    saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
                     assistant_metadata=assistant_metadata,
@@ -705,7 +699,6 @@ async def chat_stream(
                     "Artifact naming scheduling failed",
                     user_id=user.id,
                     conversation_id=conversation.id,
-                    saved_strategy_id=saved_strategy_id,
                 )
 
         if runtime_fallback.recovery_message:
@@ -941,7 +934,6 @@ async def chat_stream(
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
                 result_action_run = validated_result_action_run
-                saved_strategy_id_for_naming: str | None = None
                 result_action_type = result_action_request_type(runtime_result)
                 if (
                     result_action_type is None
@@ -1019,27 +1011,18 @@ async def chat_stream(
                                 action_type=result_action_type,
                                 language=runtime_user.language_preference,
                             )
-                        elif not _strategies_enabled():
+                        else:
                             assistant_text = await compose_private_alpha_save_response(
                                 metadata=result_followup_metadata_from_run(
                                     result_action_run
                                 ),
                                 user_message=request_message,
+                                language=runtime_user.language_preference,
                             )
                             if assistant_text is None:
                                 assistant_text = fallback_private_alpha_save_response(
                                     language=runtime_user.language_preference
                                 )
-                        else:
-                            strategy = save_strategy_from_run(
-                                user=user,
-                                run=result_action_run,
-                            )
-                            saved_strategy_id_for_naming = strategy.id
-                            metadata.update(
-                                saved_strategy_metadata(result_action_run, strategy.id)
-                            )
-                            assistant_text = f"Saved {strategy.name} to Strategies."
                     if assistant_text:
                         runtime_result["assistant_response"] = assistant_text
                     if result_action_run is not None:
@@ -1053,13 +1036,6 @@ async def chat_stream(
                         runtime_result["result_strategy_id"] = (
                             result_action_run.strategy_id
                         )
-                        if saved_strategy_id_for_naming is not None:
-                            runtime_result["saved_strategy_id"] = (
-                                saved_strategy_id_for_naming
-                            )
-                            runtime_result["result_strategy_id"] = (
-                                saved_strategy_id_for_naming
-                            )
                 for key in (
                     "latest_run_id",
                     "source_result_run_id",
@@ -1227,6 +1203,15 @@ async def chat_stream(
                                 if key in durable_retry
                             }
                     else:
+                        memory_recalls = memory_recalls_for_turn(
+                            user=user,
+                            account=turn_account,
+                            user_message=display_message,
+                            memory_opt_out=payload.memory_opt_out,
+                        )
+                        if memory_recalls:
+                            metadata["memory_recalls"] = memory_recalls
+                            runtime_result["memory_recalls"] = memory_recalls
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
                             metadata=metadata,
@@ -1297,7 +1282,6 @@ async def chat_stream(
                     assistant_message=persisted_text,
                     assistant_metadata=metadata,
                     current_run=result_action_run or run,
-                    saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
                     ),

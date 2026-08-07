@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   Activity,
   Archive,
+  Brain,
   ChevronRight,
   ChevronUp,
   Database,
@@ -45,7 +46,9 @@ import AppearanceModal from "@/components/settings/AppearanceModal";
 import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
+import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
 import UsageModal from "@/components/settings/UsageModal";
+import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
@@ -73,6 +76,7 @@ type ActiveModal =
   | "archived"
   | "deleted"
   | "usage"
+  | "memory"
   | "profile";
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
@@ -129,6 +133,7 @@ export default function ProfileMenu({
   const [accountKind, setAccountKind] = useState<"guest" | "registered" | null>(
     null,
   );
+  const [memoryControlsAvailable, setMemoryControlsAvailable] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -204,6 +209,18 @@ export default function ProfileMenu({
       /Mac|iPhone|iPad|iPod/.test(navigator.userAgent),
     );
   }, []);
+
+  // Memory stays invisible unless the backend exposes it to this account.
+  useEffect(() => {
+    if (!isOpen || accountKind !== "registered") return;
+    let isCurrent = true;
+    void fetchMemoryAvailable().then((available) => {
+      if (isCurrent) setMemoryControlsAvailable(available);
+    });
+    return () => {
+      isCurrent = false;
+    };
+  }, [isOpen, accountKind]);
 
   // Close on click-outside
   useEffect(() => {
@@ -500,6 +517,9 @@ export default function ProfileMenu({
   const quickJumpItems = useMemo<ProfileQuickJumpItem[]>(() => {
     if (activeSubmenu === "data") {
       return [
+        ...(memoryControlsAvailable
+          ? [{ id: "memory", onSelect: () => openModal("memory") }]
+          : []),
         { id: "archived", onSelect: () => openModal("archived") },
         { id: "deleted", onSelect: () => openModal("deleted") },
         {
@@ -589,6 +609,7 @@ export default function ProfileMenu({
     handleOpenDeleteRequest,
     handleOpenKeyboardShortcuts,
     handleSubmenuToggle,
+    memoryControlsAvailable,
     onClose,
     onFeedback,
     onOpenSidebarPreference,
@@ -796,6 +817,17 @@ export default function ProfileMenu({
   if (activeModal === "usage") {
     return (
       <UsageModal
+        locale={localeForLanguage(
+          normalizeEnabledLanguage(i18n.resolvedLanguage),
+        )}
+        onClose={() => setActiveModal(null)}
+        returnFocusRef={anchorRef}
+      />
+    );
+  }
+  if (activeModal === "memory") {
+    return (
+      <MemoryControlsModal
         locale={localeForLanguage(
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
@@ -1197,6 +1229,18 @@ export default function ProfileMenu({
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
+            {memoryControlsAvailable ? (
+              <button
+                onClick={() => openModal("memory")}
+                className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              >
+                <Brain className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
+                <span className="whitespace-nowrap">
+                  {t("settings.data.personalization.menu", "Personalization")}
+                </span>
+                <span className="ml-auto flex shrink-0">{quickJumpBadge("memory")}</span>
+              </button>
+            ) : null}
             <button
               onClick={() => openModal("archived")}
               className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"

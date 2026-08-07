@@ -7,11 +7,8 @@
     "history": "History",
     "settings": "Settings",
     "conversation": "Conversation",
-    "strategies": "Strategies",
-    "collections": "Collections",
     "recents": "Recents",
     "run_simulation": "Run simulation",
-    "add_to_collection": "Add to collection",
     "rename": "Rename",
     "delete": "Delete",
     "pin": "Pin",
@@ -275,11 +272,12 @@
     "error_generic": "Something went wrong. Try again.",
     "recovery": {
       "interpreter_unavailable": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+      "interpreter_unavailable_not_retryable": "I saved your message, but I could not turn it into a reliable test setup. Sending it again as written will hit the same problem, so try rewording it, or tell me the asset and the period you want.",
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
       "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
-      "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
+      "private_alpha_save_unavailable": "The legacy Strategies library and Save action have been retired. This completed run remains available in this chat and Recents, and you can use Refine idea to continue testing it.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
       "confirmation_action_missing_identity": "That confirmation action is missing its card identity. Use the latest card action before continuing.",
@@ -419,8 +417,9 @@
       "sources_panel_open_one": "{{count}} source ›",
       "sources_panel_open_other": "{{count}} sources ›",
       "sources_panel_title": "Sources Argus read",
-      "sources_panel_note": "Argus read these while answering. Not recommended reading.",
+      "sources_panel_note": "Sources used to inform this answer. Links open in a new tab.",
       "sources_panel_close": "Close sources",
+      "sources_panel_external_link_new_tab": "Opens in a new tab",
       "allowance_banner": "Grounded search allowance used",
       "allowance_banner_cta": "Sign in for more searches"
     },
@@ -506,7 +505,6 @@
     "past_sessions": "Past sessions",
     "archive_chat": "Archive chat",
     "no_past_sessions": "No past sessions yet.",
-    "added_to_collection": "Added to \"{{name}}\"",
     "good_response": "Good response",
     "poor_response": "Poor response",
     "more_actions": "More Actions",
@@ -516,8 +514,6 @@
     "copy_failed": "Copy failed",
     "report_issue": "Report Issue",
     "rename_failed": "Could not rename this chat. Try again.",
-    "saved": "Saved",
-    "saving": "Saving",
     "simulation_complete": "Simulation Complete",
     "activity_rail": {
       "aria_label": "Conversation activity",
@@ -568,7 +564,6 @@
         "rejected": "Rejected",
         "revisit_later": "Revisit later"
       },
-      "save": "Save",
       "unavailable": "Unavailable",
       "return_unavailable": "return unavailable",
       "change": "change",
@@ -774,75 +769,19 @@
         "beat_benchmark": "Beat the benchmark by {{points}} points",
         "deep_drawdown": "Worst drop was {{drawdown}}%"
       }
-    }
-  },
-  "strategies": {
-    "empty_state": "Strategies you save from chat will appear here.",
-    "no_match": "No strategies match your search.",
-    "error_load": "Could not load strategies. Make sure the API is running.",
-    "search_placeholder": "Search strategies...",
-    "metrics": {
-      "overall_profit": "overall profit",
-      "max_drawdown": "max drawdown",
-      "win_rate": "win rate"
     },
-    "unexecuted_hint": "Run this strategy to see performance",
-    "run_hint": "Run this strategy to see how {{symbols}} would have performed.",
-    "best_performer": "Best performer",
-    "suggestions": [
-      {
-        "title": "RSI Threshold",
-        "desc": "Buy or sell when RSI reaches chosen levels.",
-        "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
-      },
-      {
-        "title": "10% Stop-Loss",
-        "desc": "Protect your capital with an automated exit rule.",
-        "prompt": "I want a strategy that buys any stock in my list and automatically sells if the price drops 10% from my entry."
-      },
-      {
-        "title": "Trend Follower",
-        "desc": "Ride the momentum while the price is above the 50-day MA.",
-        "prompt": "Create a strategy that buys whenever the price is above the 50-day moving average on QQQ."
-      },
-      {
-        "title": "Monthly DCA",
-        "desc": "Build positions steadily with fixed recurring buys.",
-        "prompt": "Create a simple monthly DCA strategy that buys SPY on the first trading day of each month."
-      }
-    ]
-  },
-  "collections": {
-    "empty_state": "Add strategy to collection or save from chat to see them here.",
-    "no_match": "No collections match your search.",
-    "error_load": "Could not load collections. Make sure the API is running.",
-    "search_placeholder": "Search collections",
-    "new_collection": "New collection",
-    "no_strategies": "No strategies yet",
-    "strategy_count_one": "{{count}} strategy",
-    "strategy_count_other": "{{count}} strategies",
-    "suggestions": [
-      {
-        "title": "Tech Giants",
-        "desc": "Group FAANG or top semiconductor companies in one place.",
-        "prompt": "I want to create a collection of the top 5 tech giants like AAPL, MSFT, and NVDA."
-      },
-      {
-        "title": "Energy Transition",
-        "desc": "Climate-focused ideas and clean energy plays.",
-        "prompt": "I want to start a collection for energy transition and solar power ideas."
-      },
-      {
-        "title": "Dividend Kings",
-        "desc": "Safe, consistent yield plays for a defensive portfolio.",
-        "prompt": "How should I structure a collection for long-term dividend growth stocks?"
-      },
-      {
-        "title": "Crypto HODL",
-        "desc": "Store your Bitcoin and Ethereum dip-buying logic.",
-        "prompt": "Create a collection for my long-term crypto accumulation strategies."
-      }
-    ]
+    "memory": {
+      "recall_title": "From your memory",
+      "recall_note": "Saved decisions you confirmed. Manage them in Data Controls.",
+      "private_on": "Private chat: on",
+      "private_off": "Private chat",
+      "proposal_title": "Remember this saved decision?",
+      "proposal_benefit": "Argus would keep “{{label}}” so you can revisit and compare it later. You can inspect or remove it any time in Data Controls.",
+      "proposal_confirm": "Remember",
+      "proposal_decline": "No thanks",
+      "proposal_error": "Could not update memory. Try again.",
+      "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -915,6 +854,48 @@
     },
     "data": {
       "title": "Data Controls",
+      "personalization": {
+        "menu": "Personalization",
+        "title": "Memory",
+        "close": "Close memory",
+        "loading": "Loading memory...",
+        "load_error": "Memory could not be loaded.",
+        "retry": "Try again",
+        "intro": "Argus only remembers what you confirm. You can review, edit, delete, or turn off everything here.",
+        "toggle_label": "Remember confirmed memories",
+        "toggle_on_note": "On. New memories still need your confirmation.",
+        "toggle_off_note": "Off. Existing memories stay until you delete them.",
+        "records_title": "What Argus remembers",
+        "empty": "Nothing yet. When you confirm a memory it will appear here.",
+        "saved_on": "Saved {{date}}",
+        "why_stored": "Why is this stored?",
+        "edit": "Edit memory",
+        "edit_label": "Memory label",
+        "edit_value": "Memory content",
+        "save_edit": "Save",
+        "delete": "Delete memory",
+        "confirm_delete": "Confirm?",
+        "explanation_intro": "You confirmed this memory on {{date}}.",
+        "explanation_source": "Source: {{kind}}.",
+        "export": "Export memory data",
+        "reset": "Reset memory",
+        "reset_confirm": "Delete everything?",
+        "categories": {
+          "personalization_preference": "Personalization preference",
+          "workflow_preference": "Workflow preference",
+          "explicit_decision_note": "Saved decision",
+          "past_session_anchor": "Past session anchor"
+        },
+        "errors": {
+          "explain": "Could not load the explanation. Try again.",
+          "edit": "Could not save that change. Try again.",
+          "restricted": "Argus keeps sensitive details out of memory.",
+          "delete": "Could not delete that memory. Try again.",
+          "toggle": "Could not update memory settings. Try again.",
+          "reset": "Could not reset memory. Try again.",
+          "export": "Could not export your memory data. Try again."
+        }
+      },
       "archived_chats": "Archived chats",
       "recently_deleted": "Recently deleted",
       "close_recently_deleted": "Close recently deleted",
@@ -922,7 +903,6 @@
       "deleted_item_note": "Currently restorable.",
       "no_deleted_items": "No recently deleted items",
       "chat_item": "Chat",
-      "strategy_item": "Strategy",
       "delete_all_conversations": "Delete all conversations",
       "delete_all_confirm": {
         "title": "Delete all conversations?",

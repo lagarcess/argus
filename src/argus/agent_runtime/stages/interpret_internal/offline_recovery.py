@@ -4,7 +4,6 @@ Behavior-preserving relocation from stages/interpret.py (issue #131)."""
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
@@ -47,6 +46,7 @@ def _offline_interpreter_unavailable_result(
     snapshot: TaskSnapshot | None = None,
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
+    retryable: bool = True,
 ) -> StageResult:
     pending_no_progress = _offline_pending_no_progress_result(
         user=user,
@@ -79,18 +79,24 @@ def _offline_interpreter_unavailable_result(
             current_user_message=current_user_message,
             selected_thread_metadata=selected_thread_metadata or {},
             language=user.language_preference,
+            retryable=retryable,
         ),
     }
     stage_patch.update(
         recovery_state_stage_patch(
-            "interpreter_unavailable",
+            "interpreter_unavailable"
+            if retryable
+            else "interpreter_unavailable_not_retryable",
             language=user.language_preference,
-            retryable=True,
+            retryable=retryable,
         )
     )
-    retry_last_turn = retry_last_turn_stage_patch(current_user_message)
-    if retry_last_turn is not None:
-        stage_patch.update(retry_last_turn)
+    # A deterministic rejection reproduces itself on every attempt, so offering
+    # to replay the turn would only repeat the same failure.
+    if retryable:
+        retry_last_turn = retry_last_turn_stage_patch(current_user_message)
+        if retry_last_turn is not None:
+            stage_patch.update(retry_last_turn)
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
@@ -161,11 +167,6 @@ def _offline_pending_no_progress_result(
     )
 
 
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
 def _latest_result_save_requested(decision: InterpretDecision) -> bool:
     return _LATEST_RESULT_SAVE_REQUESTED_REASON in decision.reason_codes
 
@@ -176,6 +177,7 @@ def _offline_recovery_message(
     current_user_message: str = "",
     selected_thread_metadata: dict[str, Any] | None = None,
     language: str = "en",
+    retryable: bool = True,
 ) -> str:
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         strategy = snapshot.pending_strategy_summary
@@ -209,7 +211,12 @@ def _offline_recovery_message(
             "latest_result_followup_unavailable",
             language=language,
         )
-    return recovery_message("interpreter_unavailable", language=language)
+    return recovery_message(
+        "interpreter_unavailable"
+        if retryable
+        else "interpreter_unavailable_not_retryable",
+        language=language,
+    )
 
 
 def _current_setup_phrase(strategy: StrategySummary) -> str:

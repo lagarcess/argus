@@ -1,0 +1,81 @@
+{
+  "format": "argus.personalization-memory-export/v1",
+  "exported_at": "2026-08-07T00:15:47.737961Z",
+  "settings": {
+    "enabled": true,
+    "enabled_categories": [
+      "explicit_decision_note",
+      "past_session_anchor",
+      "personalization_preference",
+      "workflow_preference"
+    ]
+  },
+  "records": [
+    {
+      "id": "16b21f44c50747d485123e42372d98fb",
+      "candidate_id": "f15d00ee234a4fe2b7cd902d4b5c3dde",
+      "category": "workflow_preference",
+      "label": "Assumptions first",
+      "value": "Show the assumptions before results in every backtest readout.",
+      "provenance": [
+        {
+          "source_kind": "message",
+          "source_id": "message-qa-1",
+          "source_version": "1"
+        }
+      ],
+      "consent_receipt": {
+        "id": "8994790682444f838cbdbf0e575df23c",
+        "action": "candidate_confirmation",
+        "candidate_id": "f15d00ee234a4fe2b7cd902d4b5c3dde",
+        "requested_scope": [
+          "workflow_preference"
+        ],
+        "granted_scope": [],
+        "effective_scope": [
+          "explicit_decision_note",
+          "past_session_anchor",
+          "personalization_preference",
+          "workflow_preference"
+        ],
+        "recorded_at": "2026-08-07T00:13:01.153145Z"
+      },
+      "revision": 1,
+      "created_at": "2026-08-07T00:13:01.153145Z",
+      "updated_at": "2026-08-07T00:13:01.153145Z"
+    },
+    {
+      "id": "465a32632bea408fa6461dc975fae2ad",
+      "candidate_id": "991330442f9b425390c2601d7c5048f2",
+      "category": "explicit_decision_note",
+      "label": "ETH exposure: rejected",
+      "value": "Rejected the buy and hold ETH version because the drawdown was too deep.",
+      "provenance": [
+        {
+          "source_kind": "decision_note",
+          "source_id": "decision-qa-1",
+          "source_version": "2026-08-06T12:00:00Z"
+        }
+      ],
+      "consent_receipt": {
+        "id": "373680263bdd4a9996cfb1ffc4fecbd3",
+        "action": "candidate_confirmation",
+        "candidate_id": "991330442f9b425390c2601d7c5048f2",
+        "requested_scope": [
+          "explicit_decision_note"
+        ],
+        "granted_scope": [],
+        "effective_scope": [
+          "explicit_decision_note",
+          "past_session_anchor",
+          "personalization_preference",
+          "workflow_preference"
+        ],
+        "recorded_at": "2026-08-07T00:13:01.923554Z"
+      },
+      "revision": 1,
+      "created_at": "2026-08-07T00:13:01.923554Z",
+      "updated_at": "2026-08-07T00:13:01.923554Z"
+    }
+  ]
+}

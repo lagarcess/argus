@@ -337,31 +337,6 @@ class PaginatedConversations(BaseModel):
     next_cursor: str | None = None
 
 
-class StrategyCreate(BaseModel):
-    name: str | None = None
-    template: StrategyTemplate
-    asset_class: AssetClass
-    symbols: list[str] = Field(min_length=1, max_length=5)
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    metrics_preferences: list[str] = Field(
-        default_factory=lambda: [
-            "total_return_pct",
-            "win_rate",
-            "max_drawdown_pct",
-        ]
-    )
-    benchmark_symbol: str | None = None
-    conversation_id: str | None = None
-
-
-class StrategyPatch(BaseModel):
-    name: str | None = None
-    pinned: bool | None = None
-    metrics_preferences: list[str] | None = None
-    parameters: dict[str, Any] | None = None
-    deleted_at: datetime | None = None
-
-
 class Strategy(BaseModel):
     id: str
     name: str
@@ -383,35 +358,11 @@ class Strategy(BaseModel):
     def _tolerate_retired_template(cls, value: Any) -> Any:
         # Persisted strategies saved before a template was retired (e.g. the draft
         # momentum_breakout / trend_follow) must still load. Coerce any non-executable
-        # template to buy_and_hold on read, matching the save-path fallback in
-        # api/chat/strategies.strategy_template_from_run. Write models (StrategyCreate,
-        # BacktestRunRequest) intentionally stay strict so the API still rejects drafts
-        # at the request boundary.
+        # template to buy_and_hold on read. BacktestRunRequest intentionally stays
+        # strict so direct execution still rejects retired drafts.
         if value not in EXECUTABLE_TEMPLATES:
             return "buy_and_hold"
         return value
-
-
-class StrategyResponse(BaseModel):
-    strategy: Strategy
-
-
-class PaginatedStrategies(BaseModel):
-    items: list[Strategy]
-    next_cursor: str | None = None
-
-
-class CollectionCreate(BaseModel):
-    name: str | None = None
-
-
-class CollectionPatch(BaseModel):
-    name: str | None = None
-    pinned: bool | None = None
-
-
-class CollectionAttach(BaseModel):
-    strategy_ids: list[str]
 
 
 class Collection(BaseModel):
@@ -423,15 +374,6 @@ class Collection(BaseModel):
     deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
-
-class CollectionResponse(BaseModel):
-    collection: Collection
-
-
-class PaginatedCollections(BaseModel):
-    items: list[Collection]
-    next_cursor: str | None = None
 
 
 class BacktestRunRequest(BaseModel):
@@ -889,6 +831,9 @@ class ChatStreamRequest(BaseModel):
         max_length=CHAT_STREAM_MAX_MENTIONS,
     )
     language: Language | None = None
+    # Temporary chat: the client may opt a conversation out of memory. Opting
+    # out only ever disables recall and proposals; it grants nothing.
+    memory_opt_out: bool = False
 
     @model_validator(mode="after")
     def require_message_or_action(self) -> "ChatStreamRequest":

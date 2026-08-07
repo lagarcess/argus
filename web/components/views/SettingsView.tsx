@@ -18,7 +18,6 @@ import {
   RotateCcw,
   Loader2,
   MessageSquare,
-  BarChart2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -27,7 +26,6 @@ import {
   listConversations,
   listHistory,
   patchConversation,
-  patchStrategy,
   type Conversation,
   type HistoryItem,
   type ApiUser,
@@ -37,8 +35,6 @@ import {
   localeForLanguage,
   normalizeEnabledLanguage,
 } from "@/lib/language-features";
-import { strategiesEnabled } from "@/lib/private-alpha-flags";
-
 type SettingsViewProps = {
   onClose: () => void;
   onLogout: () => void;
@@ -49,18 +45,13 @@ type SettingsViewProps = {
 type SubView = "main" | "archived" | "deleted";
 
 function isDeletedItemVisible(item: HistoryItem) {
-  if (item.type === "chat") return true;
-  if (item.type === "strategy") return strategiesEnabled;
-  return false;
+  return item.type === "chat";
 }
 
 function deletedItemTypeLabel(
   item: HistoryItem,
   t: ReturnType<typeof useTranslation>["t"],
 ) {
-  if (item.type === "strategy") {
-    return t("settings.data.strategy_item", "Strategy");
-  }
   return t("settings.data.chat_item", "Chat");
 }
 
@@ -151,11 +142,7 @@ export default function SettingsView({
     if (!isDeletedItemVisible(item)) return;
 
     try {
-      if (item.type === "chat") {
-        await patchConversation(item.id, { deleted_at: null });
-      } else if (item.type === "strategy") {
-        await patchStrategy(item.id, { deleted_at: null });
-      }
+      await patchConversation(item.id, { deleted_at: null });
       setDeletedItems((prev) => prev.filter((i) => i.id !== item.id));
       onHistoryMutated?.();
     } catch (err) {
@@ -269,7 +256,7 @@ export default function SettingsView({
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-4">
                     <div className="shrink-0 w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40">
-                      {item.type === "strategy" ? <BarChart2 className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                      <MessageSquare className="w-4 h-4" />
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-[15px] font-medium text-black dark:text-white truncate">

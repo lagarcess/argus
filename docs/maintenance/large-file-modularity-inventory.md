@@ -2,9 +2,9 @@
 
 ## Summary
 
-This inventory examines the largest files across the Argus repository (`src/**/*.py`, `web/**/*.ts`, `web/**/*.tsx`) to identify mixed concerns, architectural bottlenecks, and potential extraction seams.
+This inventory examines the largest files across the Argus repository (`src/**/*.py`, `tests/**/*.py`, `web/**/*.ts`, and `web/**/*.tsx`) to identify mixed concerns, architectural bottlenecks, and potential extraction seams. Frontend unit tests and E2E files are included; dependencies, build output, and the frontend lockfile are not.
 
-- **Top largest files:** `src/argus/agent_runtime/llm_interpreter.py` (6.8k lines), `src/argus/agent_runtime/stages/interpret.py` (5.2k lines), `web/components/chat/ChatInterface.tsx` (2.3k lines).
+- **Top largest files:** `tests/agent_runtime/test_interpret_stage.py` (11.0k lines), `tests/agent_runtime/test_conversational_contract_hardening.py` (7.3k lines), and `tests/test_chat_runtime_reload_guardrails.py` (6.3k lines).
 - **Highest mixed-concern smell:** `web/components/chat/ChatInterface.tsx` (mixes routing, API parsing, local UI state, result card transformations, and view layout).
 - **Safest extraction candidates:** `src/argus/agent_runtime/llm_interpreter.py` (splitting out Audit Pydantic models and pure text-grounding utilities) and `web/lib/argus-api.ts` (splitting out chat stream parsing from standard REST fetchers).
 - Avoid touching: The agent_runtime stages (like interpret.py, execute.py,
@@ -31,6 +31,10 @@ This inventory examines the largest files across the Argus repository (`src/**/*
 | `src/argus/llm/openrouter.py` | 960 | Manages OpenRouter LLM requests and token tracking. | API routing, timeout calculations, and usage merging. | Split token usage aggregation from API transport logic. | Medium | Critical path for LLM availability. | Acceptable for now. |
 | `src/argus/api/chat/breakdown.py` | 900 | Generates detailed strategy breakdown responses. | LLM invocation, prompt drafting, and text normalization. | Separate text normalization (sentence fragment fixes) from LLM invocation. | Low | Complex string manipulation. | Acceptable for now. |
 | `src/argus/agent_runtime/stages/confirm.py` | 820 | Validates strategy capability before execution. | Deals with unsupported constraints, data adjustments, and prompt overrides. | Move data adjustment math and capability checks to `capabilities/contract.py`. | Low | Complicated assumptions logic. | Avoid touching until dedicated milestone. |
+
+## Test-file baseline policy
+
+All currently scanned test files at or above `.agent/modularity_budget.json`'s `baseline_capture_minimum_lines` value (currently 1,000) are listed with their current line count as the baseline and the standard 75-line growth allowance. This is a forward-only limit: it makes the current large suites visible and limits new growth without requiring a mass refactor. If another lane deletes one of those files, the checker skips the missing baseline so the deletion remains safe and non-blocking.
 
 ## Verification
 - **Files changed:** `docs/maintenance/large-file-modularity-inventory.md` created.

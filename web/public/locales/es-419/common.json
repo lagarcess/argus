@@ -7,11 +7,8 @@
     "history": "Historial",
     "settings": "Ajustes",
     "conversation": "Conversación",
-    "strategies": "Estrategias",
-    "collections": "Colecciones",
     "recents": "Recientes",
     "run_simulation": "Ejecutar simulación",
-    "add_to_collection": "Añadir a colección",
     "rename": "Renombrar",
     "delete": "Eliminar",
     "pin": "Anclar",
@@ -275,11 +272,12 @@
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
     "recovery": {
       "interpreter_unavailable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Intenta de nuevo en un momento.",
+      "interpreter_unavailable_not_retryable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Enviarlo igual va a dar el mismo problema, así que intenta reformularlo, o dime el activo y el periodo que quieres.",
       "assumption_edit_unapplied": "Guardé tu respuesta, pero no pude aplicar ese cambio de supuesto con confianza, así que dejé la idea actual sin cambios. Intenta el cambio de nuevo en un momento.",
       "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
       "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
       "latest_result_followup_unavailable": "No pude responder ese seguimiento. Tu resultado sigue aquí.",
-      "private_alpha_save_unavailable": "No puedo mover esto a Estrategias mientras esa superficie está desactivada para la alfa privada, pero la ejecución completa sigue en este chat y puedes volver a abrirla desde la conversación o Recientes.",
+      "private_alpha_save_unavailable": "La biblioteca heredada de Estrategias y la acción Guardar se retiraron. Esta ejecución completa sigue disponible en este chat y en Recientes, y puedes usar Refinar idea para seguir probándola.",
       "confirmation_action_guidance": "La confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.",
       "confirmation_action_missing_context": "No tengo una confirmación activa para cambiar. Describe la idea de inversión otra vez y prepararé un borrador nuevo.",
       "confirmation_action_missing_identity": "A esa acción de confirmación le falta la identidad de la tarjeta. Usa la acción de la tarjeta más reciente antes de continuar.",
@@ -419,8 +417,9 @@
       "sources_panel_open_one": "{{count}} fuente ›",
       "sources_panel_open_other": "{{count}} fuentes ›",
       "sources_panel_title": "Fuentes que Argus consultó",
-      "sources_panel_note": "Argus las consultó al responder. No son lecturas recomendadas.",
+      "sources_panel_note": "Fuentes usadas para fundamentar esta respuesta. Los enlaces se abren en una pestaña nueva.",
       "sources_panel_close": "Cerrar fuentes",
+      "sources_panel_external_link_new_tab": "Se abre en una pestaña nueva",
       "allowance_banner": "Cupo de búsqueda con fuentes agotado",
       "allowance_banner_cta": "Inicia sesión para más búsquedas"
     },
@@ -506,7 +505,6 @@
     "past_sessions": "Sesiones pasadas",
     "archive_chat": "Archivar chat",
     "no_past_sessions": "No hay sesiones pasadas aún.",
-    "added_to_collection": "Añadido a \"{{name}}\"",
     "good_response": "Buena respuesta",
     "poor_response": "Mala respuesta",
     "more_actions": "Más acciones",
@@ -516,8 +514,6 @@
     "copy_failed": "No se pudo copiar",
     "report_issue": "Reportar problema",
     "rename_failed": "No se pudo renombrar este chat. Inténtalo de nuevo.",
-    "saved": "Guardada",
-    "saving": "Guardando",
     "simulation_complete": "Simulación completa",
     "activity_rail": {
       "aria_label": "Actividad de la conversación",
@@ -568,7 +564,6 @@
         "rejected": "Rechazada",
         "revisit_later": "Revisar luego"
       },
-      "save": "Guardar",
       "unavailable": "No disponible",
       "return_unavailable": "rendimiento no disponible",
       "change": "cambio",
@@ -774,75 +769,19 @@
         "beat_benchmark": "Superó la referencia por {{points}} puntos",
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
       }
-    }
-  },
-  "strategies": {
-    "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",
-    "no_match": "No hay estrategias que coincidan con tu búsqueda.",
-    "error_load": "No se pudieron cargar las estrategias. Asegúrate de que la API esté funcionando.",
-    "search_placeholder": "Buscar estrategias...",
-    "metrics": {
-      "overall_profit": "ganancia total",
-      "max_drawdown": "caída máxima",
-      "win_rate": "tasa de éxito"
     },
-    "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
-    "run_hint": "Ejecuta esta estrategia para ver cómo se habría comportado {{symbols}}.",
-    "best_performer": "Mejor rendimiento",
-    "suggestions": [
-      {
-        "title": "Reversión a la media RSI",
-        "desc": "Compra en caídas de sobreventa y vende en picos de sobrecompra.",
-        "prompt": "Diseña una estrategia que compre la caída cada vez que el RSI caiga por debajo de 30 y venda cuando llegue a 70 para BTC."
-      },
-      {
-        "title": "Stop-Loss del 10%",
-        "desc": "Protege tu capital con una regla de salida automatizada.",
-        "prompt": "Quiero una estrategia que compre cualquier acción de mi lista y venda automáticamente si el precio cae un 10% desde mi entrada."
-      },
-      {
-        "title": "Seguidor de Tendencia",
-        "desc": "Sigue el impulso mientras el precio esté por encima de la media móvil de 50 días.",
-        "prompt": "Crea una estrategia que compre siempre que el precio esté por encima de la media móvil de 50 días en QQQ."
-      },
-      {
-        "title": "DCA Mensual",
-        "desc": "Construye posiciones con compras fijas cada mes.",
-        "prompt": "Crea una estrategia DCA mensual simple que compre SPY el primer dia habil de cada mes."
-      }
-    ]
-  },
-  "collections": {
-    "empty_state": "Añade una estrategia a una colección o guárdala del chat para verlas aquí.",
-    "no_match": "No hay colecciones que coincidan con tu búsqueda.",
-    "error_load": "No se pudieron cargar las colecciones. Asegúrate de que la API esté funcionando.",
-    "search_placeholder": "Buscar colecciones",
-    "new_collection": "Nueva colección",
-    "no_strategies": "Sin estrategias aún",
-    "strategy_count_one": "{{count}} estrategia",
-    "strategy_count_other": "{{count}} estrategias",
-    "suggestions": [
-      {
-        "title": "Gigantes Tecnológicos",
-        "desc": "Agrupa FAANG o las mejores empresas de semiconductores en un solo lugar.",
-        "prompt": "Quiero crear una colección de los 5 gigantes tecnológicos más importantes, como AAPL, MSFT y NVDA."
-      },
-      {
-        "title": "Transición Energética",
-        "desc": "Ideas centradas en el clima y jugadas de energía limpia.",
-        "prompt": "Quiero empezar una colección para ideas de transición energética y energía solar."
-      },
-      {
-        "title": "Reyes de Dividendos",
-        "desc": "Jugadas de rendimiento seguras y consistentes para una cartera defensiva.",
-        "prompt": "¿Cómo debería estructurar una colección para acciones con crecimiento de dividendos a largo plazo?"
-      },
-      {
-        "title": "Cripto HODL",
-        "desc": "Guarda tu lógica de compra de caídas de Bitcoin y Ethereum.",
-        "prompt": "Crea una colección para mis estrategias de acumulación de criptomonedas a largo plazo."
-      }
-    ]
+    "memory": {
+      "recall_title": "De tu memoria",
+      "recall_note": "Decisiones guardadas que confirmaste. Adminístralas en Controles de datos.",
+      "private_on": "Chat privado: activado",
+      "private_off": "Chat privado",
+      "proposal_title": "¿Recordar esta decisión guardada?",
+      "proposal_benefit": "Argus guardaría “{{label}}” para que puedas revisarla y compararla después. Puedes verla o quitarla cuando quieras en Controles de datos.",
+      "proposal_confirm": "Recordar",
+      "proposal_decline": "No, gracias",
+      "proposal_error": "No se pudo actualizar la memoria. Intenta de nuevo.",
+      "proposal_saved": "Guardado en memoria. Adminístralo en Controles de datos, en Personalización."
+    }
   },
   "settings": {
     "title": "Ajustes",
@@ -915,6 +854,48 @@
     },
     "data": {
       "title": "Controles de datos",
+      "personalization": {
+        "menu": "Personalización",
+        "title": "Memoria",
+        "close": "Cerrar memoria",
+        "loading": "Cargando memoria...",
+        "load_error": "No se pudo cargar la memoria.",
+        "retry": "Intentar de nuevo",
+        "intro": "Argus solo recuerda lo que confirmas. Aquí puedes revisar, editar, borrar o apagar todo.",
+        "toggle_label": "Recordar memorias confirmadas",
+        "toggle_on_note": "Activado. Las memorias nuevas siguen necesitando tu confirmación.",
+        "toggle_off_note": "Apagado. Las memorias existentes se conservan hasta que las borres.",
+        "records_title": "Lo que Argus recuerda",
+        "empty": "Nada todavía. Cuando confirmes una memoria aparecerá aquí.",
+        "saved_on": "Guardada el {{date}}",
+        "why_stored": "¿Por qué se guardó?",
+        "edit": "Editar memoria",
+        "edit_label": "Etiqueta de la memoria",
+        "edit_value": "Contenido de la memoria",
+        "save_edit": "Guardar",
+        "delete": "Borrar memoria",
+        "confirm_delete": "¿Confirmar?",
+        "explanation_intro": "Confirmaste esta memoria el {{date}}.",
+        "explanation_source": "Fuente: {{kind}}.",
+        "export": "Exportar datos de memoria",
+        "reset": "Restablecer memoria",
+        "reset_confirm": "¿Borrar todo?",
+        "categories": {
+          "personalization_preference": "Preferencia de personalización",
+          "workflow_preference": "Preferencia de flujo de trabajo",
+          "explicit_decision_note": "Decisión guardada",
+          "past_session_anchor": "Referencia de sesión anterior"
+        },
+        "errors": {
+          "explain": "No se pudo cargar la explicación. Intenta de nuevo.",
+          "edit": "No se pudo guardar ese cambio. Intenta de nuevo.",
+          "restricted": "Argus mantiene los detalles sensibles fuera de la memoria.",
+          "delete": "No se pudo borrar esa memoria. Intenta de nuevo.",
+          "toggle": "No se pudo actualizar la configuración de memoria. Intenta de nuevo.",
+          "reset": "No se pudo restablecer la memoria. Intenta de nuevo.",
+          "export": "No se pudieron exportar tus datos de memoria. Intenta de nuevo."
+        }
+      },
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",
@@ -922,7 +903,6 @@
       "deleted_item_note": "Se puede restaurar actualmente.",
       "no_deleted_items": "No hay elementos borrados recientemente",
       "chat_item": "Chat",
-      "strategy_item": "Estrategia",
       "delete_all_conversations": "Eliminar todas las conversaciones",
       "delete_all_confirm": {
         "title": "¿Eliminar todas las conversaciones?",

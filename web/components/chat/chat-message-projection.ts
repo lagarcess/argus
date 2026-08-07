@@ -6,6 +6,7 @@ import {
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
+import { memoryRecallsFromMetadata } from "@/lib/memory-recalls";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
@@ -347,6 +348,7 @@ export function hydrateMessagesFromApi(
           nextExperiments:
             nextExperimentRowsFromMetadata(metadata) ?? undefined,
           savedStrategyId,
+          memoryRecalls: memoryRecallsFromMetadata(metadata) ?? undefined,
         };
       }
       const jobMessage = backtestJobMessageFromApi(message);
@@ -383,7 +385,21 @@ export function hydrateMessagesFromApi(
       });
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
-        if (discovery) return { ...hydratedText, discovery };
+        // Grounded knowledge answers carry Try next rows on a plain message;
+        // a discovery sidecar owns its message and suppresses them. Memory
+        // recalls overlay either shape independently.
+        const nextExperiments = discovery
+          ? null
+          : nextExperimentRowsFromMetadata(metadata);
+        const memoryRecalls = memoryRecallsFromMetadata(metadata);
+        if (discovery || nextExperiments || memoryRecalls) {
+          return {
+            ...hydratedText,
+            ...(discovery ? { discovery } : {}),
+            ...(nextExperiments ? { nextExperiments } : {}),
+            ...(memoryRecalls ? { memoryRecalls } : {}),
+          };
+        }
       }
       return hydratedText;
     });

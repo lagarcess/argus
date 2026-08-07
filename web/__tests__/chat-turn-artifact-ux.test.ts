@@ -344,19 +344,19 @@ describe("chat turn artifact UX", () => {
     expect(message).toContain("canRetry={Boolean(retryAction)}");
   });
 
-  test("result card keeps lifecycle completion neutral and saved state explicit", () => {
+  test("result card keeps lifecycle completion neutral after save is retired", () => {
     const card = readFileSync(
       join(root, "components/chat/StrategyResultCard.tsx"),
       "utf-8",
     );
 
     // Completion is passive muted text — never a success tone and no longer a
-    // button-shaped pill; only the explicit saved state keeps the success tone.
+    // button-shaped pill. The retired Strategy save state must not return.
     expect(card).not.toContain('artifactStatusToneClassName("neutral")');
     expect(card).toContain(
       "Passive status, not an action: plain muted text",
     );
-    expect(card).toContain('artifactStatusToneClassName("success")');
+    expect(card).not.toContain('artifactStatusToneClassName("success")');
     expect(card).toContain("view.hero.tone === \"positive\"");
   });
 

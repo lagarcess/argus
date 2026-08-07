@@ -4,7 +4,6 @@ __all__ = [
     "agent",
     "auth",
     "backtest",
-    "collections",
     "conversation_activity",
     "conversations",
     "dev",
@@ -14,5 +13,4 @@ __all__ = [
     "ops",
     "profile",
     "search",
-    "strategies",
 ]
