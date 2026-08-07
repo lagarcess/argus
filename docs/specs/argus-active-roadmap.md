@@ -59,8 +59,14 @@ the answer into something runnable.
 - Start with exactly two jobs: a single-company read, and a competitor
   comparison. No fundamentals suite, no screener, no valuation product, no
   skill store.
-- Perplexity finance and web search modes are the likely provider; #377 is the
-  open evaluation.
+- **Spec is written and founder-locked:**
+  [`2026-08-07-research-to-test-rail.md`](../superpowers/specs/2026-08-07-research-to-test-rail.md).
+  It supersedes the narrow competitor-comparison framing: Argus is no longer
+  bounded to backtesting. Perplexity `finance_search` at $5 per 1,000
+  invocations grounds quotes, fundamentals, segments, earnings, peers, screening
+  and ETF constituents, selected by question shape with no menu. Closes #377.
+- Peers now come free from the provider, which **retires the deterministic peer
+  recommender in PR #384**. Close that lane rather than building it.
 
 Absorbs stabilization items formerly ranked Tier 1 #1, #3, #4, and the
 knowledge/statistics macro. The interpreter ValueError work is complete and
