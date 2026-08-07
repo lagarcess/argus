@@ -104,7 +104,7 @@ describe("bottom sheet keyboard handling", () => {
       join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
       "utf-8",
     );
-    expect(source).toContain("useModalFocusTrap({");
+    expect(source).toContain("useModalSurface({");
     expect(trap).toContain('if (event.key !== "Tab") return;');
     expect(source).not.toContain("FOCUSABLE_SELECTOR");
   });

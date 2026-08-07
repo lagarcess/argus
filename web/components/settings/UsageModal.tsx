@@ -5,10 +5,13 @@ import {
   useEffect,
   useRef,
   useState,
+  useId,
   type RefObject,
 } from "react";
 import { ChevronDown, Loader2, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useModalSurface } from "@/components/layout/useModalSurface";
+import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
   allowanceMeterTone,
@@ -123,6 +126,9 @@ export default function UsageModal({
 }: UsageModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const overlayId = useId();
+  // Reachable from the drawer, so it owns Escape, focus, and system back.
+  useModalSurface({ isOpen: true, overlayId, containerRef: dialogRef, onDismiss: onClose });
   const [usage, setUsage] = useState<UsageAllowanceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -151,7 +157,7 @@ export default function UsageModal({
     (focusableElements()[0] ?? dialog).focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !hasOverlayAbove(overlayId)) {
         event.preventDefault();
         onClose();
         return;
@@ -187,7 +193,7 @@ export default function UsageModal({
           : fallbackReturnFocus;
       returnTarget?.focus();
     };
-  }, [onClose, returnFocusRef]);
+  }, [onClose, overlayId, returnFocusRef]);
 
   useEffect(() => {
     let isCurrent = true;

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { patchMe } from "@/lib/argus-api";
+import { useModalSurface } from "@/components/layout/useModalSurface";
+import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import {
   ENABLED_LANGUAGES,
   localeForLanguage,
@@ -23,6 +25,11 @@ export default function LanguageModal({
   onClose,
   persistProfile = true,
 }: LanguageModalProps) {
+  const overlayId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Reachable from the drawer, so it must own Escape, focus, and system back
+  // or dismissing it takes the drawer underneath with it.
+  useModalSurface({ isOpen: true, overlayId, containerRef: panelRef, onDismiss: onClose });
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const lang = i18n.language || "en";
@@ -40,7 +47,7 @@ export default function LanguageModal({
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !hasOverlayAbove(overlayId)) onClose();
     };
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleKeyDown);
@@ -48,7 +55,7 @@ export default function LanguageModal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, overlayId]);
 
   const handleSelect = async (code: string) => {
     const nextLanguage = normalizeEnabledLanguage(code);
@@ -68,6 +75,7 @@ export default function LanguageModal({
 
   return (
     <div
+      ref={panelRef}
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60"
       role="dialog"
       aria-modal="true"

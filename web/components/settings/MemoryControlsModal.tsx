@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useId,
   type RefObject,
 } from "react";
 import {
@@ -18,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useModalSurface } from "@/components/layout/useModalSurface";
+import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import {
   ALL_MEMORY_CATEGORIES,
   deleteMemoryRecord,
@@ -313,6 +316,9 @@ export default function MemoryControlsModal({
 }: MemoryControlsModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const overlayId = useId();
+  // Reachable from the drawer, so it owns Escape, focus, and system back.
+  useModalSurface({ isOpen: true, overlayId, containerRef: dialogRef, onDismiss: onClose });
   const [settings, setSettings] = useState<MemorySettings | null>(null);
   const [records, setRecords] = useState<MemoryRecord[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -344,7 +350,7 @@ export default function MemoryControlsModal({
     (focusableElements()[0] ?? dialog).focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !hasOverlayAbove(overlayId)) {
         event.preventDefault();
         onClose();
         return;
@@ -379,7 +385,7 @@ export default function MemoryControlsModal({
           : fallbackReturnFocus;
       returnTarget?.focus();
     };
-  }, [onClose, returnFocusRef]);
+  }, [onClose, overlayId, returnFocusRef]);
 
   useEffect(() => {
     let isCurrent = true;

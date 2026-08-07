@@ -8,9 +8,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
-import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
-import { useModalFocusTrap } from "@/components/layout/useModalFocusTrap";
+import { hasOverlayAbove } from "@/components/layout/overlayStack";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 
 /** A leftward drag past a third of the panel, or any flick, dismisses. */
 const DISMISS_TRAVEL_RATIO = 0.33;
@@ -57,11 +56,14 @@ export default function SidebarDrawer({
   const dragOriginRef = useRef<{ x: number; at: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
 
-  useOverlayBackDismiss({ isOpen, overlayId, onDismiss: onClose });
-  useOverlayStackEntry(isOpen, overlayId);
   // Declaring aria-modal is a promise the rest of the page is inert; without
   // this the opener kept focus behind the scrim and Tab walked the chat.
-  useModalFocusTrap({ isOpen, containerRef: panelRef });
+  useModalSurface({
+    isOpen,
+    overlayId,
+    containerRef: panelRef,
+    onDismiss: onClose,
+  });
 
   useEffect(() => {
     if (!isOpen) return;

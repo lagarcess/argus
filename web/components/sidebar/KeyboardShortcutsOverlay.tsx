@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Keyboard, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import {
   KEYBOARD_SHORTCUTS,
   keyboardShortcutDisplay,
@@ -51,6 +52,10 @@ function shortcutsForHelpGroup(group: KeyboardShortcutGroup) {
 export default function KeyboardShortcutsOverlay({
   onClose,
 }: KeyboardShortcutsOverlayProps) {
+  const overlayId = useId();
+  const modalRef = useRef<HTMLDivElement>(null);
+  // Reachable from the drawer, so it owns Escape, focus, and system back.
+  useModalSurface({ isOpen: true, overlayId, containerRef: modalRef, onDismiss: onClose });
   const { t } = useTranslation();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [showCommandKey, setShowCommandKey] = useState(false);
@@ -79,6 +84,7 @@ export default function KeyboardShortcutsOverlay({
         aria-label={t("keyboard_shortcuts.close", "Close keyboard shortcuts")}
       />
       <section
+        ref={modalRef}
         className="relative max-h-[calc(100dvh-2rem)] w-full max-w-[860px] overflow-y-auto rounded-[18px] border border-black/10 bg-white p-5 text-black dark:border-white/10 dark:bg-[#1b1d20] dark:text-white md:p-6"
         role="dialog"
         aria-modal="true"

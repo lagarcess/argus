@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
-import { useModalFocusTrap } from "@/components/layout/useModalFocusTrap";
+import { hasOverlayAbove } from "@/components/layout/overlayStack";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 
 type ConfirmDialogProps = {
@@ -56,9 +56,14 @@ export function ConfirmDialog({
   const overlayId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   // A confirmation is the topmost surface wherever it opens, so it registers
-  // and every overlay under it stands down for Escape.
-  useOverlayStackEntry(isOpen, overlayId);
-  useModalFocusTrap({ isOpen, containerRef: panelRef });
+  // for Escape, for focus, and for system back: without the last one, hardware
+  // back closed the drawer underneath and took the confirmation with it.
+  useModalSurface({
+    isOpen,
+    overlayId,
+    containerRef: panelRef,
+    onDismiss: onCancel,
+  });
 
   useEffect(() => {
     if (!isOpen) return;

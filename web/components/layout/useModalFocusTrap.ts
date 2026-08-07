@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { hasOverlayAbove } from "./overlayStack";
 
 /**
  * Focus behavior every `aria-modal` surface owes its keyboard users.
@@ -40,10 +41,13 @@ export function nextFocusIndex({
 
 export function useModalFocusTrap({
   isOpen,
+  overlayId,
   containerRef,
   initialFocusRef,
 }: {
   isOpen: boolean;
+  /** Identity in the overlay stack, so a parent trap can stand down. */
+  overlayId: string;
   containerRef: RefObject<HTMLElement | null>;
   /** Where focus lands on open; the first focusable child otherwise. */
   initialFocusRef?: RefObject<HTMLElement | null>;
@@ -76,6 +80,9 @@ export function useModalFocusTrap({
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
+      // A parent trap runs first and would move focus, then the modal above it
+      // would see the moved focus and wrap, so forward Tab never advanced.
+      if (hasOverlayAbove(overlayId)) return;
       const elements = focusableElements();
       if (elements.length === 0) return;
       event.preventDefault();
@@ -88,5 +95,5 @@ export function useModalFocusTrap({
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [focusableElements, isOpen]);
+  }, [focusableElements, isOpen, overlayId]);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { hasOverlayAbove } from "./overlayStack";
 
 /**
  * System back closes the overlay instead of leaving Argus.
@@ -30,9 +31,38 @@ export const OVERLAY_HISTORY_KEY = "argusOverlay";
  */
 let unconsumedOverlays: string[] = [];
 
+/**
+ * Whether the `popstate` currently being handled came from our own
+ * `history.back()` rather than from the user.
+ *
+ * A closing overlay spends its entry by calling back(), and the resulting event
+ * reaches every listener, including the parent underneath, which by then is
+ * topmost and would read it as a real back press. That is how dismissing a
+ * language modal closed the drawer behind it.
+ *
+ * The flag is cleared on the next frame rather than by the first reader, so it
+ * suppresses every listener for that one event and cannot poison a later press
+ * if the expected `popstate` never arrives.
+ */
+let programmaticPop = false;
+
+export function markProgrammaticPop(): void {
+  programmaticPop = true;
+  const clear = () => {
+    programmaticPop = false;
+  };
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(clear);
+  else setTimeout(clear, 0);
+}
+
+export function isProgrammaticPop(): boolean {
+  return programmaticPop;
+}
+
 /** Test seam: reset document-level state between cases. */
 export function resetOverlayEntries(): void {
   unconsumedOverlays = [];
+  programmaticPop = false;
 }
 
 export function claimOverlayEntry(overlayId: string): boolean {
@@ -111,6 +141,12 @@ export function useOverlayBackDismiss({
     }
 
     const handlePopState = () => {
+      // An overlay closing above us spends its entry with back(); that event is
+      // not a user pressing back and must reach nobody.
+      if (isProgrammaticPop()) return;
+      // One press, one level. Every nested listener hears the same event, so
+      // without this each would claim its own id and dismiss together.
+      if (hasOverlayAbove(overlayId)) return;
       // Already claimed means this is the echo of our own back() below.
       if (!claimOverlayEntry(overlayId)) return;
       dismissRef.current();
@@ -123,7 +159,9 @@ export function useOverlayBackDismiss({
       // it, so the entry is spent on the next tick and the stack stays flat.
       pendingPopRef.current = setTimeout(() => {
         pendingPopRef.current = null;
-        if (claimOverlayEntry(overlayId)) window.history.back();
+        if (!claimOverlayEntry(overlayId)) return;
+        markProgrammaticPop();
+        window.history.back();
       }, 0);
     };
   }, [isOpen, overlayId]);

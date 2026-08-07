@@ -10,9 +10,8 @@ import {
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
-import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
-import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
-import { useModalFocusTrap } from "@/components/layout/useModalFocusTrap";
+import { hasOverlayAbove } from "@/components/layout/overlayStack";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 
 /**
  * Detents from the mobile shell spec: run dossier, sources pane, capital editor.
@@ -95,11 +94,11 @@ export function BottomSheet({
   const dragOriginRef = useRef<{ y: number; at: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
 
-  useOverlayBackDismiss({ isOpen, overlayId, onDismiss: onClose });
-  useOverlayStackEntry(isOpen, overlayId);
-  useModalFocusTrap({
+  useModalSurface({
     isOpen,
+    overlayId,
     containerRef: panelRef,
+    onDismiss: onClose,
     initialFocusRef: initialFocusRef ?? closeButtonRef,
   });
 

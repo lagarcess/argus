@@ -23,11 +23,17 @@ const PRIMITIVE = "components/ui/BottomSheet.tsx";
 const DRAWER = "components/sidebar/SidebarDrawer.tsx";
 
 /**
- * Modals that declare `aria-modal` without managing focus or joining the Escape
- * stack. Every one predates the mobile shell lane, which fixed only the three
- * surfaces in its own nesting chain: the sheet, the drawer, and the shared
- * confirmation. They are listed rather than ignored so the rules below still
- * fail on anything new, and so the size of the remaining debt is visible.
+ * Modals that declare `aria-modal` without going through `useModalSurface`.
+ *
+ * The first version of this list claimed all of these were unrelated
+ * pre-existing surfaces. That was wrong: below 720px the drawer renders
+ * ProfileMenu, and Language, Usage, and Memory open from there, so dismissing
+ * one closed the drawer underneath it. Those are fixed and off the list.
+ *
+ * What remains is genuinely not reachable from a surface this lane changed.
+ * `ProfileMenu` stays because its own two panels need care its budget does not
+ * currently allow; the modals it opens are managed, so the leak that mattered
+ * is closed.
  *
  * Shrink this list; never add to it.
  */
@@ -36,10 +42,6 @@ const UNMANAGED_MODAL_DEBT = new Set([
   "components/chat/DiscoverySourcesPanel.tsx",
   "components/guest/GuestConversionModal.tsx",
   "components/guest/GuestNewConversationDialog.tsx",
-  "components/settings/LanguageModal.tsx",
-  "components/settings/MemoryControlsModal.tsx",
-  "components/settings/UsageModal.tsx",
-  "components/sidebar/KeyboardShortcutsOverlay.tsx",
   "components/sidebar/ProfileMenu.tsx",
   "components/sidebar/RecentsQuickPeek.tsx",
 ]);
@@ -99,11 +101,19 @@ describe("bottom sheet ownership", () => {
     // The primitive is the only place that may own this wiring, so a second
     // implementation cannot quietly forget a piece of it.
     const primitive = FILES.find((file) => file.path === PRIMITIVE)!.source;
-    expect(primitive).toContain("useOverlayBackDismiss");
+    // The three obligations now arrive together, so a surface cannot take one
+    // and skip another.
+    expect(primitive).toContain("useModalSurface");
+    const bundle = readFileSync(
+      join(WEB_ROOT, "components/layout/useModalSurface.ts"),
+      "utf-8",
+    );
+    expect(bundle).toContain("useOverlayStackEntry");
+    expect(bundle).toContain("useOverlayBackDismiss");
+    expect(bundle).toContain("useModalFocusTrap");
     expect(primitive).toContain('role="dialog"');
     expect(primitive).toContain('aria-modal="true"');
-    expect(primitive).toContain("useModalFocusTrap");
-    expect(primitive).toContain("useOverlayStackEntry");
+    expect(primitive).toContain("useModalSurface");
     expect(primitive).toContain("argus-sheet-scrim");
     expect(primitive).toContain("onPointerDown={handleDragStart}");
   });
@@ -115,7 +125,7 @@ describe("bottom sheet ownership", () => {
       (file) =>
         /aria-modal="true"/.test(file.source) &&
         !UNMANAGED_MODAL_DEBT.has(file.path) &&
-        !/useModalFocusTrap/.test(file.source),
+        !/useModalSurface/.test(file.source),
     ).map((file) => file.path);
     expect(offenders).toEqual([]);
   });
@@ -126,7 +136,7 @@ describe("bottom sheet ownership", () => {
       (file) =>
         /aria-modal="true"/.test(file.source) &&
         !UNMANAGED_MODAL_DEBT.has(file.path) &&
-        !/useOverlayStackEntry/.test(file.source),
+        !/useModalSurface/.test(file.source),
     ).map((file) => file.path);
     expect(offenders).toEqual([]);
   });
@@ -137,7 +147,7 @@ describe("bottom sheet ownership", () => {
     const stillUnmanaged = FILES.filter(
       (file) =>
         UNMANAGED_MODAL_DEBT.has(file.path) &&
-        !/useModalFocusTrap/.test(file.source),
+        !/useModalSurface/.test(file.source),
     ).map((file) => file.path);
     expect([...UNMANAGED_MODAL_DEBT].sort()).toEqual(stillUnmanaged.sort());
   });

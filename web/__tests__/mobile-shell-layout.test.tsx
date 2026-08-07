@@ -449,6 +449,51 @@ describe("omnisearch below threshold", () => {
     expect(overlayStackIds()).toEqual([]);
   });
 
+  test("a programmatic pop reaches nobody", () => {
+    // A closing overlay spends its entry with back(). That event reaches every
+    // listener, including the parent underneath, which by then is topmost and
+    // would read it as a real back press: dismissing a language modal closed
+    // the drawer behind it.
+    const back = readFileSync(
+      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      "utf-8",
+    );
+    expect(back).toContain("markProgrammaticPop();");
+    expect(back).toContain("if (isProgrammaticPop()) return;");
+    // Cleared on a frame rather than by the first reader, so it suppresses the
+    // whole event and cannot poison a later press.
+    expect(back).toContain("requestAnimationFrame(clear)");
+  });
+
+  test("a parent trap and a parent back listener both stand down", () => {
+    // Same depth rule as Escape: without it the drawer trap moved focus and the
+    // dialog above wrapped it back, and one popstate dismissed both levels.
+    const trap = readFileSync(
+      join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
+      "utf-8",
+    );
+    const back = readFileSync(
+      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      "utf-8",
+    );
+    expect(trap).toContain("if (hasOverlayAbove(overlayId)) return;");
+    expect(back).toContain("if (hasOverlayAbove(overlayId)) return;");
+  });
+
+  test("modals the drawer can reach are managed, not exempted", () => {
+    // Below 720 the drawer renders ProfileMenu, and these open from there, so
+    // dismissing one used to close the drawer underneath it.
+    for (const file of [
+      "../components/settings/LanguageModal.tsx",
+      "../components/settings/UsageModal.tsx",
+      "../components/settings/MemoryControlsModal.tsx",
+      "../components/sidebar/KeyboardShortcutsOverlay.tsx",
+    ]) {
+      const source = readFileSync(join(import.meta.dir, file), "utf-8");
+      expect(source).toContain("useModalSurface");
+    }
+  });
+
   test("a confirmation above the drawer answers Escape alone", () => {
     // The exact case: Delete from a recent row raises ConfirmDialog over the
     // drawer. The drawer registered first, so without the stack its earlier
@@ -469,8 +514,8 @@ describe("omnisearch below threshold", () => {
       "../components/sidebar/SidebarDrawer.tsx",
     ]) {
       const source = readFileSync(join(import.meta.dir, file), "utf-8");
-      expect(source).toContain("useOverlayStackEntry");
-      expect(source).toContain("useModalFocusTrap");
+      // One call brings Escape ownership, focus, and system back together.
+      expect(source).toContain("useModalSurface");
       expect(source).toContain("hasOverlayAbove");
     }
   });
