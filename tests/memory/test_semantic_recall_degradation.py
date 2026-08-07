@@ -706,3 +706,34 @@ def test_an_obsolete_ref_awaiting_deletion_does_not_block_a_current_projection()
     # The projection is current even though the old ref is still queued.
     assert store.list_provider_cleanup_targets(OWNER, record_id) != ()
     assert store.settled_projection_record_ids(OWNER) == frozenset({record_id})
+
+
+def test_reasserting_the_same_ref_cannot_make_a_stale_projection_fresh() -> None:
+    """Catches a setup helper laundering staleness into authority.
+
+    After an edit advances the generation, the projection still points at
+    pre-edit content. Writing the same ref again changes nothing about what
+    the index holds, so it must not change what the record is trusted for.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder, memory=_Mem0Double(embedder=embedder)
+    )
+    record_id = _confirm_one(_service(store, provider))
+    projected_ref = store.get_provider_ref(OWNER, record_id)
+    assert projected_ref is not None
+
+    store.edit_record(
+        OWNER,
+        record_id,
+        value="Superseding text the index has never seen.",
+        label=None,
+        clock=lambda: NOW,
+    )
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
+
+    # Re-asserting the ref already on file is a no-op by design.
+    assert store.set_provider_ref(OWNER, record_id, projected_ref) is True
+
+    assert store.settled_projection_record_ids(OWNER) == frozenset()

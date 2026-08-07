@@ -1149,3 +1149,12 @@ def test_settled_projection_ids_track_the_current_generation(
     assert store.settled_projection_record_ids(owner) == frozenset()
     # Still projected, just no longer describing current content.
     assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
+
+    # Re-asserting a ref cannot launder a stale projection into an
+    # authoritative one. Here the helper declines outright, because the earlier
+    # cleanup target reserved that ref, and the in-memory store applies the
+    # same reservation rule. Either way the record stays uncovered, which is
+    # the property that matters.
+    assert store.set_provider_ref(owner, record_id, "projected-bulk-read") is False
+
+    assert store.settled_projection_record_ids(owner) == frozenset()

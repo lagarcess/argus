@@ -1029,19 +1029,20 @@ class InMemoryCanonicalMemoryStore:
             ):
                 return False
             current_provider_ref = owner_refs.get(record_id)
-            key = (owner.owner_id, record_id)
-            self._provider_ref_generations[key] = self._reconciliation_generations.get(
-                key,
-                0,
-            )
+            # An unchanged ref writes nothing, so it cannot make a projection
+            # look fresher than the content it still points at.
             if current_provider_ref == provider_ref:
                 return True
+            key = (owner.owner_id, record_id)
             if current_provider_ref is not None:
-                self._cleanup_targets.setdefault(
-                    (owner.owner_id, record_id),
-                    set(),
-                ).add(current_provider_ref)
+                self._cleanup_targets.setdefault(key, set()).add(current_provider_ref)
             owner_refs[record_id] = provider_ref
+            # Freshness follows the ref that was actually written, and never
+            # regresses below what it replaced. Mirrors the Postgres helper.
+            self._provider_ref_generations[key] = max(
+                self._reconciliation_generations.get(key, 1),
+                self._provider_ref_generations.get(key, 0),
+            )
             return True
 
     def get_provider_ref(
