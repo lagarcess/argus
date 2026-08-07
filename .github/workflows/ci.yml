@@ -75,11 +75,25 @@ jobs:
       - name: Install frontend dependencies
         run: cd web && bun install --frozen-lockfile
 
+      # next build does not lint, so without this the ESLint ban that keeps
+      # browser state behind lib/browser-storage.ts is not a gate at all.
+      - name: Lint frontend
+        run: cd web && bun run lint
+
       - name: Run frontend tests
         run: cd web && bun test
 
       - name: Build frontend
         run: cd web && bun run build
+
+      # Observation backstop for the browser-storage disclosure. The chokepoint
+      # and the ESLint ban stop accidents; this catches a deliberate bypass by
+      # watching what a real browser actually keeps. One spec, not the suite.
+      - name: Install Playwright chromium
+        run: cd web && bunx playwright install --with-deps chromium
+
+      - name: Verify browser storage matches the privacy disclosure
+        run: cd web && bunx playwright test e2e/browser-storage-disclosure.spec.ts
 
   guest-release-gates:
     runs-on: ubuntu-latest

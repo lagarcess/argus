@@ -2516,7 +2516,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(legalPage).toContain("body_before_email");
     expect(legalPage).toContain("mailto:${supportEmail}");
 
-    expect(en).toContain('"effective_date": "Effective date: June 30, 2026"');
+    expect(en).toContain('"effective_date": "Effective date: August 7, 2026"');
     expect(en).toContain('"title": "No investment advice"');
     expect(en).toContain("not a broker");
     expect(en).toContain("Historical simulations are hypothetical");
@@ -2530,7 +2530,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain("prompts may be sent");
 
     expect(es).toContain(
-      '"effective_date": "Fecha de entrada en vigor: 30 de junio de 2026"',
+      '"effective_date": "Fecha de entrada en vigor: 7 de agosto de 2026"',
     );
     expect(es).toContain("No es asesoría de inversión");
     expect(es).toContain("Argus no es broker");

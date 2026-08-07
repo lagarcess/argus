@@ -16,6 +16,7 @@ from argus.api.auth_sessions import (
     AuthSessionVerificationUnavailable,
     auth_session_is_active,
 )
+from argus.api.browser_cookies import set_browser_cookie
 from argus.api.guest_access import (
     guest_account_context,
     permanent_account_access_allowed,
@@ -350,9 +351,9 @@ def _apply_auth_session_cookies(
         cookie_kwargs["max_age"] = max_age
 
     if isinstance(access_token, str) and access_token:
-        response.set_cookie("sb-auth-token", access_token, **cookie_kwargs)
+        set_browser_cookie(response, "sb-auth-token", access_token, **cookie_kwargs)
     if isinstance(refresh_token, str) and refresh_token:
-        response.set_cookie("sb-refresh-token", refresh_token, **cookie_kwargs)
+        set_browser_cookie(response, "sb-refresh-token", refresh_token, **cookie_kwargs)
 
 
 def _session_cookie_secure(request: Request) -> bool:
