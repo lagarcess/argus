@@ -26,7 +26,7 @@ import CommandPaletteRowActions from "@/components/sidebar/command-palette/Comma
 import { commandPaletteRowActions } from "@/components/sidebar/command-palette/rowActionItems";
 import CommandPaletteDossierSheet from "@/components/sidebar/command-palette/CommandPaletteDossierSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
-import { useOverlayLayer } from "@/components/layout/overlayStack";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { CommandPaletteFooter, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
@@ -36,7 +36,6 @@ import {
   commitDossierDecision,
   DEFAULT_DOSSIER_PANE_STATE,
   dossierCountsForHistory,
-  dossierPaneKeyboardAction,
   dossierPaneTransition,
   openSelectedDossierConversation,
   selectedDossierForPane,
@@ -64,7 +63,6 @@ import {
   commandPaletteItemFromSearch,
   commandPaletteItemsFromHistory,
   commandPaletteItemsInRenderedOrder,
-  commandPaletteKeyboardAction,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
   commandPaletteOpenMessageId,
@@ -74,7 +72,6 @@ import {
   commandPaletteStatusLabelKey,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
-  isEditableKeyboardTarget,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
 import type {
@@ -89,6 +86,7 @@ import {
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
 import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
+import { useCommandPaletteKeys } from "./command-palette/useCommandPaletteKeys";
 import {
   effectivePaletteLayout,
   paletteRowActionVariant,
@@ -1075,146 +1073,35 @@ export default function ChatCommandPalette({
     [activateItem, isBelowDesktop, setPreviewItem],
   );
 
-  const onPaletteKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (pendingDeleteItem) return;
-      const eventTarget =
-        event.target instanceof HTMLElement ? event.target : null;
-      // The three-dot is a control, not the row: activating the row from it
-      // opened the dossier instead of the menu. Only activation is skipped,
-      // since standing the whole handler down swallows Escape while the
-      // trigger holds focus.
-      if (
-        (event.key === "Enter" || event.key === " ") &&
-        eventTarget?.closest("[data-row-action]")
-      ) {
-        return;
-      }
-      const targetIsEditableDossierControl = Boolean(
-        eventTarget?.closest("[data-dossier-pane]") &&
-          isEditableKeyboardTarget(eventTarget),
-      );
-      const targetIsDossierControl = Boolean(
-        eventTarget?.closest("[data-dossier-pane]") &&
-          (isEditableKeyboardTarget(eventTarget) ||
-            eventTarget.closest("button")),
-      );
-      const dossierKeyboardAction = dossierPaneKeyboardAction({
-        key: event.key,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        targetIsDossierControl,
-        targetIsEditable: targetIsEditableDossierControl,
-        state: dossierPaneState,
-      });
-      if (dossierKeyboardAction === "restore_latest") {
-        event.preventDefault();
-        setDossierPaneState((current) =>
-          dossierPaneTransition(current, { type: "restore_latest" }),
-        );
-        return;
-      }
-      if (dossierKeyboardAction === "suppress_navigation") {
-        event.preventDefault();
-        return;
-      }
-      if (dossierKeyboardAction === "allow_control") return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (editingId) {
-          cancelRename();
-          return;
-        }
-        onClose();
-        return;
-      }
-      const action = commandPaletteKeyboardAction({
-        key: event.key,
-        code: event.code,
-        itemCount: keyboardItems.length,
-        hasSelection: Boolean(selectedPreview),
-        selectedCanManageConversation: Boolean(
-          canManageConversation && selectedPreview?.canManageConversation,
-        ),
-        targetIsEditable: isEditableKeyboardTarget(event.target),
-        targetIsSearchInput: event.target === inputRef.current,
-        isEditing: Boolean(editingId),
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        repeat: event.repeat,
-        focusedRowIndex: Number(
-          eventTarget?.closest<HTMLElement>("[data-palette-row-index]")
-            ?.dataset.paletteRowIndex ?? -1,
-        ),
-        usesCommandKey: shortcutLegend.usesCommandKey,
-      });
-      if (action.type === "focus_search") {
-        event.preventDefault();
-        inputRef.current?.focus();
-        return;
-      }
-      if (action.type === "select") {
-        event.preventDefault();
-        const item = keyboardItems[action.index];
-        setPreviewItem(item);
-        document
-          .querySelector<HTMLElement>(
-            `[data-palette-row-index="${action.index}"]`,
-          )
-          ?.focus();
-        return;
-      }
-      if (action.type === "open" && selectedPreview) {
-        event.preventDefault();
-        openRow(selectedPreview, {
-          navigationDisabled: selectedNavigationDisabled,
-          openAtLeftOff: action.openAtLeftOff,
-        });
-        return;
-      }
-      if (action.type === "rename" && selectedPreview) {
-        event.preventDefault();
-        startRename(selectedPreview);
-        return;
-      }
-      if (action.type === "archive" && selectedPreview) {
-        event.preventDefault();
-        void handleArchive(selectedPreview);
-        return;
-      }
-      if (action.type === "delete" && selectedPreview) {
-        event.preventDefault();
-        handleDelete(selectedPreview, true);
-      }
-    },
-    [
+  const onPaletteKeyDown = useCommandPaletteKeys({
     cancelRename,
     canManageConversation,
     dossierPaneState,
     editingId,
     handleArchive,
     handleDelete,
+    inputRef,
     keyboardItems,
     onClose,
     openRow,
     pendingDeleteItem,
     selectedNavigationDisabled,
     selectedPreview,
-    shortcutLegend.usesCommandKey,
+    setDossierPaneState,
+    setPreviewItem,
     startRename,
-    ],
-  );
+    usesCommandKey: shortcutLegend.usesCommandKey,
+  });
 
-  // The palette owns more than Escape, so it hands the registry its whole
-  // keydown. Being offered the press only while topmost replaces the depth
-  // guard it used to carry.
-  useOverlayLayer({
+  // Owns more than Escape, so it hands over a whole keydown, and takes system
+  // back with it: without an entry, back left Argus from an open search.
+  useModalSurface({
     isOpen: true,
     overlayId: paletteOverlayId,
     containerRef: paletteRef,
     onKeyDown: onPaletteKeyDown,
+    onDismiss: onClose,
+    initialFocusRef: inputRef,
   });
 
   const toggleLayout = () => {
@@ -1410,7 +1297,7 @@ export default function ChatCommandPalette({
               );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
+    <div ref={paletteRef} className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
       <button
         type="button"
         className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"

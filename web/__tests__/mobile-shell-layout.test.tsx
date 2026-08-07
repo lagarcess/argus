@@ -536,11 +536,59 @@ describe("omnisearch below threshold", () => {
       "../components/settings/LanguageModal.tsx",
       "../components/settings/UsageModal.tsx",
       "../components/settings/MemoryControlsModal.tsx",
+      "../components/settings/AppearanceModal.tsx",
+      "../components/settings/ArchivedChatsView.tsx",
+      "../components/settings/DeletedItemsView.tsx",
       "../components/sidebar/KeyboardShortcutsOverlay.tsx",
     ]) {
       const source = readFileSync(join(import.meta.dir, file), "utf-8");
       expect(source).toContain("useModalSurface");
     }
+  });
+
+  test("every settings surface the profile menu opens is registered", () => {
+    // Enumerated from the menu itself rather than from a hand-kept list, so a
+    // new entry cannot be added without a layer. Three of these shipped
+    // unregistered behind the ones that had already been fixed.
+    const menu = readFileSync(
+      join(import.meta.dir, "../components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    const opened = [
+      ...menu.matchAll(/import (\w+) from "@\/components\/settings\/([\w/]+)"/g),
+    ].map((match) => `../components/settings/${match[2]}.tsx`);
+    expect(opened.length).toBeGreaterThanOrEqual(6);
+    const unmanaged = opened.filter(
+      (file) =>
+        !readFileSync(join(import.meta.dir, file), "utf-8").includes(
+          "useModalSurface",
+        ),
+    );
+    expect(unmanaged).toEqual([]);
+  });
+
+  test("a shortcut that opens a surface asks what is already open", () => {
+    // Naming the drawer left the same bug behind every other modal: the palette
+    // mounted as the new topmost layer at a lower z-index, invisible but
+    // holding focus and the keys meant for the dialog on screen.
+    const shell = readFileSync(
+      join(import.meta.dir, "../components/guest/useGuestShellActions.ts"),
+      "utf-8",
+    );
+    expect(shell).toContain("if (hasOpenOverlay()) {");
+    const registry = readFileSync(
+      join(import.meta.dir, "../components/layout/overlayStack.ts"),
+      "utf-8",
+    );
+    expect(registry).toContain("export function hasOpenOverlay()");
+  });
+
+  test("a busy confirmation refuses back before spending its entry", () => {
+    const confirm = readFileSync(
+      join(import.meta.dir, "../components/ui/ConfirmDialog.tsx"),
+      "utf-8",
+    );
+    expect(confirm).toContain("canDismiss: () => !isBusy,");
   });
 
   test("a confirmation above the drawer answers Escape alone", () => {

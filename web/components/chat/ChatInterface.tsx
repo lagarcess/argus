@@ -911,10 +911,10 @@ export default function ChatInterface() {
         "error",
       ),
     // The single owner of the Omnisearch shortcut; useChatKeyboardShortcuts
-    // never claims it. Gating there did nothing for this listener, which kept
-    // opening the palette at z-60 under a z-68 drawer for registered users.
-    // The drawer is a modal, so the shortcut is inert while it is open.
-    omnisearchShortcutEnabled: omnisearchEnabled && !mobileShell.isDrawerOpen,
+    // never claims it. Whether any surface is open is asked at press time
+    // against the layer registry, rather than named here one surface at a
+    // time: naming only the drawer left the same bug behind every other modal.
+    omnisearchShortcutEnabled: omnisearchEnabled,
   });
   const {
     isGuest,

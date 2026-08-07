@@ -2,7 +2,9 @@
 
 import { useTheme } from "next-themes";
 import { Sun, Moon, Monitor } from "lucide-react";
+import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import { patchMe } from "@/lib/argus-api";
 
 type AppearanceModalProps = {
@@ -14,6 +16,21 @@ type AppearanceModalProps = {
  * Extracted from SettingsView for reuse in ProfileMenu.
  */
 export default function AppearanceModal({ onClose }: AppearanceModalProps) {
+  const overlayId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Opened from the drawer, this sits above it. Without registering, Escape and
+  // hardware Back reached the drawer instead and unmounted this with it, and
+  // Tab containment still ran over the controls behind it.
+  useModalSurface({
+    isOpen: true,
+    overlayId,
+    // The panel, not the full-screen wrapper: the wrapper's first focusable
+    // child is the transparent backdrop.
+    containerRef: panelRef,
+    onDismiss: onClose,
+    onEscape: onClose,
+  });
+
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
 
@@ -32,7 +49,10 @@ export default function AppearanceModal({ onClose }: AppearanceModalProps) {
         aria-label="Close appearance modal"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden p-3">
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden p-3"
+      >
         <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/35 rounded-2xl">
           <button
             onClick={() => handleSelect("light")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   History,
   Loader2,
@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
   listHistory,
@@ -26,6 +27,21 @@ function isDeletedItemVisible(item: HistoryItem) {
 }
 
 export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsViewProps) {
+  const overlayId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Opened from the drawer, this sits above it. Without registering, Escape and
+  // hardware Back reached the drawer instead and unmounted this with it, and
+  // Tab containment still ran over the controls behind it.
+  useModalSurface({
+    isOpen: true,
+    overlayId,
+    // The panel, not the full-screen wrapper: the wrapper's first focusable
+    // child is the transparent backdrop.
+    containerRef: panelRef,
+    onDismiss: onClose,
+    onEscape: onClose,
+  });
+
   const { t } = useTranslation();
   const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,7 +70,10 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
         aria-label={t("settings.data.close_recently_deleted", "Close recently deleted")}
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md max-h-[70vh] bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden flex flex-col">
+      <div
+        ref={panelRef}
+        className="relative w-full max-w-md max-h-[70vh] bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5 dark:border-white/5">
           <div>

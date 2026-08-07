@@ -25,6 +25,27 @@ async function openPalette(page: Page) {
 }
 
 test.describe("keyboard layer behavior", () => {
+  test("system back closes Omnisearch rather than leaving Argus", async ({
+    page,
+  }) => {
+    // An installed PWA has no browser back button, so an overlay that owns no
+    // history entry is one the hardware key exits the app from. Omnisearch
+    // routed its keys through the registry but never took an entry.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installMobileShellFixture(page, { account: "registered" });
+    await page.goto("/");
+    await page.waitForTimeout(400);
+    await page.goto("/chat");
+    await page.waitForTimeout(1200);
+    await openPalette(page);
+    await expect(page.locator("[data-palette-row-index]").first()).toBeVisible();
+
+    await page.goBack();
+    await page.waitForTimeout(700);
+    expect(new URL(page.url()).pathname).toBe("/chat");
+    await expect(page.locator("[data-palette-row-index]")).toHaveCount(0);
+  });
+
   test("Enter and Space on the three-dot open the menu, never the row", async ({
     page,
   }) => {

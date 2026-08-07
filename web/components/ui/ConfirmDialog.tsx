@@ -87,6 +87,10 @@ export function ConfirmDialog({
     overlayId,
     containerRef: panelRef,
     onDismiss: onCancel,
+    // `onCancel` refuses while the delete is in flight, and refusing inside the
+    // dismissal is too late: the entry is claimed by then, so the dialog stayed
+    // open owning an id it had spent and no later press could close it.
+    canDismiss: () => !isBusy,
     // Confirm owns Enter as well as Escape, so it takes the whole keydown. The
     // registry still only offers it while this dialog is the topmost layer.
     onKeyDown: handleKeyDown,

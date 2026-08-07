@@ -2007,17 +2007,21 @@ describe("Argus Alpha frontend contract", () => {
     expect(readErrorPanel).toContain(
       "void loadLedgerBrowse(decisionStateFilter)",
     );
-    expect(palette).toContain("commandPaletteKeyboardAction");
+    // The keyboard policy moved to its own hook; the palette hands it the rows.
+    const paletteKeys = readFileSync(
+      join(root, "components/sidebar/command-palette/useCommandPaletteKeys.ts"),
+      "utf-8",
+    );
+    expect(palette).toContain("useCommandPaletteKeys({");
     expect(palette).toContain(
       "commandPaletteItemsInRenderedOrder(groupedItems)",
     );
-    expect(palette).toContain("itemCount: keyboardItems.length");
-    expect(palette).toContain("const item = keyboardItems[action.index]");
+    expect(paletteKeys).toContain("commandPaletteKeyboardAction");
+    expect(paletteKeys).toContain("itemCount: keyboardItems.length");
+    expect(paletteKeys).toContain("const item = keyboardItems[action.index]");
     expect(palette).toContain("const rowIndex = groupRowStart + itemIndex");
-    expect(palette).toContain(
-      "targetIsSearchInput: event.target === inputRef.current",
-    );
-    expect(palette).toContain("isEditableKeyboardTarget");
+    expect(paletteKeys).toContain("targetIsSearchInput: event.target === inputRef.current");
+    expect(paletteKeys).toContain("isEditableKeyboardTarget");
     expect(loadMore).toContain(
       "const capturedSignature = searchSignatureRef.current",
     );

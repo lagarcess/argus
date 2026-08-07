@@ -143,6 +143,18 @@ export function isTopOverlay(overlayId: string): boolean {
   return topLayer()?.id === overlayId;
 }
 
+/**
+ * Whether any layer currently owns input.
+ *
+ * For shortcuts that open a surface. A shortcut that fires while a dialog is up
+ * mounts its surface as the new topmost layer, which takes focus and the next
+ * keys away from whatever the user is actually looking at, and at a lower
+ * z-index it does that invisibly.
+ */
+export function hasOpenOverlay(): boolean {
+  return layers.length > 0;
+}
+
 export function overlayStackIds(): readonly string[] {
   return layers.map((open) => open.id);
 }
