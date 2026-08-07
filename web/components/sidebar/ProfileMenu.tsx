@@ -11,6 +11,7 @@ import {
   Database,
   HelpCircle,
   Keyboard,
+  Link2,
   LogOut,
   MessageSquareText,
   Palette,
@@ -47,8 +48,10 @@ import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
+import SharedReceiptsView from "@/components/settings/SharedReceiptsView";
 import UsageModal from "@/components/settings/UsageModal";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
+import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
@@ -77,6 +80,7 @@ type ActiveModal =
   | "deleted"
   | "usage"
   | "memory"
+  | "receipts"
   | "profile";
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
@@ -520,6 +524,9 @@ export default function ProfileMenu({
         ...(memoryControlsAvailable
           ? [{ id: "memory", onSelect: () => openModal("memory") }]
           : []),
+        ...(evidenceReceiptSharingEnabled
+          ? [{ id: "receipts", onSelect: () => openModal("receipts") }]
+          : []),
         { id: "archived", onSelect: () => openModal("archived") },
         { id: "deleted", onSelect: () => openModal("deleted") },
         {
@@ -835,6 +842,9 @@ export default function ProfileMenu({
         returnFocusRef={anchorRef}
       />
     );
+  }
+  if (activeModal === "receipts") {
+    return <SharedReceiptsView onClose={() => setActiveModal(null)} />;
   }
   if (activeModal === "profile") {
     return (
@@ -1239,6 +1249,20 @@ export default function ProfileMenu({
                   {t("settings.data.personalization.menu", "Personalization")}
                 </span>
                 <span className="ml-auto flex shrink-0">{quickJumpBadge("memory")}</span>
+              </button>
+            ) : null}
+            {evidenceReceiptSharingEnabled ? (
+              <button
+                onClick={() => openModal("receipts")}
+                className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              >
+                <Link2 className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
+                <span className="whitespace-nowrap">
+                  {t("settings.data.shared_links", "Shared links")}
+                </span>
+                <span className="ml-auto flex shrink-0">
+                  {quickJumpBadge("receipts")}
+                </span>
               </button>
             ) : null}
             <button

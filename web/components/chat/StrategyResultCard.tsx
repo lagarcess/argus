@@ -38,7 +38,9 @@ import {
   strategyDisplayLabel,
   strategyTypeFromResult,
 } from "@/lib/strategy-display";
+import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import ResultEquityChart from "./ResultEquityChart";
+import ShareReceiptAction from "./ShareReceiptAction";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
 
 type StrategyResultCardProps = {
@@ -478,6 +480,11 @@ export default function StrategyResultCard({
             "Saved to memory. Manage it in Data Controls under Personalization.",
           )}
         </p>
+      ) : null}
+      {evidenceReceiptSharingEnabled &&
+      canSaveDecision &&
+      result.evidenceArtifactId ? (
+        <ShareReceiptAction evidenceArtifactId={result.evidenceArtifactId} />
       ) : null}
     </section>
   );

@@ -1,0 +1,242 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Check, Copy, ExternalLink, Link2, Loader2, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import {
+  copyReceiptLink,
+  listEvidenceReceipts,
+  receiptUrl,
+  revokeEvidenceReceipt,
+  type EvidenceReceipt,
+} from "@/lib/evidence-receipts";
+import { localeForLanguage, normalizeEnabledLanguage } from "@/lib/language-features";
+
+type SharedReceiptsViewProps = {
+  onClose: () => void;
+};
+
+/**
+ * The receipt list, in Data Controls.
+ *
+ * This is the control that makes owner-revocable true in practice rather than
+ * only in the API. The largest part of the ChatGPT exposure was that people could
+ * not see what they had shared, so they were surprised by links they had
+ * forgotten creating.
+ */
+export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps) {
+  const { t, i18n } = useTranslation();
+  const [receipts, setReceipts] = useState<EvidenceReceipt[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setIsLoading(true);
+    setLoadFailed(false);
+    listEvidenceReceipts()
+      .then(setReceipts)
+      .catch(() => setLoadFailed(true))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(load, [load]);
+
+  const revoke = async (receipt: EvidenceReceipt) => {
+    setRevokingId(receipt.id);
+    setActionError(null);
+    try {
+      const updated = await revokeEvidenceReceipt(receipt.id);
+      setReceipts((previous) =>
+        previous.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setConfirmingId(null);
+    } catch {
+      setActionError(
+        t("receipt.list.revoke_error", "Could not revoke that link. Try again."),
+      );
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  // An audit list wants exact dates, not "today": the point is recognising a
+  // link you forgot creating.
+  const locale = localeForLanguage(
+    normalizeEnabledLanguage(i18n.resolvedLanguage ?? i18n.language),
+  );
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(new Date(value));
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
+      <button
+        className="absolute inset-0"
+        aria-label={t("receipt.list.close", "Close shared links")}
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#1b1d20]">
+        <div className="flex items-center justify-between border-b border-black/5 px-5 py-4 dark:border-white/5">
+          <h2 className="text-[16px] font-medium text-black dark:text-white">
+            {t("receipt.list.title", "Shared links")}
+          </h2>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+            aria-label={t("receipt.list.close", "Close shared links")}
+          >
+            <X className="h-4 w-4 text-black/50 dark:text-white/50" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <p className="text-[13px] leading-relaxed text-black/50 dark:text-white/50">
+            {t(
+              "receipt.list.intro",
+              "Every receipt you have created. Each one shows frozen result numbers and nothing about you.",
+            )}
+          </p>
+
+          {actionError && (
+            <p
+              role="alert"
+              className="mt-3 text-[12.5px] text-[#b94c55] dark:text-[#e7a2a8]"
+            >
+              {actionError}
+            </p>
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-black/20 dark:text-white/20" />
+            </div>
+          ) : loadFailed ? (
+            <div className="flex flex-col items-center gap-3 py-14 text-center">
+              <p className="text-[14px] text-black/50 dark:text-white/50">
+                {t("receipt.list.load_error", "Shared links could not be loaded.")}
+              </p>
+              <button
+                type="button"
+                onClick={load}
+                className="inline-flex min-h-9 items-center rounded-full border border-black/10 px-3.5 text-[12.5px] font-medium text-black/70 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]"
+              >
+                {t("receipt.list.retry", "Try again")}
+              </button>
+            </div>
+          ) : receipts.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/5 dark:bg-white/5">
+                <Link2 className="h-8 w-8 text-black/20 dark:text-white/20" />
+              </div>
+              <p className="text-[14.5px] text-black/40 dark:text-white/40">
+                {t("receipt.list.empty", "You have not shared any results yet.")}
+              </p>
+            </div>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-3">
+              {receipts.map((receipt) => {
+                const isRevoked = Boolean(receipt.revoked_at);
+                return (
+                  <li
+                    key={receipt.id}
+                    className="rounded-[16px] border border-black/5 bg-black/[0.02] p-4 dark:border-white/5 dark:bg-white/[0.03]"
+                  >
+                    <p className="truncate text-[14.5px] font-medium text-black dark:text-white">
+                      {receipt.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[12.5px] text-black/45 dark:text-white/45">
+                      {[receipt.symbols.join(", "), receipt.date_range_display]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    <p className="mt-1 text-[12px] text-black/40 dark:text-white/40">
+                      {isRevoked
+                        ? t("receipt.list.revoked_on", {
+                            date: formatDate(receipt.revoked_at as string),
+                            defaultValue: "Revoked {{date}}",
+                          })
+                        : t("receipt.list.created_on", {
+                            date: formatDate(receipt.created_at),
+                            defaultValue: "Shared {{date}}",
+                          })}
+                    </p>
+                    {isRevoked && receipt.revocation_reason === "source_deleted" && (
+                      <p className="mt-1 text-[12px] leading-snug text-black/40 dark:text-white/40">
+                        {t(
+                          "receipt.list.revoked_by_source",
+                          "Revoked automatically when you deleted the chat behind it.",
+                        )}
+                      </p>
+                    )}
+                    {!isRevoked && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await copyReceiptLink(receiptUrl(receipt));
+                            setCopiedId(ok ? receipt.id : null);
+                          }}
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
+                        >
+                          {copiedId === receipt.id ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                          {copiedId === receipt.id
+                            ? t("receipt.owner.copied", "Link copied")
+                            : t("receipt.list.copy", "Copy link")}
+                        </button>
+                        <a
+                          href={receipt.path}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          {t("receipt.list.open", "Open receipt")}
+                        </a>
+                        <button
+                          type="button"
+                          disabled={revokingId === receipt.id}
+                          onClick={() => {
+                            if (confirmingId === receipt.id) {
+                              void revoke(receipt);
+                              return;
+                            }
+                            setConfirmingId(receipt.id);
+                          }}
+                          className="ml-auto inline-flex min-h-9 items-center rounded-full px-3 text-[12px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 disabled:opacity-55"
+                        >
+                          {revokingId === receipt.id
+                            ? t("receipt.list.revoking", "Revoking...")
+                            : confirmingId === receipt.id
+                              ? t("receipt.list.confirm_revoke", "Revoke?")
+                              : t("receipt.list.revoke", "Revoke")}
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <p className="mt-5 text-[11.5px] leading-relaxed text-black/40 dark:text-white/40">
+            {t(
+              "receipt.list.cache_note",
+              "Revoking takes effect right away on Argus. Messaging apps may still show an old preview card in threads where the link was already pasted, and Argus cannot clear those.",
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
