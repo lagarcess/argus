@@ -114,7 +114,7 @@
             },
             "guest_handoff": {
               "label": "Guest handoff cookies",
-              "body": "If you start as a guest and then create an account, Argus sets two short-lived cookies so your temporary conversation can move onto the new account. They last ten minutes, are limited to the sign-in routes, and are cleared as soon as the handoff finishes."
+              "body": "If you start as a guest and then create an account, Argus sets two short-lived cookies so your temporary conversation can move onto the new account. They last ten minutes, are limited to Argus authentication routes, and are cleared as soon as the handoff finishes."
             },
             "security": {
               "label": "Security cookies",
