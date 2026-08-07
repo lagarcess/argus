@@ -955,7 +955,8 @@
         "close": "Close usage",
         "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
         "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
-      }
+      },
+      "shared_links": "Shared links"
     },
     "help": {
       "title": "Help & Legal",
@@ -1392,6 +1393,92 @@
       "confirmation": "Review the assumptions, then run the test.",
       "result": "Change the chart range or ask a follow-up.",
       "dismiss": "Dismiss hint"
+    }
+  },
+  "receipt": {
+    "page_title": "Tested with Argus",
+    "eyebrow": "Evidence receipt",
+    "provenance": "Tested with Argus",
+    "framing": {
+      "headline": "This is a historical simulation, not advice.",
+      "detail": "These numbers show what this idea would have done over the dates below, using past market data. They are not a prediction, not a recommendation, and not a promise of future results. Nobody bought or sold anything.",
+      "short": "Historical simulation. Not advice. Not a prediction."
+    },
+    "sections": {
+      "result": "Result",
+      "what_was_tested": "What was tested",
+      "assumptions": "Assumptions",
+      "note": "Note from whoever shared this",
+      "chart": "How the simulated value moved"
+    },
+    "fields": {
+      "asset": "Asset",
+      "asset_class": "Asset class",
+      "strategy": "Strategy",
+      "dates": "Dates tested",
+      "benchmark": "Compared against"
+    },
+    "asset_class_values": {
+      "equity": "Stocks",
+      "crypto": "Crypto",
+      "currency_pair": "Currency pair"
+    },
+    "frozen_note": "Frozen on {{date}}. These numbers do not change.",
+    "frozen_note_undated": "These numbers were frozen when this link was created and do not change.",
+    "chart_unavailable": "No chart was saved with this result.",
+    "cta": {
+      "headline": "Test your own idea",
+      "detail": "Argus turns a plain-language investing idea into a historical test. No account needed to try it.",
+      "action": "Try Argus"
+    },
+    "tombstone": {
+      "title": "This receipt is no longer available",
+      "detail": "Whoever shared it revoked the link, or removed the result behind it. Nothing here can be recovered.",
+      "cta_detail": "You can still see what Argus does."
+    },
+    "unavailable": {
+      "title": "This receipt could not be loaded",
+      "detail": "Something went wrong on our side. The link may still work if you try again in a moment."
+    },
+    "owner": {
+      "share": "Share result",
+      "share_hint": "Creates a public link showing these numbers, frozen as they are now. Your chat, your account, and anything Argus remembers are never included.",
+      "note_label": "Add a short note (optional)",
+      "note_placeholder": "What made this worth sharing?",
+      "note_public_warning": "Anyone with the link can read this note. Do not put anything private in it.",
+      "note_counter": "{{count}} of {{max}} characters",
+      "create": "Create link",
+      "creating": "Creating link...",
+      "cancel": "Cancel",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "copy_failed": "Copy failed. Select the link and copy it.",
+      "created_note": "Anonymous, not indexed by search engines, and revocable any time in Data Controls.",
+      "errors": {
+        "create": "Argus could not create that link. Try again.",
+        "note_rejected": "That note cannot be published. Remove any keys or long codes.",
+        "rate_limited": "You have created a lot of links recently. Try again shortly."
+      }
+    },
+    "list": {
+      "menu": "Shared links",
+      "title": "Shared links",
+      "close": "Close shared links",
+      "intro": "Every receipt you have created. Each one shows frozen result numbers and nothing about you.",
+      "loading": "Loading shared links...",
+      "load_error": "Shared links could not be loaded.",
+      "retry": "Try again",
+      "empty": "You have not shared any results yet.",
+      "created_on": "Shared {{date}}",
+      "revoked_on": "Revoked {{date}}",
+      "revoked_by_source": "Revoked automatically when you deleted the chat behind it.",
+      "open": "Open receipt",
+      "copy": "Copy link",
+      "revoke": "Revoke",
+      "revoking": "Revoking...",
+      "confirm_revoke": "Revoke?",
+      "revoke_error": "Could not revoke that link. Try again.",
+      "cache_note": "Revoking takes effect right away on Argus. Messaging apps may still show an old preview card in threads where the link was already pasted, and Argus cannot clear those."
     }
   }
 }
