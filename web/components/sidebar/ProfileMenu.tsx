@@ -264,7 +264,9 @@ export default function ProfileMenu({
       }
       onClose();
     },
-    // A menu is not modal: Tab should walk past it rather than be held inside.
+    // A menu is not modal, so it does not hold Tab itself. The registry hands
+    // containment down to the nearest trapping layer instead, which inside the
+    // drawer is the drawer, so Tab still cannot reach the page behind it.
     trapFocus: false,
   });
 
@@ -290,14 +292,10 @@ export default function ProfileMenu({
     overlayId: profileModalOverlayId,
     containerRef: profileModalRef,
     onDismiss: closeProfileModal,
-    returnFocusRef: anchorRef,
-  });
-
-
-  useEffect(() => {
-    if (!activeModal) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+    // The pickers inside this dialog are nested state rather than layers of
+    // their own, so the registry cannot see them. Defaulting Escape to
+    // onDismiss threw the whole dialog away while a picker was open.
+    onEscape: () => {
       if (isLanguagePickerOpen) {
         setIsLanguagePickerOpen(false);
         return;
@@ -311,18 +309,11 @@ export default function ProfileMenu({
         return;
       }
       closeProfileModal();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [
-    activeModal,
-    closeAvatarPicker,
-    closeProfileModal,
-    deleteRequestState,
-    isAvatarPickerOpen,
-    isDeleteRequestOpen,
-    isLanguagePickerOpen,
-  ]);
+    },
+    returnFocusRef: anchorRef,
+  });
+
+
 
   useEffect(() => {
     if (!isLanguagePickerOpen) return;

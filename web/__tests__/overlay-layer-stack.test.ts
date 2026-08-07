@@ -155,18 +155,25 @@ describe("overlay layer stack", () => {
     expect(subject.hasOverlayAbove("b")).toBe(true);
   });
 
-  test("refreshing handlers does not reorder the stack", () => {
-    // Callbacks change on every render. If that resubscribed, a parent would
-    // climb over the dialog above it and start answering for it.
+  test("Tab containment falls to the nearest trapping layer", () => {
+    // A menu is not modal and opts out, but a menu opened inside a drawer must
+    // not let Tab walk out of the drawer, which declared aria-modal.
     const log = fresh();
-    subject.registerOverlayLayer(layer("drawer", log));
-    subject.registerOverlayLayer(layer("confirm", log));
+    const inDrawer = {};
+    const drawerPanel = { contains: (n: unknown) => n === inDrawer };
+    subject.registerOverlayLayer(
+      layer("drawer", log, {
+        trapFocus: true,
+        containerRef: { current: drawerPanel as unknown as HTMLElement },
+      }),
+    );
+    subject.registerOverlayLayer(layer("menu", log, { trapFocus: false }));
 
-    subject.updateOverlayLayer(layer("drawer", log));
-    expect(subject.overlayStackIds()).toEqual(["drawer", "confirm"]);
-
+    // The menu is topmost, so it owns Escape.
     press("Escape");
-    expect(log.escape).toEqual(["confirm"]);
+    expect(log.escape).toEqual(["menu"]);
+    // Containment still resolves to the drawer beneath it.
+    expect(subject.overlayStackIds()).toEqual(["drawer", "menu"]);
   });
 
   test("nothing is listening once the last layer closes", () => {

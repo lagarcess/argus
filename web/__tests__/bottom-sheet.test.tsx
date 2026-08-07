@@ -112,7 +112,10 @@ describe("bottom sheet keyboard handling", () => {
     // Containment applies to whichever layer is topmost, which is the only
     // place that knows. Per-modal Tab listeners are what let focus escape a
     // dialog nested in the drawer.
-    expect(registry).toContain('event.key === "Tab" && layer.trapFocus');
+    expect(registry).toContain('if (event.key === "Tab")');
+    // And a non-trapping top layer hands containment down rather than off, so
+    // a menu opened in the drawer cannot let Tab reach the page behind it.
+    expect(registry).toContain("const trap = trappingLayer();");
     expect(source).not.toContain("FOCUSABLE_SELECTOR");
   });
 

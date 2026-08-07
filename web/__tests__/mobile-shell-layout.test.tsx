@@ -520,7 +520,7 @@ describe("omnisearch below threshold", () => {
       "utf-8",
     );
     expect(registry).toContain("const layer = topLayer();");
-    expect(registry).toContain('event.key === "Tab" && layer.trapFocus');
+    expect(registry).toContain("const trap = trappingLayer();");
     // System back still resolves by depth, since popstate reaches everyone.
     expect(back).toContain("if (hasOverlayAbove(overlayId)) return;");
   });

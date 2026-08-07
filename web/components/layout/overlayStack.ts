@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { focusableWithin, nextFocusIndex } from "./overlayFocus";
 
 /**
@@ -42,6 +42,10 @@ export type OverlayLayer = {
   onOutsidePointerDown?: (event: PointerEvent) => void;
 };
 
+/** `useLayoutEffect` warns during SSR, where there is nothing to sync anyway. */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 let layers: OverlayLayer[] = [];
 let listening = false;
 
@@ -49,12 +53,28 @@ function topLayer(): OverlayLayer | null {
   return layers.length > 0 ? layers[layers.length - 1] : null;
 }
 
+/**
+ * The layer Tab is contained by, which is not always the topmost one.
+ *
+ * A menu is not modal and opts out of containment, but a menu opened inside a
+ * drawer must not let Tab walk out of the drawer: the drawer promised
+ * `aria-modal`. So a non-trapping top layer delegates downward to the nearest
+ * layer that does trap, rather than turning containment off for the stack.
+ */
+function trappingLayer(): OverlayLayer | null {
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    if (layers[index].trapFocus) return layers[index];
+  }
+  return null;
+}
+
 function handleKeyDown(event: KeyboardEvent): void {
   const layer = topLayer();
   if (!layer) return;
 
-  if (event.key === "Tab" && layer.trapFocus) {
-    const elements = focusableWithin(layer.containerRef.current);
+  if (event.key === "Tab") {
+    const trap = trappingLayer();
+    const elements = trap ? focusableWithin(trap.containerRef.current) : [];
     if (elements.length > 0) {
       event.preventDefault();
       const index = nextFocusIndex({
@@ -108,12 +128,6 @@ export function registerOverlayLayer(layer: OverlayLayer): void {
   syncListeners();
 }
 
-/** Keeps a registered layer's callbacks current without reordering the stack. */
-export function updateOverlayLayer(layer: OverlayLayer): void {
-  if (!layers.some((open) => open.id === layer.id)) return;
-  layers = layers.map((open) => (open.id === layer.id ? layer : open));
-}
-
 export function unregisterOverlayLayer(overlayId: string): void {
   layers = layers.filter((open) => open.id !== overlayId);
   syncListeners();
@@ -164,9 +178,15 @@ export function useOverlayLayer({
   onOutsidePointerDown?: (event: PointerEvent) => void;
 }): void {
   const handlers = useRef({ onEscape, onKeyDown, onOutsidePointerDown });
-  // Refreshed after render rather than during it, and never as a dependency of
-  // the registration below, which would resubscribe and reorder the stack.
-  useEffect(() => {
+  /*
+   * Layout timing, not passive. A passive effect runs after paint, so a key
+   * arriving between commit and flush reached the previous render's callback:
+   * a second Escape still saw the submenu it had just closed, and an Enter
+   * landing just after a confirmation went busy reached the pre-busy handler.
+   * Never a dependency of the registration below, which would resubscribe and
+   * reorder the stack.
+   */
+  useIsomorphicLayoutEffect(() => {
     handlers.current = { onEscape, onKeyDown, onOutsidePointerDown };
   });
 
