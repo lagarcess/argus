@@ -215,11 +215,13 @@ The current entry under-promises now that Argus is not bounded to backtesting.
 
 **Composer placeholders.** There are three, and only two change.
 
-| Key | Current | Action |
+| Key | Current | New |
 | --- | --- | --- |
-| `chat.input_placeholder` | "Describe an investing idea" | widen |
-| `guest.shell.input_placeholder` | "What do you want to test?" | widen |
-| `chat.followup_placeholder` | "Add a follow-up" | **leave unchanged** |
+| `chat.input_placeholder` | "Describe an investing idea" | **"Ask about any company or idea"** |
+| `guest.shell.input_placeholder` | "What do you want to test?" | **"Ask about any company or idea"** |
+| `chat.followup_placeholder` | "Add a follow-up" | **unchanged** |
+
+es-419 for both new strings: **"Pregunta sobre cualquier empresa o idea"**.
 
 The two empty-state placeholders instruct rather than invite. "Describe"
 assumes the user already has an idea, and both "investing idea" and "test"
@@ -228,15 +230,33 @@ with a strategy, which is the exact barrier this rail removes. The guest one
 matters most, because guests form the first impression with no memory behind
 them.
 
-Widen both to state answering and testing in one line, for example "Ask about a
-company, or describe an idea to test". Final wording is a copy decision; the
-requirement is that it communicates both halves without listing features.
+**Why this wording, and why not "test an idea".** Naming a mechanism creates a
+promise that breaks. Argus cannot run every idea: options, shorting, leverage,
+an obscure ticker, an exchange without coverage. A placeholder that says "test
+an idea" is a broken promise at the worst possible moment, the first message.
 
-**Default both keys to the same string.** The requirement is identical for guest
-and registered, and two ways of saying one thing is copy debt. Diverge only if
-the guest shell has a real width constraint. The guest string is not a place to
-enumerate capability, because the chips below already carry that job; short and
-inviting beats comprehensive.
+"Ask" cannot break the same way. Even when a strategy is unsupportable, Argus
+still answers about the subject, so the invitation stays true in the failure
+case. "Idea" stays open too: it does not require the idea to be testable,
+tradeable, or even fully formed, which is the state most people actually arrive
+in.
+
+This still delivers the goal. The old copy under-promised because it implied
+Argus only backtests. The new copy signals the capability that is genuinely new,
+that Argus answers questions, while the chips beneath it demonstrate the range
+including testing. Neither element over-commits.
+
+**Division of labor:** the placeholder's job is to not exclude. The chips
+demonstrate breadth. Do not ask the placeholder to do both.
+
+**Both keys carry the same string.** The requirement is identical for guest and
+registered, and two ways of saying one thing is copy debt. Diverge only if the
+guest shell has a real width constraint.
+
+This reduces exposure rather than eliminating it. Someone asking for an
+unsupportable strategy still meets a limit, and Argus must answer about the
+subject anyway and offer something runnable. That is the ordinary behavior
+section 13 already requires, not a special rule for this copy.
 
 `chat.followup_placeholder` is correct as it stands. Once a conversation is
 underway the user knows what Argus does, and "Add a follow-up" is exactly right
