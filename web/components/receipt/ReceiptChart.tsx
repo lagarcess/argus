@@ -70,7 +70,9 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
       },
       rightPriceScale: {
         borderVisible: false,
-        scaleMargins: { top: 0.14, bottom: 0.14 },
+        // Generous top margin so the highest price label is not clipped by the
+        // chart's own top edge at phone height.
+        scaleMargins: { top: 0.22, bottom: 0.16 },
       },
       timeScale: { borderVisible: false, secondsVisible: false },
       handleScroll: false,

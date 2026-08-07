@@ -1,0 +1,14 @@
+{
+  "url": "http://localhost:3011/r/ZeZHdvLV1gE7HGcPhmpHv7l7Dc4RHs8V/opengraph-image?42fdccb955059fa9",
+  "status": 200,
+  "headers": {
+    "connection": "keep-alive",
+    "date": "Fri, 07 Aug 2026 23:46:09 GMT",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked",
+    "cache-control": "no-store, max-age=0",
+    "content-type": "image/png",
+    "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "x-robots-tag": "noindex, nofollow, noimageindex"
+  }
+}
