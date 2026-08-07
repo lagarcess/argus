@@ -35,6 +35,13 @@ from argus.memory.conversion import (
     MemoryStateDigest,
     plan_guest_conversion,
 )
+from argus.memory.index_policy import (
+    INDEXABLE_CATEGORIES,
+    IndexDecision,
+    IndexRefusal,
+    index_eligibility,
+    index_text,
+)
 from argus.memory.policy import MemoryPolicy, PolicyDecision, PolicyOutcome
 from argus.memory.postgres_store import PostgresCanonicalMemoryStore
 from argus.memory.provider import (
@@ -70,9 +77,12 @@ from argus.memory.telemetry import (
 )
 
 __all__ = [
+    "INDEXABLE_CATEGORIES",
     "CanonicalMemoryStore",
     "ConfirmationResult",
     "ConfirmedMemoryConsentReceipt",
+    "IndexDecision",
+    "IndexRefusal",
     "InMemoryCanonicalMemoryStore",
     "MemoryAccountKind",
     "MemoryCandidate",
@@ -129,6 +139,8 @@ __all__ = [
     "SensitivityAssessment",
     "SensitivityStatus",
     "bind_sensitivity_assessment",
+    "index_eligibility",
+    "index_text",
     "memory_candidate_content_digest",
     "plan_guest_conversion",
     "require_registered",
