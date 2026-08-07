@@ -1,10 +1,7 @@
 """Real-Postgres proof for the derivative semantic memory index.
 
-Runs the real Mem0 library against a real pgvector table: real SQL, real
-distance ranking, real per-owner scoping. Only the vendor embedding call is
-substituted, by a deterministic bag-of-words vector, so the check is free,
-repeatable, and still exercises genuine semantic overlap rather than token
-equality.
+Runs the real Mem0 library against a real pgvector table. Only the vendor
+embedding call is substituted, by a deterministic bag-of-words vector.
 """
 
 from __future__ import annotations
@@ -245,12 +242,7 @@ def test_the_index_stores_no_row_for_a_refused_record(
 def test_the_provider_reports_what_it_found_without_claiming_authority(
     provider: Mem0MemoryProvider,
 ) -> None:
-    """Catches the provider deciding an empty answer's authority on its own.
-
-    Whether an empty result is authoritative depends on which records the
-    retrieval may return, which the provider cannot see. It answers with what
-    the index found and leaves that judgement to the service.
-    """
+    """Catches the provider deciding an empty answer's authority on its own."""
     query = "zzzz qqqq vvvv unrelated tokens"
     before = provider.search(OWNER_A, query, 3)
 

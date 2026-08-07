@@ -1,10 +1,7 @@
 """The four ratified Mem0 parameters, enforced in code rather than by habit.
 
-1. Index-only over confirmed content: covered by the boundary suite.
-2. Storage on the existing Supabase database, no new datastore service.
-3. The OSS library in-process, not the hosted platform.
-4. Mem0's extraction, dedup, and conflict-resolution pipeline explicitly
-   unused; Argus owns extraction.
+Index-only over confirmed content, storage on the existing Supabase database,
+the OSS library in-process, and the extraction pipeline unused.
 """
 
 from __future__ import annotations
@@ -99,11 +96,7 @@ def test_the_embedder_is_the_argus_perplexity_client() -> None:
 def test_importing_mem0_disables_vendor_telemetry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Catches the OSS library phoning home about Argus memory usage.
-
-    Covers the awkward case too: telemetry left enabled and Mem0 already
-    imported by something else, where the environment switch alone is too late.
-    """
+    """Catches the OSS library phoning home about Argus memory usage."""
     import os
 
     import mem0.memory.main as mem0_main

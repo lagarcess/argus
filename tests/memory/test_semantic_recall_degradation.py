@@ -1,9 +1,8 @@
 """Every semantic-recall failure degrades to canonical truth, never open.
 
-Semantic recall is a quality upgrade over the canonical token match. When the
-embedder, the vendor client, or the assessor fails, the user must still get a
-correct, if less clever, answer, and no failure may widen what is stored or
-shown.
+When the embedder, the vendor client, or the assessor fails, retrieval must
+still answer from the canonical store, and no failure may widen what is stored
+or shown.
 """
 
 from __future__ import annotations
@@ -107,8 +106,7 @@ class _Mem0Double:
     def add(self, *, messages, user_id, metadata, infer):  # noqa: ANN001
         if self._add_failure is not None:
             raise self._add_failure
-        # The real client embeds through the configured adapter, so the double
-        # does too; that is what publishes per-call usage.
+        # Through the adapter, which is what publishes per-call usage.
         self._adapter.embed_documents([messages[0]["content"]])
         self.added.append({"user_id": user_id, "metadata": metadata, "infer": infer})
         return {"results": [{"id": f"mem0-{len(self.added)}"}]}
@@ -117,9 +115,7 @@ class _Mem0Double:
         if self._search_failure is not None:
             raise self._search_failure
         self._adapter.embed_query(query)
-        # The real client queries pgvector after embedding, so usage sits
-        # published for a while before the provider reads it. That gap is
-        # where a shared slot gets overwritten by another request.
+        # Stands in for the pgvector round trip, between publish and read.
         if self._post_embed_delay:
             time.sleep(self._post_embed_delay)
         del top_k, filters, threshold
@@ -347,13 +343,7 @@ def test_unassessed_content_is_suppressed_before_storage_or_indexing() -> None:
 
 
 def test_empty_index_falls_back_instead_of_answering_nothing() -> None:
-    """Catches records confirmed before the index existed losing their recall.
-
-    Projection only happens at confirmation, so enabling semantic recall on an
-    account with older memories leaves the collection empty for that owner. A
-    definitive empty answer there would suppress the canonical match and drop
-    recall that already worked.
-    """
+    """Catches records confirmed before the index existed losing their recall."""
     store = InMemoryCanonicalMemoryStore()
     record_id = _confirm_one(_service(store))
     embedder = _StubEmbedder()
@@ -469,11 +459,7 @@ def test_recall_runs_off_the_event_loop() -> None:
 
 
 def test_a_fully_projected_eligible_set_is_believed_when_empty() -> None:
-    """Catches token fallback resurrecting what semantic search rejected.
-
-    Every record this purpose may return is in the index, so an empty answer
-    is a real finding and a coincidental token overlap must not override it.
-    """
+    """Catches token fallback resurrecting what semantic search rejected."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
@@ -514,13 +500,7 @@ def test_an_unprojected_eligible_set_falls_back() -> None:
 
 
 def test_authority_is_per_eligible_set_not_per_owner() -> None:
-    """Catches an owner-wide notion of authority hiding a legacy memory.
-
-    The account has a projected record in one category and an unprojected
-    legacy record in the category this purpose actually reads. Anything that
-    asks only whether the owner has rows concludes the index is authoritative
-    and permanently hides the legacy decision.
-    """
+    """Catches an owner-wide notion of authority hiding a legacy memory."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
@@ -552,13 +532,7 @@ def test_authority_is_per_eligible_set_not_per_owner() -> None:
 
 
 def test_usage_is_attributed_to_the_call_that_produced_it() -> None:
-    """Catches concurrent recalls billing each other's tokens.
-
-    One embedder and one provider serve every request. Each call embeds with a
-    distinct token count, then waits where the pgvector round trip would be
-    before its usage is read. A process-wide slot loses the attribution in that
-    gap; a per-call one does not.
-    """
+    """Catches concurrent recalls billing each other's tokens."""
     import concurrent.futures
 
     class _CountingEmbedder:
@@ -604,13 +578,7 @@ def test_usage_is_attributed_to_the_call_that_produced_it() -> None:
 
 
 def test_an_edit_whose_projection_failed_does_not_certify_an_empty_answer() -> None:
-    """Catches a stale projection being counted as coverage.
-
-    The record stays projected under its pre-edit text when the edit's
-    projection fails, so the index cannot match the value the user just
-    confirmed. Coverage that only asks whether a projection row exists would
-    certify an empty answer and bury the edit until reconciliation succeeds.
-    """
+    """Catches a stale projection being counted as coverage."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     mem0 = _Mem0Double(embedder=embedder, search_results=[])
@@ -645,13 +613,7 @@ def test_an_edit_whose_projection_failed_does_not_certify_an_empty_answer() -> N
 
 
 def test_an_edit_stops_certifying_before_any_provider_call() -> None:
-    """Catches the window between committing an edit and projecting it.
-
-    The canonical value and its pending reconciliation land before any
-    provider I/O. A search racing that window, or arriving after a crash in
-    it, must not be told the index is authoritative, because the index still
-    holds the pre-edit text and no cleanup target exists yet to signal that.
-    """
+    """Catches the window between committing an edit and projecting it."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
@@ -677,13 +639,7 @@ def test_an_edit_stops_certifying_before_any_provider_call() -> None:
 
 
 def test_an_obsolete_ref_awaiting_deletion_does_not_block_a_current_projection() -> None:
-    """Catches one failed delete permanently demoting an account to token match.
-
-    A successful edit points the record at current content. If deleting the
-    superseded ref fails, that cleanup can stay pending indefinitely, and
-    treating it as staleness would make every empty search for this owner fall
-    back forever.
-    """
+    """Catches one failed delete permanently demoting an account to token match."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
@@ -709,12 +665,7 @@ def test_an_obsolete_ref_awaiting_deletion_does_not_block_a_current_projection()
 
 
 def test_reasserting_the_same_ref_cannot_make_a_stale_projection_fresh() -> None:
-    """Catches a setup helper laundering staleness into authority.
-
-    After an edit advances the generation, the projection still points at
-    pre-edit content. Writing the same ref again changes nothing about what
-    the index holds, so it must not change what the record is trusted for.
-    """
+    """Catches a setup helper laundering staleness into authority."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
@@ -740,13 +691,7 @@ def test_reasserting_the_same_ref_cannot_make_a_stale_projection_fresh() -> None
 
 
 def test_a_reset_retires_the_generation_with_the_projection() -> None:
-    """Catches a retired generation surviving reset and re-arming on recreate.
-
-    Postgres deletes the projection row on reset, so it never had this. The
-    deterministic store used to hold ref and generation in separate maps and
-    cleared only one, which is the shape this record structure removes: the
-    generation cannot outlive the ref because it is the same value.
-    """
+    """Catches a retired generation surviving reset and re-arming on recreate."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
@@ -771,13 +716,7 @@ def test_a_reset_retires_the_generation_with_the_projection() -> None:
 
 
 def test_attaching_a_ref_out_of_band_cannot_certify_the_index() -> None:
-    """Catches freshness being asserted by a caller instead of earned.
-
-    Attaching a provider ref performs no projection and proves nothing about
-    what the index holds. If that could mark a record current, any caller could
-    silently suppress the canonical fallback for content the index has never
-    seen.
-    """
+    """Catches freshness being asserted by a caller instead of earned."""
     store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(

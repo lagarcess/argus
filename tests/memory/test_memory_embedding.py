@@ -307,13 +307,7 @@ def test_single_embed_still_returns_one_vector() -> None:
 
 
 def test_a_batched_response_missing_indices_is_rejected() -> None:
-    """Catches the exact silent corruption: missing index and reordered.
-
-    Both entries are well formed, the count matches, there are no duplicate
-    indices and both vectors are the right width, so every other check passes.
-    Only refusing to guess order catches it, and guessing here would persist
-    each vector under the wrong memory record.
-    """
+    """Catches the exact silent corruption: missing index and reordered."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         del request

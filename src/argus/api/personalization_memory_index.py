@@ -1,26 +1,9 @@
 """Mem0-backed semantic recall behind the canonical provider protocol.
 
-Composition layer, deliberately. The `argus.memory` package stays deterministic
-and network-free, so the vendor client, its environment switches, and the
-adapters that neuter it live here instead.
-
-Mem0 ships as a batteries-included memory product. Argus uses exactly one of
-those batteries, the vector index, and this module is where the rest are turned
-off before the library can act on its defaults:
-
-- extraction, dedup, and conflict resolution are unused, so the LLM seat holds
-  a sentinel that raises instead of reaching any vendor;
-- vendor telemetry is disabled before import, because the switch is read once
-  at module import time;
-- the history journal is process-local, so the only durable store is Supabase;
-- vectors live in pgvector on the connection pool the memory subsystem already
-  owns, so no second datastore and no second credential exist.
-
-Index-only, by construction. The provider projects confirmed records and
-answers searches with ranked canonical record ids and nothing else:
-`ProviderHit` carries no content, so the service always rehydrates from the
-canonical store. The index is derivative and disposable; losing it costs recall
-quality and never costs a memory.
+Lives in the composition layer so `argus.memory` stays network-free. Mem0 runs
+with extraction, vendor telemetry, and its history journal all disabled; only
+the vector index is used. Searches answer with canonical record ids, never
+content.
 """
 
 from __future__ import annotations
@@ -46,25 +29,18 @@ from argus.memory.subject import RegisteredMemoryOwner
 
 DEFAULT_COLLECTION_NAME = "argus_memory_vectors"
 
-# Mem0's history journal is a derivative audit log Argus never reads. Keeping
-# it in process memory means the only durable memory store is Supabase.
+# In process, so Supabase stays the only durable store.
 EPHEMERAL_HISTORY_DB_PATH = ":memory:"
 
-# Metadata key holding the canonical record id. It is the only join between the
-# derivative index and canonical truth.
+# The only join between the index and canonical truth.
 RECORD_ID_METADATA_KEY = "argus_record_id"
 
-# Mem0 drops results below this similarity. Recall stays generous because the
-# canonical store, not the index, decides what the user is allowed to see.
+# Similarity floor; the canonical store still decides what may be shown.
 DEFAULT_SEARCH_THRESHOLD = 0.1
 
 _FALSE_VALUES = frozenset(("false", "0", "no", "off"))
 
-# Usage of the embedding call made during the current provider operation. One
-# embedder instance serves every concurrent request, so usage cannot live on it
-# without one request billing another. A context variable is per-call under
-# both threads and tasks, and `asyncio.to_thread` copies the context, so each
-# recall gets its own slot.
+# Per-call, because one embedder instance serves every concurrent request.
 _CALL_EMBEDDING_USAGE: ContextVar[EmbeddingUsage | None] = ContextVar(
     "argus_memory_embedding_usage",
     default=None,
@@ -76,13 +52,7 @@ class Mem0ExtractionAttempted(AssertionError):
 
 
 def import_mem0_memory() -> Any:
-    """Import Mem0 with vendor telemetry disabled, whatever the import order.
-
-    Two belts. The environment switch is the one that matters when Argus is the
-    first importer, because Mem0 reads it once at import time and builds its
-    PostHog client immediately. But being first is not something this module can
-    prove, so the already-bound flags are forced off afterwards too.
-    """
+    """Import Mem0 with vendor telemetry disabled, whatever the import order."""
 
     if os.environ.get("MEM0_TELEMETRY", "").strip().lower() not in _FALSE_VALUES:
         os.environ["MEM0_TELEMETRY"] = "False"
@@ -93,13 +63,7 @@ def import_mem0_memory() -> Any:
 
 
 def _force_telemetry_off() -> None:
-    """Clear every binding of Mem0's telemetry flag, including from-imports.
-
-    `mem0.memory.main` copies the boolean with a from-import, so patching the
-    telemetry module alone would leave that copy live. Both names are cleared,
-    which also stops the second "mem0migrations" vector collection Mem0 would
-    otherwise create in our database purely to report usage.
-    """
+    """Clear both bindings; `mem0.memory.main` holds a from-imported copy."""
 
     import mem0.memory.main as mem0_main
     import mem0.memory.telemetry as mem0_telemetry
@@ -124,9 +88,7 @@ def build_mem0_config(
             "provider": "langchain",
             "config": {"model": langchain_embeddings_adapter(embedder)},
         },
-        # Filling the LLM seat with a sentinel is the enforcement: any call
-        # into Mem0's extraction pipeline raises here instead of reaching a
-        # vendor or silently rewriting user-confirmed content.
+        # Sentinel seat: any call into Mem0's extraction pipeline raises.
         "llm": {
             "provider": "langchain",
             "config": {"model": extraction_disabled_chat_model()},
@@ -254,8 +216,6 @@ class Mem0MemoryProvider:
 
         decision = index_eligibility(owner, record)
         if not decision.allowed:
-            # Declining is not a failure: canonical truth already holds the
-            # record, and the index simply never learns about it.
             logger.warning(
                 "Memory record refused by the index gate",
                 refusal=decision.refusal.value if decision.refusal else None,
@@ -268,7 +228,7 @@ class Mem0MemoryProvider:
             messages=[{"role": "user", "content": index_text(record)}],
             user_id=owner.owner_id,
             metadata={RECORD_ID_METADATA_KEY: record.id},
-            # Argus owns extraction; Mem0 stores exactly the confirmed text.
+            # Argus owns extraction; Mem0 stores the confirmed text as-is.
             infer=False,
         )
         provider_ref = _first_result_id(result)
@@ -290,11 +250,8 @@ class Mem0MemoryProvider:
     ) -> ProviderSearchResult:
         """Answer with ranked canonical record ids; never with content.
 
-        This reports what the index found and nothing more. Whether an empty
-        answer is authoritative depends on which records the retrieval is
-        allowed to return, which only the service knows, so the service decides
-        that from canonical projection state rather than the provider guessing
-        from the index alone.
+        Reports what the index found; the service decides whether an empty
+        answer is authoritative.
         """
 
         _CALL_EMBEDDING_USAGE.set(None)

@@ -1,20 +1,9 @@
 """The two stores must agree about projection freshness, sequence by sequence.
 
-Scope note: record deletion and owner reset are not driven here. Postgres
-`delete_record` blocks against this fixture, which is a separate question from
-projection freshness, and reset needs a claim lifecycle the harness would have
-to reimplement. Reset behaviour is covered directly against the deterministic
-store instead, where the divergence actually lived.
-
-Four review findings in a row reduced to the same thing: the deterministic
-store and the Postgres store disagreeing about when a projection is
-authoritative, in a different method each time. Testing one behaviour at a time
-kept missing the next one, so this runs identical operation sequences against
-both and compares everything observable after every step.
-
-Record ids and the owner differ between the stores, so operations name records
-by label and observations are reported by label. Provider refs are values the
-harness chooses, so those are compared directly.
+Identical operation sequences run against both stores, comparing everything
+observable after every step. Records are named by label because ids differ per
+store. Owner reset and record deletion are not driven here: reset needs a claim
+lifecycle, and Postgres `delete_record` blocks against this fixture.
 """
 
 from __future__ import annotations
@@ -190,11 +179,7 @@ def stores(pool: ConnectionPool) -> Iterator[tuple[StoreUnderTest, StoreUnderTes
 
 
 def _apply(operation: Any, subject: StoreUnderTest) -> Any:
-    """Run one operation, treating a rejection as part of the answer.
-
-    Both stores must refuse the same things for the same reason, so raised
-    errors are compared rather than escaping and ending the sequence.
-    """
+    """Run one operation, treating a rejection as part of the answer."""
 
     try:
         return ("ok", operation(subject))
@@ -314,9 +299,6 @@ def _sequences(seed: int, length: int, count: int) -> Iterator[list[Any]]:
 
 @pytest.mark.parametrize("seed", range(10))
 def test_generated_sequences_keep_the_stores_in_agreement(stores, seed: int) -> None:  # noqa: ANN001
-    """Catches divergence in orderings nobody thought to write down.
-
-    Deterministic by seed, so a failure names the exact sequence to replay.
-    """
+    """Catches divergence in orderings nobody thought to write down."""
     for sequence in _sequences(seed, length=6, count=1):
         assert_parity(stores, sequence)

@@ -1,9 +1,8 @@
 """Seeding for the store parity harness.
 
-Both stores need the same starting shape: one owner with confirmed records and
-no projection yet. Postgres gets it through the same inserts the other Postgres
-suites use; the deterministic store gets it through the service, because that
-is the only way a record legitimately comes to exist there.
+Both stores start with one owner and confirmed records and no projection.
+Postgres uses the same inserts as the other Postgres suites; the deterministic
+store goes through the service.
 """
 
 from __future__ import annotations

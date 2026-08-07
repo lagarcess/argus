@@ -1,11 +1,8 @@
 """S10: memory reaches voicing and nothing earlier.
 
-The mechanism, not just the outcome. Recall annotations live in assistant
-message *metadata*, and `load_runtime_thread_history` rebuilds every persisted
-message as `ConversationMessage(role=..., content=...)`. That constructor takes
-two fields and drops everything else, so metadata, and therefore every recalled
-memory, is structurally incapable of reaching the interpreter's input. These
-tests pin that constructor's behavior rather than trusting the call sites.
+Recall annotations live in message metadata, and `load_runtime_thread_history`
+rebuilds every message as `ConversationMessage(role, content)`. These pin that
+constructor rather than trusting the call sites.
 """
 
 from __future__ import annotations
@@ -101,8 +98,7 @@ def test_runtime_history_entries_carry_only_role_and_content() -> None:
 
     assert history
     for entry in history:
-        # The rebuilt entry exposes exactly the two fields the constructor
-        # takes; there is no metadata field for memory to travel in.
+        # Two fields only; no metadata channel for memory to ride.
         assert set(entry.model_dump()) == {"role", "content"}
 
 

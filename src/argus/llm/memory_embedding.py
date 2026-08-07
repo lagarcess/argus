@@ -1,8 +1,6 @@
 """Transit-only vectorization for confirmed memory text.
 
-Memory text transits Perplexity for vectorization and nothing more: no memory
-is stored with the vendor, and both the vectors and the memories live only in
-the Argus Supabase database. Every failure is typed so retrieval degrades to
+Nothing is stored with the vendor. Failures are typed so retrieval degrades to
 the canonical fallback instead of breaking a turn.
 """
 
@@ -25,8 +23,7 @@ DEFAULT_EMBEDDING_MODEL = "pplx-embed-v1-0.6b"
 DEFAULT_EMBEDDING_DIMENSIONS = 1024
 DEFAULT_EMBEDDING_TIMEOUT_SECONDS = 8.0
 
-# int8 keeps the payload small and preserves cosine ordering; the vector store
-# normalizes, so quantized components rank the same as full-precision ones.
+# Quantized; cosine ordering is preserved.
 EMBEDDING_ENCODING_FORMAT = "base64_int8"
 
 # Documented list price for pplx-embed-v1-0.6b on 2026-08-07.
@@ -58,10 +55,9 @@ class EmbeddingUsage:
 
 
 class EmbeddingResult:
-    """Vectors and the usage of the one call that produced them.
+    """Vectors and the usage of the call that produced them.
 
-    Usage travels with its vectors rather than sitting on the embedder,
-    because one embedder instance is shared by every concurrent request.
+    Usage travels with its vectors; the embedder is shared across requests.
     """
 
     __slots__ = ("vectors", "usage")
@@ -71,8 +67,7 @@ class EmbeddingResult:
         self.usage = usage
 
 
-# The API accepts up to 512 inputs per request, so a bulk projection costs one
-# round trip instead of one per record.
+# Documented per-request input ceiling.
 MAX_EMBEDDING_BATCH = 512
 
 
@@ -199,11 +194,8 @@ class PerplexityMemoryEmbedder:
 def _vectors_in_order(payload: Any, *, expected: int) -> list[list[float]]:
     """Decode every embedding, restored to request order by its index.
 
-    A batched response must carry an explicit index on every entry. Guessing
-    order from position would let a response that is both missing indices and
-    reordered pass every other check while each vector attaches to the wrong
-    text, which persists silently under the wrong memory record. Position is
-    only trustworthy when a single input makes order unambiguous.
+    A batched response must carry an explicit index; position is only
+    trustworthy for a single input.
     """
 
     if not isinstance(payload, dict):

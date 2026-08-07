@@ -1,16 +1,9 @@
 """What the derivative index is allowed to learn, and when.
 
-Four properties, each proved against the real pipeline rather than the
-provider in isolation:
-
-1. Mem0 only ever sees confirmed content; proposals and declines never reach
-   it, because projection happens after canonical confirmation.
-2. The categorical never-stored classes, broker credentials and raw
-   conversation, are suppressed in code before storage, so they never become a
-   record and therefore never reach the index.
-3. The index gate independently refuses anything it cannot prove is confirmed,
-   so a corrupted store cannot feed the index either.
-4. A search answer carries ranked canonical ids and no content.
+Proved against the real pipeline rather than the provider in isolation: only
+confirmed content reaches Mem0, the never-stored classes never do, the gate
+refuses anything it cannot prove is confirmed, and a search answer carries
+ranked ids and no content.
 """
 
 from __future__ import annotations

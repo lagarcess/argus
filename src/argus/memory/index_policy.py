@@ -1,12 +1,8 @@
 """Deterministic gate deciding what a derivative index may ever see.
 
-Second barrier, not the first. Sensitivity classification already runs at the
-API boundary and `MemoryPolicy` suppresses anything that is not CLEAR, so a
-never-storable class cannot become a canonical record at all. This gate repeats
-the decision at the index boundary from the record itself, so a derivative
-index still cannot be fed by a corrupted store, a hand-written row, or a future
-call site that forgets the upstream gate. It reads typed structure only and
-never inspects natural language.
+Second barrier behind the sensitivity assessor and `MemoryPolicy`, decided from
+the record itself so a corrupted store cannot feed an index. Reads typed
+structure only, never natural language.
 """
 
 from __future__ import annotations
@@ -19,8 +15,7 @@ from argus.memory.contracts import MemoryCategory, MemoryRecord
 from argus.memory.policy import SAFE_MEMORY_CATEGORIES
 from argus.memory.subject import RegisteredMemoryOwner
 
-# Indexable categories are exactly the categories policy allows to be stored.
-# A category that cannot be stored can never be indexed.
+# What cannot be stored can never be indexed.
 INDEXABLE_CATEGORIES: frozenset[MemoryCategory] = SAFE_MEMORY_CATEGORIES
 
 

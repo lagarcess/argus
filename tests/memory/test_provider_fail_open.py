@@ -237,15 +237,9 @@ def test_unavailable_or_failed_search_uses_bounded_canonical_fallback(
 
 
 def test_answered_empty_is_definitive_when_the_index_covers_the_records() -> None:
-    """Catches a valid empty provider answer being replaced by canonical matches.
-
-    An empty answer is definitive only over records the index actually holds,
-    so this projects the record first. The uncovered half is the test below.
-    """
+    """Catches a valid empty provider answer being replaced by canonical matches."""
     store = InMemoryCanonicalMemoryStore()
-    # Confirmed through a provider that really projects, so the projection is
-    # claimed. Attaching a ref out of band would prove nothing and, correctly,
-    # would not make the index authoritative here.
+    # A claimed projection; attaching a ref out of band would prove nothing.
     record_id = _confirm_one(_service(store, _CanonicalFirstProjectionProvider(store)))
     owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
     assert store.get_provider_ref(owner, record_id) is not None

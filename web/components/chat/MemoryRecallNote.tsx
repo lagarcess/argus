@@ -17,10 +17,7 @@ type MemoryRecallDisclosureProps = MemoryRecallNoteProps & {
 
 /** Persistent one-line trigger; the recalled memory stays behind a click.
  *
- * The trigger sits outside the hover-gated footer, so it stays reachable
- * whether or not the pointer is over the message. Expanding grows the message
- * inside the same hover group, so the feedback row moves with it instead of
- * flickering out from under the pointer.
+ * The trigger must stay outside the hover-gated footer to remain reachable.
  */
 export function MemoryRecallDisclosure({
   recalls,

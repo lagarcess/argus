@@ -655,13 +655,9 @@ class MemoryService:
             self._emit_retrieval_result(correlation_id, ())
             return ()
 
-        # Read projection state before searching. A projection committed after
-        # this point can only widen coverage, so a search is never credited
-        # with authority over a record it could not have seen. Only settled
-        # projections count: a record awaiting cleanup is indexed under its
-        # pre-edit text, which an empty answer must not be allowed to certify.
-        index_covers_eligible = records.keys() <= self._store.settled_projection_record_ids(
-            owner
+        # Read before searching: a later projection can only widen coverage.
+        index_covers_eligible = (
+            records.keys() <= self._store.settled_projection_record_ids(owner)
         )
 
         provider_result = self._search_provider(
@@ -682,12 +678,8 @@ class MemoryService:
                 provider_result,
                 limit=limit,
             )
-        # An empty answer is believable only when the index holds every record
-        # this retrieval may return. Authority is per eligible set, not per
-        # owner: an account can have newer categories projected while the
-        # categories this purpose reads predate the index entirely. Ranked ids
-        # that resolve to nothing are not an answer either, since stale or
-        # out-of-scope hits would hide what the canonical match still finds.
+        # An empty answer counts only when the index covers every eligible
+        # record. Hits that resolve to nothing are not an answer either.
         if not answered or (
             not result
             and (

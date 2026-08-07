@@ -1856,9 +1856,7 @@ class PostgresCanonicalMemoryStore:
                 )
                 if cursor.fetchone() is not None:
                     return False
-                # Attaching a ref out of band proves nothing about what the
-                # index holds, so it records the unproven generation and
-                # inherits nothing from the ref it replaces.
+                # Only a claimed projection earns a generation.
                 generation = UNPROVEN_GENERATION
                 if projection is not None:
                     self._insert_provider_cleanup_target(

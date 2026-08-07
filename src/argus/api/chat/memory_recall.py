@@ -89,10 +89,7 @@ async def memory_recalls_for_turn_async(
 ) -> list[dict[str, Any]] | None:
     """Same recall, off the event loop.
 
-    Retrieval can reach a vector index and a vendor embedding call, both
-    synchronous and both network-bound. The API runs one Uvicorn worker, so
-    doing that inline would stall every other stream and request for the
-    duration. One optional annotation must never cost the whole process.
+    Retrieval makes synchronous network calls; the API runs one worker.
     """
 
     return await asyncio.to_thread(

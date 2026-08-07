@@ -61,23 +61,15 @@ class CanonicalEnableMutation:
     consent_receipt: MemoryConsentActionReceipt | None = None
 
 
-# A projection that no reconciliation claim ever proved. Every real generation
-# starts at 1, so this can never satisfy the freshness comparison.
+# Sentinel below every real generation, so it never reads as current.
 UNPROVEN_GENERATION = 0
 
 
 @dataclass(frozen=True, slots=True)
 class LiveProjection:
-    """A derivative pointer and the content generation it stands for.
+    """A derivative pointer and the generation it represents.
 
-    Invariant, and the reason this is one value: a projection's ref and the
-    generation it represents may never be updated independently. Retrieval
-    decides whether an empty index answer is authoritative by comparing that
-    generation against the record's latest, so a ref written without its
-    generation, or a generation surviving a ref that was removed, silently
-    turns superseded index content into authority. Storing them separately
-    made that a bug you have to remember not to write; storing them together
-    makes it one you cannot express.
+    One value: the pair must never be updated independently.
     """
 
     provider_ref: str
@@ -340,8 +332,6 @@ class InMemoryCanonicalMemoryStore:
         self._settings: dict[str, MemoryConsentSettings] = {}
         self._receipts: dict[str, dict[str, ConfirmedMemoryConsentReceipt]] = {}
         self._records: dict[str, dict[str, MemoryRecord]] = {}
-        # Ref and generation together; see LiveProjection for why they are
-        # never stored apart.
         self._projections: dict[str, dict[str, LiveProjection]] = {}
         self._cleanup_targets: dict[tuple[str, str], set[str]] = {}
         self._reconciliation_generations: dict[tuple[str, str], int] = {}
@@ -1051,16 +1041,12 @@ class InMemoryCanonicalMemoryStore:
             ):
                 return False
             current = owner_projections.get(record_id)
-            # An unchanged ref writes nothing, so it cannot make a projection
-            # look fresher than the content it still points at.
             if current is not None and current.provider_ref == provider_ref:
                 return True
             key = (owner.owner_id, record_id)
             if current is not None:
                 self._cleanup_targets.setdefault(key, set()).add(current.provider_ref)
-            # Attaching a ref out of band proves nothing about what the index
-            # holds, so it records the unproven generation and inherits nothing
-            # from the ref it replaces. Only a claimed projection earns one.
+            # Only a claimed projection earns a generation; this inherits none.
             owner_projections[record_id] = LiveProjection(
                 provider_ref=provider_ref,
                 generation=UNPROVEN_GENERATION,
@@ -1068,7 +1054,7 @@ class InMemoryCanonicalMemoryStore:
             return True
 
     def _live_provider_ref(self, owner_id: str, record_id: str) -> str | None:
-        """The live ref, read only through the pair that owns it."""
+        """The live ref, read through the pair that owns it."""
 
         projection = self._projections.get(owner_id, {}).get(record_id)
         return None if projection is None else projection.provider_ref
@@ -1087,13 +1073,8 @@ class InMemoryCanonicalMemoryStore:
     ) -> frozenset[str]:
         """Records whose projection represents their current content.
 
-        A projection is current when it is not behind a newer reconciliation
-        generation, which becomes true the moment an edit commits and before
-        any provider call. Generation 0 is the unproven sentinel: only a
-        claimed projection sets a real generation, so a ref attached out of
-        band can never satisfy this. Obsolete refs awaiting deletion do not
-        make a current projection stale, since the record already points at
-        the right content.
+        Current means not behind a newer reconciliation generation. Pending
+        cleanup of a superseded ref does not make a projection stale.
         """
 
         with self._lock:

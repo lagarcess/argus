@@ -1096,12 +1096,7 @@ def test_service_cleanup_reservation_prevents_deleting_reassigned_live_ref(
 def test_settled_projection_ids_track_the_current_generation(
     database: dict[str, Any],
 ) -> None:
-    """Catches the bulk projection read drifting from per-record truth.
-
-    Retrieval decides whether an empty index answer is authoritative from this
-    set, so a wrong answer here either buries a memory or lets a coincidental
-    token match override a real finding.
-    """
+    """Catches the bulk projection read drifting from per-record truth."""
     store = PostgresCanonicalMemoryStore(database["pool"])
     owner = database["owner"]
     record_id = database["record_id"]
@@ -1127,8 +1122,7 @@ def test_settled_projection_ids_track_the_current_generation(
     # Agrees with the per-record read it replaces in bulk.
     assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
 
-    # An obsolete ref queued for deletion does not make a current projection
-    # stale: the record already points at the right content.
+    # An obsolete ref queued for deletion does not make a projection stale.
     assert store.track_provider_cleanup_target(
         owner,
         record_id,
@@ -1136,8 +1130,7 @@ def test_settled_projection_ids_track_the_current_generation(
     )
     assert store.settled_projection_record_ids(owner) == frozenset({record_id})
 
-    # Committing a newer reconciliation generation does, and it does so before
-    # any provider call, which is the window an edit opens.
+    # A newer generation does, and before any provider call.
     mutation = store.edit_record(
         owner,
         record_id,
@@ -1150,11 +1143,8 @@ def test_settled_projection_ids_track_the_current_generation(
     # Still projected, just no longer describing current content.
     assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
 
-    # Re-asserting a ref cannot launder a stale projection into an
-    # authoritative one. Here the helper declines outright, because the earlier
-    # cleanup target reserved that ref, and the in-memory store applies the
-    # same reservation rule. Either way the record stays uncovered, which is
-    # the property that matters.
+    # Declines here because the cleanup target reserved the ref; either way
+    # the record stays uncovered.
     assert store.set_provider_ref(owner, record_id, "projected-bulk-read") is False
 
     assert store.settled_projection_record_ids(owner) == frozenset()

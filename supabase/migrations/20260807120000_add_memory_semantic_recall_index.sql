@@ -1,17 +1,8 @@
 -- Derivative semantic index for personalization-memory recall.
 --
--- This table is not canonical truth. It holds vectors and the confirmed text
--- of memories that already exist in public.memory_records, plus the canonical
--- record id that joins the two. Dropping it costs recall quality and never
--- costs a memory: retrieval falls back to the canonical token match.
---
--- Owning the shape here rather than letting the client issue DDL means the API
--- service never needs CREATE privileges at runtime, and the column types stay
--- reviewable. The shape matches what the Mem0 pgvector store expects, so its
--- own "if not exists" statements are no-ops against this table.
---
--- Like every other memory table, this is private backend state: Browser and
--- Data API roles, including service_role, have no direct access.
+-- Not canonical truth: dropping this table costs recall quality, never a
+-- memory. Owning the shape here keeps DDL privileges out of the API service.
+-- Private backend state, like every other memory table.
 
 create extension if not exists vector;
 
@@ -21,7 +12,7 @@ create table if not exists public.argus_memory_vectors (
   payload jsonb
 );
 
--- Cosine operator class: the store searches with the `<=>` distance operator.
+-- Cosine, matching the `<=>` operator the store searches with.
 create index if not exists argus_memory_vectors_hnsw_idx
   on public.argus_memory_vectors
   using hnsw (vector vector_cosine_ops);
