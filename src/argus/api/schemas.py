@@ -419,6 +419,9 @@ class BacktestJob(BaseModel):
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus
+    # Absent means an ordinary backtest; 'chat.research' jobs succeed without
+    # a run, so every serialized job surface must carry the scope.
+    operation_scope: str | None = None
     result_run_id: str | None = None
     failure_code: str | None = None
     failure_detail: str | None = None

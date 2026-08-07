@@ -172,6 +172,31 @@ describe("chat backtest jobs", () => {
     expect(pendingBacktestJobIds([message!])).toEqual(["job-1"]);
   });
 
+  test("the research operation scope survives every parser entry point", () => {
+    // The polling reconciliation compares operation_scope against
+    // "chat.research": if any serialized surface drops the field, a
+    // succeeded research job waits forever for a run that cannot exist.
+    const researchJob = {
+      ...job(),
+      status: "succeeded" as const,
+      operation_scope: "chat.research" as const,
+    };
+
+    const hydrated = backtestJobMessageFromApi(apiMessageWithJob(researchJob));
+    expect(hydrated?.backtestJob?.operation_scope).toBe("chat.research");
+
+    const fromPayload = backtestJobFromFinalPayload({
+      backtest_job: { ...researchJob },
+    });
+    expect(fromPayload?.operation_scope).toBe("chat.research");
+
+    // Unknown scopes read as null instead of leaking arbitrary strings.
+    const unknownScope = backtestJobFromFinalPayload({
+      backtest_job: { ...job(), operation_scope: "weird.scope" },
+    });
+    expect(unknownScope?.operation_scope).toBeNull();
+  });
+
   test("hydrates owner-scoped missing-message Run projection into a job card", () => {
     const message = backtestJobMessageFromApi(
       projectedUserActionWithJob(

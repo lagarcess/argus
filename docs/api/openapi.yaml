@@ -1841,6 +1841,10 @@ components:
           - failed
           - canceled
           - expired
+        operation_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
         result_run_id:
           anyOf:
           - type: string
