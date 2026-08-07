@@ -49,7 +49,8 @@ payloads (volatile identifiers and timestamps canonicalized, all else exact).
 
 - `baseline.json`: run at `2fc7dec3` (the integration tip this lane grew
   from), digest `55bb1b89ce5493c5e4f5c2374b5e043b24eb792e499676344c64f9dcef91b8b7`.
-- `head.json`: run at the lane head, digest
+- `head.json`: run at the lane's final code head (fc998983; the only
+  commit after it is this evidence refresh, which is docs-only), digest
   `55bb1b89ce5493c5e4f5c2374b5e043b24eb792e499676344c64f9dcef91b8b7`.
 
 The digests are identical.
