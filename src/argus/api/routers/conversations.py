@@ -30,6 +30,10 @@ from argus.api.message_store import (
     reconcile_reload_message_metadata,
 )
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
+from argus.api.public_excerpts import (
+    revoke_all_receipts,
+    revoke_receipts_for_conversation,
+)
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
     Conversation,
@@ -369,6 +373,9 @@ def delete_all_conversations(
                 update={"deleted_at": now, "updated_at": now},
             )
             deleted_count += 1
+    # Deleting the source revokes what it published. A user who removes their
+    # history must not be left with live public pages they believe are gone.
+    revoke_all_receipts(user_id=user.id)
     return BulkConversationDeleteResponse(success=True, deleted_count=deleted_count)
 
 
@@ -474,6 +481,10 @@ def delete_conversation(
         api_state.store.conversations[conversation_id] = conversation.model_copy(
             update={"deleted_at": utcnow(), "updated_at": utcnow()}
         )
+    revoke_receipts_for_conversation(
+        user_id=user.id,
+        conversation_id=conversation_id,
+    )
     return SuccessResponse(success=True)
 
 

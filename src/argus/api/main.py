@@ -15,11 +15,13 @@ from argus.api.routers import (
     dev,
     discovery,
     evidence,
+    evidence_receipts,
     feedback,
     history,
     ops,
     personalization_memory,
     profile,
+    public_receipts,
     search,
 )
 
@@ -45,6 +47,8 @@ for api_router in (
     conversation_activity.router,
     backtest.router,
     evidence.router,
+    evidence_receipts.router,
+    public_receipts.router,
     agent.router,
     history.router,
     search.router,

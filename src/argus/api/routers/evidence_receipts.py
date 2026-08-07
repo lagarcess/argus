@@ -1,0 +1,195 @@
+"""Owner routes for public evidence receipts: create, list, revoke.
+
+Every route here is behind the default-off sharing flag and answers 404 while it
+is off, so the endpoints do not exist for a client until the founder turns them
+on.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Request
+from loguru import logger
+
+from argus.api.dependencies import current_user, problem, require_account_capability
+from argus.api.guest_access import client_identity
+from argus.api.public_excerpt_schemas import (
+    PublicExcerptCreate,
+    PublicExcerptCreateResponse,
+    PublicExcerptListResponse,
+    PublicExcerptRevokeResponse,
+)
+from argus.api.public_excerpts import (
+    RECEIPT_CREATE_DAILY_LIMIT,
+    RECEIPT_CREATE_DAILY_WINDOW_SECONDS,
+    RECEIPT_CREATE_LIMIT,
+    RECEIPT_CREATE_WINDOW_SECONDS,
+    EvidenceReceiptSourceMissingError,
+    create_receipt_for_artifact,
+    public_excerpt_repository,
+    require_evidence_receipt_sharing_enabled,
+)
+from argus.api.rate_limits import SlidingWindowLimiter
+from argus.api.schemas import User
+from argus.domain.public_excerpts import (
+    PublicExcerptOwnerNoteError,
+    PublicExcerptSanitizationError,
+    PublicExcerptSourceError,
+    normalize_owner_note,
+    snapshot_list_item,
+)
+from argus.observability.product_events import capture_product_event
+
+router = APIRouter(prefix="/api/v1", tags=["evidence-receipts"])
+
+_RECEIPT_CREATE_LIMITER = SlidingWindowLimiter()
+
+
+def reset_receipt_create_limiter_for_tests() -> None:
+    _RECEIPT_CREATE_LIMITER.reset()
+
+
+def _enforce_create_rate_limit(request: Request, *, user_id: str) -> None:
+    visitor = client_identity(request)
+    for limit, window in (
+        (RECEIPT_CREATE_LIMIT, RECEIPT_CREATE_WINDOW_SECONDS),
+        (RECEIPT_CREATE_DAILY_LIMIT, RECEIPT_CREATE_DAILY_WINDOW_SECONDS),
+    ):
+        retry_after = _RECEIPT_CREATE_LIMITER.record_or_retry_after(
+            keys=(
+                f"receipt-create:user:{user_id}:{window}",
+                f"receipt-create:visitor:{visitor}:{window}",
+            ),
+            limit=limit,
+            window_seconds=window,
+        )
+        if retry_after is None:
+            continue
+        raise problem(
+            request,
+            status_code=429,
+            code="too_many_requests",
+            title="Too Many Requests",
+            detail="You have created a lot of links recently. Try again shortly.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+@router.post(
+    "/evidence-artifacts/{artifact_id}/public-excerpt",
+    response_model=PublicExcerptCreateResponse,
+)
+def create_public_excerpt(
+    artifact_id: str,
+    payload: PublicExcerptCreate,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> PublicExcerptCreateResponse:
+    require_evidence_receipt_sharing_enabled()
+    require_account_capability(
+        request,
+        "can_save_decision",
+        detail="Sign in to share a result.",
+        reason="share_result",
+    )
+    try:
+        owner_note = normalize_owner_note(payload.owner_note)
+    except PublicExcerptOwnerNoteError as exc:
+        raise problem(
+            request,
+            status_code=422,
+            code="receipt_note_rejected",
+            title="Note Rejected",
+            detail=str(exc),
+        ) from exc
+    _enforce_create_rate_limit(request, user_id=user.id)
+    try:
+        snapshot = create_receipt_for_artifact(
+            user=user,
+            artifact_id=artifact_id,
+            owner_note=owner_note,
+        )
+    except EvidenceReceiptSourceMissingError as exc:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="That result is not available.",
+        ) from exc
+    except PublicExcerptSourceError as exc:
+        raise problem(
+            request,
+            status_code=422,
+            code="receipt_source_unsupported",
+            title="Not Shareable",
+            detail=str(exc),
+        ) from exc
+    except PublicExcerptSanitizationError as exc:
+        # Fail closed. A payload that cannot be proven clean is never published.
+        logger.error("Receipt payload failed the never-expose audit", error=str(exc))
+        raise problem(
+            request,
+            status_code=500,
+            code="receipt_sanitization_failed",
+            title="Could Not Share",
+            detail="Argus could not safely build that link. Please try again later.",
+        ) from exc
+    capture_product_event(
+        "receipt_created",
+        user_id=user.id,
+        status="created",
+        attributes={"receipt_digest": snapshot.payload_digest[:16]},
+    )
+    return PublicExcerptCreateResponse(receipt=snapshot_list_item(snapshot))
+
+
+@router.get("/public-excerpts", response_model=PublicExcerptListResponse)
+def list_public_excerpts(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> PublicExcerptListResponse:
+    require_evidence_receipt_sharing_enabled()
+    require_account_capability(
+        request,
+        "can_save_decision",
+        detail="Sign in to review shared links.",
+        reason="share_result",
+    )
+    snapshots = public_excerpt_repository().list_public_excerpt_snapshots(
+        owner_id=user.id
+    )
+    return PublicExcerptListResponse(
+        items=[snapshot_list_item(snapshot) for snapshot in snapshots]
+    )
+
+
+@router.delete(
+    "/public-excerpts/{snapshot_id}",
+    response_model=PublicExcerptRevokeResponse,
+)
+def revoke_public_excerpt(
+    snapshot_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> PublicExcerptRevokeResponse:
+    require_evidence_receipt_sharing_enabled()
+    require_account_capability(
+        request,
+        "can_save_decision",
+        detail="Sign in to manage shared links.",
+        reason="share_result",
+    )
+    snapshot = public_excerpt_repository().revoke_public_excerpt_snapshot(
+        owner_id=user.id,
+        snapshot_id=snapshot_id,
+    )
+    if snapshot is None:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="That link is not available.",
+        )
+    capture_product_event("receipt_revoked", user_id=user.id, status="revoked")
+    return PublicExcerptRevokeResponse(receipt=snapshot_list_item(snapshot))
