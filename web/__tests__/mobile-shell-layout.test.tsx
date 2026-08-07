@@ -16,11 +16,11 @@ import {
 } from "../lib/responsive-layout";
 import {
   OVERLAY_HISTORY_KEY,
-  claimProgrammaticPop,
+  claimOverlayEntry,
+  openOverlayEntries,
   overlayHistoryState,
-  ownsPushedHistoryEntry,
-  recordProgrammaticPop,
-  resetProgrammaticPops,
+  recordOverlayEntry,
+  resetOverlayEntries,
 } from "../components/layout/useOverlayBackDismiss";
 import { sidebarDrawerDragOutcome } from "../components/sidebar/SidebarDrawer";
 import ChatShellMenuTrigger from "../components/chat/ChatShellMenuTrigger";
@@ -100,31 +100,63 @@ describe("responsive layout thresholds", () => {
 });
 
 describe("system back closes overlays", () => {
-  test("marks the pushed entry so only its owner pops it", () => {
+  test("still stamps the entry, for anyone reading the stack", () => {
     const state = overlayHistoryState({ existing: 1 }, "sheet-a");
     expect(state.existing).toBe(1);
     expect(state[OVERLAY_HISTORY_KEY]).toBe("sheet-a");
-    expect(ownsPushedHistoryEntry(state, "sheet-a")).toBe(true);
-    expect(ownsPushedHistoryEntry(state, "sheet-b")).toBe(false);
-    expect(ownsPushedHistoryEntry(null, "sheet-a")).toBe(false);
   });
 
-  test("a programmatic pop is claimed once and never read as a user back", () => {
-    resetProgrammaticPops();
-    expect(claimProgrammaticPop()).toBe(false);
-    recordProgrammaticPop();
-    expect(claimProgrammaticPop()).toBe(true);
-    expect(claimProgrammaticPop()).toBe(false);
+  test("ownership lives in module scope, not in history.state", () => {
+    // Next's App Router replaceState drops foreign keys from history.state, so
+    // an overlay that trusted the stamp would never pop its own entry and the
+    // next system back would leave Argus.
+    resetOverlayEntries();
+    expect(claimOverlayEntry("sheet-a")).toBe(false);
+    recordOverlayEntry("sheet-a");
+    expect(openOverlayEntries()).toEqual(["sheet-a"]);
+    expect(claimOverlayEntry("sheet-a")).toBe(true);
+    expect(claimOverlayEntry("sheet-a")).toBe(false);
+    expect(openOverlayEntries()).toEqual([]);
   });
 
-  test("counts pops per document, so a remount cannot dismiss itself", () => {
-    // A sheet that mounts, cleans up, and remounts pops its own entry twice.
-    resetProgrammaticPops();
-    recordProgrammaticPop();
-    recordProgrammaticPop();
-    expect(claimProgrammaticPop()).toBe(true);
-    expect(claimProgrammaticPop()).toBe(true);
-    expect(claimProgrammaticPop()).toBe(false);
+  test("a user back consumes the entry so close does not pop a second time", () => {
+    resetOverlayEntries();
+    recordOverlayEntry("sheet-a");
+    // popstate path claims it...
+    expect(claimOverlayEntry("sheet-a")).toBe(true);
+    // ...so the unmount path finds nothing left to pop.
+    expect(claimOverlayEntry("sheet-a")).toBe(false);
+  });
+
+  test("nested overlays each own their own entry", () => {
+    resetOverlayEntries();
+    recordOverlayEntry("palette-sheet");
+    recordOverlayEntry("menu-sheet");
+    expect(openOverlayEntries()).toEqual(["palette-sheet", "menu-sheet"]);
+    expect(claimOverlayEntry("menu-sheet")).toBe(true);
+    expect(openOverlayEntries()).toEqual(["palette-sheet"]);
+    expect(claimOverlayEntry("palette-sheet")).toBe(true);
+  });
+
+  test("a remount cannot dismiss itself", () => {
+    // Mount pushes, cleanup pops, remount pushes again. The echo of the pop
+    // finds the id already claimed and is ignored rather than read as a back.
+    resetOverlayEntries();
+    recordOverlayEntry("sheet-a");
+    expect(claimOverlayEntry("sheet-a")).toBe(true); // cleanup pops
+    expect(claimOverlayEntry("sheet-a")).toBe(false); // echo, ignored
+    recordOverlayEntry("sheet-a"); // remount
+    expect(openOverlayEntries()).toEqual(["sheet-a"]);
+  });
+
+  test("one rule, so a missing popstate cannot swallow the next real back", () => {
+    // The old counter went stale whenever an expected popstate never arrived.
+    const source = readFileSync(
+      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      "utf-8",
+    );
+    expect(source).not.toContain("pendingProgrammaticPops");
+    expect(source).toContain("if (!claimOverlayEntry(overlayId)) return;");
   });
 });
 

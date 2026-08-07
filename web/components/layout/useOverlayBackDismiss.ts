@@ -16,36 +16,37 @@ import { useEffect, useRef } from "react";
 export const OVERLAY_HISTORY_KEY = "argusOverlay";
 
 /**
- * Programmatic `history.back()` calls whose `popstate` has not arrived yet.
- * The event is asynchronous and fires on whatever listener is mounted when it
- * lands, so ownership has to be tracked for the document rather than per hook
- * instance. Without this, an overlay that remounts pops its own entry and then
- * reads the resulting event as a user pressing back.
+ * Overlays that pushed a history entry and have not yet spent it.
+ *
+ * This is the single source of truth for who owns an entry, for two reasons.
+ * It cannot live in `history.state`, because Next's App Router calls
+ * `replaceState` with its own routing tree and drops foreign keys. And a
+ * separate "programmatic pop" counter could go stale whenever a `popstate` it
+ * expected never arrived, after which the next real back press was swallowed.
+ *
+ * One rule instead: whoever claims the id first wins. A `popstate` that finds
+ * the id already claimed is the echo of our own `history.back()`, so it is
+ * ignored; one that still finds it is a user pressing back.
  */
-let pendingProgrammaticPops = 0;
+let unconsumedOverlays: string[] = [];
 
-export function claimProgrammaticPop(): boolean {
-  if (pendingProgrammaticPops <= 0) return false;
-  pendingProgrammaticPops -= 1;
+/** Test seam: reset document-level state between cases. */
+export function resetOverlayEntries(): void {
+  unconsumedOverlays = [];
+}
+
+export function claimOverlayEntry(overlayId: string): boolean {
+  if (!unconsumedOverlays.includes(overlayId)) return false;
+  unconsumedOverlays = unconsumedOverlays.filter((id) => id !== overlayId);
   return true;
 }
 
-export function recordProgrammaticPop(): void {
-  pendingProgrammaticPops += 1;
+export function recordOverlayEntry(overlayId: string): void {
+  unconsumedOverlays = [...unconsumedOverlays, overlayId];
 }
 
-/** Test seam: reset the document-level counter between cases. */
-export function resetProgrammaticPops(): void {
-  pendingProgrammaticPops = 0;
-}
-
-/** Only pop an entry we still own; a route change elsewhere clears the marker. */
-export function ownsPushedHistoryEntry(
-  state: unknown,
-  overlayId: string,
-): boolean {
-  if (!state || typeof state !== "object") return false;
-  return (state as Record<string, unknown>)[OVERLAY_HISTORY_KEY] === overlayId;
+export function openOverlayEntries(): readonly string[] {
+  return unconsumedOverlays;
 }
 
 export function overlayHistoryState(
@@ -69,6 +70,7 @@ export function useOverlayBackDismiss({
   onDismiss: () => void;
 }): void {
   const dismissRef = useRef(onDismiss);
+  const pendingPopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     dismissRef.current = onDismiss;
@@ -77,24 +79,39 @@ export function useOverlayBackDismiss({
   useEffect(() => {
     if (!isOpen || typeof window === "undefined") return;
 
-    window.history.pushState(
-      overlayHistoryState(window.history.state, overlayId),
-      "",
-      window.location.href,
-    );
+    // A remount lands here before the previous cleanup's pop has run, so cancel
+    // it: React double-invoking an effect is not the user closing anything.
+    if (pendingPopRef.current !== null) {
+      clearTimeout(pendingPopRef.current);
+      pendingPopRef.current = null;
+    }
+
+    // Push at most one entry per open overlay. Without this a remount stacks a
+    // second entry that nothing will ever pop.
+    if (!openOverlayEntries().includes(overlayId)) {
+      recordOverlayEntry(overlayId);
+      window.history.pushState(
+        overlayHistoryState(window.history.state, overlayId),
+        "",
+        window.location.href,
+      );
+    }
 
     const handlePopState = () => {
-      if (claimProgrammaticPop()) return;
+      // Already claimed means this is the echo of our own back() below.
+      if (!claimOverlayEntry(overlayId)) return;
       dismissRef.current();
     };
     window.addEventListener("popstate", handlePopState);
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
-      if (ownsPushedHistoryEntry(window.history.state, overlayId)) {
-        recordProgrammaticPop();
-        window.history.back();
-      }
+      // Deferred so a remount can cancel it. A real close has nothing to cancel
+      // it, so the entry is spent on the next tick and the stack stays flat.
+      pendingPopRef.current = setTimeout(() => {
+        pendingPopRef.current = null;
+        if (claimOverlayEntry(overlayId)) window.history.back();
+      }, 0);
     };
   }, [isOpen, overlayId]);
 }

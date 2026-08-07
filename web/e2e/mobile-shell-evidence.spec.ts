@@ -203,6 +203,19 @@ test.describe("mobile shell evidence", () => {
     await capture(page, "16-mobile-390-en-light");
   });
 
+  test("chat header menu goes through the sheet primitive", async ({ page }) => {
+    await open(page, "mobile", { conversation: true });
+    await page.getByRole("button", { name: /chat options/i }).click();
+    const sheet = page.locator('[role="dialog"]');
+    await expect(sheet).toHaveAttribute("aria-modal", "true");
+    await expect(page.locator(".argus-sheet-scrim")).toBeVisible();
+    await expect(page.locator(".argus-sheet-grip")).toBeVisible();
+    // Hugs its content rather than taking a detent sized for a dossier.
+    const box = await sheet.boundingBox();
+    expect(box!.height).toBeLessThan(page.viewportSize()!.height * 0.7);
+    await capture(page, "24-mobile-390-chat-menu-sheet");
+  });
+
   test("desktop is unchanged", async ({ page }) => {
     await open(page, "desktop", { conversation: true });
     await expect(page.getByTestId("chat-shell-menu-trigger")).toHaveCount(0);

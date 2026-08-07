@@ -13,13 +13,18 @@ import {
 import { X } from "lucide-react";
 import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
 
-/** Detents from the mobile shell spec: run dossier, sources pane, capital editor. */
-export type BottomSheetHeight = "full" | "tall" | "short";
+/**
+ * Detents from the mobile shell spec: run dossier, sources pane, capital editor.
+ * `auto` is for menus, which have no natural detent: it hugs its content and
+ * only starts scrolling once the content would take more than the tall detent.
+ */
+export type BottomSheetHeight = "full" | "tall" | "short" | "auto";
 
 const HEIGHT_CLASS: Record<BottomSheetHeight, string> = {
   full: "h-[96dvh]",
   tall: "h-[70dvh]",
   short: "h-[40dvh]",
+  auto: "max-h-[70dvh]",
 };
 
 const FOCUSABLE_SELECTOR = [
