@@ -6,9 +6,8 @@ import { join } from "node:path";
 import BottomSheet, {
   bottomSheetDragOutcome,
   bottomSheetHeightClass,
-  bottomSheetKeyboardAction,
-  nextFocusIndex,
 } from "../components/ui/BottomSheet";
+import { nextFocusIndex } from "../components/layout/useModalFocusTrap";
 
 const source = readFileSync(
   join(import.meta.dir, "../components/ui/BottomSheet.tsx"),
@@ -95,23 +94,19 @@ describe("bottom sheet dismissal", () => {
 });
 
 describe("bottom sheet keyboard handling", () => {
-  test("Escape closes", () => {
-    expect(bottomSheetKeyboardAction({ key: "Escape", shiftKey: false })).toBe(
-      "close",
-    );
+  test("Escape closes, and stands down for anything opened above", () => {
+    expect(source).toContain('if (event.key !== "Escape") return;');
+    expect(source).toContain("if (hasOverlayAbove(overlayId)) return;");
   });
 
-  test("Tab and Shift+Tab move focus inside the sheet", () => {
-    expect(bottomSheetKeyboardAction({ key: "Tab", shiftKey: false })).toBe(
-      "focus-next",
+  test("Tab is trapped by the shared modal hook, not a private copy", () => {
+    const trap = readFileSync(
+      join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
+      "utf-8",
     );
-    expect(bottomSheetKeyboardAction({ key: "Tab", shiftKey: true })).toBe(
-      "focus-previous",
-    );
-  });
-
-  test("other keys are left alone", () => {
-    expect(bottomSheetKeyboardAction({ key: "a", shiftKey: false })).toBe("none");
+    expect(source).toContain("useModalFocusTrap({");
+    expect(trap).toContain('if (event.key !== "Tab") return;');
+    expect(source).not.toContain("FOCUSABLE_SELECTOR");
   });
 
   test("focus wraps at both ends so it cannot escape", () => {
@@ -133,7 +128,11 @@ describe("bottom sheet keyboard handling", () => {
   });
 
   test("restores focus to the opener on close", () => {
-    expect(source).toContain("restoreFocusRef.current?.focus()");
+    const trap = readFileSync(
+      join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
+      "utf-8",
+    );
+    expect(trap).toContain("restoreFocusRef.current?.focus()");
   });
 });
 

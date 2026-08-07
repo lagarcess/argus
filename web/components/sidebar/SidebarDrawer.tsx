@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
+import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
+import { useModalFocusTrap } from "@/components/layout/useModalFocusTrap";
 
 /** A leftward drag past a third of the panel, or any flick, dismisses. */
 const DISMISS_TRAVEL_RATIO = 0.33;
@@ -56,6 +58,10 @@ export default function SidebarDrawer({
   const [dragOffset, setDragOffset] = useState(0);
 
   useOverlayBackDismiss({ isOpen, overlayId, onDismiss: onClose });
+  useOverlayStackEntry(isOpen, overlayId);
+  // Declaring aria-modal is a promise the rest of the page is inert; without
+  // this the opener kept focus behind the scrim and Tab walked the chat.
+  useModalFocusTrap({ isOpen, containerRef: panelRef });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,13 +69,16 @@ export default function SidebarDrawer({
     dragOriginRef.current = null;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      // A confirmation opened from a row sits above this panel and answers
+      // first, or one Escape would dismiss two levels.
+      if (hasOverlayAbove(overlayId)) return;
       event.preventDefault();
       event.stopPropagation();
       onClose();
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, overlayId]);
 
   const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest("a,button,input,select,textarea")) {

@@ -420,9 +420,12 @@ describe("omnisearch below threshold", () => {
     );
     const rowKeyDown = commandPalette.slice(
       commandPalette.indexOf("const handleRowKeyDown"),
-      commandPalette.indexOf("const handleRowKeyDown") + 700,
+      commandPalette.indexOf("const handleRowKeyDown") + 1200,
     );
     expect(rowKeyDown).toContain("openRow(item, {");
+    // The row's own action menu is a control, not part of the row, so Enter
+    // there opens the menu rather than the dossier.
+    expect(rowKeyDown).toContain('event.target.closest("[data-row-action]")');
   });
 
   test("Escape ownership is depth, not a list of named children", () => {
@@ -444,6 +447,32 @@ describe("omnisearch below threshold", () => {
     popOverlay("dossier-sheet");
     popOverlay("palette");
     expect(overlayStackIds()).toEqual([]);
+  });
+
+  test("a confirmation above the drawer answers Escape alone", () => {
+    // The exact case: Delete from a recent row raises ConfirmDialog over the
+    // drawer. The drawer registered first, so without the stack its earlier
+    // capture listener closed it before the dialog could cancel.
+    resetOverlayStack();
+    pushOverlay("drawer");
+    pushOverlay("confirm");
+    expect(hasOverlayAbove("drawer")).toBe(true);
+    expect(hasOverlayAbove("confirm")).toBe(false);
+    popOverlay("confirm");
+    expect(hasOverlayAbove("drawer")).toBe(false);
+  });
+
+  test("every modal in the nesting chain registers with the stack", () => {
+    for (const file of [
+      "../components/ui/BottomSheet.tsx",
+      "../components/ui/ConfirmDialog.tsx",
+      "../components/sidebar/SidebarDrawer.tsx",
+    ]) {
+      const source = readFileSync(join(import.meta.dir, file), "utf-8");
+      expect(source).toContain("useOverlayStackEntry");
+      expect(source).toContain("useModalFocusTrap");
+      expect(source).toContain("hasOverlayAbove");
+    }
   });
 
   test("re-registering an overlay moves it to the top rather than duplicating", () => {

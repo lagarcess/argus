@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
   useId,
   useRef,
@@ -12,7 +11,8 @@ import {
 } from "react";
 import { X } from "lucide-react";
 import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
-import { useOverlayStackEntry } from "@/components/layout/overlayStack";
+import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
+import { useModalFocusTrap } from "@/components/layout/useModalFocusTrap";
 
 /**
  * Detents from the mobile shell spec: run dossier, sources pane, capital editor.
@@ -27,15 +27,6 @@ const HEIGHT_CLASS: Record<BottomSheetHeight, string> = {
   short: "h-[40dvh]",
   auto: "max-h-[70dvh]",
 };
-
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled]):not([type='hidden'])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
 
 const INTERACTIVE_SELECTOR = "a[href],button,input,select,textarea,[role='button']";
 
@@ -65,35 +56,6 @@ export function bottomSheetDragOutcome({
     sheetHeight * DISMISS_TRAVEL_RATIO,
   );
   return deltaY >= travelThreshold ? "dismiss" : "settle";
-}
-
-export function bottomSheetKeyboardAction({
-  key,
-  shiftKey,
-}: {
-  key: string;
-  shiftKey: boolean;
-}): "close" | "focus-next" | "focus-previous" | "none" {
-  if (key === "Escape") return "close";
-  if (key === "Tab") return shiftKey ? "focus-previous" : "focus-next";
-  return "none";
-}
-
-/** Wraps at both ends so focus never escapes an open sheet. */
-export function nextFocusIndex({
-  count,
-  currentIndex,
-  direction,
-}: {
-  count: number;
-  currentIndex: number;
-  direction: "focus-next" | "focus-previous";
-}): number {
-  if (count <= 0) return -1;
-  if (direction === "focus-next") {
-    return currentIndex >= count - 1 || currentIndex < 0 ? 0 : currentIndex + 1;
-  }
-  return currentIndex <= 0 ? count - 1 : currentIndex - 1;
 }
 
 type BottomSheetProps = {
@@ -130,32 +92,16 @@ export function BottomSheet({
   const overlayId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const dragOriginRef = useRef<{ y: number; at: number } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
 
   useOverlayBackDismiss({ isOpen, overlayId, onDismiss: onClose });
   useOverlayStackEntry(isOpen, overlayId);
-
-  const focusableElements = useCallback((): HTMLElement[] => {
-    const panel = panelRef.current;
-    if (!panel) return [];
-    return Array.from(
-      panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-    ).filter((element) => element.offsetParent !== null || element === panel);
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    restoreFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const target = initialFocusRef?.current ?? closeButtonRef.current;
-    target?.focus();
-    return () => {
-      restoreFocusRef.current?.focus();
-      restoreFocusRef.current = null;
-    };
-  }, [initialFocusRef, isOpen]);
+  useModalFocusTrap({
+    isOpen,
+    containerRef: panelRef,
+    initialFocusRef: initialFocusRef ?? closeButtonRef,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -166,33 +112,16 @@ export function BottomSheet({
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      const action = bottomSheetKeyboardAction({
-        key: event.key,
-        shiftKey: event.shiftKey,
-      });
-      if (action === "none") return;
-      if (action === "close") {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      const elements = focusableElements();
-      if (elements.length === 0) return;
+      if (event.key !== "Escape") return;
+      // A confirmation or menu opened above this sheet answers first.
+      if (hasOverlayAbove(overlayId)) return;
       event.preventDefault();
-      const currentIndex = elements.indexOf(
-        document.activeElement as HTMLElement,
-      );
-      const index = nextFocusIndex({
-        count: elements.length,
-        currentIndex,
-        direction: action,
-      });
-      elements[index]?.focus();
+      event.stopPropagation();
+      onClose();
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [focusableElements, isOpen, onClose]);
+  }, [isOpen, onClose, overlayId]);
 
   const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     // Controls in the header keep their own clicks; capturing here would eat them.

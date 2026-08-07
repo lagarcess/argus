@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
+import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
+import { useModalFocusTrap } from "@/components/layout/useModalFocusTrap";
 import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 
 type ConfirmDialogProps = {
@@ -51,9 +53,17 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
+  const overlayId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  // A confirmation is the topmost surface wherever it opens, so it registers
+  // and every overlay under it stands down for Escape.
+  useOverlayStackEntry(isOpen, overlayId);
+  useModalFocusTrap({ isOpen, containerRef: panelRef });
+
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (hasOverlayAbove(overlayId)) return;
       const action = confirmDialogKeyboardAction({
         key: event.key,
         isBusy,
@@ -76,7 +86,7 @@ export function ConfirmDialog({
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isBusy, isOpen, onCancel, onConfirm, showKeyboardHints]);
+  }, [isBusy, isOpen, onCancel, onConfirm, overlayId, showKeyboardHints]);
 
   if (!isOpen) return null;
 
@@ -89,6 +99,7 @@ export function ConfirmDialog({
         onClick={onCancel}
       />
       <div
+        ref={panelRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="argus-confirm-title"

@@ -1659,6 +1659,14 @@ export default function ChatCommandPalette({
                             event: ReactKeyboardEvent<HTMLDivElement>,
                           ) => {
                             if (isEditing) return;
+                            // The row's own action menu is a control, not part
+                            // of the row: Enter there must open the menu.
+                            if (
+                              event.target instanceof Element &&
+                              event.target.closest("[data-row-action]")
+                            ) {
+                              return;
+                            }
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               event.stopPropagation();

@@ -22,6 +22,28 @@ const PRIMITIVE = "components/ui/BottomSheet.tsx";
 /** The drawer is bottom-sheet adjacent but slides on the other axis. */
 const DRAWER = "components/sidebar/SidebarDrawer.tsx";
 
+/**
+ * Modals that declare `aria-modal` without managing focus or joining the Escape
+ * stack. Every one predates the mobile shell lane, which fixed only the three
+ * surfaces in its own nesting chain: the sheet, the drawer, and the shared
+ * confirmation. They are listed rather than ignored so the rules below still
+ * fail on anything new, and so the size of the remaining debt is visible.
+ *
+ * Shrink this list; never add to it.
+ */
+const UNMANAGED_MODAL_DEBT = new Set([
+  "components/SettingsMenu.tsx",
+  "components/chat/DiscoverySourcesPanel.tsx",
+  "components/guest/GuestConversionModal.tsx",
+  "components/guest/GuestNewConversationDialog.tsx",
+  "components/settings/LanguageModal.tsx",
+  "components/settings/MemoryControlsModal.tsx",
+  "components/settings/UsageModal.tsx",
+  "components/sidebar/KeyboardShortcutsOverlay.tsx",
+  "components/sidebar/ProfileMenu.tsx",
+  "components/sidebar/RecentsQuickPeek.tsx",
+]);
+
 function sourceFiles(): string[] {
   const found: string[] = [];
   const walk = (dir: string) => {
@@ -80,9 +102,44 @@ describe("bottom sheet ownership", () => {
     expect(primitive).toContain("useOverlayBackDismiss");
     expect(primitive).toContain('role="dialog"');
     expect(primitive).toContain('aria-modal="true"');
-    expect(primitive).toContain("restoreFocusRef");
+    expect(primitive).toContain("useModalFocusTrap");
+    expect(primitive).toContain("useOverlayStackEntry");
     expect(primitive).toContain("argus-sheet-scrim");
     expect(primitive).toContain("onPointerDown={handleDragStart}");
+  });
+
+  test("every aria-modal surface traps focus through the shared hook", () => {
+    // Declaring aria-modal without managing focus leaves the opener focused
+    // behind the scrim, which is how the drawer shipped.
+    const offenders = FILES.filter(
+      (file) =>
+        /aria-modal="true"/.test(file.source) &&
+        !UNMANAGED_MODAL_DEBT.has(file.path) &&
+        !/useModalFocusTrap/.test(file.source),
+    ).map((file) => file.path);
+    expect(offenders).toEqual([]);
+  });
+
+  test("every aria-modal surface joins the Escape stack", () => {
+    // Otherwise one Escape dismisses two levels.
+    const offenders = FILES.filter(
+      (file) =>
+        /aria-modal="true"/.test(file.source) &&
+        !UNMANAGED_MODAL_DEBT.has(file.path) &&
+        !/useOverlayStackEntry/.test(file.source),
+    ).map((file) => file.path);
+    expect(offenders).toEqual([]);
+  });
+
+  test("the debt list stays honest", () => {
+    // A file that got fixed must leave the list, or the list stops meaning
+    // anything and a later regression slips back in unnoticed.
+    const stillUnmanaged = FILES.filter(
+      (file) =>
+        UNMANAGED_MODAL_DEBT.has(file.path) &&
+        !/useModalFocusTrap/.test(file.source),
+    ).map((file) => file.path);
+    expect([...UNMANAGED_MODAL_DEBT].sort()).toEqual(stillUnmanaged.sort());
   });
 
   test("the chat header menu goes through the primitive below the threshold", () => {
