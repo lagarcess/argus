@@ -52,6 +52,7 @@ export function useChatKeyboardShortcuts(
           recentsQuickPeekOpen: isRecentsQuickPeekOpen,
           deleteConfirmationOpen: current.deleteConfirmationOpen,
           modalOpen: current.modalOpen,
+          shortcutsOverlayOpen: keyboardShortcutsOpen,
         })
       ) {
         return;
@@ -61,7 +62,7 @@ export function useChatKeyboardShortcuts(
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isRecentsQuickPeekOpen]);
+  }, [isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -3,6 +3,8 @@ type KeyboardShortcutSurfaceState = {
   recentsQuickPeekOpen: boolean;
   deleteConfirmationOpen: boolean;
   modalOpen: boolean;
+  /** The overlay this shortcut toggles, when it is already open. */
+  shortcutsOverlayOpen?: boolean;
 };
 
 type FocusedConversationState = {
@@ -16,7 +18,13 @@ export function canOpenKeyboardShortcuts({
   recentsQuickPeekOpen,
   deleteConfirmationOpen,
   modalOpen,
+  shortcutsOverlayOpen = false,
 }: KeyboardShortcutSurfaceState): boolean {
+  // This shortcut toggles, so its own overlay is never a reason to refuse it.
+  // Opened from the drawer's Help submenu the drawer stays open underneath,
+  // which kept `modalOpen` true and left the advertised key unable to close
+  // the dialog it had just opened.
+  if (shortcutsOverlayOpen) return true;
   return !(
     searchOverlayOpen ||
     recentsQuickPeekOpen ||

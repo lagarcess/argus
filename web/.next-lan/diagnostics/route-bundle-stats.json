@@ -1,14 +1,14 @@
 [
   {
     "route": "/chat",
-    "firstLoadUncompressedJsBytes": 1739059,
+    "firstLoadUncompressedJsBytes": 1739115,
     "firstLoadChunkPaths": [
       ".next-lan/static/chunks/08vh2rq183-4k.js",
       ".next-lan/static/chunks/0018dy-m-kusj.js",
       ".next-lan/static/chunks/02scjtuttsap9.js",
       ".next-lan/static/chunks/0e7bt8dgnncgu.js",
       ".next-lan/static/chunks/0s-vjbpx0wdy~.js",
-      ".next-lan/static/chunks/05lezo-i6upjm.js",
+      ".next-lan/static/chunks/0.rycg~wmlpw6.js",
       ".next-lan/static/chunks/0g504hxzz7b5_.js",
       ".next-lan/static/chunks/03edqrb4zdj~g.js",
       ".next-lan/static/chunks/0z4i83stzylgo.js",
