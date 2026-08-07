@@ -125,25 +125,71 @@ OpenRouter runtime, real Perplexity embeddings.
 | `en-01-signed-in.png` | Signed-in surface, English |
 | `en-02-backtest-result.png` | The real backtest the decision is saved from |
 | `en-03-memory-proposal.png` | The proposal asking before anything is stored |
-| `en-04-recall-note.png` | English recall note answering a zero-token-overlap query |
+| `en-04-recall-note.png` | English recall answering a zero-token-overlap query |
 | `es-419-01-signed-in.png` | Signed-in surface, es-419 |
-| `es-419-02-recall-note.png` | es-419 recall note answering the Spanish query |
-| `en-page-text.txt`, `es-419-page-text.txt` | Captured page text for both locales |
+| `es-419-02-recall-note.png` | es-419 recall answering the Spanish query |
+| `drawer-en-01-collapsed.png` | The collapsed drawer, English |
+| `drawer-en-02-expanded.png` | The same drawer open, feedback row intact |
+| `drawer-es-419-01-collapsed.png` | The collapsed drawer, es-419 |
+| `drawer-es-419-02-expanded.png` | The same drawer open, es-419 |
+| `*-page-text.txt` | Captured page text per locale |
 
 The English run is the whole journey: backtest, save decision, confirm the
 memory proposal, then ask. The es-419 run asks only, against the memory the
 English run confirmed, which is what makes it a cross-language recall.
 
+## The recall drawer
+
+The recall block was a permanently open banner: informative, but it occupied
+the space directly under every answer whether or not the user cared. It is now
+a persistent one-line disclosure that opens on click, matching the avatar-theme
+drawer in the profile menu.
+
+| State | Measured height | `aria-expanded` |
+| --- | --- | --- |
+| collapsed (default) | 28 px | `false` |
+| expanded | 111 px | `true` |
+
+The label stays visible in both states, so the fact that Argus recalled
+something is never hidden; only the memory text is behind the click.
+
+Interaction with the feedback row, which is the risk in putting a
+height-changing control above hover-gated controls:
+
+- The trigger lives outside the hover-gated footer, so it stays reachable
+  whether or not the pointer is over the message.
+- Expanding grows the message inside the same hover group, so the thumbs and
+  three-dot row moves with the layout instead of falling out from under the
+  pointer. Verified: the feedback row was still visible after expanding while
+  hovered (`feedbackRowStillVisible: true`).
+- Keyboard: the trigger is focusable and Enter toggles it
+  (`aria-expanded` went `true` to `false` on Enter).
+- The panel carries `inert` and `aria-hidden` while closed, so it is out of tab
+  order and out of the accessibility tree rather than merely invisible.
+- Motion honors `prefers-reduced-motion`.
+
+Both locales, taken from the real UI:
+
+| Locale | Collapsed | Expanded |
+| --- | --- | --- |
+| en | `FROM YOUR MEMORY Show` | `FROM YOUR MEMORY Hide` |
+| es-419 | `DE TU MEMORIA Mostrar` | `DE TU MEMORIA Ocultar` |
+
 ## Two honest observations
 
 The assistant prose still says it has no record while the correct memory renders
-in the note directly below it. That is the exact PR #386 observation the
+in the drawer directly below it. That is the exact PR #386 observation the
 recall-loop spec cites, and it is spec item 1, history answering, which this
 lane does not build. Recall is correct here; the conversational reading of it is
-the next slice's job.
+the next slice's job. Worth noting for sequencing: semantic recall makes this
+contradiction *more* visible, because recall now succeeds on questions token
+matching used to miss entirely.
 
-The assistant's prose rendered in English for the es-419 turn. That is
-interpreter voicing, not this lane's surface. The recall note itself is
-backend-provided, and stored memory content stays verbatim user content by spec
-section 2.11, so the English memory text appearing under a Spanish question is
-the specified behavior.
+Correction to an earlier draft of this document: it claimed the assistant's
+prose rendered in English for the es-419 turn and attributed that to interpreter
+voicing. That was wrong. The first es-419 capture never switched the profile
+language, so the whole UI was English. With the profile language actually set to
+es-419, the interface, the assistant prose, and the drawer all render in
+Spanish. Only the stored memory text stays English, which is correct: stored
+memory content is verbatim user content by spec section 2.11 and is not
+localized.

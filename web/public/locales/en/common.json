@@ -772,6 +772,8 @@
     },
     "memory": {
       "recall_title": "From your memory",
+      "recall_show": "Show",
+      "recall_hide": "Hide",
       "recall_note": "Saved decisions you confirmed. Manage them in Data Controls.",
       "private_on": "Private chat: on",
       "private_off": "Private chat",

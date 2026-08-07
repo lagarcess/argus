@@ -772,6 +772,8 @@
     },
     "memory": {
       "recall_title": "De tu memoria",
+      "recall_show": "Mostrar",
+      "recall_hide": "Ocultar",
       "recall_note": "Decisiones guardadas que confirmaste. Adminístralas en Controles de datos.",
       "private_on": "Chat privado: activado",
       "private_off": "Chat privado",
