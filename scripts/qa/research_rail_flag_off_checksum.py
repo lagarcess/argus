@@ -100,8 +100,6 @@ def stream_frames(raw: str) -> list[Any]:
 
 
 def main() -> None:
-    from fastapi.testclient import TestClient
-
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
     )
@@ -110,6 +108,7 @@ def main() -> None:
     from argus.agent_runtime.state.models import StrategySummary
     from argus.api import state as api_state
     from argus.api.main import app
+    from fastapi.testclient import TestClient
 
     class DeterministicInterpreter:
         """Typed interpretations keyed by the turn script, no LLM anywhere."""

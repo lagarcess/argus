@@ -11,6 +11,7 @@ export type StarterSelectionMetadata = {
 type StarterActionsProps = {
   onSelect: (value: string, metadata?: StarterSelectionMetadata) => void;
   disabled?: boolean;
+  className?: string;
 };
 
 const pillClassName =
@@ -19,6 +20,7 @@ const pillClassName =
 export default function StarterActions({
   onSelect,
   disabled = false,
+  className = "",
 }: StarterActionsProps) {
   const { t } = useTranslation();
 
@@ -36,7 +38,9 @@ export default function StarterActions({
       }[queryKey]),
     }));
     return (
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+      <div
+        className={`mt-6 flex flex-wrap items-center justify-center gap-3${className}`}
+      >
         {queries.map(({ key, value }) => (
           <button
             key={key}
@@ -89,7 +93,9 @@ export default function StarterActions({
   ];
 
   return (
-    <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+    <div
+      className={`mt-6 flex flex-wrap items-center justify-center gap-3${className}`}
+    >
       {actions.map(({ key, strategy_category, icon: Icon, label, value }) => (
         <button
           key={key}

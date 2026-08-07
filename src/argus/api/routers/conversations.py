@@ -819,15 +819,19 @@ def add_confirmation_peer_assets(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConfirmationPeerAssetsResponse:
-    """Add researched peers to the active confirmation without spending a turn.
+    """Grow or restore the active confirmation's basket without a turn.
 
     Deterministic by construction: no LLM call, no message allowance, no
-    interpretation. Only peers the active card offered are addable, and the
-    patched draft re-passes the same execution and coverage validation every
-    confirmation passes. The result is a new superseding card that discloses
-    the material change.
+    interpretation. Only symbols the active turn offered as peer rows are
+    addable, restore undoes the latest add from the card's own typed
+    adjustment data, and every patched draft re-passes the same execution and
+    coverage validation every confirmation passes. The result is a new
+    superseding card; motion, chips, and inline period disclosure carry the
+    change, never a narration banner.
     """
     from argus.agent_runtime.research_basket import (
+        confirmation_symbols_restoration,
+        peer_add_rows,
         peer_added_confirmation_preparation,
     )
     from argus.api.chat.actions import latest_active_confirmation_id
@@ -864,45 +868,80 @@ def add_confirmation_peer_assets(
     )
     if active_id is None or active_id != confirmation_id:
         raise invalid_state
-    source_card: dict[str, Any] | None = None
     source_payload: dict[str, Any] | None = None
+    offered_symbols: list[str] = []
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):
             continue
         card = message.metadata.get("confirmation_card")
         if (
-            isinstance(card, dict)
-            and str(card.get("confirmation_id") or "") == confirmation_id
+            not isinstance(card, dict)
+            or str(card.get("confirmation_id") or "") != confirmation_id
         ):
-            source_card = card
-            candidate_payload = message.metadata.get("confirmation_payload")
-            if isinstance(candidate_payload, dict):
-                source_payload = candidate_payload
-            break
-    if source_card is None or source_payload is None:
+            continue
+        candidate_payload = message.metadata.get("confirmation_payload")
+        if isinstance(candidate_payload, dict):
+            source_payload = candidate_payload
+        rows_sidecar = message.metadata.get("next_experiments")
+        rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
+        for row in rows or []:
+            if not isinstance(row, dict) or not str(
+                row.get("kind") or ""
+            ).startswith("research_add_peer"):
+                continue
+            why = row.get("why")
+            params = why.get("params") if isinstance(why, dict) else None
+            for symbol in (params or {}).get("symbols") or []:
+                normalized = str(symbol).strip().upper()
+                if normalized and normalized not in offered_symbols:
+                    offered_symbols.append(normalized)
+        break
+    if source_payload is None:
         raise invalid_state
-    peer_block = source_card.get("research_peers")
-    offers = peer_block.get("offers") if isinstance(peer_block, dict) else None
-    offered: dict[str, dict[str, str]] = {}
-    for offer in offers or []:
-        if isinstance(offer, dict) and offer.get("symbol"):
-            offered[str(offer["symbol"]).upper()] = {
-                "symbol": str(offer["symbol"]).upper(),
-                "name": str(offer.get("name") or offer["symbol"]),
-                "asset_class": str(offer.get("asset_class") or "equity"),
-            }
-    requested = [str(symbol).strip().upper() for symbol in payload.symbols]
-    # Every candidate passed the resolver before it became an offer; anything
-    # else is not addable, whoever asks.
-    if not requested or any(symbol not in offered for symbol in requested):
-        raise invalid_state
-    added = [offered[symbol] for symbol in dict.fromkeys(requested)]
     language = str(getattr(user, "language", None) or "en")
-    preparation = peer_added_confirmation_preparation(
-        source_payload,
-        added=added,
-        language=language,
-    )
+
+    if payload.restore_previous:
+        preparation = confirmation_symbols_restoration(
+            source_payload, language=language
+        )
+        restored = set(offered_symbols)
+        adjustment = source_payload.get("assets_adjustment")
+        if isinstance(adjustment, dict):
+            previous = {
+                str(symbol).strip().upper()
+                for symbol in adjustment.get("previous_symbols") or []
+            }
+            current = {
+                str(symbol).strip().upper()
+                for symbol in (source_payload.get("strategy") or {}).get(
+                    "asset_universe"
+                )
+                or []
+            }
+            restored |= current - previous
+        remaining_symbols = sorted(restored)
+    else:
+        requested = [
+            str(symbol).strip().upper() for symbol in payload.symbols or []
+        ]
+        # Every candidate passed the resolver before it became a row;
+        # anything else is not addable, whoever asks.
+        if not requested or any(
+            symbol not in offered_symbols for symbol in requested
+        ):
+            raise invalid_state
+        added = _resolved_peer_identities(dict.fromkeys(requested))
+        if added is None:
+            raise invalid_state
+        preparation = peer_added_confirmation_preparation(
+            source_payload,
+            added=added,
+            language=language,
+        )
+        remaining_symbols = [
+            symbol for symbol in offered_symbols if symbol not in set(requested)
+        ]
+
     if preparation.confirmation_payload is None:
         error_code = preparation.error_code or "confirmation_not_executable"
         if error_code == "market_data_unavailable":
@@ -911,7 +950,7 @@ def add_confirmation_peer_assets(
                 status_code=503,
                 code="market_data_unavailable",
                 title="Service Unavailable",
-                detail="Market data is unavailable for the expanded basket.",
+                detail="Market data is unavailable for the requested basket.",
             )
         if error_code in {
             "no_common_data_window",
@@ -924,18 +963,14 @@ def add_confirmation_peer_assets(
                 status_code=422,
                 code=error_code,
                 title="Validation Error",
-                detail="The expanded basket cannot run as one test.",
+                detail="The requested basket cannot run as one test.",
             )
         raise invalid_state
     new_payload = preparation.confirmation_payload
-    remaining_peers = [
-        offer for symbol, offer in offered.items() if symbol not in set(requested)
-    ]
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": new_payload,
-            "research_peers": {"peers": remaining_peers},
         },
         confirmation_id=str(new_payload.get("confirmation_id")),
         conversation_id=conversation_id,
@@ -960,6 +995,21 @@ def add_confirmation_peer_assets(
         "active_confirmation_reference": reference.model_dump(mode="python"),
         "artifact_references": [reference.model_dump(mode="python")],
     }
+    remaining_peers = _resolved_peer_identities(remaining_symbols) or []
+    basket = [
+        str(symbol).strip().upper()
+        for symbol in (new_payload.get("strategy") or {}).get("asset_universe") or []
+    ]
+    peer_rows = peer_add_rows(
+        remaining_peers,
+        basket_symbols=basket,
+        basket_asset_class=str(
+            (new_payload.get("strategy") or {}).get("asset_class") or "equity"
+        ),
+        language=language,
+    )
+    if peer_rows is not None:
+        metadata["next_experiments"] = peer_rows
     created = create_message(
         user_id=user.id,
         conversation_id=conversation_id,
@@ -985,3 +1035,23 @@ def add_confirmation_peer_assets(
         request_id=getattr(request.state, "request_id", None),
     )
     return ConfirmationPeerAssetsResponse(message=created)
+
+
+def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:
+    """Resolver-owned identity for peer symbols; None when any fails."""
+    from argus.domain.market_data.assets import resolve_asset
+
+    resolved: list[dict[str, str]] = []
+    for symbol in symbols:
+        try:
+            asset = resolve_asset(str(symbol))
+        except Exception:  # noqa: BLE001
+            return None
+        resolved.append(
+            {
+                "symbol": asset.canonical_symbol.upper(),
+                "name": asset.name or asset.canonical_symbol.upper(),
+                "asset_class": asset.asset_class,
+            }
+        )
+    return resolved

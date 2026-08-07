@@ -38,6 +38,7 @@ import {
 } from "@/components/guest/useGuestExperience";
 import {
   addConfirmationPeerAssets,
+  restoreConfirmationAssets,
   createConversation,
   deleteConversation,
   getBacktestRun,
@@ -266,7 +267,7 @@ export default function ChatInterface() {
   // First paint waits for the authenticated profile language so a fresh
   // browser cannot send starter prompts in the wrong language.
   const [showSuggestions, setShowSuggestions] = useState(researchRailEnabled);
-  const { toast, showToast } = useChatToast();
+  const { toast, showToast, hideToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
@@ -1847,13 +1848,76 @@ export default function ChatInterface() {
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 
+  function activeConfirmationIdFromMessages(): string | null {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const candidate = messages[index]?.confirmation;
+      if (!candidate) continue;
+      if (candidate.confirmation_state === "active" || !candidate.confirmation_state) {
+        return candidate.confirmation_id ?? null;
+      }
+    }
+    return null;
+  }
+
+  function appendSupersedingConfirmation(
+    created: Parameters<typeof hydrateMessagesFromApi>[0][number],
+  ): boolean {
+    const hydrated = hydrateMessagesFromApi([created]).messages;
+    if (hydrated.length === 0) {
+      return false;
+    }
+    setMessages((prev) => [
+      // The new card supersedes the old one; mirror the reload projection
+      // instead of leaving two active cards on screen.
+      ...prev.map((message) =>
+        message.confirmation &&
+        message.confirmation.confirmation_state !== "cancelled" &&
+        message.confirmation.confirmation_id !==
+          hydrated[0].confirmation?.confirmation_id
+          ? {
+              ...message,
+              confirmation: {
+                ...message.confirmation,
+                confirmation_state: "superseded" as const,
+              },
+            }
+          : message,
+      ),
+      ...hydrated,
+    ]);
+    return true;
+  }
+
+  async function handleUndoConfirmationPeer(): Promise<void> {
+    const targetConversationId = activeConversationIdRef.current;
+    const activeId = activeConfirmationIdFromMessages();
+    if (!targetConversationId || !activeId) return;
+    hideToast();
+    try {
+      const restored = await restoreConfirmationAssets(
+        targetConversationId,
+        activeId,
+      );
+      appendSupersedingConfirmation(restored);
+    } catch {
+      showToast(
+        t(
+          "chat.confirmation.peer_add_failed",
+          "Couldn't change that test. The card is unchanged.",
+        ),
+        "error",
+      );
+    }
+  }
+
   async function handleAddConfirmationPeer(action: ChatActionOption): Promise<void> {
     const payload = action.payload ?? {};
-    const confirmationId = String(payload.confirmation_id ?? "");
     const symbols = Array.isArray(payload.symbols)
       ? payload.symbols.map((symbol) => String(symbol)).filter(Boolean)
       : [];
     const targetConversationId = activeConversationIdRef.current;
+    const confirmationId =
+      String(payload.confirmation_id ?? "") || activeConfirmationIdFromMessages();
     if (!targetConversationId || !confirmationId || symbols.length === 0) {
       return;
     }
@@ -1863,28 +1927,19 @@ export default function ChatInterface() {
         confirmationId,
         symbols,
       );
-      const hydrated = hydrateMessagesFromApi([created]).messages;
-      if (hydrated.length === 0) {
+      if (!appendSupersedingConfirmation(created)) {
         return;
       }
-      setMessages((prev) => [
-        // The new card supersedes the old one; mirror the reload projection
-        // instead of leaving two active cards on screen.
-        ...prev.map((message) =>
-          message.confirmation &&
-          message.confirmation.confirmation_state !== "cancelled" &&
-          message.confirmation.confirmation_id !== hydrated[0].confirmation?.confirmation_id
-            ? {
-                ...message,
-                confirmation: {
-                  ...message.confirmation,
-                  confirmation_state: "superseded" as const,
-                },
-              }
-            : message,
-        ),
-        ...hydrated,
-      ]);
+      // Motion is the feedback; the toast carries Undo, not information.
+      // Quick successive adds replace the single toast, and each Undo steps
+      // back exactly one add.
+      showToast("", "neutral", {
+        action: {
+          label: t("chat.confirmation.undo", "Undo"),
+          onPress: () => void handleUndoConfirmationPeer(),
+        },
+        durationMs: 6000,
+      });
     } catch {
       showToast(
         t(
@@ -2443,7 +2498,11 @@ export default function ChatInterface() {
           />
         )}
 
-        <ChatToast message={toast?.message ?? null} variant={toast?.variant} />
+        <ChatToast
+          message={toast?.message ?? null}
+          variant={toast?.variant}
+          action={toast?.action}
+        />
       </section>
 
       {/* ── Feedback Dialog ── */}

@@ -715,9 +715,8 @@
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
-      "assets_added": "Agregué {{added}}. Ahora es una prueba distinta que compara {{symbols}}.",
-      "peer_offers_label": "Agrega desde tu investigación",
-      "peer_add_failed": "No se pudo agregar ese activo a esta prueba. El resto de la tarjeta no cambió.",
+      "undo": "Deshacer",
+      "peer_add_failed": "No se pudo cambiar esa prueba. La tarjeta no cambió.",
       "status": {
         "ready_to_run": "Listo para ejecutar",
         "needs_change": "Necesita ajuste",
@@ -768,6 +767,7 @@
     "next_experiments": {
       "section": "Qué probar después",
       "labels": {
+        "research_dynamic": "{{defaultValue}}",
         "change_date_range": "Probar otro rango de fechas",
         "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
         "same_rule_peer_asset": "Probar la misma regla en un activo similar",

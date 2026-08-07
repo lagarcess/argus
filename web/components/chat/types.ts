@@ -225,7 +225,6 @@ export type StrategyConfirmationPayload = {
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
   assets_adjustment?: StrategyConfirmationAssetsAdjustment;
-  research_peers?: StrategyConfirmationResearchPeers;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
@@ -236,19 +235,12 @@ export type StrategyConfirmationAssetsAdjustment = {
   added: { symbol: string; name: string }[];
   previous_symbols: string[];
   symbols: string[];
-};
-
-export type StrategyConfirmationResearchPeerOffer = {
-  symbol: string;
-  name: string;
-  asset_class?: string;
-  label: string;
-};
-
-export type StrategyConfirmationResearchPeers = {
-  schema_version: string;
-  offers: StrategyConfirmationResearchPeerOffer[];
-  set?: { symbols: string[]; label: string } | null;
+  /* The one consequence a basket change can produce: the shared history
+   * window clamps. Disclosed inline next to the period field. */
+  period_change?: {
+    from: { start: string; end: string };
+    to: { start: string; end: string };
+  } | null;
 };
 
 export type StrategyConfirmationCapabilities = {

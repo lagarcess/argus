@@ -47,6 +47,52 @@ def _client() -> PerplexityAgentClient | None:
     return PerplexityAgentClient(api_key)
 
 
+def apply_research_job_request(
+    runtime_result: dict[str, Any],
+    *,
+    user_id: str,
+    conversation_id: str,
+    request_message_id: str | None,
+    request_id: str | None,
+) -> dict[str, Any] | None:
+    """Consume a typed research job request from the runtime result.
+
+    Returns the public job payload for the background path. The synchronous
+    dev fallback and the failure note mutate ``runtime_result`` in place so
+    the stream and metadata carry the finalized artifacts, and return None.
+    """
+    from argus.agent_runtime.research_answer import (
+        compose_completed_research,
+        research_failure_note,
+    )
+
+    job_request = runtime_result.pop("research_job_request", None)
+    if not isinstance(job_request, dict):
+        return None
+    job, sync_packet = start_research_job(
+        job_request=job_request,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        request_message_id=request_message_id,
+        request_id=request_id,
+    )
+    if job is not None:
+        return job
+    if sync_packet is not None:
+        composed = compose_completed_research(
+            job_request=job_request, packet=sync_packet
+        )
+        runtime_result["assistant_response"] = composed["answer"]
+        runtime_result["research"] = composed["research"]
+        if composed.get("next_experiments") is not None:
+            runtime_result["next_experiments"] = composed["next_experiments"]
+        return None
+    runtime_result["assistant_response"] = research_failure_note(
+        str(job_request.get("language") or "en")
+    )
+    return None
+
+
 def start_research_job(
     *,
     job_request: dict[str, Any],

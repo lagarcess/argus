@@ -808,18 +808,22 @@ paths:
     post:
       tags:
       - conversations
-      description: 'Add researched peers to the active confirmation without spending a turn.
+      description: 'Grow or restore the active confirmation''s basket without a turn.
 
 
         Deterministic by construction: no LLM call, no message allowance, no
 
-        interpretation. Only peers the active card offered are addable, and the
+        interpretation. Only symbols the active turn offered as peer rows are
 
-        patched draft re-passes the same execution and coverage validation every
+        addable, restore undoes the latest add from the card''s own typed
 
-        confirmation passes. The result is a new superseding card that discloses
+        adjustment data, and every patched draft re-passes the same execution and
 
-        the material change.'
+        coverage validation every confirmation passes. The result is a new
+
+        superseding card; motion, chips, and inline period disclosure carry the
+
+        change, never a narration banner.'
       parameters:
       - name: conversation_id
         in: path
@@ -2203,20 +2207,27 @@ components:
     ConfirmationPeerAssetsRequest:
       properties:
         symbols:
-          items:
-            type: string
-          type: array
-          maxItems: 4
-          minItems: 1
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 4
+            minItems: 1
+          - type: 'null'
+        restore_previous:
+          type: boolean
+          default: false
       type: object
-      required:
-      - symbols
-      description: 'Add researched peers to the pending confirmation without a turn.
+      description: 'Grow or restore the pending confirmation''s basket without a turn.
 
 
-        Only symbols the active card offered as research peers are addable; the
+        Add mode: only symbols the active turn offered as research peer rows are
 
-        backend re-verifies each against the resolver and coverage gates.'
+        addable; the backend re-verifies each against the resolver and coverage
+
+        gates. Restore mode undoes the latest add by re-materializing the exact
+
+        previous asset set from the card''s own typed adjustment data.'
     ConfirmationPeerAssetsResponse:
       properties:
         message:

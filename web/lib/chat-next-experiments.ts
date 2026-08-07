@@ -73,11 +73,28 @@ export function nextExperimentRowsFromMetadata(
   return rows.length > 0 ? rows : null;
 }
 
+const RESEARCH_ADD_PEER_KINDS = new Set([
+  "research_add_peer",
+  "research_add_peer_set",
+]);
+
 export function nextExperimentAction(
   row: NextExperimentRow,
   localizedLabel?: string,
   sourceRunId?: string,
 ): ChatActionOption {
+  if (RESEARCH_ADD_PEER_KINDS.has(row.kind)) {
+    // No turn is spent: the typed endpoint patches the pending card with the
+    // resolver-verified symbols the row's why payload carries.
+    const symbols = Array.isArray(row.why?.params?.symbols)
+      ? (row.why?.params?.symbols as unknown[]).map((symbol) => String(symbol))
+      : [];
+    return {
+      label: localizedLabel || row.label,
+      type: "add_confirmation_peer",
+      payload: { symbols },
+    };
+  }
   // A prebaked row sends its fully specified ask; nothing is missing, so
   // the normal lifecycle answers with the next confirmation card.
   const send = row.sendText || localizedLabel || row.label;

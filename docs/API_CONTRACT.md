@@ -2845,32 +2845,44 @@ Contract rules:
   `execution_metadata.research_result_message_id`. A succeeded research job
   has a null `result_run_id` by design; clients refresh the transcript on
   terminal research jobs instead of fetching a run.
-- The active confirmation card may carry additive `research_peers`
-  (backend-labeled one-tap add offers bounded by free asset slots) and
-  `assets_adjustment` (typed disclosure of a material basket change:
-  `{code: "assets_added", added, previous_symbols, symbols}`).
+- Researched peers still outside the active basket ride the ordinary
+  `next_experiments` surface of the card-bearing message as
+  `research_add_peer` / `research_add_peer_set` rows, bounded by free asset
+  slots; each row's `why.params.symbols` carries the resolver-verified
+  identity the tap adds. The card itself never grows a peer section.
+- The superseding card carries typed `assets_adjustment` data
+  (`{code: "assets_added" | "assets_restored", added, previous_symbols,
+  symbols, period_change?}`). Clients render it as motion on the freshly
+  added chip and, when `period_change` is present, an inline note next to
+  the period field. **Deliberate user actions are never narrated back**;
+  only unpredictable consequences (a clamped shared-history window) are
+  disclosed, inline where they land.
 
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets`
 
-Adds researched peers to the active confirmation **without spending a turn**:
-no message allowance, no interpretation, no LLM call. Available only while
-`ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
+Grows or restores the active confirmation's basket **without spending a
+turn**: no message allowance, no interpretation, no LLM call. Available only
+while `ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
 
-**Request:** `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must be an
-offer on the active card's `research_peers`, so nothing outside the
-resolver-verified offer set is addable, whoever asks).
+**Request:** exactly one mode.
+- Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
+  active turn's `research_add_peer` rows, so nothing outside the
+  resolver-verified offer set is addable, whoever asks).
+- Undo: `{"restore_previous": true}` re-materializes the exact previous
+  asset set from the active card's own `assets_adjustment` data.
 
 **Response:** `{"message": Message}` where the message is a new assistant
 confirmation message carrying the superseding card (new `confirmation_id`,
-`assets_adjustment` disclosure, recomputed provider coverage, remaining peer
-offers). The previous card supersedes by ordinary latest-active projection.
+typed `assets_adjustment`, recomputed provider coverage) plus the remaining
+peer rows on its `next_experiments` metadata. The previous card supersedes by
+ordinary latest-active projection.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
-non-active confirmation and for non-offered symbols;
-`422 asset_maximum_reached | asset_class_mismatch | no_common_data_window |
-insufficient_common_data` for baskets that cannot run as one test;
-`503 market_data_unavailable` when the coverage preflight cannot reach
-provider data. Failures persist nothing.
+non-active confirmation, non-offered symbols, and restore with nothing to
+restore; `422 asset_maximum_reached | asset_class_mismatch |
+no_common_data_window | insufficient_common_data` for baskets that cannot run
+as one test; `503 market_data_unavailable` when the coverage preflight cannot
+reach provider data. Failures persist nothing.
 
 ---
 

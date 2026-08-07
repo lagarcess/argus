@@ -49,8 +49,14 @@ describe("research rail flag-off equivalence", () => {
     const copy = source("lib/backtest-job-card-copy.ts");
     expect(copy).toContain('job.operation_scope === "chat.research"');
     const card = source("components/chat/StrategyConfirmationCard.tsx");
-    // Peer offers only render from backend-provided payload fields, which
-    // the backend only emits with the rail flag on.
-    expect(card).toContain("confirmation.research_peers?.offers ?? []");
+    // Change feedback renders only from backend-provided adjustment data,
+    // which the backend only emits with the rail flag on: motion on the new
+    // chip and an inline period note, never a narration banner.
+    expect(card).toContain("confirmation.assets_adjustment?.added");
+    expect(card).toContain("argus-chip-appear");
+    expect(card).toContain("confirmation-period-change-note");
+    expect(card).not.toContain("research_peers");
+    const rows = source("lib/chat-next-experiments.ts");
+    expect(rows).toContain('"add_confirmation_peer"');
   });
 });

@@ -57,7 +57,14 @@ export default function EmptyChatSurface({
         <EmptyChatHeading isGuest={isGuest} />
       )}
 
-      <div aria-busy={guestSubmissionPending} className="w-full max-w-2xl">
+      <div
+        aria-busy={guestSubmissionPending}
+        className={
+          showSignedInGreeting
+            ? "order-3 w-full max-w-2xl"
+            : "w-full max-w-2xl"
+        }
+      >
         <ChatInput
           key="new-conversation"
           onSend={onSend}
@@ -98,16 +105,25 @@ export default function EmptyChatSurface({
         <ChatLegalNotice
           expiresAt={expiresAt}
           isGuest={isGuest}
+          showRegisteredDisclaimer={showSignedInGreeting}
+          showGuestSafetyLine={researchRailEnabled}
           variant="before_message"
         />
       </div>
 
+      {/* One owner for the chips. Spec section 10 orders the signed-in rail
+          surface as greeting, suggestions, composer at the bottom; flex order
+          does the reordering so the flag-off DOM stays identical. */}
       {(!showSignedInGreeting || showSuggestions) && (
-        <StarterActions disabled={disabled} onSelect={onSend} />
+        <StarterActions
+          disabled={disabled}
+          onSelect={onSend}
+          className={showSignedInGreeting ? " order-2 mb-2" : ""}
+        />
       )}
 
       {showSignedInGreeting && (
-        <div className="mt-4">
+        <div className="order-4 mt-4">
           <button
             onClick={onToggleSuggestions}
             className="min-h-11 rounded-full px-3 text-[14px] font-medium text-black/60 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white/60 dark:hover:text-white dark:focus-visible:ring-white/25"

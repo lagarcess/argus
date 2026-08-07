@@ -119,6 +119,27 @@ def charge_research_ceiling() -> None:
         )
 
 
+def settle_research_turn(
+    runtime_result: dict[str, Any],
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    message_id: str | None,
+    request_id: str | None,
+) -> None:
+    """Post-terminal settlement for a turn that may carry a research sidecar."""
+    research = runtime_result.get("research")
+    if not isinstance(research, dict):
+        return
+    record_research_turn_evidence(
+        research=research,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        request_id=request_id,
+    )
+
+
 def record_research_turn_evidence(
     *,
     research: Any,

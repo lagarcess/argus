@@ -715,9 +715,8 @@
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
       "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
-      "assets_added": "Added {{added}}. This is now a different test comparing {{symbols}}.",
-      "peer_offers_label": "Add from your research",
-      "peer_add_failed": "Couldn't add that asset to this test. The rest of the card is unchanged.",
+      "undo": "Undo",
+      "peer_add_failed": "Couldn't change that test. The card is unchanged.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",
@@ -768,6 +767,7 @@
     "next_experiments": {
       "section": "Try next",
       "labels": {
+        "research_dynamic": "{{defaultValue}}",
         "change_date_range": "Test a different date range",
         "same_setup_peer_asset": "Test the same setup on a similar asset",
         "same_rule_peer_asset": "Test the same rule on a similar asset",

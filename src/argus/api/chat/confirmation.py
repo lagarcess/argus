@@ -272,80 +272,61 @@ def runtime_confirmation_card(
         card["benchmark_adjustment"] = benchmark_adjustment
     assets_adjustment = payload.get("assets_adjustment")
     if isinstance(assets_adjustment, dict):
-        # Adding an asset changed the experiment materially; the card owns
-        # disclosing exactly what changed (spec section 6).
+        # Typed change data, never a banner: it drives the new-chip motion
+        # and the inline period disclosure; the deliberate add itself is not
+        # narrated back to the user.
         card["assets_adjustment"] = dict(assets_adjustment)
-    research_peers = _research_peer_offer_block(
-        runtime_result.get("research_peers"),
-        basket_symbols=symbols,
-        basket_asset_class=asset_class,
-        language=language,
-    )
-    if research_peers is not None:
-        card["research_peers"] = research_peers
     return card
 
 
-def _research_peer_offer_block(
+def attach_research_peer_rows(
+    runtime_result: dict[str, Any],
+    metadata: dict[str, Any],
+    *,
+    language: str,
+) -> None:
+    """Attach remaining researched peers as Try-next rows on a card turn."""
+    if not isinstance(runtime_result.get("confirmation_payload"), dict):
+        return
+    rows = research_peer_add_rows_for_confirmation(
+        runtime_result.get("research_peers"),
+        confirmation_payload=runtime_result["confirmation_payload"],
+        language=language,
+    )
+    if rows is not None:
+        metadata["next_experiments"] = rows
+        runtime_result["next_experiments"] = rows
+
+
+def research_peer_add_rows_for_confirmation(
     state_peers: Any,
     *,
-    basket_symbols: list[str],
-    basket_asset_class: str | None,
+    confirmation_payload: dict[str, Any],
     language: str,
 ) -> dict[str, Any] | None:
-    """Researched peers still outside the basket become one-tap add offers.
-
-    Never a browsable list: each offer is a runnable add bound to this card,
-    already resolver-verified when it entered the research sidecar, and capped
-    by the run's free asset slots.
-    """
+    """Researched peers still outside the basket ride the ordinary Try-next
+    surface below the card's turn; composition lives with the materializer."""
     from argus.domain.research.config import research_rail_enabled
 
     if not research_rail_enabled():
         return None
     if not isinstance(state_peers, dict):
         return None
-    from argus.agent_runtime.research_basket import remaining_peer_offers
-
-    offers = remaining_peer_offers(
-        state_peers.get("peers"),
-        basket_symbols=basket_symbols,
-        basket_asset_class=basket_asset_class or "equity",
-    )
-    if not offers:
+    strategy = confirmation_payload.get("strategy")
+    if not isinstance(strategy, dict):
         return None
-    spanish = str(language or "").lower().startswith("es")
-    rows = []
-    for offer in offers:
-        named = f"{offer['name']} [{offer['symbol']}]"
-        rows.append(
-            {
-                **offer,
-                "label": (
-                    f"Agregar {named} a esta prueba"
-                    if spanish
-                    else f"Add {named} to this test"
-                ),
-            }
-        )
-    block: dict[str, Any] = {
-        "schema_version": "argus_research_peers/v1",
-        "offers": rows,
-    }
-    if len(rows) > 1:
-        names = [f"{offer['name']} [{offer['symbol']}]" for offer in offers]
-        joined = (
-            (", ".join(names[:-1]) + (" y " if spanish else " and ") + names[-1])
-            if len(names) > 1
-            else names[0]
-        )
-        block["set"] = {
-            "symbols": [offer["symbol"] for offer in offers],
-            "label": (
-                f"Agregar {joined}" if spanish else f"Add {joined}"
-            ),
-        }
-    return block
+    from argus.agent_runtime.research_basket import peer_add_rows
+
+    return peer_add_rows(
+        state_peers.get("peers"),
+        basket_symbols=[
+            str(symbol).strip().upper()
+            for symbol in strategy.get("asset_universe") or []
+            if str(symbol).strip()
+        ],
+        basket_asset_class=str(strategy.get("asset_class") or "equity"),
+        language=language,
+    )
 
 
 def _benchmark_adjustment_from_strategy(

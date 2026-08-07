@@ -717,13 +717,30 @@ export async function addConfirmationPeerAssets(
   symbols: string[],
 ) {
   // Deterministic basket growth: no chat turn, no allowance spend. The
-  // backend re-validates every symbol against the offers on the active card.
+  // backend re-validates every symbol against the active turn's peer rows.
   const response = await apiFetch<{ message: ApiMessage }>(
     `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols }),
+    },
+  );
+  return response.message;
+}
+
+export async function restoreConfirmationAssets(
+  conversationId: string,
+  confirmationId: string,
+) {
+  // Undo for a peer add: the backend re-materializes the exact previous
+  // asset set from the card's own typed adjustment data.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restore_previous: true }),
     },
   );
   return response.message;

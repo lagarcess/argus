@@ -83,7 +83,10 @@ from argus.api.chat.request_admission import (
     prepare_chat_request_admission,
     reject_invalid_non_run_confirmation_action,
 )
-from argus.api.chat.research_evidence import research_allowance_available
+from argus.api.chat.research_evidence import (
+    research_allowance_available,
+    settle_research_turn,
+)
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.retest import (
     complete_retest_turn,
@@ -903,7 +906,10 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_typed_recovery")
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
-                from argus.api.chat.confirmation import runtime_confirmation_card
+                from argus.api.chat.confirmation import (
+                    attach_research_peer_rows,
+                    runtime_confirmation_card,
+                )
 
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
@@ -933,43 +939,20 @@ async def chat_stream(
                     and isinstance(final_response_payload.get("backtest_job"), dict)
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
-                research_job_request = runtime_result.pop("research_job_request", None)
-                if backtest_job is None and isinstance(research_job_request, dict):
-                    from argus.agent_runtime.research_answer import (
-                        compose_completed_research,
-                        research_failure_note,
+                if backtest_job is None and "research_job_request" in runtime_result:
+                    from argus.api.chat.research_jobs import (
+                        apply_research_job_request,
                     )
-                    from argus.api.chat.research_jobs import start_research_job
 
-                    research_job, sync_packet = start_research_job(
-                        job_request=research_job_request,
+                    backtest_job = apply_research_job_request(
+                        runtime_result,
                         user_id=user.id,
                         conversation_id=conversation.id,
                         request_message_id=lifecycle_hooks.turn_id,
                         request_id=request.state.request_id,
                     )
-                    if research_job is not None:
-                        backtest_job = research_job
-                    elif sync_packet is not None:
-                        # Dev memory persistence: same documented thorough
-                        # configuration, run synchronously; artifacts match
-                        # the background finalizer exactly.
-                        composed = compose_completed_research(
-                            job_request=research_job_request,
-                            packet=sync_packet,
-                        )
-                        assistant_text = composed["answer"]
-                        runtime_result["assistant_response"] = composed["answer"]
-                        runtime_result["research"] = composed["research"]
-                        if composed.get("next_experiments") is not None:
-                            runtime_result["next_experiments"] = composed[
-                                "next_experiments"
-                            ]
-                    else:
-                        assistant_text = research_failure_note(
-                            str(research_job_request.get("language") or "en")
-                        )
-                        runtime_result["assistant_response"] = assistant_text
+                    if backtest_job is None:
+                        assistant_text = runtime_result.get("assistant_response")
                 run = None
                 result_action_run = validated_result_action_run
                 result_action_type = result_action_request_type(runtime_result)
@@ -1129,6 +1112,11 @@ async def chat_stream(
                             confirmation_reference.model_dump(mode="python")
                         ]
                     runtime_result["confirmation"] = confirmation_card
+                    attach_research_peer_rows(
+                        runtime_result,
+                        metadata,
+                        language=runtime_user.language_preference or "en",
+                    )
                 if result_card is not None:
                     metadata["result_card"] = result_card
                 if backtest_job is not None:
@@ -1281,22 +1269,15 @@ async def chat_stream(
                     ),
                     request_id=request.state.request_id,
                 )
-                if isinstance(runtime_result.get("research"), dict):
-                    from argus.api.chat.research_evidence import (
-                        record_research_turn_evidence,
-                    )
-
-                    record_research_turn_evidence(
-                        research=runtime_result["research"],
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                        message_id=(
-                            assistant_message.id
-                            if assistant_message is not None
-                            else None
-                        ),
-                        request_id=request.state.request_id,
-                    )
+                settle_research_turn(
+                    runtime_result,
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                    message_id=(
+                        assistant_message.id if assistant_message is not None else None
+                    ),
+                    request_id=request.state.request_id,
+                )
                 receipt_metadata = {
                     "request_id": request.state.request_id,
                     "source": "api_turn",
@@ -1456,9 +1437,7 @@ async def chat_stream(
                         is_guest=turn_account.kind == "guest",
                         client_identity=client_identity(request),
                     ),
-                    research_allowance_available=research_allowance_available(
-                        user.id
-                    ),
+                    research_allowance_available=research_allowance_available(user.id),
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
                     ],
