@@ -256,6 +256,22 @@ describe("chat recovery display", () => {
     );
   });
 
+  test("renders retired save continuity in English and Spanish", () => {
+    const display = recoveryDisplayFromMetadata({
+      recovery: {
+        code: "private_alpha_save_unavailable",
+        retryable: false,
+      },
+    });
+
+    expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe(
+      "The legacy Strategies library and Save action have been retired. This completed run remains available in this chat and Recents, and you can use Refine idea to continue testing it.",
+    );
+    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
+      "La biblioteca heredada de Estrategias y la acción Guardar se retiraron. Esta ejecución completa sigue disponible en este chat y en Recientes, y puedes usar Refinar idea para seguir probándola.",
+    );
+  });
+
   test("renders abandoned owning-row recovery in English and Spanish", () => {
     const display = recoveryDisplayFromMetadata({
       agent_runtime_turn: {

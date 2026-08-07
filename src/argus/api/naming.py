@@ -41,7 +41,7 @@ def get_starter_prompts(language: str | None = None) -> list[str]:
 
 def suggest_entity_name(
     *,
-    entity_type: Literal["conversation", "strategy", "collection"],
+    entity_type: Literal["conversation"],
     context: str,
     language: str | None,
 ) -> str | None:

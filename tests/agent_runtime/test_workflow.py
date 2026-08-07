@@ -849,7 +849,6 @@ def test_next_step_preserves_completed_result_answer() -> None:
     assert updated["next_actions"] == [
         "show_breakdown",
         "refine_strategy",
-        "save_strategy",
     ]
     assert "compare_benchmark" not in updated["next_actions"]
 

@@ -328,13 +328,6 @@ def _result_runtime_result() -> dict[str, Any]:
                 "payload": {},
             },
             {
-                "id": "save-strategy",
-                "type": "save_strategy",
-                "label": "Save strategy",
-                "presentation": "result",
-                "payload": {},
-            },
-            {
                 "id": "refine-strategy",
                 "type": "refine_strategy",
                 "label": "Refine strategy",
@@ -1010,7 +1003,6 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
     run = _stream_payloads(response.text, "result")[0]["run"]
     assert [action["type"] for action in run["conversation_result_card"]["actions"]] == [
         "show_breakdown",
-        "save_strategy",
         "refine_strategy",
     ]
     for action in run["conversation_result_card"]["actions"]:
@@ -1432,7 +1424,7 @@ def test_result_action_with_run_from_another_conversation_does_not_fallback() ->
     assert response.status_code == 200
     text = _stream_payloads(response.text, "token")[0]["text"]
     assert "could not find" in text
-    assert client.get("/api/v1/strategies").json()["items"] == []
+    assert api_state.store.strategies == {}
 
 
 def test_show_breakdown_action_rejects_mismatched_conversation_context(
@@ -1495,127 +1487,14 @@ def test_show_breakdown_action_rejects_mismatched_conversation_context(
     assert "result_run_id" not in assistant["metadata"]
 
 
-def test_save_strategy_action_creates_strategy_from_latest_result(
+@pytest.mark.parametrize(
+    ("language", "expected_request_message"),
+    [("en", "save this strategy"), ("es-419", "Guardar")],
+)
+def test_legacy_save_strategy_action_is_history_preserved_without_mutation(
     monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import state as api_state
-
-    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "true")
-    client = _client()
-    conversation = _conversation(client)
-    user_id = client.get("/api/v1/me").json()["user"]["id"]
-    run_id = api_state.store.new_id()
-    api_state.store.backtest_runs[run_id] = BacktestRun(
-        id=run_id,
-        conversation_id=conversation["id"],
-        strategy_id=None,
-        status="completed",
-        asset_class="equity",
-        symbols=["AAPL"],
-        allocation_method="equal_weight",
-        benchmark_symbol="SPY",
-        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
-        config_snapshot={
-            "template": "buy_and_hold",
-            "asset_class": "equity",
-            "symbols": ["AAPL"],
-            "start_date": "2025-05-03",
-            "end_date": "2026-05-03",
-            "starting_capital": 10000,
-            "benchmark_symbol": "SPY",
-        },
-        conversation_result_card={
-            "title": "AAPL buy and hold",
-            "date_range": {
-                "start": "2025-05-03",
-                "end": "2026-05-03",
-                "display": "May 3, 2025 to May 3, 2026",
-            },
-            "rows": [
-                {
-                    "key": "total_return_pct",
-                    "label": "Total Return (%)",
-                    "value": "+12.4%",
-                }
-            ],
-        },
-        created_at=utcnow(),
-        chart=None,
-        trades=[],
-    )
-    api_state.store.backtest_run_owners[run_id] = user_id
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "action": {
-                "type": "save_strategy",
-                "label": "Save strategy",
-                "presentation": "result",
-                "payload": {
-                    "run_id": run_id,
-                    "conversation_id": conversation["id"],
-                },
-            },
-            "language": "en",
-        },
-    )
-
-    assert response.status_code == 200
-    text = _stream_payloads(response.text, "token")[0]["text"]
-    assert "Saved" in text
-    strategies = client.get("/api/v1/strategies").json()["items"]
-    assert [strategy["symbols"] for strategy in strategies] == [["AAPL"]]
-    saved_strategy_id = strategies[0]["id"]
-    final = _stream_payloads(response.text, "final")[0]["payload"]
-    assert final["saved_strategy_id"] == saved_strategy_id
-    assert final["result_strategy_id"] == saved_strategy_id
-    assert final["result_run_id"] == run_id
-    stored_run = api_state.store.backtest_runs[run_id]
-    assert stored_run.strategy_id == saved_strategy_id
-    assert stored_run.conversation_result_card["saved_strategy_id"] == saved_strategy_id
-    assert stored_run.conversation_result_card["saved_state"] == {
-        "status": "saved",
-        "strategy_id": saved_strategy_id,
-    }
-    assert all(
-        action["type"] != "save_strategy"
-        for action in stored_run.conversation_result_card.get("actions", [])
-    )
-    assistant = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
-        "items"
-    ][-1]
-    assert assistant["metadata"]["saved_strategy_id"] == saved_strategy_id
-    assert assistant["metadata"]["result_strategy_id"] == saved_strategy_id
-    assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
-
-    duplicate = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "action": {
-                "type": "save_strategy",
-                "label": "Save strategy",
-                "presentation": "result",
-                "payload": {
-                    "run_id": run_id,
-                    "conversation_id": conversation["id"],
-                },
-            },
-            "language": "en",
-        },
-    )
-
-    assert duplicate.status_code == 200
-    strategies_after_duplicate = client.get("/api/v1/strategies").json()["items"]
-    assert [strategy["id"] for strategy in strategies_after_duplicate] == [
-        saved_strategy_id
-    ]
-
-
-def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
-    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    expected_request_message: str,
 ) -> None:
     from argus.api import state as api_state
 
@@ -1625,7 +1504,6 @@ def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
         composed_save_response.update(kwargs)
         return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
 
-    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "false")
     monkeypatch.setattr(
         "argus.api.routers.agent.compose_private_alpha_save_response",
         compose_private_alpha_save_response,
@@ -1687,7 +1565,7 @@ def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
                     "conversation_id": conversation["id"],
                 },
             },
-            "language": "en",
+            "language": language,
         },
     )
 
@@ -1695,7 +1573,8 @@ def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
     text = _stream_payloads(response.text, "token")[0]["text"]
     assert "Saved" not in text
     assert "Strategy was saved" not in text
-    assert composed_save_response["user_message"] == "save this strategy"
+    assert composed_save_response["user_message"] == expected_request_message
+    assert composed_save_response["language"] == language
     assert composed_save_response["metadata"]["run_id"] == run_id
     assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
     assert composed_save_response["metadata"]["benchmark_symbol"] == "SPY"
@@ -1714,7 +1593,27 @@ def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
     assert composed_save_response["metadata"]["result_card"]["title"] == (
         "AAPL buy and hold"
     )
-    assert client.get("/api/v1/strategies").json()["items"] == []
+    assert api_state.store.strategies == {}
+
+
+@pytest.mark.parametrize(
+    ("language", "retired_text"),
+    [("en", "has been retired"), ("es-419", "se retiró")],
+)
+def test_missing_legacy_save_action_does_not_advertise_a_removed_control(
+    language: str,
+    retired_text: str,
+) -> None:
+    from argus.api.routers.agent import missing_result_action_run_message
+
+    response = missing_result_action_run_message(
+        action_type="save_strategy",
+        language=language,
+    )
+
+    assert retired_text in response
+    assert "result card" not in response
+    assert "tarjeta de resultado" not in response
 
 
 def test_chat_stream_requires_message_or_action() -> None:

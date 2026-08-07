@@ -103,10 +103,11 @@ class PrivateAlphaSaveDraft(BaseModel):
 
     answer: str = Field(
         description=(
-            "A short natural-language response. It must explain that the latest "
-            "completed run cannot be promoted into Strategies while that surface is "
-            "off, and that the run remains retrievable through the conversation or "
-            "Recents/history. Do not claim that a Strategy was created."
+            "A short natural-language response. It must explain that the legacy "
+            "Strategies library and Save action have been retired, that the run "
+            "remains retrievable through the conversation or Recents/history, and "
+            "that Refine idea is the supported way to continue testing it. Do not "
+            "claim that a Strategy was created."
         )
     )
     answer_blocks: list[str] = Field(
@@ -253,11 +254,11 @@ async def compose_private_alpha_save_response(
 ) -> str | None:
     fact_bank = result_followup_fact_bank(metadata)
     fact_bank["save_surface_status"] = (
-        "The Strategies library and Save action are not exposed in private alpha"
+        "The legacy Strategies library and Save action have been retired"
     )
     fact_bank["retrieval_path"] = (
         "Completed runs remain available in the current conversation and through "
-        "Recents/history"
+        "Recents/history; Refine idea continues testing from the completed run"
     )
     required_fact_ids = {"save_surface_status", "retrieval_path"}
     context_packet_ids = context_packet_ids_from_fact_bank(fact_bank)
@@ -310,13 +311,12 @@ def private_alpha_save_llm_messages(
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 f"{language_instruction}\n\n"
                 "The user is asking to save, bookmark, or keep the latest completed "
-                "backtest result. In private alpha, Strategies and Save are not "
-                "exposed as a user-facing destination, so do not claim a Strategy "
-                "was created and do not point the user to hidden surfaces. Use the "
-                "fact_bank as hard product truth, but own the wording naturally. "
-                "Keep the response short. It should make the user feel that their "
-                "work is not lost while being clear that no hidden strategy object "
-                "was created."
+                "backtest result. The legacy Strategies library and Save action are "
+                "retired, so do not claim a Strategy was created and do not imply "
+                "that a hidden or disabled save surface still exists. Use the "
+                "fact_bank as hard product truth, name the supported conversation, "
+                "Recents, and Refine idea continuity path, and own the wording "
+                "naturally. Keep the response short."
             ),
         },
         {

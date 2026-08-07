@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
-  Compass,
   History,
   MessageCirclePlus,
   PanelLeft,
@@ -52,7 +51,7 @@ import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
-type View = "chat" | "strategies" | "settings";
+type View = "chat" | "settings";
 
 type ConversationActivityReadOwner = Readonly<{
   hasEffectiveUnread: (conversationId: string) => boolean;
@@ -117,7 +116,6 @@ export type ChatSidebarProps = {
   onOpenSidebarPreference?: () => void;
   onOpenKeyboardShortcuts?: () => void;
   settingsOpenRequest?: number;
-  strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
   /** Keep background shortcut hints visually quiet while a foreground surface owns focus. */
   shortcutHintsSuppressed?: boolean;
@@ -161,7 +159,6 @@ export default function ChatSidebar({
   onOpenSidebarPreference,
   onOpenKeyboardShortcuts,
   settingsOpenRequest = 0,
-  strategiesEnabled = false,
   omnisearchEnabled = false,
   shortcutHintsSuppressed = false,
   canManageConversation = true,
@@ -522,16 +519,6 @@ export default function ChatSidebar({
             showShortcutHint={shortcutHintsVisible}
             onClick={onOpenSearch}
             iconSize={20}
-          />
-        )}
-
-        {strategiesEnabled && (
-          <SidebarNavButton
-            icon={Compass}
-            label={t("common.strategies")}
-            active={currentView === "strategies"}
-            collapsed={!isOpen}
-            onClick={() => onNavigate("strategies")}
           />
         )}
 

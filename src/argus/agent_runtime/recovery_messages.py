@@ -68,9 +68,9 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "I couldn’t answer that follow-up. Your result is still here."
     ),
     "private_alpha_save_unavailable": (
-        "I cannot move this into Strategies while that surface is off for private "
-        "alpha, but the completed run is still part of this chat and can be reopened "
-        "from the conversation or Recents."
+        "The legacy Strategies library and Save action have been retired. This "
+        "completed run remains available in this chat and Recents, and you can use "
+        "Refine idea to continue testing it."
     ),
     "confirmation_action_guidance": (
         "The visible confirmation is still ready. Use the card to start the "

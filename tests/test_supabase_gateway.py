@@ -1214,30 +1214,6 @@ def test_create_backtest_run_rejects_unowned_parent_strategy() -> None:
     assert "backtest_runs" not in client.inserted_by_table
 
 
-def test_create_strategy_rejects_unowned_parent_conversation_before_insert() -> None:
-    client = _RecordingSupabaseClient()
-    gateway = SupabaseGateway(client=client)
-    gateway.get_conversation = MagicMock(return_value=None)  # type: ignore[method-assign]
-
-    with pytest.raises(ValueError, match="Conversation not found"):
-        gateway.create_strategy(
-            user_id="user-1",
-            payload={
-                "name": "AAPL idea",
-                "name_source": "user_renamed",
-                "template": "buy_and_hold",
-                "asset_class": "equity",
-                "symbols": ["AAPL"],
-                "parameters": {},
-                "metrics_preferences": ["total_return_pct"],
-                "benchmark_symbol": "SPY",
-                "conversation_id": "conversation-other",
-            },
-        )
-
-    assert "strategies" not in client.inserted_by_table
-
-
 def test_attach_context_packet_rejects_unowned_parent_run() -> None:
     client = _RecordingSupabaseClient()
     gateway = SupabaseGateway(client=client)
@@ -1250,21 +1226,6 @@ def test_attach_context_packet_rejects_unowned_parent_run() -> None:
         )
 
     assert "run_context_packets" not in client.inserted_by_table
-
-
-def test_attach_strategies_rejects_unowned_parent_collection_before_upsert() -> None:
-    client = MagicMock()
-    gateway = SupabaseGateway(client=client)
-    gateway.get_collection = MagicMock(return_value=None)  # type: ignore[method-assign]
-
-    result = gateway.attach_strategies(
-        user_id="user-1",
-        collection_id="collection-other",
-        strategy_ids=["strategy-1"],
-    )
-
-    assert result is None
-    client.table.assert_not_called()
 
 
 def test_usage_limits_check_all_windows_before_incrementing() -> None:

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
@@ -55,7 +54,7 @@ import {
   type SearchConversationItem,
 } from "@/lib/argus-api";
 import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";
-import { omnisearchEnabled, strategiesEnabled } from "@/lib/private-alpha-flags";
+import { omnisearchEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -117,8 +116,6 @@ import {
 } from "@/lib/chat-message-hydration";
 import {
   hydrateResultActionsForRun,
-  markResultCardSaved,
-  markResultCardSaving,
 } from "@/lib/chat-result-actions";
 import {
   appendOrReplacePendingAssistantMessage,
@@ -154,7 +151,6 @@ import {
 import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import SettingsView from "../views/SettingsView";
-import StrategiesView from "../views/StrategiesView";
 import ChatHeaderMenu from "./ChatHeaderMenu";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
@@ -178,8 +174,6 @@ import {
   markComposerActionsInactive,
   messageStreamPresentation,
   messagesWithSavedDecisionState,
-  resultRunIdFromFinalPayload,
-  savedStrategyIdFromFinalPayload,
   settleOpenConfirmationsFromFinalPayload,
 } from "./chat-message-projection";
 import { openFeedbackDialogState } from "./feedback-dialog-state";
@@ -204,10 +198,9 @@ import {
   isStaleConfirmationActionRejectionCode,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
-  resultActionRunId,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
-type View = "chat" | "strategies" | "settings";
+type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -243,7 +236,6 @@ export default function ChatInterface() {
   const [isRenamingHeaderChat, setIsRenamingHeaderChat] = useState(false);
   const [isSavingHeaderRename, setIsSavingHeaderRename] = useState(false);
   const [isPinningHeaderChat, setIsPinningHeaderChat] = useState(false);
-  const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [activityCausalClock] = useState(createConversationActivityCausalClock);
   const [activityTranscriptReadiness] = useState(createConversationActivityTranscriptReadiness);
@@ -525,12 +517,6 @@ export default function ChatInterface() {
       // Local preferences are optional.
     }
   }, []);
-
-  useEffect(() => {
-    if (!strategiesEnabled && currentView === "strategies") {
-      setCurrentView("chat");
-    }
-  }, [currentView]);
 
   const handleSetSidebarMode = (mode: SidebarMode) => {
     setSidebarMode(mode);
@@ -843,13 +829,6 @@ export default function ChatInterface() {
       void loadConversation(item.id);
       return;
     }
-    if (strategiesEnabled && item.type === "strategy") {
-      rememberCurrentConversationScroll();
-      cancelTranscriptNavigation();
-      setCurrentView("strategies");
-      closeTransientSidebar();
-      return;
-    }
     if (item.type === "run") {
       void loadConversationForRun(item);
       return;
@@ -958,26 +937,6 @@ export default function ChatInterface() {
         : action.label,
     [t],
   );
-
-  const handleTriggerPrompt = async (
-    _type: "strategy",
-    customPrompt?: string,
-  ) => {
-    // 1. Switch view
-    setCurrentView("chat");
-    closeTransientSidebar();
-
-    // 2. Start new chat
-    await startNewChat();
-
-    // 3. Define the localized prompt or use custom
-    const prompt =
-      customPrompt ??
-      t("chat.trigger_create_strategy", "I want to create a new strategy.");
-
-    // 4. Send it
-    void handleSend(prompt);
-  };
 
   // ── Send message ───────────────────────────────────────────────────────────
 
@@ -1321,17 +1280,7 @@ export default function ChatInterface() {
           if (compositionRetry) finalTextActions.push(compositionRetry);
         }
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
-        const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
-        if (action?.type === "save_strategy" && savedStrategyId) {
-          setMessages((prev) =>
-            markResultCardSaved(
-              prev,
-              resultRunIdFromFinalPayload(finalPayload, action),
-              savedStrategyId,
-            ),
-          );
-        }
         if (event.data.confirmation) {
           const confirmation = event.data
             .confirmation as StrategyConfirmationPayload;
@@ -1361,7 +1310,7 @@ export default function ChatInterface() {
           );
           const card = {
             ...baseCard,
-            savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
+            savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
           const finalNextExperiments =
@@ -1719,117 +1668,6 @@ export default function ChatInterface() {
   useGuestSendBridge(guestSendRef, handleSend);
   // ── Action routing ─────────────────────────────────────────────────────────
 
-  const handleSaveStrategyAction = async (action: ChatActionOption) => {
-    const routeState = readActiveConversationRouteState();
-    const targetConversationId = targetConversationIdForSend({
-      routeConversationId: routeState.conversationId,
-      stateConversationId: conversationId,
-      action,
-    });
-    if (!targetConversationId) return;
-    if (targetConversationId !== conversationId) {
-      rememberActiveConversationId(targetConversationId);
-      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, targetConversationId, "chat");
-      setConversationId(targetConversationId);
-    }
-    if (!strategiesEnabled) {
-      showToast(
-        t(
-          "chat.private_alpha_result_kept",
-          "This result is already kept in conversation/history.",
-        ),
-      );
-      return;
-    }
-    const runId = resultActionRunId(action) ?? null;
-    const streamInput: ChatActionRequest = {
-      type: "save_strategy",
-      label: action.label,
-      labelKey: action.labelKey,
-      payload: action.payload,
-      presentation: action.presentation,
-    };
-    const request = requestSessions.begin(targetConversationId, "chat_turn");
-    if (!request) return;
-    const terminalReadiness = beginConversationActivityTerminalReadiness(() => request);
-
-    try {
-      setMessages((prev) => markResultCardSaving(prev, runId, true));
-      await streamChatMessage(
-        targetConversationId,
-        streamInput,
-        i18n.language,
-        (event) => {
-          if (event.event === "stage_start") {
-            if (!requestSessions.authorize(request, "stage")) return;
-            conversationActivity.progressRequest(request.identity.conversationId, request.identity.requestId, "running");
-          }
-          if (event.event === "final") {
-            const identityAuthorized = requestSessions.authorize(request, "final");
-            if (!identityAuthorized) return;
-            const finalPayload = event.data as typeof event.data &
-              Record<string, unknown>;
-            const savedStrategyId =
-              savedStrategyIdFromFinalPayload(finalPayload);
-            if (savedStrategyId) {
-              setMessages((prev) =>
-                markResultCardSaved(
-                  prev,
-                  resultRunIdFromFinalPayload(finalPayload, action),
-                  savedStrategyId,
-                ),
-              );
-              invalidateTranscriptForMutation(targetConversationId, "durable_result_action");
-              showToast(t("chat.saved"));
-            } else if (event.data.assistant_response) {
-              showToast(event.data.assistant_response);
-            }
-            if (requestSessions.authorize(request, "save_cleanup")) {
-              setMessages((prev) => markResultCardSaving(prev, runId, false));
-            }
-            terminalReadiness.accept(event.data, identityAuthorized);
-          }
-          if (event.event === "error") {
-            if (!requestSessions.authorize(request, "error")) return;
-            if (requestSessions.canWriteVisible(request)) {
-              showToast(
-                chatStreamErrorText(event.data.detail, t("chat.error_generic")),
-                "error",
-              );
-              setMessages((prev) => markResultCardSaving(prev, runId, false));
-            }
-            terminalReadiness.finish(true); finishRequestTransport(request);
-          }
-          if (event.event === "done") {
-            if (!requestSessions.authorize(request, "done")) return;
-            if (requestSessions.authorize(request, "save_cleanup")) {
-              setMessages((prev) => markResultCardSaving(prev, runId, false));
-            }
-            terminalReadiness.finish(true);
-            finishRequestTransport(request);
-          }
-        },
-        [],
-        {
-          requestId: request.identity.requestId,
-          signal: request.controller.signal,
-        },
-      );
-    } catch (err: unknown) {
-      if (!requestSessions.authorize(request, "catch")) return;
-      const message =
-        err instanceof ChatStreamError && err.message
-          ? err.message
-          : t("chat.error_generic");
-      if (requestSessions.authorize(request, "save_cleanup")) {
-        showToast(message, "error");
-        setMessages((prev) => markResultCardSaving(prev, runId, false));
-      }
-      terminalReadiness.finish(true);
-      finishRequestTransport(request);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       const result = await logoutFromApi();
@@ -1848,7 +1686,6 @@ export default function ChatInterface() {
       transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
       clearHistory();
-      setSearchText("");
       window.location.href = "/";
     } catch {
       showToast(
@@ -1947,10 +1784,6 @@ export default function ChatInterface() {
 
   const handleAction = (action: ChatActionOption) => {
     const value = action.value ?? "";
-    if (action.type === "save_strategy") {
-      void handleSaveStrategyAction(action);
-      return;
-    }
     if (action.type === "cancel_confirmation") {
       void handleCancelConfirmationAction(action);
       return;
@@ -2248,7 +2081,6 @@ export default function ChatInterface() {
         }
         settingsOpenRequest={keyboardShortcuts.settingsOpenRequest}
         mode={sidebarMode}
-        strategiesEnabled={strategiesEnabled}
         omnisearchEnabled={
           omnisearchEnabled && (!isGuest || canUseOmnisearch)
         }
@@ -2331,7 +2163,6 @@ export default function ChatInterface() {
                     titleSource={headerConversationTitleSource}
                   />
                 )}
-              {currentView === "strategies" && t("common.strategies")}
             </h1>
 
             {/* Action cluster (guest settings or durable owner menu) */}
@@ -2368,15 +2199,6 @@ export default function ChatInterface() {
                   memoryChrome={memoryChrome}
                 />
               ) : null}
-              {strategiesEnabled && currentView === "strategies" && (
-                <button
-                  onClick={() => handleTriggerPrompt("strategy")}
-                  className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                  aria-label="New item"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              )}
             </div>
           </header>
         )}
@@ -2536,16 +2358,6 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {strategiesEnabled && currentView === "strategies" && (
-          <StrategiesView
-            onMenuClick={() => setIsSidebarOpen((o) => !o)}
-            onAddClick={() => handleTriggerPrompt("strategy")}
-            searchText={searchText}
-            onSearchChange={setSearchText}
-            isSidebarOpen={isSidebarOpen}
-            onTriggerPrompt={handleTriggerPrompt}
-          />
-        )}
         {currentView === "settings" && (
           <SettingsView
             onClose={() => setCurrentView("chat")}

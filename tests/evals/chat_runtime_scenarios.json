@@ -323,7 +323,7 @@
         }
       ],
       "artifact_checks": ["result card references immutable run id"],
-      "action_checks": ["show_breakdown and save_strategy use latest run id"],
+      "action_checks": ["show_breakdown and refine_strategy use the latest run id"],
       "reload_checks": ["after reload, follow-up answers still use latest result"],
       "forbidden_outcomes": [
         "generic investing advice detached from run",
@@ -338,11 +338,11 @@
       "qa_id": "QA 9",
       "buckets": ["workstream_3", "workstream_7"],
       "priority": "must_pass",
-      "purpose": "Result actions are stable, idempotent, and visibly tied to the completed run.",
+      "purpose": "The two visible result actions stay tied to the completed run, while stale Save actions return non-mutating continuity guidance.",
       "natural_prompt_variants": [
-        "Show a breakdown",
-        "Save strategy",
-        "Refine strategy"
+        "Explain this result",
+        "Refine this idea",
+        "Use the Save strategy action from an older result"
       ],
       "conversation_steps": [
         {
@@ -353,27 +353,33 @@
         },
         {
           "actor": "action",
-          "action_type": "save_strategy",
-          "semantic_target": "idempotent_save_from_run",
-          "hard_checks": ["visible saving/saved state", "no redundant noisy chat duplicate"]
-        },
-        {
-          "actor": "action",
           "action_type": "refine_strategy",
           "semantic_target": "ground_refinement_in_result_config",
           "hard_checks": ["asks for desired refinement or applies explicit refinement", "keeps run context"]
+        },
+        {
+          "actor": "stale_action",
+          "action_type": "save_strategy",
+          "semantic_target": "return_non_mutating_legacy_save_continuity",
+          "hard_checks": [
+            "reports that the legacy save surface is retired",
+            "keeps the completed run reachable in conversation and Recents",
+            "does not create or mutate Strategy records"
+          ]
         }
       ],
       "artifact_checks": ["result action payloads carry run_id and conversation_id"],
-      "action_checks": ["all visible result actions are clickable and have semantic ownership"],
-      "reload_checks": ["saved and result context remain sane after reload"],
+      "action_checks": ["visible result actions are exactly show_breakdown and refine_strategy; stale save_strategy is compatibility-only and non-mutating"],
+      "reload_checks": ["result context remains sane after reload and no saved state is invented"],
       "forbidden_outcomes": [
         "breakdown duplicates result card",
-        "save appears to do nothing",
+        "save_strategy appears as a visible result action",
+        "stale save creates or mutates a Strategy record",
+        "stale save invents a visible saved state",
         "refine strategy loses run config",
         "actions lose run context after reload"
       ],
-      "judge_rubric": "Actions should feel like operating the card, not sending vague follow-up prompts."
+      "judge_rubric": "Explain result and Refine idea should operate on the card, while a stale Save request should preserve continuity without reviving the retired surface."
     },
     {
       "id": "qa_10_trust_polish",

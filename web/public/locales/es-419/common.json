@@ -7,11 +7,8 @@
     "history": "Historial",
     "settings": "Ajustes",
     "conversation": "Conversación",
-    "strategies": "Estrategias",
-    "collections": "Colecciones",
     "recents": "Recientes",
     "run_simulation": "Ejecutar simulación",
-    "add_to_collection": "Añadir a colección",
     "rename": "Renombrar",
     "delete": "Eliminar",
     "pin": "Anclar",
@@ -280,7 +277,7 @@
       "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
       "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
       "latest_result_followup_unavailable": "No pude responder ese seguimiento. Tu resultado sigue aquí.",
-      "private_alpha_save_unavailable": "No puedo mover esto a Estrategias mientras esa superficie está desactivada para la alfa privada, pero la ejecución completa sigue en este chat y puedes volver a abrirla desde la conversación o Recientes.",
+      "private_alpha_save_unavailable": "La biblioteca heredada de Estrategias y la acción Guardar se retiraron. Esta ejecución completa sigue disponible en este chat y en Recientes, y puedes usar Refinar idea para seguir probándola.",
       "confirmation_action_guidance": "La confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.",
       "confirmation_action_missing_context": "No tengo una confirmación activa para cambiar. Describe la idea de inversión otra vez y prepararé un borrador nuevo.",
       "confirmation_action_missing_identity": "A esa acción de confirmación le falta la identidad de la tarjeta. Usa la acción de la tarjeta más reciente antes de continuar.",
@@ -508,7 +505,6 @@
     "past_sessions": "Sesiones pasadas",
     "archive_chat": "Archivar chat",
     "no_past_sessions": "No hay sesiones pasadas aún.",
-    "added_to_collection": "Añadido a \"{{name}}\"",
     "good_response": "Buena respuesta",
     "poor_response": "Mala respuesta",
     "more_actions": "Más acciones",
@@ -518,8 +514,6 @@
     "copy_failed": "No se pudo copiar",
     "report_issue": "Reportar problema",
     "rename_failed": "No se pudo renombrar este chat. Inténtalo de nuevo.",
-    "saved": "Guardada",
-    "saving": "Guardando",
     "simulation_complete": "Simulación completa",
     "activity_rail": {
       "aria_label": "Actividad de la conversación",
@@ -570,7 +564,6 @@
         "rejected": "Rechazada",
         "revisit_later": "Revisar luego"
       },
-      "save": "Guardar",
       "unavailable": "No disponible",
       "return_unavailable": "rendimiento no disponible",
       "change": "cambio",
@@ -790,74 +783,6 @@
       "proposal_saved": "Guardado en memoria. Adminístralo en Controles de datos, en Personalización."
     }
   },
-  "strategies": {
-    "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",
-    "no_match": "No hay estrategias que coincidan con tu búsqueda.",
-    "error_load": "No se pudieron cargar las estrategias. Asegúrate de que la API esté funcionando.",
-    "search_placeholder": "Buscar estrategias...",
-    "metrics": {
-      "overall_profit": "ganancia total",
-      "max_drawdown": "caída máxima",
-      "win_rate": "tasa de éxito"
-    },
-    "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
-    "run_hint": "Ejecuta esta estrategia para ver cómo se habría comportado {{symbols}}.",
-    "best_performer": "Mejor rendimiento",
-    "suggestions": [
-      {
-        "title": "Reversión a la media RSI",
-        "desc": "Compra en caídas de sobreventa y vende en picos de sobrecompra.",
-        "prompt": "Diseña una estrategia que compre la caída cada vez que el RSI caiga por debajo de 30 y venda cuando llegue a 70 para BTC."
-      },
-      {
-        "title": "Stop-Loss del 10%",
-        "desc": "Protege tu capital con una regla de salida automatizada.",
-        "prompt": "Quiero una estrategia que compre cualquier acción de mi lista y venda automáticamente si el precio cae un 10% desde mi entrada."
-      },
-      {
-        "title": "Seguidor de Tendencia",
-        "desc": "Sigue el impulso mientras el precio esté por encima de la media móvil de 50 días.",
-        "prompt": "Crea una estrategia que compre siempre que el precio esté por encima de la media móvil de 50 días en QQQ."
-      },
-      {
-        "title": "DCA Mensual",
-        "desc": "Construye posiciones con compras fijas cada mes.",
-        "prompt": "Crea una estrategia DCA mensual simple que compre SPY el primer dia habil de cada mes."
-      }
-    ]
-  },
-  "collections": {
-    "empty_state": "Añade una estrategia a una colección o guárdala del chat para verlas aquí.",
-    "no_match": "No hay colecciones que coincidan con tu búsqueda.",
-    "error_load": "No se pudieron cargar las colecciones. Asegúrate de que la API esté funcionando.",
-    "search_placeholder": "Buscar colecciones",
-    "new_collection": "Nueva colección",
-    "no_strategies": "Sin estrategias aún",
-    "strategy_count_one": "{{count}} estrategia",
-    "strategy_count_other": "{{count}} estrategias",
-    "suggestions": [
-      {
-        "title": "Gigantes Tecnológicos",
-        "desc": "Agrupa FAANG o las mejores empresas de semiconductores en un solo lugar.",
-        "prompt": "Quiero crear una colección de los 5 gigantes tecnológicos más importantes, como AAPL, MSFT y NVDA."
-      },
-      {
-        "title": "Transición Energética",
-        "desc": "Ideas centradas en el clima y jugadas de energía limpia.",
-        "prompt": "Quiero empezar una colección para ideas de transición energética y energía solar."
-      },
-      {
-        "title": "Reyes de Dividendos",
-        "desc": "Jugadas de rendimiento seguras y consistentes para una cartera defensiva.",
-        "prompt": "¿Cómo debería estructurar una colección para acciones con crecimiento de dividendos a largo plazo?"
-      },
-      {
-        "title": "Cripto HODL",
-        "desc": "Guarda tu lógica de compra de caídas de Bitcoin y Ethereum.",
-        "prompt": "Crea una colección para mis estrategias de acumulación de criptomonedas a largo plazo."
-      }
-    ]
-  },
   "settings": {
     "title": "Ajustes",
     "profile": {
@@ -978,7 +903,6 @@
       "deleted_item_note": "Se puede restaurar actualmente.",
       "no_deleted_items": "No hay elementos borrados recientemente",
       "chat_item": "Chat",
-      "strategy_item": "Estrategia",
       "delete_all_conversations": "Eliminar todas las conversaciones",
       "delete_all_confirm": {
         "title": "¿Eliminar todas las conversaciones?",
