@@ -243,9 +243,13 @@ def test_answered_empty_is_definitive_when_the_index_covers_the_records() -> Non
     so this projects the record first. The uncovered half is the test below.
     """
     store = InMemoryCanonicalMemoryStore()
-    record_id = _confirm_one(_service(store))
+    # Confirmed through a provider that really projects, so the projection is
+    # claimed. Attaching a ref out of band would prove nothing and, correctly,
+    # would not make the index authoritative here.
+    record_id = _confirm_one(_service(store, _CanonicalFirstProjectionProvider(store)))
     owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
-    assert store.set_provider_ref(owner, record_id, "projected-1")
+    assert store.get_provider_ref(owner, record_id) is not None
+    assert record_id in store.settled_projection_record_ids(owner)
     service = _service(store, _AnsweredEmptyProvider())
 
     assert (

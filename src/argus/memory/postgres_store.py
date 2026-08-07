@@ -28,6 +28,7 @@ from argus.memory.contracts import (
     SensitivityAssessment,
 )
 from argus.memory.store import (
+    UNPROVEN_GENERATION,
     CanonicalConfirmationMutation,
     CanonicalEnableMutation,
     CanonicalOwnerReset,
@@ -1855,19 +1856,11 @@ class PostgresCanonicalMemoryStore:
                 )
                 if cursor.fetchone() is not None:
                     return False
-                cursor.execute(
-                    """
-                    select coalesce(max(generation), 1)
-                      from public.memory_reconciliations
-                     where owner_id = %s and record_id = %s
-                    """,
-                    (owner_id, record_id),
-                )
-                generation_row = cursor.fetchone()
-                assert generation_row is not None
-                generation = int(generation_row[0])
+                # Attaching a ref out of band proves nothing about what the
+                # index holds, so it records the unproven generation and
+                # inherits nothing from the ref it replaces.
+                generation = UNPROVEN_GENERATION
                 if projection is not None:
-                    generation = max(generation, int(projection[1]))
                     self._insert_provider_cleanup_target(
                         cursor,
                         owner_id,
@@ -1959,6 +1952,7 @@ class PostgresCanonicalMemoryStore:
                         and reconciliation.record_id = projection.record_id
                         and reconciliation.generation > projection.generation
                    )
+
                 """,
                 (owner_id,),
             )

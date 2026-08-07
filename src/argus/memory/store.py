@@ -61,6 +61,11 @@ class CanonicalEnableMutation:
     consent_receipt: MemoryConsentActionReceipt | None = None
 
 
+# A projection that no reconciliation claim ever proved. Every real generation
+# starts at 1, so this can never satisfy the freshness comparison.
+UNPROVEN_GENERATION = 0
+
+
 @dataclass(frozen=True, slots=True)
 class LiveProjection:
     """A derivative pointer and the content generation it stands for.
@@ -77,6 +82,7 @@ class LiveProjection:
 
     provider_ref: str
     generation: int
+    """UNPROVEN_GENERATION when the ref was attached without a claim."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1040,8 +1046,7 @@ class InMemoryCanonicalMemoryStore:
                 return False
             owner_projections = self._projections.setdefault(owner.owner_id, {})
             if any(
-                other_record_id != record_id
-                and other.provider_ref == provider_ref
+                other_record_id != record_id and other.provider_ref == provider_ref
                 for other_record_id, other in owner_projections.items()
             ):
                 return False
@@ -1053,14 +1058,12 @@ class InMemoryCanonicalMemoryStore:
             key = (owner.owner_id, record_id)
             if current is not None:
                 self._cleanup_targets.setdefault(key, set()).add(current.provider_ref)
-            # Mirrors the Postgres helper: the newly written ref stands for the
-            # record's latest generation, never less than the one it replaced.
+            # Attaching a ref out of band proves nothing about what the index
+            # holds, so it records the unproven generation and inherits nothing
+            # from the ref it replaces. Only a claimed projection earns one.
             owner_projections[record_id] = LiveProjection(
                 provider_ref=provider_ref,
-                generation=max(
-                    self._reconciliation_generations.get(key, 1),
-                    0 if current is None else current.generation,
-                ),
+                generation=UNPROVEN_GENERATION,
             )
             return True
 
@@ -1084,12 +1087,13 @@ class InMemoryCanonicalMemoryStore:
     ) -> frozenset[str]:
         """Records whose projection represents their current content.
 
-        Compared by reconciliation generation rather than by cleanup state.
-        A newer generation exists from the moment an edit commits, which is
-        before any provider call, so the projection stops being authoritative
-        immediately and stays that way if the process never gets to reconcile.
-        Obsolete refs still awaiting deletion do not make a current projection
-        stale, since the record already points at the right content.
+        A projection is current when it is not behind a newer reconciliation
+        generation, which becomes true the moment an edit commits and before
+        any provider call. Generation 0 is the unproven sentinel: only a
+        claimed projection sets a real generation, so a ref attached out of
+        band can never satisfy this. Obsolete refs awaiting deletion do not
+        make a current projection stale, since the record already points at
+        the right content.
         """
 
         with self._lock:
@@ -1153,11 +1157,9 @@ class InMemoryCanonicalMemoryStore:
                 self._cleanup_targets.setdefault(reconciliation_key, set()).add(
                     current_provider_ref
                 )
-            self._projections.setdefault(owner.owner_id, {})[record_id] = (
-                LiveProjection(
-                    provider_ref=provider_ref,
-                    generation=reconciliation_claim.generation,
-                )
+            self._projections.setdefault(owner.owner_id, {})[record_id] = LiveProjection(
+                provider_ref=provider_ref,
+                generation=reconciliation_claim.generation,
             )
             return True
 
@@ -1308,9 +1310,7 @@ class InMemoryCanonicalMemoryStore:
             if not targets:
                 self._cleanup_targets.pop(key, None)
             owner_projections = self._projections.get(owner.owner_id)
-            live = (
-                None if owner_projections is None else owner_projections.get(record_id)
-            )
+            live = None if owner_projections is None else owner_projections.get(record_id)
             if live is not None and live.provider_ref == provider_ref:
                 owner_projections.pop(record_id, None)
                 if not owner_projections:

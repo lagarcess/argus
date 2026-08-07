@@ -768,3 +768,48 @@ def test_a_reset_retires_the_generation_with_the_projection() -> None:
     # Nothing survives the reset that a recreated record could inherit.
     assert store.settled_projection_record_ids(OWNER) == frozenset()
     assert store.get_provider_ref(OWNER, record_id) is None
+
+
+def test_attaching_a_ref_out_of_band_cannot_certify_the_index() -> None:
+    """Catches freshness being asserted by a caller instead of earned.
+
+    Attaching a provider ref performs no projection and proves nothing about
+    what the index holds. If that could mark a record current, any caller could
+    silently suppress the canonical fallback for content the index has never
+    seen.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder, memory=_Mem0Double(embedder=embedder)
+    )
+    record_id = _confirm_one(_service(store, provider))
+
+    store.edit_record(
+        OWNER,
+        record_id,
+        value="Edited text the index has never seen.",
+        label=None,
+    )
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
+
+    # A ref that was never projected for this record, at any generation.
+    assert store.set_provider_ref(OWNER, record_id, "ref-never-projected") is True
+
+    assert store.get_provider_ref(OWNER, record_id) == "ref-never-projected"
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
+
+
+def test_an_out_of_band_ref_cannot_inherit_a_proven_generation() -> None:
+    """Catches a replacement ref borrowing the credibility of the one it replaces."""
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder, memory=_Mem0Double(embedder=embedder)
+    )
+    record_id = _confirm_one(_service(store, provider))
+    assert store.settled_projection_record_ids(OWNER) == frozenset({record_id})
+
+    assert store.set_provider_ref(OWNER, record_id, "ref-swapped-in") is True
+
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
