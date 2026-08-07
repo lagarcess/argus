@@ -1,7 +1,7 @@
 # Legacy surface removal browser evidence
 
 Recaptured on 2026-08-07 after merging integration
-`f6fc8f78253c3929229fc8950d6169e6288f7463` and applying the completed review
+`635d5ee80216aec8d0b21d8c9fbb57129deb045c` and applying the completed review
 follow-ups through `f4e0ac06f76b1bc303526a63504bceb134604c5f`.
 
 ## Method
