@@ -72,6 +72,26 @@ def global_discovery_daily_ceiling() -> int:
         return _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
     return parsed if parsed > 0 else _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
 
+
+# The research rail rides the default question path, not an opt-in surface, so
+# its circuit breaker is sized for ordinary conversation volume rather than
+# the discovery ceiling's opt-in profile (spec 2026-08-07 section 9). Still a
+# breaker, not a budget: no honest day should reach it.
+_GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT = 5000
+GLOBAL_RESEARCH_CEILING_SUBJECT = "00000000-0000-4000-8000-000000000d16"
+
+
+def global_research_daily_ceiling() -> int:
+    raw = os.getenv("ARGUS_RESEARCH_GLOBAL_DAILY_CEILING", "").strip()
+    if not raw:
+        return _GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return _GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT
+    return parsed if parsed > 0 else _GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT
+
+
 _REGISTERED_ALLOWANCES: dict[str, list[tuple[str, int]]] = {
     MESSAGE_USAGE_RESOURCE: MESSAGE_ALLOWANCE_LIMITS,
     SIMULATION_USAGE_RESOURCE: SIMULATION_ALLOWANCE_LIMITS,

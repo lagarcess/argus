@@ -83,6 +83,7 @@ from argus.api.chat.request_admission import (
     prepare_chat_request_admission,
     reject_invalid_non_run_confirmation_action,
 )
+from argus.api.chat.research_evidence import research_allowance_available
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.retest import (
     complete_retest_turn,
@@ -932,6 +933,43 @@ async def chat_stream(
                     and isinstance(final_response_payload.get("backtest_job"), dict)
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
+                research_job_request = runtime_result.pop("research_job_request", None)
+                if backtest_job is None and isinstance(research_job_request, dict):
+                    from argus.agent_runtime.research_answer import (
+                        compose_completed_research,
+                        research_failure_note,
+                    )
+                    from argus.api.chat.research_jobs import start_research_job
+
+                    research_job, sync_packet = start_research_job(
+                        job_request=research_job_request,
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        request_message_id=lifecycle_hooks.turn_id,
+                        request_id=request.state.request_id,
+                    )
+                    if research_job is not None:
+                        backtest_job = research_job
+                    elif sync_packet is not None:
+                        # Dev memory persistence: same documented thorough
+                        # configuration, run synchronously; artifacts match
+                        # the background finalizer exactly.
+                        composed = compose_completed_research(
+                            job_request=research_job_request,
+                            packet=sync_packet,
+                        )
+                        assistant_text = composed["answer"]
+                        runtime_result["assistant_response"] = composed["answer"]
+                        runtime_result["research"] = composed["research"]
+                        if composed.get("next_experiments") is not None:
+                            runtime_result["next_experiments"] = composed[
+                                "next_experiments"
+                            ]
+                    else:
+                        assistant_text = research_failure_note(
+                            str(research_job_request.get("language") or "en")
+                        )
+                        runtime_result["assistant_response"] = assistant_text
                 run = None
                 result_action_run = validated_result_action_run
                 result_action_type = result_action_request_type(runtime_result)
@@ -1048,6 +1086,7 @@ async def chat_stream(
                     "clarification",
                     "discovery",
                     "next_experiments",
+                    "research",
                 ):
                     value = runtime_result.get(key)
                     if value is not None:
@@ -1242,6 +1281,22 @@ async def chat_stream(
                     ),
                     request_id=request.state.request_id,
                 )
+                if isinstance(runtime_result.get("research"), dict):
+                    from argus.api.chat.research_evidence import (
+                        record_research_turn_evidence,
+                    )
+
+                    record_research_turn_evidence(
+                        research=runtime_result["research"],
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        message_id=(
+                            assistant_message.id
+                            if assistant_message is not None
+                            else None
+                        ),
+                        request_id=request.state.request_id,
+                    )
                 receipt_metadata = {
                     "request_id": request.state.request_id,
                     "source": "api_turn",
@@ -1400,6 +1455,9 @@ async def chat_stream(
                         user.id,
                         is_guest=turn_account.kind == "guest",
                         client_identity=client_identity(request),
+                    ),
+                    research_allowance_available=research_allowance_available(
+                        user.id
                     ),
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance

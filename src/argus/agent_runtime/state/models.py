@@ -361,6 +361,8 @@ class RunState(BaseModel):
     # Backend-derived per-turn discovery allowance truth; the runtime consumes
     # it and never computes quota itself.
     discovery_allowance_available: bool = True
+    # Same contract for the research rail's shared daily ceiling.
+    research_allowance_available: bool = True
     # Kinds offered on the previous result turn; ran or ignored, they are
     # spent for the next Try next composition.
     prior_next_experiment_kinds: list[str] = Field(default_factory=list)

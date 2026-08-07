@@ -40,6 +40,7 @@ from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.domain.discovery_search.config import discovery_search_config
 from argus.domain.discovery_search.contracts import SearchUnavailableError
 from argus.domain.discovery_search.selection import search_provider_for_config
+from argus.domain.research.config import research_rail_enabled
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -138,6 +139,17 @@ async def knowledge_answer_stage_result(
         return None
     if strategy_has_execution_evidence(interpretation.candidate_strategy_draft):
         return None
+    if research_rail_enabled():
+        # The rail's richer classifier subsumes the legacy one, so a flag-on
+        # turn still makes exactly one routing call. The resolved-asset
+        # shortcut below is deliberately skipped: a current-quote ask must be
+        # allowed to reach the fast research shape instead of being pinned to
+        # historical stats.
+        from argus.agent_runtime.research_answer import research_answer_stage_result
+
+        return await research_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
     # A provider-resolved asset on a knowledge turn IS the interpreter's own
     # classification: the user is asking about that asset. No second LLM call.
     query = _query_from_interpretation(interpretation)
