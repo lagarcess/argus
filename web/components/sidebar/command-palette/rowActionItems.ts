@@ -29,19 +29,31 @@ export function commandPaletteRowActions({
     return [
       {
         id: "rename",
-        label: t("command_palette.rename_conversation", "Rename conversation"),
+        label: t("common.rename", "Rename"),
+        accessibleName: t(
+          "command_palette.rename_conversation",
+          "Rename conversation",
+        ),
         icon: Edit2,
         onSelect: onRename,
       },
       {
         id: "archive",
-        label: t("command_palette.archive_conversation", "Archive conversation"),
+        label: t("common.archive", "Archive"),
+        accessibleName: t(
+          "command_palette.archive_conversation",
+          "Archive conversation",
+        ),
         icon: Archive,
         onSelect: onArchive,
       },
       {
         id: "delete",
-        label: t("command_palette.delete_conversation", "Delete conversation"),
+        label: t("common.delete", "Delete"),
+        accessibleName: t(
+          "command_palette.delete_conversation",
+          "Delete conversation",
+        ),
         icon: Trash2,
         destructive: true,
         onSelect: onDelete,
@@ -52,7 +64,12 @@ export function commandPaletteRowActions({
     return [
       {
         id: "open_source",
+        // Not shortened: "Open source" reads as something else entirely.
         label: t(
+          "command_palette.open_source_conversation",
+          "Open source conversation",
+        ),
+        accessibleName: t(
           "command_palette.open_source_conversation",
           "Open source conversation",
         ),

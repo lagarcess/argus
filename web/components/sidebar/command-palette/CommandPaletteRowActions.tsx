@@ -7,7 +7,13 @@ import { Tooltip } from "@/components/ui/Tooltip";
 
 export type CommandPaletteRowAction = {
   id: "rename" | "archive" | "delete" | "open_source";
+  /** Shown to the eye: short, and the same word Recents uses. */
   label: string;
+  /**
+   * Read aloud: names the object the row acts on, which the visible label can
+   * leave to context but an icon-only control cannot.
+   */
+  accessibleName: string;
   icon: typeof Edit2;
   destructive?: boolean;
   disabled?: boolean;
@@ -72,7 +78,7 @@ export default function CommandPaletteRowActions({
                   ? "rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
                   : "rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
               }
-              aria-label={action.label}
+              aria-label={action.accessibleName}
             >
               <action.icon className="h-3.5 w-3.5" />
             </button>
@@ -113,6 +119,7 @@ export default function CommandPaletteRowActions({
               key={action.id}
               type="button"
               role="menuitem"
+              aria-label={action.accessibleName}
               disabled={action.disabled}
               onClick={(event) => {
                 event.stopPropagation();

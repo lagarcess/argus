@@ -331,6 +331,26 @@ describe("omnisearch below threshold", () => {
     );
   });
 
+  test("row actions read like Recents and announce the object they act on", () => {
+    const rowActions = readFileSync(
+      join(import.meta.dir, "../components/sidebar/command-palette/rowActionItems.ts"),
+      "utf-8",
+    );
+    const recents = readFileSync(
+      join(import.meta.dir, "../components/sidebar/RecentChatActions.tsx"),
+      "utf-8",
+    );
+    // Same visible verbs as the Recents menu, so one surface does not say
+    // "Delete" while the other says "Delete conversation".
+    for (const key of ["common.rename", "common.archive", "common.delete"]) {
+      expect(rowActions).toContain(key);
+      expect(recents).toContain(key);
+    }
+    // The longer form survives as the accessible name, never as visible text.
+    expect(rowActions).toContain("accessibleName: t(");
+    expect(rowActions).toContain("command_palette.rename_conversation");
+  });
+
   test("the hover cluster stays visible where hover does not exist", () => {
     const rowActions = readFileSync(
       join(

@@ -2122,16 +2122,18 @@ describe("Argus Alpha frontend contract", () => {
     expect(rowActionsView).toContain(
       'import { Tooltip } from "@/components/ui/Tooltip"',
     );
+    // The eye reads the short verb, the same one Recents shows. The screen
+    // reader hears the object too, because an icon-only control has no context.
     expect(rowActionsView).toContain("content={action.label}");
-    expect(rowActions).toContain(
-      't("command_palette.rename_conversation", "Rename conversation")',
-    );
-    expect(rowActions).toContain(
-      't("command_palette.archive_conversation", "Archive conversation")',
-    );
-    expect(rowActions).toContain(
-      't("command_palette.delete_conversation", "Delete conversation")',
-    );
+    expect(rowActionsView).toContain("aria-label={action.accessibleName}");
+    for (const [visible, announced] of [
+      ['t("common.rename", "Rename")', "command_palette.rename_conversation"],
+      ['t("common.archive", "Archive")', "command_palette.archive_conversation"],
+      ['t("common.delete", "Delete")', "command_palette.delete_conversation"],
+    ]) {
+      expect(rowActions).toContain(visible);
+      expect(rowActions).toContain(announced);
+    }
     expect(palette).not.toContain("getConversationMessages");
     expect(palette).not.toContain("hydrateMessagesFromApi");
     expect(palette).not.toContain("ChatMessage");
