@@ -1042,6 +1042,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/evidence-artifacts/{artifact_id}/public-excerpt:
+    post:
+      tags:
+      - evidence-receipts
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicExcerptCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptCreateResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/feedback:
     post:
       tags:
@@ -1597,6 +1634,124 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MemoryConsentSettingsResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/public-excerpts:
+    get:
+      tags:
+      - evidence-receipts
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptListResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/public-excerpts/{snapshot_id}:
+    delete:
+      tags:
+      - evidence-receipts
+      parameters:
+      - name: snapshot_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptRevokeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/public/receipt-funnel:
+    post:
+      tags:
+      - public-receipts
+      description: 'Record one viewer-side funnel stage. Carries no id and stores nothing.
+
+
+        Section 7.2 asks for the acquisition path to be observable end to end, and
+
+        the Try Argus tap happens on a page nobody is signed in to. The alternative,
+
+        a marker on the guest entry url, is ruled out by section 6: sharing adds no
+
+        new parameter to that surface.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicExcerptFunnelStage'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/public/receipts/{public_id}:
+    get:
+      tags:
+      - public-receipts
+      parameters:
+      - name: public_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptView'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '503':
           $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
@@ -3487,6 +3642,254 @@ components:
       - synchronized
       - not_applicable
       - reconciliation_required
+    PublicExcerptCreate:
+      properties:
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+      additionalProperties: false
+      type: object
+    PublicExcerptCreateResponse:
+      properties:
+        receipt:
+          $ref: '#/components/schemas/PublicExcerptListItem'
+      additionalProperties: false
+      type: object
+      required:
+      - receipt
+    PublicExcerptDateRange:
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+        display:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - start
+      - end
+      - display
+      description: The tested window, frozen as the run reported it.
+    PublicExcerptFunnelStage:
+      properties:
+        stage:
+          type: string
+          const: try_argus
+      additionalProperties: false
+      type: object
+      required:
+      - stage
+      description: One viewer-side funnel stage. There is deliberately nothing else in it.
+    PublicExcerptListItem:
+      properties:
+        id:
+          type: string
+        public_id:
+          type: string
+        path:
+          type: string
+        title:
+          type: string
+        symbols:
+          items:
+            type: string
+          type: array
+        date_range_display:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        revocation_reason:
+          anyOf:
+          - type: string
+            enum:
+            - owner_revoked
+            - source_deleted
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - public_id
+      - path
+      - title
+      - date_range_display
+      - created_at
+      description: One row of the owner's receipt list in Data Controls.
+    PublicExcerptListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/PublicExcerptListItem'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - items
+    PublicExcerptMetric:
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - key
+      - label
+      - value
+      description: One result metric, already formatted for reading.
+    PublicExcerptPayload:
+      properties:
+        schema_version:
+          type: integer
+          const: 1
+          default: 1
+        idea_title:
+          type: string
+        asset_class:
+          anyOf:
+          - type: string
+            enum:
+            - equity
+            - crypto
+            - currency_pair
+          - type: 'null'
+        symbols:
+          items:
+            type: string
+          type: array
+        strategy_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+        assumptions:
+          items:
+            type: string
+          type: array
+        date_range:
+          $ref: '#/components/schemas/PublicExcerptDateRange'
+        metrics:
+          items:
+            $ref: '#/components/schemas/PublicExcerptMetric'
+          type: array
+        benchmark_symbol:
+          anyOf:
+          - type: string
+          - type: 'null'
+        benchmark_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        visual:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptVisual'
+          - type: 'null'
+        owner_note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: historical_simulation_not_advice
+          default: historical_simulation_not_advice
+        provenance_mark:
+          type: string
+          const: tested_with_argus
+          default: tested_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - idea_title
+      - date_range
+      description: The closed receipt payload. Adding a field here is a product decision.
+    PublicExcerptRevokeResponse:
+      properties:
+        receipt:
+          $ref: '#/components/schemas/PublicExcerptListItem'
+      additionalProperties: false
+      type: object
+      required:
+      - receipt
+    PublicExcerptView:
+      properties:
+        public_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - available
+          - revoked
+        indexing:
+          type: string
+          const: noindex, nofollow
+          default: noindex, nofollow
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        payload:
+          anyOf:
+          - $ref: '#/components/schemas/PublicExcerptPayload'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - public_id
+      - status
+      description: Everything an unauthenticated viewer receives. Nothing else exists here.
+    PublicExcerptVisual:
+      properties:
+        kind:
+          type: string
+          const: portfolio_equity
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+        base_value:
+          anyOf:
+          - type: number
+          - type: 'null'
+        series:
+          items:
+            $ref: '#/components/schemas/PublicExcerptVisualPoint'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - series
+      description: Frozen visual evidence. No series is fetched at view time.
+    PublicExcerptVisualPoint:
+      properties:
+        time:
+          type: string
+        value:
+          type: number
+      additionalProperties: false
+      type: object
+      required:
+      - time
+      - value
     RetrievedMemoryOut:
       properties:
         record:

@@ -998,6 +998,100 @@ Cost model notes:
 - Cost rows never store raw prompts, transcripts, credentials, balances,
   holdings, full audio, or frontend-only payloads.
 
+## 12.1.3 public_excerpt_snapshots
+
+A public evidence receipt: an immutable, sanitized snapshot of one completed
+backtest, created by its owner and revocable by its owner. Behind the default-off
+`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
+
+The pipeline is `EvidenceArtifact -> PublicExcerptSnapshot -> PublicExcerptView`.
+The snapshot is frozen at creation and the public read never queries the source
+conversation. Immutable means the numbers never move: re-running the idea later
+produces a new artifact and leaves the receipt showing what it showed the day it
+was shared.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `public_id`: `text` (Unique, `^[A-Za-z0-9_-]{22,64}$`, 24 bytes of urlsafe
+  entropy; this is the url token)
+- `owner_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `evidence_artifact_id`: `uuid` (Nullable, references `evidence_artifacts.id`
+  ON DELETE SET NULL)
+- `source_conversation_id`: `uuid` (Nullable, references `conversations.id`
+  ON DELETE SET NULL)
+- `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
+  ON DELETE SET NULL)
+- `title`: `text`
+- `payload`: `jsonb` (the closed public payload; see below)
+- `payload_digest`: `text` (`^[0-9a-f]{64}$`, sha256 over the canonical payload)
+- `created_at`: `timestamptz`
+- `revoked_at`: `timestamptz` (Nullable)
+- `revocation_reason`: `text` (Nullable, `owner_revoked` or `source_deleted`)
+
+The source references are `ON DELETE SET NULL` rather than cascade so a tombstone
+outlives whatever it pointed at. They exist only for revocation and the owner's
+audit list; the public read never selects them.
+
+### Closed payload
+
+`payload` carries exactly these keys and no others, enforced by `extra="forbid"`
+on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
+`idea_title`, `asset_class`, `symbols`, `strategy_label`, `assumptions`,
+`date_range`, `metrics`, `benchmark_symbol`, `benchmark_note`, `visual`,
+`owner_note`, `content_language`, `framing`, `provenance_mark`.
+
+Source conversation ids, route receipts, provider or model metadata, retry
+payloads, raw transcripts, broker or account data, and user-private memory are
+never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audits
+keys and values before any receipt is written and fails closed, so a payload that
+cannot be proven clean is never stored.
+
+`owner_note` is the only free-text field. It is bounded at 280 characters,
+stripped of control characters, and refused if it contains an identifier or a
+credential-shaped token.
+
+`visual` freezes the run's equity series, downsampled to at most 500 points with
+the endpoints preserved. The public view renders it client side; nothing is
+fetched at view time.
+
+### Immutability and revocation
+
+`prevent_public_excerpt_immutable_update` rejects any change to `id`,
+`public_id`, `owner_id`, `title`, `payload`, `payload_digest`, or `created_at`,
+and rejects any change to the revocation columns once `revoked_at` is set.
+Revocation is one way.
+
+`revoke_public_excerpts_for_deleted_source` revokes a receipt when its source
+goes away, so deleting a chat cannot leave a live public page behind:
+- `conversations` soft delete (`deleted_at` null to not null)
+- `conversations`, `backtest_runs`, or `evidence_artifacts` hard delete
+
+Every branch skips rows whose owner profile is already gone. Account deletion
+cascades to conversations and fires the purge trigger while the profile no longer
+exists; revoking there would fail the owner foreign key and take account deletion
+with it. Those rows are cascade-deleted moments later, reaching the same outcome.
+
+A partial unique index on `(owner_id, evidence_artifact_id) where revoked_at is
+null` allows at most one live receipt per result, so re-sharing returns the
+existing link instead of minting a second page the owner must revoke twice.
+Revoked rows are excluded, so revoking does not forbid sharing that result again.
+
+Note a pre-existing constraint: a conversation with a captured idea spine cannot
+be hard deleted at all, because `idea_versions.source_conversation_id` is
+`ON DELETE SET NULL` while `prevent_idea_version_immutable_update` forbids
+changing that column. Argus only soft deletes conversations, so this never
+surfaces in the product; the purge triggers are a backstop, not the live path.
+
+### RLS
+
+Row level security is enabled and there is deliberately **no** policy and **no**
+grant for `anon` or `authenticated`. Neither the public read nor the owner's list
+goes through the browser: both are served by the backend, which is where the
+audience split is enforced. The public read selects only
+`public_id, payload, created_at, revoked_at`. A select policy without a matching
+grant would be dead code that reads like protection, and adding the grant would
+put the owner and source columns one PostgREST call away from the browser.
+
 ## 12.1.2 Memory Persistence Incubation
 
 Memory is an isolated, no-consumer persistence checkpoint. It

@@ -589,6 +589,68 @@ assistant bubble and has no message id. No synthetic assistant message is
 inserted into the API response, and no placeholder assistant message is
 persisted solely to represent abandonment.
 
+### Public evidence receipts
+
+Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
+off, every path below answers exactly as a route that does not exist: status 404
+with body `{"detail":"Not Found"}`, produced by the same handler an unmatched path
+uses. A distinctive problem body would still advertise that receipt code is
+deployed, so the flag-off response is byte-identical to a deployment without this
+lane, and that is pinned by test.
+
+Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
+
+| Method   | Path                                               | Purpose |
+| :------- | :------------------------------------------------- | :------ |
+| `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Freeze a receipt from an owned completed backtest |
+| `GET`    | `/public-excerpts`                                 | The owner's receipt list for Data Controls |
+| `DELETE` | `/public-excerpts/{snapshot_id}`                   | Revoke, immediately and irreversibly |
+
+Public endpoints, unauthenticated:
+
+| Method | Path                           | Purpose |
+| :----- | :----------------------------- | :------ |
+| `GET`  | `/public/receipts/{public_id}` | Read one frozen receipt |
+| `POST` | `/public/receipt-funnel`       | Record one viewer-side funnel stage |
+
+`POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
+`{"owner_note": string | null}`, bounded at 280 characters, and returns
+`{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
+has a live one returns that receipt rather than minting a second link.
+
+`PublicExcerptListItem` is `{id, public_id, path, title, symbols,
+date_range_display, created_at, revoked_at, revocation_reason}`. It carries no
+source conversation, run, or artifact id. Clients compose the shareable url as
+`origin + path`, so the backend owns no origin configuration.
+
+`GET /public/receipts/{public_id}` returns
+`{public_id, status, indexing, created_at, payload}`:
+
+- `status` is `available` or `revoked`; `indexing` is always `noindex, nofollow`.
+- A revoked receipt returns `200` with `status: "revoked"`, `payload: null`, and
+  no `created_at`. It is a tombstone, not a `404`: the viewer already holds the
+  link, and a not-found page only makes the sender look careless.
+- An unknown `public_id` returns the same tombstone. With unguessable ids there is
+  nothing to enumerate, so making unknown and revoked indistinguishable removes an
+  oracle and gives a viewer with a stale link an honest page instead of a broken
+  one.
+- The request carries no credentials, and `payload` is the closed set documented in
+  `docs/DATA_MODEL.md` section 12.1.3.
+
+`POST /public/receipt-funnel` takes `{"stage": "try_argus"}` and returns `204`. It
+stores nothing and carries no identifier. It exists because the Try Argus tap
+happens on a page nobody is signed in to, and the alternative, a marker on the
+guest entry url, is ruled out: sharing adds no new parameter to that surface.
+
+Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user id
+and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
+per hour per client identity.
+
+Error codes specific to this surface: `receipt_note_rejected` (422, the note
+contains an identifier or a credential-shaped token), `receipt_source_unsupported`
+(422, not a completed backtest result), and `receipt_sanitization_failed` (500, the
+payload could not be proven free of never-expose data, so nothing was published).
+
 ## Admin Bypass
 
 If `profiles.is_admin = true`, backend quota and rate-limit restrictions are bypassed.
