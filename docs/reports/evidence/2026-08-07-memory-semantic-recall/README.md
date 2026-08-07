@@ -126,13 +126,16 @@ OpenRouter runtime, real Perplexity embeddings.
 | `en-02-backtest-result.png` | The real backtest the decision is saved from |
 | `en-03-memory-proposal.png` | The proposal asking before anything is stored |
 | `en-04-recall-note.png` | English recall answering a zero-token-overlap query |
-| `es-419-01-signed-in.png` | Signed-in surface, es-419 |
-| `es-419-02-recall-note.png` | es-419 recall answering the Spanish query |
 | `drawer-en-01-collapsed.png` | The collapsed drawer, English |
 | `drawer-en-02-expanded.png` | The same drawer open, feedback row intact |
 | `drawer-es-419-01-collapsed.png` | The collapsed drawer, es-419 |
 | `drawer-es-419-02-expanded.png` | The same drawer open, es-419 |
 | `*-page-text.txt` | Captured page text per locale |
+
+The es-419 evidence is the `drawer-es-419-*` pair. An earlier `es-419-01` and
+`es-419-02` pair was removed: it came from the run whose profile language never
+switched, so it showed an English interface under an es-419 name. The
+signed-in shot was byte-identical to its English counterpart.
 
 The English run is the whole journey: backtest, save decision, confirm the
 memory proposal, then ask. The es-419 run asks only, against the memory the
@@ -187,9 +190,16 @@ matching used to miss entirely.
 
 Correction to an earlier draft of this document: it claimed the assistant's
 prose rendered in English for the es-419 turn and attributed that to interpreter
-voicing. That was wrong. The first es-419 capture never switched the profile
-language, so the whole UI was English. With the profile language actually set to
-es-419, the interface, the assistant prose, and the drawer all render in
-Spanish. Only the stored memory text stays English, which is correct: stored
-memory content is verbatim user content by spec section 2.11 and is not
-localized.
+voicing. That was wrong, and the artifacts were wrong with it. The first es-419
+capture never switched the profile language, so the whole UI was English; the
+signed-in screenshot was byte-identical to the English one. Those three files
+have been removed rather than left to mislead a reviewer.
+
+The cause is worth recording for the next lane: `i18n` follows the **profile
+language**, not the browser locale, so a Playwright `newContext({locale})` does
+nothing on its own. Set `public.profiles.language` before sign-in.
+
+With the profile language actually set to es-419, the interface, the assistant
+prose, and the drawer all render in Spanish. Only the stored memory text stays
+English, which is correct: stored memory content is verbatim user content by
+spec section 2.11 and is not localized.
