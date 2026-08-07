@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
     NEXT_EXPERIMENT_SHORT_LABELS,
