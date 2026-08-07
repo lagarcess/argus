@@ -998,9 +998,9 @@ Cost model notes:
 - Cost rows never store raw prompts, transcripts, credentials, balances,
   holdings, full audio, or frontend-only payloads.
 
-## 12.1.2 Personalization Memory Persistence Incubation
+## 12.1.2 Memory Persistence Incubation
 
-Personalization memory is an isolated, no-consumer persistence checkpoint. It
+Memory is an isolated, no-consumer persistence checkpoint. It
 does not change P2 recall, Omnisearch, canonical Ideas, EvidenceArtifacts,
 DecisionNotes, conversations, backtests, LangGraph state, or ordinary Guest
 chat. Product exposure, API wiring, runtime retrieval, Data Controls, providers,

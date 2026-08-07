@@ -309,7 +309,7 @@ replaces.
 
 ## 11. Memory scope expansion
 
-This changes what personalization memory is for, and the in-flight recall-loop
+This changes what memory is for, and the in-flight recall-loop
 lane must absorb it.
 
 The decision memo already anticipated this in section 5.6:
