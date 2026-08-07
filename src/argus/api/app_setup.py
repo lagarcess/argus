@@ -65,9 +65,16 @@ async def lifespan(app: FastAPI):
     app.state.agent_runtime_checkpointer = checkpointer
     app.state.agent_runtime_checkpointer_cm = checkpointer_cm
     app.state.agent_runtime_workflow = None
+    from argus.api.personalization_memory import (
+        start_personalization_memory,
+        stop_personalization_memory,
+    )
+
+    start_personalization_memory(app)
     try:
         yield
     finally:
+        stop_personalization_memory(app)
         if checkpointer_cm is not None:
             await checkpointer_cm.__aexit__(None, None, None)
 

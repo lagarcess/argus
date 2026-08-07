@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DiscoverySidecar } from "./types";
 
@@ -153,9 +153,18 @@ export default function DiscoverySourcesPanel({
                       {source.title}
                     </span>
                   ) : null}
-                  <span className="text-[12px] leading-[1.5] text-black/50 [overflow-wrap:anywhere] dark:text-white/50">
-                    {source.domain}
-                    {date ? ` · ${date}` : ""}
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium leading-[1.5] text-black/70 [overflow-wrap:anywhere] dark:text-white/70">
+                    <span>
+                      {source.domain}
+                      {date ? ` · ${date}` : ""}
+                    </span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="sr-only">
+                      {t(
+                        "chat.discovery_results.sources_panel_external_link_new_tab",
+                        { defaultValue: "Opens in a new tab" },
+                      )}
+                    </span>
                   </span>
                 </a>
               </li>
