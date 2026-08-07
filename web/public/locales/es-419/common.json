@@ -106,7 +106,7 @@
         },
         "cookies": {
           "title": "Cookies y almacenamiento del navegador",
-          "body": "Argus guarda muy pocos datos en tu navegador. Todo lo que guarda es necesario para que el producto funcione o es una preferencia que tú elegiste, por eso Argus no muestra un aviso de consentimiento de cookies.",
+          "body": "Argus guarda muy pocos datos en tu navegador. Todo lo que guarda sirve para que el producto funcione o para recordar tus ajustes, y nada de eso es publicidad ni rastreo, por eso Argus no muestra un aviso de consentimiento de cookies.",
           "items": {
             "sign_in": {
               "label": "Cookies de inicio de sesión",
@@ -122,7 +122,7 @@
             },
             "preferences": {
               "label": "Preferencias que tú eliges",
-              "body": "El almacenamiento local de tu navegador guarda tu idioma, tus preferencias de apariencia y diseño, los avisos que descartaste y las conversaciones que marcaste como temporales. Todo eso queda en tu dispositivo y Argus nunca se lo envía a anunciantes."
+              "body": "El almacenamiento local de tu navegador guarda tu idioma, que empieza con el de tu propio navegador hasta que lo cambies, junto con tus preferencias de apariencia y diseño, los avisos que descartaste y las conversaciones que marcaste como temporales. Todo eso queda en tu dispositivo y Argus nunca se lo envía a anunciantes."
             }
           },
           "body_after": "Argus no usa cookies publicitarias, píxeles de anuncios, rastreadores de marketing ni rastreo entre sitios, y no comparte datos de tu navegador con socios publicitarios. La analítica de producto, cuando está activa, corre en los servidores de Argus y no guarda nada en tu navegador. Puedes borrar o bloquear este almacenamiento desde la configuración de tu navegador, aunque el inicio de sesión dejará de funcionar si bloqueas las cookies de sesión."
