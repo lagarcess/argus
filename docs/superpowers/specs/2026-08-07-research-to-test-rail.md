@@ -213,14 +213,28 @@ truly runs.
 
 The current entry under-promises now that Argus is not bounded to backtesting.
 
-**Composer placeholder.** `chat.input_placeholder` is "Describe an investing
-idea". It instructs rather than invites: "describe" assumes the user already has
-an idea, and "investing idea" excludes questions. That tells every arriving user
-they must show up with a strategy, which is the exact barrier this rail removes.
+**Composer placeholders.** There are three, and only two change.
 
-Widen it to state both halves in one line, for example "Ask about a company, or
-describe an idea to test". Final wording is a copy decision; the requirement is
-that it communicates answering and testing without listing features.
+| Key | Current | Action |
+| --- | --- | --- |
+| `chat.input_placeholder` | "Describe an investing idea" | widen |
+| `guest.shell.input_placeholder` | "What do you want to test?" | widen |
+| `chat.followup_placeholder` | "Add a follow-up" | **leave unchanged** |
+
+The two empty-state placeholders instruct rather than invite. "Describe"
+assumes the user already has an idea, and both "investing idea" and "test"
+exclude questions. Together they tell every arriving user they must show up
+with a strategy, which is the exact barrier this rail removes. The guest one
+matters most, because guests form the first impression with no memory behind
+them.
+
+Widen both to state answering and testing in one line, for example "Ask about a
+company, or describe an idea to test". Final wording is a copy decision; the
+requirement is that it communicates both halves without listing features.
+
+`chat.followup_placeholder` is correct as it stands. Once a conversation is
+underway the user knows what Argus does, and "Add a follow-up" is exactly right
+for that moment. Do not touch it.
 
 **Starter chips.** `chat.example_queries` currently holds three backtests
 (q1-q3), which implies backtesting is all Argus does. Keep three chips, but span
