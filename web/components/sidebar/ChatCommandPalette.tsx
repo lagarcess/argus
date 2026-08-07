@@ -282,7 +282,10 @@ export default function ChatCommandPalette({
   // Below the mobile threshold Omnisearch is collapsed-only: there is no room
   // for a second pane, and the dossier arrives as a sheet instead.
   const effectiveLayoutMode: LayoutMode = isBelowTablet ? "collapsed" : layoutMode;
-  const rowActionVariant = isBelowTablet ? "menu" : "hover";
+  // Hover reveal only works where hover exists. Every width below the desktop
+  // stop gets the explicit menu, and the hover variant stays visible under
+  // `@media (hover: none)` so a touch screen at desktop width is covered too.
+  const rowActionVariant = isBelowDesktop ? "menu" : "hover";
   const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
     DEFAULT_DOSSIER_PANE_STATE,
@@ -1046,6 +1049,28 @@ export default function ChatCommandPalette({
     removeLocalConversation,
   ]);
 
+  // Pointer, Enter, Space, and the search field's open action all land here, so
+  // no input method gets a different, more destructive navigation than another.
+  const openRow = useCallback(
+    (
+      item: CommandPaletteDisplayItem,
+      options: { navigationDisabled: boolean; openAtLeftOff?: boolean },
+    ) => {
+      if (isBelowDesktop) {
+        setPreviewItem(item);
+        setIsDossierSheetOpen(true);
+        return;
+      }
+      if (options.navigationDisabled) {
+        setPreviewItem(item);
+        setLayoutMode("expanded");
+        return;
+      }
+      activateItem(item, options.openAtLeftOff);
+    },
+    [activateItem, isBelowDesktop, setPreviewItem],
+  );
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (pendingDeleteItem) return;
@@ -1081,6 +1106,10 @@ export default function ChatCommandPalette({
       }
       if (dossierKeyboardAction === "allow_control") return;
       if (event.key === "Escape") {
+        // Both this and BottomSheet listen on document in the capture phase, and
+        // this one was registered first, so stopPropagation in the sheet cannot
+        // reach it. Escape must dismiss one level, so defer while it is open.
+        if (isDossierSheetOpen) return;
         event.preventDefault();
         if (editingId) {
           cancelRename();
@@ -1129,7 +1158,10 @@ export default function ChatCommandPalette({
       }
       if (action.type === "open" && selectedPreview) {
         event.preventDefault();
-        activateItem(selectedPreview, action.openAtLeftOff);
+        openRow(selectedPreview, {
+          navigationDisabled: selectedNavigationDisabled,
+          openAtLeftOff: action.openAtLeftOff,
+        });
         return;
       }
       if (action.type === "rename" && selectedPreview) {
@@ -1150,16 +1182,18 @@ export default function ChatCommandPalette({
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [
-    activateItem,
     cancelRename,
     canManageConversation,
     dossierPaneState,
     editingId,
     handleArchive,
     handleDelete,
+    isDossierSheetOpen,
     keyboardItems,
     onClose,
+    openRow,
     pendingDeleteItem,
+    selectedNavigationDisabled,
     selectedPreview,
     shortcutLegend.usesCommandKey,
     startRename,
@@ -1622,45 +1656,38 @@ export default function ChatCommandPalette({
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               event.stopPropagation();
-                              activateItem(
-                                item,
-                                event.key === "Enter" &&
+                              openRow(item, {
+                                navigationDisabled: isNavigationDisabled,
+                                openAtLeftOff:
+                                  event.key === "Enter" &&
                                   (event.metaKey || event.ctrlKey),
-                              );
+                              });
                             }
                           };
                           return (
                             <div
                               key={`${item.source}:${item.id}`}
                               data-palette-row-index={rowIndex}
-                              onClick={() => {
-                                if (isBelowDesktop) {
-                                  setPreviewItem(item);
-                                  setIsDossierSheetOpen(true);
-                                  return;
-                                }
-                                if (isNavigationDisabled) {
-                                  setPreviewItem(item);
-                                  setLayoutMode("expanded");
-                                  return;
-                                }
-                                activateItem(item);
-                              }}
+                              onClick={() =>
+                                openRow(item, {
+                                  navigationDisabled: isNavigationDisabled,
+                                })
+                              }
                               onKeyDown={handleRowKeyDown}
                               onMouseEnter={() => setPreviewItem(item)}
                               onFocus={() => setPreviewItem(item)}
                               role="button"
                               tabIndex={0}
                               aria-disabled={isNavigationDisabled}
-                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 ${
+                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 max-desktop:min-h-11 max-desktop:pe-12 ${
                                 selectedPreview?.id === item.id &&
                                 selectedPreview.type === item.type
                                   ? "bg-black/5 dark:bg-white/5"
                                   : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-24">
-                                <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1 pr-24 max-desktop:pr-0 max-desktop:self-center">
+                                <div className="flex min-w-0 items-center gap-2">
                                   {isEditing ? (
                                     <input
                                       autoFocus
@@ -1742,7 +1769,13 @@ export default function ChatCommandPalette({
                                   </div>
                                 )}
                               </div>
-                              <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">
+                              <span
+                                className={
+                                  rowActionVariant === "menu"
+                                    ? "shrink-0 self-center whitespace-nowrap text-[11px] text-black/30 dark:text-white/30"
+                                    : "absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30"
+                                }
+                              >
                                 {formatRelativeDate(
                                   item.updatedAt,
                                   t,

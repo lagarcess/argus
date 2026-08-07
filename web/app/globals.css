@@ -688,3 +688,13 @@ body {
     overflow: hidden;
   }
 }
+
+/*
+ * Hover reveal is an affordance, not a gate. Where the pointer cannot hover
+ * there is nothing to reveal it with, so the row's actions stay visible.
+ */
+@media (hover: none) {
+  .argus-row-hover-actions {
+    opacity: 1;
+  }
+}

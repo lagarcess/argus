@@ -55,7 +55,7 @@ export default function CommandPaletteRowActions({
   if (variant === "hover") {
     return (
       <div
-        className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+        className="argus-row-hover-actions absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
         data-row-action
       >
         {actions.map((action) => (
@@ -85,7 +85,7 @@ export default function CommandPaletteRowActions({
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-1 right-1 top-1 flex items-center"
+      className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center"
       data-row-action
     >
       <button

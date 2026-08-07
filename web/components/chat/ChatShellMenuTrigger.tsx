@@ -1,7 +1,7 @@
 "use client";
 
-import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { MenuGlyphIcon } from "@/components/chat/MenuGlyphIcon";
 import { ConversationActivityIndicator } from "@/components/chat/ConversationActivityIndicator";
 import type { ConversationActivityPresentation } from "@/lib/conversation-activity-state";
 
@@ -31,7 +31,7 @@ export default function ChatShellMenuTrigger({
       aria-haspopup="dialog"
       className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 active:scale-95 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
     >
-      <Menu className="h-5 w-5 text-black/70 dark:text-white/70" aria-hidden="true" />
+      <MenuGlyphIcon className="h-5 w-5 text-black/70 dark:text-white/70" aria-hidden="true" />
       {activityPresentation ? (
         <span className="pointer-events-none absolute right-1.5 top-1.5">
           <ConversationActivityIndicator presentation={activityPresentation} />

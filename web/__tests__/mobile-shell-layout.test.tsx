@@ -254,7 +254,10 @@ describe("mobile top bar", () => {
     expect(markup).toContain('data-testid="chat-shell-menu-trigger"');
     expect(markup).toContain('aria-label="Open sidebar"');
     expect(markup).toContain('aria-haspopup="dialog"');
-    expect(markup).toContain("lucide-menu");
+    // Two bars with the lower one shorter, not an even three-bar hamburger.
+    expect(markup).toContain('<line x1="3" y1="9" x2="21" y2="9"></line>');
+    expect(markup).toContain('<line x1="3" y1="15" x2="14" y2="15"></line>');
+    expect(markup).not.toContain("lucide-menu");
     expect(markup).toContain("h-11 w-11");
   });
 
@@ -320,10 +323,58 @@ describe("omnisearch below threshold", () => {
     expect(commandPalette).toContain("commandPaletteOpenLabelKey(selectedPreview)");
   });
 
-  test("row actions become a trailing three-dot on touch widths", () => {
+  test("row actions are explicit at every width a touch device is likely to use", () => {
+    // Hover reveal cannot be the only affordance where hover does not exist, so
+    // the whole band below the desktop stop gets the visible menu.
     expect(commandPalette).toContain(
-      'const rowActionVariant = isBelowTablet ? "menu" : "hover";',
+      'const rowActionVariant = isBelowDesktop ? "menu" : "hover";',
     );
+  });
+
+  test("the hover cluster stays visible where hover does not exist", () => {
+    const rowActions = readFileSync(
+      join(
+        import.meta.dir,
+        "../components/sidebar/command-palette/CommandPaletteRowActions.tsx",
+      ),
+      "utf-8",
+    );
+    expect(rowActions).toContain("argus-row-hover-actions");
+    const hoverNone = globalsCss.slice(globalsCss.indexOf("@media (hover: none)"));
+    expect(hoverNone).toContain(".argus-row-hover-actions");
+    expect(hoverNone).toContain("opacity: 1;");
+  });
+
+  test("pointer, keyboard, and the search field share one row-open path", () => {
+    // A keyboard user must not get a different, more destructive navigation.
+    expect(commandPalette).toContain("const openRow = useCallback(");
+    expect(commandPalette).not.toContain("activateItem(item)");
+    expect(commandPalette).not.toContain(
+      "activateItem(selectedPreview, action.openAtLeftOff)",
+    );
+    const rowKeyDown = commandPalette.slice(
+      commandPalette.indexOf("const handleRowKeyDown"),
+      commandPalette.indexOf("const handleRowKeyDown") + 700,
+    );
+    expect(rowKeyDown).toContain("openRow(item, {");
+  });
+
+  test("Escape dismisses one level, not the whole of Omnisearch", () => {
+    // Both listeners are on document in the capture phase and this one runs
+    // first, so stopPropagation in the sheet cannot reach it.
+    const escape = commandPalette.slice(
+      commandPalette.indexOf('if (event.key === "Escape") {'),
+      commandPalette.indexOf('if (event.key === "Escape") {') + 400,
+    );
+    expect(escape).toContain("if (isDossierSheetOpen) return;");
+  });
+
+  test("the row date is a column rather than an overlay", () => {
+    // Absolute positioning let a wide chip run underneath the date.
+    expect(commandPalette).toContain(
+      '? "shrink-0 self-center whitespace-nowrap text-[11px] text-black/30 dark:text-white/30"',
+    );
+    expect(commandPalette).toContain("max-desktop:min-h-11 max-desktop:pe-12");
   });
 });
 
