@@ -232,6 +232,12 @@ Widen both to state answering and testing in one line, for example "Ask about a
 company, or describe an idea to test". Final wording is a copy decision; the
 requirement is that it communicates both halves without listing features.
 
+**Default both keys to the same string.** The requirement is identical for guest
+and registered, and two ways of saying one thing is copy debt. Diverge only if
+the guest shell has a real width constraint. The guest string is not a place to
+enumerate capability, because the chips below already carry that job; short and
+inviting beats comprehensive.
+
 `chat.followup_placeholder` is correct as it stands. Once a conversation is
 underway the user knows what Argus does, and "Add a follow-up" is exactly right
 for that moment. Do not touch it.
@@ -261,9 +267,21 @@ as noise, animated placeholders fight users mid-thought, and they degrade
 screen-reader behavior. Retire the old composer typewriter rather than reviving
 it.
 
-**Audience.** This is primarily a guest concern. Signed-in users get
-memory-driven suggestions and already know what Argus does; guests form a first
-impression with no memory at all.
+**Audience, and the rule that decides it.**
+
+> Memory-driven suggestions when memory has something to offer. The
+> range-spanning static chips otherwise. Guests always get the static ones.
+
+The deciding case is a registered user with no memory yet, a fresh account or
+memory left off. They cannot receive personalized suggestions because there is
+nothing to personalize from, so they fall back to the static chips.
+
+That means **the static chips are not guest-only code**. They are the fallback
+for everyone, and should be built that way rather than as a guest branch.
+
+A signed-in user with real history should never see generic examples. Showing
+them "How has Nvidia's revenue changed?" when Argus knows what they actually
+follow is a downgrade, not a neutral default.
 
 **Sequencing.** This copy ships with the rail, never ahead of it. A compare
 chip that fails on tap is worse than the underwhelming backtest chip it
