@@ -62,6 +62,24 @@ class CanonicalEnableMutation:
 
 
 @dataclass(frozen=True, slots=True)
+class LiveProjection:
+    """A derivative pointer and the content generation it stands for.
+
+    Invariant, and the reason this is one value: a projection's ref and the
+    generation it represents may never be updated independently. Retrieval
+    decides whether an empty index answer is authoritative by comparing that
+    generation against the record's latest, so a ref written without its
+    generation, or a generation surviving a ref that was removed, silently
+    turns superseded index content into authority. Storing them separately
+    made that a bug you have to remember not to write; storing them together
+    makes it one you cannot express.
+    """
+
+    provider_ref: str
+    generation: int
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderCleanupTarget:
     """Inspectable derivative cleanup work retained after canonical mutation."""
 
@@ -316,10 +334,9 @@ class InMemoryCanonicalMemoryStore:
         self._settings: dict[str, MemoryConsentSettings] = {}
         self._receipts: dict[str, dict[str, ConfirmedMemoryConsentReceipt]] = {}
         self._records: dict[str, dict[str, MemoryRecord]] = {}
-        self._provider_refs: dict[str, dict[str, str]] = {}
-        # Which reconciliation generation each live projection represents, so
-        # a projection can be recognised as describing superseded content.
-        self._provider_ref_generations: dict[tuple[str, str], int] = {}
+        # Ref and generation together; see LiveProjection for why they are
+        # never stored apart.
+        self._projections: dict[str, dict[str, LiveProjection]] = {}
         self._cleanup_targets: dict[tuple[str, str], set[str]] = {}
         self._reconciliation_generations: dict[tuple[str, str], int] = {}
         self._inflight_reconciliations: dict[tuple[str, str], set[int]] = {}
@@ -735,7 +752,7 @@ class InMemoryCanonicalMemoryStore:
             return CanonicalRecordMutation(
                 before=current,
                 after=updated,
-                provider_ref=self._provider_refs.get(owner.owner_id, {}).get(record_id),
+                provider_ref=self._live_provider_ref(owner.owner_id, record_id),
                 reconciliation_generation=reconciliation_generation,
             )
 
@@ -753,8 +770,9 @@ class InMemoryCanonicalMemoryStore:
             current = records.get(record_id)
             if current is None:
                 return None
-            provider_refs = self._provider_refs.get(owner.owner_id, {})
-            provider_ref = provider_refs.get(record_id)
+            projections = self._projections.get(owner.owner_id, {})
+            projection = projections.get(record_id)
+            provider_ref = None if projection is None else projection.provider_ref
             cleanup_refs = set(self._cleanup_targets.get(reconciliation_key, set()))
             if provider_ref is not None:
                 cleanup_refs.add(provider_ref)
@@ -779,14 +797,14 @@ class InMemoryCanonicalMemoryStore:
 
             updated_records = dict(records)
             del updated_records[record_id]
-            updated_provider_refs = dict(provider_refs)
-            updated_provider_refs.pop(record_id, None)
+            updated_projections = dict(projections)
+            updated_projections.pop(record_id, None)
 
             self._records[owner.owner_id] = updated_records
-            if updated_provider_refs:
-                self._provider_refs[owner.owner_id] = updated_provider_refs
+            if updated_projections:
+                self._projections[owner.owner_id] = updated_projections
             else:
-                self._provider_refs.pop(owner.owner_id, None)
+                self._projections.pop(owner.owner_id, None)
             return CanonicalRecordMutation(
                 before=current,
                 after=None,
@@ -840,17 +858,15 @@ class InMemoryCanonicalMemoryStore:
                     )
                 )
             settings = self._settings.get(owner.owner_id, MemoryConsentSettings())
-            provider_refs = dict(self._provider_refs.get(owner.owner_id, {}))
-            for record_id, provider_ref in provider_refs.items():
+            projections = dict(self._projections.get(owner.owner_id, {}))
+            for record_id, projection in projections.items():
                 self._cleanup_targets.setdefault(
                     (owner.owner_id, record_id),
                     set(),
-                ).add(provider_ref)
+                ).add(projection.provider_ref)
             provider_state_existed = any(
-                owner_id == owner.owner_id and provider_refs
-                for (owner_id, _record_id), provider_refs in (
-                    self._cleanup_targets.items()
-                )
+                owner_id == owner.owner_id and refs
+                for (owner_id, _record_id), refs in self._cleanup_targets.items()
             )
             changed = any(
                 (
@@ -866,7 +882,7 @@ class InMemoryCanonicalMemoryStore:
             self._candidates.pop(owner.owner_id, None)
             self._receipts.pop(owner.owner_id, None)
             self._records.pop(owner.owner_id, None)
-            self._provider_refs.pop(owner.owner_id, None)
+            self._projections.pop(owner.owner_id, None)
             self._reconciliation_generations = {
                 key: generation
                 for key, generation in self._reconciliation_generations.items()
@@ -978,7 +994,7 @@ class InMemoryCanonicalMemoryStore:
                 not in self._inflight_reconciliations.get(reset_key, set())
             ):
                 return False
-            self._provider_refs.pop(owner.owner_id, None)
+            self._projections.pop(owner.owner_id, None)
             self._cleanup_targets = {
                 key: refs
                 for key, refs in self._cleanup_targets.items()
@@ -1022,28 +1038,37 @@ class InMemoryCanonicalMemoryStore:
                 for (owner_id, _target_record_id), refs in self._cleanup_targets.items()
             ):
                 return False
-            owner_refs = self._provider_refs.setdefault(owner.owner_id, {})
+            owner_projections = self._projections.setdefault(owner.owner_id, {})
             if any(
-                other_record_id != record_id and other_ref == provider_ref
-                for other_record_id, other_ref in owner_refs.items()
+                other_record_id != record_id
+                and other.provider_ref == provider_ref
+                for other_record_id, other in owner_projections.items()
             ):
                 return False
-            current_provider_ref = owner_refs.get(record_id)
+            current = owner_projections.get(record_id)
             # An unchanged ref writes nothing, so it cannot make a projection
             # look fresher than the content it still points at.
-            if current_provider_ref == provider_ref:
+            if current is not None and current.provider_ref == provider_ref:
                 return True
             key = (owner.owner_id, record_id)
-            if current_provider_ref is not None:
-                self._cleanup_targets.setdefault(key, set()).add(current_provider_ref)
-            owner_refs[record_id] = provider_ref
-            # Freshness follows the ref that was actually written, and never
-            # regresses below what it replaced. Mirrors the Postgres helper.
-            self._provider_ref_generations[key] = max(
-                self._reconciliation_generations.get(key, 1),
-                self._provider_ref_generations.get(key, 0),
+            if current is not None:
+                self._cleanup_targets.setdefault(key, set()).add(current.provider_ref)
+            # Mirrors the Postgres helper: the newly written ref stands for the
+            # record's latest generation, never less than the one it replaced.
+            owner_projections[record_id] = LiveProjection(
+                provider_ref=provider_ref,
+                generation=max(
+                    self._reconciliation_generations.get(key, 1),
+                    0 if current is None else current.generation,
+                ),
             )
             return True
+
+    def _live_provider_ref(self, owner_id: str, record_id: str) -> str | None:
+        """The live ref, read only through the pair that owns it."""
+
+        projection = self._projections.get(owner_id, {}).get(record_id)
+        return None if projection is None else projection.provider_ref
 
     def get_provider_ref(
         self,
@@ -1051,7 +1076,7 @@ class InMemoryCanonicalMemoryStore:
         record_id: str,
     ) -> str | None:
         with self._lock:
-            return self._provider_refs.get(owner.owner_id, {}).get(record_id)
+            return self._live_provider_ref(owner.owner_id, record_id)
 
     def settled_projection_record_ids(
         self,
@@ -1070,8 +1095,10 @@ class InMemoryCanonicalMemoryStore:
         with self._lock:
             return frozenset(
                 record_id
-                for record_id in self._provider_refs.get(owner.owner_id, {})
-                if self._provider_ref_generations.get((owner.owner_id, record_id), 0)
+                for record_id, projection in self._projections.get(
+                    owner.owner_id, {}
+                ).items()
+                if projection.generation
                 >= self._reconciliation_generations.get((owner.owner_id, record_id), 0)
             )
 
@@ -1089,9 +1116,7 @@ class InMemoryCanonicalMemoryStore:
             raise ValueError("provider ref must not be empty")
         with self._lock:
             current_record = self._records.get(owner.owner_id, {}).get(record_id)
-            current_provider_ref = self._provider_refs.get(owner.owner_id, {}).get(
-                record_id
-            )
+            current_provider_ref = self._live_provider_ref(owner.owner_id, record_id)
             reconciliation_key = (owner.owner_id, record_id)
             claim_key = (
                 owner.owner_id,
@@ -1113,8 +1138,8 @@ class InMemoryCanonicalMemoryStore:
             ):
                 return False
             if any(
-                other_record_id != record_id and other_ref == provider_ref
-                for other_record_id, other_ref in self._provider_refs.get(
+                other_record_id != record_id and other.provider_ref == provider_ref
+                for other_record_id, other in self._projections.get(
                     owner.owner_id, {}
                 ).items()
             ):
@@ -1128,9 +1153,11 @@ class InMemoryCanonicalMemoryStore:
                 self._cleanup_targets.setdefault(reconciliation_key, set()).add(
                     current_provider_ref
                 )
-            self._provider_refs.setdefault(owner.owner_id, {})[record_id] = provider_ref
-            self._provider_ref_generations[reconciliation_key] = (
-                reconciliation_claim.generation
+            self._projections.setdefault(owner.owner_id, {})[record_id] = (
+                LiveProjection(
+                    provider_ref=provider_ref,
+                    generation=reconciliation_claim.generation,
+                )
             )
             return True
 
@@ -1253,8 +1280,9 @@ class InMemoryCanonicalMemoryStore:
             raise ValueError("provider ref must not be empty")
         with self._lock:
             if any(
-                projected_record_id != record_id and projected_ref == provider_ref
-                for projected_record_id, projected_ref in self._provider_refs.get(
+                projected_record_id != record_id
+                and projected.provider_ref == provider_ref
+                for projected_record_id, projected in self._projections.get(
                     owner.owner_id, {}
                 ).items()
             ):
@@ -1279,11 +1307,14 @@ class InMemoryCanonicalMemoryStore:
             targets.remove(provider_ref)
             if not targets:
                 self._cleanup_targets.pop(key, None)
-            owner_refs = self._provider_refs.get(owner.owner_id)
-            if owner_refs is not None and owner_refs.get(record_id) == provider_ref:
-                owner_refs.pop(record_id, None)
-                if not owner_refs:
-                    self._provider_refs.pop(owner.owner_id, None)
+            owner_projections = self._projections.get(owner.owner_id)
+            live = (
+                None if owner_projections is None else owner_projections.get(record_id)
+            )
+            if live is not None and live.provider_ref == provider_ref:
+                owner_projections.pop(record_id, None)
+                if not owner_projections:
+                    self._projections.pop(owner.owner_id, None)
             return True
 
     def list_provider_cleanup_targets(

@@ -737,3 +737,34 @@ def test_reasserting_the_same_ref_cannot_make_a_stale_projection_fresh() -> None
     assert store.set_provider_ref(OWNER, record_id, projected_ref) is True
 
     assert store.settled_projection_record_ids(OWNER) == frozenset()
+
+
+def test_a_reset_retires_the_generation_with_the_projection() -> None:
+    """Catches a retired generation surviving reset and re-arming on recreate.
+
+    Postgres deletes the projection row on reset, so it never had this. The
+    deterministic store used to hold ref and generation in separate maps and
+    cleared only one, which is the shape this record structure removes: the
+    generation cannot outlive the ref because it is the same value.
+    """
+    store = InMemoryCanonicalMemoryStore()
+    embedder = _StubEmbedder()
+    provider = Mem0MemoryProvider(
+        embedder=embedder, memory=_Mem0Double(embedder=embedder)
+    )
+    service = _service(store, provider)
+    record_id = _confirm_one(service)
+    # Advance well past generation 1 so a retired value would be conspicuous.
+    for index in range(2):
+        service.edit(
+            SUBJECT,
+            record_id,
+            MemoryEdit(value=f"revision {index} of the note.", sensitivity=CLEAR),
+        )
+    assert store.settled_projection_record_ids(OWNER) == frozenset({record_id})
+
+    service.reset(SUBJECT)
+
+    # Nothing survives the reset that a recreated record could inherit.
+    assert store.settled_projection_record_ids(OWNER) == frozenset()
+    assert store.get_provider_ref(OWNER, record_id) is None
