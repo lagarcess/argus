@@ -82,6 +82,42 @@ describe("web cookie disclosure rules", () => {
     }
   });
 
+  test("covers the name this deployment's Supabase project will actually use", () => {
+    // The previous version of this test only checked a hardcoded example ref,
+    // so a naming change or a configured cookieOptions.name would not have
+    // been caught before production. Derive from the configured URL instead.
+    const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const urls = [
+      configured,
+      // Refs seen in the wild: plain, and the hyphenated form.
+      "https://lgdhvepyrzbnscqssgqq.supabase.co",
+      "https://abc-def-123.supabase.co",
+    ].filter((url): url is string => Boolean(url));
+
+    for (const url of urls) {
+      const name = supabaseCookieName(url);
+      expect(disclosedCookieConcept(name), `${url} -> ${name}`).toBe("sign_in");
+      expect(disclosedCookieConcept(`${name}.0`), `${url} chunk`).toBe(
+        "sign_in",
+      );
+      // The adapter path itself, not just the pattern, must accept it.
+      expect(() => assertDisclosedCookie(name)).not.toThrow();
+    }
+  });
+
+  test("no code customizes the Supabase cookie name behind the registry's back", () => {
+    // cookieOptions.name would replace the derived name entirely, so the
+    // patterns above would stop describing reality. If this ever becomes
+    // intentional, the chosen name has to join COOKIE_DISCLOSURE_RULES.
+    for (const file of ["supabase-client.ts", "supabase-server.ts"]) {
+      const source = readFileSync(
+        join(import.meta.dir, "..", "lib", file),
+        "utf-8",
+      );
+      expect(source, file).not.toContain("cookieOptions");
+    }
+  });
+
   test("the server adapter gates names before writing them", () => {
     const source = readFileSync(
       join(import.meta.dir, "..", "lib", "supabase-server.ts"),
