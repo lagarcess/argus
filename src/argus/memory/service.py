@@ -655,22 +655,38 @@ class MemoryService:
             self._emit_retrieval_result(correlation_id, ())
             return ()
 
+        # Read before searching: a later projection can only widen coverage.
+        index_covers_eligible = (
+            records.keys() <= self._store.settled_projection_record_ids(owner)
+        )
+
         provider_result = self._search_provider(
             owner,
             normalized_query,
             limit,
             correlation_id,
         )
-        if (
+        result: tuple[RetrievedMemory, ...] = ()
+        answered = (
             provider_result is not None
             and provider_result.status is ProviderSearchStatus.ANSWERED
-        ):
+        )
+        if answered:
+            assert provider_result is not None
             result = self._rehydrate_provider_hits(
                 records,
                 provider_result,
                 limit=limit,
             )
-        else:
+        # An empty answer counts only when the index covers every eligible
+        # record. Hits that resolve to nothing are not an answer either.
+        if not answered or (
+            not result
+            and (
+                not index_covers_eligible
+                or (provider_result is not None and provider_result.hits)
+            )
+        ):
             result = self._canonical_fallback(
                 records.values(),
                 normalized_query,

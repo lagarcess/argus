@@ -8,6 +8,7 @@ a simulation parameter. Recall failures never break the turn.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from loguru import logger
@@ -77,3 +78,24 @@ def memory_recalls_for_turn(
         }
         for memory in retrieved
     ]
+
+
+async def memory_recalls_for_turn_async(
+    *,
+    user: User,
+    account: AccountContext,
+    user_message: str | None,
+    memory_opt_out: bool,
+) -> list[dict[str, Any]] | None:
+    """Same recall, off the event loop.
+
+    Retrieval makes synchronous network calls; the API runs one worker.
+    """
+
+    return await asyncio.to_thread(
+        memory_recalls_for_turn,
+        user=user,
+        account=account,
+        user_message=user_message,
+        memory_opt_out=memory_opt_out,
+    )

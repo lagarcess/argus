@@ -236,11 +236,14 @@ def test_unavailable_or_failed_search_uses_bounded_canonical_fallback(
     assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
 
 
-def test_answered_empty_is_definitive_and_does_not_use_fallback() -> None:
+def test_answered_empty_is_definitive_when_the_index_covers_the_records() -> None:
     """Catches a valid empty provider answer being replaced by canonical matches."""
     store = InMemoryCanonicalMemoryStore()
-    setup_service = _service(store)
-    _confirm_one(setup_service)
+    # A claimed projection; attaching a ref out of band would prove nothing.
+    record_id = _confirm_one(_service(store, _CanonicalFirstProjectionProvider(store)))
+    owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
+    assert store.get_provider_ref(owner, record_id) is not None
+    assert record_id in store.settled_projection_record_ids(owner)
     service = _service(store, _AnsweredEmptyProvider())
 
     assert (
@@ -251,6 +254,22 @@ def test_answered_empty_is_definitive_and_does_not_use_fallback() -> None:
         )
         == ()
     )
+
+
+def test_answered_empty_is_not_definitive_for_records_the_index_lacks() -> None:
+    """Catches an empty answer burying memories that were never projected."""
+    store = InMemoryCanonicalMemoryStore()
+    record_id = _confirm_one(_service(store))
+    service = _service(store, _AnsweredEmptyProvider())
+
+    retrieved = service.retrieve(
+        SUBJECT,
+        "lower drawdown",
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
+
+    assert [item.record.id for item in retrieved] == [record_id]
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
 
 
 @pytest.mark.parametrize(

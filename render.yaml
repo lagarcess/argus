@@ -78,6 +78,16 @@ services:
         value: "true"
       - key: ARGUS_ENABLE_PERSONALIZATION_MEMORY
         value: "false"
+      - key: ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL
+        value: "false"
+      - key: ARGUS_MEMORY_EMBEDDING_MODEL
+        value: pplx-embed-v1-0.6b
+      - key: ARGUS_MEMORY_EMBEDDING_DIMENSIONS
+        value: "1024"
+      - key: ARGUS_MEMORY_EMBEDDING_TIMEOUT_SECONDS
+        value: "8.0"
+      - key: ARGUS_MEMORY_VECTOR_COLLECTION
+        value: argus_memory_vectors
       - key: ARGUS_DISCOVERY_SEARCH_PROVIDER
         value: perplexity_direct
       - key: ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD
