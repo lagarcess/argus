@@ -1,9 +1,10 @@
 import { getMemoryAvailability } from "./memory-api";
+import { readStored, writeStored } from "./browser-storage";
 
 // Temporary chat: conversations the user opted out of memory. Client-held
 // state; opting out only ever disables recall and proposals for that
 // conversation, so a lost entry fails safe.
-const MEMORY_OPT_OUT_STORAGE_KEY = "argus.memoryOptOutConversations.v1";
+const MEMORY_OPT_OUT_STORAGE_KEY = "argus.memoryOptOutConversations.v1" as const;
 
 // Session truth: the toggle the user sees must be the toggle the transport
 // sends, even when persistence is blocked. localStorage only carries the
@@ -11,9 +12,8 @@ const MEMORY_OPT_OUT_STORAGE_KEY = "argus.memoryOptOutConversations.v1";
 const sessionOptOut = new Map<string, boolean>();
 
 function readOptOutIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
   try {
-    const raw = window.localStorage.getItem(MEMORY_OPT_OUT_STORAGE_KEY);
+    const raw = readStored(MEMORY_OPT_OUT_STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.filter((item): item is string => typeof item === "string"));
@@ -23,15 +23,7 @@ function readOptOutIds(): Set<string> {
 }
 
 function writeOptOutIds(ids: Set<string>): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      MEMORY_OPT_OUT_STORAGE_KEY,
-      JSON.stringify([...ids].sort()),
-    );
-  } catch {
-    // Storage may be unavailable; the mode simply does not persist.
-  }
+  writeStored(MEMORY_OPT_OUT_STORAGE_KEY, JSON.stringify([...ids].sort()));
 }
 
 export function isConversationMemoryOptOut(conversationId: string): boolean {

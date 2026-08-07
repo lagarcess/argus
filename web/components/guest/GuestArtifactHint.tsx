@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { readStored, writeStored, type StorageKey } from "@/lib/browser-storage";
 
 export type GuestArtifactHintKind = "confirmation" | "result";
 
-const STORAGE_KEYS: Record<GuestArtifactHintKind, string> = {
+const STORAGE_KEYS: Record<GuestArtifactHintKind, StorageKey> = {
   confirmation: "argus:guest-hint:confirmation:v1",
   result: "argus:guest-hint:result:v1",
 };
@@ -20,11 +21,7 @@ export default function GuestArtifactHint({
   const [isDismissed, setIsDismissed] = useState(true);
 
   useEffect(() => {
-    try {
-      setIsDismissed(window.localStorage.getItem(STORAGE_KEYS[kind]) === "dismissed");
-    } catch {
-      setIsDismissed(false);
-    }
+    setIsDismissed(readStored(STORAGE_KEYS[kind]) === "dismissed");
   }, [kind]);
 
   if (isDismissed) return null;
@@ -41,11 +38,7 @@ export default function GuestArtifactHint({
         type="button"
         onClick={() => {
           setIsDismissed(true);
-          try {
-            window.localStorage.setItem(STORAGE_KEYS[kind], "dismissed");
-          } catch {
-            // Hint dismissal is optional browser-local presentation state.
-          }
+          writeStored(STORAGE_KEYS[kind], "dismissed");
         }}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-current/60 transition-colors hover:bg-black/5 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/25 dark:hover:bg-white/5"
         aria-label={t("guest.hints.dismiss", "Dismiss hint")}

@@ -8,6 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
+from argus.api.browser_cookies import delete_browser_cookie, set_browser_cookie
 from argus.api.dependencies import (
     _apply_auth_session_cookies,
     _session_cookie_secure,
@@ -337,7 +338,8 @@ def create_guest_handoff(
         status_code=201,
         content=jsonable_encoder(payload.model_dump(mode="json")),
     )
-    response.set_cookie(
+    set_browser_cookie(
+        response,
         _GUEST_HANDOFF_COOKIE,
         opaque_secret,
         httponly=True,
@@ -346,7 +348,8 @@ def create_guest_handoff(
         max_age=_GUEST_HANDOFF_MAX_AGE_SECONDS,
         path="/api/v1/auth",
     )
-    response.set_cookie(
+    set_browser_cookie(
+        response,
         _GUEST_HANDOFF_ID_COOKIE,
         payload.handoff_id,
         httponly=True,
@@ -448,7 +451,8 @@ def _guest_handoff_claim_payload(
 
 def _clear_guest_handoff_cookies(request: Request, response: JSONResponse) -> None:
     for cookie_name in (_GUEST_HANDOFF_COOKIE, _GUEST_HANDOFF_ID_COOKIE):
-        response.delete_cookie(
+        delete_browser_cookie(
+            response,
             cookie_name,
             path="/api/v1/auth",
             secure=_session_cookie_secure(request),
@@ -713,9 +717,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             # Supabase uses an empty identity list for its obfuscated existing-user
             # response. Persisting that fake user would reveal the account exists.
             if identities != []:
-                api_state.supabase_gateway.get_or_create_profile_for_auth_user(
-                    auth_user
-                )
+                api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
             return auth_response(request, result)
     except HTTPException:
         raise
@@ -864,6 +866,6 @@ def _enforce_browser_auth_origin(request: Request) -> None:
 def logout(request: Request) -> JSONResponse:
     _enforce_browser_auth_origin(request)
     response = JSONResponse({"success": True})
-    response.delete_cookie("sb-auth-token", path="/")
-    response.delete_cookie("sb-refresh-token", path="/")
+    delete_browser_cookie(response, "sb-auth-token", path="/")
+    delete_browser_cookie(response, "sb-refresh-token", path="/")
     return response
