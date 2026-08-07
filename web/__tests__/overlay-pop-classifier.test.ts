@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * A traversal has to be spent even when no overlay is left to spend it.
@@ -86,5 +88,39 @@ describe("programmatic pop classification", () => {
     dispatchPopState();
 
     expect(subject.isProgrammaticPop(new Event("popstate"))).toBe(false);
+  });
+});
+
+describe("refusing a back press", () => {
+  test("a refused dismissal never spends the entry", () => {
+    // Declining inside onDismiss was too late: the id was already claimed, so
+    // the overlay stayed open holding an id it had spent, and no later press
+    // could close it while it blocked its parents from answering.
+    const source = readFileSync(
+      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      "utf-8",
+    );
+    const guard = source.indexOf("canDismissRef.current()");
+    const claim = source.indexOf("if (!claimOverlayEntry(overlayId)) return;");
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(claim);
+    // And the traversal it refused is put back, or the next press exits Argus.
+    expect(source).toMatch(
+      /canDismissRef\.current\(\)\)\s*\{[\s\S]{0,400}window\.history\.pushState/,
+    );
+  });
+
+  test("the deletion dialog refuses only while submitting", () => {
+    const dialog = readFileSync(
+      join(import.meta.dir, "../components/sidebar/ProfileDeleteRequestDialog.tsx"),
+      "utf-8",
+    );
+    expect(dialog).toContain('state !== "submitting"');
+    expect(dialog).toContain("canDismiss,");
+    // Escape is the caller's job, and nothing else answers for this dialog.
+    expect(dialog).toContain('if (event.key !== "Escape") return;');
+    expect(dialog).toContain("hasOverlayAbove(overlayId)");
+    // Trapped on the panel, so focus does not open on the backdrop.
+    expect(dialog).toContain("containerRef: panelRef,");
   });
 });

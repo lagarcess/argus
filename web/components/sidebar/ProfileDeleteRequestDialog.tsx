@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useModalSurface } from "../layout/useModalSurface";
+import { hasOverlayAbove } from "../layout/overlayStack";
 
 /**
  * Account deletion request, lifted out of the profile menu.
@@ -29,21 +30,41 @@ export default function ProfileDeleteRequestDialog({
 }) {
   const { t } = useTranslation();
   const overlayId = useId();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // A submission in flight owns the dialog until it settles. This is answered
+  // before the history entry is spent, not inside onDismiss, so a refused press
+  // leaves the entry intact and back still works once the request lands.
+  const canDismiss = useCallback(() => state !== "submitting", [state]);
 
   useModalSurface({
     isOpen: true,
     overlayId,
-    containerRef,
-    // A submission in flight owns the dialog until it settles.
-    onDismiss: () => {
-      if (state !== "submitting") onClose();
-    },
+    // The panel, not the full-screen wrapper. The wrapper's first focusable
+    // child is the transparent backdrop, so trapping there opened keyboard
+    // users on an undisclosed control where Enter dismissed the dialog.
+    containerRef: panelRef,
+    onDismiss: onClose,
+    canDismiss,
   });
 
+  // useModalSurface leaves Escape to the caller, and the menu that used to
+  // answer for this dialog stands down once this registers above it, so
+  // without this Escape did nothing on the normal entry path.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (hasOverlayAbove(overlayId)) return;
+      if (!canDismiss()) return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [canDismiss, onClose, overlayId]);
+
   return (
-    <div ref={containerRef}
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
       <button
         className="absolute inset-0"
         onClick={() => {
@@ -57,6 +78,7 @@ export default function ProfileDeleteRequestDialog({
         )}
       />
       <div
+        ref={panelRef}
         className="relative w-full max-w-sm rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
         role="dialog"
         aria-modal="true"

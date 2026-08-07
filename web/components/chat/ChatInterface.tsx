@@ -893,7 +893,14 @@ export default function ChatInterface() {
         type: "general",
         context: { surface: "guest_header", conversation_id: conversationId },
       }),
-    onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    // The one door into Omnisearch, so the drawer closes here rather than at
+    // each caller. The palette paints below the drawer, and gating the shortcut
+    // hook alone still left the guest shell's own key listener opening it into
+    // a layer nobody can see.
+    onOpenOmnisearch: () => {
+      closeDrawer();
+      setSearchOverlayOpen(true);
+    },
     onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
     onGuestBootstrapExpired: (publicAccountAccessEnabled) => {

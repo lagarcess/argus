@@ -117,11 +117,12 @@ describe("drawer layering", () => {
 
   test("each exception actually cannot coexist", () => {
     const host = SCREEN.get(DRAWER_HOST)!;
-    // Search closes the drawer on its way to the palette.
-    expect(host).toContain("closeDrawer();");
+    // Bind the assertion to the opener itself. A bare `closeDrawer()` anywhere
+    // in the file passed while a second entry point, the guest shell's own key
+    // listener, still opened the palette straight into a hidden layer.
+    expect(host).toMatch(/onOpenOmnisearch:[\s\S]{0,240}closeDrawer\(\)/);
     // And the shortcut layer treats an open drawer as a modal, so nothing it
     // owns can open behind it.
-    expect(host).toContain("mobileShell.isDrawerOpen,");
     expect(host).toMatch(/modalOpen:[\s\S]{0,200}mobileShell\.isDrawerOpen/);
   });
 

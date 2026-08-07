@@ -159,17 +159,29 @@ export function useOverlayBackDismiss({
   isOpen,
   overlayId,
   onDismiss,
+  canDismiss,
 }: {
   isOpen: boolean;
   overlayId: string;
   onDismiss: () => void;
+  /**
+   * Whether the overlay will accept a dismissal right now.
+   *
+   * Declining inside `onDismiss` is too late: the entry has already been
+   * claimed by then, so the overlay stayed open holding an id it had already
+   * spent. Every later press found nothing to claim, and the overlay could
+   * never be closed by back again while it blocked its parents from answering.
+   */
+  canDismiss?: () => boolean;
 }): void {
   const dismissRef = useRef(onDismiss);
+  const canDismissRef = useRef(canDismiss);
   const pendingPopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     dismissRef.current = onDismiss;
-  }, [onDismiss]);
+    canDismissRef.current = canDismiss;
+  }, [canDismiss, onDismiss]);
 
   useEffect(() => {
     if (!isOpen || typeof window === "undefined") return;
@@ -199,6 +211,16 @@ export function useOverlayBackDismiss({
       // One press, one level. Every nested listener hears the same event, so
       // without this each would claim its own id and dismiss together.
       if (hasOverlayAbove(overlayId)) return;
+      if (canDismissRef.current && !canDismissRef.current()) {
+        // Refused, and the traversal is already spent. Put an entry back or the
+        // next press walks past this overlay and out of Argus.
+        window.history.pushState(
+          overlayHistoryState(window.history.state, overlayId),
+          "",
+          window.location.href,
+        );
+        return;
+      }
       // Already claimed means this is the echo of our own back() below.
       if (!claimOverlayEntry(overlayId)) return;
       dismissRef.current();
