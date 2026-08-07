@@ -202,10 +202,25 @@ reliable versioning and a way to read them back.
 
 Distribution, once there is something worth spreading.
 
-- An immutable, sanitized evidence receipt. Not a shared chat transcript.
-- Owner-created, owner-revocable, stripped of private runtime detail.
+**Partial spec written:**
+[`2026-08-07-sharing-evidence-receipts.md`](../superpowers/specs/2026-08-07-sharing-evidence-receipts.md).
+Settled by canon: the pipeline, the payload, the never-expose list, the framing.
+**Blocked on seven founder decisions in its section 7** and must not be
+dispatched until they are answered.
+
+- An immutable, sanitized evidence receipt frozen at creation. Not a shared chat
+  transcript, and never a live view.
+- Owner-created, owner-revocable, stripped of private runtime detail. Memory is
+  never shareable under any circumstance.
+- Not-advice framing is stronger in a receipt than in the app, because the
+  viewer has none of the context an app user has.
+- The public view is mobile-first and owns its own layout, since shared links
+  are opened from messaging.
 - Deliberately last of the five: sharing a broken loop spreads a bad
-  impression.
+  impression faster than a good one.
+
+The decision that determines whether this pillar produces growth or just
+produces links is 7.2, what a stranger can do after opening the link.
 
 ## Continuous, not a lane
 
