@@ -400,6 +400,23 @@ describe("activity rail and starter pills", () => {
     expect(starters).not.toContain("dismiss");
   });
 
+  test("pills center while they fit and only then become a carousel", () => {
+    const starters = readFileSync(
+      join(import.meta.dir, "../components/chat/StarterActions.tsx"),
+      "utf-8",
+    );
+    // `safe center` centers the row but falls back to start on overflow, so the
+    // first pill can never end up unreachable off the leading edge.
+    expect(starters).toContain("[justify-content:safe_center]");
+    // The peek promises more pills, so it is measured rather than assumed.
+    expect(starters).toContain("scroller.scrollWidth > scroller.clientWidth");
+    expect(starters).toContain("new ResizeObserver(sync)");
+    expect(starters).toContain('isOverflowing ? "argus-starter-peek" : ""');
+    // Trailing padding inside the scroller would widen scrollWidth and make the
+    // overflow measurement depend on its own result.
+    expect(starters).not.toContain("pe-6");
+  });
+
   test("pills sit above the composer where a thumb reaches them", () => {
     const surface = readFileSync(
       join(import.meta.dir, "../components/chat/EmptyChatSurface.tsx"),

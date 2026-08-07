@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Bitcoin, LineChart, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -12,8 +13,8 @@ type StarterActionsProps = {
   disabled?: boolean;
   /**
    * `wrap` centers the pills under the composer. `scroll` is the narrow-screen
-   * form: one row that scrolls sideways, with the next pill deliberately
-   * peeking so it reads as a list rather than as everything there is.
+   * form: one row that scrolls sideways. It still centers whenever the pills
+   * fit, and only becomes a carousel once they do not.
    */
   layout?: "wrap" | "scroll";
 };
@@ -24,6 +25,23 @@ export default function StarterActions({
   layout = "wrap",
 }: StarterActionsProps) {
   const { t } = useTranslation();
+  // The trailing peek is a promise that more pills exist, so it may only appear
+  // when they actually do. Overflow is a measured fact, not a width guess.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const sync = () =>
+      setIsOverflowing(scroller.scrollWidth > scroller.clientWidth + 1);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(scroller);
+    for (const child of Array.from(scroller.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [layout]);
+
   const actions = [
     {
       key: "tsla",
@@ -64,11 +82,20 @@ export default function StarterActions({
 
   return (
     <div
+      ref={scrollerRef}
       data-testid="starter-actions"
       data-starter-layout={layout}
+      data-starter-overflowing={isScroll ? String(isOverflowing) : undefined}
       className={
         isScroll
-          ? "argus-scrollbar argus-starter-peek flex snap-x items-center gap-2 overflow-x-auto pb-1 pe-6"
+          ? // `safe center` centers the row while it fits and falls back to
+            // start once it overflows, so the first pill never becomes
+            // unreachable off the leading edge.
+            // No trailing padding here: it would widen scrollWidth and make
+            // the overflow measurement depend on its own result.
+            `argus-scrollbar flex snap-x items-center gap-2 overflow-x-auto pb-1 [justify-content:safe_center] ${
+              isOverflowing ? "argus-starter-peek" : ""
+            }`
           : "mt-6 flex flex-wrap items-center justify-center gap-3"
       }
     >
@@ -88,7 +115,6 @@ export default function StarterActions({
           {label}
         </button>
       ))}
-      {isScroll ? <span aria-hidden="true" className="w-2 shrink-0" /> : null}
     </div>
   );
 }
