@@ -100,6 +100,45 @@ Direct edits are ordinary edits: they obey the same validation, the same
 coverage and resolver gates, and the same disclosure rules as a conversational
 edit. Nothing becomes runnable that would not have been runnable through chat.
 
+### 3.5 Repair must not drop what the user already stated (#367)
+
+`FocusedStrategyExtraction` intermittently loses an explicit 10 bps fee and 5
+bps slippage. The same prompt usually passes; one exact-head run returned an
+executable confirmation with both costs and `launch_execution_realism` missing.
+Confirmed nondeterministic, verified at `76e32322` against baseline `6533377c`,
+and present in the clean integration baseline too.
+
+This is the same defect as section 3.2 wearing different clothes. A repair path
+silently discarding a stated cost is a compound edit dropping half the request,
+just triggered by internal repair rather than by the user's next sentence.
+
+So it is in scope here, and it constrains the fix:
+
+- **One edit contract owns preservation.** Repair paths are not permitted their
+  own rules about what survives. If `FocusedStrategyExtraction` can discard a
+  user-stated value, so can any future repair, and each one becomes a separate
+  bug. Route repair through the same contract, or make the contract the thing
+  repair consults.
+- **Silent loss is the defect, not the repair.** If repair genuinely cannot
+  preserve a value, that is surfaced, never dropped quietly. Same rule as 3.2.
+- **Nondeterminism means the test must be able to fail.** A single passing run
+  proves nothing here. Reproduce the loss deliberately before claiming a fix.
+
+### 3.6 Versioning: mint on run, never on edit
+
+A confirmed run mints exactly one `IdeaVersion`. Edits to a pending card mint
+nothing, however many there are, per decision memo section 16.2.
+
+This is the write path for
+[`2026-08-07-compare-your-own-work.md`](2026-08-07-compare-your-own-work.md).
+Comparison is only as trustworthy as versioning is honest: a dropped compound
+edit produces a version record that misstates the experiment, and the user's
+own history becomes unreliable. Getting the timing backwards instead fills that
+history with phantom versions from abandoned edits.
+
+Material change is defined once, here, and consumed by comparison. There is no
+second definition anywhere.
+
 ## 4. Open decision for the founder
 
 **Does a confirmation-card edit mint a new `IdeaVersion`?**
