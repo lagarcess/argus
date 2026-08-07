@@ -117,9 +117,9 @@ describe("refusing a back press", () => {
     );
     expect(dialog).toContain('state !== "submitting"');
     expect(dialog).toContain("canDismiss,");
-    // Escape is the caller's job, and nothing else answers for this dialog.
-    expect(dialog).toContain('if (event.key !== "Escape") return;');
-    expect(dialog).toContain("hasOverlayAbove(overlayId)");
+    // Escape arrives from the registry, and only while this dialog is topmost.
+    expect(dialog).toContain("onEscape:");
+    expect(dialog).not.toContain('document.addEventListener("keydown"');
     // Trapped on the panel, so focus does not open on the backdrop.
     expect(dialog).toContain("containerRef: panelRef,");
   });

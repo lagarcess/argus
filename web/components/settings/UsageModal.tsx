@@ -11,7 +11,6 @@ import {
 import { ChevronDown, Loader2, RefreshCw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useModalSurface } from "@/components/layout/useModalSurface";
-import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
   allowanceMeterTone,
@@ -129,6 +128,10 @@ export default function UsageModal({
     overlayId,
     containerRef: dialogRef,
     onDismiss: onClose,
+    // Escape and Tab are routed by the registry to whichever layer is topmost,
+    // so this modal no longer installs listeners that could answer for a press
+    // meant for something above it.
+    onEscape: onClose,
     returnFocusRef,
   });
   const [usage, setUsage] = useState<UsageAllowanceResponse | null>(null);
@@ -140,20 +143,6 @@ export default function UsageModal({
   const retry = useCallback(() => {
     setRequestVersion((current) => current + 1);
   }, []);
-
-  // Focus is the shared hook's job. Running a second Tab handler beside it
-  // advanced focus twice per press and skipped a control each time, and its
-  // cleanup fought the same hook over where focus returned.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (hasOverlayAbove(overlayId)) return;
-      event.preventDefault();
-      onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose, overlayId]);
 
   useEffect(() => {
     let isCurrent = true;

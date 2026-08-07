@@ -25,7 +25,7 @@ import CommandPaletteRowActions from "@/components/sidebar/command-palette/Comma
 import { commandPaletteRowActions } from "@/components/sidebar/command-palette/rowActionItems";
 import CommandPaletteDossierSheet from "@/components/sidebar/command-palette/CommandPaletteDossierSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
-import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
+import { useOverlayLayer } from "@/components/layout/overlayStack";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { CommandPaletteFooter, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
@@ -281,7 +281,7 @@ export default function ChatCommandPalette({
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
   const { isBelowTablet, isBelowDesktop } = useResponsiveLayout();
   const paletteOverlayId = useId();
-  useOverlayStackEntry(true, paletteOverlayId);
+  const paletteRef = useRef<HTMLDivElement>(null);
   const [isDossierSheetOpen, setIsDossierSheetOpen] = useState(false);
   // Below the mobile threshold Omnisearch is collapsed-only: there is no room
   // for a second pane, and the dossier arrives as a sheet instead.
@@ -1075,11 +1075,21 @@ export default function ChatCommandPalette({
     [activateItem, isBelowDesktop, setPreviewItem],
   );
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+  const onPaletteKeyDown = useCallback(
+    (event: KeyboardEvent) => {
       if (pendingDeleteItem) return;
       const eventTarget =
         event.target instanceof HTMLElement ? event.target : null;
+      // The three-dot is a control, not the row: activating the row from it
+      // opened the dossier instead of the menu. Only activation is skipped,
+      // since standing the whole handler down swallows Escape while the
+      // trigger holds focus.
+      if (
+        (event.key === "Enter" || event.key === " ") &&
+        eventTarget?.closest("[data-row-action]")
+      ) {
+        return;
+      }
       const targetIsEditableDossierControl = Boolean(
         eventTarget?.closest("[data-dossier-pane]") &&
           isEditableKeyboardTarget(eventTarget),
@@ -1110,12 +1120,6 @@ export default function ChatCommandPalette({
       }
       if (dossierKeyboardAction === "allow_control") return;
       if (event.key === "Escape") {
-        // Everything here listens on document in the capture phase, and this
-        // listener was registered first, so a child's stopPropagation can never
-        // reach it. Escape must dismiss one level, so stand down whenever
-        // anything is open above: the dossier sheet, a row's action menu, or
-        // whatever nests here next.
-        if (hasOverlayAbove(paletteOverlayId)) return;
         event.preventDefault();
         if (editingId) {
           cancelRename();
@@ -1184,10 +1188,8 @@ export default function ChatCommandPalette({
         event.preventDefault();
         handleDelete(selectedPreview, true);
       }
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [
+    },
+    [
     cancelRename,
     canManageConversation,
     dossierPaneState,
@@ -1197,13 +1199,23 @@ export default function ChatCommandPalette({
     keyboardItems,
     onClose,
     openRow,
-    paletteOverlayId,
     pendingDeleteItem,
     selectedNavigationDisabled,
     selectedPreview,
     shortcutLegend.usesCommandKey,
     startRename,
-  ]);
+    ],
+  );
+
+  // The palette owns more than Escape, so it hands the registry its whole
+  // keydown. Being offered the press only while topmost replaces the depth
+  // guard it used to carry.
+  useOverlayLayer({
+    isOpen: true,
+    overlayId: paletteOverlayId,
+    containerRef: paletteRef,
+    onKeyDown: onPaletteKeyDown,
+  });
 
   const toggleLayout = () => {
     setLayoutMode((current) => {

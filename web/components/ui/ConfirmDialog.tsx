@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
-import { hasOverlayAbove } from "@/components/layout/overlayStack";
+import { useId, useRef, useCallback } from "react";
 import { useModalSurface } from "@/components/layout/useModalSurface";
 import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 
@@ -58,17 +57,8 @@ export function ConfirmDialog({
   // A confirmation is the topmost surface wherever it opens, so it registers
   // for Escape, for focus, and for system back: without the last one, hardware
   // back closed the drawer underneath and took the confirmation with it.
-  useModalSurface({
-    isOpen,
-    overlayId,
-    containerRef: panelRef,
-    onDismiss: onCancel,
-  });
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (hasOverlayAbove(overlayId)) return;
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
       const action = confirmDialogKeyboardAction({
         key: event.key,
         isBusy,
@@ -88,10 +78,19 @@ export function ConfirmDialog({
         event.stopPropagation();
         onConfirm();
       }
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isBusy, isOpen, onCancel, onConfirm, overlayId, showKeyboardHints]);
+    },
+    [isBusy, onCancel, onConfirm, showKeyboardHints],
+  );
+
+  useModalSurface({
+    isOpen,
+    overlayId,
+    containerRef: panelRef,
+    onDismiss: onCancel,
+    // Confirm owns Enter as well as Escape, so it takes the whole keydown. The
+    // registry still only offers it while this dialog is the topmost layer.
+    onKeyDown: handleKeyDown,
+  });
 
   if (!isOpen) return null;
 

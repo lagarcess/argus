@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Edit2, MoreVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { useOverlayStackEntry } from "@/components/layout/overlayStack";
+import { useOverlayLayer } from "@/components/layout/overlayStack";
 
 export type CommandPaletteRowAction = {
   id: "rename" | "archive" | "delete" | "open_source";
@@ -40,25 +40,16 @@ export default function CommandPaletteRowActions({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useOverlayStackEntry(isOpen, overlayId);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      setIsOpen(false);
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [isOpen]);
+  // Escape and outside presses arrive from the registry, and only while this
+  // menu is the topmost layer. It used to install both itself and lean on
+  // stopPropagation, which cannot stop a sibling listener on the same target.
+  useOverlayLayer({
+    isOpen,
+    overlayId,
+    containerRef,
+    onEscape: () => setIsOpen(false),
+    onOutsidePointerDown: () => setIsOpen(false),
+  });
 
   if (actions.length === 0) return null;
 
@@ -95,7 +86,16 @@ export default function CommandPaletteRowActions({
   return (
     <div
       ref={containerRef}
-      className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center"
+      /*
+       * Raised while open, because the rows below this one are positioned too
+       * and paint after it. Without this the next row's date chip and its own
+       * three-dot drew straight through the open menu, and the lower items were
+       * unclickable: the menu's own z-index cannot help, since the thing
+       * covering it is a sibling of the row rather than a sibling of the menu.
+       */
+      className={`absolute right-0 top-1/2 flex -translate-y-1/2 items-center ${
+        isOpen ? "z-20" : ""
+      }`}
       data-row-action
     >
       <button

@@ -1,0 +1,17 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/account/security/page": "/account/security",
+  "/api/auth/recovery/route": "/api/auth/recovery",
+  "/auth/forgot-password/page": "/auth/forgot-password",
+  "/auth/recovery/page": "/auth/recovery",
+  "/chat/page": "/chat",
+  "/dev/bottom-sheet/page": "/dev/bottom-sheet",
+  "/dev/result-card/page": "/dev/result-card",
+  "/favicon.ico/route": "/favicon.ico",
+  "/login/page": "/login",
+  "/page": "/",
+  "/privacy/page": "/privacy",
+  "/signup/page": "/signup",
+  "/terms/page": "/terms"
+}

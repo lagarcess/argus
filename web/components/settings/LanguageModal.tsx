@@ -5,7 +5,6 @@ import { Check, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { patchMe } from "@/lib/argus-api";
 import { useModalSurface } from "@/components/layout/useModalSurface";
-import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import {
   ENABLED_LANGUAGES,
   localeForLanguage,
@@ -40,6 +39,7 @@ export default function LanguageModal({
     overlayId,
     containerRef: panelRef,
     onDismiss: onClose,
+    onEscape: onClose,
     initialFocusRef: searchInputRef,
   });
   const { t, i18n } = useTranslation();
@@ -58,16 +58,11 @@ export default function LanguageModal({
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !hasOverlayAbove(overlayId)) onClose();
-    };
     document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose, overlayId]);
+  }, []);
 
   const handleSelect = async (code: string) => {
     const nextLanguage = normalizeEnabledLanguage(code);

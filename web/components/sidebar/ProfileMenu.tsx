@@ -10,7 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useModalSurface } from "../layout/useModalSurface";
-import { hasOverlayAbove } from "../layout/overlayStack";
+import { useOverlayLayer } from "../layout/overlayStack";
 import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
 import {
   profileMenuClass,
@@ -247,22 +247,6 @@ export default function ProfileMenu({
     };
   }, [isOpen, accountKind]);
 
-  // Close on click-outside
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isOpen, onClose, anchorRef]);
 
   // Opened from the drawer this is a modal surface, not a detached popover: it
   // owns system back ahead of the drawer, and Tab has to reach it.
@@ -271,6 +255,30 @@ export default function ProfileMenu({
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onDismiss: onClose,
+    // A submenu is the shallower thing on screen, so it answers first instead
+    // of one press closing both levels.
+    onEscape: () => {
+      if (activeSubmenu) {
+        setActiveSubmenu(null);
+        return;
+      }
+      onClose();
+    },
+    // A menu is not modal: Tab should walk past it rather than be held inside.
+    trapFocus: false,
+  });
+
+  // On the rail this is a detached popover rather than a layer, so it keeps the
+  // plain dismissal rules a popover has.
+  useOverlayLayer({
+    isOpen: isOpen && !isDrawerPlacement,
+    overlayId: menuOverlayId,
+    containerRef: menuRef,
+    onEscape: onClose,
+    onOutsidePointerDown: (event) => {
+      if (anchorRef.current?.contains(event.target as Node)) return;
+      onClose();
+    },
   });
 
   // Opening this closes the menu, so the registration above has already stood
@@ -285,27 +293,6 @@ export default function ProfileMenu({
     returnFocusRef: anchorRef,
   });
 
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (!isDrawerPlacement) {
-        onClose();
-        return;
-      }
-      if (hasOverlayAbove(menuOverlayId)) return;
-      // Stacked in the drawer a submenu is the shallower thing on screen, so it
-      // answers first instead of both levels closing on one press.
-      if (activeSubmenu) {
-        setActiveSubmenu(null);
-        return;
-      }
-      onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [activeSubmenu, isDrawerPlacement, isOpen, menuOverlayId, onClose]);
 
   useEffect(() => {
     if (!activeModal) return;

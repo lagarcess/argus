@@ -919,7 +919,11 @@ export default function ChatInterface() {
         ),
         "error",
       ),
-    omnisearchShortcutEnabled: omnisearchEnabled,
+    // The single owner of the Omnisearch shortcut; useChatKeyboardShortcuts
+    // never claims it. Gating there did nothing for this listener, which kept
+    // opening the palette at z-60 under a z-68 drawer for registered users.
+    // The drawer is a modal, so the shortcut is inert while it is open.
+    omnisearchShortcutEnabled: omnisearchEnabled && !mobileShell.isDrawerOpen,
   });
   const {
     isGuest,

@@ -8,7 +8,6 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import { useModalSurface } from "@/components/layout/useModalSurface";
 
 /** A leftward drag past a third of the panel, or any flick, dismisses. */
@@ -63,24 +62,15 @@ export default function SidebarDrawer({
     overlayId,
     containerRef: panelRef,
     onDismiss: onClose,
+    onEscape: onClose,
   });
 
   useEffect(() => {
     if (!isOpen) return;
     setDragOffset(0);
     dragOriginRef.current = null;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // A confirmation opened from a row sits above this panel and answers
-      // first, or one Escape would dismiss two levels.
-      if (hasOverlayAbove(overlayId)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isOpen, onClose, overlayId]);
+  }, [isOpen]);
+
 
   const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.target instanceof Element && event.target.closest("a,button,input,select,textarea")) {

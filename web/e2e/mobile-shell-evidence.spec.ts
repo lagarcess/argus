@@ -147,7 +147,7 @@ test.describe("mobile shell evidence", () => {
     const railDisplay = async () =>
       page.evaluate(() => {
         const probe = document.createElement("div");
-        probe.className = "hidden md:block";
+        probe.className = "hidden tablet:block";
         document.body.appendChild(probe);
         const display = getComputedStyle(probe).display;
         probe.remove();

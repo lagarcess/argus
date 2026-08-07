@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef } from "react";
+import { useCallback, useId, useRef } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useModalSurface } from "../layout/useModalSurface";
-import { hasOverlayAbove } from "../layout/overlayStack";
 
 /**
  * Account deletion request, lifted out of the profile menu.
@@ -46,22 +45,12 @@ export default function ProfileDeleteRequestDialog({
     containerRef: panelRef,
     onDismiss: onClose,
     canDismiss,
+    // Routed to the topmost layer, so opening this from a submenu no longer
+    // depends on some other component happening to answer for it.
+    onEscape: () => {
+      if (canDismiss()) onClose();
+    },
   });
-
-  // useModalSurface leaves Escape to the caller, and the menu that used to
-  // answer for this dialog stands down once this registers above it, so
-  // without this Escape did nothing on the normal entry path.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (hasOverlayAbove(overlayId)) return;
-      if (!canDismiss()) return;
-      event.preventDefault();
-      onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [canDismiss, onClose, overlayId]);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">

@@ -108,7 +108,7 @@ describe("bottom sheet ownership", () => {
       join(WEB_ROOT, "components/layout/useModalSurface.ts"),
       "utf-8",
     );
-    expect(bundle).toContain("useOverlayStackEntry");
+    expect(bundle).toContain("useOverlayLayer");
     expect(bundle).toContain("useOverlayBackDismiss");
     expect(bundle).toContain("useModalFocusTrap");
     expect(primitive).toContain('role="dialog"');

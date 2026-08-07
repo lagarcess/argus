@@ -246,7 +246,8 @@ describe("private-alpha usage allowance", () => {
     // beside it moved focus twice per press and skipped a control each time.
     expect(modal).not.toContain("dialogTabTarget");
     expect(modal).toContain("useModalSurface");
-    expect(modal).toContain('event.key !== "Escape"');
+    expect(modal).toContain("onEscape: onClose,");
+    expect(modal).not.toContain('document.addEventListener("keydown"');
     // The opener can be gone by the time this closes, so the fallback is
     // handed to the hook rather than managed here.
     expect(modal).toContain("returnFocusRef,");

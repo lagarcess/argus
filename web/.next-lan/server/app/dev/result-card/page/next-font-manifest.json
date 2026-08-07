@@ -1,0 +1,11 @@
+{
+  "pages": {},
+  "app": {
+    "[project]/app/dev/result-card/page": [
+      "static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+      "static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pagesUsingSizeAdjust": false
+}

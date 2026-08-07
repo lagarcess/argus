@@ -94,18 +94,25 @@ describe("bottom sheet dismissal", () => {
 });
 
 describe("bottom sheet keyboard handling", () => {
-  test("Escape closes, and stands down for anything opened above", () => {
-    expect(source).toContain('if (event.key !== "Escape") return;');
-    expect(source).toContain("if (hasOverlayAbove(overlayId)) return;");
+  test("Escape is routed to it by the registry, not listened for", () => {
+    // The sheet installs nothing. The registry offers Escape to the topmost
+    // layer only, so a menu or confirmation above it answers first without the
+    // sheet needing to know that anything is above it.
+    expect(source).toContain("onEscape: onClose,");
+    expect(source).not.toContain('document.addEventListener("keydown"');
+    expect(source).not.toContain("hasOverlayAbove");
   });
 
-  test("Tab is trapped by the shared modal hook, not a private copy", () => {
-    const trap = readFileSync(
-      join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
+  test("Tab containment belongs to the registry, not to each surface", () => {
+    const registry = readFileSync(
+      join(import.meta.dir, "../components/layout/overlayStack.ts"),
       "utf-8",
     );
     expect(source).toContain("useModalSurface({");
-    expect(trap).toContain('if (event.key !== "Tab") return;');
+    // Containment applies to whichever layer is topmost, which is the only
+    // place that knows. Per-modal Tab listeners are what let focus escape a
+    // dialog nested in the drawer.
+    expect(registry).toContain('event.key === "Tab" && layer.trapFocus');
     expect(source).not.toContain("FOCUSABLE_SELECTOR");
   });
 

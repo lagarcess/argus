@@ -28,10 +28,21 @@ import {
   hasOverlayAbove,
   isTopOverlay,
   overlayStackIds,
-  popOverlay,
-  pushOverlay,
+  registerOverlayLayer,
+  unregisterOverlayLayer,
   resetOverlayStack,
 } from "../components/layout/overlayStack";
+
+/** Ordering-only layer: no container, no handlers. */
+function openLayer(id: string): void {
+  registerOverlayLayer({
+    id,
+    containerRef: { current: null },
+    trapFocus: false,
+  });
+}
+const pushOverlay = openLayer;
+const popOverlay = unregisterOverlayLayer;
 import { sidebarDrawerDragOutcome } from "../components/sidebar/SidebarDrawer";
 import ChatShellMenuTrigger from "../components/chat/ChatShellMenuTrigger";
 import SidebarHeader from "../components/sidebar/SidebarHeader";
@@ -496,18 +507,21 @@ describe("omnisearch below threshold", () => {
     expect(source).not.toContain("requestAnimationFrame");
   });
 
-  test("a parent trap and a parent back listener both stand down", () => {
-    // Same depth rule as Escape: without it the drawer trap moved focus and the
-    // dialog above wrapped it back, and one popstate dismissed both levels.
-    const trap = readFileSync(
-      join(import.meta.dir, "../components/layout/useModalFocusTrap.ts"),
+  test("a parent cannot answer for the layer above it", () => {
+    // Standing down used to be each surface's job, which is why the same bug
+    // appeared five times. Input is routed to the topmost layer instead, so a
+    // parent is never offered the press in the first place.
+    const registry = readFileSync(
+      join(import.meta.dir, "../components/layout/overlayStack.ts"),
       "utf-8",
     );
     const back = readFileSync(
       join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
       "utf-8",
     );
-    expect(trap).toContain("if (hasOverlayAbove(overlayId)) return;");
+    expect(registry).toContain("const layer = topLayer();");
+    expect(registry).toContain('event.key === "Tab" && layer.trapFocus');
+    // System back still resolves by depth, since popstate reaches everyone.
     expect(back).toContain("if (hasOverlayAbove(overlayId)) return;");
   });
 
@@ -545,9 +559,12 @@ describe("omnisearch below threshold", () => {
       "../components/sidebar/SidebarDrawer.tsx",
     ]) {
       const source = readFileSync(join(import.meta.dir, file), "utf-8");
-      // One call brings Escape ownership, focus, and system back together.
+      // One call registers the layer and brings Escape routing, focus, and
+      // system back together.
       expect(source).toContain("useModalSurface");
-      expect(source).toContain("hasOverlayAbove");
+      // And none of them listens on its own, which is the property that makes
+      // the routing authoritative rather than advisory.
+      expect(source).not.toContain('document.addEventListener("keydown"');
     }
   });
 
@@ -599,14 +616,13 @@ describe("omnisearch below threshold", () => {
   });
 
   test("Escape dismisses one level, not the whole of Omnisearch", () => {
-    // Both listeners are on document in the capture phase and this one runs
-    // first, so stopPropagation in the sheet cannot reach it.
-    const escape = commandPalette.slice(
-      commandPalette.indexOf('if (event.key === "Escape") {'),
-      commandPalette.indexOf('if (event.key === "Escape") {') + 600,
-    );
-    expect(escape).toContain("if (hasOverlayAbove(paletteOverlayId)) return;");
-    // The named-child guard could not see the row menu, so it is gone.
+    // The palette hands its keydown to the registry, which offers it only
+    // while the palette is topmost. A sheet or a row menu above it therefore
+    // answers first without the palette knowing they exist, which is what the
+    // named-child guard and then the depth guard were both trying to do.
+    expect(commandPalette).toContain("onKeyDown: onPaletteKeyDown,");
+    expect(commandPalette).not.toContain('document.addEventListener("keydown"');
+    expect(commandPalette).not.toContain("hasOverlayAbove");
     expect(commandPalette).not.toContain("if (isDossierSheetOpen) return;");
   });
 

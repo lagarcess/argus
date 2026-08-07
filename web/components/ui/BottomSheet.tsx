@@ -10,7 +10,6 @@ import {
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
-import { hasOverlayAbove } from "@/components/layout/overlayStack";
 import { useModalSurface } from "@/components/layout/useModalSurface";
 
 /**
@@ -99,6 +98,9 @@ export function BottomSheet({
     overlayId,
     containerRef: panelRef,
     onDismiss: onClose,
+    // Escape is routed by the registry, which only calls the topmost layer, so
+    // the sheet no longer has to work out whether the press was meant for it.
+    onEscape: onClose,
     initialFocusRef: initialFocusRef ?? closeButtonRef,
   });
 
@@ -108,19 +110,6 @@ export function BottomSheet({
     dragOriginRef.current = null;
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // A confirmation or menu opened above this sheet answers first.
-      if (hasOverlayAbove(overlayId)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isOpen, onClose, overlayId]);
 
   const handleDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     // Controls in the header keep their own clicks; capturing here would eat them.
