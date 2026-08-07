@@ -4,9 +4,8 @@ import { join } from "node:path";
 
 import {
   COOKIE_DISCLOSURE_RULES,
-  UndisclosedCookieError,
-  assertDisclosedCookie,
   disclosedCookieConcept,
+  undisclosedCookies,
 } from "../lib/browser-cookies";
 import en from "../public/locales/en/common.json";
 import es419 from "../public/locales/es-419/common.json";
@@ -52,11 +51,13 @@ describe("web cookie disclosure rules", () => {
     }
   });
 
-  test("refuses a cookie no rule covers", () => {
+  test("reports a cookie no rule covers, without throwing", () => {
+    // A predicate, not a guard. A stale disclosure must never be able to break
+    // sign-in, so this reports and CI fails instead of the request path.
     expect(disclosedCookieConcept("argus-undisclosed")).toBeNull();
-    expect(() => assertDisclosedCookie("argus-undisclosed")).toThrow(
-      UndisclosedCookieError,
-    );
+    expect(undisclosedCookies(["sb-abc-auth-token", "argus-undisclosed"])).toEqual([
+      "argus-undisclosed",
+    ]);
   });
 
   test("covers every cookie the backend registry declares", () => {
@@ -100,17 +101,15 @@ describe("web cookie disclosure rules", () => {
       expect(disclosedCookieConcept(`${name}.0`), `${url} chunk`).toBe(
         "sign_in",
       );
-      // The adapter path itself, not just the pattern, must accept it.
-      expect(() => assertDisclosedCookie(name)).not.toThrow();
+      expect(undisclosedCookies([name]), name).toEqual([]);
     }
   });
 
   test("accepts every name shape the auth libraries can derive", () => {
     // Enumerated from the packages rather than guessed: @supabase/ssr chunks
     // with `${key}.${i}`, and @supabase/auth-js derives
-    // `${storageKey}-code-verifier` for PKCE. Missing the verifier made
-    // assertDisclosedCookie throw inside the password-reset flow, which is a
-    // broken feature and not only a disclosure gap.
+    // `${storageKey}-code-verifier` for PKCE. Missing the verifier once broke
+    // password reset outright, back when this check could throw.
     const base = supabaseCookieName("https://lgdhvepyrzbnscqssgqq.supabase.co");
     for (const name of [
       base,
@@ -119,15 +118,14 @@ describe("web cookie disclosure rules", () => {
       `${base}-code-verifier.0`,
     ]) {
       expect(disclosedCookieConcept(name), name).toBe("sign_in");
-      expect(() => assertDisclosedCookie(name), name).not.toThrow();
+      expect(undisclosedCookies([name]), name).toEqual([]);
     }
   });
 
-  test("the password-reset path can write its cookies through the adapter", () => {
-    // app/api/auth/recovery/route.ts calls createClient() from the gated
-    // adapter, then resetPasswordForEmail, which writes the PKCE verifier.
-    // Every name that flow produces has to pass the gate or recovery breaks in
-    // development and CI, where the assertion throws.
+  test("the password-reset path's cookies are all disclosed", () => {
+    // app/api/auth/recovery/route.ts calls createClient(), then
+    // resetPasswordForEmail, which writes the PKCE verifier. The disclosure
+    // has to cover every name that flow produces.
     const route = readFileSync(
       join(import.meta.dir, "..", "app", "api", "auth", "recovery", "route.ts"),
       "utf-8",
@@ -138,7 +136,7 @@ describe("web cookie disclosure rules", () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL ??
       "https://lgdhvepyrzbnscqssgqq.supabase.co";
     const verifier = `${supabaseCookieName(configured)}-code-verifier`;
-    expect(() => assertDisclosedCookie(verifier)).not.toThrow();
+    expect(undisclosedCookies([verifier])).toEqual([]);
   });
 
   test("no code customizes the Supabase cookie name behind the registry's back", () => {
@@ -154,17 +152,15 @@ describe("web cookie disclosure rules", () => {
     }
   });
 
-  test("the server adapter gates names before writing them", () => {
+  test("the auth path carries no disclosure check that could break it", () => {
+    // The regression this pins: asserting inside the adapter put a
+    // documentation check on the critical path, and a missing rule broke
+    // password reset. Enforcement belongs in CI, not in a user's request.
     const source = readFileSync(
       join(import.meta.dir, "..", "lib", "supabase-server.ts"),
       "utf-8",
     );
-    expect(source).toContain("assertDisclosedCookie");
-    // The gate must sit outside the Server Component try/catch, or a
-    // disclosure failure would be swallowed with the rest.
-    const gate = source.indexOf("assertDisclosedCookie(name)");
-    const tryBlock = source.indexOf("try {", source.indexOf("setAll("));
-    expect(gate).toBeGreaterThan(0);
-    expect(gate).toBeLessThan(tryBlock);
+    expect(source).not.toContain("assertDisclosedCookie");
+    expect(source).not.toContain("browser-cookies");
   });
 });

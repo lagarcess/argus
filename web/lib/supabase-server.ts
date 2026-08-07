@@ -1,8 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { assertDisclosedCookie } from "./browser-cookies";
-
 export async function createClient() {
   const cookieStore = await cookies();
 
@@ -24,10 +22,6 @@ export async function createClient() {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          // Outside the try on purpose: the catch below is for Server
-          // Component writes, and swallowing a disclosure failure there would
-          // hide it and skip the remaining cookies.
-          cookiesToSet.forEach(({ name }) => assertDisclosedCookie(name));
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);

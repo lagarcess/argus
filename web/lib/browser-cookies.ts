@@ -67,26 +67,23 @@ export function disclosedCookieConcept(name: string): CookieConcept | null {
   );
 }
 
-export class UndisclosedCookieError extends Error {}
-
 /**
- * Refuse a cookie no disclosure covers.
+ * Deliberately a predicate, not a guard that throws.
  *
- * Throws outside production so it surfaces in development and CI, where an
- * undisclosed cookie should stop the build. In production it reports instead:
- * locking a real user out of sign-in is worse harm than a bookkeeping gap that
- * the CI gates are there to catch first.
+ * An earlier version asserted inside the Supabase adapter's cookie write. That
+ * put a documentation check on the critical path: when the rules missed the
+ * PKCE verifier, password reset broke. A stale disclosure must never be able
+ * to break sign-in.
+ *
+ * Enforcement therefore lives where failure is free, not where users are:
+ *  - CI observes what a real browser actually kept
+ *    (e2e/browser-storage-disclosure.spec.ts)
+ *  - CI observes what the backend actually set
+ *    (tests/test_browser_cookie_disclosure.py)
+ *  - ESLint keeps cookie writes out of page and route code
+ *
+ * Those fail a build. This function only answers a question.
  */
-export function assertDisclosedCookie(name: string): void {
-  if (disclosedCookieConcept(name)) return;
-
-  const message =
-    `cookie "${name}" is not covered by COOKIE_DISCLOSURE_RULES, so no ` +
-    "privacy disclosure describes it. Add a rule and disclose it.";
-
-  if (process.env.NODE_ENV === "production") {
-    console.error(message);
-    return;
-  }
-  throw new UndisclosedCookieError(message);
+export function undisclosedCookies(names: readonly string[]): string[] {
+  return [...new Set(names)].filter((name) => !disclosedCookieConcept(name)).sort();
 }

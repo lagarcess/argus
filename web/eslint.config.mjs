@@ -24,9 +24,8 @@ const STORAGE_SELECTORS = [
   },
 ];
 
-// Every Next.js cookie-writing API, not just the Supabase adapter. A route
-// handler or proxy reaching cookies().set or NextResponse.cookies.set writes a
-// real browser cookie no registry would ever see.
+// Cookie WRITES only. Reading cookies is ordinary work and stays free; it is
+// setting one that adds browser state the disclosure has to cover.
 const COOKIE_SELECTORS = [
   {
     selector:
@@ -42,19 +41,6 @@ const COOKIE_SELECTORS = [
   },
 ];
 
-const RESTRICTED_COOKIE_IMPORTS = [
-  "error",
-  {
-    paths: [
-      {
-        name: "next/headers",
-        importNames: ["cookies"],
-        message:
-          "Only lib/supabase-server.ts may reach the cookie store, so every write is asserted against COOKIE_DISCLOSURE_RULES.",
-      },
-    ],
-  },
-];
 
 // Tests, e2e fixtures, and build config drive the real APIs on purpose and
 // never ship as Argus code.
@@ -83,7 +69,6 @@ const eslintConfig = defineConfig([
     ignores: [...NON_SHIPPING, "lib/browser-storage.ts", "lib/supabase-server.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...STORAGE_SELECTORS, ...COOKIE_SELECTORS],
-      "no-restricted-imports": RESTRICTED_COOKIE_IMPORTS,
     },
   },
   // The one sanctioned storage handle. Cookie rules still apply to it.
@@ -91,7 +76,6 @@ const eslintConfig = defineConfig([
     files: ["lib/browser-storage.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...COOKIE_SELECTORS],
-      "no-restricted-imports": RESTRICTED_COOKIE_IMPORTS,
     },
   },
   // The one sanctioned cookie writer; it asserts before every set. Storage

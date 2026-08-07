@@ -2,8 +2,9 @@
 
 Two independent checks, because either alone is escapable:
 
-* The chokepoint refuses an unregistered name, so ordinary code cannot write
-  one. That is enforcement by construction.
+* The chokepoint is the single place cookies are written, so there is one
+  place to read to know what Argus sets. It reports an unregistered name
+  rather than raising: a stale disclosure must never break a live request.
 * The observation test patches ``Response.set_cookie`` on the class itself and
   exercises the real auth surface, so it records what was genuinely written no
   matter which name the calling code used to reach the method. Aliasing,
@@ -20,11 +21,7 @@ import json
 from pathlib import Path
 
 import pytest
-from argus.api.browser_cookies import (
-    COOKIE_REGISTRY,
-    UndisclosedCookieError,
-    set_browser_cookie,
-)
+from argus.api.browser_cookies import COOKIE_REGISTRY, set_browser_cookie
 from starlette.responses import Response
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -45,14 +42,20 @@ def recorded_cookies(monkeypatch) -> list[str]:
     return written
 
 
-def test_chokepoint_refuses_an_undisclosed_cookie():
+def test_undisclosed_cookie_is_reported_without_breaking_the_request(caplog):
+    """A missing disclosure entry must never fail a live request.
+
+    Refusing to set an auth cookie over a documentation gap turns bookkeeping
+    into a broken login. The observation test below is what fails instead, in
+    CI, where failure costs nothing.
+    """
     response = Response()
-    with pytest.raises(UndisclosedCookieError) as excinfo:
-        set_browser_cookie(response, "argus-undisclosed", "value")
-    assert "argus-undisclosed" in str(excinfo.value)
-    assert "set-cookie" not in {
-        header.decode().lower() for header, _ in response.raw_headers
-    }
+    set_browser_cookie(response, "argus-undisclosed", "value")
+    assert any(
+        "argus-undisclosed" in raw.decode()
+        for header, raw in response.raw_headers
+        if header.decode().lower() == "set-cookie"
+    )
 
 
 def test_chokepoint_allows_every_registered_cookie():

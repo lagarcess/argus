@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import Any, Final
 
+from loguru import logger
+
 # Cookie name -> the item key under legal.privacy.sections.cookies.items that
 # discloses it. Adding a cookie means adding it here and to that disclosure.
 COOKIE_REGISTRY: Final[dict[str, str]] = {
@@ -24,30 +26,32 @@ COOKIE_REGISTRY: Final[dict[str, str]] = {
 }
 
 
-class UndisclosedCookieError(RuntimeError):
-    """Raised when code tries to set a cookie no disclosure covers."""
+def _warn_if_unregistered(name: str) -> None:
+    """Report an undisclosed cookie without failing the request.
 
-
-def _require_registered(name: str) -> None:
+    Deliberately not an exception. Refusing to set an auth cookie because a
+    disclosure entry is missing turns a documentation gap into a broken login,
+    which is far worse than the gap. The test suite observes every cookie this
+    module writes and fails there instead, where failure costs nothing.
+    """
     if name not in COOKIE_REGISTRY:
-        raise UndisclosedCookieError(
-            f"cookie {name!r} is not in COOKIE_REGISTRY, so no privacy "
-            "disclosure covers it. Register it and disclose it before setting "
-            "it on a browser."
+        logger.warning(
+            "Cookie {name} is not in COOKIE_REGISTRY, so no privacy disclosure "
+            "covers it. Register it and disclose it.",
+            name=name,
         )
 
 
 def set_browser_cookie(response: Any, name: str, value: str, **kwargs: Any) -> None:
-    """Set a registered cookie. Unregistered names raise rather than ship."""
-    _require_registered(name)
+    """Set a cookie, reporting any that no disclosure covers."""
+    _warn_if_unregistered(name)
     response.set_cookie(name, value, **kwargs)
 
 
 def delete_browser_cookie(response: Any, name: str, **kwargs: Any) -> None:
-    """Delete a registered cookie.
+    """Delete a cookie.
 
     A delete cannot create browser state, but routing it here keeps one place
     that knows every cookie Argus owns.
     """
-    _require_registered(name)
     response.delete_cookie(name, **kwargs)
