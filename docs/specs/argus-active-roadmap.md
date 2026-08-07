@@ -59,8 +59,24 @@ the answer into something runnable.
 - Start with exactly two jobs: a single-company read, and a competitor
   comparison. No fundamentals suite, no screener, no valuation product, no
   skill store.
-- Perplexity finance and web search modes are the likely provider; #377 is the
-  open evaluation.
+- **Spec is written and founder-locked:**
+  [`2026-08-07-research-to-test-rail.md`](../superpowers/specs/2026-08-07-research-to-test-rail.md).
+  It supersedes the narrow competitor-comparison framing: Argus is no longer
+  bounded to backtesting. Perplexity `finance_search` at $5 per 1,000
+  invocations grounds quotes, fundamentals, segments, earnings, peers, screening
+  and ETF constituents, selected by question shape with no menu. Closes #377.
+- Peers now come free from the provider, which **retires the deterministic peer
+  recommender in PR #384**. Close that lane rather than building it.
+- **Follow-up, not in the rail lane:** the rail spec details the signed-in empty
+  chat but leaves the guest empty state as placeholder and chips only. A landing
+  page was considered on 2026-08-07 and rejected, because a composer that
+  carries the typed question into chat makes the landing page and the guest
+  entry the same surface with two sets of copy, and a front door with the chat
+  behind it rebuilds the lobby this board refuses. The idea worth keeping is the
+  inverse: the guest empty state becomes the entry experience, with a hero line,
+  a cycling typewriter composer showing the range of questions, and trust
+  signals sitting above the composer, collapsing into the conversation on first
+  send. Revisit after mobile lands, since the exposure gate comes first.
 
 Absorbs stabilization items formerly ranked Tier 1 #1, #3, #4, and the
 knowledge/statistics macro. The interpreter ValueError work is complete and
