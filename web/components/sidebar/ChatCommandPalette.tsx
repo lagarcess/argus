@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -22,8 +23,9 @@ import { DecisionHistoryView } from "@/components/sidebar/command-palette/Decisi
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
 import CommandPaletteRowActions from "@/components/sidebar/command-palette/CommandPaletteRowActions";
 import { commandPaletteRowActions } from "@/components/sidebar/command-palette/rowActionItems";
-import { BottomSheet } from "@/components/ui/BottomSheet";
+import CommandPaletteDossierSheet from "@/components/sidebar/command-palette/CommandPaletteDossierSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import { hasOverlayAbove, useOverlayStackEntry } from "@/components/layout/overlayStack";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
 import { CommandPaletteFooter, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
@@ -278,6 +280,8 @@ export default function ChatCommandPalette({
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
   const { isBelowTablet, isBelowDesktop } = useResponsiveLayout();
+  const paletteOverlayId = useId();
+  useOverlayStackEntry(true, paletteOverlayId);
   const [isDossierSheetOpen, setIsDossierSheetOpen] = useState(false);
   // Below the mobile threshold Omnisearch is collapsed-only: there is no room
   // for a second pane, and the dossier arrives as a sheet instead.
@@ -1106,10 +1110,12 @@ export default function ChatCommandPalette({
       }
       if (dossierKeyboardAction === "allow_control") return;
       if (event.key === "Escape") {
-        // Both this and BottomSheet listen on document in the capture phase, and
-        // this one was registered first, so stopPropagation in the sheet cannot
-        // reach it. Escape must dismiss one level, so defer while it is open.
-        if (isDossierSheetOpen) return;
+        // Everything here listens on document in the capture phase, and this
+        // listener was registered first, so a child's stopPropagation can never
+        // reach it. Escape must dismiss one level, so stand down whenever
+        // anything is open above: the dossier sheet, a row's action menu, or
+        // whatever nests here next.
+        if (hasOverlayAbove(paletteOverlayId)) return;
         event.preventDefault();
         if (editingId) {
           cancelRename();
@@ -1188,10 +1194,10 @@ export default function ChatCommandPalette({
     editingId,
     handleArchive,
     handleDelete,
-    isDossierSheetOpen,
     keyboardItems,
     onClose,
     openRow,
+    paletteOverlayId,
     pendingDeleteItem,
     selectedNavigationDisabled,
     selectedPreview,
@@ -1823,45 +1829,27 @@ export default function ChatCommandPalette({
         </div>
 
         {isBelowDesktop && isDossierSheetOpen && selectedPreview ? (
-          <BottomSheet
-            isOpen
-            height="full"
-            title={selectedPreview.title}
-            closeLabel={t("command_palette.close_dossier", "Close dossier")}
+          <CommandPaletteDossierSheet
+            preview={selectedPreview}
+            navigationDisabled={selectedNavigationDisabled}
             onClose={() => setIsDossierSheetOpen(false)}
-            footer={
-              <button
-                type="button"
-                data-testid="dossier-sheet-open-conversation"
-                disabled={
-                  !selectedPreview.conversationId || selectedNavigationDisabled
-                }
-                onClick={() => {
-                  setIsDossierSheetOpen(false);
-                  if (!selectedDossier) {
-                    openSourceConversation(selectedPreview);
-                    return;
-                  }
-                  openSelectedDossierConversation({
-                    conversationId: selectedPreview.conversationId,
-                    dossier: selectedDossier,
-                    navigationDisabled: selectedNavigationDisabled,
-                    onOpenConversation: (conversationId, messageId) =>
-                      onOpenConversation(conversationId, messageId),
-                    onClose,
-                  });
-                }}
-                className="flex min-h-11 w-full items-center justify-center rounded-full bg-black px-6 text-[15px] font-medium text-white transition-opacity hover:opacity-85 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:bg-white dark:text-black dark:focus-visible:ring-white/30"
-              >
-                {t(
-                  commandPaletteOpenLabelKey(selectedPreview),
-                  commandPaletteOpenFallback(selectedPreview),
-                )}
-              </button>
-            }
+            onOpenConversation={() => {
+              if (!selectedDossier) {
+                openSourceConversation(selectedPreview);
+                return;
+              }
+              openSelectedDossierConversation({
+                conversationId: selectedPreview.conversationId,
+                dossier: selectedDossier,
+                navigationDisabled: selectedNavigationDisabled,
+                onOpenConversation: (conversationId, messageId) =>
+                  onOpenConversation(conversationId, messageId),
+                onClose,
+              });
+            }}
           >
             {dossierPaneContent}
-          </BottomSheet>
+          </CommandPaletteDossierSheet>
         ) : null}
 
         <CommandPaletteFooter

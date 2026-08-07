@@ -690,11 +690,34 @@ body {
 }
 
 /*
- * Hover reveal is an affordance, not a gate. Where the pointer cannot hover
- * there is nothing to reveal it with, so the row's actions stay visible.
+ * Hover reveal is an affordance, not a gate.
+ *
+ * `any-pointer: coarse` rather than `hover: none`, because a hybrid laptop
+ * reports its trackpad as the primary pointer: `hover: none` stays false there
+ * even while the user is touching the screen, which left the cluster hidden for
+ * exactly the input that cannot hover. `any-pointer` asks whether a coarse
+ * pointer exists at all, which is the real question.
+ *
+ * Revealing it is only half the job. The buttons are drawn at icon size, so
+ * they also need a real 44px hit area wherever a finger may arrive, added as a
+ * centred pseudo-element so the row's visual density is unchanged.
  */
-@media (hover: none) {
+@media (any-pointer: coarse) {
   .argus-row-hover-actions {
     opacity: 1;
+  }
+
+  .argus-row-hover-actions > button {
+    position: relative;
+  }
+
+  .argus-row-hover-actions > button::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    height: 2.75rem;
+    width: 2.75rem;
+    transform: translate(-50%, -50%);
   }
 }

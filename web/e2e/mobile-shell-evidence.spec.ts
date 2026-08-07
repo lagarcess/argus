@@ -63,6 +63,9 @@ async function open(
   });
   const query = options.conversation ? "?conversation=conversation-alpha" : "";
   await page.goto(`/chat${query}`, { waitUntil: "networkidle" });
+  // Dev-only chrome sits in the same corner as the header menu and swallows
+  // its clicks, so it goes before any interaction, not just before a capture.
+  await page.addStyleTag({ content: HIDE_DEV_CHROME });
   await page.waitForTimeout(900);
 }
 

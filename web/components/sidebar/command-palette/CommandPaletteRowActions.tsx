@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Edit2, MoreVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useOverlayStackEntry } from "@/components/layout/overlayStack";
 
 export type CommandPaletteRowAction = {
   id: "rename" | "archive" | "delete" | "open_source";
@@ -35,8 +36,11 @@ export default function CommandPaletteRowActions({
   variant: "hover" | "menu";
 }) {
   const { t } = useTranslation();
+  const overlayId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useOverlayStackEntry(isOpen, overlayId);
 
   useEffect(() => {
     if (!isOpen) return;

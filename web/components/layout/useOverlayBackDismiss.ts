@@ -49,6 +49,19 @@ export function openOverlayEntries(): readonly string[] {
   return unconsumedOverlays;
 }
 
+/**
+ * Consume every outstanding entry without popping any of them.
+ *
+ * A navigation out of an overlay writes the destination onto the entry the
+ * overlay pushed, using `replaceState`. Popping that entry afterwards restores
+ * the URL the overlay opened over, leaving the address bar pointing at the
+ * conversation the user just left while the transcript shows the new one, and a
+ * reload lands on the wrong one. The entry is not spare, it is the destination.
+ */
+export function consumeOverlayEntriesForNavigation(): void {
+  unconsumedOverlays = [];
+}
+
 export function overlayHistoryState(
   currentState: unknown,
   overlayId: string,

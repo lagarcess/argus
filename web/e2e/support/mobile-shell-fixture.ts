@@ -338,6 +338,12 @@ export async function installMobileShellFixture(
       return json(route, { items: resultMessages(language), next_cursor: null });
     }
 
+    if (/\/api\/v1\/conversations\/[^/]+$/.test(path)) {
+      const id = path.split("/").pop()!;
+      const entry = CONVERSATIONS.find((c) => c.id === id) ?? CONVERSATIONS[0];
+      return json(route, conversation(entry.id, entry.title));
+    }
+
     if (path.endsWith("/api/v1/history")) {
       const items = (isGuest ? [CONVERSATIONS[0]] : CONVERSATIONS).map((entry) =>
         conversation(

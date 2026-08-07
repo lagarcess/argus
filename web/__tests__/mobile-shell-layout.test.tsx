@@ -22,6 +22,14 @@ import {
   recordOverlayEntry,
   resetOverlayEntries,
 } from "../components/layout/useOverlayBackDismiss";
+import {
+  hasOverlayAbove,
+  isTopOverlay,
+  overlayStackIds,
+  popOverlay,
+  pushOverlay,
+  resetOverlayStack,
+} from "../components/layout/overlayStack";
 import { sidebarDrawerDragOutcome } from "../components/sidebar/SidebarDrawer";
 import ChatShellMenuTrigger from "../components/chat/ChatShellMenuTrigger";
 import SidebarHeader from "../components/sidebar/SidebarHeader";
@@ -349,10 +357,16 @@ describe("omnisearch below threshold", () => {
   });
 
   test("pins Open conversation inside the sheet", () => {
-    expect(commandPalette).toContain(
-      'data-testid="dossier-sheet-open-conversation"',
+    const sheet = readFileSync(
+      join(
+        import.meta.dir,
+        "../components/sidebar/command-palette/CommandPaletteDossierSheet.tsx",
+      ),
+      "utf-8",
     );
-    expect(commandPalette).toContain("commandPaletteOpenLabelKey(selectedPreview)");
+    expect(sheet).toContain('data-testid="dossier-sheet-open-conversation"');
+    expect(sheet).toContain("commandPaletteOpenLabelKey(preview)");
+    expect(sheet).toContain("min-h-11");
   });
 
   test("row actions are explicit at every width a touch device is likely to use", () => {
@@ -392,9 +406,9 @@ describe("omnisearch below threshold", () => {
       "utf-8",
     );
     expect(rowActions).toContain("argus-row-hover-actions");
-    const hoverNone = globalsCss.slice(globalsCss.indexOf("@media (hover: none)"));
-    expect(hoverNone).toContain(".argus-row-hover-actions");
-    expect(hoverNone).toContain("opacity: 1;");
+    const coarse = globalsCss.slice(globalsCss.indexOf("@media (any-pointer: coarse)"));
+    expect(coarse).toContain(".argus-row-hover-actions");
+    expect(coarse).toContain("opacity: 1;");
   });
 
   test("pointer, keyboard, and the search field share one row-open path", () => {
@@ -411,14 +425,84 @@ describe("omnisearch below threshold", () => {
     expect(rowKeyDown).toContain("openRow(item, {");
   });
 
+  test("Escape ownership is depth, not a list of named children", () => {
+    resetOverlayStack();
+    pushOverlay("palette");
+    expect(hasOverlayAbove("palette")).toBe(false);
+    expect(isTopOverlay("palette")).toBe(true);
+
+    pushOverlay("row-menu");
+    expect(hasOverlayAbove("palette")).toBe(true);
+    expect(isTopOverlay("row-menu")).toBe(true);
+
+    popOverlay("row-menu");
+    expect(hasOverlayAbove("palette")).toBe(false);
+
+    // A sheet nests just as a menu does; the parent does not need to know which.
+    pushOverlay("dossier-sheet");
+    expect(hasOverlayAbove("palette")).toBe(true);
+    popOverlay("dossier-sheet");
+    popOverlay("palette");
+    expect(overlayStackIds()).toEqual([]);
+  });
+
+  test("re-registering an overlay moves it to the top rather than duplicating", () => {
+    resetOverlayStack();
+    pushOverlay("a");
+    pushOverlay("b");
+    pushOverlay("a");
+    expect(overlayStackIds()).toEqual(["b", "a"]);
+    expect(hasOverlayAbove("b")).toBe(true);
+  });
+
+  test("a navigation keeps its entry instead of popping it", () => {
+    // Popping would restore the URL the overlay opened over, so the address bar
+    // would point at the conversation the user just left.
+    const source = readFileSync(
+      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      "utf-8",
+    );
+    expect(source).toContain("export function consumeOverlayEntriesForNavigation");
+    const sheet = readFileSync(
+      join(
+        import.meta.dir,
+        "../components/sidebar/command-palette/CommandPaletteDossierSheet.tsx",
+      ),
+      "utf-8",
+    );
+    const handler = sheet.slice(
+      sheet.indexOf('data-testid="dossier-sheet-open-conversation"'),
+    );
+    // Consumed before the close, so the deferred pop finds nothing to undo.
+    expect(handler.indexOf("consumeOverlayEntriesForNavigation")).toBeLessThan(
+      handler.indexOf("onClose()"),
+    );
+    expect(handler.indexOf("onClose()")).toBeLessThan(
+      handler.indexOf("onOpenConversation()"),
+    );
+  });
+
+  test("row actions stay reachable wherever a coarse pointer exists", () => {
+    // `hover: none` reports the primary pointer, so a hybrid laptop with a
+    // trackpad answered false while the user was touching the screen.
+    const coarse = globalsCss.slice(globalsCss.indexOf("@media (any-pointer: coarse)"));
+    expect(coarse).toContain(".argus-row-hover-actions");
+    expect(coarse).toContain("opacity: 1;");
+    expect(coarse).toContain("height: 2.75rem;");
+    expect(coarse).toContain("width: 2.75rem;");
+    expect(globalsCss).not.toContain("@media (hover: none)");
+  });
+
   test("Escape dismisses one level, not the whole of Omnisearch", () => {
     // Both listeners are on document in the capture phase and this one runs
     // first, so stopPropagation in the sheet cannot reach it.
     const escape = commandPalette.slice(
       commandPalette.indexOf('if (event.key === "Escape") {'),
-      commandPalette.indexOf('if (event.key === "Escape") {') + 400,
+      commandPalette.indexOf('if (event.key === "Escape") {') + 600,
     );
-    expect(escape).toContain("if (isDossierSheetOpen) return;");
+    expect(escape).toContain("if (hasOverlayAbove(paletteOverlayId)) return;");
+    // The named-child guard could not see the row menu, so it is gone.
+    expect(commandPalette).not.toContain("if (isDossierSheetOpen) return;");
   });
 
   test("the row date is a column rather than an overlay", () => {

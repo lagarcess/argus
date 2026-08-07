@@ -12,6 +12,7 @@ import {
 } from "react";
 import { X } from "lucide-react";
 import { useOverlayBackDismiss } from "@/components/layout/useOverlayBackDismiss";
+import { useOverlayStackEntry } from "@/components/layout/overlayStack";
 
 /**
  * Detents from the mobile shell spec: run dossier, sources pane, capital editor.
@@ -134,6 +135,7 @@ export function BottomSheet({
   const [dragOffset, setDragOffset] = useState(0);
 
   useOverlayBackDismiss({ isOpen, overlayId, onDismiss: onClose });
+  useOverlayStackEntry(isOpen, overlayId);
 
   const focusableElements = useCallback((): HTMLElement[] => {
     const panel = panelRef.current;
