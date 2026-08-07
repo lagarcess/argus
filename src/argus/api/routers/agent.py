@@ -68,7 +68,7 @@ from argus.api.chat.discovery_evidence import (
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
-from argus.api.chat.memory_recall import memory_recalls_for_turn
+from argus.api.chat.memory_recall import memory_recalls_for_turn_async
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -436,9 +436,8 @@ async def chat_stream(
             raise RuntimeError("Response-option admission returned no request.")
         request_message = accepted_option_request.content
         display_message = accepted_option_request.content
-        if (
-            payload.action is not None
-            and payload.action.payload.get("request_message_id")
+        if payload.action is not None and payload.action.payload.get(
+            "request_message_id"
         ):
             mention_provenance = []
     lifecycle_hooks = (
@@ -1204,7 +1203,7 @@ async def chat_stream(
                                 if key in durable_retry
                             }
                     else:
-                        memory_recalls = memory_recalls_for_turn(
+                        memory_recalls = await memory_recalls_for_turn_async(
                             user=user,
                             account=turn_account,
                             user_message=display_message,

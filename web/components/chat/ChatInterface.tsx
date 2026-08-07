@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import { readStored, writeStored } from "@/lib/browser-storage";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcutSurfaces";
 import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
@@ -510,26 +511,16 @@ export default function ChatInterface() {
   }, [isSidebarOpen]);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(
-        "argus:sidebar_mode",
-      ) as SidebarMode | null;
-      if (saved === "expanded" || saved === "collapsed" || saved === "hover") {
-        setSidebarMode(saved);
-        setIsSidebarOpen(saved === "expanded");
-      }
-    } catch {
-      // Local preferences are optional.
+    const saved = readStored("argus:sidebar_mode") as SidebarMode | null;
+    if (saved === "expanded" || saved === "collapsed" || saved === "hover") {
+      setSidebarMode(saved);
+      setIsSidebarOpen(saved === "expanded");
     }
   }, []);
 
   const handleSetSidebarMode = (mode: SidebarMode) => {
     setSidebarMode(mode);
-    try {
-      window.localStorage.setItem("argus:sidebar_mode", mode);
-    } catch {
-      // Local preferences are optional.
-    }
+    writeStored("argus:sidebar_mode", mode);
     if (mode === "expanded") setIsSidebarOpen(true);
     if (mode === "collapsed" || mode === "hover") setIsSidebarOpen(false);
   };

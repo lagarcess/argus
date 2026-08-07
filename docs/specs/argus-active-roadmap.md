@@ -56,11 +56,30 @@ the answer into something runnable.
   closed candidates; it may not mint symbols, strategies, or asks. Every
   candidate passes resolver, asset-class, and coverage checks before it is
   tappable.
-- Start with exactly two jobs: a single-company read, and a competitor
-  comparison. No fundamentals suite, no screener, no valuation product, no
-  skill store.
-- Perplexity finance and web search modes are the likely provider; #377 is the
-  open evaluation.
+- Cover the full question range the founder asked for on 2026-08-07: live
+  quotes, single-company reads, cross-company comparison, screening, and market
+  stats. An earlier draft of this line restricted the lane to two jobs; that was
+  a recommendation the founder overruled the same day, and it should never have
+  survived here. No skill store, no menu, no picker: the range is reached
+  through natural language, never a capability list.
+- **Spec is written and founder-locked:**
+  [`2026-08-07-research-to-test-rail.md`](../superpowers/specs/2026-08-07-research-to-test-rail.md).
+  It supersedes the narrow competitor-comparison framing: Argus is no longer
+  bounded to backtesting. Perplexity `finance_search` at $5 per 1,000
+  invocations grounds quotes, fundamentals, segments, earnings, peers, screening
+  and ETF constituents, selected by question shape with no menu. Closes #377.
+- Peers now come free from the provider, which **retires the deterministic peer
+  recommender in PR #384**. Close that lane rather than building it.
+- **Follow-up, not in the rail lane:** the rail spec details the signed-in empty
+  chat but leaves the guest empty state as placeholder and chips only. A landing
+  page was considered on 2026-08-07 and rejected, because a composer that
+  carries the typed question into chat makes the landing page and the guest
+  entry the same surface with two sets of copy, and a front door with the chat
+  behind it rebuilds the lobby this board refuses. The idea worth keeping is the
+  inverse: the guest empty state becomes the entry experience, with a hero line,
+  a cycling typewriter composer showing the range of questions, and trust
+  signals sitting above the composer, collapsing into the conversation on first
+  send. Revisit after mobile lands, since the exposure gate comes first.
 
 Absorbs stabilization items formerly ranked Tier 1 #1, #3, #4, and the
 knowledge/statistics macro. The interpreter ValueError work is complete and

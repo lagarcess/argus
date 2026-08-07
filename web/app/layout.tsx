@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { THEME_STORAGE_KEY } from "@/lib/browser-storage";
 import { I18nProvider } from "@/components/I18nProvider";
 import localFont from "next/font/local";
 
@@ -49,7 +50,7 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
-          storageKey="argus-theme"
+          storageKey={THEME_STORAGE_KEY}
           enableSystem
           disableTransitionOnChange
         >

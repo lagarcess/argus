@@ -2436,16 +2436,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain(
       "Request permanent deletion of your Argus account. Support will follow up by email.",
     );
-    expect(en).toContain(
-      "Support handles account deletion during private alpha.",
-    );
+    expect(en).toContain("Support handles account deletion. We'll verify");
     expect(en).toContain("Request sent. We'll follow up by email.");
     expect(es).toContain("Solicitar eliminación de cuenta");
     expect(es).toContain(
       "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
     );
     expect(es).toContain(
-      "Soporte gestiona la eliminación de cuentas durante la alfa privada.",
+      "Soporte gestiona la eliminación de cuentas. Verificaremos",
     );
     expect(es).toContain(
       "Solicitud enviada. Te contactaremos por correo electrónico.",
@@ -2550,7 +2548,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(legalPage).toContain("body_before_email");
     expect(legalPage).toContain("mailto:${supportEmail}");
 
-    expect(en).toContain('"effective_date": "Effective date: June 30, 2026"');
+    expect(en).toContain('"effective_date": "Effective date: August 7, 2026"');
     expect(en).toContain('"title": "No investment advice"');
     expect(en).toContain("not a broker");
     expect(en).toContain("Historical simulations are hypothetical");
@@ -2564,7 +2562,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain("prompts may be sent");
 
     expect(es).toContain(
-      '"effective_date": "Fecha de entrada en vigor: 30 de junio de 2026"',
+      '"effective_date": "Fecha de entrada en vigor: 7 de agosto de 2026"',
     );
     expect(es).toContain("No es asesoría de inversión");
     expect(es).toContain("Argus no es broker");

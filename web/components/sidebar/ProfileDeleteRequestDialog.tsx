@@ -120,7 +120,7 @@ export default function ProfileDeleteRequestDialog({
             <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
               {t(
                 "settings.profile.request_deletion.body",
-                "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+                "Support handles account deletion. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
               )}
             </p>
             {state === "error" && (

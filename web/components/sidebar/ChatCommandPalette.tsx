@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { panelFailureIconClass } from "@/lib/failure-treatment";
 import { useTranslation } from "react-i18next";
+import { readStored, writeStored } from "@/lib/browser-storage";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DecisionHistoryView } from "@/components/sidebar/command-palette/DecisionHistoryView";
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
@@ -309,7 +310,7 @@ export default function ChatCommandPalette({
 
   useEffect(() => {
     inputRef.current?.focus();
-    const saved = window.localStorage.getItem("argus:command_palette_layout");
+    const saved = readStored("argus:command_palette_layout");
     if (saved === "expanded" || saved === "collapsed") {
       setLayoutMode(saved);
     }
@@ -1220,7 +1221,7 @@ export default function ChatCommandPalette({
   const toggleLayout = () => {
     setLayoutMode((current) => {
       const next = current === "expanded" ? "collapsed" : "expanded";
-      window.localStorage.setItem("argus:command_palette_layout", next);
+      writeStored("argus:command_palette_layout", next);
       return next;
     });
   };
