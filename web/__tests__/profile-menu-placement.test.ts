@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   profileMenuClass,
+  profileSubmenuAnchorClass,
   profileSubmenuClass,
 } from "../components/sidebar/profileMenuPlacement";
 
@@ -50,12 +51,27 @@ describe("drawer placement", () => {
     expect(className).toContain("left-0 right-0");
   });
 
-  test("submenus stack upward instead of off the side of the screen", () => {
+  test("submenus cover the menu instead of overflowing the screen", () => {
     const drawer = profileSubmenuClass("drawer", "min-w-[304px]");
     expect(drawer).not.toContain("left-full");
     expect(drawer).not.toContain("min-w-[304px]");
-    expect(drawer).toContain("bottom-full");
-    expect(drawer).toContain("left-0 right-0");
+    // Sized to the menu, which already fits, so a tall submenu on a short
+    // screen cannot push its first actions above the top of the viewport.
+    expect(drawer).toContain("inset-0");
+    expect(drawer).toContain("overflow-y-auto");
+  });
+
+  test("only the rail anchors a submenu to its own row", () => {
+    // In the drawer the row must not be the containing block, or the submenu
+    // is measured against a 44px row instead of the menu.
+    expect(profileSubmenuAnchorClass("rail")).toBe("relative");
+    expect(profileSubmenuAnchorClass("drawer")).toBe("");
+  });
+
+  test("the drawer menu is bounded and scrollable", () => {
+    const { className } = profileMenuClass("drawer", false);
+    expect(className).toContain("max-h-[70dvh]");
+    expect(className).toContain("overflow-y-auto");
   });
 
   test("touch targets meet the 44px minimum", () => {

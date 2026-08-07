@@ -11,8 +11,10 @@ import {
 import { createPortal } from "react-dom";
 import { useModalSurface } from "../layout/useModalSurface";
 import { hasOverlayAbove } from "../layout/overlayStack";
+import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
 import {
   profileMenuClass,
+  profileSubmenuAnchorClass,
   profileSubmenuClass,
 } from "./profileMenuPlacement";
 import {
@@ -144,7 +146,9 @@ export default function ProfileMenu({
   const { t, i18n } = useTranslation();
   const isDrawerPlacement = placement === "drawer";
   const menuOverlayId = useId();
+  const profileModalOverlayId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
+  const profileModalRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
   const avatarTriggerRef = useRef<HTMLButtonElement>(null);
   const avatarThemeDrawerRef = useRef<HTMLDivElement>(null);
@@ -267,6 +271,18 @@ export default function ProfileMenu({
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onDismiss: onClose,
+  });
+
+  // Opening this closes the menu, so the registration above has already stood
+  // down by the time the dialog paints. It needs its own or nothing owns back,
+  // Escape, or focus for it. Scoped to the panel rather than the backdrop, so
+  // focus does not open on an invisible dismiss control.
+  useModalSurface({
+    isOpen: activeModal === "profile",
+    overlayId: profileModalOverlayId,
+    containerRef: profileModalRef,
+    onDismiss: closeProfileModal,
+    returnFocusRef: anchorRef,
   });
 
   // Close on Escape
@@ -721,119 +737,12 @@ export default function ProfileMenu({
   )}`;
 
   const deleteRequestDialog = isDeleteRequestOpen ? (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
-      <button
-        className="absolute inset-0"
-        onClick={() => {
-          if (deleteRequestState !== "submitting") {
-            setIsDeleteRequestOpen(false);
-          }
-        }}
-        aria-label={t(
-          "settings.profile.request_deletion.close",
-          "Close deletion request",
-        )}
-      />
-      <div
-        className="relative w-full max-w-sm rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="argus-delete-request-title"
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3
-            id="argus-delete-request-title"
-            className="font-display text-[16px] font-medium text-black dark:text-white"
-          >
-            {t(
-              "settings.profile.request_deletion.title",
-              "Request account deletion",
-            )}
-          </h3>
-          <button
-            type="button"
-            onClick={() => setIsDeleteRequestOpen(false)}
-            disabled={deleteRequestState === "submitting"}
-            className="rounded-full p-1.5 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/10"
-            aria-label={t(
-              "settings.profile.request_deletion.close",
-              "Close deletion request",
-            )}
-          >
-            <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-          </button>
-        </div>
-
-        {deleteRequestState === "success" ? (
-          <>
-            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-              {t(
-                "settings.profile.request_deletion.success",
-                "Request sent. We'll follow up by email.",
-              )}
-            </p>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsDeleteRequestOpen(false)}
-                className="rounded-md bg-black px-3 py-2 text-[13px] font-medium text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85"
-              >
-                {t("common.done", "Done")}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-              {t(
-                "settings.profile.request_deletion.body",
-                "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
-              )}
-            </p>
-            {deleteRequestState === "error" && (
-              <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
-                {t(
-                  "settings.profile.request_deletion.error",
-                  "We could not submit that request yet.",
-                )}{" "}
-                <a className="underline" href={supportMailto}>
-                  {t(
-                    "settings.profile.request_deletion.email_fallback",
-                    "Email support",
-                  )}
-                </a>
-              </p>
-            )}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsDeleteRequestOpen(false)}
-                disabled={deleteRequestState === "submitting"}
-                className="rounded-md px-3 py-2 text-[13px] font-medium text-black/55 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white/55 dark:hover:bg-white/10"
-              >
-                {t("common.cancel", "Cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSubmitDeleteRequest()}
-                disabled={deleteRequestState === "submitting"}
-                className="rounded-md bg-[#d66d75]/12 px-3 py-2 text-[13px] font-medium text-[#b94c55] hover:bg-[#d66d75]/18 disabled:cursor-wait disabled:opacity-60 dark:text-[#e7a2a8]"
-              >
-                {deleteRequestState === "submitting"
-                  ? t(
-                      "settings.profile.request_deletion.submitting",
-                      "Sending...",
-                    )
-                  : t(
-                      "settings.profile.request_deletion.contact_support",
-                      "Contact support",
-                    )}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+    <ProfileDeleteRequestDialog
+      state={deleteRequestState}
+      supportMailto={supportMailto}
+      onClose={() => setIsDeleteRequestOpen(false)}
+      onSubmit={handleSubmitDeleteRequest}
+    />
   ) : null;
 
   if (!isOpen && !activeModal && !isDeleteRequestOpen) return null;
@@ -893,6 +802,7 @@ export default function ProfileMenu({
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
+            ref={profileModalRef}
             className="relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
             role="dialog"
             aria-modal="true"
@@ -1233,6 +1143,7 @@ export default function ProfileMenu({
   );
   const submenuSurfaceClass = (railSizeClass: string) =>
     profileSubmenuClass(placement, railSizeClass);
+  const submenuAnchorClass = profileSubmenuAnchorClass(placement);
 
   const menu = (
     <div
@@ -1256,7 +1167,7 @@ export default function ProfileMenu({
 
       {/* Data */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("data")}
         onMouseLeave={handleSubmenuLeave}
       >
@@ -1370,7 +1281,7 @@ export default function ProfileMenu({
 
       {/* Preferences */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("settings")}
         onMouseLeave={handleSubmenuLeave}
       >
@@ -1436,7 +1347,7 @@ export default function ProfileMenu({
 
       {/* Help */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("help")}
         onMouseLeave={handleSubmenuLeave}
       >
@@ -1491,7 +1402,7 @@ export default function ProfileMenu({
 
       {/* Feedback */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("feedback")}
         onMouseLeave={handleSubmenuLeave}
       >

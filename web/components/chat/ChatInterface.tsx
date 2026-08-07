@@ -1995,7 +1995,14 @@ export default function ChatInterface() {
     isGuest,
     searchOverlayOpen,
     deleteConfirmationOpen: Boolean(pendingHeaderDelete),
-    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen || showChatOptions,
+    // The drawer is a modal too. Left out, its shortcuts still fired, and
+    // Recents Quick Peek opened at z-65 behind a z-68 drawer: a real modal
+    // nobody could see, reachable only by keyboard or switch control.
+    modalOpen:
+      isSidebarPreferenceModalOpen ||
+      feedbackState.isOpen ||
+      showChatOptions ||
+      mobileShell.isDrawerOpen,
     sidebarOpen: isSidebarOpen,
     setSidebarOpen: setIsSidebarOpen,
     recentsExpanded: isRecentsExpanded,

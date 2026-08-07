@@ -28,7 +28,9 @@ export function profileMenuClass(
 ): { className: string; left: string | undefined } {
   if (placement === "drawer") {
     return {
-      className: `absolute bottom-full left-0 right-0 z-30 mb-1.5 ${TOUCH_TARGETS} ${MENU_SURFACE}`,
+      // Bounded so it cannot outgrow the screen, and scrollable so nothing in
+      // it becomes unreachable when it does hit the bound.
+      className: `absolute bottom-full left-0 right-0 z-30 mb-1.5 max-h-[70dvh] overflow-y-auto overscroll-contain ${TOUCH_TARGETS} ${MENU_SURFACE}`,
       left: undefined,
     };
   }
@@ -38,12 +40,28 @@ export function profileMenuClass(
   };
 }
 
+/**
+ * Whether a row establishes the positioning context for its own submenu.
+ *
+ * On the rail it must: the submenu flies out beside that row. In the drawer it
+ * must not. Anchored to the row, a submenu taller than the space above it, such
+ * as Data Controls on a short screen with Personalization present, put its top
+ * and its first actions off the top of the viewport with no way to scroll to
+ * them. Anchored to the menu instead, it covers the menu it came from and can
+ * never be taller than a surface that already fits.
+ */
+export function profileSubmenuAnchorClass(
+  placement: ProfileMenuPlacement,
+): string {
+  return placement === "drawer" ? "" : "relative";
+}
+
 export function profileSubmenuClass(
   placement: ProfileMenuPlacement,
   railSizeClass: string,
 ): string {
   if (placement === "drawer") {
-    return `absolute bottom-full left-0 right-0 mb-1.5 ${TOUCH_TARGETS} [&_a]:min-h-[44px] ${SUBMENU_SURFACE}`;
+    return `absolute inset-0 overflow-y-auto overscroll-contain ${TOUCH_TARGETS} [&_a]:min-h-[44px] ${SUBMENU_SURFACE}`;
   }
   return `absolute bottom-0 left-full ml-1.5 ${railSizeClass} ${SUBMENU_SURFACE}`;
 }

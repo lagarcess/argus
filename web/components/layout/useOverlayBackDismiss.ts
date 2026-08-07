@@ -61,7 +61,31 @@ function clearProgrammaticPopExpiry(): void {
   programmaticPopExpiry = null;
 }
 
+/**
+ * Spends pending traversals even when no overlay is left to notice them.
+ *
+ * Closing the last overlay by its own control removes that overlay's listener
+ * before the deferred `back()` runs, so nothing was there to classify the event
+ * and the count sat pending until it timed out. Reopening an overlay inside
+ * that window and pressing Android back read the real press as our own echo,
+ * and the overlay stayed put.
+ *
+ * This listener is never removed, so a traversal is always observed by someone.
+ * Order against the overlay listeners does not matter: whichever runs first
+ * spends the traversal and records the event, and the rest read that back.
+ */
+let popClassifierInstalled = false;
+
+function installPopClassifier(): void {
+  if (popClassifierInstalled || typeof window === "undefined") return;
+  popClassifierInstalled = true;
+  window.addEventListener("popstate", (event) => {
+    isProgrammaticPop(event);
+  });
+}
+
 export function markProgrammaticPop(): void {
+  installPopClassifier();
   pendingProgrammaticPops += 1;
   clearProgrammaticPopExpiry();
   programmaticPopExpiry = setTimeout(() => {

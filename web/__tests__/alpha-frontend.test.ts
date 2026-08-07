@@ -2397,6 +2397,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/language-features.ts"),
       "utf-8",
     );
+    const deleteRequestDialog = readFileSync(
+      join(root, "components/sidebar/ProfileDeleteRequestDialog.tsx"),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const en = readFileSync(
       join(root, "public/locales/en/common.json"),
@@ -2417,7 +2421,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(profileMenu).toContain('source: "profile_modal"');
     expect(profileMenu).toContain("argus-profile-language-trigger");
     expect(profileMenu).toContain("absolute right-0 top-full");
-    expect(profileMenu).toContain("settings.profile.request_deletion.title");
+    // The dialog itself lives in its own component now, because a body-portaled
+    // aria-modal surface has to register its own back, Escape, and focus.
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.title",
+    );
     expect(profileMenu).toContain("settings.profile.language_save_error");
     expect(profileMenu).not.toContain(
       "overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]",
