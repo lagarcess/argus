@@ -193,9 +193,18 @@ Standing chore work, picked up alongside lanes rather than scheduled:
 - **Personalization memory** (PR #386) — complete loop behind a default-off flag
   scoped to `admin` and `developer` allowlist roles. Propose, confirm, inspect,
   explain, edit, delete, disable, reset, export, and temporary chat. Guests
-  denied before any side effect. **Open decisions live in that PR's own docs**,
-  including Mem0 cloud versus self-hosted and disabling Mem0's automatic fact
-  extraction, which conflicts with the assisted-not-automatic rule.
+  denied before any side effect.
+
+  **Follow-up is specced and ready to dispatch, not pending decisions.** The
+  recall loop is locked in
+  [`2026-08-06-personalization-memory-recall-loop.md`](../superpowers/specs/2026-08-06-personalization-memory-recall-loop.md)
+  on branch `codex/personalization-memory-recall-loop`. Four Mem0 parameters
+  are ratified: index-only over confirmed content, so Mem0 never sees
+  unconfirmed material; storage on the existing Supabase database with no new
+  datastore service; Mem0 as the OSS library running in-process inside the API
+  service rather than the hosted platform; and its extraction, dedup, and
+  conflict-resolution pipeline explicitly unused, because Argus owns extraction
+  and the assisted-not-automatic rule forbids it.
 - **Canary automation** (PR #385) — API-layer denial probe, deployed-SHA
   evidence binding, and the fix for the canary validating the wrong branch. A
   signup enumeration oracle and a false-evidence path were caught in review.
