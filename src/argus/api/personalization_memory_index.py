@@ -290,17 +290,11 @@ class Mem0MemoryProvider:
     ) -> ProviderSearchResult:
         """Answer with ranked canonical record ids; never with content.
 
-        Zero hits is two different situations and they need opposite answers.
-        The index only holds records projected since it was installed, so for
-        an owner it has never seen it cannot speak at all, and claiming a
-        definitive empty answer would suppress the canonical fallback and drop
-        recall that already worked. For an owner it does hold, zero hits is a
-        real finding, and falling back would let a coincidental token match
-        surface something semantic search deliberately rejected.
-
-        The two are separated by asking whether this owner has any indexed
-        rows, which is a filtered read on the existing pool with no embedding
-        and no vendor call, and only on the path that already found nothing.
+        This reports what the index found and nothing more. Whether an empty
+        answer is authoritative depends on which records the retrieval is
+        allowed to return, which only the service knows, so the service decides
+        that from canonical projection state rather than the provider guessing
+        from the index alone.
         """
 
         _CALL_EMBEDDING_USAGE.set(None)
@@ -310,24 +304,11 @@ class Mem0MemoryProvider:
             filters={"user_id": owner.owner_id},
             threshold=self._search_threshold,
         )
-        hits = _hits_from(raw, limit=limit)
-        if not hits and not self._owner_is_indexed(owner):
-            return ProviderSearchResult(status=ProviderSearchStatus.UNAVAILABLE)
         return ProviderSearchResult(
             status=ProviderSearchStatus.ANSWERED,
-            hits=hits,
+            hits=_hits_from(raw, limit=limit),
             **self._usage_fields(),
         )
-
-    def _owner_is_indexed(self, owner: RegisteredMemoryOwner) -> bool:
-        """Whether the index holds anything at all for this owner."""
-
-        listed = self._memory.get_all(
-            filters={"user_id": owner.owner_id},
-            top_k=1,
-        )
-        entries = listed.get("results") if isinstance(listed, dict) else listed
-        return bool(isinstance(entries, list) and entries)
 
     def delete(
         self,

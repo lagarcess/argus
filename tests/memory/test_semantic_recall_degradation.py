@@ -36,7 +36,6 @@ from argus.memory.contracts import (
     SensitivityAssessment,
     SensitivityStatus,
 )
-from argus.memory.provider import ProviderSearchStatus
 from argus.memory.service import MemoryService, MemoryServiceConfig
 from argus.memory.store import InMemoryCanonicalMemoryStore
 from argus.memory.subject import MemoryAccountKind, MemorySubject, RegisteredMemoryOwner
@@ -131,18 +130,20 @@ class _Mem0Double:
         del user_id
 
 
-def _ids() -> Iterator[str]:
+def _ids(prefix: str = "generated") -> Iterator[str]:
     index = 0
     while True:
         index += 1
-        yield f"generated-{index:03d}"
+        yield f"{prefix}-{index:03d}"
 
 
 def _service(
     store: InMemoryCanonicalMemoryStore,
     provider: object | None = None,
+    *,
+    id_prefix: str = "generated",
 ) -> MemoryService:
-    generated = _ids()
+    generated = _ids(id_prefix)
     return MemoryService(
         store=store,
         provider=provider,  # type: ignore[arg-type]
@@ -152,18 +153,24 @@ def _service(
     )
 
 
-def _confirm_one(service: MemoryService) -> str:
+def _confirm_one(
+    service: MemoryService,
+    *,
+    label: str = "Lower drawdown choice",
+    value: str = "Keep the lower drawdown choice for later comparison.",
+    source_id: str = "decision-degradation-test",
+) -> str:
     proposal = service.propose(
         SUBJECT,
         MemoryCandidateDraft(
             category=MemoryCategory.EXPLICIT_DECISION_NOTE,
-            value="Keep the lower drawdown choice for later comparison.",
-            label="Lower drawdown choice",
+            value=value,
+            label=label,
             future_benefit="Argus can revisit the confirmed choice later.",
             provenance=(
                 MemoryProvenance(
                     source_kind=MemorySourceKind.DECISION_NOTE,
-                    source_id="decision-degradation-test",
+                    source_id=source_id,
                     source_version="1",
                 ),
             ),
@@ -452,68 +459,87 @@ def test_recall_runs_off_the_event_loop() -> None:
     assert calling_threads[0] != loop_thread
 
 
-def test_a_populated_index_that_finds_nothing_is_believed() -> None:
+def test_a_fully_projected_eligible_set_is_believed_when_empty() -> None:
     """Catches token fallback resurrecting what semantic search rejected.
 
-    This provider's own answer is asserted, not a generic one: an index that
-    holds rows for the owner and still returns nothing is authoritative, and a
-    coincidental token overlap must not override it.
+    Every record this purpose may return is in the index, so an empty answer
+    is a real finding and a coincidental token overlap must not override it.
     """
     store = InMemoryCanonicalMemoryStore()
-    _confirm_one(_service(store))
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
         embedder=embedder,
-        memory=_Mem0Double(embedder=embedder, search_results=[], indexed=True),
+        memory=_Mem0Double(embedder=embedder, search_results=[]),
     )
+    # Confirming through the provider is what projects the record, so the
+    # eligible set is covered by construction.
+    _confirm_one(_service(store, provider))
 
-    answer = provider.search(OWNER, QUERY, 3)
     retrieved = _service(store, provider).retrieve(
         SUBJECT,
         QUERY,
         MemoryUsePurpose.REVISIT_SAVED_DECISION,
     )
 
-    assert answer.status is ProviderSearchStatus.ANSWERED
-    assert answer.hits == ()
     assert retrieved == ()
 
 
-def test_an_unprojected_owner_is_not_treated_as_authoritative() -> None:
+def test_an_unprojected_eligible_set_falls_back() -> None:
     """Catches the never-projected case being answered as a real empty."""
+    store = InMemoryCanonicalMemoryStore()
+    record_id = _confirm_one(_service(store))
     embedder = _StubEmbedder()
     provider = Mem0MemoryProvider(
         embedder=embedder,
-        memory=_Mem0Double(embedder=embedder, search_results=[], indexed=False),
+        memory=_Mem0Double(embedder=embedder, search_results=[]),
     )
 
-    answer = provider.search(OWNER, QUERY, 3)
+    retrieved = _service(store, provider).retrieve(
+        SUBJECT,
+        QUERY,
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
 
-    assert answer.status is ProviderSearchStatus.UNAVAILABLE
+    assert [item.record.id for item in retrieved] == [record_id]
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
 
 
-def test_the_projection_probe_costs_nothing_when_the_index_answers() -> None:
-    """Catches an extra read on every search rather than only the empty path."""
+def test_authority_is_per_eligible_set_not_per_owner() -> None:
+    """Catches an owner-wide notion of authority hiding a legacy memory.
+
+    The account has a projected record in one category and an unprojected
+    legacy record in the category this purpose actually reads. Anything that
+    asks only whether the owner has rows concludes the index is authoritative
+    and permanently hides the legacy decision.
+    """
+    store = InMemoryCanonicalMemoryStore()
     embedder = _StubEmbedder()
-    mem0 = _Mem0Double(
+    provider = Mem0MemoryProvider(
         embedder=embedder,
-        search_results=[
-            {"id": "mem0-1", "score": 0.8, "metadata": {RECORD_ID_METADATA_KEY: "r"}}
-        ],
-        indexed=True,
+        memory=_Mem0Double(embedder=embedder, search_results=[]),
     )
-    probes: list[int] = []
-    original = mem0.get_all
+    # Legacy: confirmed with no provider, so it never reached the index.
+    legacy_id = _confirm_one(_service(store))
+    # Newer: confirmed through the provider, so this one is projected.
+    _confirm_one(
+        _service(store, provider, id_prefix="later"),
+        label="Later note",
+        value="A later confirmed note that did reach the index.",
+        source_id="decision-later",
+    )
 
-    def _counting(**kwargs: object) -> object:
-        probes.append(1)
-        return original(**kwargs)  # type: ignore[arg-type]
+    owner_refs = store.projected_record_ids(OWNER)
+    retrieved = _service(store, provider).retrieve(
+        SUBJECT,
+        QUERY,
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
 
-    mem0.get_all = _counting  # type: ignore[assignment]
-
-    Mem0MemoryProvider(embedder=embedder, memory=mem0).search(OWNER, QUERY, 3)
-
-    assert probes == []
+    # The owner does have an indexed row, which is exactly the trap.
+    assert owner_refs
+    assert legacy_id not in owner_refs
+    assert legacy_id in {item.record.id for item in retrieved}
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
 
 
 def test_usage_is_attributed_to_the_call_that_produced_it() -> None:

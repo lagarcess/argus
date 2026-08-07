@@ -236,11 +236,16 @@ def test_unavailable_or_failed_search_uses_bounded_canonical_fallback(
     assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
 
 
-def test_answered_empty_is_definitive_and_does_not_use_fallback() -> None:
-    """Catches a valid empty provider answer being replaced by canonical matches."""
+def test_answered_empty_is_definitive_when_the_index_covers_the_records() -> None:
+    """Catches a valid empty provider answer being replaced by canonical matches.
+
+    An empty answer is definitive only over records the index actually holds,
+    so this projects the record first. The uncovered half is the test below.
+    """
     store = InMemoryCanonicalMemoryStore()
-    setup_service = _service(store)
-    _confirm_one(setup_service)
+    record_id = _confirm_one(_service(store))
+    owner = RegisteredMemoryOwner(owner_id=OWNER_ID)
+    assert store.set_provider_ref(owner, record_id, "projected-1")
     service = _service(store, _AnsweredEmptyProvider())
 
     assert (
@@ -251,6 +256,22 @@ def test_answered_empty_is_definitive_and_does_not_use_fallback() -> None:
         )
         == ()
     )
+
+
+def test_answered_empty_is_not_definitive_for_records_the_index_lacks() -> None:
+    """Catches an empty answer burying memories that were never projected."""
+    store = InMemoryCanonicalMemoryStore()
+    record_id = _confirm_one(_service(store))
+    service = _service(store, _AnsweredEmptyProvider())
+
+    retrieved = service.retrieve(
+        SUBJECT,
+        "lower drawdown",
+        MemoryUsePurpose.REVISIT_SAVED_DECISION,
+    )
+
+    assert [item.record.id for item in retrieved] == [record_id]
+    assert retrieved[0].selection_reason is MemorySelectionReason.CANONICAL_TOKEN_MATCH
 
 
 @pytest.mark.parametrize(

@@ -1091,3 +1091,38 @@ def test_service_cleanup_reservation_prevents_deleting_reassigned_live_ref(
     assert provider.delete_calls == [(database["owner"], "provider-service-reserved")]
     assert provider.deleted_live_projection is False
     assert result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+
+
+def test_projected_record_ids_reports_exactly_what_the_database_holds(
+    database: dict[str, Any],
+) -> None:
+    """Catches the bulk projection read drifting from per-record truth.
+
+    Retrieval decides whether an empty index answer is authoritative from this
+    set, so a wrong answer here either buries a memory or lets a coincidental
+    token match override a real finding.
+    """
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    owner = database["owner"]
+    record_id = database["record_id"]
+
+    assert store.projected_record_ids(owner) == frozenset()
+
+    record = store.get_record(owner, record_id)
+    assert record is not None
+    claim = store.claim_reconciliation_turn(owner, record_id, 1)
+    assert claim is not None
+    assert store.compare_and_set_provider_ref(
+        owner,
+        record_id,
+        expected_record=record,
+        expected_provider_ref=None,
+        reconciliation_claim=claim,
+        provider_ref="projected-bulk-read",
+    )
+
+    projected = store.projected_record_ids(owner)
+
+    assert projected == frozenset({record_id})
+    # Agrees with the per-record read it replaces in bulk.
+    assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"

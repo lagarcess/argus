@@ -655,6 +655,11 @@ class MemoryService:
             self._emit_retrieval_result(correlation_id, ())
             return ()
 
+        # Read projection state before searching. A projection committed after
+        # this point can only widen coverage, so a search is never credited
+        # with authority over a record it could not have seen.
+        index_covers_eligible = records.keys() <= self._store.projected_record_ids(owner)
+
         provider_result = self._search_provider(
             owner,
             normalized_query,
@@ -673,11 +678,18 @@ class MemoryService:
                 provider_result,
                 limit=limit,
             )
-        # Ranked ids that resolve to nothing are not an answer. Stale, deleted,
-        # or out-of-scope hits would otherwise hide memories the canonical
-        # match can still find.
+        # An empty answer is believable only when the index holds every record
+        # this retrieval may return. Authority is per eligible set, not per
+        # owner: an account can have newer categories projected while the
+        # categories this purpose reads predate the index entirely. Ranked ids
+        # that resolve to nothing are not an answer either, since stale or
+        # out-of-scope hits would hide what the canonical match still finds.
         if not answered or (
-            provider_result is not None and provider_result.hits and not result
+            not result
+            and (
+                not index_covers_eligible
+                or (provider_result is not None and provider_result.hits)
+            )
         ):
             result = self._canonical_fallback(
                 records.values(),

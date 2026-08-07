@@ -239,6 +239,11 @@ class CanonicalMemoryStore(Protocol):
         record_id: str,
     ) -> str | None: ...
 
+    def projected_record_ids(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> frozenset[str]: ...
+
     def compare_and_set_provider_ref(
         self,
         owner: RegisteredMemoryOwner,
@@ -1038,6 +1043,13 @@ class InMemoryCanonicalMemoryStore:
     ) -> str | None:
         with self._lock:
             return self._provider_refs.get(owner.owner_id, {}).get(record_id)
+
+    def projected_record_ids(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> frozenset[str]:
+        with self._lock:
+            return frozenset(self._provider_refs.get(owner.owner_id, {}))
 
     def compare_and_set_provider_ref(
         self,

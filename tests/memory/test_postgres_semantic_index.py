@@ -242,23 +242,14 @@ def test_the_index_stores_no_row_for_a_refused_record(
     assert provider.search(OWNER_A, ETH_VALUE, 5).hits == ()
 
 
-def test_an_owner_with_no_rows_cannot_speak(provider: Mem0MemoryProvider) -> None:
-    """Catches a never-projected owner being answered as authoritatively empty."""
-    answer = provider.search(OWNER_A, "anything at all", 3)
-
-    assert answer.status is ProviderSearchStatus.UNAVAILABLE
-    assert answer.hits == ()
-
-
-def test_a_populated_owner_answers_on_its_own_authority(
+def test_the_provider_reports_what_it_found_without_claiming_authority(
     provider: Mem0MemoryProvider,
 ) -> None:
-    """Catches a real populated index being downgraded to unavailable.
+    """Catches the provider deciding an empty answer's authority on its own.
 
-    Same provider, same database, same query. The only difference is whether
-    the owner has rows, which is exactly the distinction the answer carries.
-    The hit count is not asserted: the test embedder is a small hashed vector,
-    so its similarity floor is an artifact of the double, not the product.
+    Whether an empty result is authoritative depends on which records the
+    retrieval may return, which the provider cannot see. It answers with what
+    the index found and leaves that judgement to the service.
     """
     query = "zzzz qqqq vvvv unrelated tokens"
     before = provider.search(OWNER_A, query, 3)
@@ -266,5 +257,6 @@ def test_a_populated_owner_answers_on_its_own_authority(
     _seed(provider)
     after = provider.search(OWNER_A, query, 3)
 
-    assert before.status is ProviderSearchStatus.UNAVAILABLE
+    assert before.status is ProviderSearchStatus.ANSWERED
+    assert before.hits == ()
     assert after.status is ProviderSearchStatus.ANSWERED

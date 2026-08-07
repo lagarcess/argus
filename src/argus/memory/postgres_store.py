@@ -1932,6 +1932,21 @@ class PostgresCanonicalMemoryStore:
             row = cursor.fetchone()
             return None if row is None else row[0]
 
+    def projected_record_ids(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> frozenset[str]:
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select record_id
+                  from public.memory_provider_projections
+                 where owner_id = %s
+                """,
+                (owner_id,),
+            )
+            return frozenset(str(row[0]) for row in cursor.fetchall())
+
     def track_provider_cleanup_target(
         self,
         owner: RegisteredMemoryOwner,
