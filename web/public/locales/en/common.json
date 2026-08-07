@@ -420,8 +420,9 @@
       "sources_panel_open_one": "{{count}} source ›",
       "sources_panel_open_other": "{{count}} sources ›",
       "sources_panel_title": "Sources Argus read",
-      "sources_panel_note": "Argus read these while answering. Not recommended reading.",
+      "sources_panel_note": "Sources used to inform this answer. Links open in a new tab.",
       "sources_panel_close": "Close sources",
+      "sources_panel_external_link_new_tab": "Opens in a new tab",
       "allowance_banner": "Grounded search allowance used",
       "allowance_banner_cta": "Sign in for more searches"
     },
