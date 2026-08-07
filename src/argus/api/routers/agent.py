@@ -69,6 +69,7 @@ from argus.api.chat.discovery_evidence import (
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
+from argus.api.chat.memory_recall import memory_recalls_for_turn
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -1227,6 +1228,15 @@ async def chat_stream(
                                 if key in durable_retry
                             }
                     else:
+                        memory_recalls = memory_recalls_for_turn(
+                            user=user,
+                            account=turn_account,
+                            user_message=display_message,
+                            memory_opt_out=payload.memory_opt_out,
+                        )
+                        if memory_recalls:
+                            metadata["memory_recalls"] = memory_recalls
+                            runtime_result["memory_recalls"] = memory_recalls
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
                             metadata=metadata,

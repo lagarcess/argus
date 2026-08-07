@@ -12,6 +12,7 @@ import {
   normalizeEnabledLanguage,
   type ArgusLocale,
 } from "./language-features";
+import { isConversationMemoryOptOut } from "./memory-privacy";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
 import type { AvatarTheme } from "./avatar-theme";
@@ -1040,6 +1041,11 @@ export async function streamChatMessage(
       // that a discovery selection attaches to its action turn.
       ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
+      // Temporary chat: only ever narrows behavior, so the transport layer
+      // owns it and ordinary conversations send an unchanged body.
+      ...(isConversationMemoryOptOut(conversationId)
+        ? { memory_opt_out: true }
+        : {}),
     }),
   }).catch(() => { throw new ChatStreamError(CHAT_STREAM_INTERRUPTED_MESSAGE, 0, "stream_interrupted", submittedRequestId); });
   const responseRequestId = response.headers.get("X-Request-Id")?.trim() || submittedRequestId;

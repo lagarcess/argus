@@ -775,6 +775,18 @@
         "beat_benchmark": "Beat the benchmark by {{points}} points",
         "deep_drawdown": "Worst drop was {{drawdown}}%"
       }
+    },
+    "memory": {
+      "recall_title": "From your memory",
+      "recall_note": "Saved decisions you confirmed. Manage them in Data Controls.",
+      "private_on": "Private chat: on",
+      "private_off": "Private chat",
+      "proposal_title": "Remember this saved decision?",
+      "proposal_benefit": "Argus would keep “{{label}}” so you can revisit and compare it later. You can inspect or remove it any time in Data Controls.",
+      "proposal_confirm": "Remember",
+      "proposal_decline": "No thanks",
+      "proposal_error": "Could not update memory. Try again.",
+      "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
     }
   },
   "strategies": {
@@ -916,6 +928,48 @@
     },
     "data": {
       "title": "Data Controls",
+      "personalization": {
+        "menu": "Personalization",
+        "title": "Memory",
+        "close": "Close memory",
+        "loading": "Loading memory...",
+        "load_error": "Memory could not be loaded.",
+        "retry": "Try again",
+        "intro": "Argus only remembers what you confirm. You can review, edit, delete, or turn off everything here.",
+        "toggle_label": "Remember confirmed memories",
+        "toggle_on_note": "On. New memories still need your confirmation.",
+        "toggle_off_note": "Off. Existing memories stay until you delete them.",
+        "records_title": "What Argus remembers",
+        "empty": "Nothing yet. When you confirm a memory it will appear here.",
+        "saved_on": "Saved {{date}}",
+        "why_stored": "Why is this stored?",
+        "edit": "Edit memory",
+        "edit_label": "Memory label",
+        "edit_value": "Memory content",
+        "save_edit": "Save",
+        "delete": "Delete memory",
+        "confirm_delete": "Confirm?",
+        "explanation_intro": "You confirmed this memory on {{date}}.",
+        "explanation_source": "Source: {{kind}}.",
+        "export": "Export memory data",
+        "reset": "Reset memory",
+        "reset_confirm": "Delete everything?",
+        "categories": {
+          "personalization_preference": "Personalization preference",
+          "workflow_preference": "Workflow preference",
+          "explicit_decision_note": "Saved decision",
+          "past_session_anchor": "Past session anchor"
+        },
+        "errors": {
+          "explain": "Could not load the explanation. Try again.",
+          "edit": "Could not save that change. Try again.",
+          "restricted": "Argus keeps sensitive details out of memory.",
+          "delete": "Could not delete that memory. Try again.",
+          "toggle": "Could not update memory settings. Try again.",
+          "reset": "Could not reset memory. Try again.",
+          "export": "Could not export your memory data. Try again."
+        }
+      },
       "archived_chats": "Archived chats",
       "recently_deleted": "Recently deleted",
       "close_recently_deleted": "Close recently deleted",

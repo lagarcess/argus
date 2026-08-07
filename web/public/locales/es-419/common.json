@@ -775,6 +775,18 @@
         "beat_benchmark": "Superó la referencia por {{points}} puntos",
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
       }
+    },
+    "memory": {
+      "recall_title": "De tu memoria",
+      "recall_note": "Decisiones guardadas que confirmaste. Adminístralas en Controles de datos.",
+      "private_on": "Chat privado: activado",
+      "private_off": "Chat privado",
+      "proposal_title": "¿Recordar esta decisión guardada?",
+      "proposal_benefit": "Argus guardaría “{{label}}” para que puedas revisarla y compararla después. Puedes verla o quitarla cuando quieras en Controles de datos.",
+      "proposal_confirm": "Recordar",
+      "proposal_decline": "No, gracias",
+      "proposal_error": "No se pudo actualizar la memoria. Intenta de nuevo.",
+      "proposal_saved": "Guardado en memoria. Adminístralo en Controles de datos, en Personalización."
     }
   },
   "strategies": {
@@ -916,6 +928,48 @@
     },
     "data": {
       "title": "Controles de datos",
+      "personalization": {
+        "menu": "Personalización",
+        "title": "Memoria",
+        "close": "Cerrar memoria",
+        "loading": "Cargando memoria...",
+        "load_error": "No se pudo cargar la memoria.",
+        "retry": "Intentar de nuevo",
+        "intro": "Argus solo recuerda lo que confirmas. Aquí puedes revisar, editar, borrar o apagar todo.",
+        "toggle_label": "Recordar memorias confirmadas",
+        "toggle_on_note": "Activado. Las memorias nuevas siguen necesitando tu confirmación.",
+        "toggle_off_note": "Apagado. Las memorias existentes se conservan hasta que las borres.",
+        "records_title": "Lo que Argus recuerda",
+        "empty": "Nada todavía. Cuando confirmes una memoria aparecerá aquí.",
+        "saved_on": "Guardada el {{date}}",
+        "why_stored": "¿Por qué se guardó?",
+        "edit": "Editar memoria",
+        "edit_label": "Etiqueta de la memoria",
+        "edit_value": "Contenido de la memoria",
+        "save_edit": "Guardar",
+        "delete": "Borrar memoria",
+        "confirm_delete": "¿Confirmar?",
+        "explanation_intro": "Confirmaste esta memoria el {{date}}.",
+        "explanation_source": "Fuente: {{kind}}.",
+        "export": "Exportar datos de memoria",
+        "reset": "Restablecer memoria",
+        "reset_confirm": "¿Borrar todo?",
+        "categories": {
+          "personalization_preference": "Preferencia de personalización",
+          "workflow_preference": "Preferencia de flujo de trabajo",
+          "explicit_decision_note": "Decisión guardada",
+          "past_session_anchor": "Referencia de sesión anterior"
+        },
+        "errors": {
+          "explain": "No se pudo cargar la explicación. Intenta de nuevo.",
+          "edit": "No se pudo guardar ese cambio. Intenta de nuevo.",
+          "restricted": "Argus mantiene los detalles sensibles fuera de la memoria.",
+          "delete": "No se pudo borrar esa memoria. Intenta de nuevo.",
+          "toggle": "No se pudo actualizar la configuración de memoria. Intenta de nuevo.",
+          "reset": "No se pudo restablecer la memoria. Intenta de nuevo.",
+          "export": "No se pudieron exportar tus datos de memoria. Intenta de nuevo."
+        }
+      },
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",

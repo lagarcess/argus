@@ -5,6 +5,7 @@ import type {
 } from "@/components/chat/types";
 import type { NextExperimentRow } from "./chat-next-experiments";
 import type { RecoveryDisplay } from "./chat-recovery-display";
+import type { MemoryRecallItem } from "./memory-recalls";
 
 type MergeFinalTextOptions = {
   assistantId: string;
@@ -16,6 +17,7 @@ type MergeFinalTextOptions = {
   strategyPathContext?: Message["strategyPathContext"];
   assistantRecoveryCode?: string | null;
   discovery?: DiscoverySidecar | null;
+  memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
 };
 
@@ -31,6 +33,7 @@ export function mergeFinalTextMessage(
     strategyPathContext,
     assistantRecoveryCode,
     discovery,
+    memoryRecalls,
     nextExperiments,
   }: MergeFinalTextOptions,
 ): Message {
@@ -49,6 +52,7 @@ export function mergeFinalTextMessage(
       strategyPathContext ?? message.strategyPathContext,
     assistantRecoveryCode: assistantRecoveryCode ?? message.assistantRecoveryCode,
     discovery: discovery ?? message.discovery,
+    memoryRecalls: memoryRecalls ?? message.memoryRecalls,
     nextExperiments: nextExperiments ?? message.nextExperiments,
   };
 }

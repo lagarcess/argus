@@ -9,6 +9,7 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
 import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
 import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
@@ -50,6 +51,7 @@ type ChatMessageProps = {
   turnInFlight?: boolean;
   isGuest?: boolean;
   canSaveDecision?: boolean;
+  memoryProposalEnabled?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
   onDecisionSaved?: (decisionState: DecisionState) => void;
   onRequestSearchUpgrade?: () => void;
@@ -72,6 +74,7 @@ export default function ChatMessage({
   turnInFlight = false,
   isGuest = false,
   canSaveDecision = true,
+  memoryProposalEnabled = false,
   onDecisionUnavailable,
   onDecisionSaved,
   onRequestSearchUpgrade,
@@ -345,6 +348,7 @@ export default function ChatMessage({
                 result={message.result}
                 onAction={onAction}
                 canSaveDecision={canSaveDecision}
+                memoryProposalEnabled={memoryProposalEnabled}
                 onDecisionUnavailable={onDecisionUnavailable}
                 onDecisionSaved={onDecisionSaved}
                 resumeDecisionArtifactId={resumeDecisionArtifactId}
@@ -435,6 +439,9 @@ export default function ChatMessage({
             </div>
           )}
 
+          {!isUser && !isStreaming && message.memoryRecalls?.length ? (
+            <MemoryRecallNote recalls={message.memoryRecalls} />
+          ) : null}
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
               <div className="flex flex-col divide-y divide-black/8 dark:divide-white/8">
