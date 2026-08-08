@@ -26,18 +26,32 @@ _SECRET_ENVIRONMENT_NAME = re.compile(
 )
 _CREDENTIAL_KEY = (
     r"(?:api[_-]?key|access[_-]?key|access[_-]?token|client[_-]?secret|secret"
-    r"|token|password|passwd|authorization|signature)"
+    r"|token|password|passwd|authorization|signature|session[_-]?id"
+    r"|session[_-]?token|csrf[_-]?token|xsrf[_-]?token|refresh[_-]?token"
+    r"|id[_-]?token|auth[_-]?token|private[_-]?key)"
 )
 _CREDENTIAL_ASSIGNMENT = rf"[\"']?{_CREDENTIAL_KEY}[\"']?\s*[:=]\s*"
 # An auth value is a scheme followed by its credentials, so the space after the
 # scheme name does not end the value.
 _AUTH_SCHEME = r"(?:bearer|basic|digest|negotiate|token|apikey)"
+# Retained prose is provider and runtime error output, so a dumped request or
+# response header is the realistic leak vector. A header value owns its own
+# internal separators, so it ends at the line, not at the first space or `;`.
+_CREDENTIAL_HEADER = (
+    r"(?:set-)?cookie|proxy-authorization|x-api-key|x-auth-token|x-csrf-token"
+    r"|x-amz-security-token|x-goog-api-key"
+)
+# A quoted value ends at its closing quote, and a backslash escape is not that
+# quote.
+_DOUBLE_QUOTED = r'"(?:[^"\\\n]|\\.){4,}"'
+_SINGLE_QUOTED = r"'(?:[^'\\\n]|\\.){4,}'"
 _MARKER_PREFIX = "[redacted:"
 
-# Every rule must consume a secret to its real end. A value's end comes from
-# whatever opened it, never from the first plausible-looking delimiter: cutting
-# early publishes the tail, and the shortened head can also fall under a length
-# guard so the rule stops firing and publishes the whole value.
+# Every rule must consume a secret to its real end. A value's boundary comes
+# from its own grammar, the opener, its escape convention, and its internal
+# separators, never from a generic delimiter set: cutting early publishes the
+# tail, and the shortened head can also fall under a length guard so the rule
+# stops firing and publishes the whole value.
 #
 # Ordered: narrower structural rules run before the generic address rule, and
 # quoted assignments run before unquoted ones.
@@ -70,21 +84,39 @@ _REDACTION_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
         "[redacted:url_userinfo]@",
     ),
     (
+        # A quoted header value still ends at its closing quote.
+        "credential_header",
+        re.compile(
+            rf"(?i)([\"']?(?:{_CREDENTIAL_HEADER})[\"']?\s*[:=]\s*)"
+            rf"(?:{_DOUBLE_QUOTED}|{_SINGLE_QUOTED})"
+        ),
+        r"\1[redacted:credential_header]",
+    ),
+    (
+        # Unquoted, a header value owns every separator it contains, so only
+        # the line ends it.
+        "credential_header",
+        re.compile(
+            rf"(?im)([\"']?(?:{_CREDENTIAL_HEADER})[\"']?\s*[:=]\s*)[^\n\"']{{4,}}"
+        ),
+        r"\1[redacted:credential_header]",
+    ),
+    (
         # A quoted value runs to its closing quote, whatever it contains.
         "credential_assignment",
-        re.compile(rf'(?i)({_CREDENTIAL_ASSIGNMENT})"[^"\n]{{4,}}"'),
+        re.compile(rf"(?i)({_CREDENTIAL_ASSIGNMENT}){_DOUBLE_QUOTED}"),
         r'\1"[redacted:credential_assignment]"',
     ),
     (
         "credential_assignment",
-        re.compile(rf"(?i)({_CREDENTIAL_ASSIGNMENT})'[^'\n]{{4,}}'"),
+        re.compile(rf"(?i)({_CREDENTIAL_ASSIGNMENT}){_SINGLE_QUOTED}"),
         r"\1'[redacted:credential_assignment]'",
     ),
     (
         # An unterminated quote, as in a clipped log line, has no closing
         # delimiter to trust, so the line end is the only safe boundary.
         "credential_assignment",
-        re.compile(rf"(?im)({_CREDENTIAL_ASSIGNMENT})[\"'][^\"'\n]{{4,}}$"),
+        re.compile(rf"(?im)({_CREDENTIAL_ASSIGNMENT})[\"'](?:[^\"'\\\n]|\\.){{4,}}$"),
         r"\1[redacted:credential_assignment]",
     ),
     (

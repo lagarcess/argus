@@ -205,15 +205,21 @@ drops exactly the part an `honesty` failure lives in.
 
 Credential-shaped and user-identifying spans are stripped from the retained copy
 only: API keys, bearer tokens, JWTs, URL userinfo, `key=value` credential
-assignments, email addresses, and the verbatim values of secret-named
-environment variables. Raw runtime error text is a graded criterion, so provider
+assignments, credential-carrying HTTP headers such as `Cookie`, `Set-Cookie`,
+and `Proxy-Authorization`, email addresses, and the verbatim values of
+secret-named environment variables. Raw runtime error text is a graded criterion, so provider
 error strings do reach the artifact and could otherwise carry a credential with
 them. Every strip is counted in `redactions`, so a reader can tell that the
 retained text is not verbatim.
 
-The invariant every redaction rule must hold: a secret ends where whatever
-opened it says it ends. A quoted value runs to its closing quote, an auth value
-covers its scheme and the credentials after it, and a JWT covers every segment.
+The invariant every redaction rule must hold: a secret's boundary comes from its
+own grammar, never from a generic delimiter set. That means three things. The
+opener decides the closer, so a quoted value runs to its closing quote. The
+escape convention holds, so a backslash-escaped quote is not that closing quote.
+Internal separators belong to the value, so an auth value covers its scheme and
+credentials, a cookie header covers every `;`-separated pair, and a JWT covers
+every segment.
+
 Cutting at the first plausible-looking delimiter publishes the tail, and the
 shortened head can also fall under a rule's minimum-length guard, which silences
 the rule and publishes the whole value. When adding a rule, test that no

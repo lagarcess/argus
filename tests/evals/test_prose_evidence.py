@@ -231,7 +231,8 @@ def test_clean_prose_is_retained_verbatim() -> None:
     assert evidence["omitted_character_count"] == 0
 
 
-# A secret ends where its opening delimiter says it ends. Cutting at the first
+# A secret's boundary comes from its own grammar: the opener, its escape
+# convention, and its internal separators. Cutting at the first
 # plausible-looking character publishes the tail, and the shortened head can
 # also drop under a length guard so nothing is redacted at all.
 @pytest.mark.parametrize(
@@ -254,6 +255,25 @@ def test_clean_prose_is_retained_verbatim() -> None:
         # scheme name does not end it.
         ("authorization: Basic dXNlcjpwYXNzd29yZA==", ("dXNlcjpwYXNzd29yZA",)),
         ("Authorization=Digest usernameiscool", ("usernameiscool",)),
+        # A backslash escape is not the closing quote.
+        (
+            r'{"password": "correct\"horse battery staple"}',
+            ("horse", "battery", "staple"),
+        ),
+        (r"{'api_key': 'live\'keyvalue with spaces'}", ("keyvalue", "spaces")),
+        (r'password: "abc\"def unterminated', ("def", "unterminated")),
+        # A header value owns its internal separators, so `;` does not end it.
+        ("Cookie: sessionid=abcdefghijklmnop0123456789", ("abcdefghijklmnop",)),
+        ("Set-Cookie: sessionid=secret123; Path=/; HttpOnly", ("secret123",)),
+        (
+            "Cookie: a=1; sessionid=abcdefghijklmnop; csrftoken=zyxwvut",
+            ("abcdefghijklmnop", "zyxwvut"),
+        ),
+        ("x-api-key: some value with spaces", ("some value with spaces",)),
+        ('{"Cookie": "sessionid=abc; csrf=def"}', ("sessionid=abc", "csrf=def")),
+        ("Proxy-Authorization: Basic dXNlcjpwYXNz", ("dXNlcjpwYXNz",)),
+        ("sessionid=abcdefghijklmnop", ("abcdefghijklmnop",)),
+        ("refresh_token=abcdefghijk123", ("abcdefghijk123",)),
     ],
 )
 def test_secrets_are_redacted_to_their_real_end(
@@ -307,6 +327,9 @@ def test_redaction_preserves_the_diagnostic_context_around_a_secret() -> None:
         "El token de sesión expiró. Vuelve a entrar.",
         "La señal: 'compra' cuando el RSI baja de 30.",
         "Here's the plan: buy and hold SPY, rebalance monthly, compare to BTC.",
+        "Usamos cookies: solo las esenciales para mantener tu sesión.",
+        "We use cookies only for essential session continuity.",
+        "Tu sesión sigue activa. ¿Seguimos con la prueba?",
     ],
 )
 def test_ordinary_prose_is_not_over_redacted(prose: str) -> None:

@@ -121,6 +121,43 @@ the fix did not swing into over-redaction. The new tests assert that no fragment
 of the secret survives, rather than that a marker appears, so the next rule with
 a guessed boundary fails the suite instead of shipping.
 
+## Review round 2: escapes and header values
+
+Codex comments `3740853398` and `3740853401` (both P2) at head `00c2c0ae`. Both
+are the round-1 pattern in new clothes, so the invariant was sharpened rather
+than the two lines patched:
+
+> A secret's boundary comes from its own grammar: the opener, its **escape
+> convention**, and its **internal separators**.
+
+| Instance | Input | Before |
+| --- | --- | --- |
+| Escaped quote | `{"password": "correct\"horse battery staple"}` | leaked `horse battery staple` |
+| Cookie header, total miss | `Cookie: sessionid=abcdefghijklmnop0123456789` | nothing redacted at all |
+| Cookie header, partial | `Cookie: a=1; sessionid=…; csrftoken=…` | only the last pair redacted, `sessionid` published |
+| `x-api-key` header | `x-api-key: some value with spaces` | nothing redacted at all |
+
+The third row is the one that matters most and neither comment named it: where a
+key *did* match, `;` was treated as a terminator when it is an internal
+separator of a cookie header value, so the middle credential was published while
+the artifact still showed a redaction marker.
+
+Fixes:
+
+- Quoted values honour backslash escapes, in both quote flavours and in the
+  unterminated-quote fallback.
+- A new `credential_header` rule covers credential-carrying HTTP headers, whose
+  values legitimately contain spaces, semicolons, and commas, so only the line
+  or the closing quote ends them. Retained prose is provider and runtime error
+  output, so a dumped header is the realistic leak vector, which is why the
+  header set is covered as a class rather than one key at a time.
+- The bare-assignment key list gained the session, CSRF, refresh, and id token
+  family.
+
+Proof 4 grew from 94 to 160 adversarial shapes, adding escaped-quote and header
+variants, still with zero surviving fragments. Proof 5 grew to 11 ordinary prose
+samples including cookie-mentioning copy, still zero over-redacted.
+
 ## Inspectable fixture
 
 `judged-prose-retention-fixture.json` is real harness output for the motivating
@@ -139,8 +176,8 @@ Baseline captured on a clean checkout of `37c7eb52` before any edit.
 
 | Check | Baseline | Candidate |
 | --- | --- | --- |
-| Mocked eval suite | 72 passed | 86 passed (72 unchanged, 14 new) |
-| Full backend suite | 4182 passed, 3 failed, 430 skipped | 4196 passed, 3 failed, 430 skipped |
+| Mocked eval suite | 72 passed | 119 passed (72 unchanged, 47 new) |
+| Full backend suite | 4182 passed, 3 failed, 430 skipped | 4229 passed, 3 failed, 430 skipped |
 | `ruff check src tests workflows scripts` | clean | clean |
 | `scripts/check_modularity_budget.py` | no violations | no violations |
 
