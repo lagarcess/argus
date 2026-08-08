@@ -475,3 +475,14 @@ describe("the public route escapes the client i18n gate", () => {
     }
   });
 });
+
+describe("when the label and the frozen strategy name disagree", () => {
+  test("the page shows the name derived from the executed rule", () => {
+    // The two are frozen from different records: the label from the result card,
+    // the name from the run's own config. Hiding the name whenever any label
+    // exists would let a stale label speak for a run it does not describe.
+    const body = source(RECEIPT_BODY);
+    expect(body).toContain("namesTheSameStrategy");
+    expect(body).not.toContain("!payload.strategy_label");
+  });
+});

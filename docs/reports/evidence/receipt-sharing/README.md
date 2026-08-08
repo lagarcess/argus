@@ -18,13 +18,20 @@ these captures exist only to show what the surface does once it is turned on.
 | `05-tombstone-phone-en.png` | A revoked receipt. Honest tombstone, not a 404, still offers Try Argus. |
 | `06-tombstone-phone-es.png` | The tombstone in Spanish. |
 | `07-receipt-phone-es-indicator.png` | The indicator receipt in Spanish. The strategy labels translate while the frozen values do not, which is why the keys are a closed enum rather than frozen English labels. |
-| `08-data-controls-phone-en.png` | The receipt list in Data Controls at phone width. |
-| `09-data-controls-en.png` | The receipt list at desktop width: every receipt, when it was shared, what it shows, revoke in one action, the automatic revocation reason on the revoked row, and the cached-preview limit stated plainly. |
+| `08-data-controls-phone-en.png` | The receipt list at phone width, inside the responsive shell: a bottom sheet with a `Data Controls` back row, matching every sibling panel in that submenu. |
+| `09-data-controls-en.png` | The receipt list at desktop width, a centred dialog with no back row, which is the same rule the shared panel applies to its siblings. Every receipt, when it was shared, what it shows, every receipt, when it was shared, what it shows, revoke in one action, the automatic revocation reason on the revoked row, and the cached-preview limit stated plainly. |
 | `10-receipt-desktop-en-indicator.png` | The indicator receipt at 1280x900, scaling up from the phone. |
 | `11-preview-card-en.png` | The real preview image a platform fetches, 1200x630, rendered server side from the frozen payload. |
 | `12-preview-card-es.png` | The card for a Spanish receipt, following the receipt's own language because a crawler fetching it has none. |
 | `13-preview-card-indicator.png` | The card for the indicator receipt. |
 | `14-preview-card-revoked.png` | The card for a revoked receipt. |
+| `15-receipt-phone-en-crossover.png` | A moving average crossover receipt. Both windows are named, fast average and window beside slow average and window, plus the direction. A crossover previously rendered with neither, so a 20/50 and a 5/200 crossover were indistinguishable. |
+| `16-receipt-phone-es-crossover.png` | The crossover receipt in Spanish. The window labels translate, the frozen values do not. |
+| `17-preview-card-crossover.png` | The crossover receipt's preview card. |
+| `18-data-controls-phone-es.png` | The receipt list in Spanish inside the mobile sheet. |
+| `crossover-rendered-text.json` | The crossover receipt's rendered body text in both languages, so the parameter labels and frozen values can be read without opening an image. |
+| `data-controls-capture-steps.json` | The click path each Data Controls capture actually took, and the rendered text at the end of it. |
+| `flag-off-byte-identity.json` | Nine flag-off probes with status, header names and body, and the digest they hash to. The same digest comes out at base `01044cda`, where no receipt code exists at all. |
 | `og-and-robots-meta.json` | The head metadata a scraper actually reads, captured from the live page, plus the rendered body text. |
 | `preview-card-headers.json` | The preview image's response headers. |
 | `preview-card-outage-response.json` | The card during a real outage: 503, zero bytes, `Retry-After`, `no-store`. Platforms cache nothing and ask again, instead of pinning a revoked-looking card to a live receipt. |
@@ -80,3 +87,19 @@ From `preview-card-headers.json`:
   which the rate limit makes slow to reach by hand. Pagination is proven instead by
   `test_the_receipt_list_pages_instead_of_hiding_older_live_links`, which walks
   every page and asserts each receipt appears exactly once.
+
+## The mobile shell, after reconciliation
+
+The incoming responsive-shell lane moved every settings panel onto one shared
+panel component that owns the sheet-or-dialog rule. The receipt list still drew
+its own centred overlay, so it merged cleanly and rendered a desktop card at
+phone width. `08` and `18` show it as a sheet with a back row, and `09` shows the
+same panel as a centred dialog with no back row, which is the rule applied rather
+than restated.
+
+## Not captured, and why (continued)
+
+- **The Spanish app shell by `Accept-Language` alone.** The signed-in app follows
+  the profile's language, so `18` sets it through `PATCH /me` the way the language
+  picker does. The receipt page itself is server-rendered from the request header,
+  so `04`, `07` and `16` are genuine header-driven captures.

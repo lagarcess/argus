@@ -21,6 +21,17 @@ const LABEL_CLASS =
   "text-[11.5px] font-medium uppercase tracking-[0.07em] text-black/40 dark:text-white/40";
 const VALUE_CLASS = "mt-1 text-[14px] leading-snug text-black dark:text-white";
 
+/** True when the label already says what the frozen strategy name says. */
+function namesTheSameStrategy(
+  name: string,
+  label: string | null | undefined,
+): boolean {
+  if (!label) return false;
+  const normalize = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return normalize(name) === normalize(label);
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -126,9 +137,17 @@ export default function ReceiptBody({
           )}
           {/* The label above names a category. These are the parameters that
               actually decided what happened, so two runs of the same kind with
-              different settings do not read as the same strategy. */}
+              different settings do not read as the same strategy.
+
+              The name is hidden only when the label already says the same thing.
+              The two are frozen from different records, so when they disagree the
+              one derived from the executed rule is the one worth showing. */}
           {payload.strategy_facts
-            .filter((fact) => fact.key !== "strategy_type" || !payload.strategy_label)
+            .filter(
+              (fact) =>
+                fact.key !== "strategy_type" ||
+                namesTheSameStrategy(fact.value, payload.strategy_label) === false,
+            )
             .map((fact) => (
               <Field
                 key={fact.key}

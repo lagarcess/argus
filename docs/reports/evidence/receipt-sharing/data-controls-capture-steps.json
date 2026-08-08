@@ -1,0 +1,29 @@
+{
+  "08-data-controls-phone-en": {
+    "steps": [
+      "opened drawer",
+      "opened profile menu",
+      "opened Data Controls",
+      "opened Shared links"
+    ],
+    "text": "argus\nNew chat\nSearch\nRecents\nShared links\nData Controls\n\nEverything you have shared. Each link shows locked numbers and nothing about you.\n\nAn idea I stopped sharing\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nTaken down August 8, 2026\n\nMoving average crossover on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nMonthly buys of AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nRSI threshold on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nBuy and hold on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nThe link dies on Argus right away. Chat apps sometimes keep an old preview card in threads where it was already pasted, and Argus cannot reach into those.\n\nSettings\nargus\nDescribe an investing idea\nTest Apple vs SPY\nTest Bitcoin (BTC) hold\nTest weekly Nvidia buys"
+  },
+  "09-data-controls-en": {
+    "steps": [
+      "expanded rail",
+      "opened profile menu",
+      "hovered Data Controls",
+      "opened Shared links"
+    ],
+    "text": "argus\nNew chat\nSearch\nRecents\nShared links\n\nEverything you have shared. Each link shows locked numbers and nothing about you.\n\nAn idea I stopped sharing\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nTaken down August 8, 2026\n\nMoving average crossover on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nMonthly buys of AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nRSI threshold on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nBuy and hold on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nShared August 8, 2026\n\nCopy link\nOpen it\nTake it down\n\nThe link dies on Argus right away. Chat apps sometimes keep an old preview card in threads where it was already pasted, and Argus cannot reach into those.\n\nSettings\nargus\nDescribe an investing idea\nTest Apple vs SPY\nTest Bitcoin (BTC) hold\nTest weekly Nvidia buys"
+  },
+  "18-data-controls-phone-es": {
+    "steps": [
+      "opened drawer",
+      "opened profile menu",
+      "opened Data Controls",
+      "opened Shared links"
+    ],
+    "text": "argus\nNuevo chat\nBuscar\nRecientes\nEnlaces compartidos\nControles de datos\n\nTodo lo que has compartido. Cada enlace muestra números fijos y nada sobre ti.\n\nAn idea I stopped sharing\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nQuitado el 8 de agosto de 2026\n\nMoving average crossover on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nCompartido el 8 de agosto de 2026\n\nCopiar enlace\nAbrirlo\nQuitarlo\n\nMonthly buys of AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nCompartido el 8 de agosto de 2026\n\nCopiar enlace\nAbrirlo\nQuitarlo\n\nRSI threshold on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nCompartido el 8 de agosto de 2026\n\nCopiar enlace\nAbrirlo\nQuitarlo\n\nBuy and hold on AAPL\n\nAAPL · Jan 2, 2024 to Mar 1, 2024\n\nCompartido el 8 de agosto de 2026\n\nCopiar enlace\nAbrirlo\nQuitarlo\n\nEl enlace muere en Argus de inmediato. Las apps de chat a veces guardan una tarjeta de vista previa antigua en las conversaciones donde ya se pegó, y Argus no puede entrar ahí.\n\nAjustes\nargus\nDescribe una idea de inversión...\nPrueba Apple vs SPY\nPrueba mantener Bitcoin (BTC)\nPrueba compras semanales de Nvidia"
+  }
+}
