@@ -1061,6 +1061,15 @@ fetched at view time.
 and rejects any change to the revocation columns once `revoked_at` is set.
 Revocation is one way.
 
+`enforce_public_excerpt_source_is_live` refuses an insert whose source conversation
+is soft-deleted or gone. Revocation-on-delete only revokes snapshots that exist when
+`deleted_at` changes, so without this a stale result card, or a create racing behind
+the delete, could publish a page for a conversation the owner had already removed.
+The trigger takes `FOR SHARE` on the conversation row, which is the part an
+application check cannot do: a check-then-insert could pass and have the delete
+commit before the insert lands, whereas the lock makes a concurrent soft delete block
+the insert, which then reads the delete's result and refuses.
+
 `revoke_public_excerpts_for_deleted_source` revokes a receipt when its source
 goes away, so deleting a chat cannot leave a live public page behind:
 - `conversations` soft delete (`deleted_at` null to not null)

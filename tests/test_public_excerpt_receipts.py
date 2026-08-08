@@ -53,6 +53,7 @@ from tests.public_excerpt_factories import (
     build_artifact,
     build_artifact_payload,
     build_chart,
+    build_conversation,
     build_result_card,
     build_run,
     utc,
@@ -562,7 +563,12 @@ def _memory_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 def _seed_owned_result() -> None:
     artifact = build_artifact()
     run = build_run()
+    # The conversation is part of the fixture because an artifact whose source is
+    # gone is no longer shareable.
+    conversation = build_conversation()
     api_state.store.users[OWNER.id] = OWNER
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = OWNER.id
     api_state.store.evidence_artifacts[artifact.id] = artifact
     api_state.store.evidence_artifact_owners[artifact.id] = OWNER.id
     api_state.store.backtest_runs[run.id] = run
@@ -607,15 +613,17 @@ def test_revocation_is_one_way() -> None:
         user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None
     )
     repository = MemoryPublicExcerptRepository(api_state.store)
-    revoked = repository.revoke_public_excerpt_snapshot(
+    revoked, revoked_now = repository.revoke_public_excerpt_snapshot(
         owner_id=OWNER.id, snapshot_id=snapshot.id
     )
-    again = repository.revoke_public_excerpt_snapshot(
+    again, again_now = repository.revoke_public_excerpt_snapshot(
         owner_id=OWNER.id, snapshot_id=snapshot.id
     )
     assert revoked is not None and again is not None
     assert again.revoked_at == revoked.revoked_at
     assert again.revocation_reason == "owner_revoked"
+    # Only the transition is a revocation; the retry is the same outcome.
+    assert (revoked_now, again_now) == (True, False)
 
 
 def test_another_account_cannot_read_or_revoke_a_receipt() -> None:
@@ -631,12 +639,9 @@ def test_another_account_cannot_read_or_revoke_a_receipt() -> None:
         )
         is None
     )
-    assert (
-        repository.revoke_public_excerpt_snapshot(
-            owner_id=stranger, snapshot_id=snapshot.id
-        )
-        is None
-    )
+    assert repository.revoke_public_excerpt_snapshot(
+        owner_id=stranger, snapshot_id=snapshot.id
+    ) == (None, False)
     assert repository.list_public_excerpt_snapshots(owner_id=stranger) == []
 
 

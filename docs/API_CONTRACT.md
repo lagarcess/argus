@@ -613,6 +613,11 @@ Public endpoints, unauthenticated:
 | `GET`  | `/public/receipts/{public_id}` | Read one frozen receipt |
 | `POST` | `/public/receipt-funnel`       | Record one viewer-side funnel stage |
 
+A result whose conversation has been deleted is no longer shareable: creation answers
+`404` with the ordinary not-available detail, and the database refuses the insert even
+if the deletion lands mid-request. Revoking is idempotent, and only the state
+transition emits `receipt_revoked`.
+
 `POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
 `{"owner_note": string | null}`, bounded at 280 characters, and returns
 `{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already

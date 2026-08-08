@@ -489,3 +489,131 @@ def test_no_browser_role_can_reach_the_receipt_table(role: str) -> None:
                     )
         finally:
             connection.rollback()
+
+
+def test_a_receipt_cannot_be_inserted_for_a_soft_deleted_conversation() -> None:
+    with psycopg.connect(DSN) as connection:
+        try:
+            with connection.cursor() as cursor:
+                fixture = _Fixture(cursor)
+                fixture.owner_id = fixture.owner_id
+                fixture.seed()
+                cursor.execute(
+                    "delete from public.public_excerpt_snapshots where id = %s",
+                    (fixture.snapshot_id,),
+                )
+                cursor.execute(
+                    "update public.conversations set deleted_at = now() where id = %s",
+                    (fixture.conversation_id,),
+                )
+                with pytest.raises(psycopg.errors.CheckViolation) as failure:
+                    fixture.insert_snapshot()
+                assert "public_excerpt_source_deleted" in str(failure.value)
+        finally:
+            connection.rollback()
+
+
+def test_a_receipt_cannot_be_inserted_for_a_conversation_that_is_gone() -> None:
+    with psycopg.connect(DSN) as connection:
+        try:
+            with connection.cursor() as cursor:
+                fixture = _Fixture(cursor)
+                fixture.seed()
+                fixture.drop_idea_spine()
+                cursor.execute(
+                    "delete from public.conversations where id = %s",
+                    (fixture.conversation_id,),
+                )
+                # The foreign key refuses first, which is the same outcome: no page.
+                with pytest.raises(
+                    (
+                        psycopg.errors.CheckViolation,
+                        psycopg.errors.ForeignKeyViolation,
+                    )
+                ):
+                    fixture.reinsert_snapshot(
+                        conversation_id=fixture.conversation_id
+                    )
+        finally:
+            connection.rollback()
+
+
+def test_a_soft_delete_racing_an_insert_cannot_leave_a_live_receipt() -> None:
+    """The race an application check cannot close.
+
+    Two transactions: one inserts a receipt, the other soft deletes its source. The
+    insert takes FOR SHARE on the conversation, so whichever order they commit in,
+    the receipt does not end up live for a deleted chat.
+    """
+    with psycopg.connect(DSN) as setup:
+        with setup.cursor() as cursor:
+            fixture = _Fixture(cursor)
+            fixture.seed()
+            cursor.execute(
+                "delete from public.public_excerpt_snapshots where id = %s",
+                (fixture.snapshot_id,),
+            )
+        setup.commit()
+        try:
+            deleter = psycopg.connect(DSN)
+            inserter = psycopg.connect(DSN)
+            try:
+                # The delete goes first and holds its row lock uncommitted.
+                with deleter.cursor() as delete_cursor:
+                    delete_cursor.execute(
+                        "update public.conversations set deleted_at = now()"
+                        " where id = %s",
+                        (fixture.conversation_id,),
+                    )
+                    # The insert must not slip past while that is in flight.
+                    with inserter.cursor() as insert_cursor:
+                        insert_cursor.execute("set local lock_timeout = '400ms'")
+                        blocked = _Fixture(insert_cursor)
+                        blocked.owner_id = fixture.owner_id
+                        blocked.conversation_id = fixture.conversation_id
+                        blocked.artifact_id = fixture.artifact_id
+                        blocked.run_id = fixture.run_id
+                        with pytest.raises(
+                            (
+                                psycopg.errors.LockNotAvailable,
+                                psycopg.errors.CheckViolation,
+                            )
+                        ):
+                            blocked.insert_snapshot(snapshot_id=str(uuid4()))
+                        inserter.rollback()
+                    deleter.commit()
+
+                # After the delete commits, the insert is refused outright.
+                with inserter.cursor() as retry_cursor:
+                    retry = _Fixture(retry_cursor)
+                    retry.owner_id = fixture.owner_id
+                    retry.conversation_id = fixture.conversation_id
+                    retry.artifact_id = fixture.artifact_id
+                    retry.run_id = fixture.run_id
+                    with pytest.raises(psycopg.errors.CheckViolation) as failure:
+                        retry.insert_snapshot(snapshot_id=str(uuid4()))
+                    assert "public_excerpt_source_deleted" in str(failure.value)
+                    inserter.rollback()
+
+                with setup.cursor() as check:
+                    check.execute(
+                        "select count(*) from public.public_excerpt_snapshots"
+                        " where source_conversation_id = %s and revoked_at is null",
+                        (fixture.conversation_id,),
+                    )
+                    assert check.fetchone()[0] == 0
+            finally:
+                deleter.rollback()
+                deleter.close()
+                inserter.rollback()
+                inserter.close()
+        finally:
+            with psycopg.connect(DSN, autocommit=True) as cleanup:
+                with cleanup.cursor() as cursor:
+                    cursor.execute(
+                        "delete from public.profiles where id = %s",
+                        (fixture.owner_id,),
+                    )
+                    cursor.execute(
+                        "delete from auth.users where id = %s", (fixture.owner_id,)
+                    )

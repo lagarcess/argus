@@ -229,7 +229,7 @@ def revoke_public_excerpt(
         detail="Sign in to manage shared links.",
         reason="share_result",
     )
-    snapshot = public_excerpt_repository().revoke_public_excerpt_snapshot(
+    snapshot, revoked_now = public_excerpt_repository().revoke_public_excerpt_snapshot(
         owner_id=user.id,
         snapshot_id=snapshot_id,
     )
@@ -241,5 +241,9 @@ def revoke_public_excerpt(
             title="Not Found",
             detail="That link is not available.",
         )
-    capture_product_event("receipt_revoked", user_id=user.id, status="revoked")
+    if revoked_now:
+        # Only the transition is a revocation. A network retry asks for the same
+        # outcome and gets it, but counting it again would overstate revocations in
+        # append-only evidence.
+        capture_product_event("receipt_revoked", user_id=user.id, status="revoked")
     return PublicExcerptRevokeResponse(receipt=snapshot_list_item(snapshot))

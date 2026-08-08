@@ -52,7 +52,24 @@ class EvidenceReceiptDisabledError(RuntimeError):
 
 
 class EvidenceReceiptSourceMissingError(LookupError):
-    """The artifact is absent, not owned, or not a shareable result."""
+    """The artifact is absent, not owned, or its source was deleted.
+
+    Deliberately the same error for all three. A stale tab sharing a result whose
+    chat was deleted should hear that the result is not available, not learn which
+    of those reasons applied.
+    """
+
+
+# The database refuses an insert whose source is gone; these are its signals.
+_SOURCE_REFUSED_MARKERS = (
+    "public_excerpt_source_deleted",
+    "public_excerpt_source_missing",
+)
+
+
+def _is_source_refusal(error: BaseException) -> bool:
+    text = str(error).lower()
+    return any(marker in text for marker in _SOURCE_REFUSED_MARKERS)
 
 
 def evidence_receipt_sharing_enabled() -> bool:
@@ -192,14 +209,14 @@ class MemoryPublicExcerptRepository:
         owner_id: str,
         snapshot_id: str,
         reason: str = "owner_revoked",
-    ) -> PublicExcerptSnapshot | None:
+    ) -> tuple[PublicExcerptSnapshot | None, bool]:
         snapshot = self.get_owned_public_excerpt_snapshot(
             owner_id=owner_id,
             snapshot_id=snapshot_id,
         )
         if snapshot is None or snapshot.revoked_at is not None:
-            return snapshot
-        return self._revoke(snapshot, reason=reason)
+            return snapshot, False
+        return self._revoke(snapshot, reason=reason), True
 
     def revoke_public_excerpts_for_conversation(
         self, *, owner_id: str, conversation_id: str
@@ -291,7 +308,16 @@ def create_receipt_for_artifact(
         payload_digest=payload_digest(payload),
         created_at=datetime.now(timezone.utc),
     )
-    return repository.create_public_excerpt_snapshot(snapshot=snapshot)
+    try:
+        return repository.create_public_excerpt_snapshot(snapshot=snapshot)
+    except Exception as exc:
+        # The database refuses a source that was deleted while this request was in
+        # flight, which the application check above cannot catch on its own.
+        if _is_source_refusal(exc):
+            raise EvidenceReceiptSourceMissingError(
+                "That result is not available."
+            ) from exc
+        raise
 
 
 def revoke_receipts_for_conversation(*, user_id: str, conversation_id: str) -> int:
@@ -324,7 +350,37 @@ def _owned_artifact(*, user_id: str, artifact_id: str) -> EvidenceArtifact:
         raise PublicExcerptSourceError(
             "Only completed backtest results are shareable."
         )
+    # An artifact outlives its conversation, so ownership alone does not mean the
+    # owner still has the thing they would be publishing. A stale result card in an
+    # open tab is the ordinary way this happens.
+    if _source_conversation_is_deleted(
+        user_id=user_id,
+        conversation_id=artifact.source_conversation_id,
+    ):
+        raise EvidenceReceiptSourceMissingError("That result is not available.")
     return artifact
+
+
+def _source_conversation_is_deleted(
+    *, user_id: str, conversation_id: str | None
+) -> bool:
+    """Cheap read for the common case. The database trigger closes the race."""
+    if conversation_id is None:
+        return False
+    if api_state.supabase_gateway is not None:
+        conversation = api_state.supabase_gateway.get_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+    else:
+        conversation = api_state.store.conversations.get(conversation_id)
+        if conversation is not None and (
+            api_state.store.conversation_owners.get(conversation_id) != user_id
+        ):
+            conversation = None
+    if conversation is None:
+        return True
+    return getattr(conversation, "deleted_at", None) is not None
 
 
 def _run_chart(*, user_id: str, run_id: str | None) -> dict[str, Any] | None:

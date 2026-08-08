@@ -661,3 +661,122 @@ def test_flag_off_is_identical_for_an_unauthenticated_production_client(
     )
     assert malformed.status_code == reference.status_code
     assert malformed.content == reference.content
+
+
+# ── Review round 3: no publishing a deleted source, honest revocation counts ──
+
+
+def test_a_deleted_conversation_cannot_be_shared_afterwards(sharing_on: None) -> None:
+    """The trap from the other side.
+
+    Revocation-on-delete only revokes receipts that exist when the delete happens,
+    so a stale result card in an open tab could otherwise publish a page for a chat
+    the owner had already removed.
+    """
+    client = _client()
+    _seed(client)
+    assert client.delete(f"/api/v1/conversations/{CONVERSATION_ID}").status_code == 200
+
+    refused = client.post(CREATE_PATH, json={})
+    assert refused.status_code == 404
+    assert api_state.store.public_excerpt_snapshots == {}
+
+
+def test_deleting_all_conversations_also_blocks_later_sharing(
+    sharing_on: None,
+) -> None:
+    client = _client()
+    _seed(client)
+    assert client.delete("/api/v1/conversations").status_code == 200
+    assert client.post(CREATE_PATH, json={}).status_code == 404
+
+
+def test_an_artifact_whose_conversation_is_gone_is_not_shareable(
+    sharing_on: None,
+) -> None:
+    client = _client()
+    user_id = _seed(client)
+    # An artifact outlives its conversation, so ownership alone is not enough.
+    api_state.store.conversations.pop(CONVERSATION_ID)
+    api_state.store.conversation_owners.pop(CONVERSATION_ID)
+    assert api_state.store.evidence_artifact_owners[ARTIFACT_ID] == user_id
+    assert client.post(CREATE_PATH, json={}).status_code == 404
+
+
+def test_a_source_deleted_mid_request_is_refused_by_the_database(
+    sharing_on: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The race the application check cannot catch.
+
+    The pre-check passes and the delete commits before the insert lands. The insert
+    trigger refuses, and that refusal has to read as the ordinary not-available
+    answer rather than a 500.
+    """
+    from argus.api import public_excerpts as service
+
+    client = _client()
+    _seed(client)
+
+    real_create = service.public_excerpt_repository().create_public_excerpt_snapshot
+
+    def _raise_source_deleted(**kwargs: Any) -> Any:
+        raise RuntimeError(
+            'new row violates ... raise exception "public_excerpt_source_deleted"'
+        )
+
+    monkeypatch.setattr(
+        service.MemoryPublicExcerptRepository,
+        "create_public_excerpt_snapshot",
+        lambda self, **kwargs: _raise_source_deleted(**kwargs),
+    )
+    response = client.post(CREATE_PATH, json={})
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    assert real_create is not None
+
+
+def test_an_unrelated_insert_failure_is_not_masked_as_not_available(
+    sharing_on: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import public_excerpts as service
+
+    client = _client()
+    _seed(client)
+    monkeypatch.setattr(
+        service.MemoryPublicExcerptRepository,
+        "create_public_excerpt_snapshot",
+        lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("disk on fire")),
+    )
+    # A genuine failure must surface as a failure, not be reshaped into the
+    # not-available answer reserved for a deleted source.
+    response = client.post(CREATE_PATH, json={})
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
+
+
+def test_revoking_twice_reports_one_revocation(
+    sharing_on: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    monkeypatch.setattr(
+        evidence_receipts,
+        "capture_product_event",
+        lambda kind, **kwargs: events.append(kind),
+    )
+    client = _client()
+    _seed(client)
+    receipt = _create(client)
+
+    first = client.delete(f"{LIST_PATH}/{receipt['id']}")
+    second = client.delete(f"{LIST_PATH}/{receipt['id']}")
+
+    assert first.status_code == second.status_code == 200
+    assert first.json()["receipt"]["revoked_at"] == (
+        second.json()["receipt"]["revoked_at"]
+    )
+    assert [kind for kind in events if kind == "receipt_revoked"] == [
+        "receipt_revoked"
+    ]

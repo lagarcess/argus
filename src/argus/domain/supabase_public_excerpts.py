@@ -174,7 +174,13 @@ class SupabasePublicExcerptMixin:
         owner_id: str,
         snapshot_id: str,
         reason: str = "owner_revoked",
-    ) -> PublicExcerptSnapshot | None:
+    ) -> tuple[PublicExcerptSnapshot | None, bool]:
+        """Revoke a receipt. Returns ``(snapshot, revoked_now)``.
+
+        Revoking twice is not an error, it is the outcome the caller asked for, but
+        only the transition is a revocation. Reporting the retry as one too would
+        overstate revocation counts in append-only evidence.
+        """
         result = (
             self.client.table(TABLE)
             .update({"revoked_at": _now_iso(), "revocation_reason": reason})
@@ -185,11 +191,13 @@ class SupabasePublicExcerptMixin:
         )
         rows = _rows(result)
         if rows:
-            return _snapshot_from_row(rows[0])
-        # Already revoked is the same outcome the caller asked for.
-        return self.get_owned_public_excerpt_snapshot(
-            owner_id=owner_id,
-            snapshot_id=snapshot_id,
+            return _snapshot_from_row(rows[0]), True
+        return (
+            self.get_owned_public_excerpt_snapshot(
+                owner_id=owner_id,
+                snapshot_id=snapshot_id,
+            ),
+            False,
         )
 
     def revoke_public_excerpts_for_conversation(

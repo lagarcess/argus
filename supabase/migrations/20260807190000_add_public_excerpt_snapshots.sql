@@ -89,6 +89,56 @@ create trigger prevent_public_excerpt_immutable_update
 before update on public.public_excerpt_snapshots
 for each row execute function public.prevent_public_excerpt_immutable_update();
 
+-- A receipt cannot be created for a source the owner already deleted.
+--
+-- Revocation-on-delete only revokes snapshots that exist when deleted_at changes,
+-- so without this a stale result card, or a create racing behind the delete, could
+-- publish a page for a conversation the owner had already removed. That is the same
+-- trap as leaving a page live after deletion, entered from the other side.
+--
+-- The row lock is the point. An application check alone is read-then-write: the
+-- check could pass and the delete commit before the insert lands. FOR SHARE makes a
+-- concurrent soft delete block here, so this transaction then reads its result and
+-- refuses.
+create or replace function public.enforce_public_excerpt_source_is_live()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_deleted_at timestamptz;
+begin
+  if new.source_conversation_id is null then
+    return new;
+  end if;
+
+  select deleted_at
+    into v_deleted_at
+    from public.conversations
+   where id = new.source_conversation_id
+     for share;
+
+  if not found then
+    raise exception 'public_excerpt_source_missing'
+      using errcode = '23514';
+  end if;
+
+  if v_deleted_at is not null then
+    raise exception 'public_excerpt_source_deleted'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_public_excerpt_source_is_live
+  on public.public_excerpt_snapshots;
+create trigger enforce_public_excerpt_source_is_live
+before insert on public.public_excerpt_snapshots
+for each row execute function public.enforce_public_excerpt_source_is_live();
+
 -- Source deletion revokes. The source foreign keys are set null, so the
 -- tombstone outlives whatever it pointed at.
 --
@@ -191,6 +241,8 @@ alter table public.public_excerpt_snapshots enable row level security;
 -- and source columns one PostgREST call away from the browser for no gain.
 revoke all on table public.public_excerpt_snapshots from anon, authenticated;
 revoke all on function public.prevent_public_excerpt_immutable_update()
+  from public, anon, authenticated;
+revoke all on function public.enforce_public_excerpt_source_is_live()
   from public, anon, authenticated;
 revoke all on function public.revoke_public_excerpts_for_deleted_source()
   from public, anon, authenticated;
