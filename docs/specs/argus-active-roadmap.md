@@ -20,13 +20,38 @@ This is a timing change, not a thesis change. Argus stays the pre-flight
 checklist: test the idea, see the evidence, remember why. It does not become an
 investment command center, an agent marketplace, or a trading surface.
 
+## Vocabulary (founder-locked 2026-08-07)
+
+Two words that were previously conflated, and are not the same thing.
+
+**Memory** is the shipped feature. Argus proposes something worth remembering,
+the user confirms, and it is recalled later. Inferred then confirmed. It lives
+in `src/argus/memory/`, is opt-in, and is fully inspectable, editable, and
+deletable. Call it memory, never "personalization memory".
+
+**Personalization** is declared, not learned: the user tells Argus who they are
+and how they want to be spoken to, from options Argus defines. Name, preferred
+address, tone, interaction style. It does not exist yet. When it is built it is
+a settings surface, not a memory mechanism, and it needs no consent flow because
+the user authors every value directly.
+
+The distinction matters because the consent posture differs. Memory stores
+Argus's inferences about you and therefore needs earned opt-in. Personalization
+stores your own stated preferences and needs none.
+
+The flag `ARGUS_ENABLE_PERSONALIZATION_MEMORY` still carries the old name. It is
+live and gating shipped code, so renaming it moves the release contract
+(`.env.example`, `render.yaml`, `argus-env.sh`, the release profile, canary, and
+QA scripts) together. Do it when something else touches that surface, not as a
+standalone edit.
+
 ## Operating rules (founder-locked 2026-08-06)
 
 1. **No phases, no incubation.** When a lane is dispatched it is built
    production-ready end to end: implementation, tests, evidence, docs, and
    user-facing polish in one lane. Review checkpoints are not a delivery model.
 2. **Flags, not ceremony.** Work that is not ready for users ships behind a
-   default-off flag on the same terms personalization memory did. The flag is
+   default-off flag on the same terms memory did. The flag is
    the safety boundary; staged branches are not.
 3. **Items 1 and 2 are serial with each other.** Both rewrite the same
    interpreter and confirmation-card surfaces, so they cannot run in parallel
@@ -149,27 +174,54 @@ Locked shape, in brief:
   home-screen install does not look app-like today.
 - Desktop and laptop behavior must not regress; it is already strong.
 
-### 4. Product memory (parallel, behind flag)
+### 4. Compare your own work (parallel, behind flag)
 
-The differentiation competitors cannot copy, and it is still unproven in the
-public product.
+Previously called "product memory". That name was wrong: none of it is a memory
+system. The records already exist and are already written; what was missing is
+reliable versioning and a way to read them back.
 
-- Canonical Idea, IdeaVersion, EvidenceArtifact, and DecisionNote recall: A1b
-  linked versions and A2 comparison.
-- Comparing your own past strategies is the same engine as comparing
-  competitors in item 1. Build them so they share it.
-- Distinct from personalization memory. Product memory is canonical truth;
-  personalization memory is an opt-in sidecar that may reference it and never
-  becomes an alternate source of truth.
+**Spec is written and founder-locked:**
+[`2026-08-07-compare-your-own-work.md`](../superpowers/specs/2026-08-07-compare-your-own-work.md).
+
+- Serves three real questions: which of my ideas did best, did my change help,
+  should I do A or B.
+- Spans three homes deliberately: versioning belongs to editing and mints on
+  confirmed run rather than on edit, comparison answers are another question
+  shape on the research rail's one router, and the only new surface is a
+  multi-select confirmation card.
+- **Works with memory off**, because reading your own runs is the product.
+  Memory is a pre-wired optional sharpener for conceptual phrasing and personal
+  success criteria, never the mechanism.
+- Candidate relevance is structured filtering, not semantic search. The set is a
+  bounded personal one, so exact beats fuzzy.
+- Grounded with market context that explains *why*, under a hard boundary:
+  numbers come from your evidence artifacts, Perplexity never restates a
+  simulation result.
 
 ### 5. Sharing (parallel, behind flag)
 
 Distribution, once there is something worth spreading.
 
-- An immutable, sanitized evidence receipt. Not a shared chat transcript.
-- Owner-created, owner-revocable, stripped of private runtime detail.
+**Spec is written and founder-locked:**
+[`2026-08-07-sharing-evidence-receipts.md`](../superpowers/specs/2026-08-07-sharing-evidence-receipts.md).
+Complete, all decisions made, dispatchable when the pillar comes up.
+
+- An immutable, sanitized evidence receipt frozen at creation. Not a shared chat
+  transcript, and never a live view.
+- Owner-created, owner-revocable, stripped of private runtime detail. Memory is
+  never shareable under any circumstance.
+- Not-advice framing is stronger in a receipt than in the app, because the
+  viewer has none of the context an app user has.
+- The public view is mobile-first and owns its own layout, since shared links
+  are opened from messaging.
 - Deliberately last of the five: sharing a broken loop spreads a bad
-  impression.
+  impression faster than a good one.
+
+Decided from prior art rather than preference: never indexable with no
+discoverability toggle, anonymous with no attribution, results only, no expiry
+but a receipt list so revocation is real. ChatGPT exposed roughly 100,000 shared
+conversations through a toggle users misread, and Claude shipped share links
+with no noindex at all.
 
 ## Continuous, not a lane
 
@@ -209,7 +261,7 @@ Standing chore work, picked up alongside lanes rather than scheduled:
 
 ## Landed this cycle
 
-- **Personalization memory** (PR #386) — complete loop behind a default-off flag
+- **Memory** (PR #386) — complete loop behind a default-off flag
   scoped to `admin` and `developer` allowlist roles. Propose, confirm, inspect,
   explain, edit, delete, disable, reset, export, and temporary chat. Guests
   denied before any side effect.

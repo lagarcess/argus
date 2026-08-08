@@ -3673,9 +3673,9 @@ Deferred surfaces:
 
 ---
 
-# 17.2 Personalization Memory (registered, role-gated)
+# 17.2 Memory (registered, role-gated)
 
-User-confirmed personalization memory for registered accounts. Assisted, not
+User-confirmed memory for registered accounts. Assisted, not
 automatic: Argus proposes, the user confirms, and only confirmed content
 becomes a durable `MemoryRecord`. Memory never influences interpretation,
 routing, or simulation truth; it may only inform post-interpretation surfaces

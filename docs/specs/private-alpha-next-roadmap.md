@@ -267,7 +267,7 @@ default.** The prior assumption was that closing the interim hands control
 straight back to the A1b → A2 → A4 sequence as originally planned. Instead:
 after promotion, run a real Guest-canary/public-exposure window (target
 2–4 weeks, per the same external validation) before committing engineering
-time to any of A1b, A2, A4, or personalization memory. Prioritize among
+time to any of A1b, A2, A4, or memory. Prioritize among
 them using observed signal — return-visit rate, decision-note save rate,
 refinement/version-creation rate, Omnisearch return-recall usage — not the
 original planning order alone. If that signal is weak across the board,
@@ -285,7 +285,7 @@ and the core loop, not building further ahead of evidence.
    compounding-loop items already named above. Paused pending founder
    resume; sequenced by the signal-driven rule above once resumed, not
    built in isolation from usage data.
-3. **Personalization memory** — the incubation lane (`codex/personalization-
+3. **Memory** — the incubation lane (`codex/personalization-
    memory-incubation-persistence-v1` and its planned successors), tracked
    separately in
    [`docs/specs/lanes/personalization-memory-contract.md`](lanes/personalization-memory-contract.md).
@@ -545,7 +545,7 @@ In scope for the next implementation wave:
 Out of scope until explicitly started:
 
 - generic RAG/vector memory as canonical truth;
-- automatic personalization memory beyond explicit or assisted saved-decision
+- automatic memory beyond explicit or assisted saved-decision
   moments;
 - standalone Idea Ledger dashboard;
 - broker account connection, broker execution, or order submission;
@@ -869,7 +869,7 @@ second-engine need.
 
 Memory must be earned opt-in, inspectable, editable, deletable, resettable, and
 explainable ("why was this used?"). Alpha legal/Data Controls work (#137) is the
-surface to extend. Do not add automatic broad personalization memory before these
+surface to extend. Do not add automatic broad memory before these
 controls exist.
 
 **Parallel design/prototype lanes.**
@@ -1069,7 +1069,7 @@ LANES BY GATE (the board agents execute from):
   used?"). POST-PMF READY-SPEC (extends the #137 Data Controls surface).
   Personalization-memory implementation is not required for P2 and remains
   blocked until PMF evidence justifies a user-confirmed `MemoryRecord` contract.
-  No automatic broad personalization memory before these controls exist.
+  No automatic broad memory before these controls exist.
 
 **Design-only lanes** (all READY for notes/mocks; no runtime, schema, or UI
 code): sanitized public excerpt design, voice-to-composer STT prototype, thin

@@ -100,6 +100,93 @@ Direct edits are ordinary edits: they obey the same validation, the same
 coverage and resolver gates, and the same disclosure rules as a conversational
 edit. Nothing becomes runnable that would not have been runnable through chat.
 
+### 3.5 Repair must not drop what the user already stated (#367)
+
+`FocusedStrategyExtraction` intermittently loses an explicit 10 bps fee and 5
+bps slippage. The same prompt usually passes; one exact-head run returned an
+executable confirmation with both costs and `launch_execution_realism` missing.
+Confirmed nondeterministic, verified at `76e32322` against baseline `6533377c`,
+and present in the clean integration baseline too.
+
+This is the same defect as section 3.2 wearing different clothes. A repair path
+silently discarding a stated cost is a compound edit dropping half the request,
+just triggered by internal repair rather than by the user's next sentence.
+
+So it is in scope here, and it constrains the fix:
+
+- **One edit contract owns preservation.** Repair paths are not permitted their
+  own rules about what survives. If `FocusedStrategyExtraction` can discard a
+  user-stated value, so can any future repair, and each one becomes a separate
+  bug. Route repair through the same contract, or make the contract the thing
+  repair consults.
+- **Silent loss is the defect, not the repair.** If repair genuinely cannot
+  preserve a value, that is surfaced, never dropped quietly. Same rule as 3.2.
+- **Nondeterminism means the test must be able to fail.** A single passing run
+  proves nothing here. Reproduce the loss deliberately before claiming a fix.
+
+### 3.5b Dates: the LLM interprets, deterministic code computes (#332)
+
+`argus.nlp.natural_time.parse_date_text` mishandles fractional durations. It
+reads the digit after the decimal point as the whole quantity and discards the
+integer part. Probed against reference date 2026-08-01:
+
+| input | resolves to | equivalent to |
+| --- | --- | --- |
+| `8.5 months ago` | 2026-03-01 | 5 months ago |
+| `3.5 months ago` | 2026-03-01 | 5 months ago |
+| `2.5 months ago` | 2026-03-01 | 5 months ago |
+| `5 months ago` | 2026-03-01 | correct |
+| `2 months ago` | 2026-06-01 | correct |
+
+Every `N.5` collapses to the same date regardless of N. Integer durations are
+correct, so the defect is specific to fractional parsing. Asking for 8.5 months
+returns 5, a 41 percent shortfall; asking for 2.5 months also returns 5, double
+the request.
+
+**Do not patch the fractional case.** The defect is the pattern, not the digit.
+
+This repo forbids regex, hardcoded language gates, and shortcut routing ahead of
+LLM interpretation. A deterministic parser guessing at date prose is a second
+interpreter competing with the real one, and it will keep losing on phrasings
+nobody enumerated. Fractional months are simply the instance that surfaced.
+
+**The macro pattern:**
+
+> The LLM interprets language into a typed value. Deterministic code validates
+> and computes from that value. Deterministic code never parses prose.
+
+Concretely, interpretation emits something typed, a unit and a quantity that may
+be fractional, and date math runs from that. Arithmetic is exactly what
+deterministic code is good at; turning "the last 8.5 months" into a number is
+language, and it belongs to the interpreter.
+
+Where prose parsing remains for a legitimate reason, say why and bound it.
+Silent prose parsing is the thing being removed.
+
+**This is an editing concern** because changing dates is the most common edit on
+the card, and because the failure is the same harm as section 3.2: the user
+silently gets a different experiment than the one they asked for. A dropped
+compound edit and a misparsed duration land the user in the same wrong place.
+
+Nondeterminism note: verify by probing the parser directly, as above, rather
+than through a full turn. LLM interpretation runs first and normalizes some
+phrasings, so a passing journey proves nothing about the parser.
+
+### 3.6 Versioning: mint on run, never on edit
+
+A confirmed run mints exactly one `IdeaVersion`. Edits to a pending card mint
+nothing, however many there are, per decision memo section 16.2.
+
+This is the write path for
+[`2026-08-07-compare-your-own-work.md`](2026-08-07-compare-your-own-work.md).
+Comparison is only as trustworthy as versioning is honest: a dropped compound
+edit produces a version record that misstates the experiment, and the user's
+own history becomes unreliable. Getting the timing backwards instead fills that
+history with phantom versions from abandoned edits.
+
+Material change is defined once, here, and consumed by comparison. There is no
+second definition anywhere.
+
 ## 4. Open decision for the founder
 
 **Does a confirmation-card edit mint a new `IdeaVersion`?**
