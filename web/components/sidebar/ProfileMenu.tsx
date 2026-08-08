@@ -13,6 +13,7 @@ import { useModalSurface } from "../layout/useModalSurface";
 import { useOverlayLayer } from "../layout/overlayStack";
 import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
 import {
+  SHEET_SUBMENU_CLASS,
   profileMenuClass,
   profileSubmenuAnchorClass,
   profileSubmenuClass,
@@ -43,6 +44,8 @@ import {
   Edit2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
 import {
   AVATAR_THEMES,
@@ -144,6 +147,14 @@ export default function ProfileMenu({
   placement = "rail",
 }: ProfileMenuProps) {
   const { t, i18n } = useTranslation();
+  const { isBelowDesktop } = useResponsiveLayout();
+  /*
+   * Below the panel line this menu is a sheet, whatever the sidebar is doing.
+   * Tying it to the sidebar's own 720 line left the tablet band showing a
+   * shrunken mouse menu whose submenus only opened on a hover that a tablet
+   * cannot produce.
+   */
+  const asSheet = isBelowDesktop;
   const isDrawerPlacement = placement === "drawer";
   const menuOverlayId = useId();
   const profileModalOverlayId = useId();
@@ -174,6 +185,7 @@ export default function ProfileMenu({
     useState<DeleteRequestState>("idle");
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverOpenedRef = useRef(false);
 
   const closeAvatarPicker = useCallback(() => {
     if (!isAvatarPickerOpen) return;
@@ -343,22 +355,41 @@ export default function ProfileMenu({
   // cancelled each other out and no submenu ever appeared in the drawer. Touch
   // has no hover to express intent with, so the tap is the only opener there.
   const handleSubmenuEnter = useCallback((menu: SubMenu) => {
-    if (isDrawerPlacement) return;
+    if (asSheet) return;
     if (!canOpenSubmenu) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
+    hoverOpenedRef.current = true;
     setActiveSubmenu(menu);
-  }, [canOpenSubmenu, isDrawerPlacement]);
+  }, [asSheet, canOpenSubmenu]);
 
+  /*
+   * Click opens a submenu at every width; hover only ever accelerates it.
+   *
+   * A press on a hover-capable machine fires enter and then click, so a plain
+   * toggle closed what the hover had just opened and the submenu never
+   * appeared. Anything a mouse can reach only by hovering is unreachable on a
+   * tablet, which stays above the panel line in landscape.
+   */
   const handleSubmenuToggle = useCallback((menu: SubMenu) => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
-    setActiveSubmenu((current) => (current === menu ? null : menu));
-  }, []);
+    if (activeSubmenu === menu) {
+      if (hoverOpenedRef.current) {
+        // The hover opened it a moment ago; this click confirms rather than undoes.
+        hoverOpenedRef.current = false;
+        return;
+      }
+      setActiveSubmenu(null);
+      return;
+    }
+    hoverOpenedRef.current = false;
+    setActiveSubmenu(menu);
+  }, [activeSubmenu]);
 
   const handleSubmenuLeave = useCallback(() => {
-    if (isDrawerPlacement) return;
+    if (asSheet) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
     submenuTimeoutRef.current = setTimeout(() => setActiveSubmenu(null), 250);
-  }, [isDrawerPlacement]);
+  }, [asSheet]);
 
   const handleSubmenuKeepAlive = useCallback(() => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -1116,13 +1147,30 @@ export default function ProfileMenu({
 
   // ── Menu rendering ──────────────────────────────────────────────────────
 
-  const { className: menuClassName, left: menuLeft } = profileMenuClass(
+  const { className: rawMenuClass, left: rawMenuLeft } = profileMenuClass(
     placement,
     sidebarCollapsed,
   );
+  // Inside a sheet the shell is the panel, so the menu is just its rows.
+  const menuClassName = asSheet
+    ? "[&_button]:min-h-[44px] [&_a]:min-h-[44px]"
+    : rawMenuClass;
+  const menuLeft = asSheet ? undefined : rawMenuLeft;
   const submenuSurfaceClass = (railSizeClass: string) =>
-    profileSubmenuClass(placement, railSizeClass);
-  const submenuAnchorClass = profileSubmenuAnchorClass(placement);
+    asSheet ? SHEET_SUBMENU_CLASS : profileSubmenuClass(placement, railSizeClass);
+  const submenuAnchorClass = asSheet ? "" : profileSubmenuAnchorClass(placement);
+  // In the sheet a submenu replaces the list rather than floating over it.
+  // Drilled into a submenu, the sheet shows that submenu alone. The bodies
+  // already render conditionally, so only the root-level rows need standing
+  // down; moving them would mean relocating 200 lines of markup for a class.
+  const showRootRows = !asSheet || !activeSubmenu;
+  const rootRow = showRootRows ? "" : " hidden";
+  const sheetTitles: Record<string, string> = {
+    data: t("settings.data.title", "Data Controls"),
+    settings: t("settings.app.title", "Preferences"),
+    help: t("settings.help.title", "Help & Legal"),
+    feedback: t("feedback.title", "Feedback"),
+  };
 
   const menu = (
     <div
@@ -1137,7 +1185,7 @@ export default function ProfileMenu({
       {/* Profile */}
       <button
         onClick={() => openModal("profile")}
-        className="font-display flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        className={`font-display flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
       >
         <User className="h-4 w-4 text-black/50 dark:text-white/50" />
         {t("settings.profile.title", "Profile")}
@@ -1152,7 +1200,7 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("data")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <Database className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1266,7 +1314,7 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("settings")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <Palette className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1332,7 +1380,7 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("help")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1387,7 +1435,7 @@ export default function ProfileMenu({
       >
         <button
           onClick={() => handleSubmenuToggle("feedback")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <MessageSquareText className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1449,7 +1497,7 @@ export default function ProfileMenu({
       </div>
 
       {/* Divider */}
-      <div className="my-1 border-t border-black/5 dark:border-white/5" />
+      <div className={`my-1 border-t border-black/5 dark:border-white/5${rootRow}`} />
 
       {/* Log out */}
       <button
@@ -1457,15 +1505,15 @@ export default function ProfileMenu({
           onLogout();
           onClose();
         }}
-        className="font-display flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5"
+        className={`font-display flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5${rootRow}`}
       >
         <LogOut className="h-4 w-4" />
         {t("settings.logout", "Log out")}
       </button>
 
       {/* Footer links */}
-      <div className="my-1 border-t border-black/5 dark:border-white/5" />
-      <div className="flex items-center gap-1 px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25">
+      <div className={`my-1 border-t border-black/5 dark:border-white/5${rootRow}`} />
+      <div className={`flex items-center gap-1 px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25${rootRow}`}>
         <a href="/terms" className="transition-colors hover:text-black dark:hover:text-white">
           {t("settings.help.terms", "Terms of Use")}
         </a>
@@ -1478,6 +1526,34 @@ export default function ProfileMenu({
   );
 
   if (typeof document === "undefined") return null;
+
+  if (asSheet) {
+    // The sheet supplies the panel, the title and the way back, so the menu
+    // contributes only its rows.
+    const sheet = (
+      <AdaptivePanel
+        title={
+          activeSubmenu
+            ? sheetTitles[activeSubmenu]
+            : t("common.settings", "Settings")
+        }
+        closeLabel={t("common.close", "Close")}
+        onClose={onClose}
+        onBack={activeSubmenu ? () => setActiveSubmenu(null) : undefined}
+        backLabel={t("common.settings", "Settings")}
+      >
+        {menu}
+      </AdaptivePanel>
+    );
+    return (
+      <>
+        {createPortal(sheet, document.body)}
+        {deleteRequestDialog
+          ? createPortal(deleteRequestDialog, document.body)
+          : null}
+      </>
+    );
+  }
 
   return (
     <>

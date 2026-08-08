@@ -13,6 +13,13 @@
 
 export type ProfileMenuPlacement = "rail" | "drawer";
 
+/**
+ * Inside a sheet a submenu is the sheet's whole body, so it needs no surface of
+ * its own: the shell already supplies the panel, the title and the way back.
+ */
+export const SHEET_SUBMENU_CLASS =
+  "[&_button]:min-h-[44px] [&_a]:min-h-[44px]";
+
 const MENU_SURFACE =
   "rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>div>button]:mx-1 [&>div>button]:my-0.5 [&>div>button]:w-[calc(100%-0.5rem)] [&>div>button]:rounded-[10px]";
 

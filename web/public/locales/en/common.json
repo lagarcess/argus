@@ -879,7 +879,8 @@
         "light": "Light",
         "dark": "Dark",
         "system": "System"
-      }
+      },
+      "close_appearance": "Close appearance"
     },
     "sidebar": {
       "title": "Sidebar preference",

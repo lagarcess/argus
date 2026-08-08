@@ -879,7 +879,8 @@
         "light": "Claro",
         "dark": "Oscuro",
         "system": "Sistema"
-      }
+      },
+      "close_appearance": "Cerrar apariencia"
     },
     "sidebar": {
       "title": "Preferencia de barra lateral",

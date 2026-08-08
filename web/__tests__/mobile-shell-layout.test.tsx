@@ -564,7 +564,10 @@ describe("omnisearch below threshold", () => {
       "../components/sidebar/KeyboardShortcutsOverlay.tsx",
     ]) {
       const source = readFileSync(join(import.meta.dir, file), "utf-8");
-      expect(source).toContain("useModalSurface");
+      // Managed means it registers, or renders through a shell that does.
+      expect(
+        /useModalSurface|AdaptivePanel|BottomSheet/.test(source),
+      ).toBe(true);
     }
   });
 
@@ -582,8 +585,8 @@ describe("omnisearch below threshold", () => {
     expect(opened.length).toBeGreaterThanOrEqual(6);
     const unmanaged = opened.filter(
       (file) =>
-        !readFileSync(join(import.meta.dir, file), "utf-8").includes(
-          "useModalSurface",
+        !/useModalSurface|AdaptivePanel|BottomSheet/.test(
+          readFileSync(join(import.meta.dir, file), "utf-8"),
         ),
     );
     expect(unmanaged).toEqual([]);

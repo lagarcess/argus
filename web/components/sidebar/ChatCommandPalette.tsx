@@ -1204,16 +1204,24 @@ export default function ChatCommandPalette({
                           selectedNavigationDisabled
                         }
                         retestDisabled={turnInFlight}
-                        onOpenConversation={() => {
-                          openSelectedDossierConversation({
-                            conversationId: selectedPreview.conversationId,
-                            dossier: selectedDossier,
-                            navigationDisabled: selectedNavigationDisabled,
-                            onOpenConversation: (conversationId, messageId) =>
-                              onOpenConversation(conversationId, messageId),
-                            onClose,
-                          });
-                        }}
+                        // The sheet pins this action in its footer, so the body
+                        // only carries it where nothing else does: the pane.
+                        onOpenConversation={
+                          isBelowDesktop
+                            ? undefined
+                            : () => {
+                                openSelectedDossierConversation({
+                                  conversationId: selectedPreview.conversationId,
+                                  dossier: selectedDossier,
+                                  navigationDisabled: selectedNavigationDisabled,
+                                  onOpenConversation: (
+                                    conversationId,
+                                    messageId,
+                                  ) => onOpenConversation(conversationId, messageId),
+                                  onClose,
+                                });
+                              }
+                        }
                         onRetest={(sourceRunId) => {
                           if (!selectedPreview.conversationId) return;
                           return onRetest(
