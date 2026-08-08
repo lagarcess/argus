@@ -109,6 +109,20 @@ def settle_visitor_usage(
     ).execute()
 
 
+def purge_expired_visitor_usage(
+    client: Any,
+    *,
+    before: datetime | None = None,
+) -> int:
+    """Delete counters whose window has passed. Returns the row count."""
+    at = before or datetime.now(timezone.utc)
+    purged = client.rpc(
+        "purge_expired_visitor_usage",
+        {"p_before": at.isoformat()},
+    ).execute()
+    return int(getattr(purged, "data", 0) or 0)
+
+
 def settle_memory_visitor_usage(
     counters: dict[tuple[str, str, str], dict[str, Any]],
     *,

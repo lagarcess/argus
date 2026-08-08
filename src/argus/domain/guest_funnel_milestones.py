@@ -46,6 +46,20 @@ def claim_milestone(
     return bool(getattr(claimed, "data", False))
 
 
+def purge_expired_milestones(
+    client: Any,
+    *,
+    before: datetime | None = None,
+) -> int:
+    """Delete claims whose retention has lapsed. Returns the row count."""
+    at = before or datetime.now(timezone.utc)
+    purged = client.rpc(
+        "purge_expired_guest_funnel_milestones",
+        {"p_before": at.isoformat()},
+    ).execute()
+    return int(getattr(purged, "data", 0) or 0)
+
+
 def claim_memory_milestone(
     claims: dict[tuple[str, str], datetime],
     *,
