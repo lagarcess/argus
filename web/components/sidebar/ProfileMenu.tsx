@@ -260,10 +260,16 @@ export default function ProfileMenu({
   }, [isOpen, accountKind]);
 
 
-  // Opened from the drawer this is a modal surface, not a detached popover: it
-  // owns system back ahead of the drawer, and Tab has to reach it.
+  /*
+   * One registration per visible surface.
+   *
+   * As a sheet the shell already owns the layer, the history entry and the
+   * focus trap, so registering here as well gave the same panel two owners:
+   * closing it scheduled two `history.back()` calls, and traversal being
+   * asynchronous, that leaves a phantom entry the next press spends.
+   */
   useModalSurface({
-    isOpen: isOpen && isDrawerPlacement,
+    isOpen: isOpen && isDrawerPlacement && !asSheet,
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onDismiss: onClose,
@@ -285,7 +291,7 @@ export default function ProfileMenu({
   // On the rail this is a detached popover rather than a layer, so it keeps the
   // plain dismissal rules a popover has.
   useOverlayLayer({
-    isOpen: isOpen && !isDrawerPlacement,
+    isOpen: isOpen && !isDrawerPlacement && !asSheet,
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onEscape: onClose,

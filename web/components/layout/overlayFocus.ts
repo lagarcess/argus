@@ -6,12 +6,22 @@
  * through an element only one of them could see.
  */
 
+/*
+ * `tabindex="-1"` is excluded everywhere, not only on the catch-all.
+ *
+ * A trap moves focus itself rather than letting the browser do it, so opting an
+ * element out of the native tab order means nothing unless the trap agrees.
+ * That is why marking the backdrops non-tabbable did not stop Shift+Tab landing
+ * on one: they are buttons, and `button:not([disabled])` still matched.
+ */
+const NOT_OPTED_OUT = ':not([tabindex="-1"])';
+
 export const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled]):not([type='hidden'])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
+  `a[href]${NOT_OPTED_OUT}`,
+  `button:not([disabled])${NOT_OPTED_OUT}`,
+  `input:not([disabled]):not([type='hidden'])${NOT_OPTED_OUT}`,
+  `select:not([disabled])${NOT_OPTED_OUT}`,
+  `textarea:not([disabled])${NOT_OPTED_OUT}`,
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 

@@ -166,8 +166,11 @@ describe("bottom sheet ownership", () => {
      */
     const offenders: string[] = [];
     for (const file of FILES) {
+      // The class list may carry a scrim colour after the inset, and the first
+      // version of this rule required the attribute to end right there. Four
+      // backdrops sat outside it, including Omnisearch's.
       for (const match of file.source.matchAll(
-        /<button\b[\s\S]{0,400}?className="absolute inset-0"/g,
+        /<button\b[\s\S]{0,400}?className="absolute inset-0[^"]*"/g,
       )) {
         if (!match[0].includes("tabIndex={-1}")) {
           offenders.push(file.path);

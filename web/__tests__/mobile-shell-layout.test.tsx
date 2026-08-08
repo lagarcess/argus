@@ -608,6 +608,31 @@ describe("omnisearch below threshold", () => {
     expect(registry).toContain("export function hasOpenOverlay()");
   });
 
+  test("a surface has one owner, never two", () => {
+    // As a sheet the shell owns the layer, the entry and the trap. Registering
+    // again alongside it gave one visible panel two owners, and closing it
+    // scheduled two history.back() calls for the same entry.
+    const menu = readFileSync(
+      join(import.meta.dir, "../components/sidebar/ProfileMenu.tsx"),
+      "utf-8",
+    );
+    expect(menu).toContain("isOpen: isOpen && isDrawerPlacement && !asSheet,");
+    expect(menu).toContain("isOpen: isOpen && !isDrawerPlacement && !asSheet,");
+  });
+
+  test("back-dismiss callbacks are current before input resumes", () => {
+    // A passive effect runs after paint, so a press between commit and flush
+    // reached the previous render's guard.
+    const back = readFileSync(
+      join(import.meta.dir, "../components/layout/useOverlayBackDismiss.ts"),
+      "utf-8",
+    );
+    const at = back.indexOf("dismissRef.current = onDismiss;");
+    expect(back.lastIndexOf("useIsomorphicLayoutEffect", at)).toBeGreaterThan(
+      back.lastIndexOf("useEffect(() => {", at),
+    );
+  });
+
   test("a busy confirmation refuses back before spending its entry", () => {
     const confirm = readFileSync(
       join(import.meta.dir, "../components/ui/ConfirmDialog.tsx"),

@@ -78,6 +78,7 @@ export default function KeyboardShortcutsOverlay({
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
       <button
+        tabIndex={-1}
         type="button"
         className="absolute inset-0 cursor-default"
         onClick={onClose}

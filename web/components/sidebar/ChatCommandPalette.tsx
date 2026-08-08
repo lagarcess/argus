@@ -1307,6 +1307,7 @@ export default function ChatCommandPalette({
   return (
     <div ref={paletteRef} className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
       <button
+        tabIndex={-1}
         type="button"
         className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
         onClick={onClose}

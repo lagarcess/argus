@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { hasOverlayAbove } from "./overlayStack";
 import {
   claimOverlayEntry,
@@ -32,6 +32,10 @@ export {
   resetOverlayEntries,
 } from "@/lib/overlay-history";
 
+/** `useLayoutEffect` warns during SSR, where there is nothing to sync. */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 export function useOverlayBackDismiss({
   isOpen,
   overlayId,
@@ -55,7 +59,13 @@ export function useOverlayBackDismiss({
   const canDismissRef = useRef(canDismiss);
   const pendingPopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  /*
+   * Layout timing, as the keyboard registry already uses. A passive effect runs
+   * after paint, so a back press landing between commit and flush reached the
+   * previous render's closures: a confirmation that had just gone busy was
+   * still judged by the pre-busy guard, which is the case the guard exists for.
+   */
+  useIsomorphicLayoutEffect(() => {
     dismissRef.current = onDismiss;
     canDismissRef.current = canDismiss;
   }, [canDismiss, onDismiss]);
