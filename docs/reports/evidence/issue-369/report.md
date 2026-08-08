@@ -154,6 +154,15 @@ Fixes:
 - The bare-assignment key list gained the session, CSRF, refresh, and id token
   family.
 
+Re-auditing every remaining rule against the sharpened invariant surfaced one
+more instance that neither round reported: the `email` local part accepted only
+`[\w.+-]`, so an RFC 5322 address left its opening characters behind as a
+partial identifier, `weird!name@x.com` retaining `weird!` and `o'brien@x.com`
+retaining `o'`. Low severity, but it is the same defect and the claim being made
+here is that nothing user-identifying reaches a committed artifact, so the local
+part now accepts atext. Fixing it in-lane also keeps a known instance from
+returning as a later review finding.
+
 Proof 4 grew from 94 to 160 adversarial shapes, adding escaped-quote and header
 variants, still with zero surviving fragments. Proof 5 grew to 11 ordinary prose
 samples including cookie-mentioning copy, still zero over-redacted.
@@ -176,8 +185,8 @@ Baseline captured on a clean checkout of `37c7eb52` before any edit.
 
 | Check | Baseline | Candidate |
 | --- | --- | --- |
-| Mocked eval suite | 72 passed | 119 passed (72 unchanged, 47 new) |
-| Full backend suite | 4182 passed, 3 failed, 430 skipped | 4229 passed, 3 failed, 430 skipped |
+| Mocked eval suite | 72 passed | 121 passed (72 unchanged, 49 new) |
+| Full backend suite | 4182 passed, 3 failed, 430 skipped | 4231 passed, 3 failed, 430 skipped |
 | `ruff check src tests workflows scripts` | clean | clean |
 | `scripts/check_modularity_budget.py` | no violations | no violations |
 

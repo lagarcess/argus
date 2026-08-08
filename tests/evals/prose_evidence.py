@@ -128,8 +128,10 @@ _REDACTION_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
         r"\1\2[redacted:credential_assignment]",
     ),
     (
+        # RFC 5322 atext, so an address like o'brien@ or weird!name@ does not
+        # leave its opening characters behind as a partial identifier.
         "email",
-        re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]*\w"),
+        re.compile(r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+@[\w-]+\.[\w.-]*\w"),
         "[redacted:email]",
     ),
 )

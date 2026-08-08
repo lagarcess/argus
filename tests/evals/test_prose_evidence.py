@@ -274,6 +274,10 @@ def test_clean_prose_is_retained_verbatim() -> None:
         ("Proxy-Authorization: Basic dXNlcjpwYXNz", ("dXNlcjpwYXNz",)),
         ("sessionid=abcdefghijklmnop", ("abcdefghijklmnop",)),
         ("refresh_token=abcdefghijk123", ("abcdefghijk123",)),
+        # An address keeps its RFC 5322 opening characters, so none are left
+        # behind as a partial identifier.
+        ("contact weird!name@example.com now", ("weird", "name")),
+        ("contact o'brien@example.com now", ("brien",)),
     ],
 )
 def test_secrets_are_redacted_to_their_real_end(
