@@ -12,6 +12,8 @@ import { installMobileShellFixture } from "./support/mobile-shell-fixture";
 
 const SHEET = "[class*='rounded-t-[28px]']";
 const DIALOG = "[role='dialog']";
+/** Recents Quick Peek renders its own fixed layer at z-65. */
+const QUICK_PEEK = "[class*='z-[65]']";
 
 async function openChat(page: Page, account: "registered" | "guest") {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -228,6 +230,75 @@ test.describe("a panel that opens for typing starts in the field", () => {
       expect(typed).toBe("esp");
     });
   }
+});
+
+test.describe("no shortcut acts behind a surface at tablet width", () => {
+  /*
+   * 720 to 1023 is the band where shortcuts are registered and the settings
+   * panel is still a sheet. The guard was a named list of surfaces and that
+   * sheet was not on it, so Open Recents mounted Quick Peek at z-65 underneath
+   * a z-120 sheet: a real dialog holding focus that nobody could see.
+   */
+  const TABLET = { width: 800, height: 1000 };
+
+  async function openChatAtTablet(page: Page) {
+    await page.setViewportSize(TABLET);
+    await installMobileShellFixture(page, { account: "registered" });
+    await page.goto("/chat");
+    await page.waitForTimeout(1400);
+  }
+
+  test("Open Recents does nothing while the settings sheet is up", async ({
+    page,
+  }) => {
+    await openChatAtTablet(page);
+    const trigger = page.getByTestId("chat-shell-menu-trigger");
+    if (await trigger.count()) {
+      await trigger.click();
+      await page.waitForTimeout(400);
+    }
+    await page.getByRole("button", { name: /^settings$/i }).first().click();
+    await page.waitForTimeout(600);
+    await expect(page.locator(SHEET).first()).toBeVisible();
+
+    await page.keyboard.press("ControlOrMeta+Shift+Comma");
+    await page.waitForTimeout(700);
+
+    // The claim is that Quick Peek never mounts. Asserting on focus instead
+    // let this pass with the guard removed, because the invisible dialog can
+    // mount without having taken focus yet.
+    await expect(page.locator(QUICK_PEEK)).toHaveCount(0);
+    await expect(page.locator(SHEET).first()).toBeVisible();
+  });
+
+  test("and still opens at that width with nothing covering it", async ({
+    page,
+  }) => {
+    // The control. Without it the case above passes on a key that never fires,
+    // and the whole band could have had no shortcuts at all.
+    await openChatAtTablet(page);
+    await page.keyboard.press("ControlOrMeta+Shift+Comma");
+    await page.waitForTimeout(700);
+    await expect(page.locator(QUICK_PEEK)).toHaveCount(1);
+  });
+
+  test("the shortcuts sheet can still close itself", async ({ page }) => {
+    // Its key toggles, so the surface it opens must never be a reason to
+    // refuse it. Consulting the registry naively would have broken exactly this.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await installMobileShellFixture(page, { account: "registered" });
+    await page.goto("/chat");
+    await page.waitForTimeout(1400);
+
+    await page.keyboard.press("ControlOrMeta+/");
+    await page.waitForTimeout(600);
+    const shortcuts = page.getByRole("heading", { name: /keyboard shortcuts/i });
+    await expect(shortcuts).toBeVisible();
+
+    await page.keyboard.press("ControlOrMeta+/");
+    await page.waitForTimeout(600);
+    await expect(shortcuts).toHaveCount(0);
+  });
 });
 
 test.describe("the Omnisearch key never reaches a covered surface", () => {
