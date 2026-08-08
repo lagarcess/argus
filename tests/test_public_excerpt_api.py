@@ -72,6 +72,17 @@ def _create(client: TestClient, note: str | None = None) -> dict[str, Any]:
     return response.json()["receipt"]
 
 
+_FLAG_OFF_PROBES = (
+    ("POST", CREATE_PATH, {}),
+    ("GET", LIST_PATH, None),
+    ("GET", f"{LIST_PATH}?limit=5", None),
+    ("DELETE", f"{LIST_PATH}/anything", None),
+    ("GET", "/api/v1/public/receipts/abcdefghijklmnopqrstuvwx", None),
+    ("POST", "/api/v1/public/receipt-funnel", {"stage": "try_argus"}),
+    ("PATCH", LIST_PATH, None),
+)
+
+
 # ── The default-off flag ──────────────────────────────────────────────────────
 
 
@@ -111,19 +122,11 @@ def test_flag_off_responses_are_byte_identical_to_a_route_that_never_existed(
     reference = client.get("/api/v1/definitely-not-a-route")
     assert reference.status_code == 404
 
-    for method, path, body in (
-        ("POST", CREATE_PATH, {}),
-        ("GET", LIST_PATH, None),
-        ("DELETE", f"{LIST_PATH}/anything", None),
-        ("GET", "/api/v1/public/receipts/abcdefghijklmnopqrstuvwx", None),
-        ("POST", "/api/v1/public/receipt-funnel", {"stage": "try_argus"}),
-    ):
+    for method, path, body in _FLAG_OFF_PROBES:
         response = client.request(method, path, json=body)
         assert response.status_code == reference.status_code, path
         assert response.content == reference.content, path
-        assert response.headers.get("content-type") == reference.headers.get(
-            "content-type"
-        ), path
+        assert sorted(response.headers) == sorted(reference.headers), path
 
 
 # ── The happy path ────────────────────────────────────────────────────────────
@@ -276,6 +279,9 @@ def test_a_revoked_result_can_be_shared_again_as_a_new_link(sharing_on: None) ->
 def test_receipt_creation_is_rate_limited(sharing_on: None) -> None:
     client = _client()
     user_id = _seed(client)
+    # The mock developer is an admin and admins bypass the limiter by contract.
+    user = api_state.store.get_or_create_dev_user()
+    api_state.store.users[user_id] = user.model_copy(update={"is_admin": False})
     # Each new artifact is a distinct receipt, so the limit is what stops the run.
     for index in range(evidence_receipts.RECEIPT_CREATE_LIMIT):
         artifact = build_artifact(artifact_id=f"artifact-{index:04d}")
@@ -328,23 +334,104 @@ def test_an_unowned_artifact_cannot_be_shared(sharing_on: None) -> None:
     assert response.status_code == 404
 
 
-def test_the_funnel_endpoint_stores_nothing_and_accepts_one_stage(
+def test_the_funnel_endpoint_stores_nothing_and_accepts_only_known_stages(
     sharing_on: None,
 ) -> None:
     client = _client()
+    for stage in ("viewed", "try_argus"):
+        assert (
+            client.post(
+                "/api/v1/public/receipt-funnel", json={"stage": stage}
+            ).status_code
+            == 204
+        ), stage
+    for rejected in ("receipt_viewed", "anything", ""):
+        assert (
+            client.post(
+                "/api/v1/public/receipt-funnel", json={"stage": rejected}
+            ).status_code
+            == 422
+        ), rejected
+    assert api_state.store.public_excerpt_snapshots == {}
+
+
+def test_reading_a_receipt_never_counts_a_view(
+    sharing_on: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The read endpoint answers metadata passes and preview images too.
+
+    Counting a view here would log several views for a link that was pasted into a
+    chat and never opened by anyone.
+    """
+    events: list[str] = []
+    monkeypatch.setattr(
+        public_receipts,
+        "capture_product_event",
+        lambda kind, **kwargs: events.append(kind),
+    )
+    client = _client()
+    _seed(client)
+    receipt = _create(client)
+
+    for _ in range(3):
+        assert (
+            client.get(f"/api/v1/public/receipts/{receipt['public_id']}").status_code
+            == 200
+        )
+    assert events == []
+
+    # The rendered page is what reports a view.
     assert (
         client.post(
-            "/api/v1/public/receipt-funnel", json={"stage": "try_argus"}
+            "/api/v1/public/receipt-funnel", json={"stage": "viewed"}
         ).status_code
         == 204
     )
-    assert (
-        client.post(
-            "/api/v1/public/receipt-funnel", json={"stage": "receipt_viewed"}
-        ).status_code
-        == 422
+    assert events == ["receipt_viewed"]
+
+
+def test_an_admin_is_not_rate_limited_on_creation(sharing_on: None) -> None:
+    """docs/API_CONTRACT.md bypasses quota and rate limits for is_admin.
+
+    The mock developer account is an admin, so an unconditional limiter also blocked
+    internal QA of this surface.
+    """
+    client = _client()
+    user_id = _seed(client)
+    assert api_state.store.get_or_create_dev_user().is_admin is True
+    for index in range(evidence_receipts.RECEIPT_CREATE_LIMIT + 3):
+        artifact = build_artifact(artifact_id=f"admin-artifact-{index:04d}")
+        api_state.store.evidence_artifacts[artifact.id] = artifact
+        api_state.store.evidence_artifact_owners[artifact.id] = user_id
+        response = client.post(
+            f"/api/v1/evidence-artifacts/{artifact.id}/public-excerpt", json={}
+        )
+        assert response.status_code == 200, (index, response.text)
+
+
+def test_an_ordinary_account_is_still_rate_limited(sharing_on: None) -> None:
+    client = _client()
+    user_id = _seed(client)
+    user = api_state.store.get_or_create_dev_user()
+    api_state.store.users[user_id] = user.model_copy(update={"is_admin": False})
+    for index in range(evidence_receipts.RECEIPT_CREATE_LIMIT):
+        artifact = build_artifact(artifact_id=f"plain-artifact-{index:04d}")
+        api_state.store.evidence_artifacts[artifact.id] = artifact
+        api_state.store.evidence_artifact_owners[artifact.id] = user_id
+        assert (
+            client.post(
+                f"/api/v1/evidence-artifacts/{artifact.id}/public-excerpt", json={}
+            ).status_code
+            == 200
+        )
+    blocked = build_artifact(artifact_id="plain-artifact-blocked")
+    api_state.store.evidence_artifacts[blocked.id] = blocked
+    api_state.store.evidence_artifact_owners[blocked.id] = user_id
+    refused = client.post(
+        f"/api/v1/evidence-artifacts/{blocked.id}/public-excerpt", json={}
     )
-    assert api_state.store.public_excerpt_snapshots == {}
+    assert refused.status_code == 429
 
 
 # ── Construction guard on the public route module ─────────────────────────────
@@ -541,3 +628,36 @@ def test_an_insert_race_returns_the_existing_receipt_rather_than_failing(
     assert snapshot.id == live.id
     assert created is False
     assert live.owner_id == user_id
+
+
+def test_flag_off_is_identical_for_an_unauthenticated_production_client(
+    sharing_off: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gap the first version of this lane had.
+
+    A flag check inside the route runs after FastAPI resolves ``current_user`` and
+    parses the body, so with real auth an unauthenticated caller got 401 (or 500
+    where Supabase is absent) and a malformed body got 422. Each of those tells an
+    observer that receipt code is deployed. The gate now runs before routing, and
+    this covers the path the mock-auth tests above cannot reach.
+    """
+    monkeypatch.delenv("NEXT_PUBLIC_MOCK_AUTH", raising=False)
+    monkeypatch.delenv("ARGUS_MOCK_AUTH", raising=False)
+    client = _client()
+    reference = client.get("/api/v1/definitely-not-a-route")
+    assert reference.status_code == 404
+
+    for method, path, body in _FLAG_OFF_PROBES:
+        response = client.request(method, path, json=body)
+        assert response.status_code == reference.status_code, path
+        assert response.content == reference.content, path
+        assert sorted(response.headers) == sorted(reference.headers), path
+
+    malformed = client.post(
+        CREATE_PATH,
+        content=b"{not json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert malformed.status_code == reference.status_code
+    assert malformed.content == reference.content

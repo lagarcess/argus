@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ARGUS_API_BASE_URL } from "@/lib/argus-api-transport";
+import { reportReceiptFunnelStage } from "@/lib/receipt-funnel";
 
 type TryArgusCallToActionProps = {
   headline: string;
@@ -23,25 +23,6 @@ export default function TryArgusCallToAction({
   detail,
   action,
 }: TryArgusCallToActionProps) {
-  const recordTap = () => {
-    const url = `${ARGUS_API_BASE_URL}/public/receipt-funnel`;
-    const body = JSON.stringify({ stage: "try_argus" });
-    try {
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
-        return;
-      }
-      void fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        keepalive: true,
-      }).catch(() => null);
-    } catch {
-      // Analytics never blocks the one action this page offers.
-    }
-  };
-
   return (
     <section className="rounded-2xl border border-black/[0.08] bg-black/[0.02] px-4 py-5 dark:border-white/[0.10] dark:bg-white/[0.03]">
       <h2 className="font-display text-[16px] font-semibold text-black dark:text-white">
@@ -52,7 +33,7 @@ export default function TryArgusCallToAction({
       </p>
       <Link
         href="/"
-        onClick={recordTap}
+        onClick={() => reportReceiptFunnelStage("try_argus")}
         className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#191c1f] px-5 text-[14px] font-medium text-white transition-colors hover:bg-black dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
       >
         {action}

@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
+import { receiptCopy } from "@/lib/receipt-copy";
 import {
-  fetchPublicReceipt,
+  readPublicReceipt,
   headlineReceiptMetric,
   type PublicReceiptPayload,
 } from "@/lib/public-receipt-contract";
@@ -49,8 +50,18 @@ const BACKGROUND = "#191c1f";
 const FOREGROUND = "#ffffff";
 const MUTED = "rgba(255,255,255,0.52)";
 const ACCENT = "#5ba897";
-const FRAMING = "A what if, run on past market data. Not a tip.";
-const PROVENANCE = "Tested with Argus";
+
+// The card follows the receipt's own language, not a viewer's. There is no viewer
+// when a crawler fetches it, and the frozen facts on the card are in that language
+// already, so anything else produces a mixed-language public artifact.
+function cardCopy(language: "en" | "es-419") {
+  const copy = receiptCopy(language);
+  return {
+    framing: copy.framing.short,
+    provenance: copy.provenance,
+    gone: copy.tombstone.title,
+  };
+}
 
 function previewFacts(payload: PublicReceiptPayload) {
   const headline = headlineReceiptMetric(payload);
@@ -82,7 +93,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ProvenanceRow() {
+function ProvenanceRow({ label }: { label: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
       <div
@@ -101,7 +112,7 @@ function ProvenanceRow() {
           color: MUTED,
         }}
       >
-        {PROVENANCE}
+        {label}
       </div>
     </div>
   );
@@ -116,18 +127,21 @@ export default async function Image({
     return new Response(null, { status: 404 });
   }
   const { receiptId } = await params;
-  const result = await fetchPublicReceipt(receiptId);
+  const result = await readPublicReceipt(receiptId);
 
   if (result.kind !== "available") {
+    // No payload means no content language to follow, so the tombstone card falls
+    // back to English.
+    const copy = cardCopy("en");
     return new ImageResponse(
       (
         <Frame>
-          <ProvenanceRow />
+          <ProvenanceRow label={copy.provenance} />
           <div style={{ display: "flex", fontSize: 52, color: FOREGROUND }}>
-            This one is gone
+            {copy.gone}
           </div>
           <div style={{ display: "flex", fontSize: 26, color: MUTED }}>
-            {FRAMING}
+            {copy.framing}
           </div>
         </Frame>
       ),
@@ -135,11 +149,12 @@ export default async function Image({
     );
   }
 
+  const copy = cardCopy(result.payload.content_language);
   const facts = previewFacts(result.payload);
   return new ImageResponse(
     (
       <Frame>
-        <ProvenanceRow />
+        <ProvenanceRow label={copy.provenance} />
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           <div
             style={{
@@ -177,7 +192,7 @@ export default async function Image({
             {[facts.symbols, facts.dates].filter(Boolean).join("  ·  ")}
           </div>
           <div style={{ display: "flex", fontSize: 24, color: MUTED }}>
-            {FRAMING}
+            {copy.framing}
           </div>
         </div>
       </Frame>

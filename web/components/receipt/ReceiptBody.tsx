@@ -7,6 +7,7 @@ import {
 import type { ArgusLanguage } from "@/lib/language-features";
 import ProvenanceMark from "./ProvenanceMark";
 import ReceiptChart from "./ReceiptChart";
+import ReceiptViewBeacon from "./ReceiptViewBeacon";
 import TryArgusCallToAction from "./TryArgusCallToAction";
 
 type ReceiptBodyProps = {
@@ -45,6 +46,7 @@ export default function ReceiptBody({
 
   return (
     <main className="mx-auto flex w-full max-w-[560px] flex-col gap-5 px-4 pb-14 pt-7 sm:px-6 sm:pt-10">
+      <ReceiptViewBeacon />
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <span className={LABEL_CLASS}>{copy.eyebrow}</span>

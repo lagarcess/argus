@@ -19,7 +19,8 @@ these captures exist only to show what the surface does once it is turned on.
 | `06-data-controls-shared-links-phone-en.png` | The receipt list in Data Controls at phone width. |
 | `07-data-controls-shared-links-en.png` | The receipt list at desktop width: every receipt, when it was shared, what it shows, revoke in one action, the automatic revocation reason on the revoked row, and the cached-preview limit stated plainly. |
 | `09-preview-card-en.png` | The real preview image a platform fetches, 1200x630, rendered server side from the frozen payload. |
-| `10-preview-card-revoked.png` | The preview image for a revoked receipt. |
+| `10-preview-card-es.png` | The card for a Spanish receipt. It follows the receipt's own language, not a viewer's, because a crawler fetching it has no language and the frozen facts on it are already Spanish. |
+| `11-preview-card-revoked.png` | The card for a revoked receipt. |
 | `og-and-robots-meta.json` | The head metadata a scraper actually reads, captured from the live page, plus the rendered body text. |
 | `preview-card-headers.json` | The preview image's response headers. |
 
@@ -47,6 +48,11 @@ From `preview-card-headers.json`:
   which needs a live provider. Its behaviour is covered by
   `web/__tests__/evidence-receipts.test.ts`, and the same copy-link primitive is
   visible in the receipt-list captures.
+- **A view-count screenshot.** Views are reported by a beacon from the rendered
+  page rather than counted when the receipt is read, because the read endpoint also
+  answers the metadata pass and the preview image. That is proven by
+  `test_reading_a_receipt_never_counts_a_view`, which reads a receipt three times
+  and asserts no event, then posts the page's beacon and asserts exactly one.
 - **The receipt list in Spanish.** The list is an in-app surface, and selecting the
   app's language is pre-existing client i18n behaviour this lane does not change.
   The receipt page itself is server rendered per request, which is why its Spanish

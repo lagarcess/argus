@@ -43,27 +43,20 @@ def reset_receipt_funnel_limiter_for_tests() -> None:
 
 
 @router.get("/receipts/{public_id}", response_model=PublicExcerptView)
-def read_public_receipt(
-    public_id: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-) -> PublicExcerptView:
+def read_public_receipt(public_id: str, request: Request) -> PublicExcerptView:
+    """Read one frozen receipt. Deliberately counts nothing.
+
+    This endpoint answers more than once per human visit, from the page's metadata
+    pass, the page render, and the preview image, and a crawler expanding a pasted
+    link hits it with nobody having opened anything. Views are reported by the
+    rendered page instead, through /public/receipt-funnel.
+    """
     require_evidence_receipt_sharing_enabled()
     if len(public_id) > MAX_PUBLIC_ID_LENGTH:
         # Bounded before it reaches storage, and answered like any other stale
         # link so an oversized id is not its own signal.
-        view = revoked_public_view(public_id[:MAX_PUBLIC_ID_LENGTH])
-    else:
-        view = public_excerpt_reader().read_public_excerpt_view(public_id=public_id)
-    # No actor, no source id. A view is never attributable to whoever shared it.
-    # Deferred so a stranger hitting the page never waits on analytics.
-    background_tasks.add_task(
-        capture_product_event,
-        "receipt_viewed",
-        user_id=None,
-        status=view.status,
-    )
-    return view
+        return revoked_public_view(public_id[:MAX_PUBLIC_ID_LENGTH])
+    return public_excerpt_reader().read_public_excerpt_view(public_id=public_id)
 
 
 @router.post("/receipt-funnel", status_code=204)
@@ -75,9 +68,14 @@ def record_receipt_funnel_stage(
     """Record one viewer-side funnel stage. Carries no id and stores nothing.
 
     Section 7.2 asks for the acquisition path to be observable end to end, and
-    the Try Argus tap happens on a page nobody is signed in to. The alternative,
-    a marker on the guest entry url, is ruled out by section 6: sharing adds no
-    new parameter to that surface.
+    both viewer-side stages happen on a page nobody is signed in to. A marker on
+    the guest entry url is ruled out by section 6: sharing adds no new parameter
+    to that surface.
+
+    Views are reported from the rendered page rather than counted on the read
+    endpoint, because that endpoint answers metadata passes and preview-image
+    renders too. A pasted link would otherwise log several views before any
+    person opened it.
     """
     require_evidence_receipt_sharing_enabled()
     retry_after = _FUNNEL_LIMITER.record_or_retry_after(
@@ -98,6 +96,6 @@ def record_receipt_funnel_stage(
         capture_product_event,
         f"receipt_{payload.stage}",
         user_id=None,
-        status="tapped",
+        status=payload.stage,
     )
     return Response(status_code=204)

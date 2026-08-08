@@ -149,11 +149,15 @@ class PublicExcerptRevokeResponse(BaseModel):
 
 
 class PublicExcerptFunnelStage(BaseModel):
-    """One viewer-side funnel stage. There is deliberately nothing else in it."""
+    """One viewer-side funnel stage. There is deliberately nothing else in it.
+
+    ``viewed`` is reported by the rendered page rather than counted on the read
+    endpoint, which also answers metadata passes and preview-image renders.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    stage: Literal["try_argus"]
+    stage: Literal["viewed", "try_argus"]
 
 
 class PublicExcerptView(BaseModel):

@@ -188,6 +188,28 @@ describe("never indexable", () => {
     }
   });
 
+  test("a view is reported by the rendered page, not by reading the receipt", () => {
+    // The read endpoint answers the metadata pass and the preview image too, so
+    // counting there would log views for a pasted link nobody opened.
+    const contract = code(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
+    expect(contract).not.toContain("receipt-funnel");
+    expect(source(join(WEB_ROOT, "components/receipt/ReceiptViewBeacon.tsx"))).toContain(
+      'reportReceiptFunnelStage("viewed")',
+    );
+    for (const path of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
+      expect(source(path)).toContain("<ReceiptViewBeacon />");
+    }
+    // The image never reports anything.
+    expect(code(OG_IMAGE_ROUTE)).not.toContain("receipt-funnel");
+  });
+
+  test("the metadata pass and the page render share one backend read", () => {
+    const contract = source(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
+    expect(contract).toContain("cache(fetchPublicReceipt)");
+    expect(source(RECEIPT_ROUTE)).toContain("readPublicReceipt");
+    expect(source(RECEIPT_ROUTE)).not.toContain("await fetchPublicReceipt");
+  });
+
   test("the route is never cached, so revocation lands on the next request", () => {
     const body = source(RECEIPT_ROUTE);
     expect(body).toContain('dynamic = "force-dynamic"');
@@ -229,8 +251,23 @@ describe("the preview image inherits the never-expose list", () => {
 
   test("it carries the provenance mark and the not-advice framing", () => {
     const body = source(OG_IMAGE_ROUTE);
-    expect(body).toContain("Tested with Argus");
-    expect(body).toContain("Not a tip");
+    expect(body).toContain("copy.provenance");
+    expect(body).toContain("copy.framing");
+    for (const bundle of [enCommon.receipt, esCommon.receipt]) {
+      expect(bundle.provenance.length).toBeGreaterThan(0);
+      expect(bundle.framing.short.length).toBeGreaterThan(0);
+    }
+    expect(enCommon.receipt.framing.short).toContain("Not a tip");
+  });
+
+  test("it follows the receipt's own language, not a viewer's", () => {
+    // A crawler fetching the card has no language of its own, and the frozen facts
+    // on the card are already in the receipt's language.
+    const body = code(OG_IMAGE_ROUTE);
+    expect(body).toContain("cardCopy(result.payload.content_language)");
+    expect(body).not.toContain("accept-language");
+    expect(body).not.toContain("const FRAMING");
+    expect(body).not.toContain("const PROVENANCE");
   });
 });
 

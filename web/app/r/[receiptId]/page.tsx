@@ -4,7 +4,7 @@ import ReceiptBody from "@/components/receipt/ReceiptBody";
 import ReceiptNotice from "@/components/receipt/ReceiptNotice";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import {
-  fetchPublicReceipt,
+  readPublicReceipt,
   headlineReceiptMetric,
   type PublicReceiptResult,
 } from "@/lib/public-receipt-contract";
@@ -59,7 +59,7 @@ export async function generateMetadata({
   const { receiptId } = await params;
   const language = await resolveLanguage();
   const copy = receiptCopy(language);
-  const result = await fetchPublicReceipt(receiptId);
+  const result = await readPublicReceipt(receiptId);
   if (result.kind !== "available") {
     return {
       title: copy.tombstone.title,
@@ -105,7 +105,7 @@ export default async function PublicReceiptPage({ params }: ReceiptPageProps) {
   const { receiptId } = await params;
   const language = await resolveLanguage();
   const copy = receiptCopy(language);
-  const result: PublicReceiptResult = await fetchPublicReceipt(receiptId);
+  const result: PublicReceiptResult = await readPublicReceipt(receiptId);
 
   if (result.kind !== "available") {
     return (

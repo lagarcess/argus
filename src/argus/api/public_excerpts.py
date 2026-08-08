@@ -11,6 +11,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from argus.api import state as api_state
@@ -30,6 +31,15 @@ from argus.domain.public_excerpts import (
 from argus.domain.supabase_public_excerpts import DEFAULT_OWNER_PAGE_SIZE
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
+
+# Every path this lane adds, so the flag gate can recognise them before routing.
+_RECEIPT_EXACT_PATHS = frozenset(
+    {"/api/v1/public-excerpts", "/api/v1/public/receipt-funnel"}
+)
+_RECEIPT_PATH_PREFIXES = (
+    "/api/v1/public-excerpts/",
+    "/api/v1/public/receipts/",
+)
 
 RECEIPT_CREATE_LIMIT = 10
 RECEIPT_CREATE_WINDOW_SECONDS = 3600
@@ -59,10 +69,51 @@ def require_evidence_receipt_sharing_enabled() -> None:
     response body is produced by the same handler and is byte-identical to a
     deployment without this lane. A distinctive problem body would advertise that
     receipt code is deployed.
+
+    This is the in-route backstop. The gate that actually holds is
+    :class:`EvidenceReceiptFlagGateMiddleware`, because a check inside the route
+    runs too late.
     """
     if evidence_receipt_sharing_enabled():
         return
     raise StarletteHTTPException(status_code=404, detail="Not Found")
+
+
+def _is_receipt_path(path: str) -> bool:
+    if path in _RECEIPT_EXACT_PATHS:
+        return True
+    if any(path.startswith(prefix) for prefix in _RECEIPT_PATH_PREFIXES):
+        return True
+    return path.startswith("/api/v1/evidence-artifacts/") and path.endswith(
+        "/public-excerpt"
+    )
+
+
+class EvidenceReceiptFlagGateMiddleware:
+    """Answer receipt paths as non-existent while sharing is off.
+
+    A flag check inside the route is too late to keep that promise. FastAPI parses
+    the body and resolves dependencies before the route body runs, so with sharing
+    off an unauthenticated caller got 401 (or 500 where Supabase is absent) and a
+    malformed body got 422, each of which tells an observer that receipt code is
+    deployed. Gating here, before routing, makes every probe answer exactly as it
+    would on a deployment that never had this lane: same status, same body, same
+    headers, whatever the method, auth, or payload.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if (
+            scope.get("type") == "http"
+            and _is_receipt_path(scope.get("path", ""))
+            and not evidence_receipt_sharing_enabled()
+        ):
+            response = JSONResponse({"detail": "Not Found"}, status_code=404)
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
 
 
 class PublicExcerptReader(Protocol):

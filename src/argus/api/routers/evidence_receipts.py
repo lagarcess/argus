@@ -55,7 +55,16 @@ def reset_receipt_create_limiter_for_tests() -> None:
     _RECEIPT_CREATE_LIMITER.reset()
 
 
-def _enforce_create_rate_limit(request: Request, *, user_id: str) -> None:
+def _enforce_create_rate_limit(request: Request, *, user: User) -> None:
+    """Rate-limit receipt creation, honouring the documented admin bypass.
+
+    `docs/API_CONTRACT.md` says backend quota and rate-limit restrictions are
+    bypassed for `profiles.is_admin`, and the mock developer account is an admin, so
+    an unconditional limiter also blocked internal QA of this surface. The limit
+    still applies to every ordinary account, which is who section 7.4 is about.
+    """
+    if user.is_admin:
+        return
     visitor = client_identity(request)
     for limit, window in (
         (RECEIPT_CREATE_LIMIT, RECEIPT_CREATE_WINDOW_SECONDS),
@@ -63,7 +72,7 @@ def _enforce_create_rate_limit(request: Request, *, user_id: str) -> None:
     ):
         retry_after = _RECEIPT_CREATE_LIMITER.record_or_retry_after(
             keys=(
-                f"receipt-create:user:{user_id}:{window}",
+                f"receipt-create:user:{user.id}:{window}",
                 f"receipt-create:visitor:{visitor}:{window}",
             ),
             limit=limit,
@@ -108,7 +117,7 @@ def create_public_excerpt(
             title="Note Rejected",
             detail=str(exc),
         ) from exc
-    _enforce_create_rate_limit(request, user_id=user.id)
+    _enforce_create_rate_limit(request, user=user)
     try:
         snapshot, created = create_receipt_for_artifact(
             user=user,

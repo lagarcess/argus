@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { AssetClass } from "./argus-types";
 import { ARGUS_API_BASE_URL } from "./argus-api-transport";
 
@@ -81,6 +82,9 @@ export type PublicReceiptResult =
 /**
  * The only network call the public route makes. No credentials and no auth
  * header, so this request cannot carry an Argus session even by accident.
+ *
+ * Wrapped in `cache` at the call site so the metadata pass and the page render
+ * share one read per request instead of asking the backend twice.
  */
 export async function fetchPublicReceipt(
   publicId: string,
@@ -126,3 +130,9 @@ export function headlineReceiptMetric(
   }
   return payload.metrics[0] ?? null;
 }
+
+/**
+ * Request-scoped dedupe. `generateMetadata` and the page render both need the
+ * receipt in the same request, and `no-store` means fetch will not dedupe them.
+ */
+export const readPublicReceipt = cache(fetchPublicReceipt);

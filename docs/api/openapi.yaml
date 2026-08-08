@@ -1731,11 +1731,20 @@ paths:
 
         Section 7.2 asks for the acquisition path to be observable end to end, and
 
-        the Try Argus tap happens on a page nobody is signed in to. The alternative,
+        both viewer-side stages happen on a page nobody is signed in to. A marker on
 
-        a marker on the guest entry url, is ruled out by section 6: sharing adds no
+        the guest entry url is ruled out by section 6: sharing adds no new parameter
 
-        new parameter to that surface.'
+        to that surface.
+
+
+        Views are reported from the rendered page rather than counted on the read
+
+        endpoint, because that endpoint answers metadata passes and preview-image
+
+        renders too. A pasted link would otherwise log several views before any
+
+        person opened it.'
       requestBody:
         content:
           application/json:
@@ -1763,6 +1772,16 @@ paths:
     get:
       tags:
       - public-receipts
+      description: 'Read one frozen receipt. Deliberately counts nothing.
+
+
+        This endpoint answers more than once per human visit, from the page''s metadata
+
+        pass, the page render, and the preview image, and a crawler expanding a pasted
+
+        link hits it with nobody having opened anything. Views are reported by the
+
+        rendered page instead, through /public/receipt-funnel.'
       parameters:
       - name: public_id
         in: path
@@ -3708,12 +3727,19 @@ components:
       properties:
         stage:
           type: string
-          const: try_argus
+          enum:
+          - viewed
+          - try_argus
       additionalProperties: false
       type: object
       required:
       - stage
-      description: One viewer-side funnel stage. There is deliberately nothing else in it.
+      description: 'One viewer-side funnel stage. There is deliberately nothing else in it.
+
+
+        ``viewed`` is reported by the rendered page rather than counted on the read
+
+        endpoint, which also answers metadata passes and preview-image renders.'
     PublicExcerptListItem:
       properties:
         id:
