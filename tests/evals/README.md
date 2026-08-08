@@ -169,3 +169,48 @@ Judge rubric version: `argus-prose-quality-v1`.
 The judge grades prose only: recovery tone, honesty, Spanish language integrity,
 and raw runtime error leakage. Typed facts such as intent, assets, dates,
 benchmark, stage outcomes, and capability verdict are asserted outside the judge.
+
+### Judged Prose Retention (issue #369)
+
+Every prose-judged case result carries the exact text the judge scored, under
+`prose_judge.judged_assistant_text`. Without it, a surprising prose verdict
+cannot be attributed to the generator or to the judge, and these cases are
+nondeterministic enough that a rerun may not reproduce the failure.
+
+Retention is unconditional, on passes as well as failures. A false pass costs
+the same trust as a false failure, comparing a run's failing prose against its
+passing prose is what separates a generator regression from judge drift, and
+retaining only on failure would make the artifact depend on the verdict.
+
+Retention is additive and inert: it never reaches a verdict, a failed check, or
+a status. The record is built from the same value handed to the judge, so a
+result cannot attribute a verdict to prose the judge never saw.
+
+| Field | Meaning |
+| --- | --- |
+| `text` | Retained copy of the judged prose |
+| `sha256` | Digest of the exact judged text, so two runs stay comparable |
+| `character_count` | Length of the exact judged text |
+| `truncated` | Whether `text` is an excerpt |
+| `omitted_character_count` | Characters dropped by truncation |
+| `redactions` | Redaction kinds and counts applied to `text` |
+
+`text` is the judged prose verbatim when `truncated` is false and `redactions`
+is empty, which is the ordinary case.
+
+Prose over 4,000 characters keeps its first 2,500 and last 1,500 characters
+around an explicit elision marker. Both ends are kept because judges react to
+closing capability claims as often as to opening tone, and first-N truncation
+drops exactly the part an `honesty` failure lives in.
+
+Credential-shaped and user-identifying spans are stripped from the retained copy
+only: API keys, bearer tokens, JWTs, URL userinfo, `key=value` credential
+assignments, email addresses, and the verbatim values of secret-named
+environment variables. Raw runtime error text is a graded criterion, so provider
+error strings do reach the artifact and could otherwise carry a credential with
+them. Every strip is counted in `redactions`, so a reader can tell that the
+retained text is not verbatim.
+
+Live scorecards land in gitignored `temp/`, but they are routinely promoted into
+`docs/reports/evidence/` as durable acceptance evidence. Treat the bound and the
+redaction pass as requirements of that committed path, not as local hygiene.
