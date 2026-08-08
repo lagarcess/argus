@@ -1327,8 +1327,11 @@ foreign key to `profiles.id`.
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
   execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
-- Expired rows are disposable operational data and must be removed through the
-  bounded purge function.
+- Expired rows are disposable operational data and are removed through the
+  bounded purge function. The row has no owner to cascade from, so the guest
+  cleanup job is the only thing that deletes it: `purge_expired_visitor_usage`
+  is registered in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on
+  every non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`.
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the
@@ -1371,8 +1374,13 @@ user-keyed milestone would re-fire on every renewal. Like
 - Claims expire 30 days after they are recorded, outliving the seven-day guest
   workspace with headroom. A visitor-keyed table with no expiry would become a
   durable visitor log.
-- `claim_guest_funnel_milestone` takes over an expired claim in the same
-  statement, so retention never depends on the purge having run.
+- The row has no owner to cascade from, so the guest cleanup job is the only
+  thing that deletes it: `purge_expired_guest_funnel_milestones` is registered
+  in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
+  non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
+  never returns is deleted by that job, not by the takeover path.
+- `claim_guest_funnel_milestone` also takes over an already-expired claim in the
+  same statement, so a returning visitor is correct even between purge runs.
 
 ### Milestone policy
 - Milestone-class kinds are `first_useful_assistant_response_completed`,
