@@ -56,16 +56,16 @@ export default function ShareReceiptAction({
         reason === "note_rejected"
           ? t(
               "receipt.owner.errors.note_rejected",
-              "That note cannot be published. Remove any keys or long codes.",
+              "That note cannot go public. Take out any keys or long codes.",
             )
           : reason === "rate_limited"
             ? t(
                 "receipt.owner.errors.rate_limited",
-                "You have created a lot of links recently. Try again shortly.",
+                "You have made a lot of links just now. Try again shortly.",
               )
             : t(
                 "receipt.owner.errors.create",
-                "Argus could not create that link. Try again.",
+                "Argus could not make that link. Try again.",
               ),
       );
       setPhase("composing");
@@ -89,7 +89,7 @@ export default function ShareReceiptAction({
                 setError(
                   t(
                     "receipt.owner.copy_failed",
-                    "Copy failed. Select the link and copy it.",
+                    "Copying did not work. Select the link and copy it.",
                   ),
                 );
               }
@@ -102,7 +102,7 @@ export default function ShareReceiptAction({
               <Copy className="h-3.5 w-3.5" />
             )}
             {copied
-              ? t("receipt.owner.copied", "Link copied")
+              ? t("receipt.owner.copied", "Copied")
               : t("receipt.owner.copy", "Copy link")}
           </button>
         </div>
@@ -114,7 +114,7 @@ export default function ShareReceiptAction({
         <p className="mt-2 text-[11.5px] leading-snug text-black/45 dark:text-white/45">
           {t(
             "receipt.owner.created_note",
-            "Anonymous, not indexed by search engines, and revocable any time in Data Controls.",
+            "Your name is not on it, search engines cannot find it, and you can take it down any time from Data Controls.",
           )}
         </p>
       </div>
@@ -130,7 +130,7 @@ export default function ShareReceiptAction({
           className={OUTLINE_BUTTON}
         >
           <Link2 className="h-3.5 w-3.5" />
-          {t("receipt.owner.share", "Share result")}
+          {t("receipt.owner.share", "Share this")}
         </button>
       </div>
     );
@@ -141,14 +141,14 @@ export default function ShareReceiptAction({
       <p className="text-[12.5px] leading-snug text-black/55 dark:text-white/55">
         {t(
           "receipt.owner.share_hint",
-          "Creates a public link showing these numbers, frozen as they are now. Your chat, your account, and anything Argus remembers are never included.",
+          "Makes a link anyone can open. It shows these numbers, locked as they are right now. Your chat, your name, and anything Argus remembers all stay out of it.",
         )}
       </p>
       <label
         htmlFor="receipt-owner-note"
         className="mt-3 block text-[12px] font-medium text-black/70 dark:text-white/70"
       >
-        {t("receipt.owner.note_label", "Add a short note (optional)")}
+        {t("receipt.owner.note_label", "Add a note if you want")}
       </label>
       <textarea
         id="receipt-owner-note"
@@ -158,14 +158,14 @@ export default function ShareReceiptAction({
         onChange={(event) => setNote(event.target.value)}
         placeholder={t(
           "receipt.owner.note_placeholder",
-          "What made this worth sharing?",
+          "Why is this worth a look?",
         )}
         className="mt-1.5 w-full resize-none rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] text-black outline-none focus-visible:ring-2 focus-visible:ring-black/15 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus-visible:ring-white/20"
       />
       <p className="mt-1.5 text-[11.5px] leading-snug text-[#8a7530] dark:text-[#d3bb6a]">
         {t(
           "receipt.owner.note_public_warning",
-          "Anyone with the link can read this note. Do not put anything private in it.",
+          "Anyone with the link can read this. Keep it free of anything private.",
         )}
       </p>
       {error && (
@@ -182,7 +182,7 @@ export default function ShareReceiptAction({
           }}
           className={OUTLINE_BUTTON}
         >
-          {t("receipt.owner.cancel", "Cancel")}
+          {t("receipt.owner.cancel", "Never mind")}
         </button>
         <button
           type="button"
@@ -192,8 +192,8 @@ export default function ShareReceiptAction({
         >
           <Link2 className="h-3.5 w-3.5" />
           {phase === "creating"
-            ? t("receipt.owner.creating", "Creating link...")
-            : t("receipt.owner.create", "Create link")}
+            ? t("receipt.owner.creating", "Making the link...")
+            : t("receipt.owner.create", "Make the link")}
         </button>
       </div>
     </div>

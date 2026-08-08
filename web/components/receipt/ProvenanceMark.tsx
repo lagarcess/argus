@@ -9,7 +9,7 @@ type ProvenanceMarkProps = {
  */
 export default function ProvenanceMark({ label }: ProvenanceMarkProps) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-[0.08em] text-black/45 dark:text-white/45">
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11.5px] font-medium uppercase tracking-[0.08em] text-black/45 dark:text-white/45">
       <span
         aria-hidden="true"
         className="inline-block h-[7px] w-[7px] rounded-full bg-[#5ba897]"

@@ -49,7 +49,7 @@ const BACKGROUND = "#191c1f";
 const FOREGROUND = "#ffffff";
 const MUTED = "rgba(255,255,255,0.52)";
 const ACCENT = "#5ba897";
-const FRAMING = "Historical simulation. Not advice. Not a prediction.";
+const FRAMING = "A what if, run on past market data. Not a tip.";
 const PROVENANCE = "Tested with Argus";
 
 function previewFacts(payload: PublicReceiptPayload) {
@@ -124,7 +124,7 @@ export default async function Image({
         <Frame>
           <ProvenanceRow />
           <div style={{ display: "flex", fontSize: 52, color: FOREGROUND }}>
-            This receipt is no longer available
+            This one is gone
           </div>
           <div style={{ display: "flex", fontSize: 26, color: MUTED }}>
             {FRAMING}

@@ -1397,25 +1397,25 @@
   },
   "receipt": {
     "page_title": "Probado con Argus",
-    "eyebrow": "Comprobante de evidencia",
+    "eyebrow": "Compartido contigo",
     "provenance": "Probado con Argus",
     "framing": {
-      "headline": "Esto es una simulación histórica, no un consejo.",
-      "detail": "Estos números muestran lo que habría hecho esta idea en las fechas de abajo, con datos de mercado del pasado. No son una predicción, no son una recomendación y no prometen resultados futuros. Nadie compró ni vendió nada.",
-      "short": "Simulación histórica. No es un consejo. No es una predicción."
+      "headline": "Esto es un qué habría pasado, no un consejo.",
+      "detail": "Alguien tuvo curiosidad por saber cómo le habría ido a esta idea, así que Argus la revisó con lo que el mercado hizo de verdad en esas fechas. No se movió dinero real, nadie compró nada, y esto no dice nada sobre lo que va a pasar.",
+      "short": "Un qué habría pasado, con datos del mercado del pasado. No es un consejo."
     },
     "sections": {
-      "result": "Resultado",
-      "what_was_tested": "Qué se probó",
-      "assumptions": "Supuestos",
-      "note": "Nota de quien compartió esto",
-      "chart": "Cómo se movió el valor simulado"
+      "result": "Cómo le fue",
+      "what_was_tested": "Qué probaron",
+      "assumptions": "Qué supuso Argus",
+      "note": "Dejaron una nota",
+      "chart": "Cómo se movió el dinero de prueba"
     },
     "fields": {
-      "asset": "Activo",
-      "asset_class": "Tipo de activo",
-      "strategy": "Estrategia",
-      "dates": "Fechas probadas",
+      "asset": "Qué",
+      "asset_class": "Tipo",
+      "strategy": "El plan",
+      "dates": "Cuándo",
       "benchmark": "Comparado con"
     },
     "asset_class_values": {
@@ -1423,40 +1423,40 @@
       "crypto": "Cripto",
       "currency_pair": "Par de divisas"
     },
-    "frozen_note": "Congelado el {{date}}. Estos números no cambian.",
-    "frozen_note_undated": "Estos números se congelaron cuando se creó este enlace y no cambian.",
-    "chart_unavailable": "No se guardó ningún gráfico con este resultado.",
+    "frozen_note": "Guardado el {{date}}. Estos números quedaron fijos, así que se verán igual cuando vuelvas.",
+    "frozen_note_undated": "Estos números quedaron fijos cuando se creó el enlace, así que se verán igual cuando vuelvas.",
+    "chart_unavailable": "No se guardó ningún gráfico con este.",
     "cta": {
-      "headline": "Prueba tu propia idea",
-      "detail": "Argus convierte una idea de inversión escrita en lenguaje normal en una prueba histórica. No necesitas cuenta para probarlo.",
+      "headline": "¿Tienes una idea? Pruébala.",
+      "detail": "Cuéntale a Argus una idea con tus propias palabras y te mostrará cómo le habría ido. Gratis y sin cuenta.",
       "action": "Probar Argus"
     },
     "tombstone": {
-      "title": "Este comprobante ya no está disponible",
-      "detail": "Quien lo compartió revocó el enlace, o borró el resultado que había detrás. Nada de esto se puede recuperar.",
-      "cta_detail": "Aun así puedes ver qué hace Argus."
+      "title": "Este ya no está",
+      "detail": "La persona que lo compartió quitó el enlace, o borró el resultado que había detrás. No queda nada por mostrar.",
+      "cta_detail": "Aun así puedes probar Argus por tu cuenta."
     },
     "unavailable": {
-      "title": "No se pudo cargar este comprobante",
-      "detail": "Algo falló de nuestro lado. El enlace puede seguir funcionando si vuelves a intentarlo en un momento."
+      "title": "No pudimos cargar este",
+      "detail": "Algo falló de nuestro lado, no del tuyo. El enlace probablemente sigue sirviendo, así que inténtalo de nuevo en un momento."
     },
     "owner": {
-      "share": "Compartir resultado",
-      "share_hint": "Crea un enlace público que muestra estos números, congelados tal como están ahora. Tu chat, tu cuenta y lo que Argus recuerda nunca se incluyen.",
-      "note_label": "Agrega una nota corta (opcional)",
-      "note_placeholder": "¿Por qué vale la pena compartir esto?",
-      "note_public_warning": "Cualquiera con el enlace puede leer esta nota. No pongas nada privado en ella.",
+      "share": "Compartir esto",
+      "share_hint": "Crea un enlace que cualquiera puede abrir. Muestra estos números, fijos tal como están ahora. Tu chat, tu nombre y todo lo que Argus recuerda se quedan fuera.",
+      "note_label": "Agrega una nota si quieres",
+      "note_placeholder": "¿Por qué vale la pena verlo?",
+      "note_public_warning": "Cualquiera con el enlace puede leer esto. No pongas nada privado.",
       "note_counter": "{{count}} de {{max}} caracteres",
-      "create": "Crear enlace",
-      "creating": "Creando enlace...",
-      "cancel": "Cancelar",
+      "create": "Crear el enlace",
+      "creating": "Creando el enlace...",
+      "cancel": "Mejor no",
       "copy": "Copiar enlace",
-      "copied": "Enlace copiado",
+      "copied": "Copiado",
       "copy_failed": "No se pudo copiar. Selecciona el enlace y cópialo.",
-      "created_note": "Anónimo, no indexado por buscadores y revocable en cualquier momento en Controles de datos.",
+      "created_note": "Tu nombre no aparece, los buscadores no lo encuentran, y puedes quitarlo cuando quieras desde Controles de datos.",
       "errors": {
         "create": "Argus no pudo crear ese enlace. Inténtalo de nuevo.",
-        "note_rejected": "Esa nota no se puede publicar. Quita cualquier clave o código largo.",
+        "note_rejected": "Esa nota no puede ser pública. Quita cualquier clave o código largo.",
         "rate_limited": "Has creado muchos enlaces hace poco. Inténtalo de nuevo en un rato."
       }
     },
@@ -1464,21 +1464,22 @@
       "menu": "Enlaces compartidos",
       "title": "Enlaces compartidos",
       "close": "Cerrar enlaces compartidos",
-      "intro": "Todos los comprobantes que has creado. Cada uno muestra números de resultado congelados y nada sobre ti.",
-      "loading": "Cargando enlaces compartidos...",
-      "load_error": "No se pudieron cargar los enlaces compartidos.",
+      "intro": "Todo lo que has compartido. Cada enlace muestra números fijos y nada sobre ti.",
+      "loading": "Cargando tus enlaces...",
+      "load_error": "Tus enlaces compartidos no se cargaron.",
+      "load_more": "Ver enlaces más antiguos",
       "retry": "Intentar de nuevo",
-      "empty": "Todavía no has compartido ningún resultado.",
+      "empty": "Todavía no has compartido nada.",
       "created_on": "Compartido el {{date}}",
-      "revoked_on": "Revocado el {{date}}",
-      "revoked_by_source": "Revocado automáticamente cuando borraste el chat que había detrás.",
-      "open": "Abrir comprobante",
+      "revoked_on": "Quitado el {{date}}",
+      "revoked_by_source": "Se quitó solo cuando borraste el chat que había detrás.",
+      "open": "Abrirlo",
       "copy": "Copiar enlace",
-      "revoke": "Revocar",
-      "revoking": "Revocando...",
-      "confirm_revoke": "¿Revocar?",
-      "revoke_error": "No se pudo revocar ese enlace. Inténtalo de nuevo.",
-      "cache_note": "Revocar surte efecto de inmediato en Argus. Las apps de mensajería pueden seguir mostrando una tarjeta de vista previa antigua en las conversaciones donde ya se pegó el enlace, y Argus no puede borrarlas."
+      "revoke": "Quitarlo",
+      "revoking": "Quitándolo...",
+      "confirm_revoke": "¿Seguro?",
+      "revoke_error": "Ese enlace no se quitó. Inténtalo de nuevo.",
+      "cache_note": "El enlace muere en Argus de inmediato. Las apps de chat a veces guardan una tarjeta de vista previa antigua en las conversaciones donde ya se pegó, y Argus no puede entrar ahí."
     }
   }
 }

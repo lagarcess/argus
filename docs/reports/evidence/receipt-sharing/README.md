@@ -55,3 +55,7 @@ From `preview-card-headers.json`:
 - **A light-scheme capture.** `ThemeProvider` pins the app's dark theme regardless
   of the operating system preference, so a light capture is a byte-identical
   duplicate rather than evidence.
+- **The "Show older links" control.** It only appears past one page of receipts,
+  which the rate limit makes slow to reach by hand. Pagination is proven instead by
+  `test_the_receipt_list_pages_instead_of_hiding_older_live_links`, which walks
+  every page and asserts each receipt appears exactly once.

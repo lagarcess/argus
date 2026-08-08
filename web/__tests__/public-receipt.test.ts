@@ -230,7 +230,7 @@ describe("the preview image inherits the never-expose list", () => {
   test("it carries the provenance mark and the not-advice framing", () => {
     const body = source(OG_IMAGE_ROUTE);
     expect(body).toContain("Tested with Argus");
-    expect(body).toContain("Not advice");
+    expect(body).toContain("Not a tip");
   });
 });
 
