@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Link2, Loader2, X } from "lucide-react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
+import { Check, Copy, ExternalLink, Link2, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import {
   copyReceiptLink,
   listEvidenceReceipts,
@@ -14,6 +15,10 @@ import { localeForLanguage, normalizeEnabledLanguage } from "@/lib/language-feat
 
 type SharedReceiptsViewProps = {
   onClose: () => void;
+  /** Present on a child panel; returns to Data Controls instead of dismissing. */
+  onBack?: () => void;
+  backLabel?: string;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 /**
@@ -24,7 +29,12 @@ type SharedReceiptsViewProps = {
  * not see what they had shared, so they were surprised by links they had
  * forgotten creating.
  */
-export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps) {
+export default function SharedReceiptsView({
+  onClose,
+  onBack,
+  backLabel,
+  returnFocusRef,
+}: SharedReceiptsViewProps) {
   const { t, i18n } = useTranslation();
   const [receipts, setReceipts] = useState<EvidenceReceipt[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -98,27 +108,16 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
     }).format(new Date(value));
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
-      <button
-        className="absolute inset-0"
-        aria-label={t("receipt.list.close", "Close shared links")}
-        onClick={onClose}
-      />
-      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#1b1d20]">
-        <div className="flex items-center justify-between border-b border-black/5 px-5 py-4 dark:border-white/5">
-          <h2 className="text-[16px] font-medium text-black dark:text-white">
-            {t("receipt.list.title", "Shared links")}
-          </h2>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-            aria-label={t("receipt.list.close", "Close shared links")}
-          >
-            <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+    <AdaptivePanel
+      title={t("receipt.list.title", "Shared links")}
+      closeLabel={t("receipt.list.close", "Close shared links")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="md"
+      returnFocusRef={returnFocusRef}
+    >
+        <div className="px-5 py-4">
           <p className="text-[13px] leading-relaxed text-black/50 dark:text-white/50">
             {t(
               "receipt.list.intro",
@@ -273,7 +272,6 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
             )}
           </p>
         </div>
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }

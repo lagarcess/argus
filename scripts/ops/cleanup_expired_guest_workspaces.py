@@ -24,7 +24,9 @@ def main() -> int:
         dry_run=args.dry_run,
     )
     print(json.dumps(result.as_dict(), sort_keys=True))
-    return 1 if result.auth_delete_failed else 0
+    # A failed retention purge exits non-zero too: a silent zero is how a
+    # retention boundary becomes documentation instead of behavior.
+    return 1 if result.auth_delete_failed or result.purge_failed else 0
 
 
 if __name__ == "__main__":

@@ -1,44 +1,46 @@
 {
   "common": {
-    "backtest": "Backtest",
-    "strategy": "Strategy",
-    "collection": "Collection",
-    "chat": "Chat",
-    "history": "History",
-    "settings": "Settings",
-    "conversation": "Conversation",
-    "recents": "Recents",
-    "run_simulation": "Run simulation",
-    "rename": "Rename",
-    "delete": "Delete",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "loading": "Loading...",
-    "retry": "Retry",
-    "try_again": "Try again",
-    "back": "Back",
-    "error_occurred": "An error occurred",
-    "save": "Save",
-    "confirm": "Confirm",
-    "cancel": "Cancel",
-    "done": "Done",
-    "search": "Search",
+    "and": "and",
     "archive": "Archive",
     "archived": "Archived",
-    "today": "today",
-    "yesterday": "yesterday",
-    "no_items": "No items found",
-    "restore": "Restore",
-    "permanently_delete": "Permanently delete",
-    "submit": "Submit",
-    "more": "More",
-    "current": "Current",
+    "back": "Back",
+    "backtest": "Backtest",
+    "cancel": "Cancel",
+    "chat": "Chat",
+    "close": "Close",
     "collapse": "Collapse",
+    "collection": "Collection",
+    "confirm": "Confirm",
+    "conversation": "Conversation",
+    "current": "Current",
+    "delete": "Delete",
+    "done": "Done",
+    "error_occurred": "An error occurred",
     "expand": "Expand",
+    "history": "History",
     "learn_more": "Learn more",
-    "and": "and",
+    "loading": "Loading...",
+    "more": "More",
+    "navigation": "Navigation",
+    "no_items": "No items found",
     "or": "or",
-    "tap_to_cancel": "Tap elsewhere to cancel"
+    "permanently_delete": "Permanently delete",
+    "pin": "Pin",
+    "recents": "Recents",
+    "rename": "Rename",
+    "restore": "Restore",
+    "retry": "Retry",
+    "run_simulation": "Run simulation",
+    "save": "Save",
+    "search": "Search",
+    "settings": "Settings",
+    "strategy": "Strategy",
+    "submit": "Submit",
+    "tap_to_cancel": "Tap elsewhere to cancel",
+    "today": "today",
+    "try_again": "Try again",
+    "unpin": "Unpin",
+    "yesterday": "yesterday"
   },
   "legal": {
     "eyebrow": "Early access legal",
@@ -215,7 +217,8 @@
         "safety": "Safety or legal concern",
         "other": "Other"
       }
-    }
+    },
+    "close": "Close feedback"
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
@@ -791,6 +794,19 @@
         "lost_to_benchmark": "Lagged the benchmark by {{points}} points",
         "beat_benchmark": "Beat the benchmark by {{points}} points",
         "deep_drawdown": "Worst drop was {{drawdown}}%"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Other cadence",
+        "adjust_indicator_thresholds": "Other thresholds",
+        "adjust_signal_periods": "Other signal periods",
+        "change_date_range": "Different dates",
+        "compare_buy_and_hold": "Compare with holding",
+        "recurring_monthly_buys": "Monthly buys",
+        "same_rule_peer_asset": "Same rule, similar asset",
+        "same_setup_peer_asset": "Similar asset",
+        "supported_ma_crossover": "SMA/EMA crossover",
+        "supported_rsi_or_ma_rule": "Simplify the rule",
+        "supported_rsi_threshold": "Supported RSI rule"
       }
     },
     "memory": {
@@ -864,7 +880,8 @@
         "light": "Light",
         "dark": "Dark",
         "system": "System"
-      }
+      },
+      "close_appearance": "Close appearance"
     },
     "sidebar": {
       "title": "Sidebar preference",
@@ -956,7 +973,9 @@
         "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
         "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
       },
-      "shared_links": "Shared links"
+      "shared_links": "Shared links",
+      "close_archived": "Close archived chats",
+      "close_deleted": "Close recently deleted"
     },
     "help": {
       "title": "Help & Legal",
@@ -1174,7 +1193,9 @@
       "idea": "Idea",
       "run": "Run",
       "strategy": "Strategy"
-    }
+    },
+    "row_actions": "Conversation actions",
+    "close_dossier": "Close dossier"
   },
   "auth": {
     "captcha": {

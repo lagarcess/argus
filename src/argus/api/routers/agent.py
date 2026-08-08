@@ -692,6 +692,7 @@ async def chat_stream(
                     assistant_metadata=assistant_metadata,
                     message_id=message_id,
                     run_id=current_run.id if current_run is not None else None,
+                    viewport=payload.viewport,
                 )
             except Exception:
                 logger.opt(exception=True).warning(

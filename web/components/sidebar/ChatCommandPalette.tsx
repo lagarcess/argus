@@ -3,20 +3,17 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
-  Archive,
   ChevronRight,
-  Edit2,
   Loader2,
-  MessageSquare,
   MessageSquareWarning,
   Search,
-  Trash2,
   X,
 } from "lucide-react";
 import { panelFailureIconClass } from "@/lib/failure-treatment";
@@ -25,8 +22,12 @@ import { readStored, writeStored } from "@/lib/browser-storage";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DecisionHistoryView } from "@/components/sidebar/command-palette/DecisionHistoryView";
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
+import CommandPaletteRowActions from "@/components/sidebar/command-palette/CommandPaletteRowActions";
+import { commandPaletteRowActions } from "@/components/sidebar/command-palette/rowActionItems";
+import CommandPaletteDossierSheet from "@/components/sidebar/command-palette/CommandPaletteDossierSheet";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import { useRunDossierHistory } from "@/components/sidebar/command-palette/useRunDossierHistory";
-import { Tooltip } from "@/components/ui/Tooltip";
 import { CommandPaletteFooter, useCommandPaletteShortcutLegend } from "@/components/sidebar/command-palette/CommandPaletteShortcutLegend";
 import { SearchHighlight } from "@/components/sidebar/SearchHighlight";
 import { searchQueryIsIndexable } from "@/lib/search-text";
@@ -35,7 +36,6 @@ import {
   commitDossierDecision,
   DEFAULT_DOSSIER_PANE_STATE,
   dossierCountsForHistory,
-  dossierPaneKeyboardAction,
   dossierPaneTransition,
   openSelectedDossierConversation,
   selectedDossierForPane,
@@ -63,7 +63,6 @@ import {
   commandPaletteItemFromSearch,
   commandPaletteItemsFromHistory,
   commandPaletteItemsInRenderedOrder,
-  commandPaletteKeyboardAction,
   commandPaletteOpenFallback,
   commandPaletteOpenLabelKey,
   commandPaletteOpenMessageId,
@@ -73,7 +72,6 @@ import {
   commandPaletteStatusLabelKey,
   commandPaletteTypeFallback,
   commandPaletteTypeLabelKey,
-  isEditableKeyboardTarget,
   type CommandPaletteDisplayItem,
 } from "@/lib/command-palette-items";
 import type {
@@ -88,6 +86,12 @@ import {
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
 import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
+import { useCommandPaletteKeys } from "./command-palette/useCommandPaletteKeys";
+import {
+  effectivePaletteLayout,
+  paletteRowActionVariant,
+  type LayoutMode,
+} from "./command-palette/paletteLayout";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
 
 type ChatCommandPaletteProps = {
@@ -110,7 +114,6 @@ type ChatCommandPaletteProps = {
   onConversationRemoved?: (conversationId: string) => void;
 };
 
-type LayoutMode = "expanded" | "collapsed";
 type SearchReadError = "history" | "search" | "ledger" | null;
 type DateDisplayGroup = {
   id: string;
@@ -279,6 +282,12 @@ export default function ChatCommandPalette({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
+  const { isBelowTablet, isBelowDesktop } = useResponsiveLayout();
+  const paletteOverlayId = useId();
+  const paletteRef = useRef<HTMLDivElement>(null);
+  const [isDossierSheetOpen, setIsDossierSheetOpen] = useState(false);
+  const effectiveLayoutMode = effectivePaletteLayout(layoutMode, isBelowTablet);
+  const rowActionVariant = paletteRowActionVariant(isBelowDesktop);
   const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
     DEFAULT_DOSSIER_PANE_STATE,
@@ -299,9 +308,7 @@ export default function ChatCommandPalette({
   useEffect(() => {
     inputRef.current?.focus();
     const saved = readStored("argus:command_palette_layout");
-    if (window.matchMedia("(pointer: coarse)").matches) {
-      setLayoutMode("expanded");
-    } else if (saved === "expanded" || saved === "collapsed") {
+    if (saved === "expanded" || saved === "collapsed") {
       setLayoutMode(saved);
     }
   }, []);
@@ -1044,124 +1051,58 @@ export default function ChatCommandPalette({
     removeLocalConversation,
   ]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (pendingDeleteItem) return;
-      const eventTarget =
-        event.target instanceof HTMLElement ? event.target : null;
-      const targetIsEditableDossierControl = Boolean(
-        eventTarget?.closest("[data-dossier-pane]") &&
-          isEditableKeyboardTarget(eventTarget),
-      );
-      const targetIsDossierControl = Boolean(
-        eventTarget?.closest("[data-dossier-pane]") &&
-          (isEditableKeyboardTarget(eventTarget) ||
-            eventTarget.closest("button")),
-      );
-      const dossierKeyboardAction = dossierPaneKeyboardAction({
-        key: event.key,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        targetIsDossierControl,
-        targetIsEditable: targetIsEditableDossierControl,
-        state: dossierPaneState,
-      });
-      if (dossierKeyboardAction === "restore_latest") {
-        event.preventDefault();
-        setDossierPaneState((current) =>
-          dossierPaneTransition(current, { type: "restore_latest" }),
-        );
-        return;
-      }
-      if (dossierKeyboardAction === "suppress_navigation") {
-        event.preventDefault();
-        return;
-      }
-      if (dossierKeyboardAction === "allow_control") return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (editingId) {
-          cancelRename();
-          return;
-        }
-        onClose();
-        return;
-      }
-      const action = commandPaletteKeyboardAction({
-        key: event.key,
-        code: event.code,
-        itemCount: keyboardItems.length,
-        hasSelection: Boolean(selectedPreview),
-        selectedCanManageConversation: Boolean(
-          canManageConversation && selectedPreview?.canManageConversation,
-        ),
-        targetIsEditable: isEditableKeyboardTarget(event.target),
-        targetIsSearchInput: event.target === inputRef.current,
-        isEditing: Boolean(editingId),
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        repeat: event.repeat,
-        focusedRowIndex: Number(
-          eventTarget?.closest<HTMLElement>("[data-palette-row-index]")
-            ?.dataset.paletteRowIndex ?? -1,
-        ),
-        usesCommandKey: shortcutLegend.usesCommandKey,
-      });
-      if (action.type === "focus_search") {
-        event.preventDefault();
-        inputRef.current?.focus();
-        return;
-      }
-      if (action.type === "select") {
-        event.preventDefault();
-        const item = keyboardItems[action.index];
+  // Pointer, Enter, Space, and the search field's open action all land here, so
+  // no input method gets a different, more destructive navigation than another.
+  const openRow = useCallback(
+    (
+      item: CommandPaletteDisplayItem,
+      options: { navigationDisabled: boolean; openAtLeftOff?: boolean },
+    ) => {
+      if (isBelowDesktop) {
         setPreviewItem(item);
-        document
-          .querySelector<HTMLElement>(
-            `[data-palette-row-index="${action.index}"]`,
-          )
-          ?.focus();
+        setIsDossierSheetOpen(true);
         return;
       }
-      if (action.type === "open" && selectedPreview) {
-        event.preventDefault();
-        activateItem(selectedPreview, action.openAtLeftOff);
+      if (options.navigationDisabled) {
+        setPreviewItem(item);
+        setLayoutMode("expanded");
         return;
       }
-      if (action.type === "rename" && selectedPreview) {
-        event.preventDefault();
-        startRename(selectedPreview);
-        return;
-      }
-      if (action.type === "archive" && selectedPreview) {
-        event.preventDefault();
-        void handleArchive(selectedPreview);
-        return;
-      }
-      if (action.type === "delete" && selectedPreview) {
-        event.preventDefault();
-        handleDelete(selectedPreview, true);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [
-    activateItem,
+      activateItem(item, options.openAtLeftOff);
+    },
+    [activateItem, isBelowDesktop, setPreviewItem],
+  );
+
+  const onPaletteKeyDown = useCommandPaletteKeys({
     cancelRename,
     canManageConversation,
     dossierPaneState,
     editingId,
     handleArchive,
     handleDelete,
+    inputRef,
     keyboardItems,
     onClose,
+    openRow,
     pendingDeleteItem,
+    selectedNavigationDisabled,
     selectedPreview,
-    shortcutLegend.usesCommandKey,
+    setDossierPaneState,
+    setPreviewItem,
     startRename,
-  ]);
+    usesCommandKey: shortcutLegend.usesCommandKey,
+  });
+
+  // Owns more than Escape, so it hands over a whole keydown, and takes system
+  // back with it: without an entry, back left Argus from an open search.
+  useModalSurface({
+    isOpen: true,
+    overlayId: paletteOverlayId,
+    containerRef: paletteRef,
+    onKeyDown: onPaletteKeyDown,
+    onDismiss: onClose,
+    initialFocusRef: inputRef,
+  });
 
   const toggleLayout = () => {
     setLayoutMode((current) => {
@@ -1175,9 +1116,198 @@ export default function ChatCommandPalette({
   const footerCount = displayItems.length;
   const selectedCanManageShortcutActions = Boolean(canManageConversation && selectedPreview?.canManageConversation);
 
+  // One dossier body, shown as a pane on desktop and as a sheet below 1024px.
+  const dossierPaneContent =
+              selectedPreview ? (
+                <div
+                  className="flex h-full flex-col"
+                  data-dossier-pane={selectedPreview.dossier ? "true" : undefined}
+                >
+                  <div className="mb-6">
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {(selectedPreview.type === "chat" ||
+                        selectedPreview.type === "conversation") &&
+                        activeConversationId ===
+                          selectedPreview.conversationId && (
+                          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                            {t("common.current", "Current")}
+                          </span>
+                        )}
+                      <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                        {t(
+                          commandPaletteTypeLabelKey(selectedPreview.type),
+                          commandPaletteTypeFallback(selectedPreview.type),
+                        )}
+                      </span>
+                    </div>
+                    <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
+                      {selectedPreview.title}
+                    </h2>
+                    <p className="mt-2 text-[13px] text-black/40 dark:text-white/40">
+                      {formatRelativeDate(
+                        selectedPreview.updatedAt,
+                        t,
+                        i18n.language,
+                      )}
+                    </p>
+                  </div>
+                  {selectedPreview.dossier && selectedDossier ? (
+                    dossierPaneState.view === "history" ? (
+                      <DecisionHistoryView
+                        items={history.items}
+                        nextCursor={history.nextCursor}
+                        status={history.status}
+                        onBack={() =>
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "restore_latest",
+                            }),
+                          )
+                        }
+                        onLoadOlder={history.loadOlder}
+                        onRetry={history.retry}
+                        onSelectRun={(dossier) =>
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "select_run",
+                              runId: dossier.run_id,
+                            }),
+                          )
+                        }
+                      />
+                    ) : (
+                      <RunDossierView
+                        key={selectedDossier.run_id}
+                        dossier={selectedDossier}
+                        totalRuns={dossierCounts.totalRuns}
+                        decidedRuns={dossierCounts.decidedRuns}
+                        onBackToLatest={
+                          dossierPaneState.historicalRunId
+                            ? () =>
+                                setDossierPaneState((current) =>
+                                  dossierPaneTransition(current, {
+                                    type: "restore_latest",
+                                  }),
+                                )
+                            : undefined
+                        }
+                        onOpenHistory={() => {
+                          void history.open();
+                          setDossierPaneState((current) =>
+                            dossierPaneTransition(current, {
+                              type: "open_history",
+                            }),
+                          );
+                        }}
+                        openConversationDisabled={
+                          !selectedPreview.conversationId ||
+                          selectedNavigationDisabled
+                        }
+                        retestDisabled={turnInFlight}
+                        // The sheet pins this action in its footer, so the body
+                        // only carries it where nothing else does: the pane.
+                        onOpenConversation={
+                          isBelowDesktop
+                            ? undefined
+                            : () => {
+                                openSelectedDossierConversation({
+                                  conversationId: selectedPreview.conversationId,
+                                  dossier: selectedDossier,
+                                  navigationDisabled: selectedNavigationDisabled,
+                                  onOpenConversation: (
+                                    conversationId,
+                                    messageId,
+                                  ) => onOpenConversation(conversationId, messageId),
+                                  onClose,
+                                });
+                              }
+                        }
+                        onRetest={(sourceRunId) => {
+                          if (!selectedPreview.conversationId) return;
+                          return onRetest(
+                            selectedPreview.conversationId,
+                            sourceRunId,
+                          );
+                        }}
+                        onSaveDecision={(action, draft) =>
+                          saveDecision(selectedDossier.run_id, action, draft)
+                        }
+                        onDecisionUnavailable={onDecisionUnavailable}
+                        resumeDecisionTarget={dossierDecisionResumeTarget(
+                          decisionResumeTarget,
+                        )}
+                        onDecisionResumeHandled={onDecisionResumeHandled}
+                      />
+                    )
+                  ) : (
+                    <>
+                      <div
+                        className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto"
+                        tabIndex={0}
+                        role="region"
+                        aria-label={t("command_palette.preview", "Preview")}
+                      >
+                        <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
+                          {t("command_palette.preview", "Preview")}
+                        </p>
+                        <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
+                          {selectedPreview.snippet ||
+                            t(
+                              "command_palette.preview_empty",
+                              "Select a result to preview its details.",
+                            )}
+                        </p>
+                      </div>
+                      {isBelowDesktop ? null : (
+                      <button
+                        type="button"
+                        onClick={() => openSourceConversation(selectedPreview)}
+                        disabled={
+                          !selectedPreview.conversationId ||
+                          selectedNavigationDisabled
+                        }
+                        title={
+                          selectedPreview.conversationId
+                            ? undefined
+                            : t(
+                                "command_palette.no_source_conversation",
+                                "No source conversation",
+                              )
+                        }
+                        className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
+                      >
+                        <span>
+                          {selectedPreview.conversationId
+                            ? t(
+                                commandPaletteOpenLabelKey(selectedPreview),
+                                commandPaletteOpenFallback(selectedPreview),
+                              )
+                            : t(
+                                "command_palette.no_source_conversation",
+                                "No source conversation",
+                              )}
+                        </span>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-1 items-center justify-center text-center">
+                  <p className="text-[13px] text-black/30 dark:text-white/30">
+                    {t(
+                      "command_palette.select_preview",
+                      "Select a result to preview its details.",
+                    )}
+                  </p>
+                </div>
+              );
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
+    <div ref={paletteRef} className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
       <button
+        tabIndex={-1}
         type="button"
         className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
         onClick={onClose}
@@ -1186,7 +1316,7 @@ export default function ChatCommandPalette({
 
       <div
         className={`relative flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white transition-all duration-300 dark:border-white/10 dark:bg-[#1b1d20] ${
-          layoutMode === "expanded"
+          effectiveLayoutMode === "expanded"
             ? "h-[78dvh] w-[94vw] max-w-6xl"
             : "h-[60dvh] w-full max-w-lg"
         }`}
@@ -1300,8 +1430,8 @@ export default function ChatCommandPalette({
         <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
           <div
             className={`flex-1 overflow-y-auto ${
-              layoutMode === "expanded"
-                ? "border-b border-black/5 dark:border-white/5 md:border-b-0 md:border-r"
+              effectiveLayoutMode === "expanded"
+                ? "border-b border-black/5 dark:border-white/5 tablet:border-b-0 tablet:border-r"
                 : ""
             }`}
             data-command-palette-action-region
@@ -1437,50 +1567,49 @@ export default function ChatCommandPalette({
                             event: ReactKeyboardEvent<HTMLDivElement>,
                           ) => {
                             if (isEditing) return;
+                            // The row's own action menu is a control, not part
+                            // of the row: Enter there must open the menu.
+                            if (
+                              event.target instanceof Element &&
+                              event.target.closest("[data-row-action]")
+                            ) {
+                              return;
+                            }
                             if (event.key === "Enter" || event.key === " ") {
                               event.preventDefault();
                               event.stopPropagation();
-                              activateItem(
-                                item,
-                                event.key === "Enter" &&
+                              openRow(item, {
+                                navigationDisabled: isNavigationDisabled,
+                                openAtLeftOff:
+                                  event.key === "Enter" &&
                                   (event.metaKey || event.ctrlKey),
-                              );
+                              });
                             }
                           };
                           return (
                             <div
                               key={`${item.source}:${item.id}`}
                               data-palette-row-index={rowIndex}
-                              onClick={() => {
-                                if (isNavigationDisabled) {
-                                  setPreviewItem(item);
-                                  setLayoutMode("expanded");
-                                  return;
-                                }
-                                if (
-                                  window.matchMedia("(pointer: coarse)").matches
-                                ) {
-                                  setPreviewItem(item);
-                                  setLayoutMode("expanded");
-                                  return;
-                                }
-                                activateItem(item);
-                              }}
+                              onClick={() =>
+                                openRow(item, {
+                                  navigationDisabled: isNavigationDisabled,
+                                })
+                              }
                               onKeyDown={handleRowKeyDown}
                               onMouseEnter={() => setPreviewItem(item)}
                               onFocus={() => setPreviewItem(item)}
                               role="button"
                               tabIndex={0}
                               aria-disabled={isNavigationDisabled}
-                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 ${
+                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 max-desktop:min-h-11 max-desktop:pe-12 ${
                                 selectedPreview?.id === item.id &&
                                 selectedPreview.type === item.type
                                   ? "bg-black/5 dark:bg-white/5"
                                   : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-24">
-                                <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1 pr-24 max-desktop:pr-0 max-desktop:self-center">
+                                <div className="flex min-w-0 items-center gap-2">
                                   {isEditing ? (
                                     <input
                                       autoFocus
@@ -1562,113 +1691,33 @@ export default function ChatCommandPalette({
                                   </div>
                                 )}
                               </div>
-                              <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">
+                              <span
+                                className={
+                                  rowActionVariant === "menu"
+                                    ? "shrink-0 self-center whitespace-nowrap text-[11px] text-black/30 dark:text-white/30"
+                                    : "absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30"
+                                }
+                              >
                                 {formatRelativeDate(
                                   item.updatedAt,
                                   t,
                                   i18n.language,
                                 )}
                               </span>
-                              {!isEditing && item.canManageConversation && (
-                                <div
-                                  className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                  data-row-action
-                                >
-                                  <Tooltip
-                                    content={t("common.rename", "Rename")}
-                                    side="top"
-                                    delay={120}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        startRename(item);
-                                      }}
-                                      className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                      aria-label={t(
-                                        "command_palette.rename_conversation",
-                                        "Rename conversation",
-                                      )}
-                                    >
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </Tooltip>
-                                  <Tooltip
-                                    content={t("common.archive", "Archive")}
-                                    side="top"
-                                    delay={120}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        void handleArchive(item);
-                                      }}
-                                      className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                      aria-label={t(
-                                        "command_palette.archive_conversation",
-                                        "Archive conversation",
-                                      )}
-                                    >
-                                      <Archive className="h-3.5 w-3.5" />
-                                    </button>
-                                  </Tooltip>
-                                  <Tooltip
-                                    content={t("common.delete", "Delete")}
-                                    side="top"
-                                    delay={120}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleDelete(item);
-                                      }}
-                                      className="rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
-                                      aria-label={t(
-                                        "command_palette.delete_conversation",
-                                        "Delete conversation",
-                                      )}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </Tooltip>
-                                </div>
+                              {!isEditing && (
+                                <CommandPaletteRowActions
+                                  variant={rowActionVariant}
+                                  actions={commandPaletteRowActions({
+                                    item,
+                                    t,
+                                    navigationDisabled: isNavigationDisabled,
+                                    onRename: () => startRename(item),
+                                    onArchive: () => void handleArchive(item),
+                                    onDelete: () => handleDelete(item),
+                                    onOpenSource: () => openSourceConversation(item),
+                                  })}
+                                />
                               )}
-                              {!isEditing &&
-                                !item.canManageConversation &&
-                                item.conversationId && (
-                                  <div
-                                    className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                    data-row-action
-                                  >
-                                    <Tooltip
-                                      content={t(
-                                        "command_palette.open_source_conversation",
-                                        "Open source conversation",
-                                      )}
-                                      side="top"
-                                      delay={120}
-                                    >
-                                      <button
-                                        type="button"
-                                        disabled={isNavigationDisabled}
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          openSourceConversation(item);
-                                        }}
-                                        className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                        aria-label={t(
-                                          "command_palette.open_source_conversation",
-                                          "Open source conversation",
-                                        )}
-                                      >
-                                        <MessageSquare className="h-3.5 w-3.5" />
-                                      </button>
-                                    </Tooltip>
-                                  </div>
-                                )}
                             </div>
                           );
                         })
@@ -1688,194 +1737,44 @@ export default function ChatCommandPalette({
             )}
           </div>
 
-          {layoutMode === "expanded" && (
+          {effectiveLayoutMode === "expanded" && !isBelowDesktop && (
             <div className={commandPaletteDossierPanelClassName(dossierPaneState.view)}>
-              {selectedPreview ? (
-                <div
-                  className="flex h-full flex-col"
-                  data-dossier-pane={selectedPreview.dossier ? "true" : undefined}
-                >
-                  <div className="mb-6">
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {(selectedPreview.type === "chat" ||
-                        selectedPreview.type === "conversation") &&
-                        activeConversationId ===
-                          selectedPreview.conversationId && (
-                          <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
-                            {t("common.current", "Current")}
-                          </span>
-                        )}
-                      <span className="inline-flex rounded-full border border-black/8 bg-white/50 px-2.5 py-1 text-[11px] font-semibold text-black/45 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
-                        {t(
-                          commandPaletteTypeLabelKey(selectedPreview.type),
-                          commandPaletteTypeFallback(selectedPreview.type),
-                        )}
-                      </span>
-                    </div>
-                    <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
-                      {selectedPreview.title}
-                    </h2>
-                    <p className="mt-2 text-[13px] text-black/40 dark:text-white/40">
-                      {formatRelativeDate(
-                        selectedPreview.updatedAt,
-                        t,
-                        i18n.language,
-                      )}
-                    </p>
-                  </div>
-                  {selectedPreview.dossier && selectedDossier ? (
-                    dossierPaneState.view === "history" ? (
-                      <DecisionHistoryView
-                        items={history.items}
-                        nextCursor={history.nextCursor}
-                        status={history.status}
-                        onBack={() =>
-                          setDossierPaneState((current) =>
-                            dossierPaneTransition(current, {
-                              type: "restore_latest",
-                            }),
-                          )
-                        }
-                        onLoadOlder={history.loadOlder}
-                        onRetry={history.retry}
-                        onSelectRun={(dossier) =>
-                          setDossierPaneState((current) =>
-                            dossierPaneTransition(current, {
-                              type: "select_run",
-                              runId: dossier.run_id,
-                            }),
-                          )
-                        }
-                      />
-                    ) : (
-                      <RunDossierView
-                        key={selectedDossier.run_id}
-                        dossier={selectedDossier}
-                        totalRuns={dossierCounts.totalRuns}
-                        decidedRuns={dossierCounts.decidedRuns}
-                        onBackToLatest={
-                          dossierPaneState.historicalRunId
-                            ? () =>
-                                setDossierPaneState((current) =>
-                                  dossierPaneTransition(current, {
-                                    type: "restore_latest",
-                                  }),
-                                )
-                            : undefined
-                        }
-                        onOpenHistory={() => {
-                          void history.open();
-                          setDossierPaneState((current) =>
-                            dossierPaneTransition(current, {
-                              type: "open_history",
-                            }),
-                          );
-                        }}
-                        openConversationDisabled={
-                          !selectedPreview.conversationId ||
-                          selectedNavigationDisabled
-                        }
-                        retestDisabled={turnInFlight}
-                        onOpenConversation={() => {
-                          openSelectedDossierConversation({
-                            conversationId: selectedPreview.conversationId,
-                            dossier: selectedDossier,
-                            navigationDisabled: selectedNavigationDisabled,
-                            onOpenConversation: (conversationId, messageId) =>
-                              onOpenConversation(conversationId, messageId),
-                            onClose,
-                          });
-                        }}
-                        onRetest={(sourceRunId) => {
-                          if (!selectedPreview.conversationId) return;
-                          return onRetest(
-                            selectedPreview.conversationId,
-                            sourceRunId,
-                          );
-                        }}
-                        onSaveDecision={(action, draft) =>
-                          saveDecision(selectedDossier.run_id, action, draft)
-                        }
-                        onDecisionUnavailable={onDecisionUnavailable}
-                        resumeDecisionTarget={dossierDecisionResumeTarget(
-                          decisionResumeTarget,
-                        )}
-                        onDecisionResumeHandled={onDecisionResumeHandled}
-                      />
-                    )
-                  ) : (
-                    <>
-                      <div
-                        className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto"
-                        tabIndex={0}
-                        role="region"
-                        aria-label={t("command_palette.preview", "Preview")}
-                      >
-                        <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
-                          {t("command_palette.preview", "Preview")}
-                        </p>
-                        <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
-                          {selectedPreview.snippet ||
-                            t(
-                              "command_palette.preview_empty",
-                              "Select a result to preview its details.",
-                            )}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => openSourceConversation(selectedPreview)}
-                        disabled={
-                          !selectedPreview.conversationId ||
-                          selectedNavigationDisabled
-                        }
-                        title={
-                          selectedPreview.conversationId
-                            ? undefined
-                            : t(
-                                "command_palette.no_source_conversation",
-                                "No source conversation",
-                              )
-                        }
-                        className="mt-auto flex min-h-11 shrink-0 items-center justify-between border-t border-black/5 pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-default disabled:hover:text-black/35 dark:border-white/5 dark:text-white/35 dark:hover:text-white dark:disabled:hover:text-white/35"
-                      >
-                        <span>
-                          {selectedPreview.conversationId
-                            ? t(
-                                commandPaletteOpenLabelKey(selectedPreview),
-                                commandPaletteOpenFallback(selectedPreview),
-                              )
-                            : t(
-                                "command_palette.no_source_conversation",
-                                "No source conversation",
-                              )}
-                        </span>
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-1 items-center justify-center text-center">
-                  <p className="text-[13px] text-black/30 dark:text-white/30">
-                    {t(
-                      "command_palette.select_preview",
-                      "Select a result to preview its details.",
-                    )}
-                  </p>
-                </div>
-              )}
+              {dossierPaneContent}
             </div>
           )}
         </div>
+
+        {isBelowDesktop && isDossierSheetOpen && selectedPreview ? (
+          <CommandPaletteDossierSheet
+            preview={selectedPreview}
+            navigationDisabled={selectedNavigationDisabled}
+            onClose={() => setIsDossierSheetOpen(false)}
+            onOpenConversation={() => {
+              if (!selectedDossier) {
+                openSourceConversation(selectedPreview);
+                return;
+              }
+              openSelectedDossierConversation({
+                conversationId: selectedPreview.conversationId,
+                dossier: selectedDossier,
+                navigationDisabled: selectedNavigationDisabled,
+                onOpenConversation: (conversationId, messageId) =>
+                  onOpenConversation(conversationId, messageId),
+                onClose,
+              });
+            }}
+          >
+            {dossierPaneContent}
+          </CommandPaletteDossierSheet>
+        ) : null}
 
         <CommandPaletteFooter
           footerCount={footerCount}
           hasManageActions={selectedCanManageShortcutActions}
           isFiltering={isFiltering}
           isLedgerMode={isLedgerMode}
-          layoutMode={layoutMode}
-          onToggleLayout={toggleLayout}
+          layoutMode={effectiveLayoutMode}
+          onToggleLayout={isBelowTablet ? undefined : toggleLayout}
           shortcutLegendVisible={shortcutLegend.isVisible}
           usesCommandKey={shortcutLegend.usesCommandKey}
         />

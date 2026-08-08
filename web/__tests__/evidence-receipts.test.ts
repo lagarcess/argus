@@ -150,4 +150,24 @@ describe("the receipt list", () => {
       expect(body).not.toContain(forbidden);
     }
   });
+
+  test("draws itself through the shared panel, not its own centred card", () => {
+    // The panel rule lives in AdaptivePanel: sheet below the desktop stop,
+    // centred dialog above it. A panel that draws its own fixed overlay renders
+    // a desktop card at phone width, which is the regression the shell exists to
+    // prevent, and it escapes the overlay layer stack the drawer depends on.
+    const list = source(RECEIPT_LIST);
+    expect(list).toContain("AdaptivePanel");
+    expect(list).not.toContain("fixed inset-0");
+  });
+
+  test("returns to Data Controls in the sheet instead of dismissing it", () => {
+    // Reached from the drawer's Data Controls submenu on a phone, so it owes the
+    // same back row every sibling there offers.
+    expect(source(RECEIPT_LIST)).toContain("onBack");
+    const menu = source(PROFILE_MENU);
+    const mount = menu.slice(menu.indexOf('activeModal === "receipts"'));
+    expect(mount).toContain("asSheet");
+    expect(mount).toContain('setActiveSubmenu("data")');
+  });
 });

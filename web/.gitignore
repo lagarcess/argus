@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+# Any custom NEXT_DIST_DIR, not just the default. A LAN build dir named
+# .next-lan slipped past `/.next/` and 468 build artifacts were committed.
+/.next-*/
 /temp-next-build*/
 /temp/
 /out/

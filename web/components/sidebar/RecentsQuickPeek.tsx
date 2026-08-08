@@ -83,6 +83,7 @@ export default function RecentsQuickPeek({
   return (
     <div className="fixed inset-0 z-[65]">
       <button
+        tabIndex={-1}
         type="button"
         className="absolute inset-0 cursor-default"
         aria-label={t("recents_quick_peek.close", "Close Recents")}

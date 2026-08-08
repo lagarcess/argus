@@ -10,6 +10,7 @@ import {
   type ChatStreamEvent,
 } from "../lib/argus-api";
 import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
+import { effectivePaletteLayout } from "../components/sidebar/command-palette/paletteLayout";
 
 const root = join(import.meta.dir, "..");
 
@@ -159,7 +160,7 @@ describe("Argus Alpha frontend contract", () => {
 
   test("sidebar logo swap preserves toggle behavior and archives the legacy mark", () => {
     const sidebar = readFileSync(
-      join(root, "components/sidebar/ChatSidebar.tsx"),
+      join(root, "components/sidebar/SidebarHeader.tsx"),
       "utf-8",
     );
     const logo = readFileSync(join(root, "components/ArgusLogo.tsx"), "utf-8");
@@ -2006,17 +2007,21 @@ describe("Argus Alpha frontend contract", () => {
     expect(readErrorPanel).toContain(
       "void loadLedgerBrowse(decisionStateFilter)",
     );
-    expect(palette).toContain("commandPaletteKeyboardAction");
+    // The keyboard policy moved to its own hook; the palette hands it the rows.
+    const paletteKeys = readFileSync(
+      join(root, "components/sidebar/command-palette/useCommandPaletteKeys.ts"),
+      "utf-8",
+    );
+    expect(palette).toContain("useCommandPaletteKeys({");
     expect(palette).toContain(
       "commandPaletteItemsInRenderedOrder(groupedItems)",
     );
-    expect(palette).toContain("itemCount: keyboardItems.length");
-    expect(palette).toContain("const item = keyboardItems[action.index]");
+    expect(paletteKeys).toContain("commandPaletteKeyboardAction");
+    expect(paletteKeys).toContain("itemCount: keyboardItems.length");
+    expect(paletteKeys).toContain("const item = keyboardItems[action.index]");
     expect(palette).toContain("const rowIndex = groupRowStart + itemIndex");
-    expect(palette).toContain(
-      "targetIsSearchInput: event.target === inputRef.current",
-    );
-    expect(palette).toContain("isEditableKeyboardTarget");
+    expect(paletteKeys).toContain("targetIsSearchInput: event.target === inputRef.current");
+    expect(paletteKeys).toContain("isEditableKeyboardTarget");
     expect(loadMore).toContain(
       "const capturedSignature = searchSignatureRef.current",
     );
@@ -2078,7 +2083,13 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(palette).toContain("command_palette.read_error");
     expect(palette).toContain("command_palette.try_searching");
-    expect(palette).toContain('window.matchMedia("(pointer: coarse)")');
+    // The mobile shell spec replaced pointer sniffing with the width bands:
+    // touch on a wide screen keeps the desktop layout, and a narrow window on a
+    // mouse machine gets the mobile one.
+    expect(palette).not.toContain('window.matchMedia("(pointer: coarse)")');
+    expect(palette).toContain("useResponsiveLayout()");
+    expect(palette).toContain("effectivePaletteLayout(layoutMode, isBelowTablet)");
+    expect(effectivePaletteLayout("expanded", true)).toBe("collapsed");
     expect(palette).toContain("text-[16px]");
     expect(palette).toContain("min-h-11");
   });
@@ -2092,11 +2103,19 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
+    const rowActions = readFileSync(
+      join(root, "components/sidebar/command-palette/rowActionItems.ts"),
+      "utf-8",
+    );
+    const rowActionsView = readFileSync(
+      join(root, "components/sidebar/command-palette/CommandPaletteRowActions.tsx"),
+      "utf-8",
+    );
 
     expect(chat).toContain("onMutated={refreshHistory}");
-    expect(palette).toContain("Edit2");
-    expect(palette).toContain("Archive");
-    expect(palette).toContain("Trash2");
+    expect(rowActions).toContain("Edit2");
+    expect(rowActions).toContain("Archive");
+    expect(rowActions).toContain("Trash2");
     expect(palette).toContain("editingId");
     expect(palette).toContain("editingTitle");
     expect(palette).toContain("handleRenameSave");
@@ -2104,12 +2123,21 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("handleDelete");
     expect(palette).toContain("patchConversation");
     expect(palette).toContain("apiDeleteConversation");
-    expect(palette).toContain(
+    expect(rowActionsView).toContain(
       'import { Tooltip } from "@/components/ui/Tooltip"',
     );
-    expect(palette).toContain('content={t("common.rename", "Rename")}');
-    expect(palette).toContain('content={t("common.archive", "Archive")}');
-    expect(palette).toContain('content={t("common.delete", "Delete")}');
+    // The eye reads the short verb, the same one Recents shows. The screen
+    // reader hears the object too, because an icon-only control has no context.
+    expect(rowActionsView).toContain("content={action.label}");
+    expect(rowActionsView).toContain("aria-label={action.accessibleName}");
+    for (const [visible, announced] of [
+      ['t("common.rename", "Rename")', "command_palette.rename_conversation"],
+      ['t("common.archive", "Archive")', "command_palette.archive_conversation"],
+      ['t("common.delete", "Delete")', "command_palette.delete_conversation"],
+    ]) {
+      expect(rowActions).toContain(visible);
+      expect(rowActions).toContain(announced);
+    }
     expect(palette).not.toContain("getConversationMessages");
     expect(palette).not.toContain("hydrateMessagesFromApi");
     expect(palette).not.toContain("ChatMessage");
@@ -2373,6 +2401,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/language-features.ts"),
       "utf-8",
     );
+    const deleteRequestDialog = readFileSync(
+      join(root, "components/sidebar/ProfileDeleteRequestDialog.tsx"),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const en = readFileSync(
       join(root, "public/locales/en/common.json"),
@@ -2393,7 +2425,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(profileMenu).toContain('source: "profile_modal"');
     expect(profileMenu).toContain("argus-profile-language-trigger");
     expect(profileMenu).toContain("absolute right-0 top-full");
-    expect(profileMenu).toContain("settings.profile.request_deletion.title");
+    // The dialog itself lives in its own component now, because a body-portaled
+    // aria-modal surface has to register its own back, Escape, and focus.
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.title",
+    );
     expect(profileMenu).toContain("settings.profile.language_save_error");
     expect(profileMenu).not.toContain(
       "overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]",

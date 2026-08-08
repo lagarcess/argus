@@ -287,9 +287,10 @@ describe("sources panel", () => {
     expect(trigger).toContain("relative");
 
     const close = panel.slice(
-      panel.indexOf("sources_panel_close") - 400,
-      panel.indexOf("sources_panel_close") + 400,
+      panel.indexOf("<button\n            type=\"button\"\n            data-autofocus"),
+      panel.indexOf("</button>", panel.indexOf("data-autofocus\n")),
     );
+    expect(close).toContain("aria-label={closeLabel}");
     expect(close).toContain("min-h-11");
     expect(close).toContain("min-w-11");
   });

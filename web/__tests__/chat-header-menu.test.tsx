@@ -54,7 +54,7 @@ async function renderMenu(
 }
 
 describe("ChatHeaderMenu unread control", () => {
-  test("renders unread first with mobile sheet and desktop popover unchanged", async () => {
+  test("renders unread first, popover on desktop and the primitive below it", async () => {
     const html = await renderMenu();
     const unread = html.indexOf("Mark as read");
     const pin = html.indexOf("Pin chat");
@@ -67,9 +67,16 @@ describe("ChatHeaderMenu unread control", () => {
     expect(pin).toBeLessThan(rename);
     expect(rename).toBeLessThan(separator);
     expect(separator).toBeLessThan(remove);
-    expect(html).toContain("fixed inset-x-0 bottom-0");
-    expect(html).toContain("md:absolute");
-    expect(html).toContain("md:w-[260px]");
+    // Server render is the desktop band, so this is the popover. The mobile
+    // form is no longer a second hand-rolled sheet here: it goes through the
+    // BottomSheet primitive, which owns the scrim, focus trap, real drag, and
+    // the history entry that makes system back close it. Enforced by
+    // __tests__/bottom-sheet-ownership.test.ts.
+    expect(html).toContain("absolute bottom-auto right-0 left-auto top-full");
+    expect(html).toContain("w-[260px]");
+    expect(html).not.toContain("fixed inset-x-0 bottom-0");
+    expect(source).toContain("<BottomSheet");
+    expect(source).toContain('height="auto"');
   });
 
   test("disables only the read mutation action", async () => {
