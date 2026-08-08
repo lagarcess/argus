@@ -1327,11 +1327,14 @@ foreign key to `profiles.id`.
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
   execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
-- Expired rows are disposable operational data and are removed through the
-  bounded purge function. The row has no owner to cascade from, so the guest
-  cleanup job is the only thing that deletes it: `purge_expired_visitor_usage`
-  is registered in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on
-  every non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`.
+- Expired rows are disposable operational data, but `period_end` is not a timer
+  and nothing in the database acts on it. The row has no owner to cascade from,
+  so it is deleted only when a successful non-dry-run of the guest cleanup job
+  reaches the purge: `purge_expired_visitor_usage` is registered in
+  `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every non-dry-run
+  `scripts/ops/cleanup_expired_guest_workspaces.py`. Retention therefore holds
+  exactly as often as that job is run; the runbook requires it daily, and no
+  repo-side schedule runs it (see #401).
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the

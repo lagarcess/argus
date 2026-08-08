@@ -10,8 +10,13 @@
 --
 -- visitor_key holds a keyed digest, never a raw address. The counter needs to
 -- tell visitors apart, not to name them, and a raw IP in a primary key would be
--- a durable record of who visited. Rows are disposable and are deleted once
--- their window has passed.
+-- a durable record of who visited. Rows are disposable, but period_end is not a
+-- timer: nothing in the database acts on it. The row has no owner to cascade
+-- from, so it is deleted only when a successful non-dry-run of the guest
+-- cleanup job (argus.domain.guest_cleanup, run by
+-- scripts/ops/cleanup_expired_guest_workspaces.py) reaches
+-- purge_expired_visitor_usage. Retention holds exactly as often as that job is
+-- run.
 
 create table if not exists public.visitor_usage_counters (
   visitor_key text not null,
