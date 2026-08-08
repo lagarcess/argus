@@ -3,8 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { patchMe } from "@/lib/argus-api";
-import { useModalSurface } from "@/components/layout/useModalSurface";
 import {
   ENABLED_LANGUAGES,
   localeForLanguage,
@@ -13,6 +13,8 @@ import {
 
 type LanguageModalProps = {
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
   persistProfile?: boolean;
 };
 
@@ -22,26 +24,11 @@ type LanguageModalProps = {
  */
 export default function LanguageModal({
   onClose,
+  onBack,
+  backLabel,
   persistProfile = true,
 }: LanguageModalProps) {
-  const overlayId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  // Reachable from the drawer, so it must own Escape, focus, and system back
-  // or dismissing it takes the drawer underneath with it.
-  //
-  // The container is the full-screen wrapper, whose first focusable child is
-  // the invisible backdrop dismiss button. Without naming the field, keyboard
-  // users opened straight onto an undisclosed close control where Enter shut
-  // the modal.
-  useModalSurface({
-    isOpen: true,
-    overlayId,
-    containerRef: panelRef,
-    onDismiss: onClose,
-    onEscape: onClose,
-    initialFocusRef: searchInputRef,
-  });
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const lang = i18n.language || "en";
@@ -81,23 +68,14 @@ export default function LanguageModal({
   };
 
   return (
-    <div
-      ref={panelRef}
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("guest.shell.language", "Language")}
+    <AdaptivePanel
+      title={t("guest.shell.language", "Language")}
+      closeLabel={t("settings.app.close_language_modal", "Close language modal")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="sm"
     >
-      <button
-        tabIndex={-1}
-        className="absolute inset-0"
-        aria-label={t("settings.app.close_language_modal", "Close language modal")}
-        onClick={() => {
-          onClose();
-          setSearchQuery("");
-        }}
-      />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#111111]">
         <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
           <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
           <input
@@ -137,7 +115,6 @@ export default function LanguageModal({
             ))
           )}
         </div>
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }

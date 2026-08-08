@@ -398,10 +398,13 @@ export default function ProfileMenu({
   const openModal = useCallback(
     (modal: ActiveModal) => {
       setActiveModal(modal);
+      if (asSheet) return;
+      // The popover has nowhere to sit behind a dialog, so it closes. A sheet
+      // stays open underneath, which is what the child's back row returns to.
       setActiveSubmenu(null);
       onClose();
     },
-    [onClose],
+    [asSheet, onClose],
   );
 
   const handleDeleteAllConversations = useCallback(() => {
@@ -758,15 +761,38 @@ export default function ProfileMenu({
 
   // ── Active modal rendering ──────────────────────────────────────────────
   if (activeModal === "appearance") {
-    return <AppearanceModal onClose={() => setActiveModal(null)} />;
+    return (
+      <AppearanceModal
+        onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("settings");
+        } : undefined}
+        backLabel={t("settings.app.title", "Preferences")}
+      />
+    );
   }
   if (activeModal === "language") {
-    return <LanguageModal onClose={() => setActiveModal(null)} />;
+    return (
+      <LanguageModal
+        onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("settings");
+        } : undefined}
+        backLabel={t("settings.app.title", "Preferences")}
+      />
+    );
   }
   if (activeModal === "archived") {
     return (
       <ArchivedChatsView
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         onRestored={onHistoryMutated}
       />
     );
@@ -775,6 +801,11 @@ export default function ProfileMenu({
     return (
       <DeletedItemsView
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         onRestored={onHistoryMutated}
       />
     );
@@ -786,6 +817,11 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         returnFocusRef={anchorRef}
       />
     );
@@ -797,6 +833,11 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         returnFocusRef={anchorRef}
       />
     );

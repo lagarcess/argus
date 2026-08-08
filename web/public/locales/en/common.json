@@ -971,7 +971,9 @@
         "close": "Close usage",
         "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
         "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
-      }
+      },
+      "close_archived": "Close archived chats",
+      "close_deleted": "Close recently deleted"
     },
     "help": {
       "title": "Help & Legal",

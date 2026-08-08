@@ -245,8 +245,11 @@ describe("private-alpha usage allowance", () => {
     // Tab containment belongs to the shared hook now. Running a private copy
     // beside it moved focus twice per press and skipped a control each time.
     expect(modal).not.toContain("dialogTabTarget");
-    expect(modal).toContain("useModalSurface");
-    expect(modal).toContain("onEscape: onClose,");
+    // Ownership moved to the shell, which supplies it to every panel.
+    expect(modal).toContain("AdaptivePanel");
+    expect(
+      readFileSync(join(root, "components/ui/AdaptivePanel.tsx"), "utf-8"),
+    ).toContain("useModalSurface");
     expect(modal).not.toContain('document.addEventListener("keydown"');
     // The opener can be gone by the time this closes, so the fallback is
     // handed to the hook rather than managed here.
@@ -268,7 +271,10 @@ describe("private-alpha usage allowance", () => {
     );
 
     expect(modal).not.toContain("shadow-sm");
-    expect(modal).toContain("min-h-11 min-w-11");
+    // The 44px close target is the shell's, so every panel inherits it.
+    expect(
+      readFileSync(join(root, "components/ui/AdaptivePanel.tsx"), "utf-8"),
+    ).toContain("min-h-11 min-w-11");
     expect(modal.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
     expect(usageButton).toContain("min-h-11");
   });

@@ -971,7 +971,9 @@
         "close": "Cerrar uso",
         "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
         "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
-      }
+      },
+      "close_archived": "Cerrar chats archivados",
+      "close_deleted": "Cerrar borrados recientemente"
     },
     "help": {
       "title": "Ayuda y legal",

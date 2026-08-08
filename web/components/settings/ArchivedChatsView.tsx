@@ -8,12 +8,14 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useModalSurface } from "@/components/layout/useModalSurface";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { listConversations, patchConversation, type Conversation } from "@/lib/argus-api";
 
 type ArchivedChatsViewProps = {
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
   onRestored?: () => void;
 };
 
@@ -21,22 +23,7 @@ type ArchivedChatsViewProps = {
  * Centered blur modal showing archived conversations with restore functionality.
  * Extracted from SettingsView for reuse in ProfileMenu > Data submenu.
  */
-export default function ArchivedChatsView({ onClose, onRestored }: ArchivedChatsViewProps) {
-  const overlayId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-  // Opened from the drawer, this sits above it. Without registering, Escape and
-  // hardware Back reached the drawer instead and unmounted this with it, and
-  // Tab containment still ran over the controls behind it.
-  useModalSurface({
-    isOpen: true,
-    overlayId,
-    // The panel, not the full-screen wrapper: the wrapper's first focusable
-    // child is the transparent backdrop.
-    containerRef: panelRef,
-    onDismiss: onClose,
-    onEscape: onClose,
-  });
-
+export default function ArchivedChatsView({ onClose, onBack, backLabel, onRestored }: ArchivedChatsViewProps) {
   const { t } = useTranslation();
   const [archivedChats, setArchivedChats] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,30 +45,14 @@ export default function ArchivedChatsView({ onClose, onRestored }: ArchivedChats
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
-      <button
-        tabIndex={-1}
-        className="absolute inset-0"
-        aria-label="Close archived chats"
-        onClick={onClose}
-      />
-      <div
-        ref={panelRef}
-        className="relative w-full max-w-md max-h-[70vh] bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden flex flex-col"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-black/5 dark:border-white/5">
-          <h2 className="text-[16px] font-medium text-black dark:text-white">
-            {t("settings.data.archived_chats")}
-          </h2>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4 text-black/50 dark:text-white/50" />
-          </button>
-        </div>
-
+    <AdaptivePanel
+      title={t("settings.data.archived_chats")}
+      closeLabel={t("settings.data.close_archived", "Close archived chats")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="md"
+    >
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {isLoading ? (
@@ -126,7 +97,6 @@ export default function ArchivedChatsView({ onClose, onRestored }: ArchivedChats
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }
