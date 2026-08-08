@@ -28,7 +28,13 @@
 
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  /* DESIGN.md section 3: Space Grotesk, Inter, Arial, sans-serif. Inter is
+     already self-hosted, so falling back to it is free and stays on brand.
+     Dropping to ui-sans-serif instead degraded the headings differently on
+     every platform, which is the one thing a named stack exists to prevent.
+     Spelled out here only, so the two rules that use it cannot drift from it
+     again. */
+  --font-display: var(--font-space-grotesk), var(--font-inter), Arial, sans-serif;
   --color-background: var(--bg);
   --color-foreground: var(--fg);
   --color-argus-dark: #191c1f;
@@ -569,7 +575,7 @@ body {
 
 .argus-result-section-label {
   margin: 0 0 0.75rem;
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 0.78rem;
   font-weight: 680;
   letter-spacing: 0;
@@ -616,7 +622,7 @@ body {
 
 .argus-result-breakdown.prose h3 {
   margin: 1.05rem 0 0.35rem;
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 0.94rem;
   font-weight: 680;
   line-height: 1.2;

@@ -21,11 +21,15 @@ const EVIDENCE_DIR = join(
   "mobile-pwa-responsive-shell",
 );
 
+/* One entry per DESIGN.md section 8 band, taken inside the band rather than on
+   its boundary, so a stop that moved by a pixel still shows up here. */
 const WIDTHS = {
+  mobileSmall: { width: 360, height: 780 },
   mobile: { width: 390, height: 844 },
   tablet: { width: 720, height: 1024 },
   desktopEdge: { width: 1024, height: 800 },
   desktop: { width: 1440, height: 900 },
+  xlarge: { width: 1920, height: 1080 },
 } as const;
 
 const HIDE_DEV_CHROME = `
@@ -227,5 +231,52 @@ test.describe("mobile shell evidence", () => {
 
     await openSearch(page);
     await capture(page, "18-desktop-1440-omnisearch-expanded");
+  });
+
+  /*
+   * The two bands the rest of this file never visits. Mobile Small is the base
+   * the scale is written from, and XLarge is the only band above the last
+   * named stop, so between them they are where a missing stop would show.
+   */
+  test("the smallest band still gets the mobile shell", async ({ page }) => {
+    await open(page, "mobileSmall", { conversation: true });
+    await expect(page.getByTestId("chat-shell-menu-trigger")).toBeVisible();
+    await capture(page, "32-mobile-small-360-chat");
+
+    await page.getByTestId("chat-shell-menu-trigger").click();
+    await expect(page.getByTestId("sidebar-drawer")).toBeVisible();
+    await capture(page, "33-mobile-small-360-drawer");
+  });
+
+  test("the largest band still gets the desktop shell", async ({ page }) => {
+    await open(page, "xlarge", { conversation: true });
+    await expect(page.getByTestId("chat-shell-menu-trigger")).toHaveCount(0);
+    await expect(page.getByTestId("sidebar-drawer")).toHaveCount(0);
+    await capture(page, "34-xlarge-1920-chat");
+
+    await openSearch(page);
+    await capture(page, "35-xlarge-1920-omnisearch");
+  });
+
+  test("both languages and both themes at the smallest band", async ({
+    page,
+  }) => {
+    await open(page, "mobileSmall", {
+      conversation: true,
+      language: "es-419",
+    });
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await capture(page, "36-mobile-small-360-es419-dark");
+
+    await open(page, "mobileSmall", {
+      conversation: true,
+      language: "es-419",
+      theme: "light",
+    });
+    await expect(page.locator("html")).not.toHaveClass(/dark/);
+    await capture(page, "37-mobile-small-360-es419-light");
+
+    await open(page, "mobileSmall", { conversation: true, theme: "light" });
+    await capture(page, "38-mobile-small-360-en-light");
   });
 });
