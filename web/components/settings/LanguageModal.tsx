@@ -75,6 +75,7 @@ export default function LanguageModal({
       onBack={onBack}
       backLabel={backLabel}
       width="sm"
+      initialFocusRef={searchInputRef}
     >
         <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
           <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />

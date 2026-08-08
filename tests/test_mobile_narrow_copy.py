@@ -20,6 +20,7 @@ from argus.agent_runtime.next_experiments import (
 from argus.api.naming import (
     NARROW_TITLE_MAX_WORDS,
     WIDE_TITLE_MAX_WORDS,
+    constrain_to_word_budget,
     title_word_budget,
 )
 from argus.api.schemas import ChatStreamRequest
@@ -94,6 +95,37 @@ def test_narrow_titles_are_generated_short_not_clipped() -> None:
     assert title_word_budget("wide") == WIDE_TITLE_MAX_WORDS
     assert title_word_budget(None) == WIDE_TITLE_MAX_WORDS
     assert NARROW_TITLE_MAX_WORDS < WIDE_TITLE_MAX_WORDS
+
+
+def test_the_budget_is_enforced_rather_than_only_requested() -> None:
+    """The prompt asks for a word limit; a model is free to ignore it.
+
+    Without enforcement the overlong title is what gets persisted, and every
+    narrow client goes back to clipping it, which is the thing the viewport
+    contract exists to avoid.
+    """
+
+    overlong = "Apple versus SPY across the last twelve months"
+    assert (
+        constrain_to_word_budget(overlong, NARROW_TITLE_MAX_WORDS)
+        == "Apple versus SPY"
+    )
+    assert len(constrain_to_word_budget(overlong, WIDE_TITLE_MAX_WORDS).split()) == (
+        WIDE_TITLE_MAX_WORDS
+    )
+
+
+def test_a_title_already_inside_the_budget_is_left_alone() -> None:
+    for title in ("Apple vs SPY", "Bitcoin", "Weekly Nvidia buys"):
+        assert constrain_to_word_budget(title, NARROW_TITLE_MAX_WORDS) == title
+
+
+def test_trimming_does_not_leave_a_dangling_separator() -> None:
+    # A cut mid-phrase reads as damage rather than as a short title.
+    assert (
+        constrain_to_word_budget("Apple, SPY, and gold over time", 2) == "Apple, SPY"
+    )
+    assert constrain_to_word_budget("Apple versus - the market", 3) == "Apple versus"
 
 
 def test_turn_request_carries_an_optional_viewport_band() -> None:

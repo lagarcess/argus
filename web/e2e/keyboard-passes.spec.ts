@@ -139,6 +139,97 @@ test.describe("Escape closes exactly one level", () => {
   });
 });
 
+test.describe("focus stays inside a modal with nothing enabled in it", () => {
+  test("Tab cannot leave a confirmation while it is busy", async ({ page }) => {
+    // A busy confirmation disables both Cancel and Confirm, so the trap has an
+    // empty list to cycle. Containment used to be decided by that list being
+    // non-empty, which let Tab out of a surface still claiming aria-modal.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installMobileShellFixture(page, { account: "registered" });
+
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/v1/conversations/**", async (route) => {
+      if (route.request().method() !== "DELETE") return route.fallback();
+      await held;
+      await route.fulfill({ status: 200, body: "{}" });
+    });
+
+    await page.goto("/chat");
+    await page.waitForTimeout(1200);
+    await openPalette(page);
+    await page.getByTestId("command-palette-row-menu").first().click();
+    await page.getByRole("menuitem", { name: /delete/i }).first().click();
+    const confirm = page.locator('[class*="z-[110]"]').first();
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: /delete/i }).first().click();
+    await page.waitForTimeout(500);
+
+    for (let press = 0; press < 6; press += 1) {
+      await page.keyboard.press("Tab");
+      await page.waitForTimeout(80);
+      const contained = await page.evaluate(() => {
+        const panel = document.querySelector('[class*="z-[110]"]');
+        if (!panel) return null;
+        const active = document.activeElement;
+        // Body is acceptable containment only if nothing at all is focusable;
+        // anything else outside the panel means Tab escaped.
+        return active === document.body || panel.contains(active);
+      });
+      expect(contained).toBe(true);
+    }
+
+    // Specifically: it did not land on the palette underneath.
+    const escaped = await page.evaluate(() =>
+      Boolean(document.activeElement?.closest("[data-palette-row-index]")),
+    );
+    expect(escaped).toBe(false);
+
+    release();
+    await page.waitForTimeout(1000);
+  });
+});
+
+test.describe("a panel that opens for typing starts in the field", () => {
+  for (const width of [390, 1280]) {
+    test(`language search takes focus at ${width}`, async ({ page }) => {
+      // AdaptivePanel owns focus now, and both presentations otherwise start on
+      // the close control, so the field's own autoFocus was overridden. Enter
+      // then closed the panel instead of searching.
+      await page.setViewportSize({ width, height: 900 });
+      await installMobileShellFixture(page, { account: "registered" });
+      await page.goto("/chat");
+      await page.waitForTimeout(1400);
+      const trigger = page.getByTestId("chat-shell-menu-trigger");
+      if (await trigger.count()) {
+        await trigger.click();
+        await page.waitForTimeout(400);
+      }
+      await page.getByRole("button", { name: /^settings$/i }).first().click();
+      await page.waitForTimeout(500);
+      await page.getByRole("button", { name: /preferences/i }).first().click();
+      await page.waitForTimeout(500);
+      await page.getByRole("button", { name: /app language/i }).first().click();
+      await page.waitForTimeout(700);
+
+      const onField = await page.evaluate(
+        () => document.activeElement?.tagName === "INPUT",
+      );
+      expect(onField).toBe(true);
+
+      // And typing reaches it, rather than the panel acting on the key.
+      await page.keyboard.type("esp");
+      await page.waitForTimeout(300);
+      const typed = await page.evaluate(
+        () => (document.activeElement as HTMLInputElement | null)?.value,
+      );
+      expect(typed).toBe("esp");
+    });
+  }
+});
+
 test.describe("the Omnisearch key never reaches a covered surface", () => {
   for (const account of ["registered", "guest"] as const) {
     test(`inert while the drawer is open (${account})`, async ({ page }) => {

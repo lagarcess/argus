@@ -40,6 +40,7 @@ export default function AdaptivePanel({
   desktopMaxHeight = "max-h-[85vh]",
   footer,
   returnFocusRef,
+  initialFocusRef,
   children,
 }: {
   title: string;
@@ -53,6 +54,16 @@ export default function AdaptivePanel({
   footer?: ReactNode;
   /** Where focus lands on close when the opener has gone with the parent. */
   returnFocusRef?: React.RefObject<HTMLElement | null>;
+  /**
+   * Where focus lands on open, for a panel whose first job is typing.
+   *
+   * Both presentations otherwise start on the close control, so a panel that
+   * marked a field `autoFocus` lost it: the attribute runs during commit and
+   * the surface's own focus effect moves focus afterwards. The visible cost was
+   * a search box that could not be typed into, where Enter closed the panel
+   * instead of searching.
+   */
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const { isBelowDesktop } = useResponsiveLayout();
@@ -80,6 +91,7 @@ export default function AdaptivePanel({
         closeLabel={closeLabel}
         height="auto"
         footer={footer}
+        initialFocusRef={initialFocusRef}
       >
         {back}
         {children}
@@ -87,7 +99,7 @@ export default function AdaptivePanel({
     );
   }
 
-  return <DesktopDialog {...{ title, titleId, overlayId, panelRef, onClose, closeLabel, width, desktopMaxHeight, footer, returnFocusRef, back, children }} />;
+  return <DesktopDialog {...{ title, titleId, overlayId, panelRef, onClose, closeLabel, width, desktopMaxHeight, footer, returnFocusRef, initialFocusRef, back, children }} />;
 }
 
 function DesktopDialog({
@@ -101,6 +113,7 @@ function DesktopDialog({
   desktopMaxHeight,
   footer,
   returnFocusRef,
+  initialFocusRef,
   back,
   children,
 }: {
@@ -114,6 +127,7 @@ function DesktopDialog({
   desktopMaxHeight: string;
   footer?: ReactNode;
   returnFocusRef?: React.RefObject<HTMLElement | null>;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
   back: ReactNode;
   children: ReactNode;
 }) {
@@ -126,6 +140,7 @@ function DesktopDialog({
     onDismiss: onClose,
     onEscape: onClose,
     returnFocusRef,
+    initialFocusRef,
   });
 
   return (

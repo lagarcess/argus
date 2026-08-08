@@ -67,6 +67,9 @@ export default function FeedbackDialog({
   const [error, setError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /* Only for the types that open straight into writing. A rating opens on the
+     stars, where taking focus to the notes field would skip the actual ask. */
+  const messageRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -237,6 +240,7 @@ export default function FeedbackDialog({
       closeLabel={t("feedback.close", "Close feedback")}
       onClose={onClose}
       width="lg"
+      initialFocusRef={isRating ? undefined : messageRef}
       footer={
         <>
         {isSuccess ? null : (
@@ -426,6 +430,7 @@ export default function FeedbackDialog({
                         : `${t("feedback.details", "Details")} *`}
                     </label>
                     <textarea
+                      ref={messageRef}
                       autoFocus={!isRating}
                       value={message}
                       onChange={(event) => setMessage(event.target.value.slice(0, 1000))}

@@ -74,9 +74,30 @@ function handleKeyDown(event: KeyboardEvent): void {
 
   if (event.key === "Tab") {
     const trap = trappingLayer();
-    const elements = trap ? focusableWithin(trap.containerRef.current) : [];
-    if (elements.length > 0) {
+    if (trap) {
+      /*
+       * Containment is decided by there being a trap, not by its contents.
+       * Guarding on a non-empty list let Tab through whenever a modal
+       * momentarily had nothing enabled to hold it, and a busy confirmation is
+       * exactly that: both of its buttons are disabled while the request is in
+       * flight, so Tab walked out of a surface still claiming `aria-modal` and
+       * into the drawer or page underneath.
+       */
       event.preventDefault();
+      const container = trap.containerRef.current;
+      const elements = focusableWithin(container);
+      if (elements.length === 0) {
+        // Park focus on the panel rather than leaving it on a disabled control
+        // or on the body, so the next press has somewhere inside to start from.
+        // A panel is a div and cannot take focus without this, and it is set
+        // here rather than on every surface so no surface has to remember; the
+        // opt-out value keeps it out of the tab order it is standing in for.
+        if (container && !container.hasAttribute("tabindex")) {
+          container.setAttribute("tabindex", "-1");
+        }
+        container?.focus();
+        return;
+      }
       const index = nextFocusIndex({
         count: elements.length,
         currentIndex: elements.indexOf(document.activeElement as HTMLElement),
