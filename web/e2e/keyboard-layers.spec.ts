@@ -104,6 +104,54 @@ test.describe("keyboard layer behavior", () => {
     await expect(page.locator("[data-palette-row-index]").first()).toBeVisible();
   });
 
+  /*
+   * A phone width is not offered the shortcut sheet, so it must not quietly
+   * hold the keys either. Two of them could not have worked there in any case:
+   * the sidebar is unmounted inside a closed drawer, so Open Settings raised a
+   * request nothing was mounted to hear, and reopening the drawer could not
+   * replay it.
+   *
+   * Whether the surface opens is the weaker half of this. It did not open
+   * before the fix either. What changed is that the press is no longer taken
+   * and thrown away, which is the half that can tell the two states apart.
+   */
+  async function pressOpenSettings(page: Page): Promise<boolean | null> {
+    await page.evaluate(() => {
+      (window as unknown as { __prevented: boolean | null }).__prevented = null;
+      window.addEventListener("keydown", (event) => {
+        if (event.code !== "Semicolon") return;
+        (window as unknown as { __prevented: boolean | null }).__prevented =
+          event.defaultPrevented;
+      });
+    });
+    await page.keyboard.press("ControlOrMeta+Shift+Semicolon");
+    await page.waitForTimeout(400);
+    return page.evaluate(
+      () => (window as unknown as { __prevented: boolean | null }).__prevented,
+    );
+  }
+
+  test("a phone width neither acts on a shortcut nor swallows it", async ({
+    page,
+  }) => {
+    await openMobile(page);
+    expect(await pressOpenSettings(page)).toBe(false);
+    await expect(page.getByTestId("sidebar-drawer")).toHaveCount(0);
+  });
+
+  test("a width that offers shortcuts still takes the same press", async ({
+    page,
+  }) => {
+    // The control side: without it, a shortcut layer that never ran anywhere
+    // would pass the case above.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await installMobileShellFixture(page, { account: "registered" });
+    await page.goto("/chat");
+    await page.waitForTimeout(1200);
+
+    expect(await pressOpenSettings(page)).toBe(true);
+  });
+
   test("Tab cannot escape a confirmation opened from the drawer", async ({
     page,
   }) => {

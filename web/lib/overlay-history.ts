@@ -67,17 +67,66 @@ function clearProgrammaticPopExpiry(): void {
  * and the overlay stayed put.
  *
  * This listener is never removed, so a traversal is always observed by someone.
- * Order against the overlay listeners does not matter: whichever runs first
- * spends the traversal and records the event, and the rest read that back.
+ * For classifying one, order against the overlay listeners does not matter:
+ * whichever runs first spends the traversal and records the event, and the rest
+ * read that back. Skipping a duplicate does depend on running first, which
+ * `skipOverlayDuplicate` explains and relies on.
+ *
+ * What is held here is the window the listener is on, rather than whether one
+ * was ever added. A boolean assumed there is only ever one window, which holds
+ * in a browser and not in a test file that stands its own up: the flag was
+ * already true from an earlier file, so the listener stayed attached to a
+ * window that had been thrown away and this one silently had none.
  */
-let popClassifierInstalled = false;
+let popClassifierWindow: unknown = null;
 
 function installPopClassifier(): void {
-  if (popClassifierInstalled || typeof window === "undefined") return;
-  popClassifierInstalled = true;
+  if (typeof window === "undefined" || popClassifierWindow === window) return;
+  popClassifierWindow = window;
   window.addEventListener("popstate", (event) => {
-    isProgrammaticPop(event);
+    if (isProgrammaticPop(event)) return;
+    skipOverlayDuplicate();
   });
+}
+
+/**
+ * Same-URL entries left underneath a destination when a nested overlay
+ * navigated away.
+ *
+ * Only the entry the topmost overlay pushed becomes the destination. The ones
+ * below it are exact copies of the URL the overlays opened over, and the
+ * History API has no way to delete an entry, so back landed on one and looked
+ * like it had done nothing: Omnisearch, then a dossier, then Open conversation
+ * cost the user a dead press.
+ *
+ * They are spent on the next real back press rather than removed. Stepping
+ * past one can never skip a page, because an overlay pushes `location.href`
+ * unchanged and every duplicate is therefore identical to the entry beneath
+ * it. The href is kept alongside so a press that lands somewhere else, after
+ * the user has navigated on from the destination, is left alone.
+ */
+let overlayDuplicateHrefs: string[] = [];
+
+/**
+ * Carries a back press past a duplicate so one press stays one step.
+ *
+ * Only while no overlay is open: with one open the press belongs to it.
+ * Reading that from the entries rather than from the layer registry keeps this
+ * module free of a runtime dependency on the React side, and holds because the
+ * classifier observes the event before any overlay does. Recording a duplicate
+ * installs the classifier, so by the time there is ever anything to skip, this
+ * listener is already the older of the two. Anything that would register the
+ * classifier later has to keep that true.
+ */
+function skipOverlayDuplicate(): void {
+  if (typeof window === "undefined") return;
+  if (unconsumedOverlays.length > 0) return;
+  const duplicateHref = overlayDuplicateHrefs[overlayDuplicateHrefs.length - 1];
+  if (duplicateHref === undefined) return;
+  if (duplicateHref !== window.location.href) return;
+  overlayDuplicateHrefs.pop();
+  markProgrammaticPop();
+  window.history.back();
 }
 
 export function markProgrammaticPop(): void {
@@ -108,6 +157,7 @@ export function isProgrammaticPop(event: Event): boolean {
 /** Test seam: reset document-level state between cases. */
 export function resetOverlayEntries(): void {
   unconsumedOverlays = [];
+  overlayDuplicateHrefs = [];
   pendingProgrammaticPops = 0;
   handledPops = new WeakSet<Event>();
   clearProgrammaticPopExpiry();
@@ -135,9 +185,26 @@ export function openOverlayEntries(): readonly string[] {
  * the URL the overlay opened over, leaving the address bar pointing at the
  * conversation the user just left while the transcript shows the new one, and a
  * reload lands on the wrong one. The entry is not spare, it is the destination.
+ *
+ * Only the topmost one is the destination, though. Nested overlays each pushed
+ * an entry, and the ones underneath become duplicates that nothing will ever
+ * pop, so they are handed to `skipOverlayDuplicate` to spend on the next back
+ * press. Recorded here rather than collapsed here: undoing them needs a
+ * traversal, and a traversal cannot be awaited without leaving the destination
+ * URL unwritten in the meantime, which is the failure this whole function
+ * exists to prevent.
  */
 export function consumeOverlayEntriesForNavigation(): void {
+  const duplicates = Math.max(0, unconsumedOverlays.length - 1);
   unconsumedOverlays = [];
+  if (duplicates === 0 || typeof window === "undefined") return;
+  // Called before the destination is written, so this is still the URL the
+  // overlays opened over, which is what those entries hold.
+  const href = window.location.href;
+  installPopClassifier();
+  for (let index = 0; index < duplicates; index += 1) {
+    overlayDuplicateHrefs.push(href);
+  }
 }
 
 export function overlayHistoryState(

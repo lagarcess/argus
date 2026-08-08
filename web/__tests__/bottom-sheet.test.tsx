@@ -76,6 +76,38 @@ describe("bottom sheet dismissal", () => {
     ).toBe("dismiss");
   });
 
+  /*
+   * The grip sits directly above a scrolling body, so the browser can decide
+   * mid-drag that a downward pull was a scroll and take the gesture back. That
+   * arrives as `pointercancel`, carrying the travel and direction of a real
+   * dismissal, and the sheet closed under the user's thumb.
+   */
+  test("a cancelled gesture never dismisses, however far or fast it went", () => {
+    for (const [deltaY, velocityY] of [
+      [160, 0.1],
+      [70, 1.2],
+      [600, 5],
+    ]) {
+      expect(
+        bottomSheetDragOutcome({
+          deltaY,
+          sheetHeight: 600,
+          velocityY,
+          phase: "cancel",
+        }),
+      ).toBe("settle");
+      // The same numbers on a release, so the case cannot pass by being inert.
+      expect(
+        bottomSheetDragOutcome({
+          deltaY,
+          sheetHeight: 600,
+          velocityY,
+          phase: "release",
+        }),
+      ).toBe("dismiss");
+    }
+  });
+
   test("short sheets still need real travel", () => {
     // 25 percent of a 40dvh sheet is under the floor, so the floor governs.
     expect(

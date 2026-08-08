@@ -9,6 +9,22 @@ import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 import { nextSidebarRecentsState } from "@/lib/sidebar-shortcuts";
 
 type UseChatKeyboardShortcutsOptions = {
+  /**
+   * Whether this width offers keyboard shortcuts at all.
+   *
+   * Below the mobile threshold the sidebar lives in a drawer that renders
+   * nothing while closed, so `open_settings` incremented a request no mounted
+   * component was listening for, and reopening the drawer could not replay it
+   * because the sidebar starts by treating the current request as already
+   * seen. `expand_sidebar_recents` toggled a rail that width does not have.
+   * Both keys took the press and gave nothing back.
+   *
+   * The profile menu already withholds the shortcut sheet there, on the
+   * grounds that a phone has no keyboard to shortcut. Registering the keys
+   * anyway is the same decision made twice with different answers, so the gate
+   * belongs to the whole layer rather than to the two dead entries.
+   */
+  enabled: boolean;
   isChatView: boolean;
   canManageConversation: boolean;
   conversationId: string | null;
@@ -33,6 +49,7 @@ type UseChatKeyboardShortcutsOptions = {
 export function useChatKeyboardShortcuts(
   options: UseChatKeyboardShortcutsOptions,
 ) {
+  const { enabled } = options;
   const optionsRef = useRef(options);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [isRecentsQuickPeekOpen, setIsRecentsQuickPeekOpen] = useState(false);
@@ -42,7 +59,16 @@ export function useChatKeyboardShortcuts(
     optionsRef.current = options;
   });
 
+  // Crossing the threshold with either surface open leaves it on a width that
+  // has no way to reopen it and no key to close it.
   useEffect(() => {
+    if (enabled) return;
+    setKeyboardShortcutsOpen(false);
+    setIsRecentsQuickPeekOpen(false);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       const current = optionsRef.current;
       if (
@@ -62,9 +88,10 @@ export function useChatKeyboardShortcuts(
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
+  }, [enabled, isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
 
   useEffect(() => {
+    if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       const current = optionsRef.current;
       if (
@@ -145,7 +172,7 @@ export function useChatKeyboardShortcuts(
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
+  }, [enabled, isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
 
   return {
     keyboardShortcutsOpen,

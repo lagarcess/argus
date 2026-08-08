@@ -38,15 +38,27 @@ export function bottomSheetHeightClass(height: BottomSheetHeight): string {
   return HEIGHT_CLASS[height];
 }
 
+/**
+ * Whether the gesture ended because the user let go, or because the browser
+ * took it away. `pointercancel` is the second, and it decides nothing: the
+ * grip sits directly above a scrolling body, so a downward drag the browser
+ * reclaims as a scroll arrives here carrying exactly the travel and direction
+ * that read as a dismissal.
+ */
+export type SheetGesturePhase = "release" | "cancel";
+
 export function bottomSheetDragOutcome({
   deltaY,
   sheetHeight,
   velocityY,
+  phase = "release",
 }: {
   deltaY: number;
   sheetHeight: number;
   velocityY: number;
+  phase?: SheetGesturePhase;
 }): "dismiss" | "settle" {
+  if (phase === "cancel") return "settle";
   if (deltaY <= 0) return "settle";
   if (velocityY >= DISMISS_FLICK_VELOCITY) return "dismiss";
   const travelThreshold = Math.max(
@@ -136,12 +148,16 @@ export function BottomSheet({
     setDragOffset(Math.max(0, deltaY));
   };
 
-  const handleDragEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const endGesture = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    phase: SheetGesturePhase,
+  ) => {
     const origin = dragOriginRef.current;
     dragOriginRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    setDragOffset(0);
     if (!origin) return;
     const deltaY = event.clientY - origin.y;
     const elapsed = Math.max(1, event.timeStamp - origin.at);
@@ -149,10 +165,16 @@ export function BottomSheet({
       deltaY,
       sheetHeight: panelRef.current?.offsetHeight ?? 0,
       velocityY: deltaY / elapsed,
+      phase,
     });
-    setDragOffset(0);
     if (outcome === "dismiss") onClose();
   };
+
+  const handleDragEnd = (event: ReactPointerEvent<HTMLDivElement>) =>
+    endGesture(event, "release");
+
+  const handleDragCancel = (event: ReactPointerEvent<HTMLDivElement>) =>
+    endGesture(event, "cancel");
 
   if (!isOpen) return null;
 
@@ -178,7 +200,7 @@ export function BottomSheet({
           onPointerDown={handleDragStart}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
-          onPointerCancel={handleDragEnd}
+          onPointerCancel={handleDragCancel}
           className="argus-sheet-grip shrink-0 cursor-grab px-4 pb-2 pt-2 active:cursor-grabbing"
         >
           <div className="mx-auto my-1 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10" />

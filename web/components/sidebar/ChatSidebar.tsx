@@ -44,6 +44,7 @@ import {
 
 import type { HistoryItem, SearchConversationItem } from "@/lib/argus-api";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
+import { sidebarShortcutHintsVisible } from "@/lib/sidebar-shortcuts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,8 +190,11 @@ export default function ChatSidebar({
   >(() => new Set());
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const [showShortcutHints, setShowShortcutHints] = useState(false);
-  const shortcutHintsVisible =
-    showShortcutHints && !shortcutHintsSuppressed;
+  const shortcutHintsVisible = sidebarShortcutHintsVisible({
+    modifierHeld: showShortcutHints,
+    suppressed: shortcutHintsSuppressed,
+    variant,
+  });
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);

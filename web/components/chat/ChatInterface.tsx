@@ -914,7 +914,9 @@ export default function ChatInterface() {
     // never claims it. Whether any surface is open is asked at press time
     // against the layer registry, rather than named here one surface at a
     // time: naming only the drawer left the same bug behind every other modal.
-    omnisearchShortcutEnabled: omnisearchEnabled,
+    // Withheld below the mobile threshold on the same rule as the rest of the
+    // layer, so there is one answer to whether this width has shortcuts.
+    omnisearchShortcutEnabled: omnisearchEnabled && !mobileShell.isBelowTablet,
   });
   const {
     isGuest,
@@ -1991,6 +1993,7 @@ export default function ChatInterface() {
     failedConversationId === conversationId;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
+    enabled: !mobileShell.isBelowTablet,
     isChatView: currentView === "chat",
     canManageConversation,
     conversationId,

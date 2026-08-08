@@ -230,6 +230,49 @@ describe("sidebar drawer", () => {
     ).toBe("dismiss");
   });
 
+  /*
+   * The panel allows vertical panning so Recents can scroll, which means the
+   * browser can take the gesture away mid-drag and send `pointercancel`. That
+   * is not the user letting go, so it decides nothing: a thumb scrolling the
+   * list drifts sideways, and both readings of a real dismissal were reachable
+   * from that drift alone.
+   */
+  test("a cancelled gesture never dismisses, however far or fast it went", () => {
+    for (const [deltaX, velocityX] of [
+      [-140, 0.1],
+      [-30, 0.9],
+      [-320, 5],
+    ]) {
+      expect(
+        sidebarDrawerDragOutcome({
+          deltaX,
+          panelWidth: 320,
+          velocityX,
+          phase: "cancel",
+        }),
+      ).toBe("settle");
+      // The same numbers on a release, so the case cannot pass by being inert.
+      expect(
+        sidebarDrawerDragOutcome({
+          deltaX,
+          panelWidth: 320,
+          velocityX,
+          phase: "release",
+        }),
+      ).toBe("dismiss");
+    }
+  });
+
+  test("cancellation is wired to the cancel phase, not to the release path", () => {
+    const source = readFileSync(
+      join(import.meta.dir, "../components/sidebar/SidebarDrawer.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("onPointerUp={handleDragEnd}");
+    expect(source).toContain("onPointerCancel={handleDragCancel}");
+    expect(source).toContain('endGesture(event, "cancel")');
+  });
+
   test("covers 80 to 85 percent so a strip of chat stays tappable", () => {
     const source = readFileSync(
       join(import.meta.dir, "../components/sidebar/SidebarDrawer.tsx"),

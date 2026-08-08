@@ -15,15 +15,27 @@ const DISMISS_TRAVEL_RATIO = 0.33;
 const DISMISS_FLICK_VELOCITY = 0.5;
 const DRAG_CAPTURE_THRESHOLD_PX = 6;
 
+/**
+ * Whether the gesture ended because the user let go, or because the browser
+ * took it away. `pointercancel` is the second, and it decides nothing: the
+ * panel allows vertical panning, so scrolling Recents hands the pointer to the
+ * scroller mid-drag, and the sideways drift of a thumb scroll was enough
+ * travel to read as a dismissal.
+ */
+export type SidebarDrawerGesturePhase = "release" | "cancel";
+
 export function sidebarDrawerDragOutcome({
   deltaX,
   panelWidth,
   velocityX,
+  phase = "release",
 }: {
   deltaX: number;
   panelWidth: number;
   velocityX: number;
+  phase?: SidebarDrawerGesturePhase;
 }): "dismiss" | "settle" {
+  if (phase === "cancel") return "settle";
   if (deltaX >= 0) return "settle";
   const travel = Math.abs(deltaX);
   if (Math.abs(velocityX) >= DISMISS_FLICK_VELOCITY) return "dismiss";
@@ -92,12 +104,16 @@ export default function SidebarDrawer({
     setDragOffset(Math.min(0, deltaX));
   };
 
-  const handleDragEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const endGesture = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    phase: SidebarDrawerGesturePhase,
+  ) => {
     const origin = dragOriginRef.current;
     dragOriginRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    setDragOffset(0);
     if (!origin) return;
     const deltaX = event.clientX - origin.x;
     const elapsed = Math.max(1, event.timeStamp - origin.at);
@@ -105,10 +121,16 @@ export default function SidebarDrawer({
       deltaX,
       panelWidth: panelRef.current?.offsetWidth ?? 0,
       velocityX: deltaX / elapsed,
+      phase,
     });
-    setDragOffset(0);
     if (outcome === "dismiss") onClose();
   };
+
+  const handleDragEnd = (event: ReactPointerEvent<HTMLDivElement>) =>
+    endGesture(event, "release");
+
+  const handleDragCancel = (event: ReactPointerEvent<HTMLDivElement>) =>
+    endGesture(event, "cancel");
 
   if (!isOpen) return null;
 
@@ -133,7 +155,7 @@ export default function SidebarDrawer({
         onPointerDown={handleDragStart}
         onPointerMove={handleDragMove}
         onPointerUp={handleDragEnd}
-        onPointerCancel={handleDragEnd}
+        onPointerCancel={handleDragCancel}
         style={
           dragOffset < 0
             ? { transform: `translate3d(${dragOffset}px, 0, 0)` }
