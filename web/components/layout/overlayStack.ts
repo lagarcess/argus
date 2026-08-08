@@ -223,7 +223,15 @@ export function useOverlayLayer({
     handlers.current = { onEscape, onKeyDown, onOutsidePointerDown };
   });
 
-  useEffect(() => {
+  /*
+   * Layout timing for the same reason, applied to membership rather than to
+   * callbacks. A passive effect leaves the registry a commit behind the screen:
+   * a dialog that has rendered above the drawer is not the input owner yet, so
+   * Escape in that window closes the drawer underneath it, and after the dialog
+   * closes its stale entry is still on top, so the next press finds nothing.
+   * The visible layer and the layer that owns input have to change together.
+   */
+  useIsomorphicLayoutEffect(() => {
     if (!isOpen) return;
     const layer: OverlayLayer = {
       id: overlayId,
@@ -239,8 +247,11 @@ export function useOverlayLayer({
     };
     registerOverlayLayer(layer);
     return () => unregisterOverlayLayer(overlayId);
-    // Handler identity is held in a ref, so it must not resubscribe here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deliberately not the handlers. They are read above only to decide whether
+    // to install a wrapper, their identity lives in the ref, and depending on
+    // them would re-register on every render, which moves the layer back to the
+    // top of the stack and lets a parent outrank the dialog above it. The deps
+    // rule does not inspect this custom hook, so the list is held by hand.
   }, [isOpen, overlayId, containerRef, trapFocus]);
 }
 
