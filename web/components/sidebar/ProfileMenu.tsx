@@ -1,7 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
+import { useModalSurface } from "../layout/useModalSurface";
+import { useOverlayLayer } from "../layout/overlayStack";
+import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
+import {
+  SHEET_SUBMENU_CLASS,
+  profileMenuClass,
+  profileSubmenuAnchorClass,
+  profileSubmenuClass,
+} from "./profileMenuPlacement";
 import {
   Activity,
   Archive,
@@ -28,6 +44,8 @@ import {
   Edit2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
 import {
   AVATAR_THEMES,
@@ -67,6 +85,11 @@ type ProfileMenuProps = {
   anchorRef: React.RefObject<HTMLElement | null>;
   /** Whether the sidebar is collapsed (affects menu position) */
   sidebarCollapsed?: boolean;
+  /**
+   * Where the menu is opening from. The rail can afford a detached popover that
+   * flies its submenus out to the right; a drawer cannot.
+   */
+  placement?: "rail" | "drawer";
 };
 
 type ActiveModal =
@@ -121,9 +144,22 @@ export default function ProfileMenu({
   onOpenKeyboardShortcuts,
   anchorRef,
   sidebarCollapsed = false,
+  placement = "rail",
 }: ProfileMenuProps) {
   const { t, i18n } = useTranslation();
+  const { isBelowDesktop } = useResponsiveLayout();
+  /*
+   * Below the panel line this menu is a sheet, whatever the sidebar is doing.
+   * Tying it to the sidebar's own 720 line left the tablet band showing a
+   * shrunken mouse menu whose submenus only opened on a hover that a tablet
+   * cannot produce.
+   */
+  const asSheet = isBelowDesktop;
+  const isDrawerPlacement = placement === "drawer";
+  const menuOverlayId = useId();
+  const profileModalOverlayId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
+  const profileModalRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
   const avatarTriggerRef = useRef<HTMLButtonElement>(null);
   const avatarThemeDrawerRef = useRef<HTMLDivElement>(null);
@@ -149,6 +185,7 @@ export default function ProfileMenu({
     useState<DeleteRequestState>("idle");
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverOpenedRef = useRef(false);
 
   const closeAvatarPicker = useCallback(() => {
     if (!isAvatarPickerOpen) return;
@@ -222,37 +259,61 @@ export default function ProfileMenu({
     };
   }, [isOpen, accountKind]);
 
-  // Close on click-outside
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
+
+  /*
+   * One registration per visible surface.
+   *
+   * As a sheet the shell already owns the layer, the history entry and the
+   * focus trap, so registering here as well gave the same panel two owners:
+   * closing it scheduled two `history.back()` calls, and traversal being
+   * asynchronous, that leaves a phantom entry the next press spends.
+   */
+  useModalSurface({
+    isOpen: isOpen && isDrawerPlacement && !asSheet,
+    overlayId: menuOverlayId,
+    containerRef: menuRef,
+    onDismiss: onClose,
+    // A submenu is the shallower thing on screen, so it answers first instead
+    // of one press closing both levels.
+    onEscape: () => {
+      if (activeSubmenu) {
+        setActiveSubmenu(null);
+        return;
       }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isOpen, onClose, anchorRef]);
+      onClose();
+    },
+    // A menu is not modal, so it does not hold Tab itself. The registry hands
+    // containment down to the nearest trapping layer instead, which inside the
+    // drawer is the drawer, so Tab still cannot reach the page behind it.
+    trapFocus: false,
+  });
 
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [isOpen, onClose]);
+  // On the rail this is a detached popover rather than a layer, so it keeps the
+  // plain dismissal rules a popover has.
+  useOverlayLayer({
+    isOpen: isOpen && !isDrawerPlacement && !asSheet,
+    overlayId: menuOverlayId,
+    containerRef: menuRef,
+    onEscape: onClose,
+    onOutsidePointerDown: (event) => {
+      if (anchorRef.current?.contains(event.target as Node)) return;
+      onClose();
+    },
+  });
 
-  useEffect(() => {
-    if (!activeModal) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+  // Opening this closes the menu, so the registration above has already stood
+  // down by the time the dialog paints. It needs its own or nothing owns back,
+  // Escape, or focus for it. Scoped to the panel rather than the backdrop, so
+  // focus does not open on an invisible dismiss control.
+  useModalSurface({
+    isOpen: activeModal === "profile",
+    overlayId: profileModalOverlayId,
+    containerRef: profileModalRef,
+    onDismiss: closeProfileModal,
+    // The pickers inside this dialog are nested state rather than layers of
+    // their own, so the registry cannot see them. Defaulting Escape to
+    // onDismiss threw the whole dialog away while a picker was open.
+    onEscape: () => {
       if (isLanguagePickerOpen) {
         setIsLanguagePickerOpen(false);
         return;
@@ -266,18 +327,11 @@ export default function ProfileMenu({
         return;
       }
       closeProfileModal();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [
-    activeModal,
-    closeAvatarPicker,
-    closeProfileModal,
-    deleteRequestState,
-    isAvatarPickerOpen,
-    isDeleteRequestOpen,
-    isLanguagePickerOpen,
-  ]);
+    },
+    returnFocusRef: anchorRef,
+  });
+
+
 
   useEffect(() => {
     if (!isLanguagePickerOpen) return;
@@ -303,21 +357,45 @@ export default function ProfileMenu({
     }
   }, [isOpen]);
 
+  // A tap emits mouseenter as well as click, so hover-to-open and tap-to-toggle
+  // cancelled each other out and no submenu ever appeared in the drawer. Touch
+  // has no hover to express intent with, so the tap is the only opener there.
   const handleSubmenuEnter = useCallback((menu: SubMenu) => {
+    if (asSheet) return;
     if (!canOpenSubmenu) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
+    hoverOpenedRef.current = true;
     setActiveSubmenu(menu);
-  }, [canOpenSubmenu]);
+  }, [asSheet, canOpenSubmenu]);
 
+  /*
+   * Click opens a submenu at every width; hover only ever accelerates it.
+   *
+   * A press on a hover-capable machine fires enter and then click, so a plain
+   * toggle closed what the hover had just opened and the submenu never
+   * appeared. Anything a mouse can reach only by hovering is unreachable on a
+   * tablet, which stays above the panel line in landscape.
+   */
   const handleSubmenuToggle = useCallback((menu: SubMenu) => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
-    setActiveSubmenu((current) => (current === menu ? null : menu));
-  }, []);
+    if (activeSubmenu === menu) {
+      if (hoverOpenedRef.current) {
+        // The hover opened it a moment ago; this click confirms rather than undoes.
+        hoverOpenedRef.current = false;
+        return;
+      }
+      setActiveSubmenu(null);
+      return;
+    }
+    hoverOpenedRef.current = false;
+    setActiveSubmenu(menu);
+  }, [activeSubmenu]);
 
   const handleSubmenuLeave = useCallback(() => {
+    if (asSheet) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
     submenuTimeoutRef.current = setTimeout(() => setActiveSubmenu(null), 250);
-  }, []);
+  }, [asSheet]);
 
   const handleSubmenuKeepAlive = useCallback(() => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -326,10 +404,13 @@ export default function ProfileMenu({
   const openModal = useCallback(
     (modal: ActiveModal) => {
       setActiveModal(modal);
+      if (asSheet) return;
+      // The popover has nowhere to sit behind a dialog, so it closes. A sheet
+      // stays open underneath, which is what the child's back row returns to.
       setActiveSubmenu(null);
       onClose();
     },
-    [onClose],
+    [asSheet, onClose],
   );
 
   const handleDeleteAllConversations = useCallback(() => {
@@ -674,134 +755,50 @@ export default function ProfileMenu({
   )}`;
 
   const deleteRequestDialog = isDeleteRequestOpen ? (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
-      <button
-        className="absolute inset-0"
-        onClick={() => {
-          if (deleteRequestState !== "submitting") {
-            setIsDeleteRequestOpen(false);
-          }
-        }}
-        aria-label={t(
-          "settings.profile.request_deletion.close",
-          "Close deletion request",
-        )}
-      />
-      <div
-        className="relative w-full max-w-sm rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="argus-delete-request-title"
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3
-            id="argus-delete-request-title"
-            className="font-display text-[16px] font-medium text-black dark:text-white"
-          >
-            {t(
-              "settings.profile.request_deletion.title",
-              "Request account deletion",
-            )}
-          </h3>
-          <button
-            type="button"
-            onClick={() => setIsDeleteRequestOpen(false)}
-            disabled={deleteRequestState === "submitting"}
-            className="rounded-full p-1.5 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/10"
-            aria-label={t(
-              "settings.profile.request_deletion.close",
-              "Close deletion request",
-            )}
-          >
-            <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-          </button>
-        </div>
-
-        {deleteRequestState === "success" ? (
-          <>
-            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-              {t(
-                "settings.profile.request_deletion.success",
-                "Request sent. We'll follow up by email.",
-              )}
-            </p>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsDeleteRequestOpen(false)}
-                className="rounded-md bg-black px-3 py-2 text-[13px] font-medium text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85"
-              >
-                {t("common.done", "Done")}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-              {t(
-                "settings.profile.request_deletion.body",
-                "Support handles account deletion. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
-              )}
-            </p>
-            {deleteRequestState === "error" && (
-              <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
-                {t(
-                  "settings.profile.request_deletion.error",
-                  "We could not submit that request yet.",
-                )}{" "}
-                <a className="underline" href={supportMailto}>
-                  {t(
-                    "settings.profile.request_deletion.email_fallback",
-                    "Email support",
-                  )}
-                </a>
-              </p>
-            )}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsDeleteRequestOpen(false)}
-                disabled={deleteRequestState === "submitting"}
-                className="rounded-md px-3 py-2 text-[13px] font-medium text-black/55 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white/55 dark:hover:bg-white/10"
-              >
-                {t("common.cancel", "Cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSubmitDeleteRequest()}
-                disabled={deleteRequestState === "submitting"}
-                className="rounded-md bg-[#d66d75]/12 px-3 py-2 text-[13px] font-medium text-[#b94c55] hover:bg-[#d66d75]/18 disabled:cursor-wait disabled:opacity-60 dark:text-[#e7a2a8]"
-              >
-                {deleteRequestState === "submitting"
-                  ? t(
-                      "settings.profile.request_deletion.submitting",
-                      "Sending...",
-                    )
-                  : t(
-                      "settings.profile.request_deletion.contact_support",
-                      "Contact support",
-                    )}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+    <ProfileDeleteRequestDialog
+      state={deleteRequestState}
+      supportMailto={supportMailto}
+      onClose={() => setIsDeleteRequestOpen(false)}
+      onSubmit={handleSubmitDeleteRequest}
+    />
   ) : null;
 
   if (!isOpen && !activeModal && !isDeleteRequestOpen) return null;
 
   // ── Active modal rendering ──────────────────────────────────────────────
   if (activeModal === "appearance") {
-    return <AppearanceModal onClose={() => setActiveModal(null)} />;
+    return (
+      <AppearanceModal
+        onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("settings");
+        } : undefined}
+        backLabel={t("settings.app.title", "Preferences")}
+      />
+    );
   }
   if (activeModal === "language") {
-    return <LanguageModal onClose={() => setActiveModal(null)} />;
+    return (
+      <LanguageModal
+        onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("settings");
+        } : undefined}
+        backLabel={t("settings.app.title", "Preferences")}
+      />
+    );
   }
   if (activeModal === "archived") {
     return (
       <ArchivedChatsView
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         onRestored={onHistoryMutated}
       />
     );
@@ -810,6 +807,11 @@ export default function ProfileMenu({
     return (
       <DeletedItemsView
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         onRestored={onHistoryMutated}
       />
     );
@@ -821,6 +823,11 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         returnFocusRef={anchorRef}
       />
     );
@@ -832,6 +839,11 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
+        onBack={asSheet ? () => {
+          setActiveModal(null);
+          setActiveSubmenu("data");
+        } : undefined}
+        backLabel={t("settings.data.title", "Data Controls")}
         returnFocusRef={anchorRef}
       />
     );
@@ -841,11 +853,13 @@ export default function ProfileMenu({
       <>
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
           <button
+        tabIndex={-1}
             className="absolute inset-0"
             onClick={closeProfileModal}
             aria-label={t("settings.profile.close", "Close profile")}
           />
           <div
+            ref={profileModalRef}
             className="relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
             role="dialog"
             aria-modal="true"
@@ -1180,14 +1194,36 @@ export default function ProfileMenu({
 
   // ── Menu rendering ──────────────────────────────────────────────────────
 
-  // Position: detached from sidebar, consistently to the right
-  const menuLeft = sidebarCollapsed ? "68px" : "16px";
+  const { className: rawMenuClass, left: rawMenuLeft } = profileMenuClass(
+    placement,
+    sidebarCollapsed,
+  );
+  // Inside a sheet the shell is the panel, so the menu is just its rows.
+  const menuClassName = asSheet
+    ? "[&_button]:min-h-[44px] [&_a]:min-h-[44px]"
+    : rawMenuClass;
+  const menuLeft = asSheet ? undefined : rawMenuLeft;
+  const submenuSurfaceClass = (railSizeClass: string) =>
+    asSheet ? SHEET_SUBMENU_CLASS : profileSubmenuClass(placement, railSizeClass);
+  const submenuAnchorClass = asSheet ? "" : profileSubmenuAnchorClass(placement);
+  // In the sheet a submenu replaces the list rather than floating over it.
+  // Drilled into a submenu, the sheet shows that submenu alone. The bodies
+  // already render conditionally, so only the root-level rows need standing
+  // down; moving them would mean relocating 200 lines of markup for a class.
+  const showRootRows = !asSheet || !activeSubmenu;
+  const rootRow = showRootRows ? "" : " hidden";
+  const sheetTitles: Record<string, string> = {
+    data: t("settings.data.title", "Data Controls"),
+    settings: t("settings.app.title", "Preferences"),
+    help: t("settings.help.title", "Help & Legal"),
+    feedback: t("feedback.title", "Feedback"),
+  };
 
   const menu = (
     <div
       ref={menuRef}
       data-profile-menu-surface
-      className="fixed bottom-16 z-[60] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>div>button]:mx-1 [&>div>button]:my-0.5 [&>div>button]:w-[calc(100%-0.5rem)] [&>div>button]:rounded-[10px]"
+      className={menuClassName}
       style={{
         left: menuLeft,
         boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
@@ -1196,7 +1232,7 @@ export default function ProfileMenu({
       {/* Profile */}
       <button
         onClick={() => openModal("profile")}
-        className="font-display flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        className={`font-display flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
       >
         <User className="h-4 w-4 text-black/50 dark:text-white/50" />
         {t("settings.profile.title", "Profile")}
@@ -1205,13 +1241,13 @@ export default function ProfileMenu({
 
       {/* Data */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("data")}
         onMouseLeave={handleSubmenuLeave}
       >
         <button
           onClick={() => handleSubmenuToggle("data")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <Database className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1224,7 +1260,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "data" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-h-[294px] min-w-[304px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
+            className={submenuSurfaceClass("min-h-[294px] min-w-[304px]")}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1319,13 +1355,13 @@ export default function ProfileMenu({
 
       {/* Preferences */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("settings")}
         onMouseLeave={handleSubmenuLeave}
       >
         <button
           onClick={() => handleSubmenuToggle("settings")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <Palette className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1339,7 +1375,7 @@ export default function ProfileMenu({
         {activeSubmenu === "settings" && (
           <div
             aria-label={t("settings.preferences.title", "Preferences")}
-            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
+            className={submenuSurfaceClass("min-w-[248px]")}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1385,13 +1421,13 @@ export default function ProfileMenu({
 
       {/* Help */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("help")}
         onMouseLeave={handleSubmenuLeave}
       >
         <button
           onClick={() => handleSubmenuToggle("help")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1404,11 +1440,13 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "help" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px] [&>a]:mx-1 [&>a]:my-0.5 [&>a]:w-[calc(100%-0.5rem)] [&>a]:rounded-[10px]"
+            className={`${submenuSurfaceClass("min-w-[248px]")} [&>a]:mx-1 [&>a]:my-0.5 [&>a]:w-[calc(100%-0.5rem)] [&>a]:rounded-[10px]`}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
+            {/* A phone has no keyboard to shortcut, so it is not offered there. */}
+            {isDrawerPlacement ? null : (
             <button
               type="button"
               onClick={handleOpenKeyboardShortcuts}
@@ -1420,6 +1458,7 @@ export default function ProfileMenu({
               </span>
               <span className="ml-auto flex shrink-0">{quickJumpBadge("keyboard-shortcuts")}</span>
             </button>
+            )}
             <a href="/terms" className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <FileText className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">
@@ -1440,13 +1479,13 @@ export default function ProfileMenu({
 
       {/* Feedback */}
       <div
-        className="relative"
+        className={submenuAnchorClass}
         onMouseEnter={() => handleSubmenuEnter("feedback")}
         onMouseLeave={handleSubmenuLeave}
       >
         <button
           onClick={() => handleSubmenuToggle("feedback")}
-          className="font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+          className={`font-display flex min-h-[38px] w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5${rootRow}`}
         >
           <div className="flex items-center gap-2.5">
             <MessageSquareText className="h-4 w-4 text-black/50 dark:text-white/50" />
@@ -1459,7 +1498,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "feedback" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[248px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225] [&>button]:mx-1 [&>button]:my-0.5 [&>button]:w-[calc(100%-0.5rem)] [&>button]:rounded-[10px]"
+            className={submenuSurfaceClass("min-w-[248px]")}
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -1508,7 +1547,7 @@ export default function ProfileMenu({
       </div>
 
       {/* Divider */}
-      <div className="my-1 border-t border-black/5 dark:border-white/5" />
+      <div className={`my-1 border-t border-black/5 dark:border-white/5${rootRow}`} />
 
       {/* Log out */}
       <button
@@ -1516,15 +1555,15 @@ export default function ProfileMenu({
           onLogout();
           onClose();
         }}
-        className="font-display flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5"
+        className={`font-display flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5${rootRow}`}
       >
         <LogOut className="h-4 w-4" />
         {t("settings.logout", "Log out")}
       </button>
 
       {/* Footer links */}
-      <div className="my-1 border-t border-black/5 dark:border-white/5" />
-      <div className="flex items-center gap-1 px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25">
+      <div className={`my-1 border-t border-black/5 dark:border-white/5${rootRow}`} />
+      <div className={`flex items-center gap-1 px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25${rootRow}`}>
         <a href="/terms" className="transition-colors hover:text-black dark:hover:text-white">
           {t("settings.help.terms", "Terms of Use")}
         </a>
@@ -1536,10 +1575,42 @@ export default function ProfileMenu({
     </div>
   );
 
-  return typeof document !== "undefined" ? (
+  if (typeof document === "undefined") return null;
+
+  if (asSheet) {
+    // The sheet supplies the panel, the title and the way back, so the menu
+    // contributes only its rows.
+    const sheet = (
+      <AdaptivePanel
+        title={
+          activeSubmenu
+            ? sheetTitles[activeSubmenu]
+            : t("common.settings", "Settings")
+        }
+        closeLabel={t("common.close", "Close")}
+        onClose={onClose}
+        onBack={activeSubmenu ? () => setActiveSubmenu(null) : undefined}
+        backLabel={t("common.settings", "Settings")}
+      >
+        {menu}
+      </AdaptivePanel>
+    );
+    return (
+      <>
+        {createPortal(sheet, document.body)}
+        {deleteRequestDialog
+          ? createPortal(deleteRequestDialog, document.body)
+          : null}
+      </>
+    );
+  }
+
+  return (
     <>
-      {createPortal(menu, document.body)}
-      {deleteRequestDialog ? createPortal(deleteRequestDialog, document.body) : null}
+      {isDrawerPlacement ? menu : createPortal(menu, document.body)}
+      {deleteRequestDialog
+        ? createPortal(deleteRequestDialog, document.body)
+        : null}
     </>
-  ) : null;
+  );
 }

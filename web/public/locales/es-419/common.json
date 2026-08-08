@@ -1,44 +1,46 @@
 {
   "common": {
-    "backtest": "Simulación",
-    "strategy": "Estrategia",
-    "collection": "Colección",
-    "chat": "Chat",
-    "history": "Historial",
-    "settings": "Ajustes",
-    "conversation": "Conversación",
-    "recents": "Recientes",
-    "run_simulation": "Ejecutar simulación",
-    "rename": "Renombrar",
-    "delete": "Eliminar",
-    "pin": "Anclar",
-    "unpin": "Desanclar",
-    "loading": "Cargando...",
-    "retry": "Reintentar",
-    "try_again": "Intentar de nuevo",
-    "back": "Volver",
-    "error_occurred": "Ha ocurrido un error",
-    "save": "Guardar",
-    "confirm": "Confirmar",
-    "cancel": "Cancelar",
-    "done": "Listo",
-    "search": "Buscar",
+    "and": "y",
     "archive": "Archivar",
     "archived": "Archivado",
-    "today": "hoy",
-    "yesterday": "ayer",
-    "no_items": "No se encontraron elementos",
-    "restore": "Restaurar",
-    "permanently_delete": "Eliminar permanentemente",
-    "submit": "Enviar",
-    "more": "Más",
-    "current": "Actual",
+    "back": "Volver",
+    "backtest": "Simulación",
+    "cancel": "Cancelar",
+    "chat": "Chat",
+    "close": "Cerrar",
     "collapse": "Contraer",
+    "collection": "Colección",
+    "confirm": "Confirmar",
+    "conversation": "Conversación",
+    "current": "Actual",
+    "delete": "Eliminar",
+    "done": "Listo",
+    "error_occurred": "Ha ocurrido un error",
     "expand": "Expandir",
+    "history": "Historial",
     "learn_more": "Más información",
-    "and": "y",
+    "loading": "Cargando...",
+    "more": "Más",
+    "navigation": "Navegación",
+    "no_items": "No se encontraron elementos",
     "or": "o",
-    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
+    "permanently_delete": "Eliminar permanentemente",
+    "pin": "Anclar",
+    "recents": "Recientes",
+    "rename": "Renombrar",
+    "restore": "Restaurar",
+    "retry": "Reintentar",
+    "run_simulation": "Ejecutar simulación",
+    "save": "Guardar",
+    "search": "Buscar",
+    "settings": "Ajustes",
+    "strategy": "Estrategia",
+    "submit": "Enviar",
+    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar",
+    "today": "hoy",
+    "try_again": "Intentar de nuevo",
+    "unpin": "Desanclar",
+    "yesterday": "ayer"
   },
   "legal": {
     "eyebrow": "Legal de acceso anticipado",
@@ -215,7 +217,8 @@
         "safety": "Preocupación de seguridad o legal",
         "other": "Otro"
       }
-    }
+    },
+    "close": "Cerrar comentarios"
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
@@ -791,6 +794,19 @@
         "lost_to_benchmark": "Quedó {{points}} puntos por debajo de la referencia",
         "beat_benchmark": "Superó la referencia por {{points}} puntos",
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_indicator_thresholds": "Otros umbrales",
+        "adjust_signal_periods": "Otros períodos",
+        "change_date_range": "Otras fechas",
+        "compare_buy_and_hold": "Comparar con mantener",
+        "recurring_monthly_buys": "Compras mensuales",
+        "same_rule_peer_asset": "Misma regla, activo similar",
+        "same_setup_peer_asset": "Activo similar",
+        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_rsi_or_ma_rule": "Simplificar la regla",
+        "supported_rsi_threshold": "Regla RSI compatible"
       }
     },
     "memory": {
@@ -864,7 +880,8 @@
         "light": "Claro",
         "dark": "Oscuro",
         "system": "Sistema"
-      }
+      },
+      "close_appearance": "Cerrar apariencia"
     },
     "sidebar": {
       "title": "Preferencia de barra lateral",
@@ -955,7 +972,9 @@
         "close": "Cerrar uso",
         "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
         "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
-      }
+      },
+      "close_archived": "Cerrar chats archivados",
+      "close_deleted": "Cerrar borrados recientemente"
     },
     "help": {
       "title": "Ayuda y legal",
@@ -1173,7 +1192,9 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    }
+    },
+    "row_actions": "Acciones de la conversación",
+    "close_dossier": "Cerrar el expediente"
   },
   "auth": {
     "captcha": {

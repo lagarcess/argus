@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import ChatInput from "./ChatInput";
 import ChatLegalNotice from "./ChatLegalNotice";
 import EmptyChatHeading from "./EmptyChatHeading";
@@ -43,14 +44,26 @@ export default function EmptyChatSurface({
   onToast,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
+  const { isBelowTablet } = useResponsiveLayout();
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
+  // The tall top inset belongs to tablet and up. Expressing it as a min-width
+  // variant rather than overriding a base value keeps `sm:` from winning the
+  // cascade between 400 and 719px, where most phones actually sit.
   return (
-    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-      <EmptyChatHeading isGuest={isGuest} />
+    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 tablet:pb-8 tablet:pt-[28vh]">
+      {/* The heading absorbs the free space below the mobile threshold, which
+          settles the pills and the composer onto the bottom edge where a thumb
+          rests. Above it, the surface keeps its centered composition. */}
+      <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
+        <EmptyChatHeading isGuest={isGuest} />
+      </div>
 
-      <div aria-busy={guestSubmissionPending} className="w-full max-w-2xl">
+      <div
+        aria-busy={guestSubmissionPending}
+        className="order-3 w-full max-w-2xl tablet:order-2"
+      >
         <ChatInput
           key="new-conversation"
           onSend={onSend}
@@ -95,10 +108,18 @@ export default function EmptyChatSurface({
         />
       </div>
 
-      <StarterActions disabled={disabled} onSelect={onSend} />
+      {/* Thumb-reachable above the composer on narrow screens, and in its
+          familiar place under the composer from tablet up. */}
+      <div className="order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3">
+        <StarterActions
+          disabled={disabled}
+          onSelect={onSend}
+          layout={isBelowTablet ? "scroll" : "wrap"}
+        />
+      </div>
 
       {chatExploratorySuggestionsEnabled && (
-        <div className="mt-4">
+        <div className="order-4 mt-4">
           <button
             onClick={onToggleSuggestions}
             className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
@@ -111,7 +132,7 @@ export default function EmptyChatSurface({
       )}
 
       {chatExploratorySuggestionsEnabled && showSuggestions && (
-        <div className="mt-8 flex flex-col items-center gap-4 text-center">
+        <div className="order-5 mt-8 flex flex-col items-center gap-4 text-center">
           {(["q1", "q2", "q3"] as const).map((queryKey) => {
             const fallback = {
               q1: "What if I bought Apple after big drops?",

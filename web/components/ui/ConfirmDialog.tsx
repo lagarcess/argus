@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useId, useRef, useCallback } from "react";
+import { useModalSurface } from "@/components/layout/useModalSurface";
 import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
 
 type ConfirmDialogProps = {
@@ -51,9 +52,13 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
+  const overlayId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  // A confirmation is the topmost surface wherever it opens, so it registers
+  // for Escape, for focus, and for system back: without the last one, hardware
+  // back closed the drawer underneath and took the confirmation with it.
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
       const action = confirmDialogKeyboardAction({
         key: event.key,
         isBusy,
@@ -73,22 +78,37 @@ export function ConfirmDialog({
         event.stopPropagation();
         onConfirm();
       }
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [isBusy, isOpen, onCancel, onConfirm, showKeyboardHints]);
+    },
+    [isBusy, onCancel, onConfirm, showKeyboardHints],
+  );
+
+  useModalSurface({
+    isOpen,
+    overlayId,
+    containerRef: panelRef,
+    onDismiss: onCancel,
+    // `onCancel` refuses while the delete is in flight, and refusing inside the
+    // dismissal is too late: the entry is claimed by then, so the dialog stayed
+    // open owning an id it had spent and no later press could close it.
+    canDismiss: () => !isBusy,
+    // Confirm owns Enter as well as Escape, so it takes the whole keydown. The
+    // registry still only offers it while this dialog is the topmost layer.
+    onKeyDown: handleKeyDown,
+  });
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
       <button
+        tabIndex={-1}
         type="button"
         className="absolute inset-0"
         aria-label={cancelLabel}
         onClick={onCancel}
       />
       <div
+        ref={panelRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="argus-confirm-title"

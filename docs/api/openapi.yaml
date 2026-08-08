@@ -2143,6 +2143,13 @@ components:
         memory_opt_out:
           type: boolean
           default: false
+        viewport:
+          anyOf:
+          - type: string
+            enum:
+            - narrow
+            - wide
+          - type: 'null'
       type: object
       required:
       - conversation_id

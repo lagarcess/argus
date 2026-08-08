@@ -33,6 +33,7 @@ import {
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
@@ -82,6 +83,7 @@ export default function ChatMessage({
   onDecisionResumeHandled,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
+  const { isBelowTablet } = useResponsiveLayout();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
@@ -629,6 +631,12 @@ export default function ChatMessage({
                 <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
                   {(message.nextExperiments ?? []).map((row, rowIndex) => {
                     const rowLabel = t(row.labelKey, row.label);
+                    // Narrow screens read the backend's short form; the clamp
+                    // below is only a safety net, never a single-line ellipsis.
+                    const narrowLabel =
+                      isBelowTablet && row.labelShortKey
+                        ? t(row.labelShortKey, row.labelShort ?? row.label)
+                        : rowLabel;
                     // One result-level reason; captioning every row repeats it.
                     const whyText =
                       row.why && rowIndex === 0
@@ -652,7 +660,7 @@ export default function ChatMessage({
                           )
                         }
                       >
-                        <NextMoveTitle>{rowLabel}</NextMoveTitle>
+                        <NextMoveTitle>{narrowLabel}</NextMoveTitle>
                         {row.detail ? (
                           <>
                             <NextMoveSeparator>·</NextMoveSeparator>

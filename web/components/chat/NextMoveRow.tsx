@@ -42,7 +42,7 @@ export default function NextMoveRow({
       >
         ↳
       </span>
-      <span className="min-w-0 py-2 text-[14px] leading-[1.5] tracking-tight text-black/80 [overflow-wrap:anywhere] dark:text-white/80">
+      <span className="argus-next-move-text min-w-0 py-2 text-[14px] leading-[1.5] tracking-tight text-black/80 [overflow-wrap:anywhere] dark:text-white/80">
         {children}
       </span>
     </button>

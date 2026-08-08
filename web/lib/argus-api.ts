@@ -13,6 +13,7 @@ import {
   type ArgusLocale,
 } from "./language-features";
 import { isConversationMemoryOptOut } from "./memory-privacy";
+import { currentViewportBand } from "./responsive-layout";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
 import type { AvatarTheme } from "./avatar-theme";
@@ -911,6 +912,8 @@ export async function streamChatMessage(
       ...(isConversationMemoryOptOut(conversationId)
         ? { memory_opt_out: true }
         : {}),
+      // Width band, so a generated title is composed short rather than clipped.
+      viewport: currentViewportBand(),
     }),
   }).catch(() => { throw new ChatStreamError(CHAT_STREAM_INTERRUPTED_MESSAGE, 0, "stream_interrupted", submittedRequestId); });
   const responseRequestId = response.headers.get("X-Request-Id")?.trim() || submittedRequestId;

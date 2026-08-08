@@ -37,6 +37,8 @@ describe("Try next rows (issue #249)", () => {
         why: { code: "beat_benchmark", params: { points: 4.2 } },
         detail: null,
         sendText: null,
+        labelShort: null,
+        labelShortKey: null,
       },
     ]);
     expect(

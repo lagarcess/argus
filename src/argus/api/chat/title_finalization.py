@@ -30,6 +30,7 @@ def finalize_conversation_title_after_turn(
     assistant_metadata: dict[str, object] | None = None,
     message_id: str | None = None,
     run_id: str | None = None,
+    viewport: str | None = None,
 ) -> str | None:
     """Finalize a conversation title as fail-open utility-tier polish."""
 
@@ -47,6 +48,7 @@ def finalize_conversation_title_after_turn(
                 assistant_message,
                 metadata=assistant_metadata,
             ),
+            viewport=viewport,
         )
         if title is not None:
             fallback_failure_mode = None
@@ -95,6 +97,7 @@ def schedule_artifact_naming_after_stream(
     assistant_metadata: dict[str, object] | None = None,
     message_id: str | None = None,
     run_id: str | None = None,
+    viewport: str | None = None,
 ) -> None:
     """Start fail-open artifact naming after the canonical stream is complete."""
 
@@ -114,6 +117,7 @@ def schedule_artifact_naming_after_stream(
             assistant_metadata=assistant_metadata,
             message_id=message_id,
             run_id=run_id,
+            viewport=viewport,
         )
     try:
         asyncio.get_running_loop().create_task(_run())

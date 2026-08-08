@@ -39,14 +39,47 @@ def get_starter_prompts(language: str | None = None) -> list[str]:
     return STARTER_PROMPTS[resolve_language(language)]
 
 
+# A phone header shows roughly this much before it truncates, so the narrow
+# budget is a generation rule rather than a clip applied after the fact.
+NARROW_TITLE_MAX_WORDS = 3
+WIDE_TITLE_MAX_WORDS = 6
+
+
+def title_word_budget(viewport: str | None) -> int:
+    return NARROW_TITLE_MAX_WORDS if viewport == "narrow" else WIDE_TITLE_MAX_WORDS
+
+
+def constrain_to_word_budget(candidate: str, budget: int) -> str:
+    """Hold a generated title to the budget the prompt asked for.
+
+    A prompt is a request, not a guarantee. The contract says the backend owns
+    the short form so a narrow header shows a title composed short rather than
+    one the client clips, and that only holds if something here enforces it.
+
+    Trimming is structural on purpose: taking the first words and dropping
+    trailing punctuation, with no notion of which words matter. Anything
+    smarter would need to know the language, and choosing behaviour by language
+    is what this codebase does not do.
+    """
+
+    words = candidate.split()
+    if budget <= 0 or len(words) <= budget:
+        return candidate.strip()
+    kept = " ".join(words[:budget])
+    # A cut mid-phrase can leave a dangling comma or dash that reads as damage.
+    return kept.rstrip(" ,;:-–—/&").strip()
+
+
 def suggest_entity_name(
     *,
     entity_type: Literal["conversation"],
     context: str,
     language: str | None,
+    viewport: str | None = None,
 ) -> str | None:
     try:
         resolved = resolve_language(language)
+        budget = title_word_budget(viewport)
         response = invoke_openrouter_json_schema_sync(
             task="name_suggestion",
             schema_model=NameSuggestion,
@@ -56,7 +89,8 @@ def suggest_entity_name(
                     "role": "system",
                     "content": (
                         "Generate a concise user-facing name for Argus Alpha. "
-                        "Max 6 words. No punctuation-only output. "
+                        f"Max {budget} words. "
+                        "No punctuation-only output. "
                         f"Entity type: {entity_type}. Language: {resolved}."
                     ),
                 },
@@ -65,7 +99,7 @@ def suggest_entity_name(
         )
         if response is None:
             return None
-        candidate = response.name.strip()
+        candidate = constrain_to_word_budget(response.name.strip(), budget)
         return candidate if candidate else None
     except Exception as exc:
         log_openrouter_failure(

@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type RefObject,
 } from "react";
@@ -15,9 +14,9 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
-  X,
-} from "lucide-react";
+  } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import {
   ALL_MEMORY_CATEGORIES,
   deleteMemoryRecord,
@@ -33,15 +32,13 @@ import {
   type MemoryRecord,
   type MemorySettings,
 } from "@/lib/memory-api";
-import { dialogTabTarget } from "@/lib/dialog-focus";
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type MemoryControlsModalProps = {
   locale: "en-US" | "es-419";
   onClose: () => void;
+  onBack?: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
+  backLabel?: string;
 };
 
 type RecordRowProps = {
@@ -309,10 +306,11 @@ function MemoryRecordRow({ record, locale, onEdited, onDeleted }: RecordRowProps
 export default function MemoryControlsModal({
   locale,
   onClose,
+  onBack,
+  backLabel,
   returnFocusRef,
 }: MemoryControlsModalProps) {
   const { t } = useTranslation();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<MemorySettings | null>(null);
   const [records, setRecords] = useState<MemoryRecord[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -325,61 +323,6 @@ export default function MemoryControlsModal({
   const retry = useCallback(() => {
     setRequestVersion((current) => current + 1);
   }, []);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const returnFocusRoot = returnFocusRef?.current ?? null;
-    const fallbackReturnFocus = returnFocusRoot?.matches(FOCUSABLE_SELECTOR)
-      ? returnFocusRoot
-      : returnFocusRoot?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-    const focusableElements = () =>
-      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-
-    (focusableElements()[0] ?? dialog).focus();
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = focusableElements();
-      if (focusable.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-      const target = dialogTabTarget(
-        focusable,
-        document.activeElement as HTMLElement | null,
-        event.shiftKey,
-      );
-      if (target) {
-        event.preventDefault();
-        target.focus();
-      }
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      const previousFocusIsPageRoot =
-        previousFocus === document.body ||
-        previousFocus === document.documentElement;
-      const returnTarget =
-        previousFocus?.isConnected && !previousFocusIsPageRoot
-          ? previousFocus
-          : fallbackReturnFocus;
-      returnTarget?.focus();
-    };
-  }, [onClose, returnFocusRef]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -480,36 +423,15 @@ export default function MemoryControlsModal({
   }, [isMutating, t]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/25 p-4 backdrop-blur-sm sm:items-center dark:bg-black/60">
-      <button
-        className="absolute inset-0"
-        aria-label={t("settings.data.personalization.close", "Close memory")}
-        onClick={onClose}
-      />
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-[20px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#1b1d20]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="argus-memory-modal-title"
-      >
-        <header className="flex items-center justify-between gap-4 px-5 pt-3 pb-1">
-          <h2
-            id="argus-memory-modal-title"
-            className="font-display text-[17px] font-medium text-black dark:text-white"
-          >
-            {t("settings.data.personalization.title", "Memory")}
-          </h2>
-          <button
-            onClick={onClose}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/[0.08] dark:hover:text-white"
-            aria-label={t("settings.data.personalization.close", "Close memory")}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-
+    <AdaptivePanel
+      title={t("settings.data.personalization.title", "Memory")}
+      closeLabel={t("settings.data.personalization.close", "Close memory")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="md"
+      returnFocusRef={returnFocusRef}
+    >
         <div className="overflow-y-auto px-5 pb-5" aria-live="polite">
           {isLoading ? (
             <div
@@ -665,7 +587,6 @@ export default function MemoryControlsModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }

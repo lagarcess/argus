@@ -100,6 +100,7 @@ export default function GuestConversionModal({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
       <button
+        tabIndex={-1}
         type="button"
         aria-label={t("common.cancel", "Cancel")}
         className="absolute inset-0 bg-black/25 backdrop-blur-sm dark:bg-black/65"

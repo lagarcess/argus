@@ -180,6 +180,10 @@ import {
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
+import SidebarShell from "@/components/sidebar/SidebarShell";
+import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
+import GuestSettingsMenu from "@/components/guest/GuestSettingsMenu";
+import { useMobileShell } from "@/components/chat/useMobileShell";
 import { memoryRecallsFromFinalPayload, useMemoryChrome } from "./memory-chrome";
 import {
   isStarterSelectionMetadata,
@@ -229,6 +233,7 @@ export default function ChatInterface() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const mobileShell = useMobileShell();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [pendingHeaderDelete, setPendingHeaderDelete] = useState<KeyboardDeleteRequest | null>(null);
@@ -524,14 +529,18 @@ export default function ChatInterface() {
     setIsSidebarOpen((open) => !open);
   };
 
+  const closeDrawer = mobileShell.closeDrawer;
   const closeTransientSidebar = useCallback(() => {
+    // Navigating out of the drawer always dismisses it; the rail keeps its own
+    // transient rule, which depends on the user's sidebar mode.
+    closeDrawer();
     setIsSidebarOpen((currentOpen) =>
       sidebarOpenAfterTransientNavigation({
         currentOpen,
         mode: sidebarMode,
       }),
     );
-  }, [sidebarMode]);
+  }, [closeDrawer, sidebarMode]);
 
   function rememberCurrentConversationScroll(): void {
     const currentConversationId = readyTranscriptConversationIdRef.current;
@@ -875,7 +884,14 @@ export default function ChatInterface() {
         type: "general",
         context: { surface: "guest_header", conversation_id: conversationId },
       }),
-    onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    // The one door into Omnisearch, so the drawer closes here rather than at
+    // each caller. The palette paints below the drawer, and gating the shortcut
+    // hook alone still left the guest shell's own key listener opening it into
+    // a layer nobody can see.
+    onOpenOmnisearch: () => {
+      closeDrawer();
+      setSearchOverlayOpen(true);
+    },
     onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
     onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
@@ -894,7 +910,13 @@ export default function ChatInterface() {
         ),
         "error",
       ),
-    omnisearchShortcutEnabled: omnisearchEnabled,
+    // The single owner of the Omnisearch shortcut; useChatKeyboardShortcuts
+    // never claims it. Whether any surface is open is asked at press time
+    // against the layer registry, rather than named here one surface at a
+    // time: naming only the drawer left the same bug behind every other modal.
+    // Withheld below the mobile threshold on the same rule as the rest of the
+    // layer, so there is one answer to whether this width has shortcuts.
+    omnisearchShortcutEnabled: omnisearchEnabled && !mobileShell.isBelowTablet,
   });
   const {
     isGuest,
@@ -1971,13 +1993,21 @@ export default function ChatInterface() {
     failedConversationId === conversationId;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
+    enabled: !mobileShell.isBelowTablet,
     isChatView: currentView === "chat",
     canManageConversation,
     conversationId,
     isGuest,
     searchOverlayOpen,
     deleteConfirmationOpen: Boolean(pendingHeaderDelete),
-    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen || showChatOptions,
+    // The drawer is a modal too. Left out, its shortcuts still fired, and
+    // Recents Quick Peek opened at z-65 behind a z-68 drawer: a real modal
+    // nobody could see, reachable only by keyboard or switch control.
+    modalOpen:
+      isSidebarPreferenceModalOpen ||
+      feedbackState.isOpen ||
+      showChatOptions ||
+      mobileShell.isDrawerOpen,
     sidebarOpen: isSidebarOpen,
     setSidebarOpen: setIsSidebarOpen,
     recentsExpanded: isRecentsExpanded,
@@ -2018,10 +2048,27 @@ export default function ChatInterface() {
       selectPresentation={conversationActivity.selectPresentation}
       selectAggregatePresentation={conversationActivity.selectAggregatePresentation} selectOperationLabel={conversationActivity.selectOperationLabel}
     >
-      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
-      {/* ── Desktop sidebar ── */}
+      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white tablet:flex-row">
+      {/* ── Sidebar: rail on desktop, off-canvas drawer below the mobile threshold ── */}
+      <SidebarShell
+        isBelowTablet={mobileShell.isBelowTablet}
+        isDrawerOpen={mobileShell.isDrawerOpen}
+        onCloseDrawer={mobileShell.closeDrawer}
+        label={t("common.navigation", "Navigation")}
+      >
       <ChatSidebar
-        isOpen={isSidebarOpen}
+        variant={mobileShell.isBelowTablet ? "drawer" : "rail"}
+        onRequestClose={mobileShell.closeDrawer}
+        guestSettings={
+          mobileShell.isBelowTablet && isGuest ? (
+            <GuestSettingsMenu
+              feedbackEnabled={canSubmitFeedback}
+              onFeedback={requestGuestFeedback}
+              placement="drawer"
+            />
+          ) : null
+        }
+        isOpen={mobileShell.isBelowTablet ? true : isSidebarOpen}
         onToggle={toggleSidebar}
         currentView={currentView}
         conversationId={conversationId}
@@ -2048,6 +2095,7 @@ export default function ChatInterface() {
         onOpenItem={openHistoryItem}
         onLoadMoreHistory={loadMoreHistory}
         onOpenSearch={() => {
+          closeDrawer();
           if (omnisearchEnabled) {
             requestOmnisearch();
           }
@@ -2081,6 +2129,7 @@ export default function ChatInterface() {
         isGuest={guestExperience.isEstablishedGuest}
         guestExpiresAt={account?.guest?.expires_at}
       />
+      </SidebarShell>
 
       <KeyboardShortcutSurfaces
         keyboardShortcutsOpen={keyboardShortcuts.keyboardShortcutsOpen}
@@ -2143,9 +2192,23 @@ export default function ChatInterface() {
       <section className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]">
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
-          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-4 px-4 pointer-events-none md:px-8">
+          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-2 px-4 pointer-events-none tablet:gap-4 tablet:px-8">
+            {mobileShell.isBelowTablet && (
+              <div className="pointer-events-auto shrink-0">
+                <ChatShellMenuTrigger
+                  onOpen={mobileShell.openDrawer}
+                  activityPresentation={
+                    mobileShell.isDrawerOpen
+                      ? null
+                      : conversationActivity.selectAggregatePresentation(
+                          historyItems.map((item) => item.conversation_id ?? item.id),
+                        )
+                  }
+                />
+              </div>
+            )}
             {/* Title (left-aligned; truncates before the action cluster) */}
-            <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+            <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 tablet:text-[18px]">
               {currentView === "chat" &&
                 (conversationId !== null || messages.length > 0) && (
                   <ChatHeaderTitle
@@ -2164,6 +2227,7 @@ export default function ChatInterface() {
                   feedbackEnabled={canSubmitFeedback}
                   onFeedback={requestGuestFeedback}
                   onSignIn={requestGuestSignIn}
+                  showSettings={!mobileShell.isBelowTablet}
                 />
               ) : currentView === "chat" &&
                 conversationId &&
