@@ -1,0 +1,25 @@
+Issue #369 verdict byte-identity proof
+Base harness: 37c7eb5213f6c7933a6a56f5e7316eb9943de5fe (origin/codex/private-alpha-next tip)
+Comparison: base tests/evals/measurement_eval_harness.py loaded side by side with the candidate.
+Proof 2 replays real committed live-eval verdicts through both scorecard_for_results,
+blocking_eval_results, and expected_fail_issue_for_result.
+Proof 3 runs run_eval_case on both across every prose path and compares the full result
+dict with only the additive keys removed, then compares status/failed_checks/typed_outcome/
+expected_fail and the judge verdict fields with no stripping at all.
+Proofs 4 and 5 cover the redaction boundary after Codex comments 3740028402 (round 1) and
+3740853398 / 3740853401 (round 2): a secret's boundary comes from its own grammar, the
+opener, its escape convention, and its internal separators, without eating ordinary prose.
+
+[proof 2] aggregation byte-identical over 20 committed scorecards, 366 real results (177 prose-judged, 3 prose-failed)
+[proof 3] prose_fail_honesty       status=failed          checks=['prose_judge:honesty'] retained=58c truncated=False redactions=[]
+[proof 3] prose_fail_multi         status=failed          checks=['prose_judge:honesty', 'prose_judge:spanish_language_integrity'] retained=33c truncated=False redactions=[]
+[proof 3] prose_pass               status=passed          checks=[] retained=57c truncated=False redactions=[]
+[proof 3] prose_missing_text       status=failed          checks=['prose_judge:missing_assistant_text'] retained=3c truncated=False redactions=[]
+[proof 3] prose_empty_text         status=failed          checks=['prose_judge:missing_assistant_text'] retained=0c truncated=False redactions=[]
+[proof 3] prose_with_credentials   status=failed          checks=['prose_judge:no_raw_runtime_error'] retained=73c truncated=False redactions=[{'kind': 'bearer_token', 'count': 1}, {'kind': 'email', 'count': 1}]
+[proof 3] prose_oversized          status=failed          checks=['prose_judge:honesty'] retained=9010c truncated=True redactions=[]
+[proof 3] 8 scenarios byte-identical outside the additive keys; 7 carry retention
+[proof 4] 160 adversarial secret shapes, 0 surviving fragments
+[proof 5] 11 ordinary prose samples retained verbatim, 0 over-redacted
+
+ALL PROOFS PASSED: retention is additive and inert with respect to scoring.
