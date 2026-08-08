@@ -22,11 +22,12 @@ import BottomSheet from "@/components/ui/BottomSheet";
  * rather than a dozen near-copies.
  */
 
-export type AdaptivePanelWidth = "sm" | "md";
+export type AdaptivePanelWidth = "sm" | "md" | "lg";
 
 const DESKTOP_WIDTH: Record<AdaptivePanelWidth, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
+  lg: "max-w-[600px]",
 };
 
 export default function AdaptivePanel({
@@ -38,6 +39,7 @@ export default function AdaptivePanel({
   width = "sm",
   desktopMaxHeight = "max-h-[85vh]",
   footer,
+  returnFocusRef,
   children,
 }: {
   title: string;
@@ -49,6 +51,8 @@ export default function AdaptivePanel({
   width?: AdaptivePanelWidth;
   desktopMaxHeight?: string;
   footer?: ReactNode;
+  /** Where focus lands on close when the opener has gone with the parent. */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const { isBelowDesktop } = useResponsiveLayout();
@@ -83,7 +87,7 @@ export default function AdaptivePanel({
     );
   }
 
-  return <DesktopDialog {...{ title, titleId, overlayId, panelRef, onClose, closeLabel, width, desktopMaxHeight, footer, back, children }} />;
+  return <DesktopDialog {...{ title, titleId, overlayId, panelRef, onClose, closeLabel, width, desktopMaxHeight, footer, returnFocusRef, back, children }} />;
 }
 
 function DesktopDialog({
@@ -96,6 +100,7 @@ function DesktopDialog({
   width,
   desktopMaxHeight,
   footer,
+  returnFocusRef,
   back,
   children,
 }: {
@@ -108,6 +113,7 @@ function DesktopDialog({
   width: AdaptivePanelWidth;
   desktopMaxHeight: string;
   footer?: ReactNode;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
   back: ReactNode;
   children: ReactNode;
 }) {
@@ -119,6 +125,7 @@ function DesktopDialog({
     containerRef: panelRef,
     onDismiss: onClose,
     onEscape: onClose,
+    returnFocusRef,
   });
 
   return (

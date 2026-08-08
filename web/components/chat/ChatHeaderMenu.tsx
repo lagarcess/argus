@@ -61,7 +61,9 @@ export default function ChatHeaderMenu({
   memoryChrome,
 }: ChatHeaderMenuProps) {
   const { t } = useTranslation();
-  const { isBelowTablet } = useResponsiveLayout();
+  // The panel line, not the sidebar's: at tablet width the dossier beside
+  // this was already a sheet while this was not.
+  const { isBelowDesktop } = useResponsiveLayout();
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -78,7 +80,7 @@ export default function ChatHeaderMenu({
       }
     }
     // Below the threshold the sheet owns Escape, the scrim, and focus restore.
-    if (isOpen && !isBelowTablet) {
+    if (isOpen && !isBelowDesktop) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("keydown", handleKeyDown);
     }
@@ -86,7 +88,7 @@ export default function ChatHeaderMenu({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isBelowTablet, isOpen, onRequestClose]);
+  }, [isBelowDesktop, isOpen, onRequestClose]);
 
   const handleToggleUnread = () => {
     onRequestClose();
@@ -207,12 +209,12 @@ export default function ChatHeaderMenu({
       >
         <MoreVertical className="h-5 w-5" />
       </button>
-      {isOpen && !isBelowTablet && (
+      {isOpen && !isBelowDesktop && (
         <div className="absolute bottom-auto right-0 left-auto top-full mt-2 w-[260px] rounded-[20px] border border-black/5 bg-white pb-2 pt-2 dark:border-white/5 dark:bg-[#1f2225]">
           {menuBody}
         </div>
       )}
-      {isOpen && isBelowTablet && (
+      {isOpen && isBelowDesktop && (
         <BottomSheet
           isOpen
           height="auto"

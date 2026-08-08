@@ -46,12 +46,14 @@ export default function DiscoverySourcesPanel({
   anchorIndex = null,
 }: DiscoverySourcesPanelProps) {
   const { t, i18n } = useTranslation();
-  const { isBelowTablet } = useResponsiveLayout();
+  // The panel line, not the sidebar's: at tablet width the dossier beside
+  // this was already a sheet while this was not.
+  const { isBelowDesktop } = useResponsiveLayout();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (isBelowTablet) {
+    if (isBelowDesktop) {
       // BottomSheet owns focus, Escape, and focus restore for the sheet form.
       panelRef.current
         ?.querySelector(`[data-source-index="${anchorIndex}"]`)
@@ -94,7 +96,7 @@ export default function DiscoverySourcesPanel({
       document.removeEventListener("keydown", handleKeyDown, true);
       restoreFocusRef.current?.focus?.();
     };
-  }, [onClose, anchorIndex, isBelowTablet]);
+  }, [onClose, anchorIndex, isBelowDesktop]);
 
   const title = t("chat.discovery_results.sources_panel_title", {
     defaultValue: "Sources Argus read",
@@ -152,7 +154,7 @@ export default function DiscoverySourcesPanel({
   );
 
   // Below the mobile threshold the evidence trail is a sheet, not a side panel.
-  if (isBelowTablet) {
+  if (isBelowDesktop) {
     return (
       <BottomSheet
         isOpen

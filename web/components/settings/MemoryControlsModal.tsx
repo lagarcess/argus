@@ -3,9 +3,7 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
-  useId,
   type RefObject,
 } from "react";
 import {
@@ -16,8 +14,7 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
-  X,
-} from "lucide-react";
+  } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import {
@@ -40,8 +37,8 @@ type MemoryControlsModalProps = {
   locale: "en-US" | "es-419";
   onClose: () => void;
   onBack?: () => void;
-  backLabel?: string;
   returnFocusRef?: RefObject<HTMLElement | null>;
+  backLabel?: string;
 };
 
 type RecordRowProps = {
@@ -433,6 +430,7 @@ export default function MemoryControlsModal({
       onBack={onBack}
       backLabel={backLabel}
       width="md"
+      returnFocusRef={returnFocusRef}
     >
         <div className="overflow-y-auto px-5 pb-5" aria-live="polite">
           {isLoading ? (

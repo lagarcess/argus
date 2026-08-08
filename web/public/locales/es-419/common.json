@@ -217,7 +217,8 @@
         "safety": "Preocupación de seguridad o legal",
         "other": "Otro"
       }
-    }
+    },
+    "close": "Cerrar comentarios"
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",

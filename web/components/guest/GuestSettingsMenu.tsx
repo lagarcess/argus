@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import LanguageModal from "@/components/settings/LanguageModal";
 
 /** Top bar on desktop; the drawer bottom below the mobile threshold (spec section 10). */
@@ -26,6 +28,11 @@ export default function GuestSettingsMenu({
   placement?: GuestSettingsPlacement;
 }) {
   const isDrawerPlacement = placement === "drawer";
+  const { isBelowDesktop } = useResponsiveLayout();
+  // The last floating panel inside the drawer, and the only surface still
+  // shaped like the settings menu that moved to the sheet. Small, so it hugs
+  // its content rather than taking the screen.
+  const asSheet = isBelowDesktop;
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -72,6 +79,62 @@ export default function GuestSettingsMenu({
     },
   ] as const;
 
+  const settingsBody = (
+    <>
+        <div
+          className="grid grid-cols-3 gap-1 rounded-[14px] bg-black/[0.035] p-1 dark:bg-black/20"
+          role="group"
+          aria-label={t("settings.app.appearance", "Theme")}
+        >
+          {themeOptions.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTheme(id)}
+              className={`flex min-h-11 items-center justify-center rounded-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:focus-visible:ring-white/30 ${
+                theme === id
+                  ? "bg-black/[0.065] text-black dark:bg-white/[0.1] dark:text-white"
+                  : "text-black/45 hover:bg-black/[0.035] hover:text-black dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white"
+              }`}
+              aria-label={label}
+              aria-pressed={theme === id}
+            >
+              <Icon className="h-[17px] w-[17px]" />
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-2 space-y-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              setIsLanguageModalOpen(true);
+            }}
+            className="flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-[14px] font-medium transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
+            role="menuitem"
+          >
+            <Languages className="h-[17px] w-[17px] text-black/50 dark:text-white/50" />
+            {t("guest.shell.language", "Language")}
+          </button>
+          {feedbackEnabled ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onFeedback();
+              }}
+              className="flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-[14px] font-medium transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
+              role="menuitem"
+            >
+              <MessageSquareText className="h-[17px] w-[17px] text-black/50 dark:text-white/50" />
+              {t("guest.shell.feedback", "Feedback")}
+            </button>
+          ) : null}
+        </div>
+    </>
+  );
+
   return (
     <div className="relative" ref={menuRef} data-guest-settings-placement={placement}>
       <button
@@ -93,7 +156,18 @@ export default function GuestSettingsMenu({
         ) : null}
       </button>
 
-      {isOpen ? (
+      {isOpen && asSheet ? (
+        <AdaptivePanel
+          title={t("common.settings", "Settings")}
+          closeLabel={t("common.close", "Close")}
+          onClose={() => setIsOpen(false)}
+          width="sm"
+        >
+          <div className="p-3">{settingsBody}</div>
+        </AdaptivePanel>
+      ) : null}
+
+      {isOpen && !asSheet ? (
         <div
           className={
             isDrawerPlacement
@@ -103,57 +177,7 @@ export default function GuestSettingsMenu({
           role="menu"
           aria-label={t("guest.shell.settings", "Guest settings")}
         >
-          <div
-            className="grid grid-cols-3 gap-1 rounded-[14px] bg-black/[0.035] p-1 dark:bg-black/20"
-            role="group"
-            aria-label={t("settings.app.appearance", "Theme")}
-          >
-            {themeOptions.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTheme(id)}
-                className={`flex min-h-11 items-center justify-center rounded-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:focus-visible:ring-white/30 ${
-                  theme === id
-                    ? "bg-black/[0.065] text-black dark:bg-white/[0.1] dark:text-white"
-                    : "text-black/45 hover:bg-black/[0.035] hover:text-black dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white"
-                }`}
-                aria-label={label}
-                aria-pressed={theme === id}
-              >
-                <Icon className="h-[17px] w-[17px]" />
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-2 space-y-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                setIsLanguageModalOpen(true);
-              }}
-              className="flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-[14px] font-medium transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
-              role="menuitem"
-            >
-              <Languages className="h-[17px] w-[17px] text-black/50 dark:text-white/50" />
-              {t("guest.shell.language", "Language")}
-            </button>
-            {feedbackEnabled ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  onFeedback();
-                }}
-                className="flex min-h-11 w-full items-center gap-3 rounded-[12px] px-3 text-left text-[14px] font-medium transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
-                role="menuitem"
-              >
-                <MessageSquareText className="h-[17px] w-[17px] text-black/50 dark:text-white/50" />
-                {t("guest.shell.feedback", "Feedback")}
-              </button>
-            ) : null}
-          </div>
+          {settingsBody}
         </div>
       ) : null}
 

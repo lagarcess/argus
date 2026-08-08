@@ -11,15 +11,14 @@ describe("guest modal viewport fit", () => {
       "utf8",
     );
 
-    expect(source).toContain("p-3 sm:p-6");
-    // Full height minus 12px read as a broken page rather than a dialog, and a
-    // bug report is tall enough to hit the cap on every phone.
-    expect(source).toContain("max-h-[88dvh]");
-    expect(source).toContain("sm:max-h-[82dvh]");
+    // Height and scrolling are the shell's now: a sheet below the panel line,
+    // a capped dialog above it. Either way the form scrolls inside itself.
+    expect(source).toContain("AdaptivePanel");
+    expect(source).toContain('width="lg"');
     expect(source).toContain("flex-1 overflow-y-auto");
     // The actions are pinned outside the scrolling body, so a long form cannot
     // push Submit off the bottom of the screen.
-    expect(source).toContain("flex shrink-0 justify-end gap-3 border-t");
+    expect(source).toContain("footer={");
     expect(source).toContain("form={formId}");
   });
 

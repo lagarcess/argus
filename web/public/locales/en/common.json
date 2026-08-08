@@ -217,7 +217,8 @@
         "safety": "Safety or legal concern",
         "other": "Other"
       }
-    }
+    },
+    "close": "Close feedback"
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",

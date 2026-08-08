@@ -1439,6 +1439,8 @@ export default function ProfileMenu({
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
           >
+            {/* A phone has no keyboard to shortcut, so it is not offered there. */}
+            {isDrawerPlacement ? null : (
             <button
               type="button"
               onClick={handleOpenKeyboardShortcuts}
@@ -1450,6 +1452,7 @@ export default function ProfileMenu({
               </span>
               <span className="ml-auto flex shrink-0">{quickJumpBadge("keyboard-shortcuts")}</span>
             </button>
+            )}
             <a href="/terms" className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
               <FileText className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">

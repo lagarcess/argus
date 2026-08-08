@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import {
   AlertCircle,
   Bug,
@@ -231,40 +232,42 @@ export default function FeedbackDialog({
         : t("feedback.subheading.general", "Share feedback about your Argus experience.");
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
-        onClick={onClose}
-        aria-label="Close feedback"
-      />
-
-      <div className="relative flex max-h-[88dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f5f5f5] dark:border-white/10 dark:bg-[#1c1f24] sm:max-h-[82dvh]">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/5 px-5 py-5 dark:border-white/5 sm:px-6">
-          <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-black/45 dark:text-white/45">
-              <MessageCircle className="h-4 w-4" />
-              <span className="font-display text-[11px] font-semibold uppercase tracking-wider">
-                {t("feedback.eyebrow", "Feedback")}
-              </span>
-            </div>
-            <h2 className="font-display text-[22px] font-semibold tracking-tight text-black dark:text-white">
-              {displayTitle}
-            </h2>
-            <p className="mt-1 text-[13px] leading-relaxed text-black/50 dark:text-white/50">
-              {subheading}
-            </p>
+    <AdaptivePanel
+      title={displayTitle}
+      closeLabel={t("feedback.close", "Close feedback")}
+      onClose={onClose}
+      width="lg"
+      footer={
+        <>
+        {isSuccess ? null : (
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-11 rounded-full border border-black/10 px-6 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+            >
+              {t("common.cancel", "Cancel")}
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              disabled={!canSubmit() || isSubmitting}
+              className="flex min-h-11 items-center gap-2 rounded-full bg-black px-6 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40 dark:bg-white dark:text-black"
+            >
+              {isSubmitting ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                t("feedback.submit", "Submit feedback")
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-black/40 transition-colors hover:bg-black/5 hover:text-black dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white"
-            aria-label="Close feedback"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+        )}
+        </>
+      }
+    >
+      <p className="px-5 pt-4 text-[13px] leading-relaxed text-black/50 dark:text-white/50">
+        {subheading}
+      </p>
         <div className="argus-thin-scrollbar flex-1 overflow-y-auto p-5 sm:p-6">
           {isSuccess ? (
             <div className="py-12 text-center">
@@ -552,30 +555,6 @@ export default function FeedbackDialog({
           push Submit past the bottom of a phone, and nothing about the cut-off
           content said there was an action down there to scroll to.
         */}
-        {isSuccess ? null : (
-          <div className="flex shrink-0 justify-end gap-3 border-t border-black/5 px-5 py-4 dark:border-white/5 sm:px-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-11 rounded-full border border-black/10 px-6 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
-            >
-              {t("common.cancel", "Cancel")}
-            </button>
-            <button
-              type="submit"
-              form={formId}
-              disabled={!canSubmit() || isSubmitting}
-              className="flex min-h-11 items-center gap-2 rounded-full bg-black px-6 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40 dark:bg-white dark:text-black"
-            >
-              {isSubmitting ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                t("feedback.submit", "Submit feedback")
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }

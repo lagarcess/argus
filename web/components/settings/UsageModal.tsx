@@ -3,12 +3,10 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
-  useId,
   type RefObject,
 } from "react";
-import { ChevronDown, Loader2, RefreshCw, X } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { getUsageAllowances } from "@/lib/argus-api";
@@ -26,8 +24,8 @@ type UsageModalProps = {
   locale: "en-US" | "es-419";
   onClose: () => void;
   onBack?: () => void;
-  backLabel?: string;
   returnFocusRef?: RefObject<HTMLElement | null>;
+  backLabel?: string;
 };
 
 type AllowanceSectionProps = {
@@ -161,6 +159,7 @@ export default function UsageModal({
       onBack={onBack}
       backLabel={backLabel}
       width="md"
+      returnFocusRef={returnFocusRef}
     >
         <div className="overflow-y-auto px-5 pb-5" aria-live="polite">
           {isLoading ? (

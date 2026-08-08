@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   History,
   Loader2,
   MessageSquare,
   RotateCcw,
-  X,
-} from "lucide-react";
+  } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { Tooltip } from "@/components/ui/Tooltip";
