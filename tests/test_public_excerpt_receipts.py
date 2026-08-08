@@ -22,6 +22,7 @@ from argus.api.public_excerpts import (
     create_receipt_for_artifact,
 )
 from argus.api.schemas import EvidenceArtifactType, User
+from argus.domain import credential_shapes
 from argus.domain.public_excerpts import (
     NEVER_EXPOSE_KEY_MARKERS,
     PublicExcerptOwnerNoteError,
@@ -46,11 +47,16 @@ from pydantic import ValidationError
 from tests.public_excerpt_factories import (
     ARTIFACT_ID,
     BUY_AND_HOLD_CONFIG_SNAPSHOT,
+    BUY_THE_DIP_CONFIG_SNAPSHOT,
     CONVERSATION_ID,
+    CROSSOVER_CONFIG_SNAPSHOT,
     DCA_CONFIG_SNAPSHOT,
+    ENGINE_CONFIG_SNAPSHOT,
+    GENERIC_RULE_SPEC_CONFIG_SNAPSHOT,
     IDEA_ID,
     IDEA_VERSION_ID,
     INDICATOR_CONFIG_SNAPSHOT,
+    MACD_CONFIG_SNAPSHOT,
     RUN_ID,
     STRATEGY_ID,
     build_artifact,
@@ -703,6 +709,92 @@ def test_buy_and_hold_stays_simple_rather_than_inventing_facts() -> None:
     assert [fact.key for fact in payload.strategy_facts] == ["strategy_type"]
 
 
+def test_a_crossover_receipt_freezes_both_of_its_windows() -> None:
+    """The defect this closes: a crossover described by one generic period.
+
+    fast and slow are what decide the trades, and a 20/50 crossover and a 5/200
+    crossover are different strategies that would otherwise render identically.
+    """
+    payload = _payload(run_config_snapshot=CROSSOVER_CONFIG_SNAPSHOT)
+    facts = {fact.key: fact.value for fact in payload.strategy_facts}
+    assert facts["fast_indicator"] == "sma"
+    assert facts["fast_period"] == "20"
+    assert facts["slow_indicator"] == "sma"
+    assert facts["slow_period"] == "50"
+    assert facts["direction"] == "bullish"
+    # Named for what ran, not for the execution type that carried it.
+    assert facts["strategy_type"] == "moving average crossover"
+
+
+def test_two_crossovers_with_different_windows_do_not_look_identical() -> None:
+    faster = {
+        **CROSSOVER_CONFIG_SNAPSHOT,
+        "resolved_strategy": {
+            **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"],
+            "entry_rule": {
+                **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"]["entry_rule"],
+                "fast_period": 5,
+                "slow_period": 200,
+            },
+        },
+    }
+    first = _payload(run_config_snapshot=CROSSOVER_CONFIG_SNAPSHOT)
+    second = _payload(run_config_snapshot=faster)
+    assert first.strategy_facts != second.strategy_facts
+    assert payload_digest(first) != payload_digest(second)
+
+
+def test_a_crossover_missing_one_window_describes_nothing() -> None:
+    """Half a crossover is not a truthful record of a crossover."""
+    half = {
+        **CROSSOVER_CONFIG_SNAPSHOT,
+        "resolved_strategy": {
+            **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"],
+            "entry_rule": {
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 20,
+            },
+        },
+    }
+    assert _payload(run_config_snapshot=half).strategy_facts == []
+
+
+def test_a_macd_receipt_freezes_all_three_of_its_periods() -> None:
+    payload = _payload(run_config_snapshot=MACD_CONFIG_SNAPSHOT)
+    facts = {fact.key: fact.value for fact in payload.strategy_facts}
+    assert facts["fast_period"] == "12"
+    assert facts["slow_period"] == "26"
+    assert facts["signal_period"] == "9"
+    assert facts["strategy_type"] == "macd crossover"
+
+
+def test_buy_the_dip_borrows_no_parameters_from_its_execution_type() -> None:
+    """Its trigger is hardcoded in the engine, so there is nothing frozen to show.
+
+    It shares indicator_threshold as an execution type, so the risk is showing an
+    indicator and thresholds that belong to a different strategy.
+    """
+    payload = _payload(run_config_snapshot=BUY_THE_DIP_CONFIG_SNAPSHOT)
+    assert [fact.key for fact in payload.strategy_facts] == ["strategy_type"]
+    assert payload.strategy_facts[0].value == "buy the dip"
+
+
+def test_a_run_configured_through_the_engine_path_still_describes_itself() -> None:
+    """The direct path stores the engine config, with parameters and no resolved_*."""
+    payload = _payload(run_config_snapshot=ENGINE_CONFIG_SNAPSHOT)
+    facts = {fact.key: fact.value for fact in payload.strategy_facts}
+    assert facts["cadence"] == "weekly"
+
+
+def test_a_generic_rule_spec_is_left_undescribed_rather_than_flattened() -> None:
+    """A condition tree cannot round-trip into flat facts, so it claims nothing."""
+    assert (
+        _payload(run_config_snapshot=GENERIC_RULE_SPEC_CONFIG_SNAPSHOT).strategy_facts
+        == []
+    )
+
+
 def test_a_run_with_no_config_yields_no_strategy_facts() -> None:
     assert _payload(run_config_snapshot=None).strategy_facts == []
 
@@ -718,13 +810,178 @@ def test_strategy_facts_carry_only_readable_scalars() -> None:
         "resolved_strategy": {"strategy_type": "indicator_threshold"},
     }
     payload = _payload(run_config_snapshot=hostile)
-    assert [fact.key for fact in payload.strategy_facts] == ["strategy_type"]
+    # Fails closed for the shape rather than keeping the name of a strategy whose
+    # parameters it could not read.
+    assert payload.strategy_facts == []
 
 
 def test_strategy_facts_are_audited_like_the_rest_of_the_payload() -> None:
+    # A complete shape, so the poisoned value is actually projected and has to be
+    # caught by the audit rather than dropped for being incomplete.
     poisoned = {
-        "resolved_strategy": {"strategy_type": "indicator_threshold"},
-        "resolved_parameters": {"indicator": f"RSI via openrouter {CONVERSATION_ID}"},
+        **INDICATOR_CONFIG_SNAPSHOT,
+        "resolved_parameters": {
+            **INDICATOR_CONFIG_SNAPSHOT["resolved_parameters"],
+            "indicator": f"RSI via openrouter {CONVERSATION_ID}",
+        },
     }
     with pytest.raises(PublicExcerptSanitizationError):
         _payload(run_config_snapshot=poisoned)
+
+
+def test_every_executable_strategy_shape_round_trips_completely() -> None:
+    """The enumeration itself, driven from the capability registry.
+
+    A hand-picked field list is the defect this closes, so the guard is not a
+    hand-kept list either: it walks every template the registry calls executable and
+    requires a fixture and a complete projection for each. Adding a strategy, or a
+    parameter to one, fails here instead of shipping a receipt that describes a run
+    that never happened.
+    """
+    from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+    from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
+    # Every executable template, the snapshot a run of it freezes, and the facts a
+    # receipt must show. Buy and hold and buy the dip declare no tunable parameters.
+    coverage: dict[str, tuple[dict[str, Any], set[str]]] = {
+        "buy_and_hold": (BUY_AND_HOLD_CONFIG_SNAPSHOT, set()),
+        "buy_the_dip": (BUY_THE_DIP_CONFIG_SNAPSHOT, set()),
+        "rsi_mean_reversion": (
+            INDICATOR_CONFIG_SNAPSHOT,
+            {"indicator", "indicator_period", "entry_threshold", "exit_threshold"},
+        ),
+        "moving_average_crossover": (
+            CROSSOVER_CONFIG_SNAPSHOT,
+            {"fast_indicator", "fast_period", "slow_indicator", "slow_period"},
+        ),
+        "dca_accumulation": (DCA_CONFIG_SNAPSHOT, {"cadence"}),
+    }
+    assert set(coverage) == set(EXECUTABLE_TEMPLATES), (
+        "an executable strategy has no receipt projection: "
+        f"{sorted(set(EXECUTABLE_TEMPLATES) ^ set(coverage))}"
+    )
+
+    for template, (snapshot, expected) in coverage.items():
+        facts = {
+            fact.key: fact.value
+            for fact in _payload(run_config_snapshot=snapshot).strategy_facts
+        }
+        assert facts, f"{template} produced a receipt describing no strategy"
+        assert "strategy_type" in facts, f"{template} receipt names no strategy"
+        assert expected <= set(facts), (
+            f"{template} receipt is missing {sorted(expected - set(facts))}"
+        )
+        # Every parameter the registry declares tunable is disclosed, so a receipt
+        # cannot omit one that changed the result.
+        declared = set(STRATEGY_CAPABILITIES[template].parameters)
+        undisclosed = {
+            key
+            for key in declared
+            if key not in facts and key.replace("dca_", "") not in facts
+        }
+        assert not undisclosed, f"{template} hides tunable {sorted(undisclosed)}"
+
+
+def test_draft_strategies_cannot_reach_a_receipt_at_all() -> None:
+    """A draft template has no execution type, so it can never produce a run."""
+    from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+    from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
+    for template, capability in STRATEGY_CAPABILITIES.items():
+        if template in EXECUTABLE_TEMPLATES:
+            continue
+        assert capability.execution_strategy_type is None
+
+
+# ── The owner note, the one channel a secret can reach a public page through ───
+
+# Real credential shapes. Each is a distinct grammar: an issuer prefix, a segment
+# count, a scheme keyword, a PEM banner, userinfo in a URL. None is caught by length
+# alone, which is the point.
+#
+# Assembled from a prefix and a body at import time so no live-looking key literal
+# sits in this file. A pushed literal trips secret scanning, and the correct answer
+# to that is a fixture that cannot be mistaken for a credential, not an allowlist
+# entry that teaches the scanner to ignore one.
+def _shaped(prefix: str, body: str, template: str = "{}") -> str:
+    return template.format(f"{prefix}{body}")
+
+
+CREDENTIAL_NOTES: tuple[tuple[str, str], ...] = (
+    (
+        "aws access key id",
+        _shaped("AKIA", "IOSFODNN7EXAMPLE", "keys {} for the data pull"),
+    ),
+    (
+        "aws secret access key",
+        _shaped("wJalrXUtnFEMI", "K7MDENGbPxRfiCYEXAMPLEKEY", "secret {} used here"),
+    ),
+    ("github classic token", _shaped("ghp", "_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")),
+    ("github fine grained token", _shaped("github", "_pat_11ABCDE0000_ABCDEFGHIJ")),
+    ("stripe live secret", _shaped("sk", "_live_EXAMPLENOTAREALKEY")),
+    ("stripe publishable", _shaped("pk", "_live_EXAMPLENOTAREALKEY")),
+    ("slack bot token", _shaped("xoxb", "-0000000000-EXAMPLENOTAREAL")),
+    ("gitlab token", _shaped("glpat", "-EXAMPLENOTAREALTOKEN")),
+    (
+        "jwt",
+        _shaped(
+            "eyJhbGciOiJIUzI1NiJ9.",
+            "eyJzdWIiOiJFWEFNUExFIn0.EXAMPLEnotAREALsignature00",
+        ),
+    ),
+    ("bearer header", _shaped("Bearer ", "EXAMPLEnotAREALtoken00", "Authorization: {}")),
+    ("private key banner", "-----BEGIN RSA PRIVATE KEY-----"),
+    ("url userinfo", _shaped("admin:", "notarealpassword", "from https://{}@host/x")),
+    ("keyed opaque value", _shaped("api_key = ", "a1b2c3d4e5f6g7")),
+)
+
+# Notes a real owner might write. Several deliberately name a credential without
+# carrying one, because redaction that eats ordinary notes defeats the feature.
+ORDINARY_NOTES: tuple[str, ...] = (
+    "The secret: consistency beat every clever entry rule I tried.",
+    "Tested my token strategy on the dip and it held up better than expected.",
+    "Ran this for my brother in law who kept asking whether timing works.",
+    "Password protected my spreadsheet after this, the numbers surprised me.",
+    "Shared because the drawdown in March 2020 is the part people forget.",
+    "My key takeaway is that the benchmark won on a risk adjusted basis.",
+    "Access to good data mattered more than the rules themselves.",
+    "AAPL and SPY only, monthly buys of 500 dollars, no leverage anywhere.",
+    "Authorization from nobody needed, this is just my own money and my own idea.",
+    "Probé esto en español y el resultado fue peor que comprar y mantener.",
+)
+
+
+@pytest.mark.parametrize(("name", "note"), CREDENTIAL_NOTES, ids=lambda value: value)
+def test_a_credential_shaped_note_is_refused_whatever_its_length(
+    name: str,
+    note: str,
+) -> None:
+    """Grammar, not size. The AWS key id that motivated this is twenty characters.
+
+    Refused rather than redacted: a receipt is frozen at creation, so a marker
+    would be permanent, and the owner is here now and can take the key out.
+    """
+    with pytest.raises(PublicExcerptOwnerNoteError):
+        normalize_owner_note(note)
+
+
+@pytest.mark.parametrize("note", ORDINARY_NOTES, ids=lambda value: value[:36])
+def test_an_ordinary_note_is_not_over_redacted(note: str) -> None:
+    """Naming a credential in a sentence does not make the sentence one."""
+    assert normalize_owner_note(note) == note
+
+
+def test_a_credential_shaped_value_anywhere_in_the_payload_fails_closed() -> None:
+    """The note is checked as it is written; this guards every other field."""
+    with pytest.raises(PublicExcerptSanitizationError):
+        audit_public_excerpt_document({"idea_title": "AKIAIOSFODNN7EXAMPLE run"})
+
+
+def test_the_credential_grammar_has_one_home() -> None:
+    """The eval lane and the receipt path share the grammar rather than copying it."""
+    from tests.evals import prose_evidence
+
+    assert prose_evidence.JWT_PATTERN is credential_shapes.JWT_PATTERN
+    assert (
+        prose_evidence.UPPERCASE_KEY_PATTERN is credential_shapes.UPPERCASE_KEY_PATTERN
+    )

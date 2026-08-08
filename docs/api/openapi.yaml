@@ -3910,6 +3910,11 @@ components:
           - indicator_period
           - entry_threshold
           - exit_threshold
+          - fast_indicator
+          - fast_period
+          - slow_indicator
+          - slow_period
+          - signal_period
           - direction
         value:
           type: string

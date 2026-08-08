@@ -1507,6 +1507,11 @@
       "cadence": "Cada cuánto",
       "indicator": "Indicador",
       "indicator_period": "Periodo del indicador",
+      "fast_indicator": "Promedio rápido",
+      "fast_period": "Ventana rápida",
+      "slow_indicator": "Promedio lento",
+      "slow_period": "Ventana lenta",
+      "signal_period": "Ventana de señal",
       "entry_threshold": "Compra en",
       "exit_threshold": "Vende en",
       "direction": "Dirección"

@@ -28,6 +28,7 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptVisualPoint,
 )
 from argus.api.schemas import EvidenceArtifact
+from argus.domain.credential_shapes import credential_shape_in
 
 PUBLIC_EXCERPT_ID_BYTES = 24
 PUBLIC_EXCERPT_PATH_PREFIX = "/r/"
@@ -122,8 +123,10 @@ def payload_digest(payload: PublicExcerptPayload) -> str:
 def normalize_owner_note(note: object) -> str | None:
     """Bound and clean the one free-text field a receipt carries.
 
-    Rejects credential-shaped tokens because the owner note is the only channel
-    through which a secret can reach a public Argus page.
+    Every other field in the payload is structured, so this is the only channel
+    through which a secret can reach a public Argus page. Refused rather than
+    redacted: a receipt is frozen at creation, so a redaction marker would be
+    permanent, and the owner is still here and can take the key out.
     """
     if note is None:
         return None
@@ -140,7 +143,14 @@ def normalize_owner_note(note: object) -> str | None:
         return None
     if len(cleaned) > PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH:
         raise PublicExcerptOwnerNoteError("The note is too long to publish.")
-    if _UUID_RE.search(cleaned) or _SECRET_SHAPED_RE.search(cleaned):
+    # Grammar first, length second. A credential is recognisable from its own
+    # structure at any length, and the length guard exists only for opaque blobs
+    # no issuer prefix names.
+    if (
+        _UUID_RE.search(cleaned)
+        or credential_shape_in(cleaned)
+        or _SECRET_SHAPED_RE.search(cleaned)
+    ):
         raise PublicExcerptOwnerNoteError(
             "The note looks like it contains a key or a long code."
         )
@@ -332,6 +342,13 @@ def _audit_value(
         raise PublicExcerptSanitizationError(
             f"Receipt payload field '{location}' carries a record identifier."
         )
+    # The note is validated when the owner writes it; this is the guard for every
+    # other field, including one a later change adds.
+    credential_kind = credential_shape_in(value)
+    if credential_kind is not None:
+        raise PublicExcerptSanitizationError(
+            f"Receipt payload field '{location}' carries a {credential_kind}."
+        )
     lowered = value.lower()
     for private_id in private_ids:
         if private_id and private_id in lowered:
@@ -429,89 +446,185 @@ def _metrics(value: object) -> list[PublicExcerptMetric]:
 def _strategy_facts(config_snapshot: object) -> list[PublicExcerptStrategyFact]:
     """Freeze the parameters that define what was executed.
 
-    The strategy label is a category name. For every shape except buy and hold that
-    is not enough to know what produced the numbers: two RSI runs with different
-    periods and thresholds, or two DCA runs with different cadence, would otherwise
-    render as the same strategy with different results, which is the opposite of
-    evidence.
+    The strategy label is a category name. For every shape except buy and hold it
+    does not identify what produced the numbers: two RSI runs with different periods
+    and thresholds, or two crossovers with different windows, would otherwise render
+    as the same strategy with different results, which is the opposite of evidence.
 
-    Read from the run's immutable ``config_snapshot``, and only through the closed
-    key set below, so widening what a receipt discloses about a strategy stays a
-    deliberate change.
+    Dispatched on shape, not assembled from whichever fields happen to be present.
+    Each shape below declares the complete set of parameters that decide its trades,
+    and a shape whose set is not fully present projects nothing at all. Partial
+    parameters are worse than none here: a viewer cannot tell that a receipt naming
+    one window of a crossover is missing the other, so it would read as a truthful
+    record of a strategy that never ran.
     """
     snapshot = _mapping(config_snapshot)
     resolved_strategy = _mapping(snapshot.get("resolved_strategy"))
     resolved_parameters = _mapping(snapshot.get("resolved_parameters"))
+    # Two config_snapshot shapes reach here. The agent path nests the strategy under
+    # resolved_strategy/resolved_parameters; the direct engine path stores the engine
+    # config itself, whose parameters live under `parameters`. Reading only the first
+    # left every run made through the second with no parameters at all.
+    engine_parameters = _mapping(snapshot.get("parameters"))
     entry_rule = _mapping(resolved_strategy.get("entry_rule"))
     exit_rule = _mapping(resolved_strategy.get("exit_rule"))
+    parameters = {**engine_parameters, **resolved_parameters}
 
-    def first(*candidates: object) -> object:
-        for candidate in candidates:
-            if candidate not in (None, ""):
-                return candidate
-        return None
+    shape = _strategy_shape(
+        snapshot=snapshot,
+        resolved_strategy=resolved_strategy,
+        entry_rule=entry_rule,
+        parameters=parameters,
+    )
+    if shape is None:
+        return []
+    label, required, optional = shape
 
-    facts: list[tuple[str, object]] = [
-        (
-            "strategy_type",
-            first(
-                resolved_strategy.get("strategy_type"),
-                snapshot.get("template"),
-            ),
-        ),
-        (
-            "cadence",
-            first(
-                resolved_strategy.get("cadence"),
-                resolved_parameters.get("cadence"),
-            ),
-        ),
-        (
-            "indicator",
-            first(
-                resolved_parameters.get("indicator"),
-                entry_rule.get("indicator"),
-                exit_rule.get("indicator"),
-            ),
-        ),
-        (
-            "indicator_period",
-            first(
-                resolved_parameters.get("indicator_period"),
-                entry_rule.get("period"),
-                exit_rule.get("period"),
-            ),
-        ),
-        (
-            "entry_threshold",
-            first(
-                resolved_parameters.get("entry_threshold"),
-                resolved_parameters.get("indicator_entry_threshold"),
-                entry_rule.get("threshold"),
-            ),
-        ),
-        (
-            "exit_threshold",
-            first(
-                resolved_parameters.get("exit_threshold"),
-                resolved_parameters.get("indicator_exit_threshold"),
-                exit_rule.get("threshold"),
-            ),
-        ),
-        (
-            "direction",
-            first(
-                resolved_strategy.get("direction"),
-                entry_rule.get("direction"),
-            ),
-        ),
+    facts: list[PublicExcerptStrategyFact] = [
+        PublicExcerptStrategyFact(key="strategy_type", value=label)
     ]
-    projected: list[PublicExcerptStrategyFact] = []
-    for key, raw in facts:
-        value = _strategy_fact_value(raw)
+    for key in required:
+        value = _strategy_fact_value(
+            _strategy_source_value(
+                key,
+                parameters=parameters,
+                resolved_strategy=resolved_strategy,
+                entry_rule=entry_rule,
+                exit_rule=exit_rule,
+            )
+        )
+        if value is None:
+            # Incomplete for this shape, so the whole block goes rather than a
+            # subset that misdescribes the run.
+            return []
+        facts.append(PublicExcerptStrategyFact(key=key, value=value))
+    for key in optional:
+        value = _strategy_fact_value(
+            _strategy_source_value(
+                key,
+                parameters=parameters,
+                resolved_strategy=resolved_strategy,
+                entry_rule=entry_rule,
+                exit_rule=exit_rule,
+            )
+        )
         if value is not None:
-            projected.append(PublicExcerptStrategyFact(key=key, value=value))
-    return projected
+            facts.append(PublicExcerptStrategyFact(key=key, value=value))
+    return facts
+
+
+def _strategy_shape(
+    *,
+    snapshot: dict[str, Any],
+    resolved_strategy: dict[str, Any],
+    entry_rule: dict[str, Any],
+    parameters: dict[str, Any],
+) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
+    """Resolve the executed shape: its truthful name, then the set that defines it.
+
+    Keyed on the typed rule before the execution type, because the rule is what the
+    engine compiles and the execution type does not name a shape on its own:
+    ``signal_strategy`` covers both a moving average crossover and an arbitrary rule
+    spec, and naming a crossover "signal strategy" would be true of the runtime and
+    useless to a reader.
+    """
+    template = (_text(snapshot.get("template")) or "").lower()
+    strategy_type = (_text(resolved_strategy.get("strategy_type")) or "").lower()
+    rule_type = (_text(entry_rule.get("type")) or "").lower()
+    identity = {template, strategy_type}
+
+    if rule_type == "moving_average_crossover":
+        return (
+            "moving average crossover",
+            ("fast_indicator", "fast_period", "slow_indicator", "slow_period"),
+            ("direction",),
+        )
+    if rule_type == "macd_crossover":
+        return (
+            "macd crossover",
+            ("fast_period", "slow_period", "signal_period"),
+            ("direction",),
+        )
+    if "dca_accumulation" in identity:
+        return ("dca accumulation", ("cadence",), ())
+    if "buy_and_hold" in identity:
+        return ("buy and hold", (), ())
+    if "buy_the_dip" in identity:
+        # fixed_parameters in the capability registry: the trigger is hardcoded in
+        # the engine, so there is nothing frozen to disclose, and nothing to borrow
+        # from the indicator shape it shares an execution type with either.
+        return ("buy the dip", (), ())
+    if identity & {"indicator_threshold", "rsi_mean_reversion"}:
+        name = (
+            "rsi threshold"
+            if template == "rsi_mean_reversion"
+            else "indicator threshold"
+        )
+        return (
+            name,
+            ("indicator", "indicator_period", "entry_threshold", "exit_threshold"),
+            ("direction",),
+        )
+    # A generic rule spec is a condition tree. Flattening one into key and value
+    # pairs cannot round-trip it, so it goes undescribed rather than described
+    # wrongly, and an unrecognised shape takes the same path.
+    return None
+
+
+def _strategy_source_value(
+    key: str,
+    *,
+    parameters: dict[str, Any],
+    resolved_strategy: dict[str, Any],
+    entry_rule: dict[str, Any],
+    exit_rule: dict[str, Any],
+) -> object:
+    """Where each fact is frozen from, most specific source first."""
+    candidates: tuple[object, ...]
+    if key == "cadence":
+        candidates = (
+            parameters.get("dca_cadence"),
+            resolved_strategy.get("cadence"),
+            parameters.get("cadence"),
+        )
+    elif key == "indicator":
+        candidates = (
+            parameters.get("indicator"),
+            entry_rule.get("indicator"),
+            exit_rule.get("indicator"),
+        )
+    elif key == "indicator_period":
+        candidates = (
+            parameters.get("indicator_period"),
+            entry_rule.get("period"),
+            entry_rule.get("indicator_period"),
+            exit_rule.get("period"),
+        )
+    elif key == "entry_threshold":
+        candidates = (
+            parameters.get("entry_threshold"),
+            parameters.get("indicator_entry_threshold"),
+            entry_rule.get("threshold"),
+        )
+    elif key == "exit_threshold":
+        candidates = (
+            parameters.get("exit_threshold"),
+            parameters.get("indicator_exit_threshold"),
+            exit_rule.get("threshold"),
+        )
+    elif key == "direction":
+        candidates = (
+            entry_rule.get("direction"),
+            resolved_strategy.get("direction"),
+        )
+    else:
+        # fast_indicator, fast_period, slow_indicator, slow_period, signal_period:
+        # the typed rule is the only place these are frozen.
+        candidates = (entry_rule.get(key), parameters.get(key))
+    for candidate in candidates:
+        if candidate not in (None, ""):
+            return candidate
+    return None
 
 
 def _strategy_fact_value(value: object) -> str | None:

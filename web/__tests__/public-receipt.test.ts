@@ -29,6 +29,16 @@ function source(path: string): string {
   return readFileSync(path, "utf8");
 }
 
+/** The closed key set, read from the contract so no list is kept here by hand. */
+function strategyFactKeys(): string[] {
+  const contract = source(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
+  const start = contract.indexOf("PublicReceiptStrategyFactKey =");
+  const union = contract.slice(start, contract.indexOf(";", start));
+  const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
+  if (keys.length < 12) throw new Error("strategy fact key union not parsed");
+  return keys;
+}
+
 /**
  * Structural assertions below are about code, not prose. Comments on these files
  * legitimately name the things the code must not touch (that is what the comments
@@ -412,16 +422,11 @@ describe("the strategy a receipt shows", () => {
 
   test("labels are the viewer's language and values stay frozen", () => {
     // Freezing an English label would put untranslatable chrome in the payload.
+    // Keys come from the contract rather than a list kept here by hand, because a
+    // hand-kept list is what let a crossover ship with no window labels: adding a
+    // key to the union now fails until both languages can render it.
     for (const bundle of [enCommon.receipt, esCommon.receipt]) {
-      for (const key of [
-        "strategy_type",
-        "cadence",
-        "indicator",
-        "indicator_period",
-        "entry_threshold",
-        "exit_threshold",
-        "direction",
-      ]) {
+      for (const key of strategyFactKeys()) {
         expect(
           (bundle.strategy_facts as Record<string, string>)[key]?.length,
         ).toBeGreaterThan(0);
@@ -430,6 +435,18 @@ describe("the strategy a receipt shows", () => {
     expect(enCommon.receipt.strategy_facts.indicator).not.toBe(
       esCommon.receipt.strategy_facts.indicator,
     );
+  });
+
+  test("the frozen key set matches the backend enum exactly", () => {
+    // Two enums that have to agree. A key the backend can freeze but the page
+    // cannot name would render as a raw identifier on a public page.
+    const schema = source(
+      join(WEB_ROOT, "../src/argus/api/public_excerpt_schemas.py"),
+    );
+    const start = schema.indexOf("StrategyFactKey = Literal[");
+    const literal = schema.slice(start, schema.indexOf("]", start));
+    const backend = [...literal.matchAll(/"(\w+)"/g)].map((match) => match[1]);
+    expect([...strategyFactKeys()].sort()).toEqual([...backend].sort());
   });
 });
 

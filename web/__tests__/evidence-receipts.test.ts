@@ -166,8 +166,17 @@ describe("the receipt list", () => {
     // same back row every sibling there offers.
     expect(source(RECEIPT_LIST)).toContain("onBack");
     const menu = source(PROFILE_MENU);
-    const mount = menu.slice(menu.indexOf('activeModal === "receipts"'));
-    expect(mount).toContain("asSheet");
-    expect(mount).toContain('setActiveSubmenu("data")');
+    const mountStart = menu.indexOf('if (activeModal === "receipts")');
+    const mount = menu.slice(
+      mountStart,
+      menu.indexOf('if (activeModal ===', mountStart + 1),
+    );
+    expect(mount).toContain("SharedReceiptsView");
+    expect(mount).toContain("onBack={backToDataControls}");
+    // The shared handler is the sheet's back row, and it returns to the submenu
+    // this panel was opened from rather than closing the drawer under it.
+    const handler = menu.slice(menu.indexOf("const backToDataControls"));
+    expect(handler).toContain("asSheet");
+    expect(handler).toContain('setActiveSubmenu("data")');
   });
 });

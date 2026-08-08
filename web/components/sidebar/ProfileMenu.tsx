@@ -174,6 +174,15 @@ export default function ProfileMenu({
     null,
   );
   const [memoryControlsAvailable, setMemoryControlsAvailable] = useState(false);
+  const dataControlsLabel = t("settings.data.title", "Data Controls");
+  // Every Data Controls panel offers the same return, so the sheet's back row is
+  // defined once rather than rebuilt at each mount.
+  const backToDataControls = asSheet
+    ? () => {
+        setActiveModal(null);
+        setActiveSubmenu("data");
+      }
+    : undefined;
   // Every receipt endpoint requires the registered-only can_save_decision
   // capability, so showing this to a guest offers a modal whose only action is a
   // retry that can never succeed.
@@ -807,11 +816,8 @@ export default function ProfileMenu({
     return (
       <ArchivedChatsView
         onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
+        onBack={backToDataControls}
+        backLabel={dataControlsLabel}
         onRestored={onHistoryMutated}
       />
     );
@@ -820,11 +826,8 @@ export default function ProfileMenu({
     return (
       <DeletedItemsView
         onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
+        onBack={backToDataControls}
+        backLabel={dataControlsLabel}
         onRestored={onHistoryMutated}
       />
     );
@@ -836,11 +839,8 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
+        onBack={backToDataControls}
+        backLabel={dataControlsLabel}
         returnFocusRef={anchorRef}
       />
     );
@@ -852,11 +852,8 @@ export default function ProfileMenu({
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
         onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
+        onBack={backToDataControls}
+        backLabel={dataControlsLabel}
         returnFocusRef={anchorRef}
       />
     );
@@ -865,11 +862,8 @@ export default function ProfileMenu({
     return (
       <SharedReceiptsView
         onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
+        onBack={backToDataControls}
+        backLabel={dataControlsLabel}
         returnFocusRef={anchorRef}
       />
     );

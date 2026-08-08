@@ -227,3 +227,92 @@ BUY_AND_HOLD_CONFIG_SNAPSHOT: dict[str, Any] = {
     "resolved_strategy": {"strategy_type": "buy_and_hold"},
     "resolved_parameters": {"capital_amount": 10_000, "timeframe": "1D"},
 }
+
+# The typed crossover rule as engine_launch/adapter.py freezes it: the parameters
+# that decide the trades live in the rule, not in a generic indicator field.
+CROSSOVER_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "moving_average_crossover",
+    "resolved_strategy": {
+        "strategy_type": "signal_strategy",
+        "requested_strategy_template": "moving_average_crossover",
+        "entry_rule": {
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 20,
+            "slow_indicator": "sma",
+            "slow_period": 50,
+            "direction": "bullish",
+        },
+        "exit_rule": {
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 20,
+            "slow_indicator": "sma",
+            "slow_period": 50,
+            "direction": "bearish",
+        },
+    },
+    "resolved_parameters": {"timeframe": "1D"},
+}
+
+MACD_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "signal_strategy",
+    "resolved_strategy": {
+        "strategy_type": "signal_strategy",
+        "entry_rule": {
+            "type": "macd_crossover",
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "direction": "bullish",
+        },
+    },
+    "resolved_parameters": {"timeframe": "1D"},
+}
+
+BUY_THE_DIP_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "buy_the_dip",
+    "resolved_strategy": {"strategy_type": "indicator_threshold"},
+    "resolved_parameters": {"timeframe": "1D"},
+}
+
+# The direct engine path stores the engine config itself, so the executed
+# parameters sit under `parameters` with no resolved_* nesting at all.
+ENGINE_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "dca_accumulation",
+    "symbols": ["AAPL"],
+    "parameters": {"dca_cadence": "weekly"},
+}
+
+# A condition tree with no typed rule above it: nothing a flat fact list can
+# round-trip.
+GENERIC_RULE_SPEC_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "signal_strategy",
+    "parameters": {
+        "rule_spec": {
+            "entry": {
+                "conditions": [
+                    {
+                        "left": {"kind": "indicator", "key": "ema", "period": 9},
+                        "operator": "cross_above",
+                        "right": {"kind": "indicator", "key": "ema", "period": 21},
+                    },
+                    {
+                        "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                        "operator": "lte",
+                        "right": 40,
+                    },
+                ]
+            },
+            "exit": {
+                "conditions": [
+                    {
+                        "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                        "operator": "gte",
+                        "right": 65,
+                    }
+                ]
+            },
+        }
+    },
+}

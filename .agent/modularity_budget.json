@@ -2,7 +2,8 @@
   "allowed_growth_lines": 75,
   "baseline_capture_minimum_lines": 1000,
   "allowed_growth_lines_by_file": {
-    "web/components/sidebar/ChatCommandPalette.tsx": 0
+    "web/components/sidebar/ChatCommandPalette.tsx": 0,
+    "web/components/sidebar/ProfileMenu.tsx": 0
   },
   "top_offender_count": 10,
   "scan_roots": [
@@ -61,7 +62,7 @@
     "src/argus/agent_runtime/stages/explain.py": 1574,
     "tests/test_chat_turn_lifecycle_postgres.py": 1568,
     "tests/test_chat_turn_lifecycle.py": 1559,
-    "web/components/sidebar/ProfileMenu.tsx": 1545,
+    "web/components/sidebar/ProfileMenu.tsx": 1650,
     "src/argus/api/memory_search_candidates.py": 1530,
     "tests/agent_runtime/test_latest_result_fact_answers.py": 1504,
     "src/argus/agent_runtime/interpreter/artifact_assumption_edit.py": 1489,

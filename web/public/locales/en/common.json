@@ -1507,6 +1507,11 @@
       "cadence": "How often",
       "indicator": "Indicator",
       "indicator_period": "Indicator period",
+      "fast_indicator": "Fast average",
+      "fast_period": "Fast window",
+      "slow_indicator": "Slow average",
+      "slow_period": "Slow window",
+      "signal_period": "Signal window",
       "entry_threshold": "Buys at",
       "exit_threshold": "Sells at",
       "direction": "Direction"

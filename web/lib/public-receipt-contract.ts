@@ -20,6 +20,12 @@ export type PublicReceiptStrategyFactKey =
   | "indicator_period"
   | "entry_threshold"
   | "exit_threshold"
+  // A crossover is defined by both of its windows, so neither one is optional.
+  | "fast_indicator"
+  | "fast_period"
+  | "slow_indicator"
+  | "slow_period"
+  | "signal_period"
   | "direction";
 
 export type PublicReceiptStrategyFact = {
