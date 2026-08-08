@@ -36,6 +36,11 @@ const HIDE_DEV_CHROME = `
   nextjs-portal { display: none !important; }
   [data-dev-mode-badge] { display: none !important; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* The caret blink is native rather than a CSS animation, so the rule above
+     does not stop it. Any capture holding a focused field came out a few bytes
+     different every run, which makes a real change indistinguishable from
+     having taken the screenshot half a second later. */
+  * { caret-color: transparent !important; }
 `;
 
 async function capture(page: Page, name: string) {
