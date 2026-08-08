@@ -43,6 +43,32 @@ class PublicExcerptMetric(BaseModel):
     value: str
 
 
+StrategyFactKey = Literal[
+    "strategy_type",
+    "cadence",
+    "indicator",
+    "indicator_period",
+    "entry_threshold",
+    "exit_threshold",
+    "direction",
+]
+
+
+class PublicExcerptStrategyFact(BaseModel):
+    """One fact that defines the executed strategy, frozen from the run.
+
+    ``key`` is a closed enum and the label is rendered from it at view time, so the
+    viewer reads it in their own language while ``value`` stays frozen. The
+    alternative, freezing an English label, would put untranslatable chrome inside
+    the payload.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    key: StrategyFactKey
+    value: str
+
+
 class PublicExcerptVisualPoint(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -71,6 +97,9 @@ class PublicExcerptPayload(BaseModel):
     asset_class: AssetClass | None = None
     symbols: list[str] = Field(default_factory=list)
     strategy_label: str | None = None
+    # The label alone names a category. For anything but buy and hold it does not
+    # identify what was executed, so the defining parameters are frozen beside it.
+    strategy_facts: list[PublicExcerptStrategyFact] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     date_range: PublicExcerptDateRange
     metrics: list[PublicExcerptMetric] = Field(default_factory=list)

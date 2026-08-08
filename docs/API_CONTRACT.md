@@ -652,8 +652,11 @@ timestamps cannot drop or repeat a row across pages.
 - The request carries no credentials, and `payload` is the closed set documented in
   `docs/DATA_MODEL.md` section 12.1.3.
 
-`POST /public/receipt-funnel` takes `{"stage": "try_argus"}` and returns `204`. It
-stores nothing and carries no identifier. It exists because the Try Argus tap
+`POST /public/receipt-funnel` takes `{"stage": "viewed" | "try_argus"}` and returns
+`204`. It stores nothing and carries no identifier. `viewed` is reported by the
+rendered page rather than counted when the receipt is read, because that read also
+answers the metadata pass and the preview image; a link pasted into a chat would
+otherwise log views nobody caused. It exists because the Try Argus tap
 happens on a page nobody is signed in to, and the alternative, a marker on the
 guest entry url, is ruled out: sharing adds no new parameter to that surface.
 

@@ -45,6 +45,18 @@ describe("the sharing flag", () => {
     expect(source(RESULT_CARD)).toContain("evidenceReceiptSharingEnabled &&");
     expect(source(PROFILE_MENU)).toContain("evidenceReceiptSharingEnabled");
   });
+
+  test("hides the receipt list from guests, not just behind the flag", () => {
+    // Every owner endpoint needs the registered-only can_save_decision, so a
+    // guest opening this gets a modal whose only action is a retry that cannot
+    // succeed.
+    const menu = source(PROFILE_MENU);
+    expect(menu).toContain(
+      'evidenceReceiptSharingEnabled && accountKind === "registered"',
+    );
+    // Both the menu entry and its quick-jump counterpart use the same gate.
+    expect(menu.match(/receiptsAvailable/g)?.length).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe("receipt urls", () => {

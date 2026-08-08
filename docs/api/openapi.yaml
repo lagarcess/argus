@@ -3834,6 +3834,10 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        strategy_facts:
+          items:
+            $ref: '#/components/schemas/PublicExcerptStrategyFact'
+          type: array
         assumptions:
           items:
             type: string
@@ -3888,6 +3892,35 @@ components:
       type: object
       required:
       - receipt
+    PublicExcerptStrategyFact:
+      properties:
+        key:
+          type: string
+          enum:
+          - strategy_type
+          - cadence
+          - indicator
+          - indicator_period
+          - entry_threshold
+          - exit_threshold
+          - direction
+        value:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - key
+      - value
+      description: 'One fact that defines the executed strategy, frozen from the run.
+
+
+        ``key`` is a closed enum and the label is rendered from it at view time, so the
+
+        viewer reads it in their own language while ``value`` stays frozen. The
+
+        alternative, freezing an English label, would put untranslatable chrome inside
+
+        the payload.'
     PublicExcerptView:
       properties:
         public_id:

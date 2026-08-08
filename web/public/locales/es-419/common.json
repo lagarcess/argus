@@ -1480,6 +1480,15 @@
       "confirm_revoke": "¿Seguro?",
       "revoke_error": "Ese enlace no se quitó. Inténtalo de nuevo.",
       "cache_note": "El enlace muere en Argus de inmediato. Las apps de chat a veces guardan una tarjeta de vista previa antigua en las conversaciones donde ya se pegó, y Argus no puede entrar ahí."
+    },
+    "strategy_facts": {
+      "strategy_type": "Estrategia",
+      "cadence": "Cada cuánto",
+      "indicator": "Indicador",
+      "indicator_period": "Periodo del indicador",
+      "entry_threshold": "Compra en",
+      "exit_threshold": "Vende en",
+      "direction": "Dirección"
     }
   }
 }

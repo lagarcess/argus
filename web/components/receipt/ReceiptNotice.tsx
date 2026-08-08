@@ -24,7 +24,9 @@ export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-[560px] flex-col gap-5 px-4 pb-14 pt-7 sm:px-6 sm:pt-10">
-      <ReceiptViewBeacon />
+      {/* A revoked receipt is a real answer someone saw, so it counts. An outage
+          displayed nothing, so counting it would inflate the view stage. */}
+      {kind === "revoked" ? <ReceiptViewBeacon /> : null}
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] font-medium uppercase tracking-[0.07em] text-black/40 dark:text-white/40">
           {copy.eyebrow}

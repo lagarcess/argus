@@ -138,6 +138,11 @@ export default function ProfileMenu({
     null,
   );
   const [memoryControlsAvailable, setMemoryControlsAvailable] = useState(false);
+  // Every receipt endpoint requires the registered-only can_save_decision
+  // capability, so showing this to a guest offers a modal whose only action is a
+  // retry that can never succeed.
+  const receiptsAvailable =
+    evidenceReceiptSharingEnabled && accountKind === "registered";
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -524,7 +529,7 @@ export default function ProfileMenu({
         ...(memoryControlsAvailable
           ? [{ id: "memory", onSelect: () => openModal("memory") }]
           : []),
-        ...(evidenceReceiptSharingEnabled
+        ...(receiptsAvailable
           ? [{ id: "receipts", onSelect: () => openModal("receipts") }]
           : []),
         { id: "archived", onSelect: () => openModal("archived") },
@@ -617,6 +622,7 @@ export default function ProfileMenu({
     handleOpenKeyboardShortcuts,
     handleSubmenuToggle,
     memoryControlsAvailable,
+    receiptsAvailable,
     onClose,
     onFeedback,
     onOpenSidebarPreference,
@@ -1251,7 +1257,7 @@ export default function ProfileMenu({
                 <span className="ml-auto flex shrink-0">{quickJumpBadge("memory")}</span>
               </button>
             ) : null}
-            {evidenceReceiptSharingEnabled ? (
+            {receiptsAvailable ? (
               <button
                 onClick={() => openModal("receipts")}
                 className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"

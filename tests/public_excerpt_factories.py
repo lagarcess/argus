@@ -187,3 +187,43 @@ def stable_uuid(seed: int, *, prefix: int = 9) -> str:
     would let the in-memory backend accept a shape the real one rejects.
     """
     return f"{prefix:08d}-0000-4000-8000-{seed:012d}"
+
+
+# Non-buy-and-hold shapes. AGENTS.md requires acceptance evidence to span the
+# strategy-shape space rather than standardising on the oldest, simplest shape,
+# and buy and hold is the one shape whose label alone describes it.
+INDICATOR_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "indicator_threshold",
+    "resolved_strategy": {
+        "strategy_type": "indicator_threshold",
+        "entry_rule": {
+            "indicator": "RSI",
+            "period": 14,
+            "threshold": 30,
+            "direction": "below",
+        },
+        "exit_rule": {"indicator": "RSI", "period": 14, "threshold": 70},
+    },
+    "resolved_parameters": {
+        "indicator": "RSI",
+        "indicator_period": 14,
+        "entry_threshold": 30,
+        "exit_threshold": 70,
+        "timeframe": "1D",
+    },
+}
+
+DCA_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "dca_accumulation",
+    "resolved_strategy": {
+        "strategy_type": "dca_accumulation",
+        "cadence": "monthly",
+    },
+    "resolved_parameters": {"cadence": "monthly", "recurring_contribution": 200},
+}
+
+BUY_AND_HOLD_CONFIG_SNAPSHOT: dict[str, Any] = {
+    "template": "buy_and_hold",
+    "resolved_strategy": {"strategy_type": "buy_and_hold"},
+    "resolved_parameters": {"capital_amount": 10_000, "timeframe": "1D"},
+}

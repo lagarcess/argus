@@ -45,9 +45,12 @@ from pydantic import ValidationError
 
 from tests.public_excerpt_factories import (
     ARTIFACT_ID,
+    BUY_AND_HOLD_CONFIG_SNAPSHOT,
     CONVERSATION_ID,
+    DCA_CONFIG_SNAPSHOT,
     IDEA_ID,
     IDEA_VERSION_ID,
+    INDICATOR_CONFIG_SNAPSHOT,
     RUN_ID,
     STRATEGY_ID,
     build_artifact,
@@ -66,6 +69,9 @@ CLOSED_PAYLOAD_FIELDS = {
     "asset_class",
     "symbols",
     "strategy_label",
+    # Part of section 2's "strategy", not a new field: the label alone names a
+    # category, so the defining parameters sit beside it.
+    "strategy_facts",
     "assumptions",
     "date_range",
     "metrics",
@@ -105,6 +111,7 @@ def _payload(**overrides: Any) -> PublicExcerptPayload:
     kwargs: dict[str, Any] = {
         "artifact": build_artifact(),
         "run_chart": build_chart(),
+        "run_config_snapshot": BUY_AND_HOLD_CONFIG_SNAPSHOT,
         "owner_note": None,
         "content_language": "en",
     }
@@ -649,3 +656,75 @@ def test_public_id_is_unguessable_and_distinct_per_receipt() -> None:
     ids = {new_public_excerpt_id() for _ in range(500)}
     assert len(ids) == 500
     assert all(len(value) >= 22 for value in ids)
+
+
+# ── The strategy a receipt claims to show ─────────────────────────────────────
+
+
+def test_an_indicator_receipt_freezes_the_rules_that_produced_it() -> None:
+    """The label names a category; these are the parameters that decided the trade.
+
+    Without them two RSI runs with different periods and thresholds render as the
+    same strategy with different numbers, which is the opposite of evidence.
+    """
+    payload = _payload(run_config_snapshot=INDICATOR_CONFIG_SNAPSHOT)
+    facts = {fact.key: fact.value for fact in payload.strategy_facts}
+    assert facts["indicator"] == "RSI"
+    assert facts["indicator_period"] == "14"
+    assert facts["entry_threshold"] == "30"
+    assert facts["exit_threshold"] == "70"
+    assert facts["direction"] == "below"
+
+
+def test_two_indicator_runs_with_different_rules_do_not_look_identical() -> None:
+    tighter = {
+        **INDICATOR_CONFIG_SNAPSHOT,
+        "resolved_parameters": {
+            **INDICATOR_CONFIG_SNAPSHOT["resolved_parameters"],
+            "indicator_period": 7,
+            "entry_threshold": 20,
+        },
+    }
+    first = _payload(run_config_snapshot=INDICATOR_CONFIG_SNAPSHOT)
+    second = _payload(run_config_snapshot=tighter)
+    assert first.strategy_facts != second.strategy_facts
+    assert payload_digest(first) != payload_digest(second)
+
+
+def test_a_recurring_buy_receipt_freezes_its_cadence() -> None:
+    payload = _payload(run_config_snapshot=DCA_CONFIG_SNAPSHOT)
+    facts = {fact.key: fact.value for fact in payload.strategy_facts}
+    assert facts["cadence"] == "monthly"
+    assert facts["strategy_type"] == "dca accumulation"
+
+
+def test_buy_and_hold_stays_simple_rather_than_inventing_facts() -> None:
+    payload = _payload(run_config_snapshot=BUY_AND_HOLD_CONFIG_SNAPSHOT)
+    assert [fact.key for fact in payload.strategy_facts] == ["strategy_type"]
+
+
+def test_a_run_with_no_config_yields_no_strategy_facts() -> None:
+    assert _payload(run_config_snapshot=None).strategy_facts == []
+
+
+def test_strategy_facts_carry_only_readable_scalars() -> None:
+    """A nested structure is not a fact a viewer can read, and could hide anything."""
+    hostile = {
+        "resolved_parameters": {
+            "indicator": {"nested": "structure"},
+            "indicator_period": [1, 2, 3],
+            "entry_threshold": True,
+        },
+        "resolved_strategy": {"strategy_type": "indicator_threshold"},
+    }
+    payload = _payload(run_config_snapshot=hostile)
+    assert [fact.key for fact in payload.strategy_facts] == ["strategy_type"]
+
+
+def test_strategy_facts_are_audited_like_the_rest_of_the_payload() -> None:
+    poisoned = {
+        "resolved_strategy": {"strategy_type": "indicator_threshold"},
+        "resolved_parameters": {"indicator": f"RSI via openrouter {CONVERSATION_ID}"},
+    }
+    with pytest.raises(PublicExcerptSanitizationError):
+        _payload(run_config_snapshot=poisoned)

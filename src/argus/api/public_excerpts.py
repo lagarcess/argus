@@ -292,9 +292,13 @@ def create_receipt_for_artifact(
     )
     if existing is not None:
         return existing, False
+    run = _owned_run(user_id=user.id, run_id=artifact.source_run_id)
     payload = build_public_excerpt_payload(
         artifact=artifact,
-        run_chart=_run_chart(user_id=user.id, run_id=artifact.source_run_id),
+        run_chart=getattr(run, "chart", None) if run is not None else None,
+        run_config_snapshot=(
+            getattr(run, "config_snapshot", None) if run is not None else None
+        ),
         owner_note=owner_note,
         content_language=_artifact_content_language(conversation),
     )
@@ -411,20 +415,22 @@ def _owned_source_conversation(
     return conversation
 
 
-def _run_chart(*, user_id: str, run_id: str | None) -> dict[str, Any] | None:
-    """Read the run's frozen chart. The public view never repeats this read."""
+def _owned_run(*, user_id: str, run_id: str | None) -> Any | None:
+    """Read the run once. It is immutable, and the public view never reads it.
+
+    Both the frozen chart and the frozen strategy facts come from here, so one
+    read means the two cannot describe different runs.
+    """
     if run_id is None:
         return None
     if api_state.supabase_gateway is not None:
-        run = api_state.supabase_gateway.get_backtest_run(
+        return api_state.supabase_gateway.get_backtest_run(
             user_id=user_id,
             run_id=run_id,
         )
-        return run.chart if run is not None else None
     run = api_state.store.backtest_runs.get(run_id)
     if run is None:
         return None
     if api_state.store.backtest_run_owners.get(run_id) != user_id:
         return None
-    chart = getattr(run, "chart", None)
-    return chart if isinstance(chart, dict) else None
+    return run

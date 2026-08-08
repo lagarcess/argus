@@ -61,6 +61,10 @@ const PAYLOAD: PublicReceiptPayload = {
   ],
   benchmark_symbol: "SPY",
   benchmark_note: "Compared against SPY.",
+  strategy_facts: [
+    { key: "indicator", value: "RSI" },
+    { key: "indicator_period", value: "14" },
+  ],
   visual: null,
   owner_note: null,
   content_language: "en",
@@ -396,5 +400,61 @@ describe("viewer language", () => {
     expect(formatReceiptDate(null, "en")).toBeNull();
     expect(formatReceiptDate("not-a-date", "en")).toBeNull();
     expect(formatReceiptDate("2026-08-07T12:00:00Z", "en")).toBe("August 7, 2026");
+  });
+});
+
+describe("the strategy a receipt shows", () => {
+  test("renders the parameters that defined the run, not only its category", () => {
+    const body = source(RECEIPT_BODY);
+    expect(body).toContain("payload.strategy_facts");
+    expect(body).toContain("copy.strategy_facts[fact.key]");
+  });
+
+  test("labels are the viewer's language and values stay frozen", () => {
+    // Freezing an English label would put untranslatable chrome in the payload.
+    for (const bundle of [enCommon.receipt, esCommon.receipt]) {
+      for (const key of [
+        "strategy_type",
+        "cadence",
+        "indicator",
+        "indicator_period",
+        "entry_threshold",
+        "exit_threshold",
+        "direction",
+      ]) {
+        expect(
+          (bundle.strategy_facts as Record<string, string>)[key]?.length,
+        ).toBeGreaterThan(0);
+      }
+    }
+    expect(enCommon.receipt.strategy_facts.indicator).not.toBe(
+      esCommon.receipt.strategy_facts.indicator,
+    );
+  });
+});
+
+describe("a view is only counted when a receipt was shown", () => {
+  test("the outage notice does not fire the beacon", () => {
+    const notice = source(join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx"));
+    expect(notice).toContain('kind === "revoked" ? <ReceiptViewBeacon /> : null');
+  });
+});
+
+describe("the public route escapes the client i18n gate", () => {
+  test("so a shared link is not blank without JavaScript", () => {
+    // The gate returns a placeholder instead of children until i18n initialises,
+    // which left the initial HTML empty and the page permanently blank with JS off.
+    const provider = source(join(WEB_ROOT, "components/I18nProvider.tsx"));
+    expect(provider).toContain("PUBLIC_RECEIPT_PATH_PREFIX");
+    expect(provider).toContain("!isInitialized && !rendersWithoutI18n");
+    // The receipt surface consumes no i18next resources, which is what makes this safe.
+    for (const file of [
+      "components/receipt/ReceiptBody.tsx",
+      "components/receipt/ReceiptNotice.tsx",
+      "components/receipt/TryArgusCallToAction.tsx",
+      "components/receipt/ProvenanceMark.tsx",
+    ]) {
+      expect(source(join(WEB_ROOT, file))).not.toContain("useTranslation");
+    }
   });
 });

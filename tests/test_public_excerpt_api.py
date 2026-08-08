@@ -841,6 +841,7 @@ def test_the_snapshot_captures_nothing_mutable_beyond_the_owner_note() -> None:
         "asset_class",
         "symbols",
         "strategy_label",
+        "strategy_facts",
         "assumptions",
         "date_range",
         "metrics",

@@ -22,6 +22,7 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptMetric,
     PublicExcerptPayload,
     PublicExcerptSnapshot,
+    PublicExcerptStrategyFact,
     PublicExcerptView,
     PublicExcerptVisual,
     PublicExcerptVisualPoint,
@@ -150,6 +151,7 @@ def build_public_excerpt_payload(
     *,
     artifact: EvidenceArtifact,
     run_chart: dict[str, Any] | None,
+    run_config_snapshot: dict[str, Any] | None = None,
     owner_note: str | None,
     content_language: str,
 ) -> PublicExcerptPayload:
@@ -169,6 +171,7 @@ def build_public_excerpt_payload(
         ),
         symbols=_symbols(provenance.get("symbols") or result_card.get("symbols")),
         strategy_label=_text(result_card.get("strategy_label")),
+        strategy_facts=_strategy_facts(run_config_snapshot),
         assumptions=_text_list(
             source.get("assumptions") or result_card.get("assumptions"),
             limit=MAX_ASSUMPTIONS,
@@ -421,6 +424,111 @@ def _metrics(value: object) -> list[PublicExcerptMetric]:
         if len(metrics) >= MAX_METRICS:
             break
     return metrics
+
+
+def _strategy_facts(config_snapshot: object) -> list[PublicExcerptStrategyFact]:
+    """Freeze the parameters that define what was executed.
+
+    The strategy label is a category name. For every shape except buy and hold that
+    is not enough to know what produced the numbers: two RSI runs with different
+    periods and thresholds, or two DCA runs with different cadence, would otherwise
+    render as the same strategy with different results, which is the opposite of
+    evidence.
+
+    Read from the run's immutable ``config_snapshot``, and only through the closed
+    key set below, so widening what a receipt discloses about a strategy stays a
+    deliberate change.
+    """
+    snapshot = _mapping(config_snapshot)
+    resolved_strategy = _mapping(snapshot.get("resolved_strategy"))
+    resolved_parameters = _mapping(snapshot.get("resolved_parameters"))
+    entry_rule = _mapping(resolved_strategy.get("entry_rule"))
+    exit_rule = _mapping(resolved_strategy.get("exit_rule"))
+
+    def first(*candidates: object) -> object:
+        for candidate in candidates:
+            if candidate not in (None, ""):
+                return candidate
+        return None
+
+    facts: list[tuple[str, object]] = [
+        (
+            "strategy_type",
+            first(
+                resolved_strategy.get("strategy_type"),
+                snapshot.get("template"),
+            ),
+        ),
+        (
+            "cadence",
+            first(
+                resolved_strategy.get("cadence"),
+                resolved_parameters.get("cadence"),
+            ),
+        ),
+        (
+            "indicator",
+            first(
+                resolved_parameters.get("indicator"),
+                entry_rule.get("indicator"),
+                exit_rule.get("indicator"),
+            ),
+        ),
+        (
+            "indicator_period",
+            first(
+                resolved_parameters.get("indicator_period"),
+                entry_rule.get("period"),
+                exit_rule.get("period"),
+            ),
+        ),
+        (
+            "entry_threshold",
+            first(
+                resolved_parameters.get("entry_threshold"),
+                resolved_parameters.get("indicator_entry_threshold"),
+                entry_rule.get("threshold"),
+            ),
+        ),
+        (
+            "exit_threshold",
+            first(
+                resolved_parameters.get("exit_threshold"),
+                resolved_parameters.get("indicator_exit_threshold"),
+                exit_rule.get("threshold"),
+            ),
+        ),
+        (
+            "direction",
+            first(
+                resolved_strategy.get("direction"),
+                entry_rule.get("direction"),
+            ),
+        ),
+    ]
+    projected: list[PublicExcerptStrategyFact] = []
+    for key, raw in facts:
+        value = _strategy_fact_value(raw)
+        if value is not None:
+            projected.append(PublicExcerptStrategyFact(key=key, value=value))
+    return projected
+
+
+def _strategy_fact_value(value: object) -> str | None:
+    """Plain scalars only. A nested structure is not a fact a viewer can read."""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        # Whole numbers read as periods and thresholds, not as decimals.
+        return str(int(value)) if value.is_integer() else f"{value:g}"
+    if isinstance(value, str):
+        normalized = _text(value)
+        if normalized is None:
+            return None
+        return normalized[:48].replace("_", " ")
+    return None
 
 
 def _visual(chart: object) -> PublicExcerptVisual | None:

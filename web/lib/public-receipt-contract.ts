@@ -12,6 +12,21 @@ export type PublicReceiptDateRange = {
   display: string;
 };
 
+/** Closed key set; the label is rendered from the key in the viewer's language. */
+export type PublicReceiptStrategyFactKey =
+  | "strategy_type"
+  | "cadence"
+  | "indicator"
+  | "indicator_period"
+  | "entry_threshold"
+  | "exit_threshold"
+  | "direction";
+
+export type PublicReceiptStrategyFact = {
+  key: PublicReceiptStrategyFactKey;
+  value: string;
+};
+
 export type PublicReceiptMetric = {
   key: string;
   label: string;
@@ -36,6 +51,7 @@ export type PublicReceiptPayload = {
   asset_class?: AssetClass | null;
   symbols: string[];
   strategy_label?: string | null;
+  strategy_facts: PublicReceiptStrategyFact[];
   assumptions: string[];
   date_range: PublicReceiptDateRange;
   metrics: PublicReceiptMetric[];

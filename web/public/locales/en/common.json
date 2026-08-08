@@ -1480,6 +1480,15 @@
       "confirm_revoke": "Sure?",
       "revoke_error": "That link did not come down. Try again.",
       "cache_note": "The link dies on Argus right away. Chat apps sometimes keep an old preview card in threads where it was already pasted, and Argus cannot reach into those."
+    },
+    "strategy_facts": {
+      "strategy_type": "Strategy",
+      "cadence": "How often",
+      "indicator": "Indicator",
+      "indicator_period": "Indicator period",
+      "entry_threshold": "Buys at",
+      "exit_threshold": "Sells at",
+      "direction": "Direction"
     }
   }
 }

@@ -11,22 +11,24 @@ these captures exist only to show what the surface does once it is turned on.
 
 | File | What it shows |
 | :--- | :--- |
-| `01-receipt-phone-en.png` | The receipt at 375x812, English. Provenance mark, not-advice framing above the numbers, result metrics, frozen chart, what was tested, assumptions, owner note, frozen-on date, Try Argus. |
-| `02-receipt-phone-es.png` | The same surface in Spanish. The chrome is the viewer's language; the frozen prose keeps the language it was authored in. |
-| `03-tombstone-phone-en.png` | A revoked receipt. Honest tombstone, not a 404, and it still offers Try Argus. |
-| `04-tombstone-phone-es.png` | The tombstone in Spanish. |
-| `05-outage-phone-en.png` | The same live receipt during a real upstream outage. Reads "We could not load this one", plainly temporary, distinct from the tombstone. |
-| `06-outage-phone-es.png` | The outage state in Spanish. |
-| `07-data-controls-shared-links-phone-en.png` | The receipt list in Data Controls at phone width. |
-| `08-data-controls-shared-links-en.png` | The receipt list at desktop width: every receipt, when it was shared, what it shows, revoke in one action, the automatic revocation reason on the revoked row, and the cached-preview limit stated plainly. |
-| `09-receipt-desktop-en.png` | The same page at 1280x900, scaling up from the phone. |
-| `10-preview-card-en.png` | The real preview image a platform fetches, 1200x630, rendered server side from the frozen payload. |
-| `11-preview-card-es.png` | The card for a Spanish receipt. It follows the receipt's own language, not a viewer's, because a crawler fetching it has no language and the frozen facts on it are already Spanish. This receipt came from a Spanish conversation while the owner's profile was English, so it also shows the frozen language coming from the artifact rather than the profile. |
-| `12-preview-card-revoked.png` | The card for a revoked receipt. |
-| `preview-card-outage-response.json` | The card during a real outage: 503, zero bytes, `Retry-After`, `no-store`. Platforms cache nothing and ask again, instead of pinning a revoked-looking card to a live receipt. |
-| `outage-page-text.json` | The outage page's title and text, showing a neutral title rather than a permanent-sounding one. |
+| `01-receipt-phone-en.png` | A buy-and-hold receipt at 375x812, English. Provenance mark, not-advice framing above the numbers, result metrics, frozen chart, what was tested, assumptions, owner note, frozen-on date, Try Argus. |
+| `02-receipt-phone-en-indicator.png` | An indicator receipt. Shows the parameters that actually decided the trades: indicator, period, buy and sell thresholds, direction. Without them two RSI runs with different settings would render as the same strategy with different numbers. |
+| `03-receipt-phone-en-recurring.png` | A recurring-buy receipt, whose cadence is what defines it. |
+| `04-receipt-phone-es.png` | A Spanish receipt. Chrome in the viewer's language, frozen prose in its own. |
+| `05-tombstone-phone-en.png` | A revoked receipt. Honest tombstone, not a 404, still offers Try Argus. |
+| `06-tombstone-phone-es.png` | The tombstone in Spanish. |
+| `07-receipt-phone-es-indicator.png` | The indicator receipt in Spanish. The strategy labels translate while the frozen values do not, which is why the keys are a closed enum rather than frozen English labels. |
+| `08-data-controls-phone-en.png` | The receipt list in Data Controls at phone width. |
+| `09-data-controls-en.png` | The receipt list at desktop width: every receipt, when it was shared, what it shows, revoke in one action, the automatic revocation reason on the revoked row, and the cached-preview limit stated plainly. |
+| `10-receipt-desktop-en-indicator.png` | The indicator receipt at 1280x900, scaling up from the phone. |
+| `11-preview-card-en.png` | The real preview image a platform fetches, 1200x630, rendered server side from the frozen payload. |
+| `12-preview-card-es.png` | The card for a Spanish receipt, following the receipt's own language because a crawler fetching it has none. |
+| `13-preview-card-indicator.png` | The card for the indicator receipt. |
+| `14-preview-card-revoked.png` | The card for a revoked receipt. |
 | `og-and-robots-meta.json` | The head metadata a scraper actually reads, captured from the live page, plus the rendered body text. |
 | `preview-card-headers.json` | The preview image's response headers. |
+| `preview-card-outage-response.json` | The card during a real outage: 503, zero bytes, `Retry-After`, `no-store`. Platforms cache nothing and ask again, instead of pinning a revoked-looking card to a live receipt. |
+| `outage-page-text.json` | The outage page's title and text, showing a neutral title rather than a permanent-sounding one. |
 
 ## What the metadata capture proves
 
@@ -56,6 +58,11 @@ From `preview-card-headers.json`:
   read in the browser, which does nothing to a server-rendered page, and produced
   a normal receipt. Those captures were discarded and retaken with the backend
   process actually stopped.
+- **The outage page screenshots.** `preview-card-outage-response.json` and
+  `outage-page-text.json` record that state instead, captured with the backend
+  process stopped. They were retaken from an earlier invalid attempt that
+  intercepted the read in the browser, which does nothing to a server-rendered
+  page.
 - **A view-count screenshot.** Views are reported by a beacon from the rendered
   page rather than counted when the receipt is read, because the read endpoint also
   answers the metadata pass and the preview image. That is proven by

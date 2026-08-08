@@ -124,6 +124,18 @@ export default function ReceiptBody({
               </dd>
             </div>
           )}
+          {/* The label above names a category. These are the parameters that
+              actually decided what happened, so two runs of the same kind with
+              different settings do not read as the same strategy. */}
+          {payload.strategy_facts
+            .filter((fact) => fact.key !== "strategy_type" || !payload.strategy_label)
+            .map((fact) => (
+              <Field
+                key={fact.key}
+                label={copy.strategy_facts[fact.key] ?? fact.key}
+                value={fact.value}
+              />
+            ))}
           <Field label={copy.fields.dates} value={payload.date_range.display} />
           {payload.benchmark_symbol && (
             <Field
