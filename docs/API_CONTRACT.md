@@ -616,12 +616,22 @@ Public endpoints, unauthenticated:
 `POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
 `{"owner_note": string | null}`, bounded at 280 characters, and returns
 `{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
-has a live one returns that receipt rather than minting a second link.
+has a live one returns that receipt rather than minting a second link, including
+when two concurrent requests race on the insert. Only a real insert emits the
+`receipt_created` funnel event, so a retry or a reload cannot inflate the
+acquisition funnel's creation stage.
 
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols,
 date_range_display, created_at, revoked_at, revocation_reason}`. It carries no
 source conversation, run, or artifact id. Clients compose the shareable url as
 `origin + path`, so the backend owns no origin configuration.
+
+`GET /public-excerpts` is paginated, newest first, with `limit` (default 50, max
+200) and an opaque `cursor`, returning `{items, next_cursor}`. It is paginated
+rather than capped on purpose: this list is the only place an owner can find a
+snapshot id to revoke, so a row hidden behind a cap would be a public page they
+cannot take down. The cursor is keyset on `(created_at, id)` so identical
+timestamps cannot drop or repeat a row across pages.
 
 `GET /public/receipts/{public_id}` returns
 `{public_id, status, indexing, created_at, payload}`:

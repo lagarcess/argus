@@ -139,6 +139,7 @@ class PublicExcerptListResponse(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     items: list[PublicExcerptListItem]
+    next_cursor: str | None = None
 
 
 class PublicExcerptRevokeResponse(BaseModel):

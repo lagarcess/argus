@@ -410,3 +410,134 @@ def test_the_public_route_module_holds_only_the_reader_and_the_funnel() -> None:
         "read_public_receipt",
         "record_receipt_funnel_stage",
     ]
+
+
+# ── Review follow-ups: pagination, insert race, funnel accuracy ───────────────
+
+
+def _seed_extra_artifacts(user_id: str, count: int) -> None:
+    for index in range(count):
+        artifact = build_artifact(artifact_id=f"page-artifact-{index:04d}")
+        api_state.store.evidence_artifacts[artifact.id] = artifact
+        api_state.store.evidence_artifact_owners[artifact.id] = user_id
+
+
+def test_the_receipt_list_pages_instead_of_hiding_older_live_links(
+    sharing_on: None,
+) -> None:
+    """No live receipt may be unreachable.
+
+    Data Controls is the only place an owner can find a snapshot id, so a row that
+    falls off the list is a public page they cannot take down.
+    """
+    client = _client()
+    user_id = _seed(client)
+    _seed_extra_artifacts(user_id, 5)
+    created: list[str] = []
+    for index in range(5):
+        response = client.post(
+            f"/api/v1/evidence-artifacts/page-artifact-{index:04d}/public-excerpt",
+            json={},
+        )
+        assert response.status_code == 200, response.text
+        created.append(response.json()["receipt"]["id"])
+
+    seen: list[str] = []
+    cursor: str | None = None
+    pages = 0
+    while True:
+        query = f"{LIST_PATH}?limit=2" + (f"&cursor={cursor}" if cursor else "")
+        body = client.get(query).json()
+        assert len(body["items"]) <= 2
+        seen.extend(item["id"] for item in body["items"])
+        pages += 1
+        cursor = body["next_cursor"]
+        if not cursor:
+            break
+        assert pages < 20, "pagination did not terminate"
+
+    # Every receipt is reachable exactly once, in newest-first order.
+    assert len(seen) == len(set(seen))
+    assert set(created).issubset(set(seen))
+    assert pages > 1
+
+
+def test_a_stale_or_malformed_cursor_is_rejected(sharing_on: None) -> None:
+    client = _client()
+    _seed(client)
+    _create(client)
+    assert client.get(f"{LIST_PATH}?cursor=not-base64").status_code == 400
+    assert client.get(f"{LIST_PATH}?limit=0").status_code == 422
+    assert client.get(f"{LIST_PATH}?limit=99999").status_code == 422
+
+
+def test_resharing_a_result_does_not_count_as_a_new_receipt(
+    sharing_on: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The funnel's creation stage must not count retries and reloads."""
+    events: list[str] = []
+    monkeypatch.setattr(
+        evidence_receipts,
+        "capture_product_event",
+        lambda kind, **kwargs: events.append(kind),
+    )
+    client = _client()
+    _seed(client)
+    first = _create(client)
+    second = _create(client)
+
+    assert first["public_id"] == second["public_id"]
+    assert events == ["receipt_created"]
+
+
+def test_an_insert_race_returns_the_existing_receipt_rather_than_failing(
+    sharing_on: None,
+) -> None:
+    """The loser of a concurrent create reads the winner's row.
+
+    Both requests can pass the pre-check; the partial unique index lets one in.
+    The contract says re-sharing returns the existing link, so a 500 would break it.
+    """
+    from argus.domain.supabase_public_excerpts import SupabasePublicExcerptMixin
+
+    winner: dict[str, Any] = {}
+
+    class _RacingGateway(SupabasePublicExcerptMixin):
+        def __init__(self) -> None:
+            self.client = None
+
+        def get_live_public_excerpt_for_artifact(
+            self, *, owner_id: str, evidence_artifact_id: str | None
+        ):
+            # Empty before the insert, populated after, exactly as the loser of a
+            # race would observe it.
+            return winner.get("snapshot")
+
+    gateway = _RacingGateway()
+
+    class _FailingTable:
+        def insert(self, payload: dict[str, Any]) -> _FailingTable:
+            return self
+
+        def execute(self) -> Any:
+            raise RuntimeError("duplicate key value violates unique constraint")
+
+    gateway.client = type("C", (), {"table": lambda self, name: _FailingTable()})()
+
+    client = _client()
+    user_id = _seed(client)
+    seed_response = _create(client)
+    live = api_state.store.public_excerpt_snapshots[seed_response["id"]]
+    winner["snapshot"] = None
+
+    # First call: no existing row and the insert fails, so the error surfaces.
+    with pytest.raises(RuntimeError):
+        gateway.create_public_excerpt_snapshot(snapshot=live)
+
+    # Now the winner's row exists, so the loser returns it and reports no creation.
+    winner["snapshot"] = live
+    snapshot, created = gateway.create_public_excerpt_snapshot(snapshot=live)
+    assert snapshot.id == live.id
+    assert created is False
+    assert live.owner_id == user_id

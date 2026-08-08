@@ -571,14 +571,20 @@ def _seed_owned_result() -> None:
 
 def test_creating_twice_returns_the_same_live_receipt() -> None:
     _seed_owned_result()
-    first = create_receipt_for_artifact(user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None)
-    second = create_receipt_for_artifact(user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None)
+    first, first_created = create_receipt_for_artifact(
+        user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None
+    )
+    second, second_created = create_receipt_for_artifact(
+        user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None
+    )
     assert first.public_id == second.public_id
+    # Only the first call created anything, which is what the funnel counts.
+    assert (first_created, second_created) == (True, False)
 
 
 def test_revocation_takes_effect_on_the_next_public_read() -> None:
     _seed_owned_result()
-    snapshot = create_receipt_for_artifact(
+    snapshot, _ = create_receipt_for_artifact(
         user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None
     )
     repository = MemoryPublicExcerptRepository(api_state.store)
@@ -597,7 +603,7 @@ def test_revocation_takes_effect_on_the_next_public_read() -> None:
 
 def test_revocation_is_one_way() -> None:
     _seed_owned_result()
-    snapshot = create_receipt_for_artifact(
+    snapshot, _ = create_receipt_for_artifact(
         user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None
     )
     repository = MemoryPublicExcerptRepository(api_state.store)
@@ -614,7 +620,7 @@ def test_revocation_is_one_way() -> None:
 
 def test_another_account_cannot_read_or_revoke_a_receipt() -> None:
     _seed_owned_result()
-    snapshot = create_receipt_for_artifact(
+    snapshot, _ = create_receipt_for_artifact(
         user=OWNER, artifact_id=ARTIFACT_ID, owner_note=None
     )
     repository = MemoryPublicExcerptRepository(api_state.store)

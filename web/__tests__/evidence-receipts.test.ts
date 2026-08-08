@@ -109,6 +109,16 @@ describe("the receipt list", () => {
     expect(body).toContain("receipt.list.confirm_revoke");
   });
 
+  test("pages instead of capping, so no live link can hide", () => {
+    // A silent cap would leave older live links unreachable, and this list is
+    // the only place an owner can find one to take down.
+    const body = source(RECEIPT_LIST);
+    expect(body).toContain("next_cursor");
+    expect(body).toContain("receipt.list.load_more");
+    const client = source(join(WEB_ROOT, "lib/evidence-receipts.ts"));
+    expect(client).toContain("cursor=");
+  });
+
   test("states the cached-preview limit rather than implying links vanish", () => {
     expect(source(RECEIPT_LIST)).toContain("receipt.list.cache_note");
   });

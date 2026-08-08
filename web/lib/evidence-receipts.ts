@@ -49,11 +49,24 @@ export async function createEvidenceReceipt(
   return response.receipt;
 }
 
-export async function listEvidenceReceipts(): Promise<EvidenceReceipt[]> {
-  const response = await apiFetch<{ items: EvidenceReceipt[] }>(
-    "/public-excerpts",
-  );
-  return response.items;
+export type EvidenceReceiptPage = {
+  items: EvidenceReceipt[];
+  next_cursor: string | null;
+};
+
+/**
+ * Paginated, not capped. This list is the only place an owner can find a receipt
+ * to revoke, so every one of them has to stay reachable.
+ */
+export async function listEvidenceReceipts(
+  cursor?: string | null,
+): Promise<EvidenceReceiptPage> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const response = await apiFetch<{
+    items: EvidenceReceipt[];
+    next_cursor?: string | null;
+  }>(`/public-excerpts${query}`);
+  return { items: response.items, next_cursor: response.next_cursor ?? null };
 }
 
 export async function revokeEvidenceReceipt(

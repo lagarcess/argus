@@ -40,7 +40,8 @@ OWNER_COLUMNS = (
     "revocation_reason",
 )
 
-MAX_OWNER_RECEIPTS = 200
+DEFAULT_OWNER_PAGE_SIZE = 50
+MAX_OWNER_PAGE_SIZE = 200
 
 
 class PublicExcerptConflictError(RuntimeError):
@@ -69,19 +70,38 @@ class SupabasePublicExcerptMixin:
 
     def create_public_excerpt_snapshot(
         self, *, snapshot: PublicExcerptSnapshot
-    ) -> PublicExcerptSnapshot:
+    ) -> tuple[PublicExcerptSnapshot, bool]:
+        """Insert a receipt, or return the live one that already covers the result.
+
+        Returns ``(snapshot, created)``. Callers need the flag because sharing the
+        same result twice is deliberately idempotent, and counting the second call
+        as a creation would inflate the acquisition funnel.
+        """
         existing = self.get_live_public_excerpt_for_artifact(
             owner_id=snapshot.owner_id,
             evidence_artifact_id=snapshot.evidence_artifact_id,
         )
         if existing is not None:
-            return existing
+            return existing, False
         payload = snapshot.model_dump(mode="json")
-        created = self.client.table(TABLE).insert(payload).execute()
+        try:
+            created = self.client.table(TABLE).insert(payload).execute()
+        except Exception:
+            # Two concurrent creates can both pass the lookup above; the partial
+            # unique index lets one in and rejects the other. The loser reads the
+            # winner's row rather than surfacing a 500, because the contract says
+            # re-sharing a result returns its existing link.
+            raced = self.get_live_public_excerpt_for_artifact(
+                owner_id=snapshot.owner_id,
+                evidence_artifact_id=snapshot.evidence_artifact_id,
+            )
+            if raced is not None:
+                return raced, False
+            raise
         rows = _rows(created)
         if not rows:
             raise PublicExcerptConflictError("The receipt was not recorded.")
-        return _snapshot_from_row(rows[0])
+        return _snapshot_from_row(rows[0]), True
 
     def get_live_public_excerpt_for_artifact(
         self, *, owner_id: str, evidence_artifact_id: str | None
@@ -101,14 +121,35 @@ class SupabasePublicExcerptMixin:
         return _snapshot_from_row(rows[0]) if rows else None
 
     def list_public_excerpt_snapshots(
-        self, *, owner_id: str
+        self,
+        *,
+        owner_id: str,
+        limit: int = DEFAULT_OWNER_PAGE_SIZE,
+        before: tuple[str, str] | None = None,
     ) -> list[PublicExcerptSnapshot]:
-        result = (
+        """One page of the owner's receipts, newest first.
+
+        Paginated rather than capped. A silent cap would hide older live links from
+        Data Controls, and Data Controls is the only place an owner can find a
+        snapshot id to revoke, so a hidden row is an unrevocable public page.
+        """
+        query = (
             self.client.table(TABLE)
             .select(",".join(OWNER_COLUMNS))
             .eq("owner_id", owner_id)
-            .order("created_at", desc=True)
-            .limit(MAX_OWNER_RECEIPTS)
+        )
+        if before is not None:
+            created_at, snapshot_id = before
+            # Keyset on (created_at, id) so identical timestamps cannot drop or
+            # repeat a row across pages.
+            query = query.or_(
+                f"created_at.lt.{created_at},"
+                f"and(created_at.eq.{created_at},id.lt.{snapshot_id})"
+            )
+        result = (
+            query.order("created_at", desc=True)
+            .order("id", desc=True)
+            .limit(limit)
             .execute()
         )
         return [_snapshot_from_row(row) for row in _rows(result)]

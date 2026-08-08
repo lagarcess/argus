@@ -27,7 +27,9 @@ type SharedReceiptsViewProps = {
 export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps) {
   const { t, i18n } = useTranslation();
   const [receipts, setReceipts] = useState<EvidenceReceipt[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -38,12 +40,32 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
     setIsLoading(true);
     setLoadFailed(false);
     listEvidenceReceipts()
-      .then(setReceipts)
+      .then((page) => {
+        setReceipts(page.items);
+        setNextCursor(page.next_cursor);
+      })
       .catch(() => setLoadFailed(true))
       .finally(() => setIsLoading(false));
   }, []);
 
   useEffect(load, [load]);
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setIsLoadingMore(true);
+    setActionError(null);
+    try {
+      const page = await listEvidenceReceipts(nextCursor);
+      setReceipts((previous) => [...previous, ...page.items]);
+      setNextCursor(page.next_cursor);
+    } catch {
+      setActionError(
+        t("receipt.list.load_error", "Your shared links did not load."),
+      );
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const revoke = async (receipt: EvidenceReceipt) => {
     setRevokingId(receipt.id);
@@ -56,7 +78,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
       setConfirmingId(null);
     } catch {
       setActionError(
-        t("receipt.list.revoke_error", "Could not revoke that link. Try again."),
+        t("receipt.list.revoke_error", "That link did not come down. Try again."),
       );
     } finally {
       setRevokingId(null);
@@ -100,7 +122,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
           <p className="text-[13px] leading-relaxed text-black/50 dark:text-white/50">
             {t(
               "receipt.list.intro",
-              "Every receipt you have created. Each one shows frozen result numbers and nothing about you.",
+              "Everything you have shared. Each link shows locked numbers and nothing about you.",
             )}
           </p>
 
@@ -120,7 +142,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
           ) : loadFailed ? (
             <div className="flex flex-col items-center gap-3 py-14 text-center">
               <p className="text-[14px] text-black/50 dark:text-white/50">
-                {t("receipt.list.load_error", "Shared links could not be loaded.")}
+                {t("receipt.list.load_error", "Your shared links did not load.")}
               </p>
               <button
                 type="button"
@@ -136,7 +158,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
                 <Link2 className="h-8 w-8 text-black/20 dark:text-white/20" />
               </div>
               <p className="text-[14.5px] text-black/40 dark:text-white/40">
-                {t("receipt.list.empty", "You have not shared any results yet.")}
+                {t("receipt.list.empty", "You have not shared anything yet.")}
               </p>
             </div>
           ) : (
@@ -160,7 +182,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
                       {isRevoked
                         ? t("receipt.list.revoked_on", {
                             date: formatDate(receipt.revoked_at as string),
-                            defaultValue: "Revoked {{date}}",
+                            defaultValue: "Taken down {{date}}",
                           })
                         : t("receipt.list.created_on", {
                             date: formatDate(receipt.created_at),
@@ -171,7 +193,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
                       <p className="mt-1 text-[12px] leading-snug text-black/40 dark:text-white/40">
                         {t(
                           "receipt.list.revoked_by_source",
-                          "Revoked automatically when you deleted the chat behind it.",
+                          "Taken down on its own when you deleted the chat behind it.",
                         )}
                       </p>
                     )}
@@ -191,7 +213,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
                             <Copy className="h-3.5 w-3.5" />
                           )}
                           {copiedId === receipt.id
-                            ? t("receipt.owner.copied", "Link copied")
+                            ? t("receipt.owner.copied", "Copied")
                             : t("receipt.list.copy", "Copy link")}
                         </button>
                         <a
@@ -201,7 +223,7 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
                           className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
-                          {t("receipt.list.open", "Open receipt")}
+                          {t("receipt.list.open", "Open it")}
                         </a>
                         <button
                           type="button"
@@ -216,10 +238,10 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
                           className="ml-auto inline-flex min-h-9 items-center rounded-full px-3 text-[12px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 disabled:opacity-55"
                         >
                           {revokingId === receipt.id
-                            ? t("receipt.list.revoking", "Revoking...")
+                            ? t("receipt.list.revoking", "Taking it down...")
                             : confirmingId === receipt.id
-                              ? t("receipt.list.confirm_revoke", "Revoke?")
-                              : t("receipt.list.revoke", "Revoke")}
+                              ? t("receipt.list.confirm_revoke", "Sure?")
+                              : t("receipt.list.revoke", "Take it down")}
                         </button>
                       </div>
                     )}
@@ -229,10 +251,25 @@ export default function SharedReceiptsView({ onClose }: SharedReceiptsViewProps)
             </ul>
           )}
 
+          {nextCursor && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                disabled={isLoadingMore}
+                onClick={() => void loadMore()}
+                className="inline-flex min-h-9 items-center rounded-full border border-black/10 px-3.5 text-[12.5px] font-medium text-black/70 transition-colors hover:bg-black/[0.03] disabled:opacity-55 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]"
+              >
+                {isLoadingMore
+                  ? t("receipt.list.loading", "Loading your links...")
+                  : t("receipt.list.load_more", "Show older links")}
+              </button>
+            </div>
+          )}
+
           <p className="mt-5 text-[11.5px] leading-relaxed text-black/40 dark:text-white/40">
             {t(
               "receipt.list.cache_note",
-              "Revoking takes effect right away on Argus. Messaging apps may still show an old preview card in threads where the link was already pasted, and Argus cannot clear those.",
+              "The link dies on Argus right away. Chat apps sometimes keep an old preview card in threads where it was already pasted, and Argus cannot reach into those.",
             )}
           </p>
         </div>

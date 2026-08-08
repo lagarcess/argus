@@ -27,6 +27,7 @@ from argus.domain.public_excerpts import (
     revoked_public_view,
     snapshot_public_view,
 )
+from argus.domain.supabase_public_excerpts import DEFAULT_OWNER_PAGE_SIZE
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -78,15 +79,15 @@ class MemoryPublicExcerptRepository:
 
     def create_public_excerpt_snapshot(
         self, *, snapshot: PublicExcerptSnapshot
-    ) -> PublicExcerptSnapshot:
+    ) -> tuple[PublicExcerptSnapshot, bool]:
         existing = self.get_live_public_excerpt_for_artifact(
             owner_id=snapshot.owner_id,
             evidence_artifact_id=snapshot.evidence_artifact_id,
         )
         if existing is not None:
-            return existing
+            return existing, False
         self._store.public_excerpt_snapshots[snapshot.id] = snapshot
-        return snapshot
+        return snapshot, True
 
     def get_live_public_excerpt_for_artifact(
         self, *, owner_id: str, evidence_artifact_id: str | None
@@ -103,14 +104,28 @@ class MemoryPublicExcerptRepository:
         return None
 
     def list_public_excerpt_snapshots(
-        self, *, owner_id: str
+        self,
+        *,
+        owner_id: str,
+        limit: int = DEFAULT_OWNER_PAGE_SIZE,
+        before: tuple[str, str] | None = None,
     ) -> list[PublicExcerptSnapshot]:
-        owned = [
-            snapshot
-            for snapshot in self._store.public_excerpt_snapshots.values()
-            if snapshot.owner_id == owner_id
-        ]
-        return sorted(owned, key=lambda snapshot: snapshot.created_at, reverse=True)
+        owned = sorted(
+            (
+                snapshot
+                for snapshot in self._store.public_excerpt_snapshots.values()
+                if snapshot.owner_id == owner_id
+            ),
+            key=lambda snapshot: (snapshot.created_at.isoformat(), snapshot.id),
+            reverse=True,
+        )
+        if before is not None:
+            owned = [
+                snapshot
+                for snapshot in owned
+                if (snapshot.created_at.isoformat(), snapshot.id) < before
+            ]
+        return owned[:limit]
 
     def get_owned_public_excerpt_snapshot(
         self, *, owner_id: str, snapshot_id: str
@@ -192,8 +207,13 @@ def create_receipt_for_artifact(
     user: User,
     artifact_id: str,
     owner_note: str | None,
-) -> PublicExcerptSnapshot:
-    """Freeze a receipt from an owned result. Reads private records exactly once."""
+) -> tuple[PublicExcerptSnapshot, bool]:
+    """Freeze a receipt from an owned result. Reads private records exactly once.
+
+    Returns ``(snapshot, created)``. Sharing the same result twice returns the
+    existing link, and the caller needs to know that so a retry or a reload is not
+    counted as a new receipt in the funnel.
+    """
     artifact = _owned_artifact(user_id=user.id, artifact_id=artifact_id)
     repository = public_excerpt_repository()
     existing = repository.get_live_public_excerpt_for_artifact(
@@ -201,7 +221,7 @@ def create_receipt_for_artifact(
         evidence_artifact_id=artifact.id,
     )
     if existing is not None:
-        return existing
+        return existing, False
     payload = build_public_excerpt_payload(
         artifact=artifact,
         run_chart=_run_chart(user_id=user.id, run_id=artifact.source_run_id),
