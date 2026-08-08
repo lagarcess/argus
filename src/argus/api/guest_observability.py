@@ -6,7 +6,11 @@ from typing import Any, Literal
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.guest_access import AccountContext
+from argus.api.guest_access import AccountContext, current_account_context
+from argus.domain.guest_funnel_milestones import (
+    claim_memory_milestone,
+    claim_milestone,
+)
 from argus.domain.usage_limits import (
     MESSAGE_USAGE_RESOURCE,
     SIMULATION_USAGE_RESOURCE,
@@ -21,6 +25,8 @@ from argus.observability.guest_funnel import (
     GuestFunnelSurface,
     GuestFunnelTerminalOutcome,
     capture_guest_funnel_event,
+    is_milestone_event,
+    milestone_subject,
 )
 
 
@@ -57,17 +63,82 @@ def emit_guest_funnel_event(
     emit_verified_guest_funnel_event(
         kind,
         user_id=user_id,
+        visitor_key=account.visitor_key,
         **{key: value for key, value in optional_fields.items() if value is not None},
     )
+
+
+def _bound_visitor_key(user_id: str) -> str | None:
+    """The visitor key of the account context this request already verified."""
+    context = current_account_context()
+    if context is None or context.user_id != user_id:
+        return None
+    return context.visitor_key
+
+
+def _claim_milestone(kind: GuestFunnelEventKind, subject_key: str) -> bool:
+    if api_state.supabase_gateway is not None:
+        return claim_milestone(
+            api_state.supabase_gateway.client,
+            subject_key=subject_key,
+            milestone=kind,
+        )
+    return claim_memory_milestone(
+        api_state.store.guest_funnel_milestones,
+        subject_key=subject_key,
+        milestone=kind,
+    )
+
+
+def milestone_emission_allowed(
+    kind: GuestFunnelEventKind,
+    *,
+    user_id: str,
+    visitor_key: str | None = None,
+) -> bool:
+    """Whether this milestone has not already been recorded for its subject.
+
+    Non-milestone kinds are repeatable and always pass. A claim that cannot be
+    resolved or persisted suppresses the emission: duplicates bias the funnel in
+    one direction, which is worse for the numbers than a milestone lost to an
+    outage that is already degrading everything else.
+    """
+    if not is_milestone_event(kind):
+        return True
+    subject_key = milestone_subject(
+        visitor_key=visitor_key or _bound_visitor_key(user_id),
+        user_id=user_id,
+    )
+    if subject_key is None:
+        logger.warning(
+            "Guest funnel milestone has no subject; suppressing emission",
+            product_event=kind,
+        )
+        return False
+    try:
+        return _claim_milestone(kind, subject_key)
+    except Exception:
+        logger.opt(exception=True).warning(
+            "Guest funnel milestone claim failed; suppressing emission",
+            product_event=kind,
+        )
+        return False
 
 
 def emit_verified_guest_funnel_event(
     kind: GuestFunnelEventKind,
     *,
     user_id: str,
+    visitor_key: str | None = None,
     **kwargs: Any,
 ) -> None:
     try:
+        if not milestone_emission_allowed(
+            kind,
+            user_id=user_id,
+            visitor_key=visitor_key,
+        ):
+            return
         capture_guest_funnel_event(
             kind,
             user_id=user_id,

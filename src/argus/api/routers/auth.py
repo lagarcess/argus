@@ -24,6 +24,7 @@ from argus.api.guest_access import (
     permanent_account_access_allowed,
     public_account_access_enabled,
     store_account_context,
+    visitor_key_for_request,
 )
 from argus.api.guest_observability import (
     emit_guest_funnel_event,
@@ -235,7 +236,10 @@ def guest_bootstrap(
             user_id=profile.id,
             created_at=profile.created_at,
         )
-        guest_context = guest_account_context(workspace)
+        guest_context = guest_account_context(
+            workspace,
+            visitor_key=visitor_key_for_request(request),
+        )
         store_account_context(request, guest_context)
         emit_guest_funnel_event(
             account=guest_context,
@@ -405,9 +409,11 @@ def claim_guest_handoff(
         return _guest_handoff_failure_response(request, str(exc))
 
     source_user_id, payload = _guest_handoff_claim_payload(request, claimed)
+    conversion_visitor_key = visitor_key_for_request(request)
     emit_verified_guest_funnel_event(
         "existing_account_sign_in_completed",
         user_id=source_user_id,
+        visitor_key=conversion_visitor_key,
         conversation_id=payload.conversation_id,
         language=user.language,
         surface="account_conversion",
@@ -417,6 +423,7 @@ def claim_guest_handoff(
     emit_verified_guest_funnel_event(
         "temporary_workspace_claimed",
         user_id=source_user_id,
+        visitor_key=conversion_visitor_key,
         conversation_id=payload.conversation_id,
         language=user.language,
         surface="account_conversion",
@@ -824,9 +831,11 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
     source_user_id, claim_payload = _guest_handoff_claim_payload(request, claimed)
     result["guest_claim"] = claim_payload.model_dump(mode="json")
     if claimed.get("replayed") is not True:
+        conversion_visitor_key = visitor_key_for_request(request)
         emit_verified_guest_funnel_event(
             "existing_account_sign_in_completed",
             user_id=source_user_id,
+            visitor_key=conversion_visitor_key,
             conversation_id=claim_payload.conversation_id,
             surface="account_conversion",
             capability_category="account",
@@ -835,6 +844,7 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
         emit_verified_guest_funnel_event(
             "temporary_workspace_claimed",
             user_id=source_user_id,
+            visitor_key=conversion_visitor_key,
             conversation_id=claim_payload.conversation_id,
             surface="account_conversion",
             capability_category="history",

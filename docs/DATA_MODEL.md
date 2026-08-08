@@ -1327,8 +1327,14 @@ foreign key to `profiles.id`.
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
   execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
-- Expired rows are disposable operational data and must be removed through the
-  bounded purge function.
+- Expired rows are disposable operational data, but `period_end` is not a timer
+  and nothing in the database acts on it. The row has no owner to cascade from,
+  so it is deleted only when a successful non-dry-run of the guest cleanup job
+  reaches the purge: `purge_expired_visitor_usage` is registered in
+  `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every non-dry-run
+  `scripts/ops/cleanup_expired_guest_workspaces.py`. Retention therefore holds
+  exactly as often as that job is run; the runbook requires it daily, and no
+  repo-side schedule runs it (see #401).
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the
@@ -1339,6 +1345,64 @@ foreign key to `profiles.id`.
 - If counter truth cannot be read, admission currently fails closed into the
   existing `discovery_limit_reached` recovery. Issue #244 retains that
   user-facing truth limitation for follow-up.
+
+---
+
+## 14.2 guest_funnel_milestones
+
+Records that a guest funnel milestone has been reached, so it is emitted at most
+once per subject. Milestone events are the acquisition funnel's numerator, and a
+duplicate inflates conversion counts in one direction.
+
+The subject is the same visitor key that meters guest allowances, not a
+`user_id`: renewing a temporary workspace mints a fresh `user_id`, so a
+user-keyed milestone would re-fire on every renewal. Like
+`visitor_usage_counters` this table is deliberately not foreign-key bound.
+
+### Fields
+- `subject_key`: `text` (visitor key; falls back to a pseudonymous actor hash
+  when no visitor key is bound to the request)
+- `milestone`: `text` (guest funnel event kind)
+- `recorded_at`: `timestamptz`
+- `expires_at`: `timestamptz`
+
+### Constraints, access, and retention
+- **Primary key**: `(subject_key, milestone)`. The primary key is the
+  idempotency guarantee. It holds across retries, restarts, concurrent
+  requests, and multiple workers in a way application logic cannot.
+- **Expiry index**: `(expires_at)`
+- RLS is enabled with no policies. Only `service_role` has table access and may
+  execute `claim_guest_funnel_milestone` or
+  `purge_expired_guest_funnel_milestones`.
+- Claims are marked expired 30 days after they are recorded, outliving the
+  seven-day guest workspace with headroom. A visitor-keyed table with no expiry
+  would become a durable visitor log.
+- `expires_at` is not a timer, and nothing in the database acts on it. The row
+  has no owner to cascade from, so the guest cleanup job is the only thing that
+  deletes it: `purge_expired_guest_funnel_milestones` is registered
+  in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
+  non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
+  never returns is deleted by that job, not by the takeover path. Retention
+  therefore holds exactly as often as that job is run; the runbook requires it
+  daily, and no repo-side schedule runs it (see #401).
+- `claim_guest_funnel_milestone` also takes over an already-expired claim in the
+  same statement, so a returning visitor is correct even between purge runs.
+
+### Milestone policy
+- Milestone-class kinds are `first_useful_assistant_response_completed`,
+  `first_simulation_admitted`, `first_result_completed`,
+  `account_creation_completed`, `existing_account_sign_in_completed`, and
+  `temporary_workspace_claimed`.
+- Every other guest funnel kind is repeatable volume or step data and is not
+  claimed. A guest reaches confirmation, sees a conversion prompt, hits a limit,
+  and submits feedback as many times as they actually do.
+- A duplicate claim is a silent no-op. A retried request must not fail because
+  it already succeeded.
+- A milestone whose claim cannot be resolved or persisted is suppressed rather
+  than emitted, because duplicates bias the funnel in one direction.
+- Visitor keys are IP-derived, so callers sharing one egress address share a
+  subject and a second visitor's milestone can be suppressed. This is the same
+  property guest allowance metering already accepts.
 
 ---
 

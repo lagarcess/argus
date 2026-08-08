@@ -132,6 +132,10 @@ class AlphaStore:
     usage_counters: dict[tuple[str, str, str], dict[str, Any]] = field(
         default_factory=dict
     )
+    # (subject_key, milestone) -> claim expiry. Twin of guest_funnel_milestones.
+    guest_funnel_milestones: dict[tuple[str, str], datetime] = field(
+        default_factory=dict
+    )
     backtest_jobs: dict[str, dict[str, Any]] = field(default_factory=dict)
     backtest_job_reservations: dict[tuple[str, str, str], str] = field(
         default_factory=dict
@@ -194,6 +198,7 @@ class AlphaStore:
         self.feedback.clear()
         self.usage_counters.clear()
         self.visitor_usage_counters.clear()
+        self.guest_funnel_milestones.clear()
         self.backtest_jobs.clear()
         self.backtest_job_reservations.clear()
 

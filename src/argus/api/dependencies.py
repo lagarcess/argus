@@ -22,6 +22,7 @@ from argus.api.guest_access import (
     permanent_account_access_allowed,
     registered_account_context,
     store_account_context,
+    visitor_key_for_request,
 )
 from argus.api.schemas import CHAT_STREAM_MAX_BODY_BYTES, ChatStreamRequest, User
 
@@ -491,7 +492,13 @@ def current_user(request: Request) -> User:
                 detail="This temporary guest session is no longer available.",
             )
         user = api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
-        store_account_context(request, guest_account_context(workspace))
+        store_account_context(
+            request,
+            guest_account_context(
+                workspace,
+                visitor_key=visitor_key_for_request(request),
+            ),
+        )
         return user
 
     auth_email = str(auth_user.get("email") or "")

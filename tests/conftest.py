@@ -22,6 +22,17 @@ def mock_auth_env(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def reset_guest_funnel_milestones():
+    """Milestone claims are durable by design, so they must not leak between
+    tests the way they must not leak between requests."""
+    from argus.api import state as api_state
+
+    api_state.store.guest_funnel_milestones.clear()
+    yield
+    api_state.store.guest_funnel_milestones.clear()
+
+
+@pytest.fixture(autouse=True)
 def provider_free_env(monkeypatch):
     """Suite runs stay provider-free unless a live eval is explicitly requested.
 
