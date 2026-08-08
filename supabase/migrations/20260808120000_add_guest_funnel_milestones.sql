@@ -13,9 +13,14 @@
 -- is deliberately opaque text and not FK-bound, because the subject is a
 -- visitor we have no account for rather than a profile.
 --
--- Rows expire. A milestone table keyed on a visitor digest with no cleanup
--- path becomes a durable visitor log. Retention outlives the seven-day guest
--- workspace with headroom and nothing more.
+-- expires_at is not a timer. Nothing in the database deletes these rows: the
+-- row has no owner to cascade from, so it is deleted by the guest cleanup job
+-- (argus.domain.guest_cleanup, run by
+-- scripts/ops/cleanup_expired_guest_workspaces.py), which is the same job that
+-- already deletes every other expired guest row. Retention therefore holds
+-- exactly as often as that job is run, and the runbook requires it daily. A
+-- milestone table keyed on a visitor digest with no cleanup path would become a
+-- durable visitor log, which is what expires_at plus that job prevents.
 
 create table if not exists public.guest_funnel_milestones (
   subject_key text not null,
@@ -94,7 +99,9 @@ grant execute on function
   to service_role;
 
 
--- Bounded retention, mirroring purge_expired_visitor_usage.
+-- Bounded retention, mirroring purge_expired_visitor_usage. Callers register in
+-- argus.domain.guest_cleanup.EXPIRING_DATA_PURGES; a purge with no registered
+-- caller is a retention claim nothing keeps.
 create or replace function public.purge_expired_guest_funnel_milestones(
   p_before timestamptz default now()
 )

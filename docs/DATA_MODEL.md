@@ -1371,14 +1371,17 @@ user-keyed milestone would re-fire on every renewal. Like
 - RLS is enabled with no policies. Only `service_role` has table access and may
   execute `claim_guest_funnel_milestone` or
   `purge_expired_guest_funnel_milestones`.
-- Claims expire 30 days after they are recorded, outliving the seven-day guest
-  workspace with headroom. A visitor-keyed table with no expiry would become a
-  durable visitor log.
-- The row has no owner to cascade from, so the guest cleanup job is the only
-  thing that deletes it: `purge_expired_guest_funnel_milestones` is registered
+- Claims are marked expired 30 days after they are recorded, outliving the
+  seven-day guest workspace with headroom. A visitor-keyed table with no expiry
+  would become a durable visitor log.
+- `expires_at` is not a timer, and nothing in the database acts on it. The row
+  has no owner to cascade from, so the guest cleanup job is the only thing that
+  deletes it: `purge_expired_guest_funnel_milestones` is registered
   in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
   non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
-  never returns is deleted by that job, not by the takeover path.
+  never returns is deleted by that job, not by the takeover path. Retention
+  therefore holds exactly as often as that job is run; the runbook requires it
+  daily, and no repo-side schedule runs it (see #401).
 - `claim_guest_funnel_milestone` also takes over an already-expired claim in the
   same statement, so a returning visitor is correct even between purge runs.
 

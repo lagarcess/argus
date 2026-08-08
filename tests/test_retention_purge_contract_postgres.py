@@ -16,6 +16,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.guest_funnel_milestones import purge_expired_milestones
 from argus.domain.visitor_usage import purge_expired_visitor_usage
 
@@ -117,6 +118,90 @@ def test_the_milestone_purge_caller_spares_live_claims(client) -> None:
         },
     ).execute()
     assert claimed_again.data is False
+
+
+class _CleanupGateway:
+    """The gateway shape the ops entry point builds, over a real connection."""
+
+    def __init__(self, client) -> None:
+        self.client = client
+
+    def claim_expired_guest_workspaces(
+        self,
+        *,
+        limit: int,
+        dry_run: bool,
+    ) -> list[dict[str, object]]:
+        return []
+
+    def purge_expired_visitor_usage(self, *, before=None) -> int:
+        return purge_expired_visitor_usage(self.client, before=before)
+
+    def purge_expired_guest_funnel_milestones(self, *, before=None) -> int:
+        return purge_expired_milestones(self.client, before=before)
+
+
+def _milestone_rows(subject_key: str) -> int:
+    """Counted directly, not through the code under test."""
+    with psycopg.connect(DSN, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "select count(*) from public.guest_funnel_milestones"
+            " where subject_key = %s",
+            (subject_key,),
+        )
+        return int(cursor.fetchone()[0])
+
+
+def test_the_cleanup_job_actually_deletes_an_expired_row(client) -> None:
+    """The end the finding cared about: a visitor who never returns.
+
+    Driven through cleanup_expired_guest_workspaces, which is what
+    scripts/ops/cleanup_expired_guest_workspaces.py runs, against real
+    PostgreSQL. The takeover path never touches this row, so if the job did not
+    delete it the digest would be retained forever.
+    """
+    expired = f"visitor:{os.urandom(16).hex()}"
+    live = f"visitor:{os.urandom(16).hex()}"
+    _seed_expired_milestone(client, expired)
+    client.rpc(
+        "claim_guest_funnel_milestone",
+        {
+            "p_subject_key": live,
+            "p_milestone": "first_result_completed",
+            "p_expires_at": (
+                datetime.now(timezone.utc) + timedelta(days=30)
+            ).isoformat(),
+        },
+    ).execute()
+    assert _milestone_rows(expired) == 1
+    assert _milestone_rows(live) == 1
+
+    result = cleanup_expired_guest_workspaces(
+        _CleanupGateway(client),
+        limit=1,
+        dry_run=False,
+    )
+
+    assert result.purge_failed == 0
+    assert result.funnel_milestones_purged >= 1
+    # The expired digest is gone; a live claim is untouched.
+    assert _milestone_rows(expired) == 0
+    assert _milestone_rows(live) == 1
+
+
+def test_a_dry_run_of_the_cleanup_job_deletes_nothing(client) -> None:
+    expired = f"visitor:{os.urandom(16).hex()}"
+    _seed_expired_milestone(client, expired)
+
+    result = cleanup_expired_guest_workspaces(
+        _CleanupGateway(client),
+        limit=1,
+        dry_run=True,
+    )
+
+    assert result.funnel_milestones_purged == 0
+    assert result.visitor_usage_purged == 0
+    assert _milestone_rows(expired) == 1
 
 
 def test_the_visitor_usage_purge_caller_deletes_expired_counters(client) -> None:
