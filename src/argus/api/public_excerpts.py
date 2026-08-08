@@ -19,7 +19,7 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptSnapshot,
     PublicExcerptView,
 )
-from argus.api.schemas import EvidenceArtifact, User
+from argus.api.schemas import Conversation, EvidenceArtifact, User
 from argus.domain.public_excerpts import (
     PublicExcerptSourceError,
     build_public_excerpt_payload,
@@ -282,7 +282,9 @@ def create_receipt_for_artifact(
     existing link, and the caller needs to know that so a retry or a reload is not
     counted as a new receipt in the funnel.
     """
-    artifact = _owned_artifact(user_id=user.id, artifact_id=artifact_id)
+    artifact, conversation = _owned_artifact(
+        user_id=user.id, artifact_id=artifact_id
+    )
     repository = public_excerpt_repository()
     existing = repository.get_live_public_excerpt_for_artifact(
         owner_id=user.id,
@@ -294,7 +296,7 @@ def create_receipt_for_artifact(
         artifact=artifact,
         run_chart=_run_chart(user_id=user.id, run_id=artifact.source_run_id),
         owner_note=owner_note,
-        content_language=user.language,
+        content_language=_artifact_content_language(conversation),
     )
     snapshot = PublicExcerptSnapshot(
         id=api_state.store.new_id(),
@@ -332,7 +334,32 @@ def revoke_all_receipts(*, user_id: str) -> int:
     return public_excerpt_repository().revoke_all_public_excerpts(owner_id=user_id)
 
 
-def _owned_artifact(*, user_id: str, artifact_id: str) -> EvidenceArtifact:
+def _artifact_content_language(conversation: Conversation | None) -> str:
+    """The language the frozen prose was written in, read from the record it came from.
+
+    Not the owner's current profile language. A receipt claims to be a frozen moment,
+    so every field it captures has to belong to the artifact rather than to a setting
+    the owner can change afterwards. An English result shared after switching the app
+    to Spanish is still an English result.
+
+    ``conversations.language`` is set when the conversation is created and is not in
+    ``ConversationPatch``, so it does not move. The artifact records no language of
+    its own, and neither does the run, which makes this the only stable anchor. With
+    no conversation there is no anchor at all, so this falls back to the schema
+    default rather than guessing from a mutable value.
+    """
+    language = getattr(conversation, "language", None) if conversation else None
+    return "es-419" if language == "es-419" else "en"
+
+
+def _owned_artifact(
+    *, user_id: str, artifact_id: str
+) -> tuple[EvidenceArtifact, Conversation | None]:
+    """Resolve the artifact and its source conversation, or refuse.
+
+    Returns the conversation too because the caller needs it for the frozen content
+    language, and reading it twice would be two chances to disagree.
+    """
     if api_state.supabase_gateway is not None:
         artifact = api_state.supabase_gateway.get_evidence_artifact(
             user_id=user_id,
@@ -353,20 +380,23 @@ def _owned_artifact(*, user_id: str, artifact_id: str) -> EvidenceArtifact:
     # An artifact outlives its conversation, so ownership alone does not mean the
     # owner still has the thing they would be publishing. A stale result card in an
     # open tab is the ordinary way this happens.
-    if _source_conversation_is_deleted(
+    conversation = _owned_source_conversation(
         user_id=user_id,
         conversation_id=artifact.source_conversation_id,
+    )
+    if artifact.source_conversation_id is not None and (
+        conversation is None or conversation.deleted_at is not None
     ):
         raise EvidenceReceiptSourceMissingError("That result is not available.")
-    return artifact
+    return artifact, conversation
 
 
-def _source_conversation_is_deleted(
+def _owned_source_conversation(
     *, user_id: str, conversation_id: str | None
-) -> bool:
+) -> Conversation | None:
     """Cheap read for the common case. The database trigger closes the race."""
     if conversation_id is None:
-        return False
+        return None
     if api_state.supabase_gateway is not None:
         conversation = api_state.supabase_gateway.get_conversation(
             user_id=user_id,
@@ -378,9 +408,7 @@ def _source_conversation_is_deleted(
             api_state.store.conversation_owners.get(conversation_id) != user_id
         ):
             conversation = None
-    if conversation is None:
-        return True
-    return getattr(conversation, "deleted_at", None) is not None
+    return conversation
 
 
 def _run_chart(*, user_id: str, run_id: str | None) -> dict[str, Any] | None:

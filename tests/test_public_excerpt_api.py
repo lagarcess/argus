@@ -7,8 +7,10 @@ construction guard on the public route module.
 from __future__ import annotations
 
 import ast
+import base64
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from argus.api import state as api_state
@@ -23,6 +25,7 @@ from tests.public_excerpt_factories import (
     build_artifact,
     build_conversation,
     build_run,
+    stable_uuid,
 )
 
 CREATE_PATH = f"/api/v1/evidence-artifacts/{ARTIFACT_ID}/public-excerpt"
@@ -284,7 +287,7 @@ def test_receipt_creation_is_rate_limited(sharing_on: None) -> None:
     api_state.store.users[user_id] = user.model_copy(update={"is_admin": False})
     # Each new artifact is a distinct receipt, so the limit is what stops the run.
     for index in range(evidence_receipts.RECEIPT_CREATE_LIMIT):
-        artifact = build_artifact(artifact_id=f"artifact-{index:04d}")
+        artifact = build_artifact(artifact_id=stable_uuid(index, prefix=4))
         api_state.store.evidence_artifacts[artifact.id] = artifact
         api_state.store.evidence_artifact_owners[artifact.id] = user_id
         response = client.post(
@@ -292,7 +295,7 @@ def test_receipt_creation_is_rate_limited(sharing_on: None) -> None:
         )
         assert response.status_code == 200, response.text
 
-    blocked = build_artifact(artifact_id="artifact-blocked")
+    blocked = build_artifact(artifact_id=stable_uuid(1, prefix=5))
     api_state.store.evidence_artifacts[blocked.id] = blocked
     api_state.store.evidence_artifact_owners[blocked.id] = user_id
     refused = client.post(
@@ -325,7 +328,7 @@ def test_a_note_longer_than_the_bound_is_refused_by_the_schema(
 def test_an_unowned_artifact_cannot_be_shared(sharing_on: None) -> None:
     client = _client()
     _seed(client)
-    artifact = build_artifact(artifact_id="artifact-owned-by-someone-else")
+    artifact = build_artifact(artifact_id=stable_uuid(3, prefix=5))
     api_state.store.evidence_artifacts[artifact.id] = artifact
     api_state.store.evidence_artifact_owners[artifact.id] = "another-user"
     response = client.post(
@@ -401,7 +404,7 @@ def test_an_admin_is_not_rate_limited_on_creation(sharing_on: None) -> None:
     user_id = _seed(client)
     assert api_state.store.get_or_create_dev_user().is_admin is True
     for index in range(evidence_receipts.RECEIPT_CREATE_LIMIT + 3):
-        artifact = build_artifact(artifact_id=f"admin-artifact-{index:04d}")
+        artifact = build_artifact(artifact_id=stable_uuid(index, prefix=2))
         api_state.store.evidence_artifacts[artifact.id] = artifact
         api_state.store.evidence_artifact_owners[artifact.id] = user_id
         response = client.post(
@@ -416,7 +419,7 @@ def test_an_ordinary_account_is_still_rate_limited(sharing_on: None) -> None:
     user = api_state.store.get_or_create_dev_user()
     api_state.store.users[user_id] = user.model_copy(update={"is_admin": False})
     for index in range(evidence_receipts.RECEIPT_CREATE_LIMIT):
-        artifact = build_artifact(artifact_id=f"plain-artifact-{index:04d}")
+        artifact = build_artifact(artifact_id=stable_uuid(index, prefix=3))
         api_state.store.evidence_artifacts[artifact.id] = artifact
         api_state.store.evidence_artifact_owners[artifact.id] = user_id
         assert (
@@ -425,7 +428,7 @@ def test_an_ordinary_account_is_still_rate_limited(sharing_on: None) -> None:
             ).status_code
             == 200
         )
-    blocked = build_artifact(artifact_id="plain-artifact-blocked")
+    blocked = build_artifact(artifact_id=stable_uuid(2, prefix=5))
     api_state.store.evidence_artifacts[blocked.id] = blocked
     api_state.store.evidence_artifact_owners[blocked.id] = user_id
     refused = client.post(
@@ -504,7 +507,7 @@ def test_the_public_route_module_holds_only_the_reader_and_the_funnel() -> None:
 
 def _seed_extra_artifacts(user_id: str, count: int) -> None:
     for index in range(count):
-        artifact = build_artifact(artifact_id=f"page-artifact-{index:04d}")
+        artifact = build_artifact(artifact_id=stable_uuid(index, prefix=1))
         api_state.store.evidence_artifacts[artifact.id] = artifact
         api_state.store.evidence_artifact_owners[artifact.id] = user_id
 
@@ -523,7 +526,7 @@ def test_the_receipt_list_pages_instead_of_hiding_older_live_links(
     created: list[str] = []
     for index in range(5):
         response = client.post(
-            f"/api/v1/evidence-artifacts/page-artifact-{index:04d}/public-excerpt",
+            f"/api/v1/evidence-artifacts/{stable_uuid(index, prefix=1)}/public-excerpt",
             json={},
         )
         assert response.status_code == 200, response.text
@@ -780,3 +783,153 @@ def test_revoking_twice_reports_one_revocation(
     assert [kind for kind in events if kind == "receipt_revoked"] == [
         "receipt_revoked"
     ]
+
+
+# ── Review round 4: frozen means frozen, transient never reads as permanent ────
+
+
+def test_changing_your_language_does_not_relabel_an_older_result(
+    sharing_on: None,
+) -> None:
+    """A snapshot may only capture what belongs to the artifact.
+
+    The owner's profile language is mutable, so reading it at share time tagged an
+    English result Spanish once the owner switched the app over. The anchor is the
+    conversation the artifact came from, which records its language at creation and
+    is not patchable.
+    """
+    client = _client()
+    user_id = _seed(client)
+    # The result was produced in an English conversation.
+    assert api_state.store.conversations[CONVERSATION_ID].language == "en"
+    # The owner has since switched the app to Spanish.
+    owner = api_state.store.get_or_create_dev_user()
+    api_state.store.users[user_id] = owner.model_copy(update={"language": "es-419"})
+
+    receipt = _create(client)
+    view = client.get(f"/api/v1/public/receipts/{receipt['public_id']}").json()
+    assert view["payload"]["content_language"] == "en"
+
+
+def test_a_spanish_conversation_produces_a_spanish_receipt(sharing_on: None) -> None:
+    client = _client()
+    user_id = _seed(client)
+    api_state.store.conversations[CONVERSATION_ID] = build_conversation(
+        language="es-419"
+    )
+    api_state.store.conversation_owners[CONVERSATION_ID] = user_id
+    owner = api_state.store.get_or_create_dev_user()
+    # Owner profile in English, conversation in Spanish: the conversation wins.
+    api_state.store.users[user_id] = owner.model_copy(update={"language": "en"})
+
+    receipt = _create(client)
+    view = client.get(f"/api/v1/public/receipts/{receipt['public_id']}").json()
+    assert view["payload"]["content_language"] == "es-419"
+
+
+def test_the_snapshot_captures_nothing_mutable_beyond_the_owner_note() -> None:
+    """The audit for this class, kept as a test so it cannot silently regress.
+
+    Every payload field must come from the artifact, the immutable run behind it, a
+    constant, or the note the owner writes at share time. Reading anything else that
+    can change later would make a frozen receipt tell a different story over time.
+    """
+    from argus.api.public_excerpt_schemas import PublicExcerptPayload
+
+    artifact_derived = {
+        "idea_title",
+        "asset_class",
+        "symbols",
+        "strategy_label",
+        "assumptions",
+        "date_range",
+        "metrics",
+        "benchmark_symbol",
+        "benchmark_note",
+        "visual",
+    }
+    constants = {"schema_version", "framing", "provenance_mark"}
+    # Written by the owner at share time, which is what it is for.
+    share_time_input = {"owner_note"}
+    # Read from the conversation the artifact came from, not from the profile.
+    source_derived = {"content_language"}
+    assert set(PublicExcerptPayload.model_fields) == (
+        artifact_derived | constants | share_time_input | source_derived
+    )
+
+
+@pytest.mark.parametrize(
+    ("cursor", "expected_status"),
+    [
+        ("not-base64", 400),
+        # Valid base64 and a valid timestamp, but the item id is not a uuid. This
+        # reached an id.lt filter on a uuid column before it was validated.
+        (
+            base64.urlsafe_b64encode(b"2026-08-07T12:00:00+00:00|not-a-uuid").decode(),
+            400,
+        ),
+        # Filter punctuation in the id half, which is interpolated into a PostgREST
+        # filter string.
+        (
+            base64.urlsafe_b64encode(
+                b"2026-08-07T12:00:00+00:00|x),or(owner_id.neq.null"
+            ).decode(),
+            400,
+        ),
+        (base64.urlsafe_b64encode(b"not-a-timestamp|" + b"0" * 8).decode(), 400),
+        (base64.urlsafe_b64encode(b"2026-08-07T12:00:00+00:00|").decode(), 400),
+        (base64.urlsafe_b64encode(b"no-separator").decode(), 400),
+    ],
+)
+def test_a_malformed_cursor_is_rejected_before_any_query(
+    sharing_on: None,
+    cursor: str,
+    expected_status: int,
+) -> None:
+    client = _client()
+    _seed(client)
+    _create(client)
+    response = client.get(f"{LIST_PATH}?cursor={quote(cursor, safe='')}")
+    assert response.status_code == expected_status, response.text
+
+
+def test_a_valid_cursor_still_pages(sharing_on: None) -> None:
+    client = _client()
+    user_id = _seed(client)
+    for index in range(3):
+        artifact = build_artifact(artifact_id=stable_uuid(index, prefix=7))
+        api_state.store.evidence_artifacts[artifact.id] = artifact
+        api_state.store.evidence_artifact_owners[artifact.id] = user_id
+        assert (
+            client.post(
+                f"/api/v1/evidence-artifacts/{artifact.id}/public-excerpt", json={}
+            ).status_code
+            == 200
+        )
+    first = client.get(f"{LIST_PATH}?limit=2").json()
+    assert first["next_cursor"]
+    second = client.get(
+        f"{LIST_PATH}?limit=2&cursor={quote(first['next_cursor'], safe='')}"
+    )
+    assert second.status_code == 200
+    assert second.json()["items"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/evidence-artifacts/not-a-uuid/public-excerpt",
+        "/api/v1/public-excerpts/not-a-uuid",
+    ],
+)
+def test_a_non_uuid_id_answers_not_found_rather_than_failing(
+    sharing_on: None,
+    path: str,
+) -> None:
+    """These ids reach filters on uuid columns, where a cast error is a 500."""
+    client = _client()
+    _seed(client)
+    method = "POST" if path.endswith("public-excerpt") else "DELETE"
+    response = client.request(method, path, json={} if method == "POST" else None)
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"

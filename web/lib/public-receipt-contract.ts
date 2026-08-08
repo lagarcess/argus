@@ -100,15 +100,24 @@ export async function fetchPublicReceipt(
         cache: "no-store",
       },
     );
-    if (response.status === 404 || response.status === 410) {
+    // Only the backend saying so makes a receipt revoked. An unknown id already
+    // answers 200 with status "revoked", so a 404 here means the endpoint is not
+    // there, which happens when sharing is enabled on this app and disabled on the
+    // API. That is a deployment state, not a statement about this receipt, and
+    // calling it revoked would be permanent-sounding and wrong.
+    if (response.status === 410) {
       return { kind: "revoked" };
     }
     if (!response.ok) {
       return { kind: "unavailable" };
     }
     const view = (await response.json()) as PublicReceiptView;
-    if (view.status !== "available" || !view.payload) {
+    if (view.status === "revoked") {
       return { kind: "revoked" };
+    }
+    if (view.status !== "available" || !view.payload) {
+      // A shape we do not recognise is not evidence that anything was revoked.
+      return { kind: "unavailable" };
     }
     return {
       kind: "available",

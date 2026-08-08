@@ -129,7 +129,19 @@ export default async function Image({
   const { receiptId } = await params;
   const result = await readPublicReceipt(receiptId);
 
-  if (result.kind !== "available") {
+  // A transient failure must not become a permanent-looking card. Platforms cache
+  // preview images, so rendering "this one is gone" during an outage would leave a
+  // revoked-looking card pinned to a receipt that is perfectly alive, and Argus
+  // cannot clear a cache it does not own. No body and a retryable status means the
+  // platform shows no card and asks again later, which is recoverable.
+  if (result.kind === "unavailable") {
+    return new Response(null, {
+      status: 503,
+      headers: { ...IMAGE_HEADERS, "Retry-After": "120" },
+    });
+  }
+
+  if (result.kind === "revoked") {
     // No payload means no content language to follow, so the tombstone card falls
     // back to English.
     const copy = cardCopy("en");

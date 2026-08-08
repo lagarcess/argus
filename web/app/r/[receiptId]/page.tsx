@@ -60,7 +60,13 @@ export async function generateMetadata({
   const language = await resolveLanguage();
   const copy = receiptCopy(language);
   const result = await readPublicReceipt(receiptId);
-  if (result.kind !== "available") {
+  // Metadata is cached by the platforms that read it, so a transient failure gets
+  // no claim at all rather than a permanent-sounding one. Titling an outage "this
+  // one is gone" would pin that on a live receipt.
+  if (result.kind === "unavailable") {
+    return { title: "Argus", robots: RECEIPT_ROBOTS };
+  }
+  if (result.kind === "revoked") {
     return {
       title: copy.tombstone.title,
       description: copy.tombstone.detail,

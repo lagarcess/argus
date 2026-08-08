@@ -122,7 +122,7 @@ describe("fetching a receipt", () => {
     });
   });
 
-  test("a revoked receipt is a tombstone, and so is a 404", async () => {
+  test("only the backend saying revoked makes a receipt revoked", async () => {
     stubFetch(
       () =>
         new Response(
@@ -135,19 +135,32 @@ describe("fetching a receipt", () => {
         ),
     );
     expect(await fetchPublicReceipt(VALID_ID)).toEqual({ kind: "revoked" });
-
-    stubFetch(() => new Response("{}", { status: 404 }));
-    expect(await fetchPublicReceipt(VALID_ID)).toEqual({ kind: "revoked" });
   });
 
-  test("a backend outage is unavailable, never a false tombstone", async () => {
-    stubFetch(() => new Response("{}", { status: 503 }));
-    expect(await fetchPublicReceipt(VALID_ID)).toEqual({ kind: "unavailable" });
+  test("a transient failure is never presented as a revocation", async () => {
+    // Permanent and temporary are different facts. An unknown id already answers
+    // 200 with status revoked, so a 404 means the endpoint is absent, which happens
+    // when sharing is on here and off on the API. That is a deployment state.
+    for (const status of [404, 500, 502, 503, 504]) {
+      stubFetch(() => new Response("{}", { status }));
+      expect(await fetchPublicReceipt(VALID_ID)).toEqual(
+        { kind: "unavailable" },
+      );
+    }
 
     stubFetch(() => {
       throw new Error("network down");
     });
     expect(await fetchPublicReceipt(VALID_ID)).toEqual({ kind: "unavailable" });
+
+    // An unrecognised shape is not evidence that anything was revoked either.
+    stubFetch(() => new Response(JSON.stringify({ nonsense: true }), { status: 200 }));
+    expect(await fetchPublicReceipt(VALID_ID)).toEqual({ kind: "unavailable" });
+  });
+
+  test("410 is the one status that does mean gone", async () => {
+    stubFetch(() => new Response("{}", { status: 410 }));
+    expect(await fetchPublicReceipt(VALID_ID)).toEqual({ kind: "revoked" });
   });
 
   test("the request carries no credentials and no auth header", () => {
@@ -208,6 +221,35 @@ describe("never indexable", () => {
     expect(contract).toContain("cache(fetchPublicReceipt)");
     expect(source(RECEIPT_ROUTE)).toContain("readPublicReceipt");
     expect(source(RECEIPT_ROUTE)).not.toContain("await fetchPublicReceipt");
+  });
+
+  test("an outage renders distinctly from a revocation, page and card alike", () => {
+    // Platforms cache preview images and metadata, so a temporary failure dressed
+    // as a permanent one would pin a revoked-looking card to a live receipt, and
+    // Argus cannot clear a cache it does not own.
+    const image = code(OG_IMAGE_ROUTE);
+    expect(image).toContain('result.kind === "unavailable"');
+    expect(image).toContain("status: 503");
+    expect(image).toContain("Retry-After");
+    expect(image).toContain('result.kind === "revoked"');
+    // The gone card is reachable only from the revoked branch.
+    expect(image.indexOf('result.kind === "unavailable"')).toBeLessThan(
+      image.indexOf("copy.gone"),
+    );
+
+    const page = code(RECEIPT_ROUTE);
+    expect(page).toContain('result.kind === "unavailable"');
+    expect(page.indexOf('result.kind === "unavailable"')).toBeLessThan(
+      page.indexOf("copy.tombstone.title"),
+    );
+
+    // The page keeps its own distinct copy for the temporary case.
+    const notice = source(join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx"));
+    expect(notice).toContain('kind === "revoked" ? copy.tombstone : copy.unavailable');
+    for (const bundle of [enCommon.receipt, esCommon.receipt]) {
+      expect(bundle.unavailable.title).not.toBe(bundle.tombstone.title);
+      expect(bundle.unavailable.detail).not.toBe(bundle.tombstone.detail);
+    }
   });
 
   test("the route is never cached, so revocation lands on the next request", () => {

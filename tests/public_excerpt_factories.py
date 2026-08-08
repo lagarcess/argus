@@ -160,7 +160,7 @@ def build_run(
 
 
 def build_conversation(
-    *, conversation_id: str = CONVERSATION_ID
+    *, conversation_id: str = CONVERSATION_ID, language: str = "en"
 ) -> Conversation:
     return Conversation(
         id=conversation_id,
@@ -172,9 +172,18 @@ def build_conversation(
         created_at=utc(-60),
         updated_at=utc(),
         last_message_preview="AAPL",
-        language="en",
+        language=language,
     )
 
 
 def new_uuid() -> str:
     return str(uuid4())
+
+
+def stable_uuid(seed: int, *, prefix: int = 9) -> str:
+    """A deterministic uuid for bulk fixtures.
+
+    Ids reach a uuid column in production, so a fixture using a readable string
+    would let the in-memory backend accept a shape the real one rejects.
+    """
+    return f"{prefix:08d}-0000-4000-8000-{seed:012d}"

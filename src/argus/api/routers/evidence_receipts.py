@@ -8,6 +8,7 @@ on.
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
@@ -53,6 +54,49 @@ _RECEIPT_CREATE_LIMITER = SlidingWindowLimiter()
 
 def reset_receipt_create_limiter_for_tests() -> None:
     _RECEIPT_CREATE_LIMITER.reset()
+
+
+def _require_uuid(value: str, request: Request) -> str:
+    """Reject an id that is not a uuid before it can reach a query.
+
+    These ids land in filters on uuid columns. An unvalidated one is a cast error
+    surfacing as a 500 at best, so the shape is checked here and the caller hears
+    the ordinary not-found answer.
+    """
+    try:
+        return str(UUID(value))
+    except (ValueError, AttributeError, TypeError):
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="That result is not available.",
+        ) from None
+
+
+def _decode_receipt_cursor(
+    cursor: str | None, request: Request
+) -> tuple[str, str] | None:
+    """Fully validate a cursor before any part of it reaches a query.
+
+    The cursor is opaque and client-supplied, and both halves are interpolated into
+    a PostgREST filter string on the way to a keyset comparison. A timestamp that
+    parses is not enough: the item id half reaches an ``id.lt`` filter on a uuid
+    column, so a fabricated cursor could produce a cast error, and a value carrying
+    filter punctuation could alter the filter itself. Both halves are therefore
+    parsed and re-serialised from their parsed forms, so what reaches the query is
+    canonical rather than whatever arrived.
+    """
+    if not cursor:
+        return None
+    raw_created_at, raw_id = decode_cursor(cursor, request)
+    try:
+        created_at = datetime.fromisoformat(raw_created_at)
+        cursor_id = UUID(raw_id)
+    except (ValueError, AttributeError, TypeError):
+        raise invalid_cursor_problem(request) from None
+    return created_at.isoformat(), str(cursor_id)
 
 
 def _enforce_create_rate_limit(request: Request, *, user: User) -> None:
@@ -107,6 +151,7 @@ def create_public_excerpt(
         detail="Sign in to share a result.",
         reason="share_result",
     )
+    owned_artifact_id = _require_uuid(artifact_id, request)
     try:
         owner_note = normalize_owner_note(payload.owner_note)
     except PublicExcerptOwnerNoteError as exc:
@@ -121,7 +166,7 @@ def create_public_excerpt(
     try:
         snapshot, created = create_receipt_for_artifact(
             user=user,
-            artifact_id=artifact_id,
+            artifact_id=owned_artifact_id,
             owner_note=owner_note,
         )
     except EvidenceReceiptSourceMissingError as exc:
@@ -183,16 +228,7 @@ def list_public_excerpts(
         detail="Sign in to review shared links.",
         reason="share_result",
     )
-    before: tuple[str, str] | None = None
-    if cursor:
-        raw_created_at, cursor_id = decode_cursor(cursor, request)
-        try:
-            datetime.fromisoformat(raw_created_at)
-        except ValueError:
-            raise invalid_cursor_problem(request) from None
-        if not cursor_id:
-            raise invalid_cursor_problem(request)
-        before = (raw_created_at, cursor_id)
+    before = _decode_receipt_cursor(cursor, request)
 
     # One extra row answers "is there another page" without a second query.
     page = public_excerpt_repository().list_public_excerpt_snapshots(
@@ -231,7 +267,7 @@ def revoke_public_excerpt(
     )
     snapshot, revoked_now = public_excerpt_repository().revoke_public_excerpt_snapshot(
         owner_id=user.id,
-        snapshot_id=snapshot_id,
+        snapshot_id=_require_uuid(snapshot_id, request),
     )
     if snapshot is None:
         raise problem(
