@@ -693,34 +693,15 @@ body {
 }
 
 /*
- * Hover reveal is an affordance, not a gate.
+ * Reach is decided by width, never by asking about the pointer.
  *
- * `any-pointer: coarse` rather than `hover: none`, because a hybrid laptop
- * reports its trackpad as the primary pointer: `hover: none` stays false there
- * even while the user is touching the screen, which left the cluster hidden for
- * exactly the input that cannot hover. `any-pointer` asks whether a coarse
- * pointer exists at all, which is the real question.
+ * This used to expand each row action to 44px under `any-pointer: coarse`. Two
+ * things were wrong with it. It asks what the device is, which is the one
+ * question the responsive scale does not answer. And the expanded boxes
+ * overlapped: three 26px buttons 4px apart put their centres 30px apart, so
+ * 44px hit areas ran 14px into each other and the later sibling won, which
+ * meant the edge of Rename could archive or delete instead.
  *
- * Revealing it is only half the job. The buttons are drawn at icon size, so
- * they also need a real 44px hit area wherever a finger may arrive, added as a
- * centred pseudo-element so the row's visual density is unchanged.
+ * Below the desktop stop the row offers an explicit menu whose trigger and
+ * items are already 44px, so there is nothing left to expand.
  */
-@media (any-pointer: coarse) {
-  .argus-row-hover-actions {
-    opacity: 1;
-  }
-
-  .argus-row-hover-actions > button {
-    position: relative;
-  }
-
-  .argus-row-hover-actions > button::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    height: 2.75rem;
-    width: 2.75rem;
-    transform: translate(-50%, -50%);
-  }
-}

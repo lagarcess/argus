@@ -18,8 +18,8 @@ export function effectivePaletteLayout(
 
 /**
  * Hover reveal is an affordance, not a gate. Every width below the desktop stop
- * gets the explicit menu, and the hover variant stays visible under
- * `@media (any-pointer: coarse)` so a touch screen at desktop width is covered.
+ * gets the explicit menu, whose trigger and items are 44px, so reach never
+ * depends on knowing what kind of pointer is in use.
  */
 export function paletteRowActionVariant(
   isBelowDesktop: boolean,

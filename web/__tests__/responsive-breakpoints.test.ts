@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 const globalsCss = readFileSync(
   join(import.meta.dir, "../app/globals.css"),
@@ -80,5 +80,39 @@ describe("responsive breakpoints", () => {
     const declared = declaredBreakpoints();
     expect(declared["--breakpoint-lg"]).toBe("64rem");
     expect(declared["--breakpoint-xl"]).toBe("80rem");
+  });
+});
+
+describe("nothing asks what the device is", () => {
+  test("no stylesheet or component branches on the pointer", () => {
+    /*
+     * Views follow the DESIGN.md widths, by feature. A pointer query answers a
+     * different question, and it shipped twice: once choosing the palette
+     * layout, once expanding row actions 14px into each other.
+     */
+    const offenders: string[] = [];
+    const scan = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          scan(full);
+          continue;
+        }
+        if (!/\.(ts|tsx|css)$/.test(entry)) continue;
+        const source = readFileSync(full, "utf-8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, "");
+        if (
+          /@media[^{]*pointer:\s*coarse|@media[^{]*hover:\s*none|matchMedia\([^)]*pointer/.test(
+            source,
+          )
+        ) {
+          offenders.push(relative(join(import.meta.dir, ".."), full));
+        }
+      }
+    };
+    scan(join(import.meta.dir, "..", "components"));
+    scan(join(import.meta.dir, "..", "app"));
+    expect(offenders).toEqual([]);
   });
 });

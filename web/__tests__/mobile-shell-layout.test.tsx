@@ -434,19 +434,6 @@ describe("omnisearch below threshold", () => {
     expect(rowActions).toContain("command_palette.rename_conversation");
   });
 
-  test("the hover cluster stays visible where hover does not exist", () => {
-    const rowActions = readFileSync(
-      join(
-        import.meta.dir,
-        "../components/sidebar/command-palette/CommandPaletteRowActions.tsx",
-      ),
-      "utf-8",
-    );
-    expect(rowActions).toContain("argus-row-hover-actions");
-    const coarse = globalsCss.slice(globalsCss.indexOf("@media (any-pointer: coarse)"));
-    expect(coarse).toContain(".argus-row-hover-actions");
-    expect(coarse).toContain("opacity: 1;");
-  });
 
   test("pointer, keyboard, and the search field share one row-open path", () => {
     // A keyboard user must not get a different, more destructive navigation.
@@ -724,16 +711,6 @@ describe("omnisearch below threshold", () => {
     expect(callers.map((file) => file.path)).toEqual([]);
   });
 
-  test("row actions stay reachable wherever a coarse pointer exists", () => {
-    // `hover: none` reports the primary pointer, so a hybrid laptop with a
-    // trackpad answered false while the user was touching the screen.
-    const coarse = globalsCss.slice(globalsCss.indexOf("@media (any-pointer: coarse)"));
-    expect(coarse).toContain(".argus-row-hover-actions");
-    expect(coarse).toContain("opacity: 1;");
-    expect(coarse).toContain("height: 2.75rem;");
-    expect(coarse).toContain("width: 2.75rem;");
-    expect(globalsCss).not.toContain("@media (hover: none)");
-  });
 
   test("Escape dismisses one level, not the whole of Omnisearch", () => {
     // The palette hands its keydown to the registry, which offers it only
@@ -744,6 +721,25 @@ describe("omnisearch below threshold", () => {
     expect(commandPalette).not.toContain('document.addEventListener("keydown"');
     expect(commandPalette).not.toContain("hasOverlayAbove");
     expect(commandPalette).not.toContain("if (isDossierSheetOpen) return;");
+  });
+
+  test("reach is decided by width, not by the pointer", () => {
+    /*
+     * The cluster used to be forced visible under a coarse-pointer query, whose
+     * expanded 44px boxes overlapped by 14px and let the edge of Rename archive
+     * or delete. Below the desktop stop the row offers an explicit menu whose
+     * trigger and items are already 44px, so nothing needs expanding.
+     */
+    const rowActions = readFileSync(
+      join(
+        import.meta.dir,
+        "../components/sidebar/command-palette/CommandPaletteRowActions.tsx",
+      ),
+      "utf-8",
+    );
+    expect(rowActions).toContain("argus-row-hover-actions");
+    expect(rowActions).toContain("h-11 w-11");
+    expect(globalsCss).not.toContain("@media (any-pointer: coarse)");
   });
 
   test("the row date is a column rather than an overlay", () => {
