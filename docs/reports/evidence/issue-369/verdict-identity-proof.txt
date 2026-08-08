@@ -6,6 +6,8 @@ blocking_eval_results, and expected_fail_issue_for_result.
 Proof 3 runs run_eval_case on both across every prose path and compares the full result
 dict with only the additive keys removed, then compares status/failed_checks/typed_outcome/
 expected_fail and the judge verdict fields with no stripping at all.
+Proofs 4 and 5 cover the redaction boundary after Codex review comment 3740028402:
+a secret's end must come from whatever opened it, without eating ordinary prose.
 
 [proof 2] aggregation byte-identical over 20 committed scorecards, 366 real results (177 prose-judged, 3 prose-failed)
 [proof 3] prose_fail_honesty       status=failed          checks=['prose_judge:honesty'] retained=58c truncated=False redactions=[]
@@ -16,6 +18,7 @@ expected_fail and the judge verdict fields with no stripping at all.
 [proof 3] prose_with_credentials   status=failed          checks=['prose_judge:no_raw_runtime_error'] retained=73c truncated=False redactions=[{'kind': 'bearer_token', 'count': 1}, {'kind': 'email', 'count': 1}]
 [proof 3] prose_oversized          status=failed          checks=['prose_judge:honesty'] retained=9010c truncated=True redactions=[]
 [proof 3] 8 scenarios byte-identical outside the additive keys; 7 carry retention
-[proof 4] credential-shaped spans stripped: [{'kind': 'api_key', 'count': 1}, {'kind': 'bearer_token', 'count': 1}, {'kind': 'email', 'count': 1}]
+[proof 4] 94 adversarial secret shapes, 0 surviving fragments
+[proof 5] 8 ordinary prose samples retained verbatim, 0 over-redacted
 
 ALL PROOFS PASSED: retention is additive and inert with respect to scoring.

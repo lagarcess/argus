@@ -211,6 +211,14 @@ error strings do reach the artifact and could otherwise carry a credential with
 them. Every strip is counted in `redactions`, so a reader can tell that the
 retained text is not verbatim.
 
+The invariant every redaction rule must hold: a secret ends where whatever
+opened it says it ends. A quoted value runs to its closing quote, an auth value
+covers its scheme and the credentials after it, and a JWT covers every segment.
+Cutting at the first plausible-looking delimiter publishes the tail, and the
+shortened head can also fall under a rule's minimum-length guard, which silences
+the rule and publishes the whole value. When adding a rule, test that no
+fragment of the secret survives rather than that a marker appears.
+
 Live scorecards land in gitignored `temp/`, but they are routinely promoted into
 `docs/reports/evidence/` as durable acceptance evidence. Treat the bound and the
 redaction pass as requirements of that committed path, not as local hygiene.

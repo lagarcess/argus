@@ -229,3 +229,88 @@ def test_clean_prose_is_retained_verbatim() -> None:
     assert evidence["redactions"] == []
     assert evidence["truncated"] is False
     assert evidence["omitted_character_count"] == 0
+
+
+# A secret ends where its opening delimiter says it ends. Cutting at the first
+# plausible-looking character publishes the tail, and the shortened head can
+# also drop under a length guard so nothing is redacted at all.
+@pytest.mark.parametrize(
+    ("raw", "leaked_fragments"),
+    [
+        (
+            '{"password": "correct horse battery staple"}',
+            ("horse", "battery", "staple"),
+        ),
+        ("{'api_key': 'live keyvalue with spaces here'}", ("live", "spaces", "here")),
+        ('{"secret": "abc,def,ghi,jkl,mno"}', ("abc", "def", "mno")),
+        ('authorization: "Basic dXNlcjpwYXNz beyond"', ("dXNlcjpwYXNz", "beyond")),
+        ('password: "unclosed value never closed', ("unclosed", "value", "never")),
+        ('{"client_secret": "a b c d e f g"}', ("a b c", "f g")),
+        (
+            "token=eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM.sig1.enckey.ciphertext",
+            ("enckey", "ciphertext"),
+        ),
+        # An auth value is a scheme plus credentials; the space after the
+        # scheme name does not end it.
+        ("authorization: Basic dXNlcjpwYXNzd29yZA==", ("dXNlcjpwYXNzd29yZA",)),
+        ("Authorization=Digest usernameiscool", ("usernameiscool",)),
+    ],
+)
+def test_secrets_are_redacted_to_their_real_end(
+    raw: str,
+    leaked_fragments: tuple[str, ...],
+) -> None:
+    redacted, redactions = redact_sensitive_text(raw)
+
+    assert redactions, f"nothing redacted in {raw!r}"
+    for fragment in leaked_fragments:
+        assert fragment not in redacted, f"{fragment!r} survived in {redacted!r}"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"api_key": "sk-or-v1-0123456789abcdef"}',
+        "?api_key=sk-or-v1-0123456789abcdef&next=/runs",
+        "Authorization: Bearer abcdefghijklmnopqrstuvwx",
+    ],
+)
+def test_one_secret_is_reported_once(raw: str) -> None:
+    _, redactions = redact_sensitive_text(raw)
+
+    assert sum(entry["count"] for entry in redactions) == 1
+
+
+def test_redaction_preserves_the_diagnostic_context_around_a_secret() -> None:
+    raw = (
+        "HTTPStatusError 401 Unauthorized for url "
+        "https://openrouter.ai/api/v1/chat?api_key=sk-or-v1-abcdef0123456789"
+        "&next=/runs"
+    )
+
+    redacted, _ = redact_sensitive_text(raw)
+
+    assert "sk-or-v1-abcdef0123456789" not in redacted
+    # The status, host, and surrounding params are what make the failure
+    # attributable, so redaction must not swallow them.
+    assert "401 Unauthorized" in redacted
+    assert "openrouter.ai/api/v1/chat?api_key=" in redacted
+    assert "&next=/runs" in redacted
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        "Probé NVDA con el cruce dorado entre 2020 y 2024. El retorno fue 312%.",
+        "Max drawdown: -41.2%. Want to try a different window?",
+        "**Assumptions:** fees 0.05%, slippage 0.02%, benchmark SPY.",
+        "El token de sesión expiró. Vuelve a entrar.",
+        "La señal: 'compra' cuando el RSI baja de 30.",
+        "Here's the plan: buy and hold SPY, rebalance monthly, compare to BTC.",
+    ],
+)
+def test_ordinary_prose_is_not_over_redacted(prose: str) -> None:
+    redacted, redactions = redact_sensitive_text(prose)
+
+    assert redactions == []
+    assert redacted == prose

@@ -28,13 +28,25 @@ _CREDENTIAL_KEY = (
     r"(?:api[_-]?key|access[_-]?key|access[_-]?token|client[_-]?secret|secret"
     r"|token|password|passwd|authorization|signature)"
 )
+_CREDENTIAL_ASSIGNMENT = rf"[\"']?{_CREDENTIAL_KEY}[\"']?\s*[:=]\s*"
+# An auth value is a scheme followed by its credentials, so the space after the
+# scheme name does not end the value.
+_AUTH_SCHEME = r"(?:bearer|basic|digest|negotiate|token|apikey)"
+_MARKER_PREFIX = "[redacted:"
 
-# Ordered: the narrower structural rules run before the generic address rule so
-# a credential inside a URL is not relabelled as an email address.
+# Every rule must consume a secret to its real end. A value's end comes from
+# whatever opened it, never from the first plausible-looking delimiter: cutting
+# early publishes the tail, and the shortened head can also fall under a length
+# guard so the rule stops firing and publishes the whole value.
+#
+# Ordered: narrower structural rules run before the generic address rule, and
+# quoted assignments run before unquoted ones.
 _REDACTION_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     (
+        # A JWS carries three segments and a JWE five, so consume every segment
+        # rather than a fixed three.
         "jwt",
-        re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+"),
+        re.compile(r"eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+){2,}"),
         "[redacted:jwt]",
     ),
     (
@@ -58,13 +70,30 @@ _REDACTION_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
         "[redacted:url_userinfo]@",
     ),
     (
+        # A quoted value runs to its closing quote, whatever it contains.
+        "credential_assignment",
+        re.compile(rf'(?i)({_CREDENTIAL_ASSIGNMENT})"[^"\n]{{4,}}"'),
+        r'\1"[redacted:credential_assignment]"',
+    ),
+    (
+        "credential_assignment",
+        re.compile(rf"(?i)({_CREDENTIAL_ASSIGNMENT})'[^'\n]{{4,}}'"),
+        r"\1'[redacted:credential_assignment]'",
+    ),
+    (
+        # An unterminated quote, as in a clipped log line, has no closing
+        # delimiter to trust, so the line end is the only safe boundary.
+        "credential_assignment",
+        re.compile(rf"(?im)({_CREDENTIAL_ASSIGNMENT})[\"'][^\"'\n]{{4,}}$"),
+        r"\1[redacted:credential_assignment]",
+    ),
+    (
         "credential_assignment",
         re.compile(
-            # Brackets are excluded so an earlier rule's marker is not redacted
-            # a second time and counted as a second secret.
-            rf"(?i)([\"']?{_CREDENTIAL_KEY}[\"']?\s*[:=]\s*)[\"']?[^\s,;&)}}\[\]\"']{{6,}}"
+            rf"(?i)({_CREDENTIAL_ASSIGNMENT})((?:{_AUTH_SCHEME}\s+)?)"
+            rf"[^\s,;&)}}\]\"']{{6,}}"
         ),
-        r"\1[redacted:credential_assignment]",
+        r"\1\2[redacted:credential_assignment]",
     ),
     (
         "email",
@@ -105,10 +134,29 @@ def redact_sensitive_text(text: str) -> tuple[str, list[dict[str, Any]]]:
                 counts.get("environment_secret", 0) + occurrences
             )
     for kind, pattern, replacement in _REDACTION_RULES:
-        redacted, replaced = pattern.subn(replacement, redacted)
-        if replaced:
-            counts[kind] = counts.get(kind, 0) + replaced
+        redacted, applied = _apply_rule(redacted, pattern, replacement)
+        if applied:
+            counts[kind] = counts.get(kind, 0) + applied
     return redacted, [{"kind": kind, "count": counts[kind]} for kind in sorted(counts)]
+
+
+def _apply_rule(
+    text: str,
+    pattern: re.Pattern[str],
+    replacement: str,
+) -> tuple[str, int]:
+    applied = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal applied
+        # An earlier rule already removed this span; redacting it again would
+        # report one secret as two.
+        if _MARKER_PREFIX in match.group(0):
+            return match.group(0)
+        applied += 1
+        return match.expand(replacement)
+
+    return pattern.sub(replace, text), applied
 
 
 def truncate_retained_text(text: str) -> tuple[str, int]:

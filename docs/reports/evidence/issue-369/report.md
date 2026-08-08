@@ -70,6 +70,57 @@ strip is counted in `redactions`, so a reader can tell the text is not verbatim.
 The base harness also reads the new artifacts without drift, so retention is
 backward compatible for existing scorecard tooling.
 
+## Review round 1: redaction boundary
+
+Codex comment `3740028402` (P2) reported that a quoted credential value
+containing whitespace was cut at the first space, publishing its tail.
+
+The macro pattern behind it: **a secret's end was guessed from a character
+class instead of derived from whatever opened it.** It has two failure modes,
+and the second is worse than the reported one. Cutting early publishes the
+tail; the shortened head can also fall under a rule's minimum-length guard, so
+the rule stops firing and publishes the *entire* value. The length guard, which
+exists to suppress false positives, becomes a silencer.
+
+Three rules carried it, found by auditing every rule against the invariant
+rather than by patching the reported line:
+
+| Instance | Input | Before |
+| --- | --- | --- |
+| Quoted value, reported | `{"password": "correct horse battery staple"}` | leaked `horse battery staple` |
+| Quoted value, total miss | `{'api_key': 'live key with spaces here'}` | nothing redacted at all |
+| Auth scheme, total miss | `authorization: Basic dXNlcjpwYXNzd29yZA==` | nothing redacted at all |
+| Multi-segment token | 5-part JWE | leaked `.enckey.ciphertext` |
+
+Fixes, all derived from the same invariant:
+
+- A quoted value runs to its closing quote. An unterminated quote, as in a
+  clipped log line, has no closing delimiter to trust, so the line end is the
+  only safe boundary.
+- An auth value is a scheme plus its credentials, so the space after the scheme
+  name does not end it.
+- A JWT covers every dot-separated segment: three for a JWS, five for a JWE.
+- Idempotency is now enforced by a marker guard in `_apply_rule` rather than by
+  excluding bracket characters from value classes. The old character exclusion
+  was itself a workaround for the same boundary-guessing habit, and it made the
+  value classes lie about what a delimiter is.
+
+The rest of the repository was audited for the same pattern and does not have
+it. `scripts/ops/canary_capture_sanitizer.py` and
+`src/argus/observability/envelope.py` redact by *key name* on structured data
+and replace the whole value, so they have no value boundary to guess. The only
+other free-text span match is `UUID_PATTERN`, which is fixed-width. This file is
+the only place that scans free text for credential values, which is exactly why
+it was the only place with the defect. Nothing outside this lane needed changing
+and nothing was spun out.
+
+Proofs 4 and 5 in `verdict-identity-proof.txt` cover the result: 94 adversarial
+secret shapes across every rule, opener, and awkward delimiter, with zero
+surviving fragments; and 8 ordinary prose samples retained verbatim, confirming
+the fix did not swing into over-redaction. The new tests assert that no fragment
+of the secret survives, rather than that a marker appears, so the next rule with
+a guessed boundary fails the suite instead of shipping.
+
 ## Inspectable fixture
 
 `judged-prose-retention-fixture.json` is real harness output for the motivating
