@@ -9,6 +9,7 @@ cover the policy layer that decides what is claimed and against which subject.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import get_args
@@ -39,6 +40,7 @@ from argus.observability.guest_funnel import (
     GUEST_FUNNEL_EVENT_MAP,
     MILESTONE_EVENT_KINDS,
     GuestFunnelEventKind,
+    build_guest_funnel_event,
     milestone_subject,
 )
 from fastapi import Request
@@ -227,6 +229,26 @@ def test_conversion_owner_still_records_both_claim_milestones() -> None:
         "temporary_workspace_claimed",
     ]
     assert "visitor_key" not in capture.call_args_list[0].kwargs
+
+
+def test_the_visitor_key_never_reaches_the_emitted_event() -> None:
+    """The subject is an IP-derived digest: it decides what is emitted, and is
+    never part of what is emitted."""
+    account = _guest_context(FIRST_GUEST_USER_ID)
+
+    with patch("argus.api.guest_observability.capture_guest_funnel_event") as capture:
+        _emit_first_result(account)
+
+    assert capture.call_count == 1
+    assert "visitor_key" not in capture.call_args_list[0].kwargs
+    assert VISITOR_KEY not in str(capture.call_args_list[0])
+
+    envelope = build_guest_funnel_event(
+        "first_result_completed",
+        user_id=FIRST_GUEST_USER_ID,
+        surface="backtest",
+    )
+    assert VISITOR_KEY not in json.dumps(envelope.model_dump(mode="json"), default=str)
 
 
 def test_an_unbound_visitor_falls_back_to_the_actor_subject() -> None:
