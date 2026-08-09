@@ -305,29 +305,35 @@ rail spec section 10 makes prebaked suggestions part of the signed-in empty
 chat. That is one flag too many. Retiring an env flag is a release-contract move
 and all four files travel together, so it is a founder call.
 
-### PostHog native funnel repair (dispatched 2026-08-09)
+### Ticker mention entity tags
 
-**Sequencing: parallel-safe.** Lives in `src/argus/observability/`, which no
-main lane touches.
+**Sequencing: after pillar 1 merges.** PR #406 is ready and clean, but it
+overlaps the research rail on nine files, including `ChatInput.tsx`,
+`ChatMessage.tsx`, `StrategyConfirmationCard.tsx`, `types.ts`,
+`src/argus/api/schemas.py`, and the API contract and OpenAPI documents. Merging
+it while the rail is in flight forces a 259-file lane to merge forward a second
+time and resolve conflicts in its own active surface. Holding costs a couple of
+days; the rework then lands on the 25-file PR instead of the large one.
 
-Product events are already captured server side, but the business label sits at
-`attributes.product_event`, which PostHog SQL can read and its native funnel
-builder cannot filter on. The activation funnel returns no data while the events
-are present.
-
-The fix is a projection inside `_posthog_event_properties()`, which already
-promotes selected fields to top level, applied to a closed allowlist of
-categorical dimensions. Derived in one place rather than written twice, so the
-two copies cannot drift.
-
-**The reason it is not deferred:** events already sent cannot be backfilled.
-Every day without it is history that will never appear in a native funnel.
-
-**Acceptance splits.** Code and tests land now. A live PostHog event and a real
-funnel need a production promotion, which is blocked behind the dark canary, so
-the lane states that rather than waiting on it.
+Its spec is `docs/superpowers/specs/2026-08-09-ticker-mention-entity-tags.md`.
 
 ## Landed this cycle
+
+- **PostHog native funnel repair** (PR #405, merged 2026-08-09 at `1b4555e2`) —
+  product events were captured server side with the business label at
+  `attributes.product_event`, which PostHog SQL can read and its native funnel
+  builder cannot filter on, so the activation funnel returned no data while the
+  events were present. A closed allowlist of categorical dimensions is now
+  projected to top level inside `_posthog_event_properties()`, derived from the
+  sanitized attributes in one place rather than written twice, so the copies
+  cannot drift. Existing top-level properties win on collision and only scalars
+  promote.
+
+  **Two acceptance criteria remain open and are not the lane's to close.** A
+  live PostHog event and a real native funnel both need a production promotion.
+  Until then the projection is proven by tests only. The urgency was never the
+  dashboard: events already sent cannot be backfilled, so every day without it
+  was history that will never appear in a native funnel.
 
 - **Memory** (PR #386) — complete loop behind a default-off flag
   scoped to `admin` and `developer` allowlist roles. Propose, confirm, inspect,
