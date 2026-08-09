@@ -62,6 +62,27 @@ def test_every_release_gate_enumerates_the_cron_alongside_the_other_three() -> N
     assert "Cron deployed SHA:" in manifest
     assert "cron_env_status:" in manifest
 
+    # The release-discipline reference is an operator-facing topology list, so a
+    # stale three-service claim there contradicts every gate fixed above.
+    topology = _source("docs/specs/private-alpha-ci-cd-sota.md")
+    assert "The stable target topology is four surfaces:" in topology
+    assert "`argus-maintenance`: scheduled retention" in topology
+    assert "Argus does not need more services at this stage." not in topology
+
+
+def test_a_failed_cron_lookup_is_never_reported_as_absent() -> None:
+    env_sync = _source(".github/render-env-sync.sh")
+    canary = _source(".github/canary-render.sh")
+    resolver = _source(".github/canary-deployed-sha.py")
+
+    # `|| true` here would turn any 401 or timeout into the absence exemption.
+    assert "|| true" not in _cron_service_block(env_sync)
+    assert "CRON_SERVICE_LOOKUP_FAILED=true" in env_sync
+    assert "cron_env_status=lookup_failed" in env_sync
+    assert "service_lookup_failed" in env_sync
+    assert 'fail_canary "deploy_status" "cron_status_unavailable"' in canary
+    assert "cron_status_unavailable" in resolver
+
 
 def test_the_cron_service_id_is_resolved_from_render_not_hardcoded() -> None:
     env_sync = _source(".github/render-env-sync.sh")
@@ -144,4 +165,23 @@ def test_an_absent_cron_is_reported_as_absent_not_silently_skipped(
     assert result.returncode == 0, result.stdout + result.stderr
     assert "cron_env_status=absent" in result.stdout
     assert "cron_env_fingerprint=<absent>" in result.stdout
+    assert "cron_env_status=ready" not in result.stdout
+
+
+def test_a_failed_cron_lookup_fails_the_audit_instead_of_reading_as_absent(
+    tmp_path: Path,
+) -> None:
+    """A 401 or timeout must not buy the absence exemption a stale cron needs."""
+    result = _run_render_release_audit(
+        tmp_path,
+        api_env_json=_safe_off_api_env(),
+        web_env_json=_render_env_payload("argus-app"),
+        cron_lookup_fails=True,
+    )
+
+    assert result.returncode == 1
+    assert "cron_env_status=lookup_failed" in result.stdout
+    assert "cron_env_fingerprint=<unknown>" in result.stdout
+    assert "status=drift" in result.stdout
+    assert "cron_env_status=absent" not in result.stdout
     assert "cron_env_status=ready" not in result.stdout

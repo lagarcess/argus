@@ -619,7 +619,11 @@ run_deploy_status_probe() {
     fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"
   fi
   # A deployed janitor runs with the service-role key, so it may not lag the
-  # release this canary certifies. absent means Render has no such service.
+  # release this canary certifies. absent means Render has no such service; a
+  # failed lookup already exited nonzero above and never reaches this exemption.
+  if [ -z "$CRON_DEPLOY_STATUS" ] || [ "$CRON_DEPLOY_STATUS" = "lookup_failed" ]; then
+    fail_canary "deploy_status" "cron_status_unavailable"
+  fi
   if [ "$CRON_DEPLOY_STATUS" != "absent" ]; then
     if [ "$CRON_DEPLOY_STATUS" != "live" ]; then
       fail_canary "deploy_status" "cron_deploy_not_live"

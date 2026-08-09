@@ -54,7 +54,9 @@ def resolve_deployed_sha(
     # The cron holds the service-role key and deletes rows, so it may never lag
     # the surfaces the canary certifies. "absent" is read back from Render and
     # means nothing destructive is deployed, which is the one safe exception.
+    # A lookup that failed is not absent and must never take that exception.
     cron_state = _value(cron, "status")
+    _require(cron_state not in {"", "lookup_failed"}, "cron_status_unavailable")
     if cron_state != "absent":
         _require(cron_state == "live", "cron_deploy_not_live")
         _require(api_sha == _value(cron, "commit"), "cron_commit_mismatch")

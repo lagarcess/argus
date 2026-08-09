@@ -17,6 +17,7 @@ WORKFLOW_SERVICE_ID="${ARGUS_RENDER_WORKFLOW_SERVICE_ID:-$ARGUS_RENDER_BACKTESTS
 CRON_SERVICE_NAME="$ARGUS_RENDER_MAINTENANCE_SERVICE_NAME"
 CRON_SERVICE_ID_CACHE=""
 CRON_SERVICE_ID_RESOLVED=false
+CRON_SERVICE_LOOKUP_FAILED=false
 
 usage() {
   cat <<'USAGE'
@@ -192,34 +193,43 @@ render_service_deploy_json() {
 }
 
 # Empty means Render has no such service, so callers must report absent rather
-# than skip: a janitor that is not deployed is a fact, not a passing check.
+# than skip. A failed lookup is never absent: it returns nonzero, because one
+# 401 or timeout would otherwise hand a stale destructive cron a passing gate.
 cron_service_id() {
   if [ "$CRON_SERVICE_ID_RESOLVED" = "true" ]; then
     printf '%s' "$CRON_SERVICE_ID_CACHE"
+    [ "$CRON_SERVICE_LOOKUP_FAILED" = "true" ] && return 1
     return 0
   fi
 
   local override="${ARGUS_RENDER_CRON_SERVICE_ID:-}"
   local payload=""
+  local resolved=""
+  CRON_SERVICE_ID_RESOLVED=true
   if [ -n "$override" ]; then
     CRON_SERVICE_ID_CACHE="$override"
-  else
-    payload="$(
-      curl -fsS \
-        --request GET \
-        --url "https://api.render.com/v1/services?name=${CRON_SERVICE_NAME}&type=cron_job&limit=20" \
-        --header "Authorization: Bearer ${RENDER_API_KEY}" \
-        --header "Accept: application/json" 2>/dev/null || true
-    )"
-    if [ -n "$payload" ]; then
-      CRON_SERVICE_ID_CACHE="$(
-        printf '%s' "$payload" |
-          jq -r --arg name "$CRON_SERVICE_NAME" \
-            '[.[] | .service | select(.name == $name)] | .[0].id // ""'
-      )"
-    fi
+    printf '%s' "$CRON_SERVICE_ID_CACHE"
+    return 0
   fi
-  CRON_SERVICE_ID_RESOLVED=true
+  if ! payload="$(
+    curl -fsS \
+      --request GET \
+      --url "https://api.render.com/v1/services?name=${CRON_SERVICE_NAME}&type=cron_job&limit=20" \
+      --header "Authorization: Bearer ${RENDER_API_KEY}" \
+      --header "Accept: application/json"
+  )"; then
+    CRON_SERVICE_LOOKUP_FAILED=true
+    return 1
+  fi
+  if ! resolved="$(
+    printf '%s' "$payload" |
+      jq -r --arg name "$CRON_SERVICE_NAME" \
+        '[.[] | .service | select(.name == $name)] | .[0].id // ""'
+  )"; then
+    CRON_SERVICE_LOOKUP_FAILED=true
+    return 1
+  fi
+  CRON_SERVICE_ID_CACHE="$resolved"
   printf '%s' "$CRON_SERVICE_ID_CACHE"
 }
 
@@ -287,9 +297,16 @@ print_web_deploy_status() {
 
 print_cron_deploy_status() {
   require_local_env RENDER_API_KEY
-  local service_id
-  service_id="$(cron_service_id)"
+  local service_id=""
 
+  if ! service_id="$(cron_service_id)"; then
+    echo "service=$CRON_SERVICE_NAME"
+    echo "deploy_id=<unknown>"
+    echo "status=lookup_failed"
+    echo "commit=<unknown>"
+    echo "commit_short=<unknown>"
+    return 1
+  fi
   if [ -z "$service_id" ]; then
     echo "service=$CRON_SERVICE_NAME"
     echo "deploy_id=<absent>"
@@ -721,7 +738,7 @@ audit_release_config() {
   CRON_AUDIT_FINGERPRINT_ROWS=()
 
   local api_env_json web_env_json workflow_env_json workflow_task real_workflow_task fingerprint workflow_fingerprint
-  local cron_env_json cron_fingerprint cron_service_id_value
+  local cron_env_json cron_fingerprint cron_service_id_value cron_lookup_ok
   local mode_pairs=()
   local mode_pair
   local workflow_pairs=()
@@ -774,7 +791,11 @@ audit_release_config() {
   else
     workflow_env_json="[]"
   fi
-  cron_service_id_value="$(cron_service_id)"
+  cron_lookup_ok=true
+  if ! cron_service_id_value="$(cron_service_id)"; then
+    cron_lookup_ok=false
+    cron_service_id_value=""
+  fi
   if [ -n "$cron_service_id_value" ]; then
     cron_env_json="$(render_env_json "$cron_service_id_value")"
   else
@@ -801,7 +822,10 @@ audit_release_config() {
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_profile_pairs[@]}"
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
   fi
-  if [ -n "$cron_service_id_value" ]; then
+  if [ "$cron_lookup_ok" != "true" ]; then
+    echo "drift $CRON_SERVICE_NAME:service_lookup_failed"
+    record_audit_failure "$CRON_SERVICE_NAME"
+  elif [ -n "$cron_service_id_value" ]; then
     audit_forbidden_render_env_keys \
       "$cron_env_json" \
       "$CRON_SERVICE_NAME" \
@@ -824,7 +848,9 @@ audit_release_config() {
   else
     workflow_fingerprint="<skipped>"
   fi
-  if [ -n "$cron_service_id_value" ]; then
+  if [ "$cron_lookup_ok" != "true" ]; then
+    cron_fingerprint="<unknown>"
+  elif [ -n "$cron_service_id_value" ]; then
     cron_fingerprint="$(cron_env_fingerprint)"
   else
     cron_fingerprint="<absent>"
@@ -843,8 +869,10 @@ audit_release_config() {
   fi
   echo "cron_env_fingerprint=$cron_fingerprint"
   # absent is read back from Render, so it states the janitor is not deployed
-  # rather than that the audit declined to look.
-  if [ -z "$cron_service_id_value" ]; then
+  # rather than that the audit declined to look, or could not.
+  if [ "$cron_lookup_ok" != "true" ]; then
+    echo "cron_env_status=lookup_failed"
+  elif [ -z "$cron_service_id_value" ]; then
     echo "cron_env_status=absent"
   elif [ "$CRON_AUDIT_FAILURES" -eq 0 ]; then
     echo "cron_env_status=ready"

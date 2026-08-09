@@ -108,6 +108,7 @@ def _run_render_release_audit(
     workflow_env_json: str | None = None,
     cron_env_json: str | None = None,
     cron_service_id: str | None = "srv-fake-maintenance",
+    cron_lookup_fails: bool = False,
     expect_mode: str = "safe-off",
     isolate: bool = False,
 ) -> subprocess.CompletedProcess[str]:
@@ -128,7 +129,7 @@ case "$*" in
   *"$FAKE_WORKFLOW_SERVICE_ID"*)
     printf "%s" "$FAKE_WORKFLOW_ENV_JSON"
     ;;
-  *type=cron_job*) printf "%s" "$FAKE_CRON_LOOKUP_JSON" ;;
+  *type=cron_job*) [ -n "$FAKE_CRON_LOOKUP_FAIL" ] && exit 22; printf "%s" "$FAKE_CRON_LOOKUP_JSON" ;;
   *env-vars*) printf "%s" "$FAKE_CRON_ENV_JSON" ;;
   *)
     echo "unexpected curl request: $*" >&2
@@ -139,6 +140,7 @@ esac
     )
     fake_curl.chmod(0o755)
 
+    cron_row = {"service": {"id": cron_service_id, "name": "argus-maintenance"}}
     env = os.environ.copy()
     env.update(
         {
@@ -151,11 +153,8 @@ esac
             "FAKE_API_ENV_JSON": api_env_json,
             "FAKE_WEB_ENV_JSON": web_env_json,
             "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
-            "FAKE_CRON_LOOKUP_JSON": json.dumps(
-                [{"service": {"id": cron_service_id, "name": "argus-maintenance"}}]
-                if cron_service_id
-                else []
-            ),
+            "FAKE_CRON_LOOKUP_JSON": json.dumps([cron_row] if cron_service_id else []),
+            "FAKE_CRON_LOOKUP_FAIL": "1" if cron_lookup_fails else "",
             "FAKE_CRON_ENV_JSON": cron_env_json
             or _render_env_payload("argus-maintenance"),
             "FAKE_CURL_REQUEST_LOG": str(request_log),
