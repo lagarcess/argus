@@ -1904,6 +1904,47 @@ window.
 - `500 Server Error`: durable usage truth is unavailable outside the explicit
   development fallback mode.
 
+## `GET /market/session`
+
+Return which session US equities are in. Owner-authenticated read; it holds no
+per-account state.
+
+**Response:**
+```json
+{
+  "session": {
+    "phase": "closed_weekend",
+    "is_market_day": false,
+    "as_of": "2026-08-09T13:04:22-04:00"
+  }
+}
+```
+
+**Session semantics:**
+- `phase` is one of `pre_market`, `open`, `after_hours`, `closed_weekend`,
+  `closed_holiday`, or `closed`. `closed` is the overnight lull on a trading
+  day, which is neither a weekend nor a holiday.
+- The session is resolved in Eastern time, never in the caller's timezone.
+  Someone in London at 2pm is in US pre-market, and a local-time calculation
+  reports that backwards.
+- Closure comes from the trading calendar, never from a weekday check. The
+  weekday is consulted only after the calendar has already ruled the day
+  closed, and only to choose between `closed_weekend` and `closed_holiday`.
+- `pre_market` runs from 04:00 Eastern to the session open, and `after_hours`
+  from the session close to 20:00 Eastern. The regular open and close come from
+  the calendar per session, because half days move them.
+- One calendar read covers a whole day: a past or present calendar day's
+  session never changes, so it is cached by date rather than on a TTL.
+- `session` is `null` when the trading calendar is unreachable. Clients say
+  nothing about the market rather than guessing an open or a holiday. Argus
+  supports crypto and currency pairs, which do not close, so any client copy
+  about a closure must stay true for those asset classes too.
+
+**Error rules:**
+- `401 Unauthorized`: authentication is missing or invalid.
+- A provider or calendar failure is not an error response. It returns `200`
+  with `session: null`.
+
 ## `PATCH /me`
 
 Update profile preferences. Partial update semantics are supported.

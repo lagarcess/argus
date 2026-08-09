@@ -913,6 +913,34 @@ class DiscoveryResponse(BaseModel):
     items: list[DiscoveryItem]
 
 
+class MarketSession(BaseModel):
+    """Which session US equities are in, resolved in Eastern time."""
+
+    model_config = ConfigDict(frozen=True)
+
+    phase: Literal[
+        "pre_market",
+        "open",
+        "after_hours",
+        "closed_weekend",
+        "closed_holiday",
+        "closed",
+    ]
+    is_market_day: bool
+    as_of: datetime
+
+
+class MarketSessionResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    session: MarketSession | None = Field(
+        description=(
+            "Null when the trading calendar is unreachable. Callers say nothing "
+            "about the market rather than guessing an open or a holiday."
+        )
+    )
+
+
 class FeedbackRequest(BaseModel):
     type: Literal["bug", "feature", "general", "account_deletion_request"]
     message: str = Field(min_length=1, max_length=MAX_FEEDBACK_MESSAGE_LENGTH)

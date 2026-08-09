@@ -16,6 +16,7 @@ import { isConversationMemoryOptOut } from "./memory-privacy";
 import { currentViewportBand } from "./responsive-layout";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { MarketSessionPhase } from "@/components/chat/greetingPool";
 import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
@@ -567,6 +568,23 @@ export async function getMe() {
 
 export async function getUsageAllowances() {
   return apiFetch<UsageAllowanceResponse>("/me/usage");
+}
+
+export type MarketSessionResponse = {
+  session: {
+    phase: MarketSessionPhase;
+    is_market_day: boolean;
+    as_of: string;
+  } | null;
+};
+
+/**
+ * Which session US equities are in, resolved by the backend in Eastern time
+ * against the real trading calendar. `session` is null when that calendar is
+ * unreachable, and callers say nothing about the market rather than guessing.
+ */
+export async function getMarketSession(signal?: AbortSignal) {
+  return apiFetch<MarketSessionResponse>("/market/session", { signal });
 }
 
 export async function patchMe(patch: ProfilePatch) {
