@@ -26,13 +26,13 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
 )
 from argus.agent_runtime.substage_events import emit_substage
-from argus.domain.discovery_search import (
+from argus.domain.market_data import resolve_asset
+from argus.domain.research.search import (
     SearchResultPacket,
     SearchUnavailableError,
     discovery_search_config,
     selection,
 )
-from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 

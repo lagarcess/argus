@@ -20,12 +20,12 @@ from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
 )
 from argus.agent_runtime.state.models import ResponseProfile
-from argus.domain.discovery_search import (
+from argus.domain.research.search import (
     SearchResultPacket,
     SearchUnavailableError,
     sanitize_search_result,
 )
-from argus.domain.discovery_search import selection as selection_module
+from argus.domain.research.search import selection as selection_module
 
 
 @dataclass(frozen=True)

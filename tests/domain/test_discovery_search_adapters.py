@@ -4,17 +4,17 @@ import json
 
 import httpx
 import pytest
-from argus.domain.discovery_search import (
+from argus.domain.research.search import (
     SearchUnavailableError,
 )
-from argus.domain.discovery_search.openrouter_web_search import (
+from argus.domain.research.search.openrouter_web_search import (
     OpenRouterWebSearchProvider,
 )
-from argus.domain.discovery_search.perplexity_direct import (
+from argus.domain.research.search.perplexity_direct import (
     DOCUMENTED_PERPLEXITY_SEARCH_COST_USD,
     PerplexityDirectProvider,
 )
-from argus.domain.discovery_search.selection import search_provider_for_config
+from argus.domain.research.search.selection import search_provider_for_config
 
 
 def _perplexity_payload() -> dict:
@@ -732,7 +732,7 @@ class TestProviderSelection:
         self,
         monkeypatch,
     ) -> None:
-        from argus.domain.discovery_search import openrouter_web_search
+        from argus.domain.research.search import openrouter_web_search
         from argus.llm.openrouter_key_policy import openrouter_traffic_class
 
         seen: dict[str, object] = {}

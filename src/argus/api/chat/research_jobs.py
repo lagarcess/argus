@@ -17,7 +17,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
 import time
 from typing import Any
 
@@ -32,6 +31,7 @@ from argus.domain.research.config import (
     background_deadline_seconds,
 )
 from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
+from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
 RESEARCH_OPERATION_SCOPE = "chat.research"
@@ -41,8 +41,8 @@ _POLLER_TASKS: set[asyncio.Task[None]] = set()
 
 
 def _client() -> PerplexityAgentClient | None:
-    api_key = os.getenv("PERPLEXITY_API_KEY", "")
-    if not api_key.strip():
+    api_key = perplexity_api_key()
+    if not api_key:
         return None
     return PerplexityAgentClient(api_key)
 

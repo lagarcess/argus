@@ -6,14 +6,14 @@ from typing import Any
 
 import httpx
 
-from argus.domain.discovery_search.contracts import (
+from argus.domain.research.search.contracts import (
     MAX_RESULTS,
     SearchResult,
     SearchResultPacket,
     SearchUnavailableError,
     sanitize_search_result,
 )
-from argus.domain.discovery_search.http_post import post_json
+from argus.domain.research.search.http_post import post_json
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 _CLAIM_ABBREVIATIONS = frozenset(
@@ -145,23 +145,18 @@ def _sanitized_citations(payload: Any) -> list[SearchResult]:
         if result is not None:
             sanitized.append(result)
         if citation_span is not None:
-            previous_citation_end = max(
-                previous_citation_end or 0, citation_span[1]
-            )
+            previous_citation_end = max(previous_citation_end or 0, citation_span[1])
     return sanitized
 
 
 def _continues_citation_group(separator: str) -> bool:
     words = "".join(
-        character.casefold() if character.isalnum() else " "
-        for character in separator
+        character.casefold() if character.isalnum() else " " for character in separator
     ).split()
     return not words or words in (["and"], ["y"])
 
 
-def _citation_span(
-    content: str, citation: dict[str, Any]
-) -> tuple[int, int] | None:
+def _citation_span(content: str, citation: dict[str, Any]) -> tuple[int, int] | None:
     start = citation.get("start_index")
     end = citation.get("end_index")
     if (
@@ -191,28 +186,26 @@ def _is_dotted_name_prefix(token: str, *, preceding_text: str) -> bool:
         for separator in ("\n", "! ", "? ", "; ", ". ")
     )
     separator_width = (
-        0
-        if previous_break < 0
-        else 1
-        if preceding_text[previous_break] == "\n"
-        else 2
+        0 if previous_break < 0 else 1 if preceding_text[previous_break] == "\n" else 2
     )
     claim_prefix = preceding_text[previous_break + separator_width :].strip(" -*•")
     return claim_prefix == token
 
 
-def _starts_lowercase_styled_name(
-    text: str, *, citation_title: str = ""
-) -> bool:
+def _starts_lowercase_styled_name(text: str, *, citation_title: str = "") -> bool:
     token = text.split(maxsplit=1)[0].strip("([{\"'")
     core = token.rstrip(".,;:!?")
     domain_parts = core.split(".")
     title_token = citation_title.split(maxsplit=1)[0].strip("([{\"'")
     title_core = title_token.rstrip(".,;:!?")
-    return bool(core) and core[0].islower() and (
-        any(character.isupper() for character in core[1:])
-        or (len(domain_parts) >= 2 and any(len(part) > 1 for part in domain_parts))
-        or (core.islower() and title_core == core)
+    return (
+        bool(core)
+        and core[0].islower()
+        and (
+            any(character.isupper() for character in core[1:])
+            or (len(domain_parts) >= 2 and any(len(part) > 1 for part in domain_parts))
+            or (core.islower() and title_core == core)
+        )
     )
 
 

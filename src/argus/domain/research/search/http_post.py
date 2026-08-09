@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from argus.domain.discovery_search.contracts import SearchUnavailableError
+from argus.domain.research.search.contracts import SearchUnavailableError
 
 
 def post_json(

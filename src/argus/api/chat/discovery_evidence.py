@@ -6,7 +6,7 @@ from typing import Any
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.domain.discovery_search import discovery_search_config
+from argus.domain.research.search import discovery_search_config
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     GLOBAL_DISCOVERY_CEILING_SUBJECT,

@@ -1,9 +1,18 @@
-from argus.domain.discovery_search.config import (
+"""The direct Search path of the one Perplexity provider layer.
+
+This package and ``research.perplexity_agent`` are the only two modules that
+speak to Perplexity: direct Search here (source-backed result lists), the
+Agent API there (finance_search grounding). One layer, two documented paths,
+one credential seam (``research.credentials``). Nothing else in the codebase
+may open its own Perplexity client.
+"""
+
+from argus.domain.research.search.config import (
     DEFAULT_PROVIDER_ID,
     DiscoverySearchConfig,
     discovery_search_config,
 )
-from argus.domain.discovery_search.contracts import (
+from argus.domain.research.search.contracts import (
     MAX_RESULTS,
     MAX_SNIPPET_CHARS,
     MAX_TITLE_CHARS,

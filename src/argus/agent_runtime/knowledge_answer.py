@@ -37,10 +37,10 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.strategy_contract import resolve_date_range
-from argus.domain.discovery_search.config import discovery_search_config
-from argus.domain.discovery_search.contracts import SearchUnavailableError
-from argus.domain.discovery_search.selection import search_provider_for_config
 from argus.domain.research.config import research_rail_enabled
+from argus.domain.research.search.config import discovery_search_config
+from argus.domain.research.search.contracts import SearchUnavailableError
+from argus.domain.research.search.selection import search_provider_for_config
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -66,10 +66,10 @@ def _with_bold_figure(text: str) -> str:
     for index, token in enumerate(tokens):
         if any(character.isdigit() for character in token):
             core = token.rstrip(".,;:)")
-            suffix = token[len(core):]
+            suffix = token[len(core) :]
             if index + 1 < len(tokens) and tokens[index + 1].startswith("%"):
                 trailing = tokens[index + 1].rstrip(".,;:)")
-                rest = tokens[index + 1][len(trailing):]
+                rest = tokens[index + 1][len(trailing) :]
                 tokens[index] = f"**{core} {trailing}**{rest or suffix}"
                 del tokens[index + 1]
             else:
@@ -212,9 +212,7 @@ def _query_from_interpretation(
     return KnowledgeQueryExtraction(
         question_kind="market_stats",
         symbols=symbols,
-        date_range_raw_text=(
-            str(raw_window) if raw_window not in (None, "") else None
-        ),
+        date_range_raw_text=(str(raw_window) if raw_window not in (None, "") else None),
     )
 
 
@@ -268,9 +266,7 @@ async def _market_stats_answer(
     if not symbols:
         return None
     symbol = symbols[0]
-    window = resolve_date_range(
-        query.date_range_raw_text or draft.date_range or None
-    )
+    window = resolve_date_range(query.date_range_raw_text or draft.date_range or None)
     try:
         # Lazy: the API import boundary keeps the backtest compute stack out
         # of startup; these load only when a market-stats answer actually runs.
@@ -293,8 +289,13 @@ async def _market_stats_answer(
             error=str(exc),
         )
         return None
-    facts = _series_facts(series=series, symbol=symbol, window_label=window.label,
-                          start=window.start, end=window.end)
+    facts = _series_facts(
+        series=series,
+        symbol=symbol,
+        window_label=window.label,
+        start=window.start,
+        end=window.end,
+    )
     if facts is None:
         return None
     return await _voiced_answer(
@@ -326,9 +327,7 @@ def _series_facts(
         peak = max(peak, value)
         drawdown = (value / peak - 1.0) * 100.0
         max_drawdown_pct = min(max_drawdown_pct, drawdown)
-    daily_returns = [
-        closes[i] / closes[i - 1] - 1.0 for i in range(1, len(closes))
-    ]
+    daily_returns = [closes[i] / closes[i - 1] - 1.0 for i in range(1, len(closes))]
     mean = sum(daily_returns) / len(daily_returns)
     variance = sum((r - mean) ** 2 for r in daily_returns) / len(daily_returns)
     annualized_vol_pct = (variance**0.5) * (252**0.5) * 100.0
@@ -376,13 +375,10 @@ async def _external_facts_answer(
     if not packet.results:
         return None
     snippets = "\n".join(
-        f"- {result.title}: {result.snippet} ({result.url})"
-        for result in packet.results
+        f"- {result.title}: {result.snippet} ({result.url})" for result in packet.results
     )
     facts = {"search_results": snippets, "provider": packet.provider_id}
-    sources = "\n".join(
-        f"- {result.url}" for result in packet.results[:3]
-    )
+    sources = "\n".join(f"- {result.url}" for result in packet.results[:3])
     fallback = f"{packet.results[0].snippet}\n\nFuentes:\n{sources}"
     voiced = await _voiced_answer(
         message=message,

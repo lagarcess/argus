@@ -15,7 +15,7 @@ from argus.agent_runtime.discovery.contracts import (
     DiscoveryExtraction,
     ValidatedCandidate,
 )
-from argus.domain.discovery_search import SearchResultPacket
+from argus.domain.research.search import SearchResultPacket
 
 
 def _bounded_text(value: str, limit: int) -> str:

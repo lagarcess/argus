@@ -674,12 +674,11 @@ async def _latest_close(symbol: str, asset_class: str) -> dict[str, str] | None:
 
 
 def _client():
-    import os
-
+    from argus.domain.research.credentials import perplexity_api_key
     from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
-    api_key = os.getenv("PERPLEXITY_API_KEY", "")
-    if not api_key.strip():
+    api_key = perplexity_api_key()
+    if not api_key:
         return None
     return PerplexityAgentClient(api_key)
 

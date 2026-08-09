@@ -6,14 +6,14 @@ from typing import Any
 
 import httpx
 
-from argus.domain.discovery_search.contracts import (
+from argus.domain.research.search.contracts import (
     MAX_RESULTS,
     SearchResult,
     SearchResultPacket,
     SearchUnavailableError,
     sanitize_search_result,
 )
-from argus.domain.discovery_search.http_post import post_json
+from argus.domain.research.search.http_post import post_json
 
 PERPLEXITY_SEARCH_URL = "https://api.perplexity.ai/search"
 
