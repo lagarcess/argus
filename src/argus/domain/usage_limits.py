@@ -52,6 +52,20 @@ GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_SIMULATION_ALLOWANCE)
 ]
 
+# One ceiling for every research shape, not one per tier. A stranger cannot
+# tell a fast lookup from a thorough comparison, and a meter they cannot
+# predict is a meter that feels arbitrary; the rail decides the tier, so the
+# rail owns that cost, not the guest.
+#
+# Three is deliberately conservative because the recorded cost is wrong: the
+# ledger's per-call figure is not yet trustworthy (issue #409). Raising this
+# is cheap once the real number is known; refunding a month of underpriced
+# strangers is not.
+GUEST_RESEARCH_ALLOWANCE = 3
+GUEST_RESEARCH_VISITOR_LIMITS: list[tuple[str, int]] = [
+    ("day", GUEST_RESEARCH_ALLOWANCE)
+]
+
 # Circuit breaker, not a budget: the only bound that holds when someone rotates
 # identity faster than any per-visitor limit can see. Sized so no honest day
 # reaches it. Env-overridable because a circuit breaker is worth nothing if

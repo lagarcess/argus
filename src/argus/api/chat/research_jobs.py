@@ -36,6 +36,11 @@ from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
 RESEARCH_OPERATION_SCOPE = "chat.research"
 
+# The keyed visitor digest a guest's background run settles against, carried on
+# the persisted job request. A digest, never an address: nothing here retains
+# more about a visitor than the counter table already does.
+GUEST_VISITOR_KEY_FIELD = "guest_visitor_key"
+
 # Keep strong references so in-flight pollers never get garbage collected.
 _POLLER_TASKS: set[asyncio.Task[None]] = set()
 
@@ -54,6 +59,7 @@ def apply_research_job_request(
     conversation_id: str,
     request_message_id: str | None,
     request_id: str | None,
+    guest_visitor_key: str | None = None,
 ) -> dict[str, Any] | None:
     """Consume a typed research job request from the runtime result.
 
@@ -70,6 +76,10 @@ def apply_research_job_request(
     job_request = runtime_result.pop("research_job_request", None)
     if not isinstance(job_request, dict):
         return None
+    if guest_visitor_key is not None:
+        # Rides the persisted job row: the background run settles the guest's
+        # allowance long after the request that authorized it is gone.
+        job_request[GUEST_VISITOR_KEY_FIELD] = guest_visitor_key
     job, sync_packet = start_research_job(
         job_request=job_request,
         user_id=user_id,
@@ -327,6 +337,7 @@ def _finalize_success(
         conversation_id=conversation_id,
         message_id=message.id,
         request_id=request_id,
+        guest_visitor_key=job_request.get(GUEST_VISITOR_KEY_FIELD),
     )
 
 

@@ -419,7 +419,9 @@ async def exhausted_result(
     disappearance: the answer still comes from Argus's own data or model
     knowledge, and still ends somewhere runnable."""
     language = language_tag(user.language_preference)
-    note = _exhausted_note(language)
+    note = _exhausted_note(
+        language, guest_allowance=state.research_guest_allowance_exhausted
+    )
     from argus.agent_runtime import knowledge_answer as ka
 
     answer: str | None = None
@@ -684,7 +686,21 @@ def _coverage_note(language: str) -> str:
     )
 
 
-def _exhausted_note(language: str) -> str:
+def _exhausted_note(language: str, *, guest_allowance: bool = False) -> str:
+    """Name the bound that actually closed, never a more flattering one."""
+    if guest_allowance:
+        if language == "es-419":
+            return (
+                "Usaste tus consultas de investigación gratis de hoy, así que "
+                "respondo con los datos propios de Argus y lo que ya sé. Crea "
+                "una cuenta para seguir investigando; probar ideas sigue "
+                "disponible."
+            )
+        return (
+            "You've used today's free research questions, so this answer "
+            "comes from Argus's own data and what I already know. Create an "
+            "account to keep researching; testing ideas is still available."
+        )
     if language == "es-419":
         return (
             "La capacidad compartida de investigación de hoy se agotó, así "

@@ -62,10 +62,7 @@ from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
 )
-from argus.api.chat.discovery_evidence import (
-    discovery_allowance_for_turn,
-    settle_discovery_turn,
-)
+from argus.api.chat.discovery_evidence import discovery_allowance_for_turn
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
@@ -85,8 +82,8 @@ from argus.api.chat.request_admission import (
     reject_invalid_non_run_confirmation_action,
 )
 from argus.api.chat.research_evidence import (
-    research_allowance_available,
-    settle_research_turn,
+    guest_research_visitor_key,
+    research_allowance_for_turn,
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.retest import (
@@ -114,6 +111,7 @@ from argus.api.chat.streaming import (
     sse_keepalive,
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
+from argus.api.chat.turn_metering import settle_metered_turn
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
@@ -269,6 +267,12 @@ async def chat_stream(
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
     turn_account = account_context(request)
+    # One turn, one subject: allowance read, job row and settlement agree.
+    turn_is_guest = turn_account.kind == "guest"
+    turn_client_identity = client_identity(request)
+    turn_guest_research_key = guest_research_visitor_key(
+        is_guest=turn_is_guest, client_identity=turn_client_identity
+    )
     clean_idempotency_key = validated_optional_idempotency_key(
         request,
         idempotency_key,
@@ -730,7 +734,7 @@ async def chat_stream(
                     is_run_backtest_turn=is_run_backtest_turn,
                     account=turn_account,
                     visitor_key=(
-                        visitor_key_for(client_identity(request))
+                        visitor_key_for(turn_client_identity)
                         if turn_account.kind == "guest"
                         else None
                     ),
@@ -773,7 +777,7 @@ async def chat_stream(
                         is_run_backtest_turn=False,
                         account=turn_account,
                         visitor_key=(
-                            visitor_key_for(client_identity(request))
+                            visitor_key_for(turn_client_identity)
                             if turn_account.kind == "guest"
                             else None
                         ),
@@ -834,7 +838,7 @@ async def chat_stream(
                     SIMULATION_USAGE_RESOURCE,
                 ),
                 visitor_key=(
-                    visitor_key_for(client_identity(request))
+                    visitor_key_for(turn_client_identity)
                     if turn_account.kind == "guest"
                     else None
                 ),
@@ -946,6 +950,7 @@ async def chat_stream(
                         conversation_id=conversation.id,
                         request_message_id=lifecycle_hooks.turn_id,
                         request_id=request.state.request_id,
+                        guest_visitor_key=turn_guest_research_key,
                     )
                     if backtest_job is None:
                         assistant_text = runtime_result.get("assistant_response")
@@ -1244,7 +1249,7 @@ async def chat_stream(
                                 is_run_backtest_turn=is_run_backtest_turn,
                                 account=turn_account,
                                 visitor_key=(
-                                    visitor_key_for(client_identity(request))
+                                    visitor_key_for(turn_client_identity)
                                     if turn_account.kind == "guest"
                                     else None
                                 ),
@@ -1256,20 +1261,13 @@ async def chat_stream(
                     ):
                         runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
-                settle_discovery_turn(
-                    usage=discovery_usage_evidence,
-                    user_id=user.id,
-                    is_guest=turn_account.kind == "guest",
-                    client_identity=client_identity(request),
-                    conversation_id=conversation.id,
-                    message_id=(
-                        assistant_message.id if assistant_message is not None else None
-                    ),
-                    request_id=request.state.request_id,
-                )
-                settle_research_turn(
+                settle_metered_turn(
                     runtime_result,
+                    discovery_usage=discovery_usage_evidence,
                     user_id=user.id,
+                    is_guest=turn_is_guest,
+                    client_identity=turn_client_identity,
+                    guest_research_visitor_key=turn_guest_research_key,
                     conversation_id=conversation.id,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
@@ -1426,6 +1424,9 @@ async def chat_stream(
             turn_execution_scope(entry_state=checkpoint_values or {}),
         ):
             workflow_input_error: Exception | None = None
+            research_allowance = research_allowance_for_turn(
+                user.id, guest_visitor_key=turn_guest_research_key
+            )
             try:
                 workflow_input = build_workflow_input(
                     user=runtime_user,
@@ -1433,10 +1434,11 @@ async def chat_stream(
                     recent_thread_history=recent_thread_history,
                     discovery_allowance_available=discovery_allowance_for_turn(
                         user.id,
-                        is_guest=turn_account.kind == "guest",
-                        client_identity=client_identity(request),
+                        is_guest=turn_is_guest,
+                        client_identity=turn_client_identity,
                     ),
-                    research_allowance_available=research_allowance_available(user.id),
+                    research_allowance_available=research_allowance.available,
+                    research_guest_allowance_exhausted=research_allowance.guest_exhausted,
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
                     ],

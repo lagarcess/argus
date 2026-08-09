@@ -31,9 +31,12 @@ def _interpretation() -> StructuredInterpretation:
     )
 
 
-def _state(message: str, *, allowance: bool = True) -> RunState:
+def _state(
+    message: str, *, allowance: bool = True, guest_exhausted: bool = False
+) -> RunState:
     state = RunState.new(current_user_message=message, recent_thread_history=[])
     state.research_allowance_available = allowance
+    state.research_guest_allowance_exhausted = guest_exhausted
     return state
 
 
@@ -52,11 +55,13 @@ def _wire_client(monkeypatch: pytest.MonkeyPatch, documents) -> RecordingTranspo
     return transport
 
 
-def _run(message: str, *, user=USER, allowance: bool = True):
+def _run(
+    message: str, *, user=USER, allowance: bool = True, guest_exhausted: bool = False
+):
     return asyncio.run(
         ra.research_answer_stage_result(
             interpretation=_interpretation(),
-            state=_state(message, allowance=allowance),
+            state=_state(message, allowance=allowance, guest_exhausted=guest_exhausted),
             user=user,
         )
     )
@@ -334,3 +339,58 @@ def test_spanish_turn_carries_the_language_into_the_prompt(monkeypatch) -> None:
     assert result is not None
     prompt = __import__("json").loads(transport.requests[0].content.decode())["input"]
     assert "es-419" in prompt
+
+
+@pytest.mark.parametrize(
+    ("user", "must_say", "must_not_say"),
+    [
+        (USER, "free research", "shared research capacity"),
+        (SPANISH_USER, "gratis", "capacidad compartida"),
+    ],
+)
+def test_a_guest_who_spent_their_own_allowance_is_told_so(
+    monkeypatch, user, must_say, must_not_say
+) -> None:
+    """A guest's three are their own. Telling them the shared capacity ran out
+    would be a more flattering story than the true one."""
+    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    _wire_client(monkeypatch, [agent_response()])
+
+    async def voice(*, message, language, facts, fallback, user=None):
+        return fallback
+
+    from argus.agent_runtime import knowledge_answer as ka
+
+    monkeypatch.setattr(ka, "_voiced_answer", voice)
+
+    result = _run(
+        "What is Apple at?", user=user, allowance=False, guest_exhausted=True
+    )
+
+    assert result is not None
+    answer = result.stage_patch["assistant_response"].lower()
+    assert must_say in answer
+    assert must_not_say not in answer
+    # Still ends somewhere runnable: an exhausted meter is not a dead end.
+    assert result.stage_patch["next_experiments"]["rows"]
+
+
+@pytest.mark.parametrize(
+    ("user", "must_say"),
+    [(USER, "shared research capacity"), (SPANISH_USER, "capacidad compartida")],
+)
+def test_a_shared_outage_still_says_shared(monkeypatch, user, must_say) -> None:
+    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    _wire_client(monkeypatch, [agent_response()])
+
+    async def voice(*, message, language, facts, fallback, user=None):
+        return fallback
+
+    from argus.agent_runtime import knowledge_answer as ka
+
+    monkeypatch.setattr(ka, "_voiced_answer", voice)
+
+    result = _run("What is Apple at?", user=user, allowance=False)
+
+    assert result is not None
+    assert must_say in result.stage_patch["assistant_response"].lower()
