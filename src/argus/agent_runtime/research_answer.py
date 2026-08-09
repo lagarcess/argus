@@ -43,9 +43,6 @@ from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.research.config import research_rail_enabled
 from argus.llm.openrouter import invoke_openrouter_json_schema
 
-_RESEARCH_KINDS = frozenset(
-    {"live_quote", "company_lookup", "cross_company", "screening"}
-)
 # Shapes that survey the market rather than a named asset: the user names no
 # subject, so the provider's own grounded result supplies the candidates.
 _MARKET_SURVEY_KINDS = frozenset({"market_pulse", "screening", "sector_radar"})
