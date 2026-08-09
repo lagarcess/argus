@@ -69,6 +69,37 @@ The four settings frames come in pairs: the base frame shows the field unset,
 and `-saved` shows it after typing a name and pressing Enter, with the value
 read back from `GET /me` to prove it persisted rather than only rendered.
 
+## Review round 1: the saved name reaches the greeting without a reload
+
+Frames 01 through 12 were captured at `2d97df3a`. Two review findings landed on
+that commit, and `1c45ab65` fixed them. Frames 07, 08, 13 and 14 are re-captured
+at the fixed head; the rest are unaffected by those fixes and stand.
+
+`13` and `14` are the propagation proof, and they are three frames each: the
+greeting before the save, the dialog with the name saved, and the greeting
+after, all in one page session.
+
+| Frame | Language | Greeting before the save | Greeting after the save | Document reloaded |
+| --- | --- | --- | --- | --- |
+| `13-named-no-reload-en-desktop` | en | Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test. | Still up, Lucas. What are you curious about? | **no** |
+| `14-named-no-reload-es-mobile` | es-419 | La bolsa está cerrada por el fin de semana. Las criptos no paran, así que hay mucho por probar. | Todavía por aquí, Lucas. ¿Qué te da curiosidad? | **no** |
+
+The profile starts with no name, so the greeting has to change for the run to
+prove anything. The name is then typed into the real settings field and saved
+through the real dialog, which is closed with Escape. Nothing reloads.
+
+"Document reloaded: no" is measured rather than asserted. A Playwright
+`addInitScript` runs once per document, so it increments a counter on `window`;
+the counter reads 1 before the save and 1 after, recorded per frame in
+`propagation-report.json` as `documentLoadsAtRead` and `documentLoadsAtEnd`.
+Counting navigation events instead would have been misleading: the shell does
+several soft `history.replaceState` routes that are not reloads.
+
+The backend half of the second finding is proven over the wire rather than in a
+frame, since a rejected request has no screenshot. At the fixed head,
+`PATCH /api/v1/me` with one leading space in front of a forty-character name
+returns `200` and stores the trimmed forty characters. It returned `422` before.
+
 ### What each set proves
 
 **No toggle anywhere.** Every one of the twelve rendered-text files was checked

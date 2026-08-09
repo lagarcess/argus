@@ -1,0 +1,28 @@
+[
+  {
+    "frame": "13-named-no-reload-en-desktop",
+    "lang": "en",
+    "viewport": "1280x900",
+    "greetingBeforeSave": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test.",
+    "greetingAfterSave": "Still up, Lucas. What are you curious about?",
+    "changedWithoutReload": true,
+    "documentLoadsAtRead": 1,
+    "documentLoadsAtEnd": 1,
+    "documentReloaded": false,
+    "softNavigations": 3,
+    "consoleErrors": []
+  },
+  {
+    "frame": "14-named-no-reload-es-mobile",
+    "lang": "es-419",
+    "viewport": "390x844",
+    "greetingBeforeSave": "La bolsa está cerrada por el fin de semana. Las criptos no paran, así que hay mucho por probar.",
+    "greetingAfterSave": "Todavía por aquí, Lucas. ¿Qué te da curiosidad?",
+    "changedWithoutReload": true,
+    "documentLoadsAtRead": 1,
+    "documentLoadsAtEnd": 1,
+    "documentReloaded": false,
+    "softNavigations": 14,
+    "consoleErrors": []
+  }
+]
