@@ -259,6 +259,74 @@ Standing chore work, picked up alongside lanes rather than scheduled:
   no pulsing or terminal-style treatment. Today `UsageModal.tsx` and
   `ProfileMenu.tsx` reference none of those tokens.
 
+## Sidequest lanes
+
+Bounded, dispatchable work that is not one of the five and does not block them.
+Each carries a sequencing constraint, because small does not mean parallel. Most
+of these touch a file a main lane already owns, and two agents in one file is
+how the last split brain happened.
+
+### Retire the show/hide suggestions toggle
+
+**Sequencing: after pillar 1 merges.** It touches
+`web/components/chat/EmptyChatSurface.tsx` and
+`web/components/chat/ChatInterface.tsx`, both owned by the research rail lane
+today.
+
+No major assistant ships this control. ChatGPT, Claude, Gemini, Perplexity, and
+Grok all put starter suggestions in the empty state and let them disappear on
+first interaction. A toggle is a control for a problem that resolves itself in
+one tap, and every control costs the user a decision. That is the no-menu rule
+applied to the interface rather than to capabilities.
+
+It also renders below the legal disclaimer, in the phone thumb zone, so the
+least important element on the screen occupies the most valuable position.
+
+**Scope:** the toggle button in `EmptyChatSurface.tsx`, its `showSuggestions`
+and `onToggleSuggestions` props, the `showSuggestions` state in
+`ChatInterface.tsx`, and the `chat.show_suggestions` and `chat.hide_suggestions`
+keys in both locale files.
+
+**Behavior after:** suggestions render whenever the empty chat surface renders,
+and stop once a conversation has a message, which happens for free because the
+surface stops rendering. Nothing replaces the toggle: no dismiss gesture, no
+auto-hide timer, no settings entry.
+
+**There is no migration to write.** The state is a plain `useState` with no
+localStorage, cookie, or server field behind it, so nothing persists and no user
+is stranded. Confirm that before deleting, but do not invent a migration for
+state that does not exist.
+
+**One decision to raise, not take.** Two flags gate the same chips.
+`NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED` is `false` in `render.yaml`,
+`.github/argus-env.sh`, `.github/private-alpha-release-profile.json`, and
+`.env.example`, while the research rail's own flag governs the same surface and
+rail spec section 10 makes prebaked suggestions part of the signed-in empty
+chat. That is one flag too many. Retiring an env flag is a release-contract move
+and all four files travel together, so it is a founder call.
+
+### PostHog native funnel repair (dispatched 2026-08-09)
+
+**Sequencing: parallel-safe.** Lives in `src/argus/observability/`, which no
+main lane touches.
+
+Product events are already captured server side, but the business label sits at
+`attributes.product_event`, which PostHog SQL can read and its native funnel
+builder cannot filter on. The activation funnel returns no data while the events
+are present.
+
+The fix is a projection inside `_posthog_event_properties()`, which already
+promotes selected fields to top level, applied to a closed allowlist of
+categorical dimensions. Derived in one place rather than written twice, so the
+two copies cannot drift.
+
+**The reason it is not deferred:** events already sent cannot be backfilled.
+Every day without it is history that will never appear in a native funnel.
+
+**Acceptance splits.** Code and tests land now. A live PostHog event and a real
+funnel need a production promotion, which is blocked behind the dark canary, so
+the lane states that rather than waiting on it.
+
 ## Landed this cycle
 
 - **Memory** (PR #386) — complete loop behind a default-off flag
