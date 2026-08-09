@@ -82,7 +82,7 @@ RESEARCH_SIDECAR_KEYS = frozenset(
         "anchor_symbols",
         "peers",
         "usage",
-        "memory",
+        "follow_up",
         "degraded",
     }
 )
@@ -847,7 +847,7 @@ def compose_completed_research(
             # cache hits answer inline and never reach a job.
             "cache_status": "miss",
         },
-        "memory": research_memory_block(
+        "follow_up": research_follow_up_block(
             subjects=subjects,
             peers=peers,
             shape="thorough",
@@ -950,7 +950,7 @@ def unsourced_figures_note(language: str) -> str:
     )
 
 
-def research_memory_block(
+def research_follow_up_block(
     *,
     subjects: list[dict[str, str]],
     peers: list[dict[str, str]],
@@ -962,8 +962,9 @@ def research_memory_block(
 
     The rail emits what memory must be able to record — research subjects,
     the comparison set when subjects were compared, peer suggestions, and the
-    open thread — in a consumable shape. Consumption ships in the memory
-    lane; nothing here writes memory."""
+    open thread — in a consumable shape. This block is not a memory record and
+    carries none of the four categories in ``argus.memory.contracts``.
+    Consumption ships in the memory lane; nothing here writes memory."""
     open_thread: dict[str, Any] = {
         "shape": shape,
         "period_of_interest": period_of_interest,
@@ -971,7 +972,7 @@ def research_memory_block(
     if category:
         open_thread["category"] = category
     return {
-        "schema_version": "argus_research_memory/v1",
+        "schema_version": "argus_research_follow_up/v1",
         "subjects": [
             {
                 "symbol": s["symbol"],
@@ -1018,7 +1019,7 @@ def research_stage_result(
             "cost_usd": packet.usage.cost_usd,
             "cache_status": cache_status,
         },
-        "memory": research_memory_block(
+        "follow_up": research_follow_up_block(
             subjects=subjects,
             peers=peers,
             shape=shape,

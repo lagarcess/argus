@@ -225,7 +225,7 @@ def test_discovery_shaped_turn_runs_the_find_operation_with_the_typed_request(
     assert research["capability_class"] == "screening"
     assert research["usage"]["cache_status"] == "miss"
     assert research["peers"][0]["symbol"] == "CRWD"
-    assert research["memory"]["open_thread"]["category"] == "cybersecurity stocks"
+    assert research["follow_up"]["open_thread"]["category"] == "cybersecurity stocks"
 
 
 def test_classifier_failure_never_loses_a_discovery_turn(monkeypatch) -> None:
@@ -446,7 +446,7 @@ def test_etf_constituents_shape_grounds_and_offers_holdings(monkeypatch) -> None
     assert rows, "top constituents must be runnable"
 
 
-def test_memory_producer_block_rides_every_research_sidecar(monkeypatch) -> None:
+def test_follow_up_producer_block_rides_every_research_sidecar(monkeypatch) -> None:
     _classify(
         monkeypatch,
         question_kind="cross_company",
@@ -471,12 +471,12 @@ def test_memory_producer_block_rides_every_research_sidecar(monkeypatch) -> None
 
     packet = _packet_from_response(agent_response(text="Compared."), latency_ms=900)
     composed = ra.compose_completed_research(job_request=job_request, packet=packet)
-    memory = composed["research"]["memory"]
-    assert memory["schema_version"] == "argus_research_memory/v1"
-    assert [s["symbol"] for s in memory["subjects"]] == ["NFLX", "AAPL"]
-    assert memory["comparison_set"] == ["NFLX", "AAPL"]
-    assert memory["open_thread"]["shape"] == "thorough"
-    assert memory["open_thread"]["period_of_interest"] == "last three years"
+    follow_up = composed["research"]["follow_up"]
+    assert follow_up["schema_version"] == "argus_research_follow_up/v1"
+    assert [s["symbol"] for s in follow_up["subjects"]] == ["NFLX", "AAPL"]
+    assert follow_up["comparison_set"] == ["NFLX", "AAPL"]
+    assert follow_up["open_thread"]["shape"] == "thorough"
+    assert follow_up["open_thread"]["period_of_interest"] == "last three years"
 
 
 def test_grounded_puts_store_under_the_data_class_ttls(monkeypatch) -> None:
