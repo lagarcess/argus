@@ -251,6 +251,8 @@ def _packet_stage_result(
     ungrounded = survey and packet.usage.invocations == 0
     if ungrounded:
         answer = f"{answer}\n\n*{_ungrounded_survey_note(language)}*"
+    elif packet.usage.invocations > 0 and not packet.sources:
+        answer = f"{answer}\n\n*{unsourced_figures_note(language)}*"
     if not rows:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     return research_stage_result(
@@ -546,14 +548,16 @@ def _client():
 # Survey shapes name no subject, so the answer must carry the assets it found
 # and the conditions it actually applied; a screen that ignores the stated
 # threshold is worse than no screen.
-# A survey answered from memory is the one failure the shape cannot have, and
-# a vague ask ("anything moving today?") is exactly when the model is most
-# tempted to skip the tool. The instruction is explicit for that reason; when
-# it is skipped anyway the answer says so rather than reading as current.
+# A survey answered from memory is the one failure the shape cannot have, so
+# the instruction asks for retrieved figures. It never names a mechanism:
+# asking the model to account for which tool it used is what produced
+# answers narrating "the requested finance_search tool was not available".
+# Whether retrieval happened is a typed fact on the packet, and the honest
+# line renders from that, not from the model explaining itself.
 _SURVEY_TOOL_REQUIREMENT = (
-    "Use finance_search to obtain these figures before answering. Do not "
-    "answer from memory: without tool results, say plainly that you could "
-    "not retrieve current data."
+    "Retrieve these figures from current market data before answering; do "
+    "not answer from memory. If you cannot retrieve them, say only that you "
+    "could not retrieve current figures, with no explanation of why."
 )
 
 _SURVEY_GUIDANCE: dict[str, str] = {
@@ -604,8 +608,10 @@ def _survey_retry_prompt(
     lines = [_SURVEY_RETRY_LINES.get(str(question_kind or ""), "")]
     lines.append(f"The user asked: {message.strip()}")
     lines.append(
-        "Lead with the figures you retrieve and state their as-of time. "
-        "If retrieval fails, say so plainly instead of answering from memory."
+        "Lead with the figures you retrieve and state their as-of time. If "
+        "retrieval fails, say only that you could not retrieve current "
+        "figures. Do not write a sources line, include links, or name any "
+        "tool, provider, or internal system."
     )
     lines.append(
         "Responde en español latinoamericano (es-419)."
@@ -650,7 +656,10 @@ def _research_prompt(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "
         "the as-of date for any current figure. If a figure is unavailable, "
-        "say so plainly; never estimate a live number. No investment advice."
+        "say so plainly; never estimate a live number. No investment advice. "
+        "Do not write a sources or citations line and do not include links: "
+        "the interface lists sources beside your answer. Never name tools, "
+        "providers, models, or internal systems."
     )
     if language == "es-419":
         lines.append("Responde en español latinoamericano (es-419).")
@@ -793,7 +802,7 @@ def compose_completed_research(
         "schema_version": RESEARCH_SCHEMA_VERSION,
         "capability_class": capability_class,
         "shape": "thorough",
-        "sources": list(packet.sources),
+        "sources": typed_sources(packet),
         "retrieved_at": packet.retrieved_at.isoformat(),
         "anchor_symbols": [s["symbol"] for s in subjects],
         "peers": peers,
@@ -861,6 +870,45 @@ def research_decision(
     )
 
 
+def typed_sources(packet: ResearchPacket) -> list[dict[str, Any]]:
+    """Sources in the one shape the typed panel renders.
+
+    Same fields grounded discovery already emits, so one surface serves every
+    shape. The title is the publisher's domain because the packet carries no
+    title, and inventing one would be the same defect as letting the model
+    write its own citation line. Only URLs the packet returned appear here.
+    """
+    from urllib.parse import urlparse
+
+    entries: list[dict[str, Any]] = []
+    for url in packet.sources:
+        domain = urlparse(url).netloc.lower()
+        if not domain:
+            continue
+        entries.append(
+            {"title": domain, "domain": domain, "url": url, "source_date": None}
+        )
+    return entries
+
+
+def unsourced_figures_note(language: str) -> str:
+    """Said only when a grounded answer carries no linkable sources.
+
+    Market data arrives as structured figures rather than articles, so a
+    grounded answer often has nothing to link. Saying that plainly is the
+    honest alternative to the model writing a citation line for pages it
+    never fetched."""
+    if language == "es-419":
+        return (
+            "Estas cifras vienen de datos de mercado, no de artículos, así "
+            "que no hay enlaces de fuentes para abrir."
+        )
+    return (
+        "These figures come from market data rather than linked articles, so "
+        "there are no source links to open."
+    )
+
+
 def research_memory_block(
     *,
     subjects: list[dict[str, str]],
@@ -919,7 +967,7 @@ def research_stage_result(
         "schema_version": RESEARCH_SCHEMA_VERSION,
         "capability_class": capability_class,
         "shape": shape,
-        "sources": list(packet.sources),
+        "sources": typed_sources(packet),
         "retrieved_at": packet.retrieved_at.isoformat(),
         "anchor_symbols": [s["symbol"] for s in subjects],
         "peers": peers,

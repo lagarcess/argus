@@ -329,6 +329,60 @@ def _pairs_from_lookup(content: str) -> list[ResearchNamePair]:
 _LINK_PATTERN = re.compile(r"\[([^\]]*)\]\((https?://[^)\s]+)\)")
 
 
+def strip_mechanism_narration(text: str) -> str:
+    """Drop any sentence that names a provider tool.
+
+    The Voice Boundary forbids raw internal names in assistant prose, and
+    spec section 2 forbids handing the user a capability list; an answer
+    explaining that "the requested finance_search tool was not available"
+    breaks both at once. Tool names come from the configurations themselves,
+    so a newly configured tool is covered without editing this function.
+    Whole sentences go, because a sentence about a mechanism has nothing
+    left to say once the mechanism is removed. Degradation is still told to
+    the reader, from the typed signal on the packet.
+    """
+    if not _PROVIDER_VOCABULARY.search(text):
+        return text
+    kept: list[str] = []
+    for block in text.split("\n"):
+        sentences = re.split(r"(?<=[.!?])\s+", block)
+        surviving = [
+            sentence
+            for sentence in sentences
+            if not _PROVIDER_VOCABULARY.search(sentence)
+        ]
+        if sentences and not surviving:
+            continue
+        kept.append(" ".join(surviving).strip())
+    return "\n".join(kept).strip()
+
+
+def _provider_vocabulary_pattern() -> re.Pattern[str]:
+    """Provider vocabulary, derived from the tools this rail declares.
+
+    The declared names are the seed; their families are the reach. The leak
+    that prompted this guard named ``finance_quotes`` and
+    ``finance_company_profile``, which are the same provider vocabulary as
+    the declared ``finance_search`` without being declared themselves.
+    Matching the family prefix covers those, and covers whatever the
+    provider names next, without a hand-maintained list. Snake_case
+    identifiers do not occur in ordinary finance prose, so the reach is
+    wide without being greedy.
+    """
+    from argus.domain.research.config import declared_tool_names
+
+    tools = sorted(declared_tool_names())
+    prefixes = sorted({tool.split("_", 1)[0] for tool in tools if "_" in tool})
+    alternatives = [re.escape(tool) for tool in tools]
+    alternatives += [rf"{re.escape(prefix)}_[a-z][a-z0-9_]*" for prefix in prefixes]
+    if not alternatives:
+        return re.compile(r"(?!x)x")
+    return re.compile(r"\b(?:" + "|".join(alternatives) + r")\b")
+
+
+_PROVIDER_VOCABULARY = _provider_vocabulary_pattern()
+
+
 def _sanitize_answer(text: str) -> str:
     """Presentation-only cleanup: provider-host links become plain text and
     typographic dashes normalize to house style (digit ranges keep a hyphen)."""
@@ -345,4 +399,4 @@ def _sanitize_answer(text: str) -> str:
     cleaned = re.sub(r"\|\s*[—–]\s*(?=\|)", "| - ", cleaned)
     cleaned = re.sub(r"(?<=\d)\s*[—–]\s*(?=\d)", "-", cleaned)
     cleaned = re.sub(r"\s*[—–]\s*", ", ", cleaned)
-    return cleaned.strip()
+    return strip_mechanism_narration(cleaned).strip()

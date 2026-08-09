@@ -2876,6 +2876,22 @@ Contract rules:
   in prose rather than presenting itself as the current state of the market.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
+- `sources` carries the same typed shape grounded discovery emits
+  (`{title, domain, url, source_date}`), and every rail shape renders through
+  that one panel. The model never authors a citation line: prompts forbid
+  source lines and links, and only URLs the packet returned can enter the
+  typed path. A grounded answer with no linkable sources says so, because
+  market data arrives as figures rather than articles.
+- Assistant prose never contains provider tool names. The guard derives from
+  the `tools` tuples in `research.config`, so a newly configured tool is
+  covered the day it is added, and it reaches the vocabulary families around
+  those names (`finance_quotes` as well as `finance_search`). Degradation is
+  told from the typed `degraded.code`, never from the model narrating which
+  mechanism failed.
+- A Try-next row never names a window longer than the coverage Argus resolved
+  for its assets. A full window says so, a shorter one names its real start
+  ("since March 2026"), and unknown coverage drops the window wording
+  entirely. The row's `send_text` carries the same window it displays.
 - `memory` is the typed producer seam for the personalization-memory
   program (spec section 11): research subjects, the comparison set when two
   or more subjects were compared, peer suggestions, and the open thread, in

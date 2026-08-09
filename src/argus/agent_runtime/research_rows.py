@@ -15,6 +15,8 @@ history".
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any, Callable, Iterable
 
 from loguru import logger
@@ -109,9 +111,86 @@ def _resolve_bounded(
         executor.shutdown(wait=False, cancel_futures=False)
 
 
-# The prebaked ask is a three-year buy and hold, so the row says so; a label
-# that hides the window behind "history" is vaguer than the thing it runs.
+# The prebaked ask is a three-year buy and hold when the assets have three
+# years to give. A row that names a window the asset cannot cover is a
+# promise the run must quietly break, so the window comes from the coverage
+# Argus resolves, never from the template alone.
 TEST_WINDOW_YEARS = 3
+_COVERAGE_PROBE_BUDGET_SECONDS = 2.0
+# A listing that starts within this margin of the window is a full window in
+# every sense a reader cares about; exchange calendars are not to the day.
+_COVERAGE_SLACK_DAYS = 21
+
+
+@dataclass(frozen=True)
+class RowWindow:
+    """What a row may honestly say about the period it will run."""
+
+    full_years: int | None
+    start: date | None
+
+    @property
+    def is_full(self) -> bool:
+        return self.full_years is not None
+
+
+def _earliest_available(symbol: str, asset_class: str) -> date | None:
+    """First date the provider actually has bars for, inside the window."""
+    from datetime import timedelta
+
+    from argus.domain.market_data.provider import fetch_price_series
+
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=365 * TEST_WINDOW_YEARS)
+    series = fetch_price_series(symbol, asset_class, start, end, "1d")
+    index = getattr(series, "index", None)
+    if index is None or len(index) == 0:
+        return None
+    return date.fromisoformat(str(index[0])[:10])
+
+
+def row_window(
+    assets: list[dict[str, str]],
+    *,
+    probe: Callable[[str, str], date | None] | None = None,
+) -> RowWindow:
+    """The window every asset in a row can actually cover.
+
+    The shortest history wins, because a versus row runs them together. When
+    coverage cannot be established inside the budget, the row says nothing
+    about a window rather than naming one that will be adjusted.
+    """
+    from datetime import timedelta
+
+    resolver = probe or _earliest_available
+    end = datetime.now(timezone.utc).date()
+    requested_start = end - timedelta(days=365 * TEST_WINDOW_YEARS)
+    latest_start: date | None = None
+    for asset in assets:
+        try:
+            executor = ThreadPoolExecutor(max_workers=1)
+            try:
+                earliest = executor.submit(
+                    resolver, asset["symbol"], asset.get("asset_class") or "equity"
+                ).result(timeout=_COVERAGE_PROBE_BUDGET_SECONDS)
+            finally:
+                executor.shutdown(wait=False, cancel_futures=False)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(
+                "Row coverage probe skipped",
+                symbol=asset.get("symbol"),
+                error=str(exc),
+            )
+            return RowWindow(full_years=None, start=None)
+        if earliest is None:
+            return RowWindow(full_years=None, start=None)
+        if latest_start is None or earliest > latest_start:
+            latest_start = earliest
+    if latest_start is None:
+        return RowWindow(full_years=None, start=None)
+    if (latest_start - requested_start).days <= _COVERAGE_SLACK_DAYS:
+        return RowWindow(full_years=TEST_WINDOW_YEARS, start=latest_start)
+    return RowWindow(full_years=None, start=latest_start)
 
 
 def _identity_parts(subjects: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -123,6 +202,7 @@ def research_next_experiment_rows(
     subjects: list[dict[str, str]],
     peers: list[dict[str, str]],
     language: str,
+    coverage_probe: Callable[[str, str], date | None] | None = None,
 ) -> dict[str, Any] | None:
     """Compose up to three prebaked runnable rows for a research answer."""
     spanish = language == "es-419"
@@ -134,40 +214,42 @@ def research_next_experiment_rows(
     if len(testable) >= 2:
         group = testable[: min(len(testable), 5)]
         symbols = ", ".join(s["symbol"] for s in group)
+        window = row_window(group, probe=coverage_probe)
         rows.append(
             _row(
                 kind="research_test_versus",
-                parts=_versus_parts(group[:1], group[1:], spanish),
-                send_text=_send_text(symbols, spanish),
+                parts=[
+                    *_versus_parts(group[:1], group[1:], spanish),
+                    *_window_parts(window, spanish),
+                ],
+                send_text=_send_text(symbols, spanish, window),
             )
         )
     else:
+        single_window = row_window([anchor], probe=coverage_probe)
         rows.append(
             _row(
                 kind="research_test_single",
                 parts=[
                     {"type": "text", "value": "Probar " if spanish else "Test "},
                     *_identity_parts([anchor]),
-                    {
-                        "type": "text",
-                        "value": (
-                            f" en los últimos {TEST_WINDOW_YEARS} años"
-                            if spanish
-                            else f" over the last {TEST_WINDOW_YEARS} years"
-                        ),
-                    },
+                    *_window_parts(single_window, spanish),
                 ],
-                send_text=_send_text(anchor["symbol"], spanish),
+                send_text=_send_text(anchor["symbol"], spanish, single_window),
             )
         )
         if peers:
             first_peers = peers[: min(len(peers), 4)]
             symbols = ", ".join([anchor["symbol"], *(p["symbol"] for p in first_peers)])
+            versus_window = row_window([anchor, *first_peers], probe=coverage_probe)
             rows.append(
                 _row(
                     kind="research_test_versus",
-                    parts=_versus_parts([anchor], first_peers, spanish),
-                    send_text=_send_text(symbols, spanish),
+                    parts=[
+                        *_versus_parts([anchor], first_peers, spanish),
+                        *_window_parts(versus_window, spanish),
+                    ],
+                    send_text=_send_text(symbols, spanish, versus_window),
                 )
             )
     return {
@@ -197,12 +279,73 @@ def _versus_parts(
     return parts
 
 
-def _send_text(symbols: str, spanish: bool) -> str:
-    # The sent text is a prompt the interpreter parses, not display copy: it
-    # keeps its spelled-out window while the visible label uses the numeral.
+_MONTHS_EN = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+_MONTHS_ES = (
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+)
+
+
+def _window_phrase(window: RowWindow, spanish: bool) -> str:
+    """What the row may say about its period, in the reader's language."""
+    if window.is_full:
+        return (
+            f" en los últimos {TEST_WINDOW_YEARS} años"
+            if spanish
+            else f" over the last {TEST_WINDOW_YEARS} years"
+        )
+    if window.start is not None:
+        if spanish:
+            return f" desde {_MONTHS_ES[window.start.month - 1]} de {window.start.year}"
+        return f" since {_MONTHS_EN[window.start.month - 1]} {window.start.year}"
+    # Coverage unknown: say nothing rather than name a window that moves.
+    return ""
+
+
+def _window_parts(window: RowWindow, spanish: bool) -> list[dict[str, str]]:
+    phrase = _window_phrase(window, spanish)
+    return [{"type": "text", "value": phrase}] if phrase else []
+
+
+def _send_text(symbols: str, spanish: bool, window: RowWindow) -> str:
+    # The sent text is a prompt the interpreter parses, not display copy, so
+    # it carries the same window the label promises: a row that says one
+    # period and runs another is the defect this replaced.
+    if window.is_full:
+        if spanish:
+            return f"Prueba comprar y mantener {symbols} durante los últimos tres años"
+        return f"Test buying and holding {symbols} over the last three years"
+    if window.start is not None:
+        start = window.start.isoformat()
+        if spanish:
+            return f"Prueba comprar y mantener {symbols} desde {start} hasta hoy"
+        return f"Test buying and holding {symbols} from {start} until today"
     if spanish:
-        return f"Prueba comprar y mantener {symbols} durante los últimos tres años"
-    return f"Test buying and holding {symbols} over the last three years"
+        return f"Prueba comprar y mantener {symbols} en su historial disponible"
+    return f"Test buying and holding {symbols} over its available history"
 
 
 def _row(*, kind: str, parts: list[dict[str, str]], send_text: str) -> dict[str, Any]:

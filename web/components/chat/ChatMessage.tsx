@@ -612,6 +612,41 @@ export default function ChatMessage({
             </div>
           )}
 
+          {/* One sources surface for every rail shape: the model never writes
+              a citation line, and this renders only what the backend sidecar
+              carried. */}
+          {!message.discovery && (message.researchSources?.length ?? 0) > 0 ? (
+            <div className="mt-2 flex w-full max-w-[min(100%,660px)]">
+              <button
+                type="button"
+                onClick={() => setShowSources(true)}
+                data-testid="research-sources-open"
+                className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
+              >
+                {t("chat.discovery_results.sources_panel_open", {
+                  count: message.researchSources?.length ?? 0,
+                  defaultValue: "{{count}} sources ›",
+                  defaultValue_one: "{{count}} source ›",
+                })}
+              </button>
+            </div>
+          ) : null}
+
+          {!message.discovery &&
+          showSources &&
+          (message.researchSources?.length ?? 0) > 0 ? (
+            <DiscoverySourcesPanel
+              onClose={() => {
+                setShowSources(false);
+                setAnchorSourceIndex(null);
+              }}
+              sidecar={{
+                sources: message.researchSources ?? [],
+                retrieved_at: "",
+              }}
+            />
+          ) : null}
+
           {message.discovery && showSources ? (
             <DiscoverySourcesPanel
               onClose={() => {

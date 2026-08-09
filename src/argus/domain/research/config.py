@@ -101,3 +101,15 @@ def capability_class_for_shape(
     if shape == "balanced":
         return "balanced_lookup"
     return "thorough_research"
+
+
+def declared_tool_names() -> frozenset[str]:
+    """Every provider tool this rail is configured to use.
+
+    Derived from the configurations themselves so a tool added there is
+    covered the day it is configured, rather than the day someone remembers
+    to extend a hand-written list.
+    """
+    return frozenset(
+        tool for spec in RESEARCH_CONFIG_SPECS.values() for tool in spec.tools
+    )

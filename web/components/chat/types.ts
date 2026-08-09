@@ -293,6 +293,8 @@ export type Message = {
   assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;
+  /** Typed sources from a research turn; the one surface every shape uses. */
+  researchSources?: DiscoverySource[] | null;
   /** Backend post-turn saved-decision recalls; rendered as context only. */
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-owned structured context for a retest receipt turn. */

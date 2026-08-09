@@ -117,3 +117,21 @@ export function discoveryCandidateMention(
     insert_text: symbol,
   };
 }
+
+/**
+ * Sources from a research turn, in the one typed shape the sources panel
+ * renders. Every rail shape reaches this surface: the model never authors a
+ * citation line, and nothing renders that the backend sidecar did not carry.
+ */
+export function researchSourcesFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): DiscoverySource[] {
+  const raw = metadata?.research;
+  if (!raw || typeof raw !== "object") return [];
+  const record = raw as Record<string, unknown>;
+  if (!Array.isArray(record.sources)) return [];
+  return record.sources
+    .map(sourceOrNull)
+    .filter((source): source is DiscoverySource => source !== null)
+    .slice(0, MAX_SOURCES);
+}
