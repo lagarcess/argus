@@ -2101,6 +2101,10 @@ components:
           - type: string
             maxLength: 64
           - type: 'null'
+        message_range:
+          anyOf:
+          - $ref: '#/components/schemas/ChatMentionTextRange'
+          - type: 'null'
         support_status:
           type: string
           enum:
@@ -2114,6 +2118,16 @@ components:
       - type
       - label
       - insert_text
+    ChatMentionTextRange:
+      properties:
+        start:
+          type: integer
+        end:
+          type: integer
+      type: object
+      required:
+      - start
+      - end
     ChatStreamRequest:
       properties:
         conversation_id:
