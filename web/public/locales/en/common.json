@@ -1432,6 +1432,45 @@
       "note": "They left a note",
       "chart": "How the test money moved"
     },
+    "plan": {
+      "heading": "What ran",
+      "buy_and_hold": "Bought once, at the start, and held the whole way.",
+      "dca": "Bought {{cadence}}, whatever the price was that day.",
+      "buy_the_dip": "Bought after each sharp drop, then sold about a week later.",
+      "indicator": "Bought when {{indicator}} fell to {{entry}}, sold when it climbed back to {{exit}}.",
+      "crossover": "Bought when the {{fast_period}} day {{fast_indicator}} crossed above the {{slow_period}} day {{slow_indicator}}.",
+      "crossover_exit_mirrored": "Sold when it crossed back below.",
+      "crossover_exit_own": "Sold when the {{fast_period}} day {{fast_indicator}} crossed below the {{slow_period}} day {{slow_indicator}}.",
+      "macd": "Bought and sold on MACD crossovers, {{fast_period}} against {{slow_period}} with a {{signal_period}} signal.",
+      "unnamed": "Ran as {{label}}."
+    },
+    "cadence_values": {
+      "daily": "every day",
+      "weekly": "every week",
+      "biweekly": "every two weeks",
+      "monthly": "every month",
+      "quarterly": "every quarter"
+    },
+    "metric_labels": {
+      "total_return_pct": "Total return",
+      "total_return": "Total return",
+      "benchmark_return_pct": "Benchmark",
+      "max_drawdown_pct": "Worst dip",
+      "max_drawdown": "Worst dip",
+      "win_rate_pct": "Win rate"
+    },
+    "hero": {
+      "ahead": "{{value}} ahead of {{symbol}}",
+      "behind": "{{value}} behind {{symbol}}",
+      "vs": "{{symbol}} did {{value}}",
+      "window": "{{range}}",
+      "drawdown": "Worst dip along the way: {{value}}"
+    },
+    "fine_print": {
+      "heading": "The fine print",
+      "settings": "Exact settings",
+      "assumed": "What Argus assumed"
+    },
     "fields": {
       "asset": "What",
       "asset_class": "Kind",

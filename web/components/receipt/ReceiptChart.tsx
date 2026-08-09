@@ -56,7 +56,7 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
     if (!container || visual.series.length < 2) return;
     const chart = createChart(container, {
       autoSize: true,
-      height: 180,
+      height: 220,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: isDark ? "rgba(255,255,255,0.42)" : "rgba(0,0,0,0.45)",
@@ -64,17 +64,19 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
       },
       grid: {
         vertLines: { color: "transparent" },
-        horzLines: {
-          color: isDark ? "rgba(255,255,255,0.055)" : "rgba(0,0,0,0.06)",
-        },
+        horzLines: { color: "transparent" },
       },
+      // No price axis and no time axis. The axis showed raw portfolio floats
+      // ("10800.00") against tick labels that read "2 5 8", which told a reader
+      // nothing the return figure above has not already told them. The window's
+      // endpoints are rendered under the chart as dates instead.
       rightPriceScale: {
+        visible: false,
         borderVisible: false,
-        // Generous top margin so the highest price label is not clipped by the
-        // chart's own top edge at phone height.
-        scaleMargins: { top: 0.22, bottom: 0.16 },
+        scaleMargins: { top: 0.12, bottom: 0.06 },
       },
-      timeScale: { borderVisible: false, secondsVisible: false },
+      leftPriceScale: { visible: false },
+      timeScale: { visible: false, borderVisible: false, secondsVisible: false },
       handleScroll: false,
       handleScale: false,
       crosshair: { horzLine: { visible: false }, vertLine: { visible: false } },
@@ -85,9 +87,9 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
       lineWidth: 2,
       topLineColor: POSITIVE_LINE,
       bottomLineColor: NEGATIVE_LINE,
-      topFillColor1: "rgba(91, 168, 151, 0.16)",
+      topFillColor1: "rgba(91, 168, 151, 0.28)",
       topFillColor2: "rgba(91, 168, 151, 0.00)",
-      bottomFillColor1: "rgba(198, 115, 120, 0.14)",
+      bottomFillColor1: "rgba(198, 115, 120, 0.24)",
       bottomFillColor2: "rgba(198, 115, 120, 0.00)",
       priceLineVisible: false,
       lastValueVisible: false,
@@ -98,9 +100,20 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
         value: point.value,
       })),
     );
-    chart.timeScale().fitContent();
-    return () => chart.remove();
+    // autoSize means the container can still be zero-width on this tick, and
+    // fitContent against a zero width leaves the series bunched into a corner.
+    // Fit once the browser has laid the container out, and again whenever it
+    // changes size.
+    const fit = () => chart.timeScale().fitContent();
+    const frame = requestAnimationFrame(fit);
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      chart.remove();
+    };
   }, [visual, isDark]);
 
-  return <div ref={containerRef} className="h-[180px] w-full" />;
+  return <div ref={containerRef} className="h-[220px] w-full" />;
 }

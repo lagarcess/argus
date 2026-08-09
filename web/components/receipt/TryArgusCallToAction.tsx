@@ -24,17 +24,17 @@ export default function TryArgusCallToAction({
   action,
 }: TryArgusCallToActionProps) {
   return (
-    <section className="rounded-2xl border border-black/[0.08] bg-black/[0.02] px-4 py-5 dark:border-white/[0.10] dark:bg-white/[0.03]">
-      <h2 className="font-display text-[16px] font-semibold text-black dark:text-white">
+    <section className="mt-12">
+      <h2 className="font-display text-[24px] font-medium leading-tight tracking-[-0.4px] text-white">
         {headline}
       </h2>
-      <p className="mt-1.5 text-[13.5px] leading-relaxed text-black/55 dark:text-white/55">
+      <p className="mt-2 max-w-[46ch] text-[14px] leading-relaxed text-white/55">
         {detail}
       </p>
       <Link
         href="/"
         onClick={() => reportReceiptFunnelStage("try_argus")}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#191c1f] px-5 text-[14px] font-medium text-white transition-colors hover:bg-black dark:bg-white dark:text-[#191c1f] dark:hover:bg-white/90"
+        className="font-display mt-5 inline-flex min-h-[52px] w-full items-center justify-center rounded-full bg-white px-8 text-[16px] font-medium text-[#191c1f] transition-colors hover:bg-white/90 sm:w-auto"
       >
         {action}
       </Link>

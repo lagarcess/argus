@@ -4,6 +4,10 @@ Captured at lane head with `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED=true` and
 `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED=true` against a local memory-mode
 backend with no provider keys. Phone width first, both languages.
 
+Captured against a **production build**, not the dev server, so no dev-only chrome
+appears in the frames. The earlier set was taken in dev and carried the Next
+dev-tools indicator over the chart; that badge was never part of the page.
+
 Enabling sharing is a separate founder decision. Both flags default to false and
 these captures exist only to show what the surface does once it is turned on.
 
@@ -122,3 +126,38 @@ looking at the file. Two capture attempts in this lane produced plausible-lookin
 images that were wrong, one from intercepting a request that a server-rendered page
 never makes and one from pointing the web server at the wrong API variable, so the
 text is the check and the image is the illustration.
+
+## The redesign
+
+The first version of this page rendered its own internal codename. It was a narrow
+column of eleven point uppercase labels over stacked values, five identically
+bordered cards deep, with a footer line reading "Saved on ...". It read as an
+itemised bill, and it matched none of the house display language in
+`.agent/designs/argus/DESIGN.md`: no Space Grotesk at display scale, no negative
+tracking, no pill action, and the number that mattered set at the same 17px as the
+asset class.
+
+What changed, and why:
+
+- **One hero.** The idea, then the return at display scale, then the one comparison
+  the page exists to make, stated as a verdict ("9.3 pts ahead of SPY") instead of
+  two numbers a reader has to subtract.
+- **The strategy is a sentence.** Twelve label and value pairs for a crossover was
+  a correct description nobody reads. The same frozen facts now compose one or two
+  sentences at view time, in the viewer's language, and every fact still appears in
+  the fine print. Nothing was dropped and the payload did not change.
+- **The chart is the evidence, so it gets the width.** Its axis showed raw
+  portfolio floats against tick labels reading "2 5 8"; both are gone, and the
+  window's endpoints are rendered as dates underneath.
+- **The not-advice framing stays above the fold** and more prominent than in the
+  app, as a typographic band rather than a warning box that arrived before the
+  reader knew what they were looking at.
+- **The fine print is complete and secondary**, which is where the design system
+  puts assumptions.
+- **One look, not two.** The page no longer follows the viewer's theme, because a
+  shared artifact and the card that advertises it have to be the same object.
+- **Metric labels render in the viewer's language** for the keys Argus owns, so a
+  Spanish page no longer reads "Max drawdown" in the middle of its own numbers.
+
+Every frame in this directory was verified by reading its rendered text first;
+`rendered-text.json` holds that text for all twelve pages.

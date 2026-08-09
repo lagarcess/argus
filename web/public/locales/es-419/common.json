@@ -1432,6 +1432,45 @@
       "note": "Dejaron una nota",
       "chart": "Cómo se movió el dinero de prueba"
     },
+    "plan": {
+      "heading": "Qué se ejecutó",
+      "buy_and_hold": "Compró una vez, al principio, y mantuvo hasta el final.",
+      "dca": "Compró {{cadence}}, sin importar el precio de ese día.",
+      "buy_the_dip": "Compró después de cada caída fuerte y vendió una semana más tarde.",
+      "indicator": "Compró cuando {{indicator}} bajó a {{entry}} y vendió cuando volvió a {{exit}}.",
+      "crossover": "Compró cuando el {{fast_indicator}} de {{fast_period}} días cruzó por encima del {{slow_indicator}} de {{slow_period}} días.",
+      "crossover_exit_mirrored": "Vendió cuando volvió a cruzar por debajo.",
+      "crossover_exit_own": "Vendió cuando el {{fast_indicator}} de {{fast_period}} días cruzó por debajo del {{slow_indicator}} de {{slow_period}} días.",
+      "macd": "Compró y vendió con cruces de MACD, {{fast_period}} contra {{slow_period}} y señal de {{signal_period}}.",
+      "unnamed": "Se ejecutó como {{label}}."
+    },
+    "cadence_values": {
+      "daily": "cada día",
+      "weekly": "cada semana",
+      "biweekly": "cada dos semanas",
+      "monthly": "cada mes",
+      "quarterly": "cada trimestre"
+    },
+    "metric_labels": {
+      "total_return_pct": "Retorno total",
+      "total_return": "Retorno total",
+      "benchmark_return_pct": "Referencia",
+      "max_drawdown_pct": "Peor caída",
+      "max_drawdown": "Peor caída",
+      "win_rate_pct": "Aciertos"
+    },
+    "hero": {
+      "ahead": "{{value}} por encima de {{symbol}}",
+      "behind": "{{value}} por debajo de {{symbol}}",
+      "vs": "{{symbol}} hizo {{value}}",
+      "window": "{{range}}",
+      "drawdown": "Peor caída en el camino: {{value}}"
+    },
+    "fine_print": {
+      "heading": "La letra chica",
+      "settings": "Ajustes exactos",
+      "assumed": "Qué supuso Argus"
+    },
     "fields": {
       "asset": "Qué",
       "asset_class": "Tipo",

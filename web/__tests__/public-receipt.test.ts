@@ -15,6 +15,7 @@ import {
   receiptCopy,
   receiptLanguageFromAcceptLanguage,
 } from "../lib/receipt-copy";
+import { benchmarkVerdict, receiptPlan } from "../lib/receipt-plan";
 import enCommon from "../public/locales/en/common.json";
 import esCommon from "../public/locales/es-419/common.json";
 
@@ -414,9 +415,14 @@ describe("viewer language", () => {
 });
 
 describe("the strategy a receipt shows", () => {
-  test("renders the parameters that defined the run, not only its category", () => {
+  test("every frozen fact still reaches the page, in the fine print", () => {
+    // The facts moved out of the headline and into the fine print; none of them
+    // was dropped. The plan is composed from the payload, and the fine print maps
+    // over the whole set rather than a chosen subset.
+    const plan = source(join(WEB_ROOT, "lib/receipt-plan.ts"));
+    expect(plan).toContain("payload.strategy_facts");
     const body = source(RECEIPT_BODY);
-    expect(body).toContain("payload.strategy_facts");
+    expect(body).toContain("plan.settings.map");
     expect(body).toContain("copy.strategy_facts[fact.key]");
   });
 
@@ -477,12 +483,134 @@ describe("the public route escapes the client i18n gate", () => {
 });
 
 describe("when the label and the frozen strategy name disagree", () => {
-  test("the page shows the name derived from the executed rule", () => {
+  test("the description is composed from the executed facts, not the label", () => {
     // The two are frozen from different records: the label from the result card,
-    // the name from the run's own config. Hiding the name whenever any label
-    // exists would let a stale label speak for a run it does not describe.
-    const body = source(RECEIPT_BODY);
-    expect(body).toContain("namesTheSameStrategy");
-    expect(body).not.toContain("!payload.strategy_label");
+    // the name from the run's own config. The page no longer renders the label as
+    // the description of what ran at all, so a stale label cannot speak for a run
+    // it does not describe. It survives only as the fallback for a shape with no
+    // sentence of its own.
+    const plan = source(join(WEB_ROOT, "lib/receipt-plan.ts"));
+    const labelUses = plan.match(/payload\.strategy_label/g) ?? [];
+    expect(labelUses).toHaveLength(1);
+    expect(plan).toContain("plan.unnamed");
+  });
+});
+
+describe("the plan sentence", () => {
+  const copy = receiptCopy("en");
+  const spanish = receiptCopy("es-419");
+
+  function withFacts(
+    facts: PublicReceiptPayload["strategy_facts"],
+  ): PublicReceiptPayload {
+    return { ...PAYLOAD, strategy_facts: facts };
+  }
+
+  test("states a crossover's entry and its mirrored exit in words", () => {
+    const { sentences, settings } = receiptPlan(
+      withFacts([
+        { key: "strategy_type", value: "moving average crossover" },
+        { key: "fast_indicator", value: "sma" },
+        { key: "fast_period", value: "20" },
+        { key: "slow_indicator", value: "sma" },
+        { key: "slow_period", value: "50" },
+      ]),
+      copy,
+    );
+    expect(sentences[0]).toBe(
+      "Bought when the 20 day SMA crossed above the 50 day SMA.",
+    );
+    expect(sentences[1]).toBe("Sold when it crossed back below.");
+    // Acronyms read as acronyms, and nothing frozen was lost on the way.
+    expect(settings).toHaveLength(4);
+  });
+
+  test("states a differing exit as its own sentence", () => {
+    const { sentences } = receiptPlan(
+      withFacts([
+        { key: "strategy_type", value: "moving average crossover" },
+        { key: "fast_indicator", value: "sma" },
+        { key: "fast_period", value: "20" },
+        { key: "slow_indicator", value: "sma" },
+        { key: "slow_period", value: "50" },
+        { key: "exit_fast_indicator", value: "ema" },
+        { key: "exit_fast_period", value: "9" },
+        { key: "exit_slow_indicator", value: "ema" },
+        { key: "exit_slow_period", value: "21" },
+      ]),
+      copy,
+    );
+    expect(sentences[1]).toBe(
+      "Sold when the 9 day EMA crossed below the 21 day EMA.",
+    );
+  });
+
+  test("states an indicator threshold and a cadence in words", () => {
+    expect(
+      receiptPlan(
+        withFacts([
+          { key: "strategy_type", value: "rsi threshold" },
+          { key: "indicator", value: "RSI" },
+          { key: "indicator_period", value: "14" },
+          { key: "entry_threshold", value: "30" },
+          { key: "exit_threshold", value: "70" },
+        ]),
+        copy,
+      ).sentences[0],
+    ).toBe("Bought when RSI fell to 30, sold when it climbed back to 70.");
+
+    expect(
+      receiptPlan(
+        withFacts([
+          { key: "strategy_type", value: "dca accumulation" },
+          { key: "cadence", value: "monthly" },
+        ]),
+        copy,
+      ).sentences[0],
+    ).toBe("Bought every month, whatever the price was that day.");
+  });
+
+  test("reads in the viewer's language while the values stay frozen", () => {
+    const { sentences } = receiptPlan(
+      withFacts([
+        { key: "strategy_type", value: "dca accumulation" },
+        { key: "cadence", value: "monthly" },
+      ]),
+      spanish,
+    );
+    expect(sentences[0]).toBe("Compró cada mes, sin importar el precio de ese día.");
+  });
+
+  test("the comparison is stated as a verdict, not left as two numbers", () => {
+    const ahead = {
+      ...PAYLOAD,
+      metrics: [
+        { key: "total_return_pct", label: "Total return", value: "+18.4%" },
+        { key: "benchmark_return_pct", label: "SPY", value: "+9.1%" },
+      ],
+    };
+    expect(benchmarkVerdict(ahead, copy)).toBe("9.3 pts ahead of SPY");
+    const behind = {
+      ...PAYLOAD,
+      metrics: [
+        { key: "total_return_pct", label: "Total return", value: "+2.0%" },
+        { key: "benchmark_return_pct", label: "SPY", value: "+9.1%" },
+      ],
+    };
+    expect(benchmarkVerdict(behind, copy)).toBe("7.1 pts behind SPY");
+  });
+
+  test("says nothing when the payload carries no benchmark to compare against", () => {
+    // PAYLOAD has a return and no benchmark row, which is a real shape.
+    expect(benchmarkVerdict(PAYLOAD, copy)).toBeNull();
+  });
+
+  test("says nothing rather than guessing when a figure will not parse", () => {
+    const unparseable = {
+      ...PAYLOAD,
+      benchmark_symbol: null,
+      metrics: [{ key: "total_return_pct", label: "Total return", value: "n/a" }],
+    };
+    expect(benchmarkVerdict(unparseable, copy)).toBeNull();
   });
 });

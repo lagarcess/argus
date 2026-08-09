@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import { receiptCopy } from "@/lib/receipt-copy";
+import { benchmarkVerdict } from "@/lib/receipt-plan";
 import {
   readPublicReceipt,
   headlineReceiptMetric,
@@ -36,6 +37,10 @@ export const PREVIEW_FIELDS = [
   "date_range.display",
   "headline_metric.label",
   "headline_metric.value",
+  // The comparison is the point of the card. It is composed at render time from
+  // metrics already on this list plus the frozen benchmark symbol, so it discloses
+  // no field the page does not already show.
+  "benchmark_verdict",
 ] as const;
 
 // The card is a public artifact too: never indexed, and never cached by Argus so
@@ -50,6 +55,7 @@ const BACKGROUND = "#191c1f";
 const FOREGROUND = "#ffffff";
 const MUTED = "rgba(255,255,255,0.52)";
 const ACCENT = "#5ba897";
+const NEGATIVE = "#d66d75";
 
 // The card follows the receipt's own language, not a viewer's. There is no viewer
 // when a crawler fetches it, and the frozen facts on the card are in that language
@@ -63,7 +69,7 @@ function cardCopy(language: "en" | "es-419") {
   };
 }
 
-function previewFacts(payload: PublicReceiptPayload) {
+function previewFacts(payload: PublicReceiptPayload, language: "en" | "es-419") {
   const headline = headlineReceiptMetric(payload);
   return {
     title: payload.idea_title,
@@ -71,6 +77,7 @@ function previewFacts(payload: PublicReceiptPayload) {
     dates: payload.date_range.display,
     metricLabel: headline?.label ?? "",
     metricValue: headline?.value ?? "",
+    verdict: benchmarkVerdict(payload, receiptCopy(language)) ?? "",
   };
 }
 
@@ -162,42 +169,45 @@ export default async function Image({
   }
 
   const copy = cardCopy(result.payload.content_language);
-  const facts = previewFacts(result.payload);
+  const facts = previewFacts(result.payload, result.payload.content_language);
   return new ImageResponse(
     (
       <Frame>
         <ProvenanceRow label={copy.provenance} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div
             style={{
               display: "flex",
-              fontSize: 60,
-              lineHeight: 1.1,
-              fontWeight: 600,
-              color: FOREGROUND,
+              fontSize: 40,
+              lineHeight: 1.15,
+              fontWeight: 500,
+              letterSpacing: -0.8,
+              color: "rgba(255,255,255,0.88)",
             }}
           >
             {facts.title}
           </div>
-          <div style={{ display: "flex", gap: 28, alignItems: "flex-end" }}>
-            {facts.metricValue ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", fontSize: 24, color: MUTED }}>
-                  {facts.metricLabel}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: 68,
-                    fontWeight: 600,
-                    color: ACCENT,
-                  }}
-                >
-                  {facts.metricValue}
-                </div>
-              </div>
-            ) : null}
-          </div>
+          {facts.metricValue ? (
+            <div
+              style={{
+                display: "flex",
+                fontSize: 150,
+                lineHeight: 1.02,
+                fontWeight: 500,
+                letterSpacing: -6,
+                color: facts.metricValue.trim().startsWith("-")
+                  ? NEGATIVE
+                  : ACCENT,
+              }}
+            >
+              {facts.metricValue}
+            </div>
+          ) : null}
+          {facts.verdict ? (
+            <div style={{ display: "flex", fontSize: 34, color: FOREGROUND }}>
+              {facts.verdict}
+            </div>
+          ) : null}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", fontSize: 28, color: FOREGROUND }}>
