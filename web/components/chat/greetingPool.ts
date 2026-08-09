@@ -14,6 +14,20 @@
  * Eastern time: 5am local overlaps US pre-market only for an Eastern user. So an
  * active session widens the current slot's pool and the same day-stable seed
  * picks from the wider set, with the generic lines still in play.
+ *
+ * The seam for a greeting that knows what you were looking at last week is
+ * `pickGreetingKey`: a caller with something to say would choose its own line
+ * and fall back here, the same rule the chips follow.
+ *
+ * Nothing plugs into it yet, and not for want of wiring. The candidate corpus
+ * does not exist. `research_memory_block()` in
+ * `src/argus/agent_runtime/research_grounded.py` writes a field named "memory"
+ * into the research sidecar, but that is a sidecar field, not a memory record:
+ * the memory system's four categories live in `src/argus/memory/contracts.py`
+ * and none of them is a research subject, an open thread, or a comparison set.
+ * That block is only emitted on a research turn, research is gated by
+ * `research_rail_enabled()`, and `ARGUS_RESEARCH_RAIL_ENABLED` is false in
+ * `render.yaml`, so zero open threads exist and none will until the flag flips.
  */
 
 export type GreetingSlot = "early" | "day" | "evening" | "night";
