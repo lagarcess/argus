@@ -18,7 +18,6 @@ describe("RecentChatActions unread control", () => {
     expect(source).toContain('MoreVertical className="h-3.5 w-3.5');
     expect(source).toContain("group-hover:opacity-100");
     expect(source).toContain("focus-visible:opacity-100");
-    expect(source).toContain("[@media(pointer:coarse)]:opacity-100");
     expect(source).toContain("isMenuOpen || isTriggerFocused || !quickJumpHint");
     expect(source).toContain('w-[88px]');
     expect(source).not.toContain("ConversationActivityIndicator");

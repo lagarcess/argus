@@ -230,7 +230,7 @@ describe("Spanish UI Smoke Harness", () => {
       "utf-8",
     );
 
-    expect(sidebarPreferenceSource).toContain('aria-label={t("settings.sidebar.close")}');
+    expect(sidebarPreferenceSource).toContain('closeLabel={t("settings.sidebar.close")}');
     for (const key of [
       "settings.sidebar.title",
       "settings.sidebar.description",

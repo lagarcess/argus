@@ -1091,3 +1091,60 @@ def test_service_cleanup_reservation_prevents_deleting_reassigned_live_ref(
     assert provider.delete_calls == [(database["owner"], "provider-service-reserved")]
     assert provider.deleted_live_projection is False
     assert result.provider_status is ProviderReconciliationStatus.SYNCHRONIZED
+
+
+def test_settled_projection_ids_track_the_current_generation(
+    database: dict[str, Any],
+) -> None:
+    """Catches the bulk projection read drifting from per-record truth."""
+    store = PostgresCanonicalMemoryStore(database["pool"])
+    owner = database["owner"]
+    record_id = database["record_id"]
+
+    assert store.settled_projection_record_ids(owner) == frozenset()
+
+    record = store.get_record(owner, record_id)
+    assert record is not None
+    claim = store.claim_reconciliation_turn(owner, record_id, 1)
+    assert claim is not None
+    assert store.compare_and_set_provider_ref(
+        owner,
+        record_id,
+        expected_record=record,
+        expected_provider_ref=None,
+        reconciliation_claim=claim,
+        provider_ref="projected-bulk-read",
+    )
+
+    projected = store.settled_projection_record_ids(owner)
+
+    assert projected == frozenset({record_id})
+    # Agrees with the per-record read it replaces in bulk.
+    assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
+
+    # An obsolete ref queued for deletion does not make a projection stale.
+    assert store.track_provider_cleanup_target(
+        owner,
+        record_id,
+        "projected-bulk-read",
+    )
+    assert store.settled_projection_record_ids(owner) == frozenset({record_id})
+
+    # A newer generation does, and before any provider call.
+    mutation = store.edit_record(
+        owner,
+        record_id,
+        value="Superseding text the index has never seen.",
+        label=None,
+    )
+    assert mutation is not None
+
+    assert store.settled_projection_record_ids(owner) == frozenset()
+    # Still projected, just no longer describing current content.
+    assert store.get_provider_ref(owner, record_id) == "projected-bulk-read"
+
+    # Declines here because the cleanup target reserved the ref; either way
+    # the record stays uncovered.
+    assert store.set_provider_ref(owner, record_id, "projected-bulk-read") is False
+
+    assert store.settled_projection_record_ids(owner) == frozenset()

@@ -26,6 +26,9 @@ export type NextExperimentRow = {
   kind: string;
   label: string;
   labelKey: string;
+  /** Backend-composed short form for narrow screens; the client never clips. */
+  labelShort: string | null;
+  labelShortKey: string | null;
   detail: string | null;
   sendText: string | null;
   why: NextExperimentReason | null;
@@ -48,10 +51,16 @@ function rowOrNull(value: unknown): NextExperimentRow | null {
   const whyCode = why && typeof why.code === "string" ? why.code : "";
   const detail = typeof raw.detail === "string" ? raw.detail.trim() : "";
   const sendText = typeof raw.send_text === "string" ? raw.send_text.trim() : "";
+  const labelShort =
+    typeof raw.label_short === "string" ? raw.label_short.trim() : "";
+  const labelShortKey =
+    typeof raw.label_short_key === "string" ? raw.label_short_key.trim() : "";
   return {
     kind,
     label,
     labelKey,
+    labelShort: labelShort || null,
+    labelShortKey: labelShortKey || null,
     detail: detail || null,
     sendText: sendText || null,
     why: whyCode

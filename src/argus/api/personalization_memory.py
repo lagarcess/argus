@@ -10,6 +10,7 @@ invisible to ordinary registered accounts even in a flag-on environment.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 from fastapi import Depends, Request
@@ -20,6 +21,7 @@ from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
 from argus.api.schemas import User
+from argus.memory.provider import MemoryRetrievalProvider
 from argus.memory.service import MemoryService, MemoryServiceConfig
 from argus.memory.subject import (
     MemoryAccountKind,
@@ -29,6 +31,7 @@ from argus.memory.subject import (
 )
 
 MEMORY_EXPOSURE_ROLES = frozenset({"admin", "developer"})
+TRUE_VALUES = frozenset(("1", "true", "yes", "on"))
 
 _memory_service: MemoryService | None = None
 
@@ -47,6 +50,54 @@ def memory_service() -> MemoryService | None:
 def personalization_memory_enabled() -> bool:
     # Single flag truth: the service config's default-off env switch.
     return MemoryServiceConfig().available
+
+
+def semantic_recall_enabled() -> bool:
+    """Second default-off switch; off means canonical token-match recall."""
+
+    raw = os.getenv("ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL", "")
+    return raw.strip().lower() in TRUE_VALUES
+
+
+def build_semantic_recall_provider(pool) -> MemoryRetrievalProvider | None:  # noqa: ANN001
+    """Build the Mem0 index provider, or None to keep token-match recall.
+
+    Every missing precondition returns None rather than raising: semantic
+    recall is an optional quality upgrade, and its absence must never keep the
+    memory surface itself from starting.
+    """
+
+    if not semantic_recall_enabled():
+        return None
+    if pool is None:
+        logger.warning("Semantic memory recall needs a database pool; staying off")
+        return None
+    try:
+        from argus.api.personalization_memory_index import (
+            DEFAULT_COLLECTION_NAME,
+            Mem0MemoryProvider,
+        )
+        from argus.llm.memory_embedding import perplexity_embedder_from_env
+
+        embedder = perplexity_embedder_from_env()
+        if embedder is None:
+            logger.warning("Semantic memory recall needs PERPLEXITY_API_KEY; staying off")
+            return None
+        collection = (
+            os.getenv("ARGUS_MEMORY_VECTOR_COLLECTION", "").strip()
+            or DEFAULT_COLLECTION_NAME
+        )
+        return Mem0MemoryProvider(
+            embedder=embedder,
+            connection_pool=pool,
+            collection_name=collection,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Semantic memory recall construction failed; token-match recall stays",
+            failure_mode=type(exc).__name__,
+        )
+        return None
 
 
 def memory_exposure_role_allowed(user: User) -> bool:
@@ -128,7 +179,10 @@ def start_personalization_memory(app) -> None:  # noqa: ANN001
             )
             app.state.personalization_memory_pool = pool
             configure_memory_service(
-                MemoryService(store=PostgresCanonicalMemoryStore(pool))
+                MemoryService(
+                    store=PostgresCanonicalMemoryStore(pool),
+                    provider=build_semantic_recall_provider(pool),
+                )
             )
             return
         from argus.memory.store import InMemoryCanonicalMemoryStore

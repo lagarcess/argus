@@ -1,53 +1,55 @@
 {
   "common": {
-    "backtest": "Simulación",
-    "strategy": "Estrategia",
-    "collection": "Colección",
-    "chat": "Chat",
-    "history": "Historial",
-    "settings": "Ajustes",
-    "conversation": "Conversación",
-    "recents": "Recientes",
-    "run_simulation": "Ejecutar simulación",
-    "rename": "Renombrar",
-    "delete": "Eliminar",
-    "pin": "Anclar",
-    "unpin": "Desanclar",
-    "loading": "Cargando...",
-    "retry": "Reintentar",
-    "try_again": "Intentar de nuevo",
-    "back": "Volver",
-    "error_occurred": "Ha ocurrido un error",
-    "save": "Guardar",
-    "confirm": "Confirmar",
-    "cancel": "Cancelar",
-    "done": "Listo",
-    "search": "Buscar",
+    "and": "y",
     "archive": "Archivar",
     "archived": "Archivado",
-    "today": "hoy",
-    "yesterday": "ayer",
-    "no_items": "No se encontraron elementos",
-    "restore": "Restaurar",
-    "permanently_delete": "Eliminar permanentemente",
-    "submit": "Enviar",
-    "more": "Más",
-    "current": "Actual",
+    "back": "Volver",
+    "backtest": "Simulación",
+    "cancel": "Cancelar",
+    "chat": "Chat",
+    "close": "Cerrar",
     "collapse": "Contraer",
+    "collection": "Colección",
+    "confirm": "Confirmar",
+    "conversation": "Conversación",
+    "current": "Actual",
+    "delete": "Eliminar",
+    "done": "Listo",
+    "error_occurred": "Ha ocurrido un error",
     "expand": "Expandir",
+    "history": "Historial",
     "learn_more": "Más información",
-    "and": "y",
+    "loading": "Cargando...",
+    "more": "Más",
+    "navigation": "Navegación",
+    "no_items": "No se encontraron elementos",
     "or": "o",
-    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
+    "permanently_delete": "Eliminar permanentemente",
+    "pin": "Anclar",
+    "recents": "Recientes",
+    "rename": "Renombrar",
+    "restore": "Restaurar",
+    "retry": "Reintentar",
+    "run_simulation": "Ejecutar simulación",
+    "save": "Guardar",
+    "search": "Buscar",
+    "settings": "Ajustes",
+    "strategy": "Estrategia",
+    "submit": "Enviar",
+    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar",
+    "today": "hoy",
+    "try_again": "Intentar de nuevo",
+    "unpin": "Desanclar",
+    "yesterday": "ayer"
   },
   "legal": {
-    "eyebrow": "Legal de alfa privada",
-    "effective_date": "Fecha de entrada en vigor: 30 de junio de 2026",
-    "footer_label": "Alfa privada de Argus",
+    "eyebrow": "Legal de acceso anticipado",
+    "effective_date": "Fecha de entrada en vigor: 7 de agosto de 2026",
+    "footer_label": "Acceso anticipado de Argus",
     "back_to_argus": "Volver a Argus",
     "terms": {
       "title": "Términos de uso",
-      "intro": "Argus es un producto en alfa privada para investigación educativa de inversión. Estos términos describen la experiencia actual de testers y no reemplazan una revisión legal final.",
+      "intro": "Argus es un producto en acceso anticipado para investigación educativa de inversión. Estos términos describen cómo funciona Argus hoy. Argus sigue en construcción, así que estos términos van a cambiar conforme cambie el producto.",
       "sections": {
         "no_investment_advice": {
           "title": "No es asesoría de inversión",
@@ -61,9 +63,9 @@
           "title": "Las simulaciones históricas son hipotéticas",
           "body": "Las simulaciones históricas son hipotéticas y dependen de los supuestos, la disponibilidad de datos, los activos compatibles, las referencias predeterminadas y los periodos que se muestran en el producto. Los rendimientos simulados no garantizan resultados futuros."
         },
-        "alpha_changes": {
-          "title": "Disponibilidad y cambios de la alfa",
-          "body": "Argus está en alfa privada. Las funciones pueden cambiar, fallar, reiniciarse o eliminarse sin aviso. Podemos limitar el acceso, suspender cuentas o retirar contenido que genere riesgos de seguridad, abuso, cumplimiento u operación."
+        "early_access_changes": {
+          "title": "Disponibilidad y cambios del acceso anticipado",
+          "body": "Argus está en acceso anticipado y se ofrece tal cual, sin garantías. Las funciones pueden cambiar, fallar, reiniciarse o eliminarse sin aviso, y algunas podrían no llegar nunca a una versión final. Podemos limitar el acceso, suspender cuentas o retirar contenido que genere riesgos de seguridad, abuso, cumplimiento u operación."
         },
         "eligibility": {
           "title": "Elegibilidad",
@@ -75,18 +77,18 @@
         },
         "third_party_services": {
           "title": "Servicios de terceros",
-          "body": "Argus depende de servicios de terceros para hosting, autenticación, datos de mercado, acceso a modelos y renderizado de gráficos. TradingView Lightweight Charts se usa para renderizar gráficos y mostrar atribución, no como fuente de datos de mercado de Argus."
+          "body": "Argus depende de servicios de terceros para hosting, autenticación, datos de mercado, acceso a modelos, protección contra bots y renderizado de gráficos. TradingView Lightweight Charts se usa para renderizar gráficos y mostrar atribución, no como fuente de datos de mercado de Argus."
         },
         "account_support": {
           "title": "Soporte de cuenta",
-          "body_before_email": "Durante la alfa privada, las solicitudes de soporte y eliminación de cuenta se gestionan manualmente. Contacta a",
+          "body_before_email": "Mientras Argus está en acceso anticipado, las solicitudes de soporte y de eliminación de cuenta las atiende una persona. Contacta a",
           "body_after_email": " o usa la solicitud de eliminación de cuenta dentro de la app."
         }
       }
     },
     "privacy": {
       "title": "Política de privacidad",
-      "intro": "Esta política explica qué maneja Argus durante la alfa privada para que testers sepan qué ocurre con los datos de cuenta, conversaciones, comentarios y solicitudes respaldadas por proveedores.",
+      "intro": "Esta política explica qué hace Argus con los datos de tu cuenta, tus conversaciones, tus comentarios y las solicitudes que envía a proveedores externos mientras el producto está en acceso anticipado.",
       "sections": {
         "data_collect": {
           "title": "Datos que recopilamos",
@@ -94,7 +96,7 @@
         },
         "data_use": {
           "title": "Cómo usamos los datos",
-          "body": "Usamos datos para operar el producto, autenticar usuarios, guardar y restaurar conversaciones, generar y revisar simulaciones históricas, depurar fallas, proteger el servicio, responder soporte y mejorar la calidad de la alfa privada."
+          "body": "Usamos datos para operar el producto, autenticar usuarios, guardar y restaurar conversaciones, generar y revisar simulaciones históricas, depurar fallas, proteger el servicio, responder soporte y mejorar Argus mientras está en acceso anticipado."
         },
         "ai_market_data": {
           "title": "Proveedores de IA y datos de mercado",
@@ -102,20 +104,43 @@
         },
         "infrastructure": {
           "title": "Infraestructura y servicios del producto",
-          "body": "Argus usa Supabase para autenticación y persistencia del producto, Render para hosting, OpenRouter para acceso a modelos y PostHog solo si la analítica de producto se habilita intencionalmente. TradingView Lightweight Charts se usa como biblioteca de gráficos con atribución; no es la fuente de datos de mercado de Argus."
+          "body": "Argus usa Supabase para autenticación y persistencia del producto, Render para hosting, OpenRouter para acceso a modelos y Cloudflare para la entrega del dominio y la protección contra bots. La analítica de producto con PostHog corre en los servidores de Argus, y solo cuando se habilita intencionalmente. TradingView Lightweight Charts se usa como biblioteca de gráficos con atribución; no es la fuente de datos de mercado de Argus."
+        },
+        "cookies": {
+          "title": "Cookies y almacenamiento del navegador",
+          "body": "Argus guarda muy pocos datos en tu navegador. Todo lo que guarda sirve para que el producto funcione o para recordar tus ajustes, y nada de eso es publicidad ni rastreo, por eso Argus no muestra un aviso de consentimiento de cookies.",
+          "items": {
+            "sign_in": {
+              "label": "Cookies de inicio de sesión",
+              "body": "Mantienen tu sesión iniciada al moverte entre páginas. Las crea la autenticación de Supabase y Argus las renueva mientras sigas usando el producto. Se conservan aunque cierres el navegador, y cerrar sesión las elimina. Iniciar sesión o restablecer tu contraseña también crea una cookie de corta duración que completa el intercambio de forma segura y se descarta al terminar. Si las bloqueas, no vas a poder iniciar sesión."
+            },
+            "guest_handoff": {
+              "label": "Cookies de traspaso de invitado",
+              "body": "Si empiezas como invitado y luego creas una cuenta, Argus crea dos cookies de corta duración para trasladar tu conversación temporal a la cuenta nueva. Duran diez minutos, se limitan a las rutas de autenticación de Argus y se eliminan apenas termina el traspaso."
+            },
+            "security": {
+              "label": "Cookies de seguridad",
+              "body": "Cloudflare Turnstile verifica que las solicitudes de inicio de sesión y de invitado vengan de una persona y no de un bot, y para eso Cloudflare puede crear cookies de desafío de corta duración. Están limitadas a Argus y no se usan para seguirte por otros sitios."
+            },
+            "preferences": {
+              "label": "Preferencias que tú eliges",
+              "body": "El almacenamiento local de tu navegador guarda tu idioma, que empieza con el de tu propio navegador hasta que lo cambies, junto con tus preferencias de apariencia y diseño, los avisos que descartaste y las conversaciones que marcaste como temporales. Todo eso queda en tu dispositivo y Argus nunca se lo envía a anunciantes."
+            }
+          },
+          "body_after": "Argus no usa cookies publicitarias, píxeles de anuncios, rastreadores de marketing ni rastreo entre sitios, y no comparte datos de tu navegador con socios publicitarios. La analítica de producto, cuando está activa, corre en los servidores de Argus y no guarda nada en tu navegador. Puedes borrar o bloquear este almacenamiento desde la configuración de tu navegador, aunque el inicio de sesión dejará de funcionar si bloqueas las cookies de sesión."
         },
         "access_retention": {
           "title": "Acceso y retención",
-          "body": "El acceso del fundador y administradores se limita a operar, depurar, proteger y mejorar la alfa privada. Conservamos datos mientras tu cuenta esté activa, mientras sean necesarios para soporte o seguridad, o mientras los registros operativos lo requieran."
+          "body": "El acceso del fundador y administradores se limita a operar, depurar, proteger y mejorar Argus durante el acceso anticipado. Conservamos datos mientras tu cuenta esté activa, mientras sean necesarios para soporte o seguridad, o mientras los registros operativos lo requieran."
         },
         "your_controls": {
           "title": "Tus controles",
-          "body_before_email": "Puedes archivar o eliminar conversaciones en la app. Durante la alfa privada, la eliminación de cuentas se gestiona manualmente mediante la solicitud dentro de la app o contactando a",
+          "body_before_email": "Puedes archivar o eliminar conversaciones en la app. Mientras Argus está en acceso anticipado, la eliminación de cuentas la atiende una persona mediante la solicitud dentro de la app o contactando a",
           "body_after_email": "."
         },
         "sale_personal_info": {
-          "title": "Venta de información personal",
-          "body": "Argus no vende información personal durante la alfa privada. Si esto cambia, la política y los controles del producto deben actualizarse antes de enviar ese comportamiento."
+          "title": "Venta y compartición de información personal",
+          "body": "Argus no vende ni comparte tu información personal, y no la usa para publicidad dirigida. Si eso llega a cambiar, esta política y los controles del producto se actualizarán antes de que entre en vigor."
         }
       }
     }
@@ -192,7 +217,8 @@
         "safety": "Preocupación de seguridad o legal",
         "other": "Otro"
       }
-    }
+    },
+    "close": "Cerrar comentarios"
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
@@ -784,10 +810,25 @@
         "lost_to_benchmark": "Quedó {{points}} puntos por debajo de la referencia",
         "beat_benchmark": "Superó la referencia por {{points}} puntos",
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_indicator_thresholds": "Otros umbrales",
+        "adjust_signal_periods": "Otros períodos",
+        "change_date_range": "Otras fechas",
+        "compare_buy_and_hold": "Comparar con mantener",
+        "recurring_monthly_buys": "Compras mensuales",
+        "same_rule_peer_asset": "Misma regla, activo similar",
+        "same_setup_peer_asset": "Activo similar",
+        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_rsi_or_ma_rule": "Simplificar la regla",
+        "supported_rsi_threshold": "Regla RSI compatible"
       }
     },
     "memory": {
       "recall_title": "De tu memoria",
+      "recall_show": "Mostrar",
+      "recall_hide": "Ocultar",
       "recall_note": "Decisiones guardadas que confirmaste. Adminístralas en Controles de datos.",
       "private_on": "Chat privado: activado",
       "private_off": "Chat privado",
@@ -829,7 +870,7 @@
       "title": "Perfil",
       "request_deletion": {
         "title": "Solicitar eliminación de cuenta",
-        "body": "Soporte gestiona la eliminación de cuentas durante la alfa privada. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
+        "body": "Soporte gestiona la eliminación de cuentas. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
         "contact_support": "Contactar soporte",
         "submitting": "Enviando...",
         "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
@@ -855,7 +896,8 @@
         "light": "Claro",
         "dark": "Oscuro",
         "system": "Sistema"
-      }
+      },
+      "close_appearance": "Cerrar apariencia"
     },
     "sidebar": {
       "title": "Preferencia de barra lateral",
@@ -946,7 +988,9 @@
         "close": "Cerrar uso",
         "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
         "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
-      }
+      },
+      "close_archived": "Cerrar chats archivados",
+      "close_deleted": "Cerrar borrados recientemente"
     },
     "help": {
       "title": "Ayuda y legal",
@@ -1164,7 +1208,9 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    }
+    },
+    "row_actions": "Acciones de la conversación",
+    "close_dossier": "Cerrar el expediente"
   },
   "auth": {
     "captcha": {
@@ -1196,7 +1242,7 @@
       }
     },
     "signup": {
-      "subtitle": "Crea tu cuenta de alpha privada",
+      "subtitle": "Crea tu cuenta de Argus",
       "name_placeholder": "Nombre",
       "submit": "Registrarse",
       "loading": "Creando cuenta...",

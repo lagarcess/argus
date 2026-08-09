@@ -256,8 +256,8 @@ its own groups.
 
 For P2, this durable `Idea` / `IdeaVersion` / `EvidenceArtifact` /
 `DecisionNote` recall is the product's "remembering" contract. It is distinct
-from personalization memory. Automatic or user-confirmed cross-conversation
-personalization memory remains post-PMF and must not be required for the P2
+from memory. Automatic or user-confirmed cross-conversation
+memory remains post-PMF and must not be required for the P2
 idea/evidence/comparison loop.
 
 ## Legacy Compatibility Goals

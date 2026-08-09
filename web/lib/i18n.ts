@@ -1,3 +1,4 @@
+import { LANGUAGE_STORAGE_KEY } from './browser-storage';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
@@ -25,6 +26,15 @@ i18n
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
+      // Declared rather than inherited, so the key the detector persists is
+      // one the storage registry knows about.
+      lookupLocalStorage: LANGUAGE_STORAGE_KEY,
+      // Language comes from what the user actually set, not from geography.
+      // navigator.language of es-MX or es-ES is still Spanish, so it resolves
+      // to the one Spanish Argus ships. A transform on the detected value, so
+      // it adds no second route to the key above.
+      convertDetectedLanguage: (language: string) =>
+        language.toLowerCase().startsWith('es') ? 'es-419' : language,
     },
   });
 

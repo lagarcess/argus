@@ -205,7 +205,7 @@ export default function ConversationActivityRail({
       ref={rootRef}
       data-testid="conversation-activity-rail"
       data-rail-awake="false"
-      className="pointer-events-none absolute bottom-40 right-0 top-24 z-30 hidden md:block"
+      className="pointer-events-none absolute bottom-40 right-0 top-24 z-30 hidden tablet:block"
       style={{ "--rail-reveal": "0" } as CSSProperties}
     >
       <nav

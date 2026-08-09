@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Bitcoin, LineChart, TrendingUp } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { researchRailEnabled } from "@/lib/private-alpha-flags";
 
@@ -11,100 +13,132 @@ export type StarterSelectionMetadata = {
 type StarterActionsProps = {
   onSelect: (value: string, metadata?: StarterSelectionMetadata) => void;
   disabled?: boolean;
-  className?: string;
+  /**
+   * `wrap` centers the pills under the composer. `scroll` is the narrow-screen
+   * form: one row that scrolls sideways. It still centers whenever the pills
+   * fit, and only becomes a carousel once they do not.
+   */
+  layout?: "wrap" | "scroll";
 };
 
-const pillClassName =
+type StarterEntry = {
+  key: string;
+  icon: LucideIcon | null;
+  metadata?: StarterSelectionMetadata;
+  label: string;
+  value: string;
+};
+
+const wrapPillClassName =
   "flex min-h-11 items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5";
+
+const scrollPillClassName =
+  "flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-black/10 bg-white/50 px-3.5 text-[13px] font-medium text-black transition-colors hover:bg-black/5 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5 dark:focus-visible:ring-white/30";
 
 export default function StarterActions({
   onSelect,
   disabled = false,
-  className = "",
+  layout = "wrap",
 }: StarterActionsProps) {
   const { t } = useTranslation();
+  // The trailing peek is a promise that more pills exist, so it may only appear
+  // when they actually do. Overflow is a measured fact, not a width guess.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
 
-  if (researchRailEnabled) {
-    // The static chips are the universal fallback, not guest-only code: every
-    // account without memory-driven suggestions gets these. Three shapes span
-    // the range (learn, compare, test); each is something a user would say,
-    // never a capability label.
-    const queries = (["q1", "q2", "q3"] as const).map((queryKey) => ({
-      key: queryKey,
-      value: t(`chat.example_queries.${queryKey}`, {
-        q1: "How does Netflix make money?",
-        q2: "Compare Costco against Walmart and Target",
-        q3: "What if I had bought Coca-Cola every month for five years?",
-      }[queryKey]),
-    }));
-    return (
-      <div
-        className={`mt-6 flex flex-wrap items-center justify-center gap-3${className}`}
-      >
-        {queries.map(({ key, value }) => (
-          <button
-            key={key}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect(value)}
-            className={pillClassName}
-          >
-            {value}
-          </button>
-        ))}
-      </div>
-    );
-  }
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const sync = () =>
+      setIsOverflowing(scroller.scrollWidth > scroller.clientWidth + 1);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(scroller);
+    for (const child of Array.from(scroller.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [layout]);
 
-  const actions = [
-    {
-      key: "tsla",
-      strategy_category: "buy_and_hold" as const,
-      icon: TrendingUp,
-      label: t("chat.starter_actions.tsla.label", "Test Apple vs SPY"),
-      value: t(
-        "chat.starter_actions.tsla.value",
-        "Compare Apple with SPY over the last 12 months.",
-      ),
-    },
-    {
-      key: "btc",
-      strategy_category: "buy_and_hold" as const,
-      icon: Bitcoin,
-      label: t("chat.starter_actions.btc.label", "Test Bitcoin (BTC) hold"),
-      value: t(
-        "chat.starter_actions.btc.value",
-        "What if I bought Bitcoin this year so far?",
-      ),
-    },
-    {
-      key: "dca",
-      strategy_category: "dca_accumulation" as const,
-      icon: LineChart,
-      label: t(
-        "chat.starter_actions.dca.label",
-        "Test weekly Nvidia buys",
-      ),
-      value: t(
-        "chat.starter_actions.dca.value",
-        "What if I bought $250 of Nvidia every week over the last 12 months?",
-      ),
-    },
-  ];
+  // One owner for the empty-chat chips, one entry vocabulary either way.
+  // Rail chips are user utterances spanning learn, compare, and test; the
+  // static set is the universal fallback, never a capability label. Legacy
+  // chips keep the shipped test actions with their icons.
+  const entries: StarterEntry[] = researchRailEnabled
+    ? (["q1", "q2", "q3"] as const).map((queryKey) => {
+        const value = t(
+          `chat.example_queries.${queryKey}`,
+          {
+            q1: "How does Netflix make money?",
+            q2: "Compare Costco against Walmart and Target",
+            q3: "What if I had bought Coca-Cola every month for five years?",
+          }[queryKey],
+        );
+        return { key: queryKey, icon: null, label: value, value };
+      })
+    : [
+        {
+          key: "tsla",
+          icon: TrendingUp,
+          metadata: { strategy_category: "buy_and_hold" as const },
+          label: t("chat.starter_actions.tsla.label", "Test Apple vs SPY"),
+          value: t(
+            "chat.starter_actions.tsla.value",
+            "Compare Apple with SPY over the last 12 months.",
+          ),
+        },
+        {
+          key: "btc",
+          icon: Bitcoin,
+          metadata: { strategy_category: "buy_and_hold" as const },
+          label: t("chat.starter_actions.btc.label", "Test Bitcoin (BTC) hold"),
+          value: t(
+            "chat.starter_actions.btc.value",
+            "What if I bought Bitcoin this year so far?",
+          ),
+        },
+        {
+          key: "dca",
+          icon: LineChart,
+          metadata: { strategy_category: "dca_accumulation" as const },
+          label: t("chat.starter_actions.dca.label", "Test weekly Nvidia buys"),
+          value: t(
+            "chat.starter_actions.dca.value",
+            "What if I bought $250 of Nvidia every week over the last 12 months?",
+          ),
+        },
+      ];
+
+  const isScroll = layout === "scroll";
 
   return (
     <div
-      className={`mt-6 flex flex-wrap items-center justify-center gap-3${className}`}
+      ref={scrollerRef}
+      data-testid="starter-actions"
+      data-starter-layout={layout}
+      data-starter-overflowing={isScroll ? String(isOverflowing) : undefined}
+      className={
+        isScroll
+          ? // `safe center` centers the row while it fits and falls back to
+            // start once it overflows, so the first pill never becomes
+            // unreachable off the leading edge.
+            // No trailing padding here: it would widen scrollWidth and make
+            // the overflow measurement depend on its own result.
+            `argus-scrollbar flex snap-x items-center gap-2 overflow-x-auto pb-1 [justify-content:safe_center] ${
+              isOverflowing ? "argus-starter-peek" : ""
+            }`
+          : "mt-6 flex flex-wrap items-center justify-center gap-3"
+      }
     >
-      {actions.map(({ key, strategy_category, icon: Icon, label, value }) => (
+      {entries.map(({ key, icon: Icon, metadata, label, value }) => (
         <button
           key={key}
           type="button"
           disabled={disabled}
-          onClick={() => onSelect(value, { strategy_category })}
-          className={pillClassName}
+          onClick={() => onSelect(value, metadata)}
+          className={isScroll ? scrollPillClassName : wrapPillClassName}
         >
-          <Icon className="h-4 w-4 text-black/60 dark:text-white/60" />
+          {Icon ? (
+            <Icon className="h-4 w-4 shrink-0 text-black/60 dark:text-white/60" />
+          ) : null}
           {label}
         </button>
       ))}

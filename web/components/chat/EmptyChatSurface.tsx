@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import ChatInput from "./ChatInput";
 import ChatLegalNotice from "./ChatLegalNotice";
 import EmptyChatGreeting from "./EmptyChatGreeting";
@@ -44,25 +45,34 @@ export default function EmptyChatSurface({
   onToast,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
+  const { isBelowTablet } = useResponsiveLayout();
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
   const showSignedInGreeting = researchRailEnabled && !isGuest;
 
+  // The tall top inset belongs to tablet and up. Expressing it as a min-width
+  // variant rather than overriding a base value keeps `sm:` from winning the
+  // cascade between 400 and 719px, where most phones actually sit.
   return (
-    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-      {showSignedInGreeting ? (
-        <EmptyChatGreeting />
-      ) : (
-        <EmptyChatHeading isGuest={isGuest} />
-      )}
+    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 tablet:pb-8 tablet:pt-[28vh]">
+      {/* The heading absorbs the free space below the mobile threshold, which
+          settles the pills and the composer onto the bottom edge where a thumb
+          rests. Above it, the surface keeps its centered composition. */}
+      <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
+        {showSignedInGreeting ? (
+          <EmptyChatGreeting />
+        ) : (
+          <EmptyChatHeading isGuest={isGuest} />
+        )}
+      </div>
 
       <div
         aria-busy={guestSubmissionPending}
         className={
           showSignedInGreeting
             ? "order-3 w-full max-w-2xl"
-            : "w-full max-w-2xl"
+            : "order-3 w-full max-w-2xl tablet:order-2"
         }
       >
         <ChatInput
@@ -111,15 +121,24 @@ export default function EmptyChatSurface({
         />
       </div>
 
-      {/* One owner for the chips. Spec section 10 orders the signed-in rail
-          surface as greeting, suggestions, composer at the bottom; flex order
-          does the reordering so the flag-off DOM stays identical. */}
+      {/* One owner for the chips. Flag off, this is integration's shipped
+          placement: thumb-reachable above the composer on narrow screens,
+          under it from tablet up. Flag on, spec section 10 keeps the
+          suggestions above the composer at every width, behind the toggle. */}
       {(!showSignedInGreeting || showSuggestions) && (
-        <StarterActions
-          disabled={disabled}
-          onSelect={onSend}
-          className={showSignedInGreeting ? " order-2 mb-2" : ""}
-        />
+        <div
+          className={
+            showSignedInGreeting
+              ? "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:mb-2"
+              : "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3"
+          }
+        >
+          <StarterActions
+            disabled={disabled}
+            onSelect={onSend}
+            layout={isBelowTablet ? "scroll" : "wrap"}
+          />
+        </div>
       )}
 
       {showSignedInGreeting && (

@@ -68,7 +68,7 @@ from argus.api.chat.discovery_evidence import (
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
-from argus.api.chat.memory_recall import memory_recalls_for_turn
+from argus.api.chat.memory_recall import memory_recalls_for_turn_async
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -696,6 +696,7 @@ async def chat_stream(
                     assistant_metadata=assistant_metadata,
                     message_id=message_id,
                     run_id=current_run.id if current_run is not None else None,
+                    viewport=payload.viewport,
                 )
             except Exception:
                 logger.opt(exception=True).warning(
@@ -1231,7 +1232,7 @@ async def chat_stream(
                                 if key in durable_retry
                             }
                     else:
-                        memory_recalls = memory_recalls_for_turn(
+                        memory_recalls = await memory_recalls_for_turn_async(
                             user=user,
                             account=turn_account,
                             user_message=display_message,

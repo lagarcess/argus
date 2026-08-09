@@ -837,6 +837,9 @@ class ChatStreamRequest(BaseModel):
     # Temporary chat: the client may opt a conversation out of memory. Opting
     # out only ever disables recall and proposals; it grants nothing.
     memory_opt_out: bool = False
+    # Width band the turn was sent from. Narrow shortens generated titles at
+    # the point of generation; the client never clips what it is given.
+    viewport: Literal["narrow", "wide"] | None = None
 
     @model_validator(mode="after")
     def require_message_or_action(self) -> "ChatStreamRequest":

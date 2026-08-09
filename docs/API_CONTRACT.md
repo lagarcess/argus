@@ -3777,9 +3777,9 @@ Deferred surfaces:
 
 ---
 
-# 17.2 Personalization Memory (registered, role-gated)
+# 17.2 Memory (registered, role-gated)
 
-User-confirmed personalization memory for registered accounts. Assisted, not
+User-confirmed memory for registered accounts. Assisted, not
 automatic: Argus proposes, the user confirms, and only confirmed content
 becomes a durable `MemoryRecord`. Memory never influences interpretation,
 routing, or simulation truth; it may only inform post-interpretation surfaces
@@ -3836,6 +3836,14 @@ Chat integration:
   feeds back into a request.
 - `POST /chat/stream` accepts optional `memory_opt_out: true` (private
   chat). Opting out only disables recall and proposals for that turn.
+- `POST /chat/stream` accepts optional `viewport: "narrow" | "wide"`, the
+  width band the turn was sent from. It only shortens a generated
+  conversation title at generation time, so a phone header shows a title
+  composed short rather than one clipped by the client. Absent means wide.
+- Try next rows in `next_experiments` may carry `label_short` and
+  `label_short_key` beside `label` and `label_key`. The short form is the
+  same ask written for a narrow screen; the backend owns both, and the
+  client never derives one from the other.
 
 ---
 

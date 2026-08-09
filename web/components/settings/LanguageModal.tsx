@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { patchMe } from "@/lib/argus-api";
 import {
   ENABLED_LANGUAGES,
@@ -12,6 +13,8 @@ import {
 
 type LanguageModalProps = {
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
   persistProfile?: boolean;
 };
 
@@ -21,8 +24,11 @@ type LanguageModalProps = {
  */
 export default function LanguageModal({
   onClose,
+  onBack,
+  backLabel,
   persistProfile = true,
 }: LanguageModalProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const lang = i18n.language || "en";
@@ -39,16 +45,11 @@ export default function LanguageModal({
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
     document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   const handleSelect = async (code: string) => {
     const nextLanguage = normalizeEnabledLanguage(code);
@@ -67,24 +68,19 @@ export default function LanguageModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("guest.shell.language", "Language")}
+    <AdaptivePanel
+      title={t("guest.shell.language", "Language")}
+      closeLabel={t("settings.app.close_language_modal", "Close language modal")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="sm"
+      initialFocusRef={searchInputRef}
     >
-      <button
-        className="absolute inset-0"
-        aria-label={t("settings.app.close_language_modal", "Close language modal")}
-        onClick={() => {
-          onClose();
-          setSearchQuery("");
-        }}
-      />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-[#111111]">
         <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
           <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
           <input
+            ref={searchInputRef}
             type="text"
             autoFocus
             placeholder={t("settings.search_language")}
@@ -120,7 +116,6 @@ export default function LanguageModal({
             ))
           )}
         </div>
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }

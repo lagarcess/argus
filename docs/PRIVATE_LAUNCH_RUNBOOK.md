@@ -365,7 +365,14 @@ Schedule a bounded batch at least daily after public guest exposure. Record the
 owner, effective schedule, selected/deleted/preserved/failed counts, oldest
 eligible expiry, and alert destination. A nonzero `auth_delete_failed` result
 or a failed cleanup transaction must alert and retry; never compensate by
-deleting product rows manually. Product deletion, anonymous-identity
+deleting product rows manually.
+
+The same run is the retention boundary for the visitor-keyed tables, which are
+deliberately not foreign-key bound and so have no owner to cascade from. It
+reports `visitor_usage_purged`, `funnel_milestones_purged`, and `purge_failed`.
+A nonzero `purge_failed` also exits nonzero and must alert: while it persists,
+IP-derived visitor digests are being retained past their stated window. A dry
+run deletes nothing and always reports zero for all three. Product deletion, anonymous-identity
 revalidation, and Auth-row deletion are one database transaction. Claimed
 source identities use a fifteen-minute reconciliation grace; incomplete
 bootstrap identities use five minutes.

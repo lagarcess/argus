@@ -31,7 +31,13 @@ type RunDossierViewProps = {
   decidedRuns: number;
   onBackToLatest?: () => void;
   onOpenHistory?: () => void;
-  onOpenConversation: () => void;
+  /**
+   * Opens the conversation from inside the body.
+   *
+   * Omitted when the host pins that action itself, as the sheet does, so the
+   * two do not both appear. The pane has no footer, so it passes one.
+   */
+  onOpenConversation?: () => void;
   onRetest: (sourceRunId: string) => Promise<void> | void;
   onSaveDecision: (
     action: SearchDecisionAction,
@@ -471,24 +477,26 @@ export function RunDossierView({
         </div>
       </div>
 
-      <button
-        type="button"
-        aria-label={t(
-          "command_palette.open_in_conversation",
-          "Open in conversation",
-        )}
-        disabled={conversationUnavailable}
-        onClick={onOpenConversation}
-        className="mt-auto flex min-h-11 shrink-0 items-center justify-between pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/35 dark:hover:text-white"
-      >
-        <span>
-          {t(
+      {onOpenConversation ? (
+        <button
+          type="button"
+          aria-label={t(
             "command_palette.open_in_conversation",
             "Open in conversation",
           )}
-        </span>
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-      </button>
+          disabled={conversationUnavailable}
+          onClick={onOpenConversation}
+          className="mt-auto flex min-h-11 shrink-0 items-center justify-between pt-4 text-left text-[12px] text-black/35 transition-colors hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/35 dark:hover:text-white"
+        >
+          <span>
+            {t(
+              "command_palette.open_in_conversation",
+              "Open in conversation",
+            )}
+          </span>
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+      ) : null}
 
       <button
         type="button"

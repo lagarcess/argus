@@ -28,6 +28,7 @@ from argus.memory.contracts import (
     SensitivityAssessment,
 )
 from argus.memory.store import (
+    UNPROVEN_GENERATION,
     CanonicalConfirmationMutation,
     CanonicalEnableMutation,
     CanonicalOwnerReset,
@@ -1855,19 +1856,9 @@ class PostgresCanonicalMemoryStore:
                 )
                 if cursor.fetchone() is not None:
                     return False
-                cursor.execute(
-                    """
-                    select coalesce(max(generation), 1)
-                      from public.memory_reconciliations
-                     where owner_id = %s and record_id = %s
-                    """,
-                    (owner_id, record_id),
-                )
-                generation_row = cursor.fetchone()
-                assert generation_row is not None
-                generation = int(generation_row[0])
+                # Only a claimed projection earns a generation.
+                generation = UNPROVEN_GENERATION
                 if projection is not None:
-                    generation = max(generation, int(projection[1]))
                     self._insert_provider_cleanup_target(
                         cursor,
                         owner_id,
@@ -1931,6 +1922,39 @@ class PostgresCanonicalMemoryStore:
             )
             row = cursor.fetchone()
             return None if row is None else row[0]
+
+    def settled_projection_record_ids(
+        self,
+        owner: RegisteredMemoryOwner,
+    ) -> frozenset[str]:
+        """Records whose projection represents their current content.
+
+        Compared by reconciliation generation rather than by cleanup state.
+        A newer generation exists from the moment an edit commits, which is
+        before any provider call, so the projection stops being authoritative
+        immediately and stays that way if the process never gets to reconcile.
+        Obsolete refs still awaiting deletion do not make a current projection
+        stale, since the record already points at the right content.
+        """
+
+        with self._confirmation_transaction(owner) as (cursor, owner_id):
+            cursor.execute(
+                """
+                select projection.record_id
+                  from public.memory_provider_projections as projection
+                 where projection.owner_id = %s
+                   and not exists (
+                     select 1
+                       from public.memory_reconciliations as reconciliation
+                      where reconciliation.owner_id = projection.owner_id
+                        and reconciliation.record_id = projection.record_id
+                        and reconciliation.generation > projection.generation
+                   )
+
+                """,
+                (owner_id,),
+            )
+            return frozenset(str(row[0]) for row in cursor.fetchall())
 
     def track_provider_cleanup_target(
         self,

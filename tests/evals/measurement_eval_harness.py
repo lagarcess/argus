@@ -29,6 +29,8 @@ from argus.llm.openrouter import (
 )
 from pydantic import BaseModel, Field
 
+from tests.evals.prose_evidence import judged_prose_evidence
+
 LOCKED_EVAL_CATEGORIES = {
     "messy_english",
     "messy_spanish",
@@ -241,7 +243,7 @@ def run_eval_case(
             )
         )
         if not assistant_text.strip():
-            judge_result = _missing_prose_judge_result(case)
+            judge_result = _missing_prose_judge_result()
             failed_checks.append("prose_judge:missing_assistant_text")
         else:
             judge_result = judge_prose_quality(
@@ -253,6 +255,10 @@ def run_eval_case(
                     f"prose_judge:{criterion}"
                     for criterion in judge_result["failed_criteria"]
                 )
+        # Bound to the same local the judge received, so the artifact cannot
+        # attribute a verdict to prose the judge never saw.
+        judge_result["requested_criteria"] = list(case.prose_judge_criteria)
+        judge_result["judged_assistant_text"] = judged_prose_evidence(assistant_text)
 
     status = _result_status(failed_checks, expected_fail=case.expected_fail)
     return {
@@ -495,11 +501,10 @@ def judge_prose_quality(*, case: EvalCase, assistant_text: str) -> dict[str, Any
     }
 
 
-def _missing_prose_judge_result(case: EvalCase) -> dict[str, Any]:
+def _missing_prose_judge_result() -> dict[str, Any]:
     return {
         "pass": False,
         "failed_criteria": ["missing_assistant_text"],
-        "requested_criteria": list(case.prose_judge_criteria),
         "notes": "case requested prose judging but produced no assistant text",
         "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
     }

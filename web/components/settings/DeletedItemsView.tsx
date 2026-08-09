@@ -6,9 +6,9 @@ import {
   Loader2,
   MessageSquare,
   RotateCcw,
-  X,
-} from "lucide-react";
+  } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
   listHistory,
@@ -18,6 +18,8 @@ import {
 
 type DeletedItemsViewProps = {
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
   onRestored?: () => void;
 };
 
@@ -25,7 +27,7 @@ function isDeletedItemVisible(item: HistoryItem) {
   return item.type === "chat";
 }
 
-export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsViewProps) {
+export default function DeletedItemsView({ onClose, onBack, backLabel, onRestored }: DeletedItemsViewProps) {
   const { t } = useTranslation();
   const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,34 +50,20 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
-      <button
-        className="absolute inset-0"
-        aria-label={t("settings.data.close_recently_deleted", "Close recently deleted")}
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-md max-h-[70vh] bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-black/5 dark:border-white/5">
-          <div>
-            <h2 className="text-[16px] font-medium text-black dark:text-white">
-              {t("settings.data.recently_deleted")}
-            </h2>
-            <p className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">
-              {t(
-                "settings.data.deleted_retention_note",
-                "Items in this list can currently be restored.",
-              )}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4 text-black/50 dark:text-white/50" />
-          </button>
-        </div>
-
+    <AdaptivePanel
+      title={t("settings.data.recently_deleted")}
+      closeLabel={t("settings.data.close_deleted", "Close recently deleted")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="md"
+    >
+      <p className="px-5 pt-3 text-[12px] text-black/40 dark:text-white/40">
+        {t(
+          "settings.data.deleted_retention_note",
+          "Items in this list can currently be restored.",
+        )}
+      </p>
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {isLoading ? (
@@ -128,7 +116,6 @@ export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsVi
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AdaptivePanel>
   );
 }

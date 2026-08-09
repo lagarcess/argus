@@ -38,4 +38,30 @@ describe("chat keyboard shortcut policy", () => {
       }),
     ).toBe(true);
   });
+
+  test("the shortcut can always close the overlay it opened", () => {
+    // Opened from the drawer's Help submenu the drawer stays open underneath,
+    // so `modalOpen` is true and the advertised key could not close the dialog
+    // it had just opened. A toggle must never be blocked by its own target.
+    expect(
+      canOpenKeyboardShortcuts({
+        searchOverlayOpen: false,
+        recentsQuickPeekOpen: false,
+        deleteConfirmationOpen: false,
+        modalOpen: true,
+        shortcutsOverlayOpen: true,
+      }),
+    ).toBe(true);
+
+    // Unrelated modals still block opening it in the first place.
+    expect(
+      canOpenKeyboardShortcuts({
+        searchOverlayOpen: false,
+        recentsQuickPeekOpen: false,
+        deleteConfirmationOpen: false,
+        modalOpen: true,
+        shortcutsOverlayOpen: false,
+      }),
+    ).toBe(false);
+  });
 });

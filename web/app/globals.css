@@ -1,9 +1,40 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Responsive scale is DESIGN.md section 8, not Tailwind defaults. Base is
+   Mobile Small; every stop above it is a named DESIGN.md range boundary.
+   Stops in rem so they track the browser font size: 25/45/64/80/120rem is
+   400/720/1024/1280/1920px at a 16px root. */
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-mobile: 25rem;
+  --breakpoint-tablet: 45rem;
+  --breakpoint-desktop: 64rem;
+  --breakpoint-large: 80rem;
+  --breakpoint-xlarge: 120rem;
+
+  /* Tailwind's default names, at Tailwind's default widths, because clearing
+     the defaults above would otherwise drop them. Aliasing them onto the named
+     stops position for position looked tidy and silently moved 60 existing
+     `sm:` classes from 640px to 400px, so every one of them started firing on
+     phones they were never written for. New work uses the named stops. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 96rem;
+}
+
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  /* DESIGN.md section 3: Space Grotesk, Inter, Arial, sans-serif. Inter is
+     already self-hosted, so falling back to it is free and stays on brand.
+     Dropping to ui-sans-serif instead degraded the headings differently on
+     every platform, which is the one thing a named stack exists to prevent.
+     Spelled out here only, so the two rules that use it cannot drift from it
+     again. */
+  --font-display: var(--font-space-grotesk), var(--font-inter), Arial, sans-serif;
   --color-background: var(--bg);
   --color-foreground: var(--fg);
   --color-argus-dark: #191c1f;
@@ -213,6 +244,83 @@ body {
   .argus-result-reveal-caution {
     animation: none;
     transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes argus_sheet_enter {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes argus_sheet_scrim_enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.argus-sheet-enter {
+  animation: argus_sheet_enter 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.argus-sheet-scrim {
+  animation: argus_sheet_scrim_enter 200ms ease-out both;
+}
+
+/* The grip owns the dismiss drag, so the browser must not scroll from it. */
+.argus-sheet-grip {
+  touch-action: none;
+}
+
+@keyframes argus_drawer_enter {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.argus-drawer-enter {
+  animation: argus_drawer_enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.argus-drawer-scrim {
+  animation: argus_sheet_scrim_enter 200ms ease-out both;
+}
+
+/* The panel owns the dismiss drag; vertical scrolling inside it still works. */
+.argus-drawer-panel {
+  touch-action: pan-y;
+}
+
+/* The trailing fade is what makes the next starter pill read as a peek. */
+.argus-starter-peek {
+  mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 2rem),
+    transparent 100%
+  );
+}
+
+/* DESIGN.md section 17 floor. Callers may only raise it, never lower it. */
+.argus-sheet :is(input, select, textarea) {
+  font-size: max(1rem, var(--argus-sheet-input-font-size, 1rem));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .argus-sheet-enter,
+  .argus-sheet-scrim,
+  .argus-drawer-enter,
+  .argus-drawer-scrim {
+    animation: none;
   }
 }
 
@@ -530,7 +638,7 @@ body {
 
 .argus-result-section-label {
   margin: 0 0 0.75rem;
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 0.78rem;
   font-weight: 680;
   letter-spacing: 0;
@@ -577,7 +685,7 @@ body {
 
 .argus-result-breakdown.prose h3 {
   margin: 1.05rem 0 0.35rem;
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 0.94rem;
   font-weight: 680;
   line-height: 1.2;
@@ -637,3 +745,32 @@ body {
 .dark .argus-result-breakdown.prose strong {
   color: rgba(255, 255, 255, 0.88);
 }
+
+/*
+ * Safety net only. The backend supplies a short form for narrow screens, so
+ * this clamp should rarely engage; two lines, never a single-line ellipsis,
+ * because one clipped line reads as broken rather than as abbreviated.
+ */
+@media (max-width: 44.99rem) {
+  .argus-next-move-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+}
+
+/*
+ * Reach is decided by width, never by asking about the pointer.
+ *
+ * This used to expand each row action to 44px under `any-pointer: coarse`. Two
+ * things were wrong with it. It asks what the device is, which is the one
+ * question the responsive scale does not answer. And the expanded boxes
+ * overlapped: three 26px buttons 4px apart put their centres 30px apart, so
+ * 44px hit areas ran 14px into each other and the later sibling won, which
+ * meant the edge of Rename could archive or delete instead.
+ *
+ * Below the desktop stop the row offers an explicit menu whose trigger and
+ * items are already 44px, so there is nothing left to expand.
+ */

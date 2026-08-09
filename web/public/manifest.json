@@ -1,0 +1,50 @@
+{
+  "id": "/",
+  "name": "Argus",
+  "short_name": "Argus",
+  "description": "Test investing ideas in plain language.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "theme_color": "#191c1f",
+  "background_color": "#191c1f",
+  "icons": [
+    {
+      "src": "/icons/argus-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/argus-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/argus-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/argus-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Argus on a phone"
+    },
+    {
+      "src": "/screenshots/argus-desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Argus on a desktop browser"
+    }
+  ]
+}

@@ -663,11 +663,11 @@ Semantic retrieval (Vector embeddings) is deferred from Alpha.
   Structured Supabase product records and run metadata are sufficient until
   Argus needs semantic recall across large histories.
 
-## Structured Recall Versus Personalization Memory
+## Structured Recall Versus Memory
 
 P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
 `EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
-That structured recall is not personalization memory. A future `MemoryRecord`
+That structured recall is not memory. A future `MemoryRecord`
 or equivalent cross-conversation preference layer remains post-PMF and requires
 earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?"
 controls before activation.
