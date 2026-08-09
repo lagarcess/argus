@@ -105,9 +105,7 @@ def provider_ticker_mentions_from_text(
             resolution.asset
         ):
             continue
-        symbol = str(
-            getattr(resolution.asset, "canonical_symbol", "") or ""
-        ).upper()
+        symbol = str(getattr(resolution.asset, "canonical_symbol", "") or "").upper()
         if not symbol or symbol in seen:
             continue
         seen.add(symbol)
@@ -178,17 +176,14 @@ def grounded_asset_mention_has_name_support(mention: GroundedAssetMention) -> bo
     if not tokens:
         return False
     name_words = {
-        word
-        for word in _asset_name_tokens(getattr(mention.asset, "name", ""))
-        if word
+        word for word in _asset_name_tokens(getattr(mention.asset, "name", "")) if word
     }
     if not name_words:
         return False
     lowered_tokens = [token.lstrip("$").lower() for token in tokens]
     if len(tokens) > 1:
-        return (
-            any(len(token) >= 4 for token in lowered_tokens)
-            and all(token in name_words for token in lowered_tokens)
+        return any(len(token) >= 4 for token in lowered_tokens) and all(
+            token in name_words for token in lowered_tokens
         )
     lowered = lowered_tokens[0]
     return (
@@ -275,15 +270,12 @@ def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
         return False
 
     symbol_texts = _asset_symbol_texts(asset)
-    name_words = {
-        word for word in _asset_name_tokens(getattr(asset, "name", "")) if word
-    }
+    name_words = {word for word in _asset_name_tokens(getattr(asset, "name", "")) if word}
     lowered_tokens = [token.lstrip("$").lower() for token in tokens]
 
     if len(tokens) > 1:
-        return (
-            any(len(token) >= 4 for token in lowered_tokens)
-            and all(token in name_words for token in lowered_tokens)
+        return any(len(token) >= 4 for token in lowered_tokens) and all(
+            token in name_words for token in lowered_tokens
         )
 
     token = tokens[0]
@@ -307,11 +299,7 @@ def _asset_symbol_texts(asset: Any) -> set[str]:
         str(getattr(asset, "canonical_symbol", "") or ""),
         str(getattr(asset, "raw_symbol", "") or ""),
     }
-    return {
-        compact
-        for value in values
-        if (compact := _compact_asset_candidate(value))
-    }
+    return {compact for value in values if (compact := _compact_asset_candidate(value))}
 
 
 def _compact_asset_candidate(value: str) -> str:

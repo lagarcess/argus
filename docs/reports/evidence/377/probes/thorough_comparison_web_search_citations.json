@@ -1,0 +1,329 @@
+{
+  "probe": "thorough_comparison_web_search_citations",
+  "tier": "thorough",
+  "elapsed_s": 72.59,
+  "response": {
+    "background": true,
+    "completed_at": 1786272195,
+    "created_at": 1786272195,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_ae63102d-134e-4b4a-bd42-697dafe42423",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 4096,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "anthropic/claude-opus-4-7",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## PLTR Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | marketCap | pe | eps | changesPercentage | yearHigh | yearLow |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| PLTR | Palantir Technologies Inc. | 2026-08-07 20:00:00 UTC | 2026-08-09 10:42:09 UTC | after_hours | 172.01 | 394,947,000,700 | 145.77 | 1.20 | 10.32 | 207.52 | 106.37 |\n\nData available in: `PLTR_LMT_quotes_9b63de.csv` (row key column: symbol)\n\n## LMT Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | marketCap | pe | eps | changesPercentage | yearHigh | yearLow |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| LMT | Lockheed Martin Corporation | 2026-08-07 20:02:30 UTC | 2026-08-09 10:42:09 UTC | after_hours | 587.95 | 135,693,568,450 | 21.67 | 26.48 | 0.88 | 692 | 424.12 |\n\nData available in: `PLTR_LMT_quotes_9b63de.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/LMT?cited_at=1786147077",
+              "https://www.perplexity.ai/finance/PLTR?cited_at=1786147195"
+            ],
+            "tickers": [
+              "PLTR",
+              "LMT"
+            ]
+          }
+        ],
+        "tickers": [
+          "PLTR",
+          "LMT"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "financials"
+        ],
+        "results": [
+          {
+            "category": "financials",
+            "content": "## PLTR FY 2023\n| date | period | income_statement_total_revenues | income_statement_operating_profit | income_statement_consolidated_net_income | ratio_operating_margin | ratio_net_profit_margin |\n| --- | --- | --- | --- | --- | --- | --- |\n| 2025-12-31 | 2025 FY | 4,475,446,000 | 1,414,015,000 | 1,634,644,000 | 0.32 | 0.37 |\n| 2024-12-31 | 2024 FY | 2,865,507,000 | 310,403,000 | 467,918,000 | 0.11 | 0.16 |\n| 2023-12-31 | 2023 FY | 2,225,012,000 | 119,966,000 | 217,375,000 | 0.05 | 0.10 |\n\nData available in: `PLTR_annual_income_statement_82e87b.csv` (row key column: date)\n\n## LMT FY 2023\n| date | period | income_statement_total_revenues | income_statement_operating_profit | income_statement_consolidated_net_income | ratio_operating_margin | ratio_net_profit_margin |\n| --- | --- | --- | --- | --- | --- | --- |\n| 2025-12-31 | 2025 FY | 75,048,000,000 | 7,731,000,000 | 5,017,000,000 | 0.10 | 0.07 |\n| 2024-12-31 | 2024 FY | 71,043,000,000 | 7,013,000,000 | 5,336,000,000 | 0.10 | 0.08 |\n| 2023-12-31 | 2023 FY | 67,571,000,000 | 8,507,000,000 | 6,920,000,000 | 0.13 | 0.10 |\n\nData available in: `LMT_annual_income_statement_82e87b.csv` (row key column: date)",
+            "sources": [
+              "https://www.perplexity.ai/finance/LMT/financials?period=annual&category=INCOME_STATEMENT&fromYear=2023&fromQuarter=4&toYear=2025&toQuarter=4",
+              "https://www.perplexity.ai/finance/PLTR/financials?period=annual&category=INCOME_STATEMENT&fromYear=2023&fromQuarter=4&toYear=2025&toQuarter=4"
+            ],
+            "tickers": [
+              "PLTR",
+              "LMT"
+            ]
+          }
+        ],
+        "tickers": [
+          "PLTR",
+          "LMT"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "queries": [
+          "Palantir 2026 contract wins defense Department of Defense",
+          "Lockheed Martin 2026 contract wins Pentagon AI",
+          "Palantir Lockheed Martin analyst commentary 2026"
+        ],
+        "results": [
+          {
+            "date": "2026-03-27",
+            "id": 1,
+            "last_updated": "2026-04-08",
+            "snippet": "# Palantir Wins Major Pentagon Contract, Boosting PLTR Stock\nPalantir's Maven Smart System designated as 'program of record', cementing its role in U.S. military AI infrastructure.\nMar. 27, 2026 at 3:34pm\n...\nPalantir Technologies, the leading data analytics and AI software firm, has been awarded a significant contract by the U.S. Department of Defense.\nThe Pentagon has formally designated Palantir's Maven Smart System as a 'program of record', ensuring the long-term use of Palantir's software within the U.S. military.\nThis development strengthens Palantir's positioning as a core component of the nation's defense infrastructure and AI capabilities.\n...\nPalantir's Pentagon contract represents a major milestone, as the company transitions from a software firm to a critical provider of AI-powered decision-making tools for the U.S. military.\n...\nThe Pentagon's decision to make Palantir's Maven Smart System a 'program of record' effectively locks in the long-term use of Palantir's software within the U.S. military.\nThis means Palantir's AI-powered analytics and decision-making tools will be a core part of the military's infrastructure, helping to 'dominate adversaries in all domains'.\nThe contract further cements Palantir's position as a leading provider of AI-based solutions for government and defense applications.\n- On March 27, 2026, the U.S. Department of Defense formally designated Palantir's Maven Smart System as a 'program of record'.\n...\nThe Pentagon's decision to designate Palantir's Maven Smart System as a 'program of record' ensures the long-term use of Palantir's software within the U.S. military, solidifying the company's role in the nation's defense and AI capabilities.",
+            "source": "web",
+            "title": "Palantir Wins Major Pentagon Contract, Boosting PLTR Stock",
+            "url": "https://nationaltoday.com/us/fl/miami/news/2026/03/27/palantir-wins-major-pentagon-contract-boosting-pltr-stock/"
+          },
+          {
+            "date": "2026-03-22",
+            "id": 2,
+            "last_updated": "2026-04-27",
+            "snippet": "The Department of Defense is expanding its use of Artificial Intelligence (AI) by formalizing Palantir Technologies\u2019 Maven system as a long-term program, signaling a shift from experimental tools to operational infrastructure.\n...\nElevating Maven to a \u201cprogram of record\u201d places it within the military\u2019s formal budgeting and acquisition system, ensuring continued funding and long-term deployment.\nThe company\u2019s footprint inside the Pentagon has grown through a series of expanding contracts rather than a single award.\nIn addition to Maven-related deals, the Army awarded Palantir an enterprise agreement in 2025 that could be worth up to $10 billion over a decade, aimed at consolidating data and software systems across the service.\nPalantir\u2019s work on Maven itself has also expanded through multiple awards, including a five-year, $480 million Army contract in 2024, a roughly $100 million follow-on expansion later that year, and a 2025 contract modification valued at up to $795 million for continued system support and software licensing.",
+            "source": "web",
+            "title": "Pentagon Expands Use of Palantir AI in New Defense Contract",
+            "url": "https://www.military.com/feature/2026/03/22/pentagon-expands-palantirs-role-ai-contract.html"
+          },
+          {
+            "date": "2026-02-17",
+            "id": 3,
+            "last_updated": "2026-02-20",
+            "snippet": "$PLTR Palantir secures $7.6 million Defence contract to supply ICT system platform 17 February 2026 American data integration and analytics company Palantir has secured a $7.6 million one-year contract for the Australian Department of Defence.\nThe contract, announced via AusTender on February 11 this year, was awarded under limited tender and facilitates that Palantir will supply an information and communications technology system platform.\nEarlier this month, Palantir Technologies announced that the Defense Information Systems Agency has authorized Palantir Federal Cloud Service Forward, extending PFCS's existing Impact Level 5 and Impact Level 6 Provisional Authorizations to include on-premises and edge deployments With this authorization, Palantir's technology stack, including its platforms; Apollo, Gotham, Foundry, and AIP, and underlying infrastructure like Rubix, can be deployed across any environment, from enterprise data centres to the tactical edge, on hardware of the customer\u2019s choosing.\n...\n\u201cThis opens the door for true multivendor architectures at the edge, bringing best-of-breed commercial technology to critical national security missions with unprecedented speed.\u201d",
+            "source": "web",
+            "title": "$PLTR Palantir secures $7.6 million Defence contract to supply ICT ...",
+            "url": "https://x.com/PalantirOg/status/2023749561240473844"
+          },
+          {
+            "date": "2026-07-13",
+            "id": 4,
+            "last_updated": "2026-07-14",
+            "snippet": "Defense Department spending through commercial solutions openings topped $300 million in the first half of fiscal 2026 after Congress dropped restrictions on the contracting method in December, according to Bloomberg Government analysis.\n...\nPalantir Technologies Inc.\nsecured about half of the Air Force's CSO spending through orders made against existing contracts.\nThe company leads the CSO market and also holds contracts with the Defense Logistics Agency.",
+            "source": "web",
+            "title": "Palantir Wins Big Using Expanded Commercial Procurement Option",
+            "url": "https://news.bgov.com/bloomberg-government-news/palantir-wins-big-using-expanded-commercial-procurement-option"
+          },
+          {
+            "date": "2026-02-24",
+            "id": 5,
+            "last_updated": "2026-03-13",
+            "snippet": "In December 2025, three months after Kistruck\u2019s appointment, Palantir won a three-year Ministry of Defence contract worth \u00a3240m to \u2018modernise defence\u2019 by providing \u201cdata analytics capabilities supporting critical strategic, tactical and live operational decision making across classifications\u201d in the armed forces.\nThe contract, which is more than three times larger than any Palantir has previously won with the MoD, was awarded without tender.\n...\nThe MoD is not the only part of the public sector where Palantir has made major inroads in the last few years.\nIt currently has live contracts worth over \u00a3500m, and a commitment from the MoD which could be worth a further \u00a3500m in the coming years.",
+            "source": "web",
+            "title": "The great Ministry of Defence-to-Palantir pipeline",
+            "url": "https://progressive.international/wire/2026-02-24-the-great-ministry-of-defence-to-palantir-pipeline/en/"
+          },
+          {
+            "date": "2023-09-27",
+            "id": 6,
+            "last_updated": "2023-09-27",
+            "snippet": "Palantir Technologies Inc. has secured a substantial contract worth $250 million with the U.S. Defense Department focused on the research and development of artificial intelligence and machine learning technologies.\nThis three-year agreement underscores the company's strong ties to the U.S. government and highlights its expanding role at the nexus of AI and defense.\n...\nThe new contract aims to enhance the ongoing collaboration Palantir has maintained with the Army Research Lab since at least 2018.\nAccording to the announcement, the company will provide 'research and development services' in the fields of AI and machine learning.\nA representative from Palantir opted not to disclose further specifics regarding the contract's extent.",
+            "source": "web",
+            "title": "Palantir Wins $250 Million AI Deal With US Defense Department",
+            "url": "https://finance.yahoo.com/news/palantir-wins-250-million-ai-222730235.html"
+          },
+          {
+            "date": "2023-09-27",
+            "id": 7,
+            "last_updated": "2026-05-18",
+            "snippet": "WASHINGTON \u2014 The U.S. Army awarded Palantir Technologies a contract worth as much as $250 million to research and experiment with artificial intelligence and machine learning.\nThe arrangement, announced by the Department of Defense on Sept. 26, runs through 2026.\nExactly where work will be done and from where funding will be pulled will be determined with each order, it said.",
+            "source": "web",
+            "title": "Palantir wins $250 million US Army AI research contract",
+            "url": "https://www.defensenews.com/artificial-intelligence/2023/09/27/palantir-wins-250-million-us-army-ai-research-contract/"
+          },
+          {
+            "date": "2025-07-21",
+            "id": 8,
+            "last_updated": "2026-07-17",
+            "snippet": "Investing.com - Palantir Technologies Inc . (NASDAQ:PLTR) stock rose after the U.S. Army awarded a $100 million contract to the Anduril-Palantir team for the Next-Generation Command and Control (NGC2) platform prototype.\n...\nThe 11-month contract, announced Monday, tasks the companies with developing the next phase of NGC2, one of the U.S. Army\u2019s highest-priority projects.\nThe Department of Defense has requested $3 billion in fiscal 2026 budget funding for NGC2 development.\nWilliam Blair estimates that $30 million of the total contract value will go to Palantir, with potential to increase to more than $150 million in annual recurring revenue over the next three years.\n...\nAccording to William Blair\u2019s contract tracker, Palantir was awarded $135 million in annual recurring revenue across nine different government contracts for the second quarter, compared to $27 million in the same period last year.\nThis NGC2 contract will be part of third-quarter bookings.\n...\nThe contract represents a significant win for both companies, with Palantir likely incorporating its Maven Smart System and Edge Data Mesh into NGC2, while Anduril continues to establish itself as a defense technology company with at least 64 contracts across its product portfolio.",
+            "source": "web",
+            "title": "Palantir stock rises as US Army awards $100 million NGC2 ...",
+            "url": "https://www.investing.com/news/analyst-ratings/palantir-stock-rises-as-us-army-awards-100-million-ngc2-contract-93CH-4143882"
+          },
+          {
+            "date": "2026-07-29",
+            "id": 9,
+            "last_updated": "2026-08-07",
+            "snippet": "The Pentagon awarded Lockheed Martin Corp.\na $59 billion deal to triple Patriot missile production over the next seven years, as the Trump administration works to boost a munitions stockpile drained by the Iran war.\nThe deal extends a $4.7 billion contract Lockheed received in April to boost production of the most advanced Patriot interceptors \u2014 known as Patriot Advanced Capability-3 Missile Segment Enhancement \u2014 with a new $53.86 billion modification that covers the duration of the seven-year contract.",
+            "source": "web",
+            "title": "Lockheed Wins $59 Billion Deal to Build More Patriot Missiles",
+            "url": "https://www.bloomberg.com/news/articles/2026-07-29/lockheed-wins-59-billion-deal-to-build-more-patriot-missiles"
+          },
+          {
+            "date": "2026-03-20",
+            "id": 10,
+            "last_updated": "2026-08-09",
+            "snippet": "NEW YORK, March 20 (Reuters) - Palantir\u2019s (PLTR.O) Maven artificial intelligence system will become an official program of record, Deputy Secretary of Defense Steve \u200bFeinberg said in a letter to Pentagon leaders, a move that locks in long-term use of Palantir\u2019s weapons-targeting technology across \u200cthe U.S. military.\n...\nThe decision is expected to go into effect by the close of the current fiscal year, which ends in September, \u200baccording to the letter, which was reviewed by Reuters and has not been previously reported.\n...\nFuture contracting with Palantir will be handled by the Army, the letter said.\n...\nFeinberg\u2019s order is a significant win for Palantir, which has landed a growing \u200bstream of contracts with the U.S. government, including a deal announced last summer with the U.S. Army worth up to $10 billion.\n...\nIn 2024, the Pentagon awarded Palantir a contract worth up to $480 million.\n...\nIn May \u200b2025, the Pentagon increased the contract ceiling to $1.3 billion.",
+            "source": "web",
+            "title": "Pentagon to adopt Palantir AI as core US military system ...",
+            "url": "https://www.reuters.com/technology/pentagon-adopt-palantir-ai-as-core-us-military-system-memo-says-2026-03-20/"
+          },
+          {
+            "date": "2026-02-03",
+            "id": 11,
+            "last_updated": "2026-08-08",
+            "snippet": "The company, founded by tech billionaire Peter Thiel and with the CIA as one of its early backers, said on Monday that revenue derived from the U.S. government jumped 66% in the fourth quarter to $570 million, helping lift total sales to $1.41 billion, above analysts' estimate of $1.33 billion.\nThe data analytics firm forecast first-quarter sales above estimates and flagged a sharp surge in sales in 2026, driven in part by government contracts.\n...\nFeb 3 (Reuters) - Shares of Palantir Technologies (PLTR.O) jumped 6.9% in early trading on Tuesday as investors bet on the company's military-grade AI tools and services after it reported a surge in quarterly sales, boosted by rising U.S. defense spending.",
+            "source": "web",
+            "title": "Palantir rallies after bumper quarter fueled by US defense ...",
+            "url": "https://www.reuters.com/business/palantir-rallies-after-bumper-quarter-fueled-by-us-defense-spending-2026-02-03/"
+          },
+          {
+            "date": "2026-06-29",
+            "id": 12,
+            "last_updated": "2026-07-31",
+            "snippet": "- Palantir's $10B Army deal consolidates 75 contracts, strips reseller fees, and raises switching costs, even though PLTR sits 28% below its award-date price.\n...\n- The $10B ceiling is not guaranteed revenue, and Palantir's trailing P/E of 127 and price-to-sales of 52 leave little room for execution misses.\n...\nThe headline number gets attention.\n**Palantir** (NASDAQ:PLTR) secured a $10 billion, 10-year Enterprise Agreement with the U.S. Army last summer.\nThe contract was awarded July 31, 2025, and the question worth asking now, nearly a year in, is whether Wall Street has properly priced what that vehicle does to the company's competitive position.\n...\nThe Army agreement folds 75 contracts (15 prime plus 60 related) into a single vehicle, strips out reseller pass-through fees, and is available to other Department of Defense components.\nIt also sits on top of the Maven Smart System work, including a 2025 expansion worth up to $795 million.\n...\nU.S. Government revenue reached $687 million in Q1 2026, up 84% year over year, with total remaining deal value of $11.8 billion and RPO of $4.5 billion, up 134% year over year.\n...\nThe $10 billion is a ceiling, the maximum potential value, not guaranteed obligated spending.\n...\nThe Enterprise Agreement makes Palantir harder to rip out and easier to expand into adjacent DoD components.\nIt does not guarantee the whole $10 billion, and it does not justify any particular multiple.",
+            "source": "web",
+            "title": "Palantir Just Secured the U.S. Army's Biggest Data Overhaul",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/palantir-just-secured-u-army-180024842.html"
+          },
+          {
+            "date": "2026-08-05",
+            "id": 13,
+            "last_updated": "2026-08-06",
+            "snippet": "Today, the U.S. government awarded Lockheed Martin (NYSE: LMT) a seven-year undefinitized contract action (UCA) for up to $35 billion to quadruple production of Terminal High Altitude Area Defense...ORLANDO, Fla., April 14, 2026 \u2013 The Pentagon has awarded Lockheed Martin (NYSE: LMT) a 10-year, sole-source, indefinite delivery, indefinite quantity (IDIQ) contract worth up to $1.9 billion to...",
+            "source": "web",
+            "title": "Newsroom News Releases - Lockheed Martin",
+            "url": "https://news.lockheedmartin.com/news-releases?l=100"
+          },
+          {
+            "date": "2026-07-07",
+            "id": 14,
+            "last_updated": "2026-07-08",
+            "snippet": "Lockheed Martin (NYSE:LMT) said its Aeronautics business secured a U.S. Air Force contract valued at up to $142.9 million to provide software sustainment services for the C-5 Galaxy transport aircraft.\n...\nThe Department of Defense said the award is structured as an indefinite-delivery, indefinite-quantity contract using both cost-plus-fixed-fee and firm-fixed-price arrangements.\nAbout $19.3 million in fiscal 2026 Air Force operations and maintenance funding was obligated at the time of the award.\nThe contract was issued through a sole-source acquisition.\nSeparately, Lockheed Martin (NYSE:LMT) also received a Navy contract initially valued at about $60.6 million for AEGIS ship integration and testing.",
+            "source": "web",
+            "title": "Lockheed Martin Stock in Focus -- Wins $143 Million Fresh Pentagon Contract",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/lockheed-martin-stock-focus-wins-131132912.html"
+          },
+          {
+            "date": "2025-08-01",
+            "id": 15,
+            "last_updated": "2025-08-01",
+            "snippet": "Investing.com -- Palantir Technologies has reached a significant agreement with the U.S. Army that may amount to as much as $10 billion over the next ten years, representing one of the most substantial software contracts in the history of the Defense Department.\nThe U.S. Army has revealed plans to merge numerous contracts into a single enterprise arrangement, which will provide volume-based discounts and the chance to acquire up to $10 billion from the software firm across a decade.\nWedbush analysts report that this enterprise agreement combines 75 individual contracts, comprising 15 primary contracts and 60 associated agreements, into a cohesive framework.\nThe Army stated that this initiative aims to expedite the implementation of artificial intelligence and data integration tools, while also reducing contract-related costs and streamlining procurement processes.\nDescribing it as 'mass U.S Army deal Wedbush emphasized that this framework enables the Army to procure and services Palant (NASDAQPLTR) on an as-needed basis, benefiting from 'volume-based discounts.'\nWhile the contract does not obligate the Army to any specific purchase commitments, it establishes a foundation for substantial utilization of Palantir's technology over the next ten years.\nWedbush highlighted that 'this contract win follows closely after the company's inaugural billion-dollar contract,' characterizing agreement as 'positive catalyst' the Pentagon intensifies its emphasis on AI and digital modernization.",
+            "source": "web",
+            "title": "Palantir: Army consolidates deals into potential $10 billion contract",
+            "url": "https://finance.yahoo.com/news/palantir-army-consolidates-deals-potential-124322530.html"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "categories": [
+          "transcript"
+        ],
+        "results": [
+          {
+            "category": "transcript",
+            "content": "[{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript \u2014 Summary**\\n\\n**Earnings Metrics:**\\n- Revenue: $1,935,464,000\\n  (est. $1,812,280,000)\\n- EPS: $0.41\\n  (est. $0.35)\\n- Post-Earnings Move: +0.29%\\n\\nThe most relevant discussion centers on Palantir\u2019s U.S. government business, especially defense, where management says demand remains strong and mission impact is growing. They highlight Maven and other government programs, noting a government program of record chose Maven as its operating platform and that Palantir is equipping the nation with \u201cbattle-tested AI capabilities.\u201d The call also emphasizes AI sovereignty and model flexibility in government/defense use cases, including the ability to switch models and avoid lock-in, which management frames as critical for mission-critical systems.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=323.34\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 5m 23s\\n\\n[5m 23s] [Ryan Taylor]: A global asset management firm started working with us in Q1, converted last quarter to a three-year $35 million TCV deal spanning asset management automation and investment lifecycle intelligence across four verticals. After an Agent Camp in May, a global software and services company signed an initial $15 million five-month deal last quarter. A leading nonprofit health system signed a pilot at the end of 2025, converted last quarter to a three-year partnership at $37 million TCV. Our U.S. government business remains a source of extraordinary strength, with momentum across both defense and civil. We continue to take great pride in our U.S. government work, equipping our nation with the most advanced battle-tested AI capabilities. For Palantir, this is our calling.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=564.26\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 9m 24s\\n\\n[9m 24s] [Shyam Sankar]: A more powerful model does not solve this problem. The limiting factor is the rate of AIP deployment. A major Silicon Valley tech company recently ran a bake-off, a frontier lab and its deployment team against AIP and our Forward Deployed Engineers. Remember, only Palantir has FDEs. Everyone else has sparkling sales engineers. The lab picked a ticketing automation problem and failed to deliver anything of value against it. We built agent swarms for each of our customers' customers, proactively recommending marketing, packaging, and pricing changes to drive revenue and utilization. This work converted into a $10 million ACV contract. The lab was shown the door. Same customer, same timeline, same models. The only difference was AIP and Palantir's unique FDE tradecraft, it was determinative. It was an incredible quarter in U.S. government, measured not just by 90% year-over-year revenue growth, but by mission impact.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=621.14\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 10m 21s\\n\\n[10m 21s] [Shyam Sankar]: Maven continues to deliver for the Joint Force, from the factory floor to the foxhole. We had our first program in the Maven platform launched this past quarter, where a government program of record chose Maven as the platform that they will operate their program in, taking advantage of our open data standards, ontology, developer tooling, peering, security, and other platform primitives to go faster and deliver seamless experiences and capabilities to the department's chosen command and control platform. Maven has also continued to win as the developer and builder platform for the Joint Force. With over 25,000 builders, uniform service members, civilians, contractors, and companies are developing agents and applications in and on the platform at the speed of war. For all that growth, our Department of War trailing 12-month revenue is still less than 25 basis points of the Pentagon's budget.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=796.04\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 13m 16s\\n\\n[13m 16s] [David Glazer]: On the back of this exceptional continued strength in the U.S. and accelerating demand for our sovereign AI capabilities, we are raising our full-year U.S. Commercial revenue guidance to in excess of $3.424 billion, representing a growth rate of at least 134%. We are also raising our full-year 2026 revenue guidance midpoint to $8.154 billion, representing 82% growth year-over-year, an 11-point increase over our full-year 2026 revenue guidance from last quarter, and our largest ever full-year revenue guidance raise. Turning to our global top-line results. Q2 revenue grew 93% year-over-year and 19% sequentially to $1.935 billion. Q2 U.S. revenue grew 115% year-over-year and 23% sequentially to $1.573 billion. Revenue from our largest customers continues to expand. Q2 trailing 12-month revenue from our top 20 customers increased 67% year-over-year to $124 million per customer. Now moving to our Commercial Segment.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=935.24\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 15m 35s\\n\\n[15m 35s] [David Glazer]: Our U.S. Commercial customer count grew to 653 customers, reflecting growth of 35% year-over-year and 6% sequentially. Q2 International Commercial revenue grew 26% year-over-year and 2% sequentially to $182 million. Revenue from strategic commercial contracts was approximately $400,000 for the quarter, representing 0.02% of overall revenue. We continue to expect revenue from these contracts to be less than $500,000 in each remaining quarter of this year. Shifting to our Government Segment. Q2 Government revenue grew 79% year-over-year and 15% sequentially to $990 million. Q2 U.S. Government revenue grew 90% year-over-year and 18% sequentially to $809 million. This growth was driven by continued execution in existing programs and new awards reflecting a growing demand for our AI platform in government. Q2 International Government revenue grew 42% year-over-year and 5% sequentially to $181 million. We closed $3.4 billion of TCV bookings, up 49% year-over-year.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=1062.84\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 17m 42s\\n\\n[17m 42s] [David Glazer]: While this change led to higher cost of revenue in Q2, going forward, we believe it will power faster time to value, drive greater efficiency, provide greater cost certainty to the customer, and enable us to expand their future workflows. Adjusted income from operations, which excluded stock-based compensation expense and related employer payroll taxes, was $1.194 billion in the Q2, representing an adjusted operating margin of 62%. Q2 adjusted expense was $741 million, up 14% sequentially and 37% year-over-year, primarily driven by the continued investment in our AI platform and technical hiring. As in prior years, we expect a significant ramp in expense in the Q3 due to the seasonality of new hire starts and other product and marketing initiatives.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=1378.09\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 22m 58s\\n\\n[22m 58s] [Alex Karp]: Now, to do that, as we went through the years, we built PG, Foundry, Gaia, Maven, Ontology, AIP. Now we're taking the AIP stack and extending it for sovereign AI, which requires us to be able to orchestrate and fine-tune models to provide a completely sovereign stack to our partners. What is the philosophical importance of that? We are offering a present that augurs to a future that we want to live in. What does that future look like? We have more rights in the PG frame. It's safer in the sovereign AI frame, which is arguably by far the most important because all these other things are downstream from GDP growth and GDP health, what if we transform America into the only democracy that actually grows where production is more efficient and manufacturing actually happens? What is that frame?\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=1486.47\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 24m 46s\\n\\n[24m 46s] [Alex Karp]: Why are they doing it? It's actually being done for what they believe are moral reasons. They are superior to you. They deserve to colonize your enterprise. You deserve to be colonized. Palantir, in A, it's interesting, it doesn't work as well or E is efficient purely on the alpha side as having an application layer, owning your compute. Witness, we built a partnership with NVIDIA. We're expanding our application layer. We are going to enter the market and already entering it in the classified space, as Shyam alluded to, of fine-tuning models. The model's actually fine-tuned by us in our enterprise on an NVIDIA stack, outperform frontier models, and you own the weights, you own the alpha. You own everything.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=1879.23\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 31m 19s\\n\\n[31m 19s] [Alex Karp]: We don't even have to agree on every client. They can occasionally compete against us. We've seen this in the defense tech stuff, Stack and Shyam, like the approach to defense tech where we partner with people. Partner doesn't mean we agree. Sometimes we compete, but it means we're marching in a similar direction. It allows us to scale. Those things are going to be a very big important part of essentially the guide. Why am I pushing the company to grow not to just the end of the year, but next year? It's because that also forces us to find ways to scale to meet the demand that's out there.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=2275.91\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 37m 55s\\n\\n[37m 55s] [Alex Karp]: No, I'll let Ryan and Shyam comment here. We're already doing that across the USG, U.S. government. We have a product that allows you to switch out models. Look, at the end of the day, if you are locked into a product, that's the nature of monopoly capitalism. That's why people want the lock-in, because then they can raise the prices and reduce the quality. We're against that because we're on the side of the American worker, the American people, and its great institutions, and other institutions across the West. Yes, people who are running big enterprises in this country are very sophisticated. They're aware of these risks, and they don't like people who are flaunting, setting this up so that they feel they're being made fun of, or they're a sucker, basically. Honestly, there's a lot of anger here.\"},{\"url\":\"https://www.perplexity.ai/finance/PLTR/earnings?eventId=660319&tab=transcript&t=2343.75\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-08-03\",\"content\":\"**PLTR Q2 2026 Earnings Transcript**\\nTimestamp: 39m 3s\\n\\n[39m 3s] [Ryan Taylor]: Yeah, I would say our whole focus is converting tokens to value. The example Shyam gave, that's happening across the board in the conversations with customers. That's why they're looking to expand, to convert how they position themselves in the industry with us, in their industry. We're seeing extreme alignment. It's not about being beholden to one model. It's about bringing the right models to bear for the right purposes, and our contracts, our structures are set up to do that, to support and compound their alpha in the organization.\"}]",
+            "sources": [
+              "https://www.perplexity.ai/finance/PLTR/earnings"
+            ],
+            "tickers": [
+              "PLTR"
+            ]
+          }
+        ],
+        "tickers": [
+          "PLTR"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "transcript"
+        ],
+        "results": [
+          {
+            "category": "transcript",
+            "content": "[{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript \u2014 Summary**\\n\\n**Earnings Metrics:**\\n- Revenue: $20,063,000,000\\n  (est. $19,339,120,000)\\n- EPS: $7.94\\n  (est. $7.22)\\n- Post-Earnings Move: +0.11%\\n\\nThe most relevant discussion is Lockheed Martin\u2019s pivot to commercial-style, long-term framework agreements and upfront investment in capacity for AI-enabled munitions and other defense technologies. Management said the huge backlog and rising backlog conversion give them confidence to scale manufacturing before formal awards, while still aiming to protect margins through multi-year contracts with better cash terms and profit mechanisms. On the AI side, they described AI-enabled manufacturing, predictive maintenance, quality checks, and AI-informed production lines as part of the broader defense-tech and scale-up strategy, which they believe will help translate demand into durable backlog and revenue growth.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=845.62\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 14m 5s\\n\\n[14m 5s] [Evan Scott]: Thank you, Jim. Good morning, everyone. I'll begin with an overview of our consolidated results, which, as Jim said, were strong both operationally and financially. I'll then cover our increased full year 2026 guidance before handing it over to Mark to discuss segment-level details. As you can see on slide three, the second quarter was record-setting for our backlog, which now totals $230 billion, an increase of roughly $64 billion versus second quarter of 2025. We recorded a second quarter book-to-bill ratio of 3.2:1. The backlog increase includes $65 billion of orders realized during the quarter, the largest being the multi-year THAAD contract, as well as new radar awards within RMS and strategic wins in Space. This deep book of contracts will fuel our sales growth for years to come, and we saw this top-line acceleration begin to show up in the second quarter.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1101.85\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 18m 21s\\n\\n[18m 21s] [Evan Scott]: Building on the momentum we generated in Q2, we now expect total sales of $79.75 billion-$81.75 billion, representing an 8% year-over-year increase at the midpoint, up from the prior 5% guidance. This uplift is driven primarily by higher volume on F-35 production in Aeronautics, radars in Rotary and Mission Systems. Correspondingly, we are increasing our segment operating profit target to now $8.5 billion-$8.7 billion. This revised outlook reinforces two important growth dynamics. First, is that our growth is clearly accelerating. Through the first half of this year, we grew sales at mid-single-digit pace year-over-year. Our revised outlook pegs our second half of 2026 growth rate in the high single digits and perhaps even the low double digits, a year-over-year increase of between 7% and 12% as compared to the second half of 2025. Secondly, is that this accelerating growth is broad-based.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1167.99\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 19m 27s\\n\\n[19m 27s] [Evan Scott]: Every segment at Lockheed Martin will grow faster in the back half of 2026 on both the top and bottom lines. Missiles and Fire Control is clearly leading the way for our growth. As we've described, our entire portfolio is accelerating, and we've reinforced that with this higher sales and segment operating profit outlook. Our free cash flow outlook is increasing, too. As I began to signal last quarter, we now expect a range of $7 billion-$7.2 billion. This improvement includes the favorable Corporate Alternative Minimum Tax Internal Revenue Service guidance we highlighted earlier this year. We're also confident that stronger working capital dynamics will improve our cash conversion cycles. We remain dynamic and disciplined in our capital allocation decisions, continually weighing the most value-enhancing approaches for deployment. Earnings per share is now projected at $29.95-$30.65, driven by higher year-to-date profits and a lower effective tax rate.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1232.09\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 20m 32s\\n\\n[20m 32s] [Evan Scott]: We are also updating our capital expenditure guidance to a range of $2 billion-$2.4 billion, reflecting efficiencies realized in Missiles and Fire Control's munitions build-out. Expanding munitions capacity as quickly as possible is our top priority. Our teams are relentlessly pursuing the most efficient ways to do so. Our framework agreements and related awards remain cash neutral, so these efficiencies are well-aligned with our customers' objectives. I will turn the call over to Mark, who will cover the segments in more detail.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1615.49\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 26m 55s\\n\\n[26m 55s] [Scott Deuschle]: Hi. Good morning. Jim, between PAC-3 ACE, MORFIUS, Sanctum, and some of these other new products you've announced recently, it seems like Lockheed is now moving pretty quickly in terms of responding to how warfare is changing. I was wondering if you could just speak to what type of timeline the business is working to in terms of the manufacturing scale-up for those solutions, and also if you're willing to deploy CapEx for those scale-ups ahead of formal awards. Thank you.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1641.81\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 27m 21s\\n\\n[27m 21s] [Jim Taiclet]: Yeah. Good morning, Scott. I'd start by answering your question with this. We've been working a mindset change at this company for the past five years. Our aspiration is not just to be the largest defense prime contractor, but it's to be America's clear leader in the defense technology segment. The way to get there is to be able and show that we can deliver decisive military advantage to drive deterrence to armed conflict on behalf of our government and our allies. The way we've been going about that is to build mission technology roadmaps that just don't wait for the next order. They predict, with a lot of informed relationships with our customer base, what they're going to need, and in some cases, before it's evident and gets through their acquisition system to come up with an RFP.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1895.27\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 31m 35s\\n\\n[31m 35s] [Jim Taiclet]: Scott, this is exactly why the landmark multiyear munitions commercial framework agreements are so critical, because the DoW team in place today, under Secretary Hegseth and Deputy Secretary Feinberg as well, and their teams, under that leadership, we believe they share our view that to fully engage U.S. industry more broadly in supporting the national defense, that they and we must embrace commercially inspired long-term enforceable agreements and contracts that can't be changed at the whim of the government, just like the C-130, without compensating the industry players, and it could be a new entrant, it could be a startup, it could be Lockheed Martin, it could be RTX. We need the confidence to act as we would act in a commercial environment to make investments to solve these national defense problems.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=1950.11\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 32m 30s\\n\\n[32m 30s] [Jim Taiclet]: I think this is the leadership team in government that can actually leapfrog what's ever gone on before when it comes to commercial-type agreements and include the biggest prime contractors in that are willing to step up and, as the prior question suggested, invest ahead of time, think ahead of time, and put development effort into non-ordered, non-contracted systems that we think, as industry, with our partners, are going to be important for the future. Those agreements will have to stand the test of time as circumstances, budgets, and political leadership is going to change over time. Again, with, I think, the administration's leadership in place today, we will establish with them survivable long-term contracts that will allow industry to act on a more commercial basis.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=2006.33\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 33m 26s\\n\\n[33m 26s] [Jim Taiclet]: That's where I think we're at today. We don't plan to ever put ourselves in a risk position where we don't have that confidence in the contract that we didn't have for the C-130. We're not doing that anymore. We're not taking that kind of risk without a counterparty that's willing to work on a commercial basis right along with us.\"},{\"url\":\"https://www.perplexity.ai/finance/LMT/earnings?eventId=653563&tab=transcript&t=2192.01\",\"name\":\"Perplexity Finance\",\"publish_date\":\"2026-07-23\",\"content\":\"**LMT Q2 2026 Earnings Transcript**\\nTimestamp: 36m 32s\\n\\n[36m 32s] [Evan Scott]: I think that sounds right on. In terms of the stock price, I do think, given the newness of what we're seeing here with the way to acquire these munitions, there's some learning that's going to happen, I think, as investors continue to understand it better. I think we'll continue to gain confidence as we convert these agreements to real contracts, as we saw in THAAD this quarter, and we're intending in the second half of the year to also get a multiyear on PAC-3. As we continue to have the contracts add to the backlog and be able to get better line of sight to the near-term multiyear revenue growth profile, I think we'll see that more translate. This quarter, I think, is a great example of that, and we're seeing good response so far.\"}]",
+            "sources": [
+              "https://www.perplexity.ai/finance/LMT/earnings"
+            ],
+            "tickers": [
+              "LMT"
+            ]
+          }
+        ],
+        "tickers": [
+          "LMT"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "I have enough to write a strong comparison. Let me compile the answer.\n\n# Palantir (PLTR) vs. Lockheed Martin (LMT): A Three-Year Comparison\n\n*All market data as of the market close on Aug 7, 2026 (after-hours). Financials are fiscal years 2023\u20132025. This is informational only, not investment advice.*\n\n## 1. The big picture\n\nThese two companies are both \"defense\" plays, but they're very different animals:\n\n- **Lockheed Martin** is the world's largest defense prime contractor \u2014 it builds the physical hardware (F-35 fighter jets, Patriot and THAAD missiles, satellites, radars).\n- **Palantir** is a software company. It sells AI and data-integration platforms (Gotham, Foundry, AIP, and the Maven Smart System) that help the military and companies make sense of huge amounts of data.\n\nThink of Lockheed as the company that builds the missile, and Palantir as the company that helps decide where to point it.\n\n## 2. Financials over the last three fiscal years\n\n| Metric (FY) | 2023 | 2024 | 2025 |\n|---|---|---|---|\n| **PLTR revenue** | $2.23B | $2.87B | $4.48B |\n| **PLTR operating margin** | 5% | 11% | 32% |\n| **PLTR net income** | $217M | $468M | $1.63B |\n| **LMT revenue** | $67.6B | $71.0B | $75.0B |\n| **LMT operating margin** | 13% | 10% | 10% |\n| **LMT net income** | $6.92B | $5.34B | $5.02B |\n\n**Takeaway:** Palantir's revenue roughly doubled over three years, and it swung from thin margins to very fat ones \u2014 classic software economics. Lockheed's revenue grew about 11% total over three years, and net income actually *fell*, squeezed by program charges and cost inflation on fixed-price contracts.\n\n## 3. Market snapshot (as of Aug 7, 2026)\n\n| | PLTR | LMT |\n|---|---|---|\n| Price | $172.01 | $587.95 |\n| Market cap | ~$395B | ~$136B |\n| P/E ratio | 145.8 | 21.7 |\n| EPS (TTM) | $1.20 | $26.48 |\n| 52-week range | $106 \u2013 $208 | $424 \u2013 $692 |\n\nPalantir now has a market cap roughly **3x** Lockheed's \u2014 despite doing about **6% of Lockheed's revenue**. That gap is the market pricing in enormous future growth for Palantir.\n\n## 4. 2026 contract wins\n\n**Palantir (2026):**\n- **March 2026:** The Pentagon formally designated Palantir's **Maven Smart System** as a \"program of record\" \u2014 meaning it moves from experimental tool into the military's permanent, funded acquisition system (Reuters, Mar 20, 2026).\n- Sits on top of the **$10 billion, 10-year U.S. Army Enterprise Agreement** awarded in July 2025, which consolidated 75 separate contracts into one.\n- **Feb 2026:** $7.6M Australian Department of Defence deal; expanded UK Ministry of Defence work (a \u00a3240M three-year deal signed Dec 2025).\n- **July 2026 (Bloomberg Government):** Palantir captured about half of the Air Force's \"Commercial Solutions Opening\" spending in the first half of fiscal 2026.\n- Q2 2026 results (reported Aug 3, 2026): U.S. government revenue grew **90% year-over-year** to $809M in a single quarter; full-year 2026 revenue guidance raised to ~$8.15B (82% growth).\n\n**Lockheed Martin (2026):**\n- **April 2026:** $4.7B initial contract to boost production of the advanced **PAC-3 Patriot interceptor**.\n- **July 2026:** That was extended into a **$59B, seven-year deal to triple Patriot missile production** (Bloomberg, Jul 29, 2026).\n- **2026:** A separate **seven-year, up-to-$35B contract to quadruple THAAD missile-defense production**.\n- **April 2026:** 10-year, up to **$1.9B sole-source IDIQ contract**.\n- **July 2026:** $142.9M Air Force C-5 software sustainment award; $60.6M Navy AEGIS integration contract.\n- Backlog hit a record **$230 billion** at the end of Q2 2026, up $64B year-over-year \u2014 book-to-bill was 3.2:1.\n\n**The scoreboard:** Lockheed is booking bigger single-contract dollar figures (missiles are expensive), while Palantir is winning smaller but strategically sticky software awards that lock the company into the military's core AI infrastructure.\n\n## 5. Recent analyst commentary\n\n- **Palantir:** Analysts (William Blair, Wedbush) frame the Army Enterprise Agreement and Maven \"program of record\" designation as transformational \u2014 it raises switching costs and opens up cross-selling across the DoD. But even bullish notes highlight the valuation: a trailing P/E of ~146 and price-to-sales of ~50x leave \"little room for execution misses\" (Yahoo Finance, Jun 29, 2026). The Q2 2026 beat (revenue $1.94B vs. $1.81B expected) drove management to raise 2026 guidance by 11 percentage points.\n- **Lockheed Martin:** Analysts are focused on **backlog conversion** \u2014 how quickly that $230B backlog turns into revenue. Management raised 2026 revenue guidance to $79.75\u201381.75B (8% growth at midpoint, up from 5% earlier) and EPS to $29.95\u2013$30.65. The debate is whether new \"commercial-style\" multi-year framework agreements (like PAC-3 and THAAD) will restore the margin discipline Lockheed lost on earlier fixed-price programs.\n\n## 6. How each is positioned in \"defense AI\"\n\n**Palantir \u2014 the software layer of defense AI.**\n- Sells the AI platforms (AIP, Maven) that human operators actually use to fuse intelligence, plan missions, and target adversaries.\n- CEO Alex Karp and CTO Shyam Sankar have leaned hard into \"sovereign AI\" \u2014 letting the U.S. government own the model weights, swap frontier models in and out, and avoid vendor lock-in.\n- Palantir also partners with defense-tech peers like **Anduril** (July 2025 Army Next-Generation Command and Control contract).\n- Management noted their Department of War (DoD) trailing-12-month revenue is still less than 0.25% of the Pentagon's budget \u2014 i.e., they see a huge runway.\n\n**Lockheed Martin \u2014 AI-enabled hardware and manufacturing.**\n- Uses AI more as an ingredient in its products and factories: AI-enabled munitions, predictive maintenance, quality checks, and AI-informed production lines.\n- CEO Jim Taiclet's stated goal is to be \"America's clear leader in the defense technology segment,\" not just the biggest prime contractor.\n- New products mentioned on the Q2 2026 call include MORFIUS (counter-drone), Sanctum, and PAC-3 ACE \u2014 all pitched as responses to how warfare is changing.\n- Lockheed doesn't sell a general-purpose AI platform the way Palantir does; instead, AI is embedded in specific weapons systems and manufacturing lines.\n\n## 7. Quick summary\n\n| Dimension | Palantir | Lockheed Martin |\n|---|---|---|\n| What it sells | AI/data software | Missiles, jets, radars, ships |\n| 3-yr revenue growth | ~2x | ~11% |\n| 3-yr margin trend | Rapidly expanding | Slightly compressing |\n| Valuation | Very expensive (P/E ~146) | Reasonable (P/E ~22) |\n| 2026 signature win | Maven \"program of record\" (Mar 2026) | $59B Patriot deal (Jul 2026) |\n| Backlog / RPO | $11.8B total deal value (Q1 2026) | $230B backlog (Q2 2026) |\n| Defense-AI role | The AI operating system | AI-enabled weapons + factories |\n\n**Bottom line for a curious observer:** Both companies are riding the same wave of rising U.S. and allied defense spending, but they benefit differently. Palantir is a high-growth, high-multiple software bet on the AI *brain* of the military. Lockheed is a lower-growth, lower-multiple industrial bet on the AI-enabled *body* \u2014 the missiles and platforms. The stock market is currently paying a big premium for Palantir's growth trajectory, while pricing Lockheed much closer to a traditional industrial.\n\n*Sources: Perplexity Finance (quotes, financials, transcripts as of Aug 9, 2026); Reuters (Mar 20 & Feb 3, 2026); Bloomberg (Jul 29, 2026); Military.com (Mar 22, 2026); Bloomberg Government (Jul 13, 2026); Yahoo Finance (Jun 29 & Jul 7, 2026); Lockheed Martin newsroom.*",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_bb50d3a2-d568-4f1b-85fa-b569546400fb",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.1261,
+        "cache_read_cost": 0.01565,
+        "currency": "USD",
+        "input_cost": 3e-05,
+        "output_cost": 0.09973,
+        "tool_calls_cost": 0.0225,
+        "tool_calls_cost_details": {
+          "finance_search": 0.02,
+          "search_web": 0.0025
+        },
+        "total_cost": 0.26401
+      },
+      "input_tokens": 51475,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 20176,
+        "cache_read_input_tokens": 31292,
+        "cached_tokens": 31292
+      },
+      "output_tokens": 3989,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "invocation": 4
+        },
+        "search_web": {
+          "invocation": 1
+        }
+      },
+      "total_tokens": 55464
+    },
+    "user": null
+  }
+}

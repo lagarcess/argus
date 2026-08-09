@@ -419,6 +419,9 @@ class BacktestJob(BaseModel):
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus
+    # Absent means an ordinary backtest; 'chat.research' jobs succeed without
+    # a run, so every serialized job surface must carry the scope.
+    operation_scope: str | None = None
     result_run_id: str | None = None
     failure_code: str | None = None
     failure_detail: str | None = None
@@ -871,6 +874,29 @@ class ChatStreamRequest(BaseModel):
         if self.message is not None and self.message.strip():
             return self
         raise ValueError("message_or_action_required")
+
+
+class ConfirmationPeerAssetsRequest(BaseModel):
+    """Grow or restore the pending confirmation's basket without a turn.
+
+    Add mode: only symbols the active turn offered as research peer rows are
+    addable; the backend re-verifies each against the resolver and coverage
+    gates. Restore mode undoes the latest add by re-materializing the exact
+    previous asset set from the card's own typed adjustment data.
+    """
+
+    symbols: list[str] | None = Field(default=None, min_length=1, max_length=4)
+    restore_previous: bool = False
+
+    @model_validator(mode="after")
+    def require_one_mode(self) -> "ConfirmationPeerAssetsRequest":
+        if self.restore_previous == bool(self.symbols):
+            raise ValueError("symbols_or_restore_required")
+        return self
+
+
+class ConfirmationPeerAssetsResponse(BaseModel):
+    message: Message
 
 
 def _validate_chat_action_payload_value(value: Any, *, depth: int) -> None:

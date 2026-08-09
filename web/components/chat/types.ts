@@ -92,7 +92,8 @@ export type ChatActionOption = {
     | "select_discovery_candidate"
     | "retry_last_turn"
     | "retry_load_conversation"
-    | "retest_run";
+    | "retest_run"
+    | "add_confirmation_peer";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -227,9 +228,23 @@ export type StrategyConfirmationPayload = {
   retest_period?: import("@/lib/chat-retest").RetestPeriodPayload | null;
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
+  assets_adjustment?: StrategyConfirmationAssetsAdjustment;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
+};
+
+export type StrategyConfirmationAssetsAdjustment = {
+  code: string;
+  added: { symbol: string; name: string }[];
+  previous_symbols: string[];
+  symbols: string[];
+  /* The one consequence a basket change can produce: the shared history
+   * window clamps. Disclosed inline next to the period field. */
+  period_change?: {
+    from: { start: string; end: string };
+    to: { start: string; end: string };
+  } | null;
 };
 
 export type StrategyConfirmationCapabilities = {
@@ -282,6 +297,8 @@ export type Message = {
   assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;
+  /** Typed sources from a research turn; the one surface every shape uses. */
+  researchSources?: DiscoverySource[] | null;
   /** Backend post-turn saved-decision recalls; rendered as context only. */
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-owned structured context for a retest receipt turn. */

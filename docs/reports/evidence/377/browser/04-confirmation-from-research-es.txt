@@ -1,0 +1,62 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Posiciones principales del ETF QQQ
+¿Qué contiene el ETF QQQ? Muéstrame sus principales posiciones
+
+QQQ contiene principalmente acciones de las mayores empresas no financieras que cotizan en Nasdaq. Sigue al índice Nasdaq-100, por lo que tiene una fuerte concentración en tecnología, semiconductores, internet y consumo digital.
+
+Principales posiciones
+
+Datos mostrados por Schwab al 6 de agosto de 2026; las ponderaciones cambian diariamente.
+
+#	EMPRESA	TICKER	PESO EN QQQ
+1	NVIDIA	NVDA	8.13%
+2	Apple	AAPL	7.24%
+3	Microsoft	MSFT	5.89%
+4	Amazon	AMZN	4.97%
+5	Micron Technology	MU	4.20%
+6	Advanced Micro Devices	AMD	3.55%
+7	Alphabet, clase A	GOOGL	3.54%
+8	Alphabet, clase C	GOOG	3.30%
+9	Broadcom	AVGO	3.02%
+10	Meta Platforms	META	2.84%
+
+Estas diez posiciones representan 46.68% del fondo. Alphabet aparece dos veces porque QQQ mantiene dos clases distintas de sus acciones.
+
+Aunque suele describirse como un ETF tecnológico, QQQ también incluye empresas de comercio electrónico, comunicaciones, consumo y salud. Excluye deliberadamente a las compañías financieras. El índice se rebalancea trimestralmente y se reconstituye anualmente.
+
+Fuentes: Invesco, descripción oficial de QQQ y Schwab, posiciones de QQQ.
+
+Prueba comprar y mantener QQQ durante los últimos tres años
+QQQ
+Comprar y mantener
+Listo para ejecutar
+CAPITAL INICIAL
+$1,000
+PERIODO
+9 ago 2023 → 7 ago 2026
+Acciones
+Datos diarios
+Hasta 7 ago
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Editar costos
+Ejecutar backtest
+Cambiar fechas
+Cambiar activo
+Ajustar supuestos
+Cancelar
+QUÉ PROBAR DESPUÉS
+↳
+Agregar NVIDIA Corporation Common Stock [NVDA] a esta prueba
+↳
+Agregar Apple Inc. Common Stock [AAPL] a esta prueba
+↳
+Agregar Microsoft Corporation Common Stock [MSFT] a esta prueba
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

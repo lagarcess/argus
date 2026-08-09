@@ -804,6 +804,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets:
+    post:
+      tags:
+      - conversations
+      description: 'Grow or restore the active confirmation''s basket without a turn.
+
+
+        Deterministic by construction: no LLM call, no message allowance, no
+
+        interpretation. Only symbols the active turn offered as peer rows are
+
+        addable, restore undoes the latest add from the card''s own typed
+
+        adjustment data, and every patched draft re-passes the same execution and
+
+        coverage validation every confirmation passes. The result is a new
+
+        superseding card; motion, chips, and inline period disclosure carry the
+
+        change, never a narration banner.'
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: confirmation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmationPeerAssetsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmationPeerAssetsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/conversations/{conversation_id}/messages:
     get:
       tags:
@@ -1783,6 +1841,10 @@ components:
           - failed
           - canceled
           - expired
+        operation_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
         result_run_id:
           anyOf:
           - type: string
@@ -2167,6 +2229,37 @@ components:
       type: object
       required:
       - conversation_id
+    ConfirmationPeerAssetsRequest:
+      properties:
+        symbols:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 4
+            minItems: 1
+          - type: 'null'
+        restore_previous:
+          type: boolean
+          default: false
+      type: object
+      description: 'Grow or restore the pending confirmation''s basket without a turn.
+
+
+        Add mode: only symbols the active turn offered as research peer rows are
+
+        addable; the backend re-verifies each against the resolver and coverage
+
+        gates. Restore mode undoes the latest add by re-materializing the exact
+
+        previous asset set from the card''s own typed adjustment data.'
+    ConfirmationPeerAssetsResponse:
+      properties:
+        message:
+          $ref: '#/components/schemas/Message'
+      type: object
+      required:
+      - message
     Conversation:
       properties:
         id:

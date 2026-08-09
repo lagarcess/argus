@@ -1,0 +1,30 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Nuevo chat
+Muéstrame acciones de semiconductores con un P/E menor a 20
+Acciones que cumplen ambos filtros
+
+Con datos de mercado al cierre del 7 de agosto de 2026, encontré estas acciones:
+
+TICKER	EMPRESA	CONDICIÓN: SEMICONDUCTORES	CONDICIÓN: P/E < 20
+UMC	United Microelectronics	Industria clasificada como Semiconductores; fabrica obleas para chips	17.44 ✅
+QCOM	Qualcomm	Industria clasificada como Semiconductores; diseña circuitos integrados y tecnologías inalámbricas	19.16 ✅
+
+El P/E compara el precio de la acción con sus ganancias por acción. En igualdad de condiciones, un número menor significa que el mercado paga menos por cada unidad de ganancias actuales.
+
+Esta es una lista ilustrativa, no un barrido exhaustivo de todas las bolsas mundiales. No incluí empresas con P/E negativo: normalmente indica pérdidas y no representa una valoración comparable “barata”. Los múltiplos cambian con el precio y con la publicación de nuevos resultados.
+
+Fecha de los datos: 7 de agosto de 2026, último cierre disponible al domingo 9 de agosto de 2026.
+No es asesoría de inversión.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar QUALCOMM QCOM en los últimos 3 años
+↳
+Probar QUALCOMM QCOM frente a Skyworks Solutions SWKS, United Microelectronic UMC y STMicroelectronics N.V STM
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

@@ -1,0 +1,71 @@
+argus
+New chat
+Search
+Recents
+Settings
+PLTR vs LMT comparison
+Compare PLTR to LMT
+PLTR vs LMT, Head-to-Head
+
+Short answer: These are two very different bets in the "defense" world. Lockheed Martin (LMT) is the mature, hardware-heavy prime contractor, ~$77B in revenue, pays a big dividend, trades at a modest P/E of 22. Palantir (PLTR) is a fast-growing AI/data-software company, much smaller ($6B revenue) but far more profitable per dollar of sales, no dividend, and trades at an extreme P/E of ~146. The market values Palantir at nearly 3× Lockheed's market cap despite Lockheed generating ~12× the revenue.
+
+All market data as of 2026-08-07 close (after-hours on 2026-08-09).
+
+Snapshot
+METRIC	PLTR	LMT
+Sector / Industry	Technology / Infrastructure Software	Industrials / Aerospace & Defense
+CEO	Alexander C. Karp	James D. Taiclet Jr.
+Employees	4,429	123,000
+IPO	Sep 2020	Listed since 1977
+Market data (as of 2026-08-07)
+METRIC	PLTR	LMT
+Price	$172.01	$587.95
+Market cap	$394.9B	$135.7B
+P/E (trailing)	145.77	21.67
+EPS (trailing)	$1.20	$26.48
+52-week range	$106.37, $207.52	$424.12, $692.00
+Dividend yield (TTM)	0%	~2.0% (approx., based on quotes shown)
+
+Note: LMT's dividend yield field shows 0.02 in the raw data (~2%); PLTR pays no dividend.
+
+Financials (trailing twelve months, through ~June 2026)
+METRIC	PLTR	LMT
+Revenue	$6.16B	$77.01B
+Gross profit	$5.22B	$9.09B
+Gross margin	85%	12%
+Operating income	$2.63B	$9.15B
+Operating margin	43%	12%
+Net income	$3.03B	$6.29B
+Net margin	49%	8%
+Operating cash flow	$3.40B	$10.40B
+CapEx	$0.04B	$1.67B
+Free cash flow (OCF, CapEx)	~$3.36B	~$8.73B
+Dividends paid	$0	$3.18B
+Cash & equivalents	$9.41B	$3.79B
+
+The margin gap tells the story: Palantir is a software business (each new dollar of revenue is mostly profit), while Lockheed is a manufacturing prime contractor with heavy costs of production.
+
+Growth trajectory (annual revenue & net income)
+YEAR (FY)	PLTR REVENUE	PLTR NET INCOME	LMT REVENUE	LMT NET INCOME
+2023	$2.23B	$0.22B	$67.57B	$6.92B
+2024	$2.87B	$0.47B	$71.04B	$5.34B
+2025	$4.48B	$1.63B	$75.05B	$5.02B
+PLTR: revenue roughly doubled in two years (~+101%); net income up ~7×.
+LMT: revenue grew ~11% over two years; net income actually declined.
+What each company does
+PLTR, Builds data/AI software platforms (Gotham for government/defense/intel, Foundry for commercial enterprises, AIP for large language model deployment). Asset-light, software margins.
+LMT, Makes the physical hardware of national defense: F-35 fighter jets, missiles, helicopters (Sikorsky), radars, satellites. Four segments: Aeronautics, Missiles & Fire Control, Rotary & Mission Systems, Space. The U.S. government is by far its largest customer.
+How to think about the comparison
+Valuation: LMT trades like a mature industrial (~22× earnings); PLTR trades like a hyper-growth software story (~146× earnings). PLTR's price already reflects very high future growth expectations.
+Cash return to shareholders: LMT returned ~$3.2B in dividends over the last twelve months; PLTR returns none.
+Balance sheet: PLTR has $9.4B in cash, more than 2× LMT's cash pile, despite being far smaller. Total debt figures were not returned by the data source for either company, so I can't state leverage precisely here.
+Scale vs. growth: LMT is ~12× larger by revenue; PLTR is growing ~10× faster.
+
+Not investment advice, just the numbers side-by-side.
+
+TRY NEXT
+↳
+Test Palantir Technologies Inc. Class A PLTR vs Lockheed Martin LMT
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

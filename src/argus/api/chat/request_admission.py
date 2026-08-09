@@ -201,9 +201,7 @@ class ChatRequestAdmission:
         if self.validated_option_source is not None:
             action_context["payload"] = {
                 **action_context.get("payload", {}),
-                "source_assistant_id": (
-                    self.validated_option_source.assistant_id
-                ),
+                "source_assistant_id": (self.validated_option_source.assistant_id),
                 "validated_source_assistant_id": (
                     self.validated_option_source.assistant_id
                 ),

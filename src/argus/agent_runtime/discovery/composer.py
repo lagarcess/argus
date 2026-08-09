@@ -26,13 +26,13 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
 )
 from argus.agent_runtime.substage_events import emit_substage
-from argus.domain.discovery_search import (
+from argus.domain.market_data import resolve_asset
+from argus.domain.research.search import (
     SearchResultPacket,
     SearchUnavailableError,
     discovery_search_config,
     selection,
 )
-from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 
@@ -71,6 +71,30 @@ async def discovery_stage_result_if_applicable(
 
     if decision.semantic_turn_act != "asset_discovery":
         return None
+    return await discovery_operation_result(
+        decision=decision,
+        request=decision.asset_discovery,
+        current_user_message=current_user_message,
+        language=language,
+        discovery_allowance_available=discovery_allowance_available,
+    )
+
+
+async def discovery_operation_result(
+    *,
+    decision: InterpretDecision,
+    request: AssetDiscoveryRequest | None,
+    current_user_message: str,
+    language: str,
+    discovery_allowance_available: bool = True,
+    packet_cache: Any | None = None,
+) -> StageResult | None:
+    """The find pipeline behind the act gate, callable as a rail operation.
+
+    ``packet_cache`` is the research rail's shared-cache seam around the
+    provider call (get before searching, put after); the flag-off act-gated
+    path never passes one, so its behavior is untouched.
+    """
     config = discovery_search_config()
     if not config.enabled:
         return await _recovery_result(
@@ -80,7 +104,6 @@ async def discovery_stage_result_if_applicable(
             current_user_message=current_user_message,
             language=language,
         )
-    request = decision.asset_discovery
     query = _search_query(request)
     if request is None or not query:
         return await _recovery_result(
@@ -101,49 +124,67 @@ async def discovery_stage_result_if_applicable(
             can_request_search=discovery_allowance_available,
         )
     usage: dict[str, Any] = {"search_attempted": False}
-    try:
-        provider = selection.search_provider_for_config(provider_id=config.provider_id)
-        usage["search_attempted"] = True
-        # Never announce a search that will not happen.
-        emit_substage("discovery_search", detail=_search_subject(request))
-        # Sync provider client: off the loop, or one search stalls every stream.
-        packet = await asyncio.to_thread(
-            provider.search,
-            query,
-            max_results=5,
-            timeout_seconds=config.timeout_seconds,
+    packet = packet_cache.get() if packet_cache is not None else None
+    if packet is not None:
+        # A cached packet is not a provider attempt: no search substage, no
+        # spend, and the ceiling stays untouched.
+        usage.update(
+            cache_status="hit",
+            provider_id=packet.provider_id,
+            latency_ms=packet.latency_ms,
+            cost_usd=None,
+            result_count=len(packet.results),
         )
-    except SearchUnavailableError as exc:
-        if exc.reason == "not_configured":
-            usage["search_attempted"] = False
-        usage["fallback_code"] = f"search_{exc.reason}"
-        permanently_unavailable = exc.reason in {
-            "not_configured",
-            "authentication_failed",
-        }
-        logger.warning(
-            "Grounded discovery search unavailable",
-            reason=exc.reason,
-            detail=exc.detail,
+    else:
+        try:
+            provider = selection.search_provider_for_config(
+                provider_id=config.provider_id
+            )
+            usage["search_attempted"] = True
+            # Never announce a search that will not happen.
+            emit_substage("discovery_search", detail=_search_subject(request))
+            # Sync provider client: off the loop, or one search stalls every
+            # stream.
+            packet = await asyncio.to_thread(
+                provider.search,
+                query,
+                max_results=5,
+                timeout_seconds=config.timeout_seconds,
+            )
+        except SearchUnavailableError as exc:
+            if exc.reason == "not_configured":
+                usage["search_attempted"] = False
+            usage["fallback_code"] = f"search_{exc.reason}"
+            permanently_unavailable = exc.reason in {
+                "not_configured",
+                "authentication_failed",
+            }
+            logger.warning(
+                "Grounded discovery search unavailable",
+                reason=exc.reason,
+                detail=exc.detail,
+            )
+            return await _recovery_result(
+                decision=decision,
+                code=(
+                    "discovery_unavailable"
+                    if permanently_unavailable
+                    else "discovery_search_failed"
+                ),
+                retryable=not permanently_unavailable,
+                current_user_message=current_user_message,
+                language=language,
+                usage=usage,
+            )
+        usage.update(
+            provider_id=packet.provider_id,
+            latency_ms=packet.latency_ms,
+            cost_usd=packet.cost_usd,
+            result_count=len(packet.results),
         )
-        return await _recovery_result(
-            decision=decision,
-            code=(
-                "discovery_unavailable"
-                if permanently_unavailable
-                else "discovery_search_failed"
-            ),
-            retryable=not permanently_unavailable,
-            current_user_message=current_user_message,
-            language=language,
-            usage=usage,
-        )
-    usage.update(
-        provider_id=packet.provider_id,
-        latency_ms=packet.latency_ms,
-        cost_usd=packet.cost_usd,
-        result_count=len(packet.results),
-    )
+        if packet_cache is not None:
+            usage["cache_status"] = "miss"
+            packet_cache.put(packet)
     extraction = await extract_candidates(
         request=request, packet=packet, language=language
     )

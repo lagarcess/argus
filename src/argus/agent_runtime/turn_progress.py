@@ -413,9 +413,7 @@ def _project_risk_rules(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list | tuple):
         return []
     projected = [
-        rule
-        for item in value
-        if (rule := _project_leaf_fields(item, _RISK_RULE_FIELDS))
+        rule for item in value if (rule := _project_leaf_fields(item, _RISK_RULE_FIELDS))
     ]
     return projected
 

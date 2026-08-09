@@ -954,6 +954,8 @@ def _retry_failed_action_stage_result(
             ),
         },
     )
+
+
 def _retry_failed_action_response_intent(
     *,
     status: ArtifactActionRecoveryStatus,
@@ -1084,9 +1086,11 @@ async def artifact_followup_stage_result_if_applicable(
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": response,
-            **({} if used_recovery else {
-                "response_intent": result_followup_response_intent(focus)
-            }),
+            **(
+                {}
+                if used_recovery
+                else {"response_intent": result_followup_response_intent(focus)}
+            ),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",

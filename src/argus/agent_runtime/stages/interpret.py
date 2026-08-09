@@ -25,7 +25,7 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.discovery import discovery_stage_result_for
+from argus.agent_runtime.research_answer import discovery_turn_stage_result
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
@@ -1091,7 +1091,7 @@ async def _stage_result_from_interpretation(
     )
     if retry_result is not None:
         return retry_result
-    discovery_result = await discovery_stage_result_for(
+    discovery_result = await discovery_turn_stage_result(
         interpretation=interpretation, decision=decision, state=state, user=user
     )
     if discovery_result is not None:

@@ -173,6 +173,8 @@ export type BacktestJob = {
   conversation_id: string;
   request_message_id?: string | null;
   confirmation_message_id?: string | null;
+  // Absent on legacy rows; treat missing as a backtest job.
+  operation_scope?: "chat.run_backtest" | "backtests.run" | "chat.research" | null;
   status: BacktestJobStatus;
   result_run_id?: string | null;
   failure_code?: string | null;
@@ -710,6 +712,41 @@ export async function getConversationMessages(
   );
 }
 
+export async function addConfirmationPeerAssets(
+  conversationId: string,
+  confirmationId: string,
+  symbols: string[],
+) {
+  // Deterministic basket growth: no chat turn, no allowance spend. The
+  // backend re-validates every symbol against the active turn's peer rows.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    },
+  );
+  return response.message;
+}
+
+export async function restoreConfirmationAssets(
+  conversationId: string,
+  confirmationId: string,
+) {
+  // Undo for a peer add: the backend re-materializes the exact previous
+  // asset set from the card's own typed adjustment data.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restore_previous: true }),
+    },
+  );
+  return response.message;
+}
+
 export async function patchConversation(
   conversationId: string,
   patch: {
@@ -844,7 +881,7 @@ export async function runBacktest(payload: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": randomId(),
     },
     body: JSON.stringify(payload),
   });
@@ -875,7 +912,7 @@ export async function streamChatMessage(
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-  const submittedRequestId = options.requestId ?? crypto.randomUUID();
+  const submittedRequestId = options.requestId ?? randomId();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -896,7 +933,7 @@ export async function streamChatMessage(
       "X-Request-Id": submittedRequestId,
       "Idempotency-Key":
         (typeof input !== "string" && runActionIdempotencyKey(input)) ||
-        crypto.randomUUID(),
+        randomId(),
       ...authHeaders,
     },
     body: JSON.stringify({
@@ -1110,6 +1147,7 @@ export async function postFeedback(payload: {
   });
 }
 import type { UserResponse } from "./guest-account";
+import { randomId } from "./random-id";
 
 export type {
   AccountCapabilities,

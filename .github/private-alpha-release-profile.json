@@ -16,6 +16,8 @@
         "ARGUS_CHECKPOINTER_MODE": "postgres",
         "ARGUS_ENABLE_EXECUTION_REALISM": "true",
         "ARGUS_ENABLE_PERSONALIZATION_MEMORY": "false",
+        "ARGUS_RESEARCH_RAIL_ENABLED": "false",
+        "ARGUS_RESEARCH_GLOBAL_DAILY_CEILING": "5000",
         "ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL": "false",
         "ARGUS_MEMORY_EMBEDDING_MODEL": "pplx-embed-v1-0.6b",
         "ARGUS_MEMORY_EMBEDDING_DIMENSIONS": "1024",
@@ -78,7 +80,7 @@
         "NEXT_PUBLIC_MOCK_AUTH": "false",
         "NEXT_PUBLIC_ENABLE_SPANISH": "true",
         "NEXT_PUBLIC_OMNISEARCH_ENABLED": "true",
-        "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED": "false",
+        "NEXT_PUBLIC_RESEARCH_RAIL_ENABLED": "false",
         "NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL": "support@get-argus.com"
       },
       "required_present": [

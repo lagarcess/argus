@@ -298,9 +298,7 @@ def _date_value_is_less_specific(candidate: Any, existing: Any) -> bool:
         return True
     candidate_digits = sum(1 for char in candidate_text if char.isdigit())
     existing_digits = sum(1 for char in existing_text if char.isdigit())
-    return candidate_digits < existing_digits and existing_text.startswith(
-        candidate_text
-    )
+    return candidate_digits < existing_digits and existing_text.startswith(candidate_text)
 
 
 def _llm_value_is_empty(value: Any) -> bool:
@@ -421,7 +419,9 @@ def _bounded_date_evidence_candidates(draft: LLMStrategyDraft) -> list[str]:
         value = evidence_spans.get(key)
         if value:
             candidates.append(value)
-    return list(dict.fromkeys(str(item).strip() for item in candidates if str(item).strip()))
+    return list(
+        dict.fromkeys(str(item).strip() for item in candidates if str(item).strip())
+    )
 
 
 def _capital_source(field_provenance: dict[str, str], key: str) -> str:

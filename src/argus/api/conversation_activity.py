@@ -42,9 +42,7 @@ def _as_datetime(value: Any, *, field: str) -> datetime:
                 candidate = normalized.find(marker, seconds_separator + 1)
                 if candidate != -1:
                     offset_start = min(offset_start, candidate)
-            fraction_start = normalized.find(
-                ".", seconds_separator + 1, offset_start
-            )
+            fraction_start = normalized.find(".", seconds_separator + 1, offset_start)
             if fraction_start != -1:
                 fraction = normalized[fraction_start + 1 : offset_start]
                 if fraction.isdigit() and 1 <= len(fraction) <= 6:
@@ -125,8 +123,7 @@ def _memory_result_hydrateable(
         return False
     card = run.conversation_result_card
     if not all(
-        isinstance(card.get(key), str) and card[key]
-        for key in EVIDENCE_IDENTITY_KEYS
+        isinstance(card.get(key), str) and card[key] for key in EVIDENCE_IDENTITY_KEYS
     ):
         return False
     artifact_id = str(card["evidence_artifact_id"])
@@ -205,14 +202,11 @@ def _memory_sources(
             "expired",
         }:
             continue
-        result_hydrateable = (
-            status == "succeeded"
-            and _memory_result_hydrateable(
-                store,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                result_run_id=row.get("result_run_id"),
-            )
+        result_hydrateable = status == "succeeded" and _memory_result_hydrateable(
+            store,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            result_run_id=row.get("result_run_id"),
         )
         occurred_at = row.get("updated_at")
         if status in {"failed", "canceled", "expired"} or result_hydrateable:
@@ -364,7 +358,11 @@ class ConversationActivityService:
                     if source is None:
                         raise ConversationActivityConflict(conversation_id)
                     current = _read_state_from_row(raw_state)
-                    if current is None or current.read_through is None or current.read_through < source.boundary:
+                    if (
+                        current is None
+                        or current.read_through is None
+                        or current.read_through < source.boundary
+                    ):
                         raw_state.update(
                             {
                                 "read_through_occurred_at": source.occurred_at,

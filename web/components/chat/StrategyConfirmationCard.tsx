@@ -109,6 +109,24 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
     canShowActions &&
     confirmation.capabilities?.execution_costs_editable === true;
   const StatusIcon = displayState.icon;
+  // Motion is the feedback for a deliberate add: freshly added chips animate
+  // in, and nothing narrates the action back to the user.
+  const addedSymbols = new Set(
+    (confirmation.assets_adjustment?.added ?? []).map((item) => item.symbol),
+  );
+  // Consequences the user did not choose disclose inline where they land:
+  // a basket change that clamps the shared history window notes it next to
+  // the period value, never in a banner.
+  const periodChange = confirmation.assets_adjustment?.period_change ?? null;
+  const periodChangeNote = periodChange
+    ? t("chat.confirmation.period_adjustment", {
+        defaultValue:
+          "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
+        period:
+          compactDateRangeDisplay(periodChange.to, i18n.language) ??
+          `${periodChange.to.start} → ${periodChange.to.end}`,
+      })
+    : null;
 
   return (
     <section className="argus-card-reveal argus-confirmation-reveal w-full overflow-hidden rounded-[20px] border border-[#c9c9cd] bg-white text-[#191c1f] dark:border-white/12 dark:bg-[#1d2023] dark:text-white">
@@ -116,7 +134,10 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {viewModel.assetSymbols.length > 0 && (
-              <AssetSymbols symbols={viewModel.assetSymbols} />
+              <AssetSymbols
+                symbols={viewModel.assetSymbols}
+                animatedSymbols={addedSymbols}
+              />
             )}
             <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
               {viewModel.strategyLabel}
@@ -145,6 +166,14 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
                     {displayConfirmationRowLabel(row, t)}
                   </dt>
                   <ConfirmationValue row={row} variant="summary" />
+                  {row.key === "period" && periodChangeNote ? (
+                    <p
+                      data-testid="confirmation-period-change-note"
+                      className="mt-1 text-[12px] leading-snug text-[#8d969e]"
+                    >
+                      {periodChangeNote}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </dl>
@@ -214,6 +243,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
           ))}
         </div>
       )}
+
     </section>
   );
 }
@@ -429,13 +459,27 @@ function confirmationAssetTitle(
   return fallbackTitle.trim() || t("chat.confirmation.selected_asset", "Selected asset");
 }
 
-function AssetSymbols({ symbols }: { symbols: string[] }) {
+function AssetSymbols({
+  symbols,
+  animatedSymbols,
+}: {
+  symbols: string[];
+  animatedSymbols?: Set<string>;
+}) {
   return (
     <span className="flex flex-wrap gap-1.5">
       {symbols.map((symbol) => (
-        <EntityToken key={symbol} kind="asset" surface="card">
-          {symbol}
-        </EntityToken>
+        <span
+          key={symbol}
+          data-testid={
+            animatedSymbols?.has(symbol) ? "confirmation-added-chip" : undefined
+          }
+          className={animatedSymbols?.has(symbol) ? "argus-chip-appear" : undefined}
+        >
+          <EntityToken kind="asset" surface="card">
+            {symbol}
+          </EntityToken>
+        </span>
       ))}
     </span>
   );

@@ -105,13 +105,8 @@ class ChatTurnLifecycleHooks:
         retryable: bool,
     ) -> Message:
         public_metadata = _public_metadata(metadata)
-        if (
-            retryable
-            and not is_legacy_onboarding_marker(self.request_message.content)
-        ):
-            public_metadata.update(
-                durable_retry_last_turn_metadata(self.request_message)
-            )
+        if retryable and not is_legacy_onboarding_marker(self.request_message.content):
+            public_metadata.update(durable_retry_last_turn_metadata(self.request_message))
         else:
             public_metadata.pop("retry_last_turn", None)
         if self.turn_id is None:

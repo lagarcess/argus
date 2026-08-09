@@ -292,7 +292,8 @@ def _llm_strategy_draft_has_executable_shape(draft: LLMStrategyDraft) -> bool:
     if strategy_type == "signal_strategy":
         return _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
     return bool(
-        draft.cadence or _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
+        draft.cadence
+        or _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
     )
 
 

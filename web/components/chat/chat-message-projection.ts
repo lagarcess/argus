@@ -5,7 +5,10 @@ import {
   type ChatActionRequest,
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
-import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
+import {
+  discoverySidecarFromMetadata,
+  researchSourcesFromMetadata,
+} from "@/lib/chat-discovery-sidecar";
 import { memoryRecallsFromMetadata } from "@/lib/memory-recalls";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
@@ -372,6 +375,10 @@ export function hydrateMessagesFromApi(
             message.id,
           ),
           actions: confirmation.actions ?? [],
+          // Researched peer adds ride the ordinary Try-next surface below
+          // the card's turn (research rail, spec section 6).
+          nextExperiments:
+            nextExperimentRowsFromMetadata(metadata) ?? undefined,
         };
       }
       const hydratedText = hydrateTextMessageFromApi(message, {
@@ -385,6 +392,7 @@ export function hydrateMessagesFromApi(
       });
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
+        const researchSources = researchSourcesFromMetadata(metadata);
         // Grounded knowledge answers carry Try next rows on a plain message;
         // a discovery sidecar owns its message and suppresses them. Memory
         // recalls overlay either shape independently.
@@ -392,10 +400,20 @@ export function hydrateMessagesFromApi(
           ? null
           : nextExperimentRowsFromMetadata(metadata);
         const memoryRecalls = memoryRecallsFromMetadata(metadata);
-        if (discovery || nextExperiments || memoryRecalls) {
+        if (
+          discovery ||
+          nextExperiments ||
+          memoryRecalls ||
+          researchSources.length > 0
+        ) {
           return {
             ...hydratedText,
             ...(discovery ? { discovery } : {}),
+            // A discovery turn already renders its own sources panel; one
+            // answer must never offer two source surfaces.
+            ...(!discovery && researchSources.length > 0
+              ? { researchSources }
+              : {}),
             ...(nextExperiments ? { nextExperiments } : {}),
             ...(memoryRecalls ? { memoryRecalls } : {}),
           };

@@ -4,7 +4,7 @@ from loguru import logger
 
 from argus.agent_runtime.discovery.contracts import DiscoveryExtraction
 from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
-from argus.domain.discovery_search import SearchResultPacket
+from argus.domain.research.search import SearchResultPacket
 from argus.llm.openrouter import invoke_openrouter_json_schema
 
 

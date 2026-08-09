@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import httpx
 from argus.observability import (
     build_event_envelope,
@@ -8,6 +11,46 @@ from argus.observability import (
     posthog_event_payload,
     sanitize_observability_attributes,
 )
+from argus.observability import envelope as envelope_module
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+_APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS = frozenset(
+    {
+        "product_event",
+        "language",
+        "surface",
+        "terminal_outcome",
+        "conversion_reason",
+        "strategy_category",
+        "capability_category",
+    }
+)
+_SCALAR_ATTRIBUTE_VALUES = st.one_of(
+    st.text(max_size=40),
+    st.integers(),
+    st.floats(allow_nan=False, allow_infinity=False),
+    st.booleans(),
+)
+
+
+def _posthog_properties(attributes: dict[str, Any]) -> dict[str, Any]:
+    envelope = build_event_envelope(
+        event_type="tool_result",
+        event_action="completed",
+        feature_area="guest_acquisition",
+        attributes=attributes,
+    )
+    payload = posthog_event_payload(envelope, api_key="ph_project_token")
+    properties = payload["properties"]
+    assert isinstance(properties, dict)
+    return properties
+
+
+def test_posthog_top_level_attribute_allowlist_is_closed() -> None:
+    assert envelope_module._POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST == (
+        _APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS
+    )
 
 
 def test_private_alpha_event_envelope_is_non_emitting_by_default(monkeypatch) -> None:
@@ -179,3 +222,160 @@ def test_observability_sanitizer_blocks_sensitive_and_raw_payloads() -> None:
         "nested": {"safe_count": 2},
         "items": [{"safe": "yes"}, "keep short text"],
     }
+
+
+@settings(max_examples=100, deadline=None)
+@given(
+    attributes=st.dictionaries(
+        keys=st.one_of(
+            st.sampled_from(sorted(_APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS)),
+            st.text(min_size=1, max_size=24),
+        ),
+        values=_SCALAR_ATTRIBUTE_VALUES,
+        max_size=20,
+    )
+)
+def test_posthog_projection_matches_allowlist_intersection_for_scalar_attributes(
+    attributes: dict[str, str | int | float | bool],
+) -> None:
+    envelope = build_event_envelope(
+        event_type="tool_result",
+        event_action="completed",
+        feature_area="guest_acquisition",
+        attributes=attributes,
+    )
+    payload = posthog_event_payload(envelope, api_key="ph_project_token")
+    properties = payload["properties"]
+    assert isinstance(properties, dict)
+
+    expected = _APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS & envelope.attributes.keys()
+    preexisting_top_level_keys = set(_posthog_properties({})) | {"attributes"}
+    promoted = (set(properties) - preexisting_top_level_keys) & envelope.attributes.keys()
+
+    assert promoted == expected
+    for key in promoted:
+        assert properties[key] == envelope.attributes[key]
+
+
+def test_posthog_projection_promotes_only_the_approved_categorical_dimensions() -> None:
+    attributes = {
+        "product_event": "first_result_completed",
+        "language": "en",
+        "surface": "chat",
+        "terminal_outcome": "completed",
+        "conversion_reason": "first_result",
+        "strategy_category": "dca",
+        "capability_category": "backtest",
+        "safe_count": 2,
+    }
+
+    properties = _posthog_properties(attributes)
+
+    assert {
+        key: properties[key]
+        for key in _APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS
+        if key in properties
+    } == {key: attributes[key] for key in _APPROVED_TOP_LEVEL_ATTRIBUTE_KEYS}
+    assert "safe_count" not in properties
+
+
+def test_posthog_projection_never_promotes_nested_allowlisted_values() -> None:
+    properties = _posthog_properties(
+        {
+            "product_event": ["first_result_completed"],
+            "language": {"code": "en"},
+            "surface": ["chat"],
+            "terminal_outcome": "completed",
+        }
+    )
+
+    assert "product_event" not in properties
+    assert "language" not in properties
+    assert "surface" not in properties
+    assert properties["terminal_outcome"] == "completed"
+    assert properties["attributes"] == {
+        "product_event": ["first_result_completed"],
+        "language": {"code": "en"},
+        "surface": ["chat"],
+        "terminal_outcome": "completed",
+    }
+
+
+def test_posthog_projection_preserves_existing_top_level_property_on_collision(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        envelope_module,
+        "_POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST",
+        frozenset({"product_event", "status"}),
+        raising=False,
+    )
+    envelope = build_event_envelope(
+        event_type="tool_result",
+        event_action="completed",
+        feature_area="guest_acquisition",
+        status="completed",
+        attributes={"product_event": "first_result_completed", "status": "ignored"},
+    )
+    payload = posthog_event_payload(envelope, api_key="ph_project_token")
+    properties = payload["properties"]
+    assert isinstance(properties, dict)
+
+    assert properties["product_event"] == "first_result_completed"
+    assert properties["status"] == "completed"
+    assert properties["attributes"]["status"] == "ignored"
+
+
+def test_posthog_projection_keeps_sanitized_attributes_byte_identical() -> None:
+    envelope = build_event_envelope(
+        event_type="tool_result",
+        event_action="completed",
+        feature_area="guest_acquisition",
+        attributes={
+            "product_event": "first_result_completed",
+            "language": "en",
+            "safe_count": 2,
+            "nested": {"safe": "value"},
+        },
+    )
+    payload = posthog_event_payload(envelope, api_key="ph_project_token")
+    properties = payload["properties"]
+    assert isinstance(properties, dict)
+
+    assert json.dumps(
+        properties["attributes"], sort_keys=True, separators=(",", ":")
+    ) == json.dumps(envelope.attributes, sort_keys=True, separators=(",", ":"))
+
+
+def test_posthog_projection_keeps_sensitive_values_and_raw_identifiers_out() -> None:
+    raw_conversation_id = "conversation-raw-id"
+    envelope = build_event_envelope(
+        event_type="tool_result",
+        event_action="completed",
+        feature_area="guest_acquisition",
+        conversation_id=raw_conversation_id,
+        attributes={
+            "product_event": "first_result_completed",
+            "raw_prompt": "buy all of my account",
+            "assistant_prose": "private message text",
+            "account_balance": "$100,000",
+            "api_key": "credential-secret",
+        },
+    )
+    payload = posthog_event_payload(envelope, api_key="ph_project_token")
+    properties = payload["properties"]
+    assert isinstance(properties, dict)
+
+    assert properties["product_event"] == "first_result_completed"
+    assert properties["conversation_id_hash"]
+    assert properties["attributes"] == {
+        "product_event": "first_result_completed",
+    }
+    for blocked_value in (
+        raw_conversation_id,
+        "buy all of my account",
+        "private message text",
+        "$100,000",
+        "credential-secret",
+    ):
+        assert blocked_value not in str(properties)

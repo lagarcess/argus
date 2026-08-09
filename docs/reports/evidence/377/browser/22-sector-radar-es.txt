@@ -1,0 +1,68 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Tendencias del sector de ciberseguridad
+¿Qué está pasando en el sector de ciberseguridad?
+En pocas palabras
+
+La ciberseguridad está en una fase expansiva y el mercado bursátil la está premiando, impulsado por tres fuerzas: ataques potenciados por IA, protección de nubes/agentes autónomos y consolidación del gasto empresarial en pocas plataformas. Pero no sube todo por igual: Palo Alto Networks (PANW), CrowdStrike (CRWD), Fortinet (FTNT) y Okta (OKTA) están cerca de máximos anuales; Zscaler (ZS) y Check Point (CHKP) están claramente rezagadas.
+
+Los ETF sectoriales confirman la fortaleza: al 4 de agosto de 2026, HACK ganaba 41.86% en el año y CIBR 37.42%. Al cierre del 7 de agosto, ambos estaban a menos de 2% de su máximo de 52 semanas.
+
+Qué está moviendo al sector
+
+La IA agranda tanto la demanda como el riesgo.
+Según una encuesta de ISG, 74% de las grandes empresas aumentó su inversión en herramientas de seguridad relacionadas con IA y 69% elevó el presupuesto para detectar amenazas de IA. En promedio, los presupuestos totales de ciberseguridad subieron 5% de 2025 a 2026.
+
+Las empresas quieren menos proveedores y plataformas más amplias.
+El gasto se está concentrando en suites que combinan protección de red, nube, dispositivos, identidad y operaciones de seguridad. Esto favorece particularmente a PANW, CRWD y FTNT, que pueden vender varios módulos al mismo cliente.
+
+Los fundamentos siguen creciendo, aunque con grandes diferencias.
+En sus periodos más recientes, PANW, CRWD, FTNT y ZS mostraron expansión secuencial de ingresos. OKTA y CHKP apenas crecieron frente al trimestre anterior.
+
+La rentabilidad importa más que antes.
+FTNT y CHKP presentan márgenes operativos GAAP altos; CRWD y ZS aún reportan pequeñas pérdidas operativas GAAP. El mercado acepta pérdidas cuando el crecimiento y los ingresos recurrentes son fuertes, pero castiga rápidamente cualquier desaceleración.
+
+Líderes y rezagados
+
+Cierres y rangos al 7 de agosto de 2026; USD. La distancia al máximo está calculada con los datos mostrados.
+
+TICKER	PRECIO	CAPITALIZACIÓN	DISTANCIA AL MÁXIMO DE 52 SEM.	LECTURA
+CRWD	$214.42	$218.34 mil millones	-2.25%	Líder en endpoint y operaciones de seguridad; fuerte crecimiento recurrente
+PANW	$363.86	$296.55 mil millones	-3.48%	Principal ganador de la consolidación en plataformas
+OKTA	$148.32	$24.64 mil millones	-5.53%	Recuperación en identidad y mejora de rentabilidad
+FTNT	$159.64	$117.13 mil millones	-7.23%	Combina crecimiento con el mejor margen del grupo analizado
+ZS	$168.68	$27.28 mil millones	-49.95%	Negocio crece, pero la acción refleja dudas sobre ejecución/valoración
+CHKP	$127.82	$13.05 mil millones	-39.32%	Muy rentable, pero crecimiento lento
+
+El 7 de agosto, la sesión también fue favorable para software de seguridad: ZS +3.74%, CRWD +3.39%, OKTA +3.35%, CHKP +2.03% y PANW +1.22%. FTNT bajó 0.29%.
+
+Lo que dicen los resultados recientes
+
+Las comparaciones siguientes son secuenciales, contra el trimestre inmediatamente anterior, porque los calendarios fiscales no coinciden:
+
+TICKER	INGRESOS MÁS RECIENTES	CRECIMIENTO SECUENCIAL	MARGEN OPERATIVO GAAP
+PANW	$3.002 mil millones	+15.73%	-6%
+CRWD	$1.386 mil millones	+6.15%	-2%
+FTNT	$2.048 mil millones	+10.72%	34%
+ZS	$850.475 millones	+4.26%	-3%
+OKTA	$765 millones	+0.53%	7%
+CHKP	$673.6 millones	+0.78%	27%
+
+Esto explica la dispersión:
+
+PANW crece con fuerza por su estrategia de “plataformización”, pero su margen trimestral GAAP fue negativo.
+CRWD mantiene alto crecimiento y generó $590.937 millones de flujo operativo en su trimestre más reciente, aunque todavía tuvo margen operativo GAAP de -2%.
+FTNT destaca por la combinación más visible de crecimiento y rentabilidad: ingresos secuenciales +10.72%, margen operativo de 34% y $1.044 mil millones de flujo operativo.
+ZS no parece rezagada por falta de demanda: sus ingresos llegaron a $850.475 millones y su ARR superó $3.5 mil millones, pero la acción está casi 50% debajo de su máximo anual. El problema es más de expectativas, competencia y valoración.
+OKTA ya muestra rentabilidad operativa positiva, aunque
+QUÉ PROBAR DESPUÉS
+↳
+Probar Palo Alto Networks PANW en los últimos 3 años
+↳
+Probar Palo Alto Networks PANW frente a CrowdStrike Holdings, Inc. Class A CRWD, Fortinet FTNT y Zscaler ZS
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

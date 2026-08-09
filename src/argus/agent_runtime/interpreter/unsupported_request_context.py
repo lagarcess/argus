@@ -39,9 +39,7 @@ def response_with_unsupported_request_runtime_facts(
     return response.model_copy(
         update={
             "candidate_strategy_draft": draft,
-            "reason_codes": list(
-                dict.fromkeys([*response.reason_codes, *reason_codes])
-            ),
+            "reason_codes": list(dict.fromkeys([*response.reason_codes, *reason_codes])),
         }
     )
 

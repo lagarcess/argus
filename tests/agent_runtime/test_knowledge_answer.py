@@ -12,7 +12,7 @@ import pytest
 from argus.agent_runtime import knowledge_answer as ka
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
-from argus.domain.discovery_search.contracts import SearchResult, SearchResultPacket
+from argus.domain.research.search.contracts import SearchResult, SearchResultPacket
 
 USER = UserState(user_id="ka", language_preference="es")
 

@@ -16,7 +16,10 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.draft_shape import (
+    _EXECUTION_EVIDENCE_FIELDS,
+    strategy_has_execution_evidence,
+)
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
     NEXT_EXPERIMENTS_VERSION,
@@ -37,9 +40,10 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.strategy_contract import resolve_date_range
-from argus.domain.discovery_search.config import discovery_search_config
-from argus.domain.discovery_search.contracts import SearchUnavailableError
-from argus.domain.discovery_search.selection import search_provider_for_config
+from argus.domain.research.config import research_rail_enabled
+from argus.domain.research.search.config import discovery_search_config
+from argus.domain.research.search.contracts import SearchUnavailableError
+from argus.domain.research.search.selection import search_provider_for_config
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -65,10 +69,10 @@ def _with_bold_figure(text: str) -> str:
     for index, token in enumerate(tokens):
         if any(character.isdigit() for character in token):
             core = token.rstrip(".,;:)")
-            suffix = token[len(core):]
+            suffix = token[len(core) :]
             if index + 1 < len(tokens) and tokens[index + 1].startswith("%"):
                 trailing = tokens[index + 1].rstrip(".,;:)")
-                rest = tokens[index + 1][len(trailing):]
+                rest = tokens[index + 1][len(trailing) :]
                 tokens[index] = f"**{core} {trailing}**{rest or suffix}"
                 del tokens[index + 1]
             else:
@@ -117,6 +121,46 @@ class KnowledgeQueryExtraction(BaseModel):
     date_range_raw_text: str | None = None
 
 
+# A default the interpreter injects for any two-asset mention is not the
+# user's stated intent to run something. Everything else in the evidence set
+# is: capital, cadence, sizing, rules, an explicit template.
+_DEFAULTED_EXECUTION_FIELDS = frozenset({"strategy_type"})
+
+
+def _rail_may_claim_clarification(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    """Widen the rail's entry to turns the builder is about to question.
+
+    "Compare PLTR to LMT" carries no capital, no window, and no execution
+    verb, yet the interpreter injects a default buy_and_hold, the draft then
+    counts as execution evidence, and the builder asks for a date window. It
+    is a question wearing a strategy's clothes, and which interpreter model
+    won the race decided whether it reached the rail at all.
+
+    This is not a second router and not a phrase list: it only lets the same
+    rail classifier see the turn. The classifier answers "none" for genuine
+    build requests, so those fall through to the builder unchanged. A draft
+    that carries any real execution field never reaches here.
+    """
+    if not research_rail_enabled():
+        return False
+    if not interpretation.requires_clarification:
+        return False
+    return _execution_evidence_is_only_a_default(
+        interpretation.candidate_strategy_draft
+    )
+
+
+def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
+    for field in _EXECUTION_EVIDENCE_FIELDS:
+        if field in _DEFAULTED_EXECUTION_FIELDS:
+            continue
+        if getattr(strategy, field, None) not in (None, "", [], {}):
+            return False
+    return True
+
+
 async def knowledge_answer_stage_result(
     *,
     interpretation: StructuredInterpretation,
@@ -126,17 +170,36 @@ async def knowledge_answer_stage_result(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     if selected_thread_metadata.get("last_stage_outcome") == "await_user_reply":
-        return None
-    if interpretation.intent not in _KNOWLEDGE_INTENTS:
-        return None
-    if (
-        interpretation.semantic_turn_act is not None
-        and interpretation.semantic_turn_act not in _KNOWLEDGE_ACTS
-    ):
+        # A reply to a pending question belongs to whoever asked it.
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
         return None
-    if strategy_has_execution_evidence(interpretation.candidate_strategy_draft):
+    rail_claim = _rail_may_claim_clarification(interpretation)
+    if (
+        strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
+        and not rail_claim
+    ):
+        return None
+    knowledge_shaped = interpretation.intent in _KNOWLEDGE_INTENTS and (
+        interpretation.semantic_turn_act is None
+        or interpretation.semantic_turn_act in _KNOWLEDGE_ACTS
+    )
+    if not knowledge_shaped and not rail_claim:
+        return None
+    if research_rail_enabled():
+        # The rail's richer classifier subsumes the legacy one, so a flag-on
+        # turn still makes exactly one routing call. The resolved-asset
+        # shortcut below is deliberately skipped: a current-quote ask must be
+        # allowed to reach the fast research shape instead of being pinned to
+        # historical stats.
+        from argus.agent_runtime.research_answer import research_answer_stage_result
+
+        return await research_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
+    if not knowledge_shaped:
+        # Flag off, the widened entry does not exist: only the legacy
+        # knowledge shapes reach the pre-rail answerer.
         return None
     # A provider-resolved asset on a knowledge turn IS the interpreter's own
     # classification: the user is asking about that asset. No second LLM call.
@@ -200,9 +263,7 @@ def _query_from_interpretation(
     return KnowledgeQueryExtraction(
         question_kind="market_stats",
         symbols=symbols,
-        date_range_raw_text=(
-            str(raw_window) if raw_window not in (None, "") else None
-        ),
+        date_range_raw_text=(str(raw_window) if raw_window not in (None, "") else None),
     )
 
 
@@ -256,9 +317,7 @@ async def _market_stats_answer(
     if not symbols:
         return None
     symbol = symbols[0]
-    window = resolve_date_range(
-        query.date_range_raw_text or draft.date_range or None
-    )
+    window = resolve_date_range(query.date_range_raw_text or draft.date_range or None)
     try:
         # Lazy: the API import boundary keeps the backtest compute stack out
         # of startup; these load only when a market-stats answer actually runs.
@@ -281,8 +340,13 @@ async def _market_stats_answer(
             error=str(exc),
         )
         return None
-    facts = _series_facts(series=series, symbol=symbol, window_label=window.label,
-                          start=window.start, end=window.end)
+    facts = _series_facts(
+        series=series,
+        symbol=symbol,
+        window_label=window.label,
+        start=window.start,
+        end=window.end,
+    )
     if facts is None:
         return None
     return await _voiced_answer(
@@ -314,9 +378,7 @@ def _series_facts(
         peak = max(peak, value)
         drawdown = (value / peak - 1.0) * 100.0
         max_drawdown_pct = min(max_drawdown_pct, drawdown)
-    daily_returns = [
-        closes[i] / closes[i - 1] - 1.0 for i in range(1, len(closes))
-    ]
+    daily_returns = [closes[i] / closes[i - 1] - 1.0 for i in range(1, len(closes))]
     mean = sum(daily_returns) / len(daily_returns)
     variance = sum((r - mean) ** 2 for r in daily_returns) / len(daily_returns)
     annualized_vol_pct = (variance**0.5) * (252**0.5) * 100.0
@@ -364,13 +426,10 @@ async def _external_facts_answer(
     if not packet.results:
         return None
     snippets = "\n".join(
-        f"- {result.title}: {result.snippet} ({result.url})"
-        for result in packet.results
+        f"- {result.title}: {result.snippet} ({result.url})" for result in packet.results
     )
     facts = {"search_results": snippets, "provider": packet.provider_id}
-    sources = "\n".join(
-        f"- {result.url}" for result in packet.results[:3]
-    )
+    sources = "\n".join(f"- {result.url}" for result in packet.results[:3])
     fallback = f"{packet.results[0].snippet}\n\nFuentes:\n{sources}"
     voiced = await _voiced_answer(
         message=message,

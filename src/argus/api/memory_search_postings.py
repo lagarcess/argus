@@ -53,9 +53,7 @@ def ranked_groups(group_ids: Iterable[str]) -> RankedGroups:
     return RankedGroups(
         ordered=ordered,
         members=frozenset(ordered),
-        positions={
-            group_id: position for position, group_id in enumerate(ordered)
-        },
+        positions={group_id: position for position, group_id in enumerate(ordered)},
     )
 
 
@@ -82,10 +80,7 @@ def indexes_by_group(group_ids: Iterable[str]) -> dict[str, tuple[int, ...]]:
     indexes: defaultdict[str, list[int]] = defaultdict(list)
     for index, group_id in enumerate(group_ids):
         indexes[group_id].append(index)
-    return {
-        group_id: tuple(group_indexes)
-        for group_id, group_indexes in indexes.items()
-    }
+    return {group_id: tuple(group_indexes) for group_id, group_indexes in indexes.items()}
 
 
 def bounded_ranked_candidate_indexes(
@@ -130,17 +125,13 @@ def bounded_ranked_candidate_indexes(
         count = 0
         for candidate_index in candidate_indexes_by_group.get(group_id, ()):
             if not all(
-                candidate_index in posting.members
-                for posting in required_postings
+                candidate_index in posting.members for posting in required_postings
             ):
                 continue
             if not candidate_matches(candidate_index):
                 continue
             count += 1
-            if (
-                best_index is None
-                or rank_key(candidate_index) > rank_key(best_index)
-            ):
+            if best_index is None or rank_key(candidate_index) > rank_key(best_index):
                 best_index = candidate_index
         if best_index is None:
             return None
@@ -206,9 +197,7 @@ def bounded_ranked_candidate_indexes(
                 group_activity=group_activity,
             )
             remaining = candidate_limit - len(selected)
-            tier_heap: list[
-                tuple[tuple[Any, ...], int, _GroupMatch]
-            ] = []
+            tier_heap: list[tuple[tuple[Any, ...], int, _GroupMatch]] = []
             found = 0
             cutoff_activity: datetime | None = None
             for group_id in islice(driver.ordered, start, None):
@@ -224,10 +213,7 @@ def bounded_ranked_candidate_indexes(
                 global_match: RankedCandidateCursor | None = None
                 if maximum_key is not None:
                     global_match = cursor_group_match(group_id)
-                    if (
-                        global_match is None
-                        or global_match.maximum_key > maximum_key
-                    ):
+                    if global_match is None or global_match.maximum_key > maximum_key:
                         continue
                 group_match = (
                     _GroupMatch(
@@ -236,8 +222,7 @@ def bounded_ranked_candidate_indexes(
                         count=global_match.match_count,
                     )
                     if (
-                        global_match is not None
-                        and global_match.layer_rank == layer_rank
+                        global_match is not None and global_match.layer_rank == layer_rank
                     )
                     else matching_group(group_id)
                 )
@@ -258,14 +243,9 @@ def bounded_ranked_candidate_indexes(
                     heappushpop(tier_heap, heap_entry)
                 if found >= remaining:
                     cutoff_activity = activity
-            tier_selected = [
-                entry[2]
-                for entry in sorted(tier_heap, reverse=True)
-            ]
+            tier_selected = [entry[2] for entry in sorted(tier_heap, reverse=True)]
             selected.extend(tier_selected)
-            match_cache.update(
-                (match.group_id, match) for match in tier_selected
-            )
+            match_cache.update((match.group_id, match) for match in tier_selected)
             if len(selected) >= candidate_limit:
                 break
         return selected
@@ -280,16 +260,12 @@ def bounded_ranked_candidate_indexes(
         )
         combined.extend(cursor_window)
     selected_by_group = {
-        group_id_for_index(match.best_index): match
-        for match in combined
+        group_id_for_index(match.best_index): match for match in combined
     }
     return BoundedRankedCandidates(
-        indexes=tuple(
-            match.best_index for match in selected_by_group.values()
-        ),
+        indexes=tuple(match.best_index for match in selected_by_group.values()),
         match_counts={
-            group_id: match.count
-            for group_id, match in selected_by_group.items()
+            group_id: match.count for group_id, match in selected_by_group.items()
         },
     )
 
@@ -337,25 +313,17 @@ def _cursor_tier_start(
     cursor_activity: datetime | None,
     group_activity: Callable[[str], datetime],
 ) -> int:
-    if (
-        cursor_group_id is None
-        or cursor_tier != current_tier
-        or cursor_activity is None
-    ):
+    if cursor_group_id is None or cursor_tier != current_tier or cursor_activity is None:
         return 0
     position = driver.positions.get(cursor_group_id)
     if position is None:
         return 0
     while (
-        position > 0
-        and group_activity(driver.ordered[position - 1]) == cursor_activity
+        position > 0 and group_activity(driver.ordered[position - 1]) == cursor_activity
     ):
         position -= 1
     return position
 
 
 def _trigrams(value: str) -> set[str]:
-    return {
-        value[index : index + 3]
-        for index in range(max(0, len(value) - 2))
-    }
+    return {value[index : index + 3] for index in range(max(0, len(value) - 2))}

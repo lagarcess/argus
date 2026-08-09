@@ -213,9 +213,7 @@ def _guest_session_simulation_used_count(*, gateway: Any, context: Any) -> int |
     raw_period_start = window.get("period_start")
     try:
         if isinstance(raw_period_start, str):
-            period_start = datetime.fromisoformat(
-                raw_period_start.replace("Z", "+00:00")
-            )
+            period_start = datetime.fromisoformat(raw_period_start.replace("Z", "+00:00"))
         elif isinstance(raw_period_start, datetime):
             period_start = raw_period_start
         else:
