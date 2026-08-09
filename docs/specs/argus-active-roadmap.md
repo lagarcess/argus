@@ -66,7 +66,34 @@ standalone edit.
 
 ## The five
 
-### 1. Answer the first question (serial, first)
+### 1. Answer the first question — SHIPPED 2026-08-09
+
+Merged as PR #396 at `ef08b25d`, 350 files, behind
+`ARGUS_RESEARCH_RAIL_ENABLED` which is `false` in `render.yaml`,
+`.github/argus-env.sh`, and the release profile. Closes #377 and #384.
+
+All five question shapes work from an organic typed question in both
+languages: market pulse, competitor analysis, screening, sector radar, and
+single-stock analysis. Grounded discovery was absorbed rather than left beside
+it, so one provider layer, one classifier, one cache, and one meter serve
+everything. Guests get their own research allowance of three per day.
+
+**Two conditions on turning the flag on**, recorded in the rail spec §13b and
+open as issues. Both are wrong-when-enabled rather than wrong-as-shipped:
+
+- **#411** the routing gate reads which execution field is set, never how it
+  was set, so it cannot tell an interpreter-injected `strategy_type` from a
+  stated one and hands the decision to a second classifier.
+- **#412** a research job whose finalizer dies is settled by a reconciler that
+  nothing schedules, so the answer is lost until an operator runs it by hand.
+
+Also left open, none blocking: **#404** the vaguest market phrasings can still
+be answered from model knowledge, honestly labelled; **#407** the source list
+caps at five by arrival order without deduping by publisher; **#409** recorded
+research cost counts tool fees only and understates a thorough turn by roughly
+40x, which is why the guest ceiling was set conservatively.
+
+The original scope, kept for the record:
 
 Argus must handle an ordinary finance question without refusing it, then turn
 the answer into something runnable.
@@ -268,7 +295,7 @@ how the last split brain happened.
 
 ### Empty chat polish
 
-**Sequencing: after pillar 1 merges, then parallel-safe with the mention tags
+**Sequencing: unblocked 2026-08-09 when pillar 1 merged. Parallel-safe with the mention tags
 lane.** It touches `EmptyChatSurface.tsx`, `ChatInterface.tsx`,
 `EmptyChatGreeting.tsx`, and both locale files. The rail owns all four today and
 created the greeting component. PR #406 touches none of them, so once the rail
@@ -415,17 +442,28 @@ profile and fall back to the nameless pool.
 
 ### Ticker mention entity tags
 
-**Sequencing: after pillar 1 merges.** PR #406 is ready and clean, but it
-overlaps the research rail on nine files, including `ChatInput.tsx`,
-`ChatMessage.tsx`, `StrategyConfirmationCard.tsx`, `types.ts`,
-`src/argus/api/schemas.py`, and the API contract and OpenAPI documents. Merging
-it while the rail is in flight forces a 259-file lane to merge forward a second
-time and resolve conflicts in its own active surface. Holding costs a couple of
-days; the rework then lands on the 25-file PR instead of the large one.
+**Sequencing: unblocked 2026-08-09 when pillar 1 merged.** PR #406 was held
+because it overlapped the research rail on nine files, including
+`ChatInput.tsx`, `ChatMessage.tsx`, `StrategyConfirmationCard.tsx`,
+`types.ts`, `src/argus/api/schemas.py`, and the API contract and OpenAPI
+documents. Merging it mid-flight would have forced a 350-file lane to merge
+forward a second time and resolve conflicts in its own active surface. It now
+merges forward once, against a landed lane instead of a moving one.
+
+It needs a reconciliation pass against the rail before merging, since those
+nine files all changed underneath it.
 
 Its spec is `docs/superpowers/specs/2026-08-09-ticker-mention-entity-tags.md`.
 
 ## Landed this cycle
+
+- **Answer the first question** (PR #396, merged 2026-08-09 at `ef08b25d`) —
+  350 files behind a default-off flag. Grounded discovery absorbed into one
+  rail: one provider layer, one classifier, one cache, one meter. All five
+  question shapes proven from organic typed questions in both languages, each
+  ending on a runnable next step. Guests carry their own research allowance.
+  Two conditions on enabling are open as #411 and #412; see pillar 1 above.
+
 
 - **PostHog native funnel repair** (PR #405, merged 2026-08-09 at `1b4555e2`) —
   product events were captured server side with the business label at
