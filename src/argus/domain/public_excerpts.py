@@ -28,6 +28,14 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptVisualPoint,
 )
 from argus.api.schemas import EvidenceArtifact
+
+# The projection borrows the engine's own substitution rather than restating it. When
+# an exit rule is absent the compiler mirrors the entry by flipping its direction, and
+# a second opinion about what "mirrored" means is how a receipt ends up describing an
+# exit that never ran.
+from argus.domain.backtesting.rules.signals import (
+    _opposite_moving_average_crossover_rule as engine_mirrored_exit_rule,
+)
 from argus.domain.credential_shapes import credential_shape_in
 
 PUBLIC_EXCERPT_ID_BYTES = 24
@@ -39,6 +47,12 @@ MAX_SYMBOLS = 5
 MAX_TEXT_LENGTH = 240
 
 CROSSOVER_WINDOW_KEYS = ("fast_indicator", "fast_period", "slow_indicator", "slow_period")
+
+# Every field _moving_average_crossover_condition reads out of a rule, which is the
+# whole of what the engine consumes. Completeness is judged over this set and not over
+# a chosen part of it: judging by the window fields alone is exactly how the
+# independently configured exit direction went unnoticed once the windows were fixed.
+CROSSOVER_RULE_FIELDS = ("type", *CROSSOVER_WINDOW_KEYS, "direction")
 
 # Owner-facing. A receipt exists to be a truthful frozen record, so a strategy this
 # module cannot describe completely is refused rather than published partially.
@@ -596,8 +610,13 @@ def _crossover_required_keys(
 
     The rule compiler builds entry and exit independently and never requires them to
     match, so reading the windows from the entry rule alone can state an exit that did
-    not run. When the exit rule is absent the engine derives it by flipping the entry
-    direction, so the windows are the entry's and there is nothing extra to say.
+    not run. When the exit rule is absent the engine substitutes the mirror of the
+    entry, which is the exit the rendered "crossed back" sentence describes.
+
+    Anything that is not that mirror has to be stated or refused, judged over the
+    engine's whole field set. A difference the payload has a fact for is projected; a
+    difference it has none for, such as an exit configured in the same direction as the
+    entry, refuses rather than publishing the mirror's sentence over it.
     """
     if not exit_rule:
         return CROSSOVER_WINDOW_KEYS
@@ -605,14 +624,35 @@ def _crossover_required_keys(
         # A crossover entry paired with some other kind of exit is a shape this module
         # has no faithful projection for.
         raise PublicExcerptSourceError(_UNDESCRIBABLE_STRATEGY)
-    differs = any(
-        _strategy_fact_value(exit_rule.get(key))
-        != _strategy_fact_value(entry_rule.get(key))
-        for key in CROSSOVER_WINDOW_KEYS
-    )
-    if not differs:
+    mirror = engine_mirrored_exit_rule(entry_rule) or {}
+    differing = {
+        field
+        for field in CROSSOVER_RULE_FIELDS
+        if _rule_field_token(exit_rule.get(field))
+        != _rule_field_token(mirror.get(field))
+    }
+    if not differing:
         return CROSSOVER_WINDOW_KEYS
+    unprojectable = differing.difference(CROSSOVER_WINDOW_KEYS)
+    if unprojectable:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_STRATEGY)
     return (*CROSSOVER_WINDOW_KEYS, *(f"exit_{key}" for key in CROSSOVER_WINDOW_KEYS))
+
+
+def _rule_field_token(value: object) -> str | None:
+    """Compare rule fields the way the compiler reads them, case and type folded.
+
+    ``20`` and ``"20"`` are the same window to the engine, and ``"Bullish"`` is the
+    same direction, so a comparison that called them different would refuse runs it
+    can describe perfectly well.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int | float):
+        return _strategy_fact_value(value)
+    return str(value).strip().lower() or None
 
 
 def _strategy_source_value(

@@ -46,21 +46,60 @@ PRIVATE_KEY_BANNER_PATTERN = re.compile(
 )
 URL_USERINFO_PATTERN = re.compile(r"(?<=://)[^\s/:@]+:[^\s/@]+@")
 
-_CREDENTIAL_KEY = (
-    r"(?:api[_-]?key|access[_-]?key|access[_-]?token|client[_-]?secret|secret"
-    r"|token|password|passwd|authorization|signature|session[_-]?id"
-    r"|session[_-]?token|csrf[_-]?token|xsrf[_-]?token|refresh[_-]?token"
-    r"|id[_-]?token|auth[_-]?token|private[_-]?key)"
+# ── The credential key names, in one place ────────────────────────────────────────
+#
+# Both grammars below are generated from this list. They used to be two hand-written
+# alternations that had to agree and did not: `csrf_token`, `xsrf_token` and
+# `session_id` were classified as credential keys by one and ignored by the other, so
+# `csrf_token=x` reached a public page while `password=x` did not. A list plus a
+# generator makes that disagreement unrepresentable rather than merely fixed.
+#
+# Spaces stand for an optional separator, so "session id" covers session_id,
+# session-id, sessionid and "session id" written out. Every name also matches its
+# plural. The separator includes a literal space because people write notes, not
+# config: "api key = hunter2" is the same disclosure as "api_key=hunter2", and the
+# value is short enough that no shape rule would catch it.
+CREDENTIAL_KEY_NAMES: tuple[str, ...] = (
+    "api key",
+    "access key",
+    "access token",
+    "auth",
+    "auth token",
+    "authorization",
+    "bearer token",
+    "client secret",
+    "credential",
+    "csrf token",
+    "id token",
+    "password",
+    "passwd",
+    "private key",
+    "pwd",
+    "refresh token",
+    "secret",
+    "session id",
+    "session token",
+    "signature",
+    "token",
+    "xsrf token",
 )
-CREDENTIAL_KEY_PATTERN = _CREDENTIAL_KEY
 
-# Keys that name a credential outright, in the spellings people actually type.
-_ASSIGNED_CREDENTIAL_KEY = (
-    r"(?:api[_-]?keys?|apikeys?|access[_-]?keys?|access[_-]?tokens?"
-    r"|client[_-]?secrets?|secrets?|tokens?|passwords?|passwd|pwd"
-    r"|credentials?|private[_-]?keys?|auth|authorization|signature"
-    r"|session[_-]?tokens?|refresh[_-]?tokens?|id[_-]?tokens?|auth[_-]?tokens?)"
-)
+
+def _key_alternation(names: tuple[str, ...]) -> str:
+    """A regex alternation over the names, longest first.
+
+    Longest first matters: with `token` ahead of `access token`, the shorter branch
+    wins and the captured key is only the tail of the real one.
+    """
+    parts = [
+        r"[_\- ]?".join(re.escape(word) for word in name.split()) + "s?"
+        for name in names
+    ]
+    return "(?:" + "|".join(sorted(parts, key=len, reverse=True)) + ")"
+
+
+_CREDENTIAL_KEY = _key_alternation(CREDENTIAL_KEY_NAMES)
+CREDENTIAL_KEY_PATTERN = _CREDENTIAL_KEY
 
 # The key is the signal, so the value is not inspected at all. Anything after the
 # separator is the secret, whatever its length or characters: a one character
@@ -69,7 +108,7 @@ _ASSIGNED_CREDENTIAL_KEY = (
 # `password=hunter2` and `password=P@ssw0rd` through.
 _CREDENTIAL_ASSIGNMENT_RE = re.compile(
     rf"(?i)(?P<lead>\b\w+[ \t]+)?"
-    rf"[\"']?\b(?P<key>{_ASSIGNED_CREDENTIAL_KEY})\b[\"']?[ \t]*"
+    rf"[\"']?\b(?P<key>{_CREDENTIAL_KEY})\b[\"']?[ \t]*"
     r"(?P<separator>[:=])[ \t]*(?P<value>\S)"
 )
 

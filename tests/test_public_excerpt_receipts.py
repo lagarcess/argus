@@ -7,6 +7,7 @@ rather than checking that a clean artifact happens to come out clean.
 
 from __future__ import annotations
 
+import re
 from typing import Any, get_args
 
 import pytest
@@ -1151,3 +1152,121 @@ def test_no_shape_publishes_a_direction() -> None:
         assert "direction" not in keys, snapshot.get("template")
         # And nothing in the payload spells it out in prose either.
         assert "bearish" not in payload.model_dump_json().lower()
+
+
+# ── The two classes, closed by invariant rather than by case ──────────────────
+
+
+def test_no_field_of_a_crossover_rule_can_change_silently() -> None:
+    """The guard for the strategy class, at the altitude the class lives at.
+
+    Three rounds each fixed one field of a crossover rule and compared only the fields
+    already known: entry-only, then windows, then direction. The compiler consumes the
+    rule whole, so the invariant is stated over its whole field set instead. Mutating
+    any field the engine reads must either change what the receipt says or refuse it.
+    Silently producing the mirrored receipt for a rule that is not the mirror is the
+    defect, whichever field carries it.
+    """
+    from argus.domain.public_excerpts import CROSSOVER_RULE_FIELDS
+
+    baseline = _payload(run_config_snapshot=CROSSOVER_CONFIG_SNAPSHOT).strategy_facts
+    entry = CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"]["entry_rule"]
+    mutations: dict[str, object] = {
+        "type": "macd_crossover",
+        "fast_indicator": "ema",
+        "fast_period": 7,
+        "slow_indicator": "ema",
+        "slow_period": 200,
+        # The mirror of a bullish entry is bearish, so bullish is a real difference.
+        "direction": "bullish",
+    }
+    assert set(mutations) == set(CROSSOVER_RULE_FIELDS), (
+        "a field the engine reads has no mutation case: "
+        f"{sorted(set(CROSSOVER_RULE_FIELDS) ^ set(mutations))}"
+    )
+
+    for field, value in mutations.items():
+        snapshot = {
+            **CROSSOVER_CONFIG_SNAPSHOT,
+            "resolved_strategy": {
+                **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"],
+                "exit_rule": {**entry, "direction": "bearish", field: value},
+            },
+        }
+        try:
+            facts = _payload(run_config_snapshot=snapshot).strategy_facts
+        except PublicExcerptSourceError:
+            continue
+        assert facts != baseline, (
+            f"changing exit_rule[{field!r}] produced the mirrored receipt unchanged, "
+            "so the page states an exit that did not run"
+        )
+
+
+def test_an_exit_configured_like_the_entry_refuses() -> None:
+    """The third instance itself, kept as a case beside the invariant.
+
+    A bullish entry with a bullish exit compiles to cross_above on both sides, so the
+    mirrored sentence, sold when it crossed back below, would describe the opposite of
+    what ran. Direction is not publishable on a long-only surface, so this refuses.
+    """
+    entry = CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"]["entry_rule"]
+    same_direction = {
+        **CROSSOVER_CONFIG_SNAPSHOT,
+        "resolved_strategy": {
+            **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"],
+            "exit_rule": {**entry, "direction": "bullish"},
+        },
+    }
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=same_direction)
+
+
+def test_the_mirror_is_the_engine_s_own_not_a_second_opinion() -> None:
+    """A restated mirror could drift from the engine's. This borrows it instead."""
+    from argus.domain import public_excerpts
+    from argus.domain.backtesting.rules.signals import (
+        _opposite_moving_average_crossover_rule,
+    )
+
+    assert (
+        public_excerpts.engine_mirrored_exit_rule
+        is _opposite_moving_average_crossover_rule
+    )
+
+
+def test_every_recognized_credential_key_is_caught_when_assigned() -> None:
+    """The guard for the credential class, at the altitude the class lives at.
+
+    Two hand-written alternations had to agree and did not, so `csrf_token=x` reached a
+    public page while `password=x` did not. Both grammars are now generated from one
+    list, and this walks that list: every name, in each separator spelling, with a one
+    character value, must be refused. The value is never the reason.
+    """
+    from argus.domain.credential_shapes import (
+        CREDENTIAL_KEY_NAMES,
+        credential_shape_in,
+    )
+
+    missed: list[str] = []
+    for name in CREDENTIAL_KEY_NAMES:
+        for separator in ("_", "-", "", " "):
+            key = separator.join(name.split())
+            for assignment in (f"{key}=x", f"{key}: x", f"{key.upper()} = 1"):
+                if credential_shape_in(assignment) is None:
+                    missed.append(assignment)
+    assert not missed, f"assigned credential keys not caught: {missed}"
+
+
+def test_the_two_credential_grammars_cannot_disagree() -> None:
+    """One list, both grammars. A second list is how the class stayed open."""
+    from argus.domain import credential_shapes
+
+    for name in credential_shapes.CREDENTIAL_KEY_NAMES:
+        spelling = "_".join(name.split())
+        # Present in the shared pattern the eval lane consumes...
+        assert re.search(
+            credential_shapes.CREDENTIAL_KEY_PATTERN, spelling, re.IGNORECASE
+        ), f"{spelling} missing from the shared key pattern"
+        # ...and in the assignment rule the receipt path consumes.
+        assert credential_shapes.keyed_credential_in(f"{spelling}=x"), spelling
