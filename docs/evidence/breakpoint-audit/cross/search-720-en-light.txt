@@ -18,6 +18,29 @@ Aug 1
 Collapse
 Apple vs SPY, twelve months
 Compare Apple with SPY over the last 12 months.
+AAPL
+Buy and hold
+
+Aug 1, 2025 → Aug 1, 2026
+
+Simulation Complete
+
+Ending value
+
+$11,840
+
++18.4%
+
+Compared with benchmark
+Benchmark unavailable
+Worst drop
+-9.1%
+
+Historical simulation · No fees/slippage · Not advice
+
+View details
+Add decision
+QUICK TAKE
 
 Apple outperformed SPY across the tested window.
 

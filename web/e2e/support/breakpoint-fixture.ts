@@ -18,6 +18,7 @@ export type UsageState = "healthy" | "nearly_out" | "exhausted" | "error";
 
 const USER_ID = "breakpoint-user";
 const CREATED_AT = "2026-08-01T12:00:00Z";
+const RUN_ID = "run-alpha";
 const DAY_PERIOD_END = "2026-08-01T23:59:59Z";
 /* Distinct from the day end so the hourly line is not a copy of the daily one. */
 const HOUR_PERIOD_END = "2026-08-01T13:00:00Z";
@@ -160,12 +161,19 @@ function confirmationCard(isSpanish: boolean) {
   };
 }
 
+/**
+ * Shape matters here. `isHydratableResultCard` requires title, status_label,
+ * rows, assumptions, actions, and a full date_range, and the message carrying
+ * it must also declare `result_run_id`. Miss any of those and the transcript
+ * silently renders the plain assistant text instead of a card.
+ */
 function resultCard(isSpanish: boolean) {
   return {
     version: "argus_result/v1",
-    run_id: "run-alpha",
+    run_id: RUN_ID,
     title: isSpanish ? "Apple, comprar y mantener" : "Apple buy and hold",
     strategy_label: isSpanish ? "Comprar y mantener" : "Buy and hold",
+    status_label: isSpanish ? "Simulación completa" : "Simulation Complete",
     symbols: ["AAPL"],
     benchmark_symbol: "SPY",
     status: "completed",
@@ -228,7 +236,10 @@ function messages(language: Language) {
         ? "Apple superó a SPY en el período probado."
         : "Apple outperformed SPY across the tested window.",
       created_at: CREATED_AT,
-      metadata: { result_card: resultCard(isSpanish) },
+      metadata: {
+        result_card: resultCard(isSpanish),
+        result_run_id: RUN_ID,
+      },
     },
     {
       id: "message-user-2",
@@ -476,7 +487,13 @@ export async function installBreakpointFixture(
  */
 export const FREEZE_CSS = `
   nextjs-portal { display: none !important; }
-  [data-dev-mode-badge] { display: none !important; }
+  /* DevModeBadge renders only under NEXT_PUBLIC_MOCK_AUTH, which is exactly how
+     these captures run, so without this it floats over the transcript in every
+     capture and sits inside every committed baseline while never shipping to a
+     user. It carries no attribute of its own, so it is matched through the
+     button it owns. */
+  div:has(> button[aria-label="Show dev tools"]),
+  div:has(> button[aria-label="Hide dev tools"]) { display: none !important; }
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;

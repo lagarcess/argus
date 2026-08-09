@@ -14,8 +14,8 @@ import { defineConfig, devices } from "@playwright/test";
  *    container rasterise at the same size;
  *  - animations disabled and the caret hidden, so a capture taken half a second
  *    later is the same bytes;
- *  - a per-pixel `threshold` plus a small `maxDiffPixelRatio`, which absorbs
- *    font antialiasing without absorbing a moved element.
+ *  - a per-pixel `threshold` plus a pixel budget measured from real runs, which
+ *    absorbs font antialiasing without absorbing a moved element.
  *
  * Run and refresh with:
  *
@@ -65,10 +65,22 @@ export default defineConfig({
       animations: "disabled",
       caret: "hide",
       scale: "css",
-      // Absorbs antialiasing, not layout: a shifted element moves far more
-      // than 1% of the pixels in a panel-sized capture.
+      /*
+       * Calibrated, not guessed. With the dev badge hidden, all 74 captures
+       * pass at `maxDiffPixels: 0`, so run-to-run noise on the reference
+       * machine is zero and this budget is headroom for a different machine
+       * rather than cover for known drift. Re-measure the same way after
+       * changing anything about how captures are taken.
+       *
+       * It replaced `maxDiffPixelRatio: 0.01`, which sounded strict and was
+       * not: one percent of a 390x844 viewport is about 3,300 pixels, and a
+       * 40x40 element was in fact removed from every capture without the suite
+       * going red. 100 still catches anything roughly 10x10 and larger. An
+       * absolute budget also scales the right way, since a small settings panel
+       * gets proportionally stricter than a full page.
+       */
       threshold: 0.2,
-      maxDiffPixelRatio: 0.01,
+      maxDiffPixels: 100,
     },
   },
   fullyParallel: false,
