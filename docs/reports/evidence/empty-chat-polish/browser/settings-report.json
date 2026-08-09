@@ -1,0 +1,46 @@
+[
+  {
+    "frame": "09-settings-field-en-desktop",
+    "lang": "en",
+    "viewport": "1280x900",
+    "fieldLabelPresent": true,
+    "unsetPlaceholderPresent": true,
+    "displayNamePresent": true,
+    "savedShown": true,
+    "persisted": "Lucas",
+    "consoleErrors": []
+  },
+  {
+    "frame": "10-settings-field-en-mobile",
+    "lang": "en",
+    "viewport": "390x844",
+    "fieldLabelPresent": true,
+    "unsetPlaceholderPresent": true,
+    "displayNamePresent": true,
+    "savedShown": true,
+    "persisted": "Lucas",
+    "consoleErrors": []
+  },
+  {
+    "frame": "11-settings-field-es-desktop",
+    "lang": "es-419",
+    "viewport": "1280x900",
+    "fieldLabelPresent": true,
+    "unsetPlaceholderPresent": true,
+    "displayNamePresent": true,
+    "savedShown": true,
+    "persisted": "Lucas",
+    "consoleErrors": []
+  },
+  {
+    "frame": "12-settings-field-es-mobile",
+    "lang": "es-419",
+    "viewport": "390x844",
+    "fieldLabelPresent": true,
+    "unsetPlaceholderPresent": true,
+    "displayNamePresent": true,
+    "savedShown": true,
+    "persisted": "Lucas",
+    "consoleErrors": []
+  }
+]
