@@ -464,6 +464,32 @@ a first test. Argus remains the pre-flight checklist.
   suggestions, in English and es-419.
 - Flag-off behavior is byte-identical to today.
 
+### 13b. Conditions on enabling, not on merging
+
+These are wrong-when-enabled, not wrong-as-shipped: the rail is off in
+`render.yaml`, `argus-env.sh`, and the release profile, so nothing here
+reaches a user while the flag is false. They are recorded as gates on the
+**flag decision** rather than the merge, and turning the flag on without
+closing them is a decision someone is making against this list.
+
+- **#411, routing provenance.** The rail's clarification gate tests which
+  execution-evidence field is set, never how it was set, so it forgives an
+  interpreter-injected `strategy_type` and cannot tell that default from a
+  stated one. An explicitly interpreted buy-and-hold with no other execution
+  field is therefore indistinguishable from a bare comparison and can reach
+  research instead of the builder, with the real routing decision falling to
+  a second classifier reading the raw message. Default provenance belongs in
+  the structured interpreter contract, after which the gate is a deterministic
+  check on typed output and the tolerated-defaults set collapses to empty.
+- **#412, stranded research jobs.** A research run is finalized by a
+  process-local poller, so a restart orphans it. The stale scanner now settles
+  such a row as a retryable failure instead of leaving the turn queued
+  forever, but nothing in a deployed environment runs that scanner on a
+  schedule (the same gap as #401), and the completed answer is discarded
+  rather than resumed from the background id already persisted on the job row.
+  Enabling the rail without a scheduled reconciler means a deploy can strand a
+  user's thorough turn until an operator intervenes.
+
 ## 14. Sources
 
 - `docs/specs/private-alpha-next-decision-memo.md` sections 5.6, 10.5, 12.3,
