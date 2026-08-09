@@ -12,7 +12,12 @@ import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
 import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
 import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
-import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
+import NextMoveRow, {
+  NextMoveDetail,
+  NextMoveSeparator,
+  NextMoveTicker,
+  NextMoveTitle,
+} from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import type { DecisionState } from "@/lib/argus-api";
@@ -452,6 +457,12 @@ export default function ChatMessage({
                     symbol: candidate.symbol,
                     defaultValue: "Backtest {{symbol}}",
                   });
+                  // One row vocabulary: the same verb the rail's rows use,
+                  // with the name leading and the ticker as its badge. The
+                  // sent text stays the backend-owned action string.
+                  const testVerb = t("chat.next_experiments.test_verb", {
+                    defaultValue: "Test",
+                  });
                   const hasName =
                     Boolean(candidate.name) && candidate.name !== candidate.symbol;
                   // One chip per row: the first corroborating source. Cheap
@@ -480,13 +491,11 @@ export default function ChatMessage({
                         })
                       }
                     >
-                      <NextMoveTitle>{sendText}</NextMoveTitle>
-                      {hasName ? (
-                        <>
-                          <NextMoveSeparator>·</NextMoveSeparator>
-                          <NextMoveDetail>{candidate.name}</NextMoveDetail>
-                        </>
-                      ) : null}
+                      <NextMoveTitle>
+                        {testVerb}
+                        {hasName ? ` ${candidate.name}` : ""}
+                        <NextMoveTicker>{candidate.symbol}</NextMoveTicker>
+                      </NextMoveTitle>
                       {candidate.reason_text ? (
                         <>
                           <NextMoveSeparator>·</NextMoveSeparator>
@@ -660,7 +669,19 @@ export default function ChatMessage({
                           )
                         }
                       >
-                        <NextMoveTitle>{narrowLabel}</NextMoveTitle>
+                        <NextMoveTitle>
+                          {row.labelParts
+                            ? row.labelParts.map((part, partIndex) =>
+                                part.type === "ticker" ? (
+                                  <NextMoveTicker key={partIndex}>
+                                    {part.value}
+                                  </NextMoveTicker>
+                                ) : (
+                                  <span key={partIndex}>{part.value}</span>
+                                ),
+                              )
+                            : narrowLabel}
+                        </NextMoveTitle>
                         {row.detail ? (
                           <>
                             <NextMoveSeparator>·</NextMoveSeparator>

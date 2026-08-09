@@ -4,8 +4,12 @@ Every candidate passes the resolver, asset-class, and coverage gates before it
 becomes tappable; provider name pairs are untrusted input, never output. Rows
 ride the existing typed Try-next surface: a tap sends a fully specified ask
 through the ordinary interpretation and confirmation lifecycle, so nothing
-here executes anything. Naming everywhere is ``<Name> [ticker]`` in plain
-language.
+here executes anything.
+
+Naming is one vocabulary everywhere: a short display name plus the
+resolver-verified ticker as a typed part the client renders as a badge. Row
+copy states the window it actually asks for, never a vague "against
+history".
 """
 
 from __future__ import annotations
@@ -15,6 +19,10 @@ from typing import Any, Callable, Iterable
 
 from loguru import logger
 
+from argus.agent_runtime.asset_identity import (
+    asset_label_parts,
+    label_from_parts,
+)
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENTS_ROW_CAP,
     NEXT_EXPERIMENTS_VERSION,
@@ -95,8 +103,13 @@ def _resolve_bounded(
         executor.shutdown(wait=False, cancel_futures=False)
 
 
-def _named(subject: dict[str, str]) -> str:
-    return f"{subject['name']} [{subject['symbol']}]"
+# The prebaked ask is a three-year buy and hold, so the row says so; a label
+# that hides the window behind "history" is vaguer than the thing it runs.
+TEST_WINDOW_YEARS = 3
+
+
+def _identity_parts(subjects: list[dict[str, str]]) -> list[dict[str, str]]:
+    return asset_label_parts(subjects)
 
 
 def research_next_experiment_rows(
@@ -114,56 +127,41 @@ def research_next_experiment_rows(
     anchor = testable[0]
     if len(testable) >= 2:
         group = testable[: min(len(testable), 5)]
-        names = _join_names([_named(s) for s in group], spanish)
         symbols = ", ".join(s["symbol"] for s in group)
         rows.append(
             _row(
                 kind="research_test_versus",
-                label=(
-                    f"Probar {names} entre sí"
-                    if spanish
-                    else f"Test {names} against each other"
-                ),
-                send_text=(
-                    f"Prueba comprar y mantener {symbols} durante los últimos tres años"
-                    if spanish
-                    else f"Test buying and holding {symbols} over the last three years"
-                ),
+                parts=_versus_parts(group[:1], group[1:], spanish),
+                send_text=_send_text(symbols, spanish),
             )
         )
     else:
         rows.append(
             _row(
                 kind="research_test_single",
-                label=(
-                    f"Probar {_named(anchor)} con datos históricos"
-                    if spanish
-                    else f"Test {_named(anchor)} against history"
-                ),
-                send_text=(
-                    f"Prueba comprar y mantener {anchor['symbol']} durante los últimos tres años"
-                    if spanish
-                    else f"Test buying and holding {anchor['symbol']} over the last three years"
-                ),
+                parts=[
+                    {"type": "text", "value": "Probar " if spanish else "Test "},
+                    *_identity_parts([anchor]),
+                    {
+                        "type": "text",
+                        "value": (
+                            f" en los últimos {TEST_WINDOW_YEARS} años"
+                            if spanish
+                            else f" over the last {TEST_WINDOW_YEARS} years"
+                        ),
+                    },
+                ],
+                send_text=_send_text(anchor["symbol"], spanish),
             )
         )
         if peers:
             first_peers = peers[: min(len(peers), 4)]
-            names = _join_names([_named(p) for p in first_peers], spanish)
             symbols = ", ".join([anchor["symbol"], *(p["symbol"] for p in first_peers)])
             rows.append(
                 _row(
                     kind="research_test_versus",
-                    label=(
-                        f"Probar {_named(anchor)} frente a {names}"
-                        if spanish
-                        else f"Test {_named(anchor)} against {names}"
-                    ),
-                    send_text=(
-                        f"Prueba comprar y mantener {symbols} durante los últimos tres años"
-                        if spanish
-                        else f"Test buying and holding {symbols} over the last three years"
-                    ),
+                    parts=_versus_parts([anchor], first_peers, spanish),
+                    send_text=_send_text(symbols, spanish),
                 )
             )
     return {
@@ -172,17 +170,42 @@ def research_next_experiment_rows(
     }
 
 
-def _join_names(names: list[str], spanish: bool) -> str:
-    if len(names) == 1:
-        return names[0]
-    conjunction = " y " if spanish else " and "
-    return ", ".join(names[:-1]) + conjunction + names[-1]
+def _versus_parts(
+    anchors: list[dict[str, str]],
+    others: list[dict[str, str]],
+    spanish: bool,
+) -> list[dict[str, str]]:
+    parts: list[dict[str, str]] = [
+        {"type": "text", "value": "Probar " if spanish else "Test "},
+        *_identity_parts(anchors),
+    ]
+    for index, other in enumerate(others):
+        if index == 0:
+            separator = " frente a " if spanish else " vs "
+        elif index == len(others) - 1:
+            separator = " y " if spanish else " and "
+        else:
+            separator = ", "
+        parts.append({"type": "text", "value": separator})
+        parts.extend(_identity_parts([other]))
+    return parts
 
 
-def _row(*, kind: str, label: str, send_text: str) -> dict[str, Any]:
+def _send_text(symbols: str, spanish: bool) -> str:
+    # The sent text is a prompt the interpreter parses, not display copy: it
+    # keeps its spelled-out window while the visible label uses the numeral.
+    if spanish:
+        return f"Prueba comprar y mantener {symbols} durante los últimos tres años"
+    return f"Test buying and holding {symbols} over the last three years"
+
+
+def _row(*, kind: str, parts: list[dict[str, str]], send_text: str) -> dict[str, Any]:
+    # `label` stays the plain sentence: aria labels, analytics, and any client
+    # that does not render parts must read exactly what the badge row shows.
     return {
         "kind": kind,
-        "label": label,
+        "label": label_from_parts(parts),
+        "label_parts": parts,
         "label_key": _DYNAMIC_LABEL_KEY,
         "send_text": send_text,
     }

@@ -823,7 +823,8 @@
         "supported_ma_crossover": "SMA/EMA crossover",
         "supported_rsi_or_ma_rule": "Simplify the rule",
         "supported_rsi_threshold": "Supported RSI rule"
-      }
+      },
+      "test_verb": "Test"
     },
     "memory": {
       "recall_title": "From your memory",

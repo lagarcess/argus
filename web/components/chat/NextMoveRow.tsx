@@ -67,6 +67,19 @@ export function NextMoveSeparator({ children }: { children: string }) {
   );
 }
 
+/**
+ * The resolver-verified ticker, as an object in the sentence rather than
+ * punctuation around it: one step off the surface, hairline bordered, quiet
+ * enough that the sentence stays the loudest thing in the row.
+ */
+export function NextMoveTicker({ children }: { children: string }) {
+  return (
+    <span className="mx-[3px] inline-flex translate-y-[-1px] items-center rounded-[5px] border border-black/10 bg-black/[0.04] px-1.5 py-px align-middle font-mono text-[11px] font-normal leading-[1.4] tracking-[0.02em] text-black/55 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/55">
+      {children}
+    </span>
+  );
+}
+
 /** Secondary row text (resolver-owned name, reason). Always wraps, never clipped. */
 export function NextMoveDetail({ children }: { children: ReactNode }) {
   return (

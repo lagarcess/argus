@@ -51,10 +51,8 @@ def test_versus_row_uses_plain_names_with_tickers() -> None:
     )
     assert rows is not None
     labels = [row["label"] for row in rows["rows"]]
-    assert labels[0] == "Test Netflix [NFLX] against history"
-    assert labels[1] == (
-        "Test Netflix [NFLX] against Walt Disney [DIS] and Comcast [CMCSA]"
-    )
+    assert labels[0] == "Test Netflix (NFLX) over the last 3 years"
+    assert labels[1] == ("Test Netflix (NFLX) vs Walt Disney (DIS) and Comcast (CMCSA)")
     # A tap sends a fully specified ask, so nothing needs clarification.
     sends = [row["send_text"] for row in rows["rows"]]
     assert sends[1] == (
@@ -72,7 +70,7 @@ def test_spanish_rows_are_native_not_rendered() -> None:
         language="es-419",
     )
     assert rows is not None
-    assert rows["rows"][0]["label"] == "Probar Netflix [NFLX] con datos históricos"
+    assert rows["rows"][0]["label"] == "Probar Netflix (NFLX) en los últimos 3 años"
     assert rows["rows"][1]["send_text"] == (
         "Prueba comprar y mantener NFLX, DIS durante los últimos tres años"
     )
@@ -89,7 +87,7 @@ def test_multi_subject_questions_get_one_versus_row() -> None:
     )
     assert rows is not None
     assert len(rows["rows"]) == 1
-    assert "against each other" in rows["rows"][0]["label"]
+    assert " vs " in rows["rows"][0]["label"]
 
 
 def test_no_testable_subject_means_no_rows_and_an_honest_line() -> None:
@@ -103,3 +101,31 @@ def test_no_testable_subject_means_no_rows_and_an_honest_line() -> None:
     assert rows is None
     assert "no one-tap test" in honest_no_next_line("en")
     assert "todavía" in honest_no_next_line("es-419")
+
+
+def test_rows_carry_typed_ticker_parts_and_a_matching_plain_label() -> None:
+    """The badge renders from typed parts; the plain label stays the same
+    sentence so aria labels and analytics read what the eye reads."""
+    rows = research_next_experiment_rows(
+        subjects=[
+            {
+                "symbol": "NFLX",
+                "name": "Netflix, Inc. Common Stock",
+                "asset_class": "equity",
+            }
+        ],
+        peers=[],
+        language="en",
+    )
+    assert rows is not None
+    row = rows["rows"][0]
+    assert row["label_parts"] == [
+        {"type": "text", "value": "Test "},
+        {"type": "text", "value": "Netflix"},
+        {"type": "ticker", "value": "NFLX"},
+        {"type": "text", "value": " over the last 3 years"},
+    ]
+    assert row["label"] == "Test Netflix (NFLX) over the last 3 years"
+    # The row states the window it actually asks for, in prose and in payload.
+    # The sent prompt keeps its spelled-out window; only display copy changed.
+    assert "last three years" in row["send_text"]

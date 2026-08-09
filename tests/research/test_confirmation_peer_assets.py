@@ -132,10 +132,10 @@ def test_peer_rows_ride_the_try_next_surface_not_the_card() -> None:
     )
     assert rows is not None
     labels = [row["label"] for row in rows["rows"]]
-    assert labels[0] == "Add Apple [AAPL] to this test"
-    assert labels[1] == "Add Microsoft [MSFT] to this test"
+    assert labels[0] == "Add Apple (AAPL) to this test"
+    assert labels[1] == "Add Microsoft (MSFT) to this test"
     # Cross-class candidates never become rows; the set row carries both.
-    assert labels[2] == "Add Apple [AAPL] and Microsoft [MSFT]"
+    assert labels[2] == "Add Apple (AAPL) and Microsoft (MSFT)"
     assert rows["rows"][2]["why"]["params"]["symbols"] == ["AAPL", "MSFT"]
     for row in rows["rows"]:
         assert row["kind"].startswith("research_add_peer")
@@ -147,7 +147,7 @@ def test_peer_rows_ride_the_try_next_surface_not_the_card() -> None:
         language="es-419",
     )
     assert spanish is not None
-    assert spanish["rows"][0]["label"] == "Agregar Apple [AAPL] a esta prueba"
+    assert spanish["rows"][0]["label"] == "Agregar Apple (AAPL) a esta prueba"
 
 
 def test_rows_respect_the_five_asset_maximum() -> None:
@@ -430,7 +430,7 @@ def test_add_peer_enforces_the_asset_maximum_as_defense_in_depth() -> None:
                 "rows": [
                     {
                         "kind": "research_add_peer_set",
-                        "label": "Add Apple [AAPL] and Microsoft [MSFT]",
+                        "label": "Add Apple (AAPL) and Microsoft (MSFT)",
                         "label_key": "chat.next_experiments.labels.research_dynamic",
                         "why": {
                             "code": "research_add_peer",

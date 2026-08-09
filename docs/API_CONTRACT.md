@@ -2897,6 +2897,15 @@ Contract rules:
   the finalized packet is stored under the requesting turn's key, and an
   identical question within the class TTL answers inline with
   `cache_status: "hit"`, no job, and no provider spend.
+- Runnable rows name assets in one vocabulary: a short display name derived
+  from the resolver's own name (listing boilerplate like "Common Stock" or
+  "Inc." stripped, share classes kept) plus the resolver-verified ticker.
+  Rows carry an additive `label_parts` array of `{type: "text" | "ticker",
+  value}` segments so clients can render the ticker as a badge; `label`
+  remains the same sentence in plain text (`Test Netflix (NFLX) over the
+  last 3 years`) and stays authoritative for aria labels, analytics, and any
+  client that ignores parts. Row copy names the window it actually asks for;
+  `send_text` is a prompt, not display copy, and is unchanged.
 - Researched peers still outside the active basket ride the ordinary
   `next_experiments` surface of the card-bearing message as
   `research_add_peer` / `research_add_peer_set` rows, bounded by free asset

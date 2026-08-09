@@ -295,8 +295,8 @@ def peer_add_rows(
 
     Same component, same position, same behavior as every other row; the
     ``why`` payload carries the resolver-verified symbols the tap adds, so
-    the frontend never derives identity from the label. Naming is
-    ``<Name> [ticker]``.
+    the frontend never derives identity from the label. Naming is the shared
+    short-name-plus-ticker-part vocabulary.
     """
     offers = remaining_peer_offers(
         peers,
@@ -305,20 +305,29 @@ def peer_add_rows(
     )
     if not offers:
         return None
+    from argus.agent_runtime.asset_identity import (
+        asset_label_parts,
+        label_from_parts,
+    )
+
     spanish = str(language or "").lower().startswith("es")
     rows: list[dict[str, Any]] = []
     for offer in offers:
-        named = f"{offer['name']} [{offer['symbol']}]"
+        parts = [
+            {"type": "text", "value": "Agregar " if spanish else "Add "},
+            *asset_label_parts([offer]),
+            {
+                "type": "text",
+                "value": " a esta prueba" if spanish else " to this test",
+            },
+        ]
         rows.append(
             {
                 # The kind doubles as the row's render identity, so each add
                 # row carries its symbol to stay unique within the group.
                 "kind": f"research_add_peer:{offer['symbol']}",
-                "label": (
-                    f"Agregar {named} a esta prueba"
-                    if spanish
-                    else f"Add {named} to this test"
-                ),
+                "label": label_from_parts(parts),
+                "label_parts": parts,
                 "label_key": _DYNAMIC_LABEL_KEY,
                 "why": {
                     "code": "research_add_peer",
@@ -327,12 +336,22 @@ def peer_add_rows(
             }
         )
     if len(offers) > 1:
-        names = [f"{offer['name']} [{offer['symbol']}]" for offer in offers]
-        joined = ", ".join(names[:-1]) + (" y " if spanish else " and ") + names[-1]
+        parts = [{"type": "text", "value": "Agregar " if spanish else "Add "}]
+        for index, offer in enumerate(offers):
+            if index:
+                last = index == len(offers) - 1
+                parts.append(
+                    {
+                        "type": "text",
+                        "value": (" y " if spanish else " and ") if last else ", ",
+                    }
+                )
+            parts.extend(asset_label_parts([offer]))
         rows.append(
             {
                 "kind": "research_add_peer_set",
-                "label": f"Agregar {joined}" if spanish else f"Add {joined}",
+                "label": label_from_parts(parts),
+                "label_parts": parts,
                 "label_key": _DYNAMIC_LABEL_KEY,
                 "why": {
                     "code": "research_add_peer",

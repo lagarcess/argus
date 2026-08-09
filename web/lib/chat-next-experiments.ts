@@ -17,6 +17,12 @@ const CONTINUITY_KINDS = new Set([
   "compare_buy_and_hold",
 ]);
 
+/** One typed segment of a row label: prose, or a resolver-verified ticker. */
+export type NextExperimentLabelPart = {
+  type: "text" | "ticker";
+  value: string;
+};
+
 export type NextExperimentReason = {
   code: string;
   params: Record<string, unknown>;
@@ -29,6 +35,8 @@ export type NextExperimentRow = {
   /** Backend-composed short form for narrow screens; the client never clips. */
   labelShort: string | null;
   labelShortKey: string | null;
+  /** Typed identity segments; absent on rows composed before badges. */
+  labelParts: NextExperimentLabelPart[] | null;
   detail: string | null;
   sendText: string | null;
   why: NextExperimentReason | null;
@@ -38,6 +46,18 @@ function recordOrNull(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function labelPartsOrNull(value: unknown): NextExperimentLabelPart[] | null {
+  if (!Array.isArray(value)) return null;
+  const parts = value.flatMap((entry) => {
+    const raw = recordOrNull(entry);
+    const text = typeof raw?.value === "string" ? raw.value : "";
+    if (!text) return [];
+    const type = raw?.type === "ticker" ? "ticker" : "text";
+    return [{ type, value: text } as NextExperimentLabelPart];
+  });
+  return parts.length > 0 ? parts : null;
 }
 
 function rowOrNull(value: unknown): NextExperimentRow | null {
@@ -55,12 +75,14 @@ function rowOrNull(value: unknown): NextExperimentRow | null {
     typeof raw.label_short === "string" ? raw.label_short.trim() : "";
   const labelShortKey =
     typeof raw.label_short_key === "string" ? raw.label_short_key.trim() : "";
+  const labelParts = labelPartsOrNull(raw.label_parts);
   return {
     kind,
     label,
     labelKey,
     labelShort: labelShort || null,
     labelShortKey: labelShortKey || null,
+    labelParts,
     detail: detail || null,
     sendText: sendText || null,
     why: whyCode

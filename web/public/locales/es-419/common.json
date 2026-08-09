@@ -823,7 +823,8 @@
         "supported_ma_crossover": "Cruce SMA/EMA",
         "supported_rsi_or_ma_rule": "Simplificar la regla",
         "supported_rsi_threshold": "Regla RSI compatible"
-      }
+      },
+      "test_verb": "Probar"
     },
     "memory": {
       "recall_title": "De tu memoria",

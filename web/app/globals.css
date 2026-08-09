@@ -747,19 +747,11 @@ body {
 }
 
 /*
- * Safety net only. The backend supplies a short form for narrow screens, so
- * this clamp should rarely engage; two lines, never a single-line ellipsis,
- * because one clipped line reads as broken rather than as abbreviated.
+ * Rows wrap at every width. A clamped reason is decoration: the user cannot
+ * read it and cannot expand it, and the clamp's own fade left ghost slivers
+ * of the next line under each row on phones. Identity leads the row, so a
+ * wrapped reason stays legible instead of becoming a puzzle.
  */
-@media (max-width: 44.99rem) {
-  .argus-next-move-text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-  }
-}
 
 /*
  * Reach is decided by width, never by asking about the pointer.
