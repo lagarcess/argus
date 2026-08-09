@@ -166,6 +166,9 @@ consumer. It will mislead the next one.
 is a documented contract surface, so `docs/API_CONTRACT.md` and the OpenAPI
 artifact move with it.
 
+**This is dispatched, not owed by this pillar.** It is being built on
+`claude/research-memory-follow-up-rename-43ec89`.
+
 It will never be cheaper than now: production has zero rows carrying the key,
 because the flag has never been on. Readers should accept the legacy `memory`
 key for non-production rows written during development, and that tolerance
