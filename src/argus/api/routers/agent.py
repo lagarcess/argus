@@ -26,6 +26,7 @@ from argus.agent_runtime.turn_execution import (
     turn_execution_summary,
 )
 from argus.api import state as api_state
+from argus.api.chat import confirmation as chat_confirmation
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
     chat_display_message,
@@ -906,12 +907,7 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_typed_recovery")
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
-                from argus.api.chat.confirmation import (
-                    attach_research_peer_rows,
-                    runtime_confirmation_card,
-                )
-
-                confirmation_card = runtime_confirmation_card(
+                confirmation_card = chat_confirmation.runtime_confirmation_card(
                     runtime_result,
                     confirmation_id=confirmation_id_for_runtime_card(
                         runtime_result,
@@ -1112,7 +1108,7 @@ async def chat_stream(
                             confirmation_reference.model_dump(mode="python")
                         ]
                     runtime_result["confirmation"] = confirmation_card
-                    attach_research_peer_rows(
+                    chat_confirmation.attach_research_peer_rows(
                         runtime_result,
                         metadata,
                         user_id=user.id,
@@ -1301,12 +1297,13 @@ async def chat_stream(
                     and assistant_text
                 ):
                     yield sse_data({"type": "token", "content": assistant_text})
-                from argus.api.chat.confirmation import public_confirmation_projection
 
                 yield sse_data(
                     {
                         "type": "final",
-                        "payload": public_confirmation_projection(runtime_result),
+                        "payload": chat_confirmation.public_confirmation_projection(
+                            runtime_result
+                        ),
                     }
                 )
                 yield sse_done()

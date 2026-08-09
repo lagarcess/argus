@@ -48,7 +48,8 @@ describe("guest funnel analytics", () => {
     );
 
     expect(starter).toContain("strategy_category");
-    expect(starter).toMatch(/onSelect\(value,\s*\{\s*strategy_category\s*\}\)/);
+    expect(starter).toMatch(/onSelect\(value,\s*metadata\)/);
+    expect(starter).toContain("metadata: { strategy_category:");
     expect(starter).not.toContain("captureGuestFunnelEvent");
     expect(guestExperience).toContain('event: "starter_action_selected"');
     expect(guestExperience).toContain("strategy_category");

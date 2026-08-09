@@ -41,7 +41,9 @@ describe("research rail flag-off equivalence", () => {
       "const showSignedInGreeting = researchRailEnabled && !isGuest;",
     );
     const starterActions = source("components/chat/StarterActions.tsx");
-    expect(starterActions).toContain("if (researchRailEnabled) {");
+    expect(starterActions).toContain(
+      "const entries: StarterEntry[] = researchRailEnabled",
+    );
     expect(starterActions).toContain("chat.starter_actions.tsla.label");
   });
 

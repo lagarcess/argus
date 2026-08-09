@@ -843,7 +843,7 @@ describe("activity rail and starter pills", () => {
     // after it from tablet up.
     expect(surface.match(/<StarterActions/g)?.length).toBe(1);
     expect(surface).toContain("order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3");
-    expect(surface).toContain('className="order-3 w-full max-w-2xl tablet:order-2"');
+    expect(surface).toContain('"order-3 w-full max-w-2xl tablet:order-2"');
     expect(surface).toContain('layout={isBelowTablet ? "scroll" : "wrap"}');
   });
 

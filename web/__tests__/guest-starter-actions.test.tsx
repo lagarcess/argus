@@ -55,7 +55,8 @@ describe("shared starter actions", () => {
     expect(`${chat}\n${emptyChat}`).not.toContain(
       "onClick={() => handleSend(t('chat.starter_actions.tsla.value'",
     );
-    expect(starter).toMatch(/onSelect\(value,\s*\{\s*strategy_category\s*\}\)/);
+    expect(starter).toMatch(/onSelect\(value,\s*metadata\)/);
+    expect(starter).toContain("metadata: { strategy_category:");
     expect(starter).not.toContain("captureGuestFunnelEvent");
     expect(guestExperience).toContain("startGuestSession");
     expect(`${chat}\n${guestExperience}`).toContain("captureGuestFunnelEvent");
