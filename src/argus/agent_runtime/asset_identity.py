@@ -64,6 +64,7 @@ def short_display_name(name: str, *, symbol: str = "") -> str:
         if trimmed == candidate or len(trimmed) < _MIN_SHORT_NAME_CHARS:
             break
         candidate = trimmed
+    candidate = _without_repeated_issuer_prefix(candidate)
     # "The Walt Disney Company" loses its suffix and keeps a dangling article;
     # spoken names drop it, and only when something substantial remains.
     if candidate.lower().startswith("the "):
@@ -108,3 +109,17 @@ def label_from_parts(parts: list[dict[str, Any]]) -> str:
         else:
             rendered.append(value)
     return "".join(rendered).replace("  ", " ").strip()
+
+
+def _without_repeated_issuer_prefix(name: str) -> str:
+    """Fund listings repeat their issuer: "First Trust Exchange-Traded Fund II
+    First Trust NASDAQ Cybersecurity ETF". When the opening words reappear
+    later, the second occurrence starts the name a person would say. The
+    result is still a substring of what the resolver returned."""
+    tokens = name.split()
+    for width in range(min(4, len(tokens) // 2), 1, -1):
+        prefix = tokens[:width]
+        for start in range(width, len(tokens) - width + 1):
+            if tokens[start : start + width] == prefix:
+                return " ".join(tokens[start:])
+    return name

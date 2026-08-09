@@ -196,14 +196,19 @@ def _packet_stage_result(
     survey = is_market_survey(question_kind)
     candidates = list(packet.name_pairs)
     if survey:
-        # A survey's answer names its assets in the results themselves, not
-        # only in a lookup table; the resolver still gates every one.
+        # A survey's answer names its assets in the results, and often only
+        # in its own tables; the resolver still gates every one.
+        from argus.domain.research.perplexity_agent import symbols_from_answer_tables
+
         seen = {pair.symbol.upper() for pair in candidates}
-        candidates.extend(
-            ResearchNamePair(symbol=symbol, name=symbol)
-            for symbol in packet.tickers
-            if symbol.upper() not in seen
-        )
+        for symbol in (
+            *packet.tickers,
+            *symbols_from_answer_tables(packet.answer_markdown),
+        ):
+            if symbol.upper() in seen:
+                continue
+            seen.add(symbol.upper())
+            candidates.append(ResearchNamePair(symbol=symbol, name=symbol))
     peers = verified_peers(
         candidates,
         exclude={s["symbol"] for s in subjects},

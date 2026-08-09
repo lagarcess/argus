@@ -222,6 +222,35 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
     )
 
 
+# Ticker-shaped cell: 1-5 uppercase letters, optionally a class suffix. Cells
+# are read only from markdown table rows, which are machine-generated
+# structure, never prose, and every symbol still passes the resolver before
+# anything becomes tappable.
+_TICKER_CELL = re.compile(r"^[A-Z]{1,5}(?:[.\-][A-Z]{1,2})?$")
+_TICKER_HEADERS = frozenset({"TICKER", "SYMBOL", "ETF"})
+
+
+def symbols_from_answer_tables(markdown: str) -> list[str]:
+    """Symbols named in the answer's own tables, in the order shown.
+
+    A market survey often reports its assets only in tables, with no typed
+    ticker list attached. Reading those cells is the same deterministic
+    markdown walk the lookup and holdings parsers already do.
+    """
+    symbols: list[str] = []
+    for line in markdown.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        for cell in stripped.strip("|").split("|"):
+            candidate = cell.strip().strip("*` ").upper()
+            if not candidate or candidate in _TICKER_HEADERS:
+                continue
+            if _TICKER_CELL.fullmatch(candidate) and candidate not in symbols:
+                symbols.append(candidate)
+    return symbols
+
+
 def _append_public_source(sources: list[str], url: Any) -> None:
     if not isinstance(url, str):
         return

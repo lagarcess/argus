@@ -55,3 +55,24 @@ def test_parts_carry_the_ticker_typed_and_render_plain_text() -> None:
         {"type": "ticker", "value": "NFLX"},
     ]
     assert label_from_parts(parts) == "Netflix (NFLX)"
+
+
+@pytest.mark.parametrize(
+    ("listing", "expected"),
+    [
+        (
+            "First Trust Exchange-Traded Fund II First Trust NASDAQ Cybersecurity ETF",
+            "First Trust NASDAQ Cybersecurity ETF",
+        ),
+        (
+            "Global X Funds Global X Cybersecurity ETF",
+            "Global X Cybersecurity ETF",
+        ),
+        # No repeated issuer: the resolver's name stands.
+        ("SPDR S&P 500 ETF Trust", "SPDR S&P 500 ETF Trust"),
+    ],
+)
+def test_fund_listings_drop_their_repeated_issuer(listing, expected) -> None:
+    assert short_display_name(listing) == expected
+    # Still a substring of what the resolver returned; nothing invented.
+    assert short_display_name(listing) in listing

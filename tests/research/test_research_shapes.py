@@ -400,3 +400,31 @@ def test_a_survey_looks_past_untradable_movers_for_a_runnable_row(
     assert "NVDA" in json.dumps(rows)
     for symbol in untradable:
         assert symbol not in json.dumps(rows)
+
+
+def test_a_survey_reads_the_symbols_its_own_tables_name(monkeypatch) -> None:
+    """Movers answers often carry no typed ticker list at all: the assets
+    live in the answer's tables. Reading those cells is the same
+    deterministic markdown walk the lookup parser does, and the resolver
+    still decides what becomes tappable."""
+    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    document = agent_response(text="", tickers=[])
+    document["output"][1]["results"] = [
+        {"category": "market_movers", "content": "movers", "sources": [], "tickers": []}
+    ]
+    document["output"][1]["categories"] = ["market_movers"]
+    document["output"][1]["tickers"] = []
+    document["output"][2]["content"][0]["text"] = (
+        "Biggest gainers\n\n"
+        "| TICKER | COMPANY | CHANGE |\n| --- | --- | --- |\n"
+        "| ZZQQ | Nonexistent Corp | +180% |\n"
+        "| NVDA | NVIDIA | +2.3% |\n"
+    )
+    _wire(monkeypatch, [document])
+
+    result = _run("What are the biggest movers today?")
+
+    assert result is not None
+    rows = json.dumps(result.stage_patch["next_experiments"]["rows"])
+    assert "NVDA" in rows
+    assert "ZZQQ" not in rows
