@@ -263,8 +263,6 @@
       "announce_needs_input": "{{title}} needs your input.",
       "announce_new_activity": "{{title}} is ready."
     },
-    "show_suggestions": "Show suggestions",
-    "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",

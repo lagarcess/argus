@@ -240,7 +240,14 @@ describe("Argus Alpha frontend contract", () => {
       "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED",
     );
     expect(emptyChat).toContain("researchRailEnabled");
-    expect(emptyChat).toContain("showSuggestions");
+    // No control gates the chips. They render whenever the empty chat does and
+    // stop when it stops, so there is nothing to show, hide, or persist.
+    expect(emptyChat).not.toContain("showSuggestions");
+    expect(chat).not.toContain("showSuggestions");
+    expect(en.chat.show_suggestions).toBeUndefined();
+    expect(en.chat.hide_suggestions).toBeUndefined();
+    expect(es.chat.show_suggestions).toBeUndefined();
+    expect(es.chat.hide_suggestions).toBeUndefined();
     expect(starterActions).toContain("chat.starter_actions.tsla.value");
     expect(starterActions).toContain("chat.starter_actions.btc.value");
     expect(starterActions).toContain("chat.starter_actions.dca.value");

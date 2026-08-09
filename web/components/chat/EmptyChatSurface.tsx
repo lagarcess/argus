@@ -19,14 +19,12 @@ type EmptyChatSurfaceProps = {
   guestSubmissionError: boolean;
   isStreamingResponse: boolean;
   isHydratingConversation: boolean;
-  showSuggestions: boolean;
   placeholder: string;
   onSend: (
     text: string,
     selection?: ChatMention[] | StarterSelectionMetadata,
   ) => void | boolean | Promise<void | boolean>;
   onRetryGuestSubmission: () => void;
-  onToggleSuggestions: () => void;
   onToast: (message: string) => void;
 };
 
@@ -37,11 +35,9 @@ export default function EmptyChatSurface({
   guestSubmissionError,
   isStreamingResponse,
   isHydratingConversation,
-  showSuggestions,
   placeholder,
   onSend,
   onRetryGuestSubmission,
-  onToggleSuggestions,
   onToast,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
@@ -121,38 +117,25 @@ export default function EmptyChatSurface({
         />
       </div>
 
-      {/* One owner for the chips. Flag off, this is integration's shipped
-          placement: thumb-reachable above the composer on narrow screens,
-          under it from tablet up. Flag on, spec section 10 keeps the
-          suggestions above the composer at every width, behind the toggle. */}
-      {(!showSignedInGreeting || showSuggestions) && (
-        <div
-          className={
-            showSignedInGreeting
-              ? "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:mb-2"
-              : "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3"
-          }
-        >
-          <StarterActions
-            disabled={disabled}
-            onSelect={onSend}
-            layout={isBelowTablet ? "scroll" : "wrap"}
-          />
-        </div>
-      )}
-
-      {showSignedInGreeting && (
-        <div className="order-4 mt-4">
-          <button
-            onClick={onToggleSuggestions}
-            className="min-h-11 rounded-full px-3 text-[14px] font-medium text-black/60 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white/60 dark:hover:text-white dark:focus-visible:ring-white/25"
-          >
-            {showSuggestions
-              ? t("chat.hide_suggestions")
-              : t("chat.show_suggestions")}
-          </button>
-        </div>
-      )}
+      {/* One owner for the chips, and they are always on. Flag off, this is
+          integration's shipped placement: thumb-reachable above the composer on
+          narrow screens, under it from tablet up. Flag on, spec section 10
+          keeps them above the composer at every width. They stop on their own
+          once a conversation has a message, because this surface stops
+          rendering. */}
+      <div
+        className={
+          showSignedInGreeting
+            ? "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:mb-2"
+            : "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3"
+        }
+      >
+        <StarterActions
+          disabled={disabled}
+          onSelect={onSend}
+          layout={isBelowTablet ? "scroll" : "wrap"}
+        />
+      </div>
     </div>
   );
 }

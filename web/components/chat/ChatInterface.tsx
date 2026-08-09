@@ -280,9 +280,6 @@ export default function ChatInterface() {
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
-  // First paint waits for the authenticated profile language so a fresh
-  // browser cannot send starter prompts in the wrong language.
-  const [showSuggestions, setShowSuggestions] = useState(researchRailEnabled);
   const { toast, showToast, hideToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
@@ -2406,11 +2403,9 @@ export default function ChatInterface() {
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
-                showSuggestions={showSuggestions}
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
-                onToggleSuggestions={() => setShowSuggestions(!showSuggestions)}
                 onToast={showToast}
               />
             ) : (
