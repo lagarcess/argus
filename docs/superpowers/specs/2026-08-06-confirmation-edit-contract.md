@@ -45,6 +45,29 @@ Edit routing lives in
 
 ## 3. Locked decisions
 
+**Build order, and it is not the section order.** Sections are numbered by what
+the contract says, not by what gets built first. The lane builds in this
+sequence:
+
+1. **3.4, in-place drawers for capital and dates.** Additive, removes nothing,
+   and depends on nothing else here. A drawer hands over a typed number or date,
+   so deterministic code computes from it and no prose is parsed at all, which
+   is 3.5b in its cleanest form. This lands first so the lane delivers something
+   visible early rather than at the end.
+2. **3.2, compound edits never drop silently**, together with 3.5 and 3.5b.
+   Those two are the same defect wearing different clothes and are fixed as one
+   theme.
+3. **3.3, scoped entry points accept broader edits.**
+4. **3.1, retiring the two scoped buttons.** Last, and only once 3.2 is proven.
+
+The order is driven by risk, not preference. The drawers add a path, so shipping
+them early costs nothing if the rest slips. Retiring the buttons removes the only
+edit paths that currently work, so it cannot go first without making the alpha
+failure more common.
+
+3.6, versioning, is not sequenced here. It must be true before the lane closes,
+because item 4 on the board reads the records it writes.
+
 ### 3.1 Three actions
 
 The end state is **Run backtest**, **Change/edit assumptions**, **Cancel**.
@@ -52,7 +75,8 @@ The end state is **Run backtest**, **Change/edit assumptions**, **Cancel**.
 `change_dates` and `change_asset` are retired as buttons.
 Change/edit assumptions becomes the only entry point to editing anything.
 
-**This is gated on section 3.2 being true first.** The retired buttons are
+**This is gated on section 3.2 being true first, and it is the last thing the
+lane builds.** See the build order above. The retired buttons are
 deterministic entry points that tell Argus exactly which field is being edited.
 Removing them routes every edit through the free-form path. Shipping the
 consolidation before compound edits are reliable would remove the working
