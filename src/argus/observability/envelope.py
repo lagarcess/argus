@@ -155,6 +155,17 @@ _HASHED_ID_FIELDS = (
     "job_id",
     "backtest_run_id",
 )
+_POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST = frozenset(
+    {
+        "product_event",
+        "language",
+        "surface",
+        "terminal_outcome",
+        "conversion_reason",
+        "strategy_category",
+        "capability_category",
+    }
+)
 
 
 def _clean_env(name: str) -> str | None:
@@ -377,9 +388,12 @@ def _posthog_event_properties(envelope: ArgusEventEnvelope) -> dict[str, Any]:
         if value not in (None, "", [], {}):
             properties[field_name] = value
     if envelope.attributes:
-        properties["attributes"] = sanitize_observability_attributes(
-            envelope.attributes
-        )
+        attributes = sanitize_observability_attributes(envelope.attributes)
+        properties["attributes"] = attributes
+        for key in _POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST:
+            value = attributes.get(key)
+            if key not in properties and isinstance(value, str | int | float | bool):
+                properties[key] = value
     return properties
 
 
