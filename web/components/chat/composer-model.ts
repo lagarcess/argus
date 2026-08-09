@@ -20,32 +20,121 @@ export type TextRange = {
 };
 
 export function serializeComposerSegments(segments: ComposerSegment[]) {
-  return segments
-    .map((segment) => (segment.type === "token" ? segment.token.insert_text : segment.text))
-    .join("")
+  return normalizeComposerText(rawComposerText(segments));
+}
+
+export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
+  const tokenSegments = segments.filter(
+    (segment): segment is ComposerTokenSegment => segment.type === "token",
+  );
+  if (tokenSegments.length === 0) return [];
+
+  const markers = tokenSegments.map((segment, index) => ({
+    segment,
+    startMarker: composerMarker(segments, index, "start"),
+    endMarker: composerMarker(segments, index, "end"),
+  }));
+  const markerLookup = new Map<
+    string,
+    { index: number; boundary: "start" | "end" }
+  >(
+    markers.flatMap(
+      (marker, index): Array<[string, { index: number; boundary: "start" | "end" }]> => [
+        [marker.startMarker, { index, boundary: "start" }],
+        [marker.endMarker, { index, boundary: "end" }],
+      ],
+    ),
+  );
+  const decorated = decorateComposerSegments(segments, markers);
+  const normalized = normalizeComposerText(decorated);
+  const ranges = Array.from({ length: markers.length }, () => ({
+    start: null as number | null,
+    end: null as number | null,
+  }));
+  let output = "";
+
+  for (let offset = 0; offset < normalized.length; ) {
+    const marker = Array.from(markerLookup.keys()).find((value) =>
+      normalized.startsWith(value, offset),
+    );
+    if (!marker) {
+      output += normalized[offset];
+      offset += 1;
+      continue;
+    }
+    const boundary = markerLookup.get(marker)!;
+    ranges[boundary.index][boundary.boundary] = output.length;
+    offset += marker.length;
+  }
+
+  const serialized = serializeComposerSegments(segments);
+  if (output !== serialized) {
+    return tokenSegments.map(({ token }) => chatMentionForToken(token));
+  }
+
+  return markers.map(({ segment }, index) => {
+    const mention = chatMentionForToken(segment.token);
+    const range = ranges[index];
+    if (
+      range.start !== null &&
+      range.end !== null &&
+      output.slice(range.start, range.end) === mention.insert_text
+    ) {
+      mention.message_range = { start: range.start, end: range.end };
+    }
+    return mention;
+  });
+}
+
+function normalizeComposerText(value: string) {
+  return value
     .replace(/[ \t]{2,}/g, " ")
     .replace(/ *\n */g, "\n")
     .trim();
 }
 
-export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
+function chatMentionForToken(token: DiscoveryItem): ChatMention {
+  const mention: ChatMention = {
+    id: token.id,
+    type: token.type,
+    label: token.label,
+    symbol: token.symbol ?? null,
+    description: token.description ?? null,
+    insert_text: token.insert_text,
+    provider: token.provider ?? null,
+  };
+  if (token.type === "asset") {
+    mention.asset_class = token.asset_class ?? null;
+  }
+  return mention;
+}
+
+function composerMarker(segments: ComposerSegment[], index: number, boundary: "start" | "end") {
+  const raw = rawComposerText(segments);
+  let nonce = 0;
+  while (true) {
+    const marker = `\uE000argus-mention-${index}-${boundary}-${nonce}\uE001`;
+    if (!raw.includes(marker)) return marker;
+    nonce += 1;
+  }
+}
+
+function decorateComposerSegments(
+  segments: ComposerSegment[],
+  markers: Array<{
+    segment: ComposerTokenSegment;
+    startMarker: string;
+    endMarker: string;
+  }>,
+) {
+  let tokenIndex = 0;
   return segments
-    .filter((segment): segment is ComposerTokenSegment => segment.type === "token")
-    .map(({ token }) => {
-      const mention: ChatMention = {
-        id: token.id,
-        type: token.type,
-        label: token.label,
-        symbol: token.symbol ?? null,
-        description: token.description ?? null,
-        insert_text: token.insert_text,
-        provider: token.provider ?? null,
-      };
-      if (token.type === "asset") {
-        mention.asset_class = token.asset_class ?? null;
-      }
-      return mention;
-    });
+    .map((segment) => {
+      if (segment.type === "text") return segment.text;
+      const marker = markers[tokenIndex++];
+      return `${marker.startMarker}${segment.token.insert_text}${marker.endMarker}`;
+    })
+    .join("");
 }
 
 export function isComposerEmpty(segments: ComposerSegment[]) {
@@ -229,6 +318,21 @@ export function deleteTokenBeforeOffset(segments: ComposerSegment[], offset: num
     cursor = end;
   }
   return { segments, offset };
+}
+
+export function composerTokenAtCaret(
+  segments: ComposerSegment[],
+  offset: number,
+): { token: DiscoveryItem; start: number; end: number } | null {
+  let cursor = 0;
+  for (const segment of segments) {
+    const end = cursor + segmentLength(segment);
+    if (segment.type === "token" && (cursor === offset || end === offset)) {
+      return { token: segment.token, start: cursor, end };
+    }
+    cursor = end;
+  }
+  return null;
 }
 
 export function rawComposerText(segments: ComposerSegment[]) {

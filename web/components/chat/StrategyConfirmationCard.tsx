@@ -48,6 +48,7 @@ import {
   type StrategyConfirmationStatus,
 } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import { EntityToken } from "./entity-token";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
@@ -432,12 +433,9 @@ function AssetSymbols({ symbols }: { symbols: string[] }) {
   return (
     <span className="flex flex-wrap gap-1.5">
       {symbols.map((symbol) => (
-        <span
-          key={symbol}
-          className="rounded-[7px] border border-[#c9c9cd]/65 px-2 py-1 text-[12px] font-medium leading-none tracking-[0.16px] text-[#505a63] dark:border-white/14 dark:text-[#8d969e]"
-        >
+        <EntityToken key={symbol} kind="asset" surface="card">
           {symbol}
-        </span>
+        </EntityToken>
       ))}
     </span>
   );

@@ -111,6 +111,10 @@ export type ChatMention = {
   description?: string | null;
   insert_text: string;
   provider?: string | null;
+  message_range?: {
+    start: number;
+    end: number;
+  };
 };
 
 export type StrategyResultPayload = {
