@@ -168,13 +168,44 @@ none appear in any frame.
   (`www.stocktitan.net`, `cybersecurityventures.com`, `www.investing.com`,
   `www.fool.com`), each a link the packet returned.
 
-**Why the research shapes show the honest line rather than a populated
-panel.** Every source URL `finance_search` returns points at
-`perplexity.ai` (verified across all eleven committed probes: the only
-source values present are provider finance pages). Argus scrubs provider
-hosts by policy, so a `finance_search` answer structurally has no public
-source to link. The typed path is wired and test-pinned for the case where
-sources exist; in practice these shapes have none, and saying that plainly
-is the honest alternative to the citation lines the model used to invent.
-The Search-API path, which does return publisher pages, populates the same
-panel, as frame 33 shows.
+**Correction, and how citations actually arrive.** An earlier version of this
+file claimed `finance_search` returns no linkable sources and that the
+research shapes therefore always show the honest empty line. That was wrong,
+and it was wrong for a reason worth recording: the eleven original probes all
+predate the survey shapes, and in every one of them **web search never
+fired**, so an empty citation field proved nothing about the channel. The
+parser read only the finance channel's `sources` (which do carry
+provider-owned URLs, correctly scrubbed) and discarded the two channels that
+carry real publisher citations, `search_results` output items and
+`annotations` on the answer chunk. Argus then asserted in its own typed copy
+that there were no links to open while holding 45 discarded publisher URLs.
+
+Both channels are read now. Three probes cover it, and each records whether
+the tool fired before anything is concluded from an empty field:
+
+- `sector_radar_web_search_citations.json`: web search fired (billed under
+  `search_web`, three `search_results` items with their queries) and returned
+  45 results, including the CIBR versus HACK comparison the answer leaned on.
+- `thorough_comparison_web_search_citations.json`: the thorough tier in
+  background mode, five publisher citations (military.com, bgov.com,
+  nationaltoday.com among them).
+- `thorough_comparison_no_web_search.json`: a thorough run where web search
+  genuinely never fired, kept as the counter-example. Empty is the truth
+  there, and the honest line belongs to answers like it.
+
+## Citations reaching the panel (`browser/40-`, `browser/41-`)
+
+- `40-sector-sources-answer-{en,es}`: a sector radar answer that cited web
+  pages. The false "no source links to open" line is gone, and a
+  "5 sources" affordance sits under the answer.
+- `41-sector-sources-panel-{en,es}`: the same turn with the typed panel open,
+  showing publisher titles, domains, and dates (MarketBeat, CNBC, Yahoo
+  Finance, Morningstar, daytraders.com). Provider-identity URLs stay
+  scrubbed, and nothing renders that the packet did not carry.
+
+Which shapes populate the panel: any run that invoked web search, which in
+practice means sector radar and thorough comparisons, plus the find
+operation's source-backed path. Which legitimately show the empty line:
+answers built purely from the finance data channel, such as a live quote or
+an ETF holdings pull, where the only citations are provider pages the
+identity scrub removes.
