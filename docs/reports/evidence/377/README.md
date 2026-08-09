@@ -114,3 +114,35 @@ lifecycle is covered by tests and the committed background probe), and the
 interpreter's known intermittent validator rejection can still fail a turn
 upstream of the rail; the evidence session hit it twice and both retries
 succeeded with identical input.
+
+## The five shapes (`browser/20-` through `browser/24-`)
+
+Captured 2026-08-09 at the shapes head against live providers, default
+configuration, organic typed questions, both languages. Every frame's text
+dump was read before the frame was kept; three defects were caught that way
+and fixed before this set was recorded (market pulse and sector radar
+dead-ending on "nothing to test" while naming tradable assets, and ticker
+badges concatenating in copied text).
+
+- `20-market-pulse`: "What are the biggest movers today?" Real gainers,
+  losers, and most active with figures, volumes, and the session as-of, plus
+  index levels. Rows offer the movers the answer itself named.
+- `21-screening`: "Show me semiconductor stocks under a 20 P/E". The answer
+  carries a condition-by-condition table (semiconductor condition, P/E
+  condition) with the figure proving each, states it is not an exhaustive
+  world screen, and explains that negative P/E names were excluded rather
+  than silently dropped.
+- `22-sector-radar`: "What's happening in cybersecurity stocks?" Sector
+  analysis: ETF performance year to date, what is driving the move, leaders
+  against laggards, and a live scoreboard. Not a list of company
+  descriptions.
+- `23-comparison-p1`: "Compare PLTR to LMT". The P1 defect, fixed: a grounded
+  financial comparison with a runnable versus row, where this exact input
+  previously answered "What date window should I use for PLTR?".
+- `24-single-stock`: "How is Netflix doing?" Grounded single-stock analysis
+  ending on a runnable row.
+
+Each shape reaches the rail from an organic question in both languages,
+grounds through finance_search, ends on a resolver-verified runnable row,
+records `screening` (surveys) or its shape's class, and caches under the
+section 7 data class for its data.

@@ -1,0 +1,49 @@
+argus
+New chat
+Search
+Recents
+Settings
+Today's Biggest Stock Movers
+What are the biggest movers today?
+Biggest U.S. stock movers
+
+U.S. markets are closed today, Sunday, August 9, 2026. There are no live Sunday stock moves. The figures below are from the latest completed regular session: Friday, August 7, 2026, at 4:00 p.m. ET. After-hours changes are excluded.
+
+Largest percentage gainers
+TICKER	COMPANY	CLOSE	CHANGE	VOLUME
+YJ	Yunji	$3.400	+176.42%	51,181,780
+MB	MasterBeef Group	$8.92	+137.87%	32,001,843
+WWR	Westwater Resources	$0.767	+87.76%	131,558,392
+RCEL	AVITA Medical	$7.77	+63.58%	7,274,963
+VATE	INNOVATE Corp.	$12.11	+63.43%	14,276,050
+Largest percentage losers
+TICKER	COMPANY	CLOSE	CHANGE	VOLUME
+PN	PN Smart Energy	$3.210	−61.28%	2,568,782
+CVRX	CVRx	$2.390	−59.76%	14,773,430
+WYHG	Wing Yip Food Holdings	$4.430	−54.93%	1,501,448
+INHD	Inno Holdings	$5.15	−42.39%	1,915,197
+FCUV	Focus Universal	$5.20	−36.66%	347,877
+Most active by share volume
+TICKER	CLOSE	CHANGE	SHARES TRADED
+YYAI	$0.0780	−2.13%	247,418,178
+SPCX	$133.11	+15.83%	241,900,067
+HTZ	$2.270	+12.38%	227,217,785
+TTD	$13.80	−21.90%	133,458,224
+WWR	$0.767	+87.76%	131,558,392
+
+For better-known names, NVDA closed at $223.96, up 2.27%, on 105,632,624 shares, while PLTR gained 10.32% to $172.01 on 77,244,625 shares.
+
+The broader market rose: the S&P 500 gained 0.62% to 7,757.64, the Nasdaq Composite climbed 1.30% to 26,690.62, and the Dow added 0.28% to 54,036.93.
+
+These lists include very small and low-priced companies, whose percentage moves can be unusually extreme. Sources: Stock Analysis market screens and Friday’s U.S. closing-market reports; figures as of August 7, 2026, 4:00 p.m. ET.
+
+I could not confirm these figures against live market data just now, so treat them as general background rather than the current state of the market.
+
+TRY NEXT
+↳
+Test Yunji Inc. American Depository Shares YJ over the last 3 years
+↳
+Test Yunji Inc. American Depository Shares YJ vs MasterBeef MB, Westwater Resources WWR and Avita Medical RCEL
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

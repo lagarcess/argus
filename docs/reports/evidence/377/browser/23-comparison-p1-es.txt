@@ -1,0 +1,79 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Comparación de PLTR con LMT
+Compara PLTR con LMT
+PLTR vs. LMT, Comparación rápida
+
+Respuesta corta: son dos negocios muy distintos aunque ambos venden al gobierno de EE. UU. Palantir (PLTR) es una empresa de software en pleno crecimiento acelerado, con márgenes altísimos y una valuación extremadamente cara. Lockheed Martin (LMT) es un gigante industrial de defensa, mucho más grande en ventas, con crecimiento lento pero flujo de caja estable y dividendos. PLTR cotiza a un múltiplo ~7× mayor que LMT en P/E.
+
+Datos de mercado al cierre del 7 de agosto de 2026 (after-hours del 9 de agosto).
+
+Foto de mercado
+MÉTRICA	PLTR	LMT
+Precio	US$172.01	US$587.95
+Capitalización bursátil	US$394.9 mil millones	US$135.7 mil millones
+P/E (ratio precio/utilidad)	145.77	21.67
+EPS (TTM)	US$1.20	US$26.48
+Rango 52 semanas	US$106.37, US$207.52	US$424.12, US$692.00
+Rendimiento por dividendo	0%	~2% (pago US$3,131 M en 2025)
+
+Curiosidad: aunque LMT vende ~17× más que PLTR, el mercado valora a PLTR ~2.9× más que a LMT.
+
+Perfil del negocio
+	PLTR	LMT
+Sector	Tecnología / Software	Industrial / Aeroespacial y Defensa
+Producto	Plataformas de datos e IA (Gotham, Foundry, AIP)	Aviones (F-35), misiles, helicópteros, satélites
+CEO	Alexander C. Karp	James D. Taiclet Jr.
+Empleados	4,429	123,000
+Fundada / IPO	2003 / 2020	1912 / 1977
+Cliente principal	Gobierno de EE. UU. y aliados, más empresas	Gobierno de EE. UU. y ventas militares al exterior
+Fundamentales (año fiscal, cierre 31-dic)
+
+Ingresos (USD)
+
+AÑO	PLTR	LMT
+2023	2,225 M	67,571 M
+2024	2,866 M	71,043 M
+2025	4,475 M	75,048 M
+Crecimiento 2024→2025	+56.2%	+5.6%
+
+Rentabilidad 2025
+
+MÉTRICA	PLTR	LMT
+Margen bruto	82%	10%
+Margen operativo	32%	10%
+Margen neto	37%	7%
+Utilidad neta	US$1,635 M	US$5,017 M
+EPS diluido	US$0.63	US$21.49
+
+Balance y caja 2025
+
+	PLTR	LMT
+Efectivo y equivalentes	US$7,177 M	US$4,121 M
+Patrimonio de accionistas	US$7,488 M	US$6,721 M
+Flujo de caja operativo	US$2,134 M	US$8,557 M
+CapEx	US$34 M	US$1,649 M
+Flujo de caja libre (aprox.)	US$2,101 M	US$6,908 M
+Dividendos pagados	US$0	US$3,131 M
+
+Nota: el campo de deuda total no fue reportado por la fuente para ninguna de las dos; no lo estimo.
+
+Cómo interpretarlo
+Crecimiento: PLTR está creciendo ~10× más rápido que LMT (+56% vs +6% en 2025), impulsado por su plataforma de IA (AIP).
+Márgenes: PLTR tiene márgenes de software puro (82% bruto). LMT, al fabricar aviones y misiles bajo contratos gubernamentales de costo controlado, tiene márgenes finos (~10%).
+Escala: LMT vende casi US$17 por cada US$1 que vende PLTR, y genera 3× más flujo de caja libre.
+Valuación: el P/E de 145 de PLTR significa que el mercado paga por muchos años de crecimiento futuro. LMT en 21.7 es una valuación mucho más tradicional.
+Retorno al accionista: LMT reparte dividendos consistentes (~US$3 mil millones/año); PLTR no paga dividendos y reinvierte todo.
+Riesgo/perfil: PLTR = alto crecimiento, alta volatilidad, valuación exigente. LMT = negocio maduro con contratos plurianuales, ingresos predecibles, sensible al presupuesto de defensa de EE. UU.
+
+Esto es solo información comparativa, no es una recomendación de inversión.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar Palantir Technologies Inc. Class A PLTR frente a Lockheed Martin LMT
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
