@@ -154,6 +154,26 @@ async def grounded_result(
                 user=user,
                 reason=exc.reason,
             )
+        if is_market_survey(query.question_kind) and packet.usage.invocations == 0:
+            # Asking again is deterministic escalation, not a second router:
+            # a vague survey ("anything moving today?") lets the model answer
+            # from memory however firmly the prompt asks for the tool, so the
+            # retry states the concrete question the shape actually means.
+            # One retry only; if it still skips the tool the answer says so.
+            try:
+                retried = await asyncio.to_thread(
+                    client.run_research,
+                    _survey_retry_prompt(
+                        question_kind=query.question_kind,
+                        message=state.current_user_message,
+                        language=language,
+                    ),
+                    spec,
+                )
+            except ResearchUnavailableError:
+                retried = None
+            if retried is not None and retried.usage.invocations > 0:
+                packet = retried
         cache_put(
             key,
             packet,
@@ -526,6 +546,16 @@ def _client():
 # Survey shapes name no subject, so the answer must carry the assets it found
 # and the conditions it actually applied; a screen that ignores the stated
 # threshold is worse than no screen.
+# A survey answered from memory is the one failure the shape cannot have, and
+# a vague ask ("anything moving today?") is exactly when the model is most
+# tempted to skip the tool. The instruction is explicit for that reason; when
+# it is skipped anyway the answer says so rather than reading as current.
+_SURVEY_TOOL_REQUIREMENT = (
+    "Use finance_search to obtain these figures before answering. Do not "
+    "answer from memory: without tool results, say plainly that you could "
+    "not retrieve current data."
+)
+
 _SURVEY_GUIDANCE: dict[str, str] = {
     "market_pulse": (
         "Report what the market is actually doing right now: name the "
@@ -545,6 +575,44 @@ _SURVEY_GUIDANCE: dict[str, str] = {
         "not a list of company descriptions."
     ),
 }
+
+
+_SURVEY_RETRY_LINES: dict[str, str] = {
+    "market_pulse": (
+        "Retrieve today's top gainers, top losers, and most active US-listed "
+        "stocks with their percentage moves, prices, and volumes."
+    ),
+    "screening": (
+        "Retrieve current fundamentals for candidate assets and report the "
+        "figure that proves each stated condition."
+    ),
+    "sector_radar": (
+        "Retrieve current performance figures for this sector's leading "
+        "names and its sector ETFs."
+    ),
+}
+
+
+def _survey_retry_prompt(
+    *, question_kind: str | None, message: str, language: str
+) -> str:
+    """The concrete question the shape means, asked first.
+
+    The first attempt led with the user's vague words and the model answered
+    from memory. Leading with the data request is what gets the tool called;
+    the user's words follow as context, not as the whole ask."""
+    lines = [_SURVEY_RETRY_LINES.get(str(question_kind or ""), "")]
+    lines.append(f"The user asked: {message.strip()}")
+    lines.append(
+        "Lead with the figures you retrieve and state their as-of time. "
+        "If retrieval fails, say so plainly instead of answering from memory."
+    )
+    lines.append(
+        "Responde en español latinoamericano (es-419)."
+        if language == "es-419"
+        else "Answer in English."
+    )
+    return "\n".join(line for line in lines if line)
 
 
 def is_market_survey(question_kind: str | None) -> bool:
@@ -577,6 +645,7 @@ def _research_prompt(
     survey_guidance = _SURVEY_GUIDANCE.get(str(question_kind or ""))
     if survey_guidance:
         lines.append(survey_guidance)
+        lines.append(_SURVEY_TOOL_REQUIREMENT)
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "

@@ -428,3 +428,56 @@ def test_a_survey_reads_the_symbols_its_own_tables_name(monkeypatch) -> None:
     rows = json.dumps(result.stage_patch["next_experiments"]["rows"])
     assert "NVDA" in rows
     assert "ZZQQ" not in rows
+
+
+def test_an_ungrounded_survey_is_asked_again_concretely(monkeypatch) -> None:
+    """A vague survey lets the model answer from memory however firmly the
+    prompt asks for the tool, so the rail asks again with the concrete
+    question the shape means. One retry, then honesty."""
+    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    transport = _wire(
+        monkeypatch,
+        [
+            agent_response(text="Markets were mixed.", invocations=0),
+            agent_response(
+                text="NVDA +2.3%, TSLA -1.1%.",
+                tickers=["NVDA"],
+                lookup_rows=[("NVIDIA", "NVDA", "NVIDIA Corporation")],
+                invocations=1,
+            ),
+        ],
+    )
+
+    result = _run("anything interesting moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 2, "exactly one retry, never a loop"
+    retry_prompt = str(
+        json.loads(transport.requests[1].content.decode()).get("input") or ""
+    )
+    assert retry_prompt.startswith("Retrieve today's top gainers")
+    # The user's words survive as context, never as the whole ask.
+    assert "anything interesting moving today" in retry_prompt
+    sidecar = result.stage_patch["research"]
+    assert sidecar["usage"]["invocations"] == 1
+    assert "degraded" not in sidecar
+    assert "NVDA" in result.stage_patch["assistant_response"]
+
+
+def test_a_survey_that_skips_the_tool_twice_stays_honest(monkeypatch) -> None:
+    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    transport = _wire(
+        monkeypatch,
+        [
+            agent_response(text="Markets were mixed.", invocations=0),
+            agent_response(text="Still mixed.", invocations=0),
+        ],
+    )
+
+    result = _run("anything interesting moving today")
+
+    assert result is not None
+    assert len(transport.requests) == 2, "the retry never loops"
+    assert result.stage_patch["research"]["degraded"] == {
+        "code": "survey_not_grounded"
+    }
