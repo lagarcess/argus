@@ -63,6 +63,11 @@ because the form has to argue for the numbers on a page nobody reached through A
   both set every exit to false in the engine, so a fixed buy-against-sell layout was
   built around the exception. The rules block shrinks to one line and says "It never
   sold" instead of leaving an empty half.
+- **A mirrored exit is now a guarantee, not an assumption.** "Sold when it crossed
+  back below" only appears when the exit rule really is the engine's mirror of the
+  entry, judged over every field the engine reads. An exit configured in the same
+  direction as the entry compiles to cross_above on both sides, so the mirrored
+  sentence would describe the opposite of what ran; that shape refuses instead.
 - **Direction is not published at all.** Argus executes long only, so a frozen
   "bearish" names which way two averages crossed and not a position taken; beside a
   sell rule it reads as shorting a stock, which Argus cannot do. The sentence carries
