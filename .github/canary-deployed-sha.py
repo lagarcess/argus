@@ -27,11 +27,12 @@ def _require(condition: bool, reason: str) -> None:
 
 
 def resolve_deployed_sha(
-    *, api_status: str, web_status: str, workflow_status: str
+    *, api_status: str, web_status: str, workflow_status: str, cron_status: str
 ) -> str:
     api = _status_values(api_status)
     web = _status_values(web_status)
     workflow = _status_values(workflow_status)
+    cron = _status_values(cron_status)
 
     _require(_value(api, "status") == "live", "api_deploy_not_live")
     _require(_value(web, "status") == "live", "web_deploy_not_live")
@@ -49,6 +50,16 @@ def resolve_deployed_sha(
     workflow_sha = _value(workflow, "commit")
     _require(api_sha and api_sha == web_sha, "api_web_deploy_sha_mismatch")
     _require(api_sha == workflow_sha, "workflow_commit_mismatch")
+
+    # The cron holds the service-role key and deletes rows, so it may never lag
+    # the surfaces the canary certifies. "absent" is read back from Render and
+    # means nothing destructive is deployed, which is the one safe exception.
+    # A lookup that failed is not absent and must never take that exception.
+    cron_state = _value(cron, "status")
+    _require(cron_state not in {"", "lookup_failed"}, "cron_status_unavailable")
+    if cron_state != "absent":
+        _require(cron_state == "live", "cron_deploy_not_live")
+        _require(api_sha == _value(cron, "commit"), "cron_commit_mismatch")
     return api_sha
 
 
@@ -57,6 +68,7 @@ def main() -> int:
     parser.add_argument("--api-status", required=True)
     parser.add_argument("--web-status", required=True)
     parser.add_argument("--workflow-status", required=True)
+    parser.add_argument("--cron-status", required=True)
     args = parser.parse_args()
     try:
         print(
@@ -64,6 +76,7 @@ def main() -> int:
                 api_status=args.api_status,
                 web_status=args.web_status,
                 workflow_status=args.workflow_status,
+                cron_status=args.cron_status,
             )
         )
     except ValueError as error:

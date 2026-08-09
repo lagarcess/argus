@@ -8,6 +8,10 @@ ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="$ARGUS_PRIVATE_LAUNCH_APP_URL"
 ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID="srv-d78tanmuk2gs73e17nn0"
 ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID="srv-d7ap6bmslomc73eqp8m0"
 ARGUS_RENDER_BACKTESTS_WORKFLOW_ID="wfl-d8hpsmuq1p3s73duv3q0"
+# Blueprint-created, so it has no id until first apply. Release tooling resolves
+# it by name, which makes "absent" a fact read back from Render rather than an
+# id someone forgot to record.
+ARGUS_RENDER_MAINTENANCE_SERVICE_NAME="argus-maintenance"
 ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"
 ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"
 ARGUS_RENDER_POETRY_VERSION="2.1.3"
@@ -15,6 +19,12 @@ ARGUS_RENDER_API_BUILD_COMMAND="poetry config virtualenvs.create false && poetry
 ARGUS_RENDER_API_START_COMMAND="poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port \$PORT"
 ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false && poetry install --only main,workflows --no-interaction"
 ARGUS_RENDER_WORKFLOW_START_COMMAND="poetry run python workflows/main.py"
+# The janitor builds exactly like the API because it imports the same runtime.
+ARGUS_RENDER_CRON_BUILD_COMMAND="$ARGUS_RENDER_API_BUILD_COMMAND"
+ARGUS_RENDER_CRON_START_COMMAND="poetry run python scripts/ops/scheduled_maintenance.py"
+# Matches DEFAULT_STALE_QUEUED_SECONDS/DEFAULT_STALE_RUNNING_SECONDS (900s): a
+# slower schedule would make that threshold understate how long a user waits.
+ARGUS_RENDER_CRON_SCHEDULE="*/15 * * * *"
 
 ARGUS_QA_REQUIRED_ENV=(
   SUPABASE_PROJECT_URL
@@ -113,6 +123,20 @@ ARGUS_RENDER_WEB_ENV=(
   NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL
   NEXT_PUBLIC_OMNISEARCH_ENABLED
   NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
+)
+
+ARGUS_RENDER_CRON_ENV=(
+  APP_ENV
+  POETRY_VERSION
+  ARGUS_PERSISTENCE_MODE
+  ARGUS_DEV_MEMORY_FALLBACK
+  POSTHOG_REGION
+  POSTHOG_PROJECT_TOKEN
+  DATABASE_URL
+  SUPABASE_URL
+  SUPABASE_ANON_KEY
+  SUPABASE_SERVICE_ROLE_KEY
+  RENDER_API_KEY
 )
 
 ARGUS_RENDER_WORKFLOW_PROOF_ENV=(

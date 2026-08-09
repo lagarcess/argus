@@ -106,6 +106,9 @@ WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
 WORKFLOW_VERSION_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS=""
+CRON_DEPLOY_SHA=""
 ENV_FINGERPRINT=""
 RELEASE_PROFILE_HASH=""
 WORKFLOW_ENV_FINGERPRINT=""
@@ -582,7 +585,12 @@ run_deploy_status_probe() {
   if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
     fail_canary "deploy_status" "workflow_version_status_failed"
   fi
+  if ! CRON_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status)"; then
+    fail_canary "deploy_status" "cron_deploy_status_failed"
+  fi
 
+  CRON_DEPLOY_STATUS="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" status || true)"
+  CRON_DEPLOY_SHA="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
@@ -610,6 +618,20 @@ run_deploy_status_probe() {
   if [ "$API_DEPLOY_SHA" != "$WORKFLOW_VERSION_COMMIT" ]; then
     fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"
   fi
+  # A deployed janitor runs with the service-role key, so it may not lag the
+  # release this canary certifies. absent means Render has no such service; a
+  # failed lookup already exited nonzero above and never reaches this exemption.
+  if [ -z "$CRON_DEPLOY_STATUS" ] || [ "$CRON_DEPLOY_STATUS" = "lookup_failed" ]; then
+    fail_canary "deploy_status" "cron_status_unavailable"
+  fi
+  if [ "$CRON_DEPLOY_STATUS" != "absent" ]; then
+    if [ "$CRON_DEPLOY_STATUS" != "live" ]; then
+      fail_canary "deploy_status" "cron_deploy_not_live"
+    fi
+    if [ "$API_DEPLOY_SHA" != "$CRON_DEPLOY_SHA" ]; then
+      fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"
+    fi
+  fi
 
   DEPLOYED_SHA="$API_DEPLOY_SHA"
   if [ "$CANDIDATE_SHA" != "$DEPLOYED_SHA" ]; then
@@ -621,6 +643,8 @@ run_deploy_status_probe() {
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
   echo "canary_deployed_sha=$DEPLOYED_SHA"
+  echo "canary_cron_deploy_status=$CRON_DEPLOY_STATUS"
+  echo "canary_cron_deploy_sha=$CRON_DEPLOY_SHA"
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
   echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"

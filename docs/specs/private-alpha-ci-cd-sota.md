@@ -16,8 +16,9 @@ relevant details and addenda in
 `docs/specs/private-alpha-next-decision-memo.md`.
 
 Implementation note: the release gate now centers on local smoke, Render
-release-config audit, live API/web deploy SHA checks, workflow env parity proof,
-an authoritative Spanish release canary, and a per-candidate release manifest.
+release-config audit, live API/web/cron deploy SHA checks, workflow env parity
+proof, cron env parity proof, an authoritative Spanish release canary, and a
+per-candidate release manifest.
 The Spanish journey proves the real workflow, finalized evidence/result metadata,
 decision-note hydration, Omnisearch provenance, and deployed signup/login UI.
 Keep this document as the release gate contract whenever a candidate is
@@ -137,11 +138,17 @@ contracts.
 
 ### Current Service Topology
 
-Argus does not need more services at this stage. The stable target topology is:
+The stable target topology is four surfaces:
 
 - `argus-app`: web surface
 - `argus-api`: chat/runtime/orchestration surface
 - `argus-backtests`: workflow execution surface
+- `argus-maintenance`: scheduled retention and job reconciliation surface
+
+`argus-maintenance` is a Render cron service. It runs destructive maintenance
+with the service-role key, so it is promoted and verified with the other three,
+never treated as a side service. See Scheduled Maintenance in
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
 
 The workflow surface has two explicit tasks, not two separate services:
 
