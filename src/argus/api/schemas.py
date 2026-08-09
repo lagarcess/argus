@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
@@ -132,11 +133,23 @@ class OnboardingState(BaseModel):
 PREFERRED_NAME_MAX_LENGTH = 40
 
 
-def _blank_preferred_name_is_no_name(value: str | None) -> str | None:
+def _blank_preferred_name_is_no_name(value: Any) -> Any:
     """Whitespace is not a name, and clearing the field is the way to opt out."""
 
-    trimmed = (value or "").strip()
-    return trimmed or None
+    if not isinstance(value, str):
+        return value
+    return value.strip() or None
+
+
+# Normalize first, then enforce the bound. As an after-validator the trim ran
+# too late: `max_length` had already measured the raw value, so a leading space
+# in front of a forty-character name was a 422 for a name that trims to exactly
+# forty. One annotation serves the read model and the patch, so the rule cannot
+# be stated twice and drift.
+PreferredName = Annotated[
+    Annotated[str, Field(max_length=PREFERRED_NAME_MAX_LENGTH)] | None,
+    BeforeValidator(_blank_preferred_name_is_no_name),
+]
 
 
 class User(BaseModel):
@@ -146,7 +159,7 @@ class User(BaseModel):
     display_name: str | None = None
     #: What the user asked Argus to call them, distinct from `display_name`,
     #: which is an identity field. Null means greetings use no name.
-    preferred_name: str | None = Field(default=None, max_length=PREFERRED_NAME_MAX_LENGTH)
+    preferred_name: PreferredName = None
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
@@ -155,10 +168,6 @@ class User(BaseModel):
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
     updated_at: datetime
-
-    _normalize_preferred_name = field_validator("preferred_name")(
-        _blank_preferred_name_is_no_name
-    )
 
 
 class GuestAccountSummary(BaseModel):
@@ -258,15 +267,11 @@ class UsageAllowanceResponse(BaseModel):
 
 class ProfilePatch(BaseModel):
     display_name: str | None = None
-    preferred_name: str | None = Field(default=None, max_length=PREFERRED_NAME_MAX_LENGTH)
+    preferred_name: PreferredName = None
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
     avatar_theme: AvatarTheme = "ocean"
-
-    _normalize_preferred_name = field_validator("preferred_name")(
-        _blank_preferred_name_is_no_name
-    )
 
 
 class ConversationCreate(BaseModel):

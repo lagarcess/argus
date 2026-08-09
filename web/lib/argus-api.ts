@@ -564,9 +564,6 @@ export type ProfilePatch = {
   avatar_theme?: AvatarTheme;
 };
 
-/** Matches the backend's `PREFERRED_NAME_MAX_LENGTH`. */
-export const PREFERRED_NAME_MAX_LENGTH = 40;
-
 export async function getMe() {
   return apiFetch<UserResponse>("/me");
 }

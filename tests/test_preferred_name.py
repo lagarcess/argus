@@ -76,6 +76,48 @@ def test_it_is_bounded() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        " " + "x" * PREFERRED_NAME_MAX_LENGTH,
+        "x" * PREFERRED_NAME_MAX_LENGTH + " ",
+        "  " + "x" * PREFERRED_NAME_MAX_LENGTH + "  ",
+        "\t" + "x" * PREFERRED_NAME_MAX_LENGTH + "\n",
+    ],
+)
+def test_the_bound_measures_the_name_not_what_was_typed_around_it(raw: str) -> None:
+    # The exact defect: as an after-validator the trim ran too late, so
+    # max_length measured the padding and a legal forty-character name 422'd.
+    assert len(raw) > PREFERRED_NAME_MAX_LENGTH
+    assert len(raw.strip()) == PREFERRED_NAME_MAX_LENGTH
+
+    for model in (ProfilePatch, _user):
+        value = (
+            model(preferred_name=raw).preferred_name
+            if model is ProfilePatch
+            else _user(preferred_name=raw).preferred_name
+        )
+        assert value == "x" * PREFERRED_NAME_MAX_LENGTH
+
+
+def test_padding_cannot_smuggle_a_name_past_the_bound() -> None:
+    too_long = "x" * (PREFERRED_NAME_MAX_LENGTH + 1)
+    with pytest.raises(ValidationError):
+        ProfilePatch(preferred_name=f"   {too_long}   ")
+
+
+def test_the_read_model_and_the_patch_state_the_rule_once() -> None:
+    # Two copies of "normalize, then bound" would be two things that can drift.
+    from argus.api import schemas
+
+    assert schemas.User.model_fields["preferred_name"].annotation == (
+        schemas.ProfilePatch.model_fields["preferred_name"].annotation
+    )
+    source = Path(schemas.__file__).read_text(encoding="utf-8")
+    assert source.count("BeforeValidator(_blank_preferred_name_is_no_name)") == 1
+    assert "preferred_name: PreferredName" in source
+
+
 def test_guests_do_not_carry_one() -> None:
     # Guests have no profile and fall back to the nameless pool.
     projected = guest_safe_user(_user(preferred_name="Lucas")).model_dump()
@@ -121,6 +163,17 @@ def test_an_over_long_name_is_rejected_by_the_api() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_a_padded_full_length_name_is_accepted_by_the_api() -> None:
+    # End to end, over the wire: this returned 422 before the bound moved behind
+    # the normalizer.
+    padded = " " + "x" * PREFERRED_NAME_MAX_LENGTH
+
+    response = _client().patch("/api/v1/me", json={"preferred_name": padded})
+
+    assert response.status_code == 200
+    assert response.json()["user"]["preferred_name"] == "x" * PREFERRED_NAME_MAX_LENGTH
 
 
 def test_the_contract_declares_it_on_user_but_not_on_guest_user() -> None:

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useProfileUpdates } from "@/components/chat/useProfileUpdates";
 import { useTranslation } from "react-i18next";
 import { readStored, writeStored } from "@/lib/browser-storage";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
@@ -235,6 +236,7 @@ export default function ChatInterface() {
     setProfileState("established");
     return nextAccount;
   }, [i18n]);
+  const { onProfileUpdated, greetingName } = useProfileUpdates(account, setAccount);
   const [messages, setMessages] = useState<Message[]>([]);
   // Long-lived handlers (the undo toast) need the current transcript, not
   // the render that created them.
@@ -2236,6 +2238,7 @@ export default function ChatInterface() {
           }
         }}
         onHistoryMutated={refreshHistory}
+        onProfileUpdated={onProfileUpdated}
         onConversationRemoved={handleConversationRemoved}
         onAllConversationsDeleted={handleAllConversationsDeleted}
         onToast={showToast}
@@ -2403,7 +2406,7 @@ export default function ChatInterface() {
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
-                preferredName={account?.user.preferred_name}
+                preferredName={greetingName}
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}

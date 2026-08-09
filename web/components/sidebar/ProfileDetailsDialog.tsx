@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Check, ChevronUp, Edit2, X } from "lucide-react";
 
 import { useModalSurface } from "@/components/layout/useModalSurface";
-import { PREFERRED_NAME_MAX_LENGTH, type ApiUser } from "@/lib/argus-api";
+import type { ApiUser } from "@/lib/argus-api";
 import {
   AVATAR_THEMES,
   avatarThemeStyle,
@@ -66,7 +66,8 @@ type ProfileDetailsDialogProps = {
   editingName: boolean;
   nameValue: string;
   setNameValue: (value: string) => void;
-  setEditingName: (editing: boolean) => void;
+  /** Leaves edit mode and clears the field's error together. */
+  stopEditingName: () => void;
   handleStartEditName: () => void;
   handleSaveName: () => void | Promise<void>;
   isSavingName: boolean;
@@ -75,7 +76,8 @@ type ProfileDetailsDialogProps = {
   editingPreferredName: boolean;
   preferredNameValue: string;
   setPreferredNameValue: (value: string) => void;
-  setEditingPreferredName: (editing: boolean) => void;
+  /** Leaves edit mode and clears the field's error together. */
+  stopEditingPreferredName: () => void;
   handleStartEditPreferredName: () => void;
   handleSavePreferredName: () => void | Promise<void>;
   isSavingPreferredName: boolean;
@@ -113,7 +115,7 @@ export default function ProfileDetailsDialog({
   editingName,
   nameValue,
   setNameValue,
-  setEditingName,
+  stopEditingName,
   handleStartEditName,
   handleSaveName,
   isSavingName,
@@ -121,7 +123,7 @@ export default function ProfileDetailsDialog({
   editingPreferredName,
   preferredNameValue,
   setPreferredNameValue,
-  setEditingPreferredName,
+  stopEditingPreferredName,
   handleStartEditPreferredName,
   handleSavePreferredName,
   isSavingPreferredName,
@@ -228,16 +230,13 @@ export default function ProfileDetailsDialog({
                       autoFocus
                       type="text"
                       value={nameValue}
-                      onChange={(e) =>
-                        setNameValue(e.target.value.slice(0, 60))
-                      }
+                      onChange={(e) => setNameValue(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") void handleSaveName();
-                        if (e.key === "Escape") setEditingName(false);
+                        if (e.key === "Escape") stopEditingName();
                       }}
                       disabled={isSavingName}
                       className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] font-medium outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
-                      maxLength={60}
                       placeholder={t(
                         "settings.profile.display_name",
                         "Display name",
@@ -257,7 +256,7 @@ export default function ProfileDetailsDialog({
                       />
                     </button>
                     <button
-                      onClick={() => setEditingName(false)}
+                      onClick={stopEditingName}
                       disabled={isSavingName}
                       className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
                       title={t("common.cancel", "Cancel")}
@@ -418,7 +417,11 @@ export default function ProfileDetailsDialog({
 
           {/* What to call you. Its own field rather than display_name, which is
               an identity field people fill with a legal name. Optional, because
-              being addressed by name is not universally welcome. */}
+              being addressed by name is not universally welcome.
+
+              Neither name input caps what can be typed. The bound belongs to the
+              trimmed name, so capping the raw value dropped a character whenever
+              a space led it; the save refuses an over-long name and says so. */}
           {accountKind === "registered" && (
             <div className="mt-2 flex flex-col gap-1.5 border-t border-black/5 pt-3 dark:border-white/5">
               <label
@@ -437,17 +440,12 @@ export default function ProfileDetailsDialog({
                     id="argus-profile-preferred-name"
                     type="text"
                     value={preferredNameValue}
-                    onChange={(event) =>
-                      setPreferredNameValue(
-                        event.target.value.slice(0, PREFERRED_NAME_MAX_LENGTH),
-                      )
-                    }
+                    onChange={(event) => setPreferredNameValue(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") void handleSavePreferredName();
-                      if (event.key === "Escape") setEditingPreferredName(false);
+                      if (event.key === "Escape") stopEditingPreferredName();
                     }}
                     disabled={isSavingPreferredName}
-                    maxLength={PREFERRED_NAME_MAX_LENGTH}
                     className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
                     placeholder={t(
                       "settings.profile.preferred_name_placeholder",
@@ -468,7 +466,7 @@ export default function ProfileDetailsDialog({
                     />
                   </button>
                   <button
-                    onClick={() => setEditingPreferredName(false)}
+                    onClick={stopEditingPreferredName}
                     disabled={isSavingPreferredName}
                     className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
                     title={t("common.cancel", "Cancel")}

@@ -48,6 +48,12 @@ import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
 import {
+  DISPLAY_NAME_MAX_LENGTH,
+  PREFERRED_NAME_MAX_LENGTH,
+  normalizeProfileName,
+  profileNameExceeds,
+} from "@/lib/profile-names";
+import {
   AVATAR_THEMES,
   avatarThemeClassName,
   avatarThemeStyle,
@@ -71,6 +77,14 @@ type ProfileMenuProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
+  /**
+   * A profile setting was saved, with the server's updated user.
+   *
+   * The menu's own copy is not the one the chat shell renders from, so every
+   * successful patch reports upward rather than the one field that happened to
+   * be noticed. A surface added later cannot go stale by omission.
+   */
+  onProfileUpdated?: (user: ApiUser) => void;
   onOpenSidebarPreference?: () => void;
   onOpenKeyboardShortcuts?: () => void;
   /** Anchor position */
@@ -108,6 +122,7 @@ export default function ProfileMenu({
   onFeedback,
   onDeleteAllConversations,
   onHistoryMutated,
+  onProfileUpdated,
   onOpenSidebarPreference,
   onOpenKeyboardShortcuts,
   anchorRef,
@@ -178,10 +193,49 @@ export default function ProfileMenu({
     setIsAvatarPickerOpen(true);
   }, [accountKind, closeAvatarPicker, isAvatarPickerOpen]);
 
+  /*
+   * Leaving an edit is one operation, so the error leaves with it.
+   *
+   * The error renders beside the field in read mode too, so an exit that only
+   * flipped the mode left a refusal pinned under a value that no longer had
+   * anything wrong with it, and nothing in the dialog could clear it.
+   */
+  const stopEditingName = useCallback(() => {
+    setEditingName(false);
+    setNameError(null);
+  }, []);
+
+  const stopEditingPreferredName = useCallback(() => {
+    setEditingPreferredName(false);
+    setPreferredNameError(null);
+  }, []);
+
   const closeProfileModal = useCallback(() => {
     setIsAvatarPickerOpen(false);
+    // Per-edit state belongs to the dialog, which unmounts here. Left behind, a
+    // cleared-but-unsaved box reopened as an empty input claiming the name was
+    // gone, and confirming it sent the clear the user never asked for.
+    stopEditingName();
+    stopEditingPreferredName();
+    setNameValue("");
+    setPreferredNameValue("");
     setActiveModal(null);
-  }, []);
+  }, [stopEditingName, stopEditingPreferredName]);
+
+  /*
+   * The one way a saved profile leaves this menu.
+   *
+   * Every `patchMe` success goes through here, not just the field whose staleness
+   * someone noticed, so the shell's copy cannot drift from this one and a
+   * surface added later inherits the propagation for free.
+   */
+  const applyPatchedProfile = useCallback(
+    (user: ApiUser) => {
+      setProfile(user);
+      onProfileUpdated?.(user);
+    },
+    [onProfileUpdated],
+  );
 
   useEffect(() => {
     if (!isAvatarPickerOpen) return;
@@ -405,17 +459,29 @@ export default function ProfileMenu({
   }, [profile]);
 
   const handleSaveName = useCallback(async () => {
-    const trimmed = nameValue.trim();
+    const trimmed = normalizeProfileName(nameValue);
     if (!trimmed || trimmed === profile?.display_name) {
-      setEditingName(false);
+      stopEditingName();
+      return;
+    }
+    // Measured after trimming, and refused rather than truncated. The input used
+    // to slice the raw value to the bound, which quietly dropped a character
+    // whenever the user had typed a space in front of a full-length name.
+    if (profileNameExceeds(nameValue, DISPLAY_NAME_MAX_LENGTH)) {
+      setNameError(
+        t("settings.profile.display_name_too_long", {
+          defaultValue: "Keep this to {{count}} characters or fewer.",
+          count: DISPLAY_NAME_MAX_LENGTH,
+        }),
+      );
       return;
     }
     setIsSavingName(true);
     setNameError(null);
     try {
       const { user } = await patchMe({ display_name: trimmed });
-      setProfile(user);
-      setEditingName(false);
+      applyPatchedProfile(user);
+      stopEditingName();
     } catch (err) {
       console.error("Failed to update display name", err);
       setNameError(
@@ -427,7 +493,7 @@ export default function ProfileMenu({
     } finally {
       setIsSavingName(false);
     }
-  }, [nameValue, profile, t]);
+  }, [applyPatchedProfile, nameValue, profile, stopEditingName, t]);
 
   /*
    * What to call the user, which is a setting and never a memory.
@@ -437,18 +503,27 @@ export default function ProfileMenu({
    * the pool does not use one.
    */
   const handleSavePreferredName = useCallback(async () => {
-    const trimmed = preferredNameValue.trim();
+    const trimmed = normalizeProfileName(preferredNameValue);
     const current = profile?.preferred_name ?? "";
     if (trimmed === current) {
-      setEditingPreferredName(false);
+      stopEditingPreferredName();
+      return;
+    }
+    if (profileNameExceeds(preferredNameValue, PREFERRED_NAME_MAX_LENGTH)) {
+      setPreferredNameError(
+        t("settings.profile.preferred_name_too_long", {
+          defaultValue: "Keep this to {{count}} characters or fewer.",
+          count: PREFERRED_NAME_MAX_LENGTH,
+        }),
+      );
       return;
     }
     setIsSavingPreferredName(true);
     setPreferredNameError(null);
     try {
       const { user } = await patchMe({ preferred_name: trimmed || null });
-      setProfile(user);
-      setEditingPreferredName(false);
+      applyPatchedProfile(user);
+      stopEditingPreferredName();
     } catch (err) {
       console.error("Failed to update preferred name", err);
       setPreferredNameError(
@@ -460,7 +535,7 @@ export default function ProfileMenu({
     } finally {
       setIsSavingPreferredName(false);
     }
-  }, [preferredNameValue, profile, t]);
+  }, [applyPatchedProfile, preferredNameValue, profile, stopEditingPreferredName, t]);
 
   const handleStartEditPreferredName = useCallback(() => {
     setPreferredNameValue(profile?.preferred_name ?? "");
@@ -507,7 +582,7 @@ export default function ProfileMenu({
           language: nextLanguage,
           locale: localeForLanguage(nextLanguage),
         });
-        setProfile(user);
+        applyPatchedProfile(user);
         setIsLanguagePickerOpen(false);
       } catch (err) {
         console.error("Failed to update language", err);
@@ -531,7 +606,7 @@ export default function ProfileMenu({
         setIsSavingLanguage(false);
       }
     },
-    [i18n, isSavingLanguage, profile, t],
+    [applyPatchedProfile, i18n, isSavingLanguage, profile, t],
   );
 
   const handleAvatarThemeSelect = useCallback(
@@ -547,7 +622,7 @@ export default function ProfileMenu({
 
       try {
         const { user } = await patchMe({ avatar_theme: avatarTheme });
-        setProfile(user);
+        applyPatchedProfile(user);
       } catch (err) {
         console.error("Failed to update avatar theme", err);
         setProfile((current) =>
@@ -563,7 +638,7 @@ export default function ProfileMenu({
         setIsSavingAvatarTheme(false);
       }
     },
-    [accountKind, isSavingAvatarTheme, profile, t],
+    [accountKind, applyPatchedProfile, isSavingAvatarTheme, profile, t],
   );
 
   const handleAvatarThemeKeyDown = useCallback(
@@ -817,7 +892,7 @@ export default function ProfileMenu({
         editingName={editingName}
         nameValue={nameValue}
         setNameValue={setNameValue}
-        setEditingName={setEditingName}
+        stopEditingName={stopEditingName}
         handleStartEditName={handleStartEditName}
         handleSaveName={handleSaveName}
         isSavingName={isSavingName}
@@ -825,7 +900,7 @@ export default function ProfileMenu({
         editingPreferredName={editingPreferredName}
         preferredNameValue={preferredNameValue}
         setPreferredNameValue={setPreferredNameValue}
-        setEditingPreferredName={setEditingPreferredName}
+        stopEditingPreferredName={stopEditingPreferredName}
         handleStartEditPreferredName={handleStartEditPreferredName}
         handleSavePreferredName={handleSavePreferredName}
         isSavingPreferredName={isSavingPreferredName}

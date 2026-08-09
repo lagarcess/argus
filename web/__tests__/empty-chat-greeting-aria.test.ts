@@ -43,7 +43,10 @@ describe("what Argus calls the user", () => {
     const surface = source("components/chat/EmptyChatSurface.tsx");
     const chat = source("components/chat/ChatInterface.tsx");
 
-    expect(chat).toContain("preferredName={account?.user.preferred_name}");
+    // Read through the one accessor rather than off the account shape, so a
+    // saved name reaches the greeting without a reload. See
+    // __tests__/profile-propagation.test.ts.
+    expect(chat).toContain("preferredName={greetingName}");
     expect(surface).toContain("preferredName={preferredName}");
     expect(greeting).toContain("preferredName");
     // It reaches the pool as a plain eligibility flag, so no greeting can
