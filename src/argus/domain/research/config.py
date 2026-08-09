@@ -89,8 +89,15 @@ def background_deadline_seconds() -> float:
 def capability_class_for_shape(
     shape: QuestionShape, *, screening: bool
 ) -> CapabilityClass:
+    """The class describes the work, not the config tier it ran on.
+
+    A market survey is screening whether it grounded on the balanced tier or
+    the thorough one; metering reads the class, so it must not change when a
+    shape is retuned."""
+    if screening:
+        return "screening"
     if shape == "fast":
         return "fast_quote"
     if shape == "balanced":
         return "balanced_lookup"
-    return "screening" if screening else "thorough_research"
+    return "thorough_research"

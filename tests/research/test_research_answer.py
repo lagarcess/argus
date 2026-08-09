@@ -192,11 +192,40 @@ def test_thorough_cache_hit_answers_inline_without_a_job(monkeypatch) -> None:
     assert sidecar["peers"] and sidecar["peers"][0]["symbol"] == "MSFT"
 
 
-def test_screening_is_classed_screening(monkeypatch) -> None:
-    _classify(monkeypatch, question_kind="screening", symbols=["AAPL"])
-    result = _run("Find me big safe tech stocks")
+def test_screening_grounds_instead_of_queueing_a_background_job(monkeypatch) -> None:
+    """A screen is a survey of current market data, so it grounds in the turn
+    and comes back with names; it is not thorough multi-year research."""
+    _classify(
+        monkeypatch,
+        question_kind="screening",
+        symbols=[],
+        screening_criteria=["under a 20 P/E", "semiconductors"],
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Three semiconductor names trade under a 20 P/E.",
+                tickers=["INTC"],
+                lookup_rows=[("Intel", "INTC", "Intel Corporation")],
+            )
+        ],
+    )
+
+    result = _run("Show me semiconductor stocks under a 20 P/E")
+
     assert result is not None
-    assert result.stage_patch["research_job_request"]["capability_class"] == "screening"
+    assert "research_job_request" not in result.stage_patch
+    sidecar = result.stage_patch["research"]
+    assert sidecar["capability_class"] == "screening"
+    assert sidecar["usage"]["cache_status"] == "miss"
+    # The stated conditions reach the provider verbatim, so the screen can
+    # actually apply them instead of quietly ignoring them.
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    prompt = body["input"] if isinstance(body.get("input"), str) else str(body)
+    assert "under a 20 P/E" in prompt and "semiconductors" in prompt
+    # A survey names no subject, so the verified name it found is runnable.
+    assert result.stage_patch["next_experiments"]["rows"]
 
 
 def test_crypto_never_reaches_finance_search(monkeypatch) -> None:

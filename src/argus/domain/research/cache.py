@@ -84,7 +84,9 @@ _CATEGORY_FAMILIES: tuple[tuple[DataClass, tuple[str, ...]], ...] = (
 # statements (quarterly); current-facts finds and screens are movers-fresh.
 _KIND_DATA_CLASS: dict[str, DataClass] = {
     "live_quote": "quotes",
+    "market_pulse": "movers",
     "screening": "movers",
+    "sector_radar": "movers",
     "find_assets": "movers",
     "etf_constituents": "peers_constituents",
     "company_lookup": "fundamentals",

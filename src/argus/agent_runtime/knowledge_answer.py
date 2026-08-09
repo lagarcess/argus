@@ -16,7 +16,10 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.draft_shape import (
+    _EXECUTION_EVIDENCE_FIELDS,
+    strategy_has_execution_evidence,
+)
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
     NEXT_EXPERIMENTS_VERSION,
@@ -118,6 +121,46 @@ class KnowledgeQueryExtraction(BaseModel):
     date_range_raw_text: str | None = None
 
 
+# A default the interpreter injects for any two-asset mention is not the
+# user's stated intent to run something. Everything else in the evidence set
+# is: capital, cadence, sizing, rules, an explicit template.
+_DEFAULTED_EXECUTION_FIELDS = frozenset({"strategy_type"})
+
+
+def _rail_may_claim_clarification(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    """Widen the rail's entry to turns the builder is about to question.
+
+    "Compare PLTR to LMT" carries no capital, no window, and no execution
+    verb, yet the interpreter injects a default buy_and_hold, the draft then
+    counts as execution evidence, and the builder asks for a date window. It
+    is a question wearing a strategy's clothes, and which interpreter model
+    won the race decided whether it reached the rail at all.
+
+    This is not a second router and not a phrase list: it only lets the same
+    rail classifier see the turn. The classifier answers "none" for genuine
+    build requests, so those fall through to the builder unchanged. A draft
+    that carries any real execution field never reaches here.
+    """
+    if not research_rail_enabled():
+        return False
+    if not interpretation.requires_clarification:
+        return False
+    return _execution_evidence_is_only_a_default(
+        interpretation.candidate_strategy_draft
+    )
+
+
+def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
+    for field in _EXECUTION_EVIDENCE_FIELDS:
+        if field in _DEFAULTED_EXECUTION_FIELDS:
+            continue
+        if getattr(strategy, field, None) not in (None, "", [], {}):
+            return False
+    return True
+
+
 async def knowledge_answer_stage_result(
     *,
     interpretation: StructuredInterpretation,
@@ -127,17 +170,21 @@ async def knowledge_answer_stage_result(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     if selected_thread_metadata.get("last_stage_outcome") == "await_user_reply":
-        return None
-    if interpretation.intent not in _KNOWLEDGE_INTENTS:
-        return None
-    if (
-        interpretation.semantic_turn_act is not None
-        and interpretation.semantic_turn_act not in _KNOWLEDGE_ACTS
-    ):
+        # A reply to a pending question belongs to whoever asked it.
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
         return None
-    if strategy_has_execution_evidence(interpretation.candidate_strategy_draft):
+    rail_claim = _rail_may_claim_clarification(interpretation)
+    if (
+        strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
+        and not rail_claim
+    ):
+        return None
+    knowledge_shaped = interpretation.intent in _KNOWLEDGE_INTENTS and (
+        interpretation.semantic_turn_act is None
+        or interpretation.semantic_turn_act in _KNOWLEDGE_ACTS
+    )
+    if not knowledge_shaped and not rail_claim:
         return None
     if research_rail_enabled():
         # The rail's richer classifier subsumes the legacy one, so a flag-on
@@ -150,6 +197,10 @@ async def knowledge_answer_stage_result(
         return await research_answer_stage_result(
             interpretation=interpretation, state=state, user=user
         )
+    if not knowledge_shaped:
+        # Flag off, the widened entry does not exist: only the legacy
+        # knowledge shapes reach the pre-rail answerer.
+        return None
     # A provider-resolved asset on a knowledge turn IS the interpreter's own
     # classification: the user is asking about that asset. No second LLM call.
     query = _query_from_interpretation(interpretation)

@@ -46,6 +46,9 @@ from argus.llm.openrouter import invoke_openrouter_json_schema
 _RESEARCH_KINDS = frozenset(
     {"live_quote", "company_lookup", "cross_company", "screening"}
 )
+# Shapes that survey the market rather than a named asset: the user names no
+# subject, so the provider's own grounded result supplies the candidates.
+_MARKET_SURVEY_KINDS = frozenset({"market_pulse", "screening", "sector_radar"})
 
 
 class ResearchQueryExtraction(BaseModel):
@@ -60,7 +63,9 @@ class ResearchQueryExtraction(BaseModel):
         "company_lookup",
         "cross_company",
         "etf_constituents",
+        "market_pulse",
         "screening",
+        "sector_radar",
         "find_assets",
         "market_stats",
         "current_external",
@@ -73,6 +78,8 @@ class ResearchQueryExtraction(BaseModel):
     period_is_closed_window: bool = False
     date_range_raw_text: str | None = None
     discovery_category: str | None = None
+    screening_criteria: list[str] = Field(default_factory=list)
+    sector_of_interest: str | None = None
 
 
 async def research_answer_stage_result(
@@ -132,7 +139,7 @@ async def discovery_turn_stage_result(
         language=user.language_preference,
     )
     request = decision.asset_discovery
-    if query is None or query.question_kind not in _RESEARCH_SHAPED_KINDS:
+    if query is None or not _is_research_shaped(query.question_kind):
         # Classifier unavailable, or it agrees the turn is discovery-shaped:
         # the find operation runs with the interpreter's typed request, so a
         # routing hiccup can never lose a discovery turn.
@@ -155,19 +162,16 @@ async def discovery_turn_stage_result(
     )
 
 
-# Kinds that divert a typed discovery act into grounded research; everything
-# else on that entry stays a find operation. Screening stays with find here:
-# a typed asset_discovery act asks for candidate assets, not a market screen.
-_RESEARCH_SHAPED_KINDS = frozenset(
-    {
-        "live_quote",
-        "company_lookup",
-        "cross_company",
-        "etf_constituents",
-        "market_stats",
-        "current_external",
-    }
-)
+# Kinds that divert a typed discovery act into grounded research. The
+# interpreter's act says "the user wants assets"; the classifier says what
+# kind of answer that is. Only a bare ask for names stays with the find
+# operation, because only that ask wants names and nothing else: a screen
+# must apply its conditions and a sector question must report the sector.
+_FIND_OPERATION_KINDS = frozenset({"find_assets"})
+
+
+def _is_research_shaped(question_kind: str) -> bool:
+    return question_kind not in _FIND_OPERATION_KINDS | {"concept", "none"}
 
 
 async def _dispatch(
@@ -182,6 +186,23 @@ async def _dispatch(
     if query.question_kind in ("market_stats", "current_external"):
         return await _legacy_kind_result(
             query=query, interpretation=interpretation, state=state, user=user
+        )
+    if query.question_kind in _MARKET_SURVEY_KINDS:
+        if not state.research_allowance_available:
+            return await grounded.exhausted_result(
+                query=query,
+                subjects=[],
+                interpretation=interpretation,
+                state=state,
+                user=user,
+            )
+        return await grounded.grounded_result(
+            query=query,
+            subjects=_resolved_subjects(query),
+            shape="balanced",
+            interpretation=interpretation,
+            state=state,
+            user=user,
         )
     if query.question_kind == "find_assets":
         from argus.agent_runtime.research_find import find_assets_stage_result
@@ -268,11 +289,24 @@ async def _classify_research_question(
         "- etf_constituents: asks what an ETF or fund holds, its "
         "constituents, top holdings or their weights, or whether and how "
         "much of a named asset is inside it.\n"
-        "- screening: asks to find, list, or rank assets matching market "
-        "criteria, including gainers, losers, and most-active style asks.\n"
-        "- find_assets: asks to discover, suggest, or get ideas for assets "
-        "by similarity, category, theme, or as comparison candidates, when "
-        "the user has not named all the assets they want. "
+        "- market_pulse: asks what the market or an index is doing right "
+        "now, or which assets are moving, gaining, losing, or most active "
+        "today.\n"
+        "- screening: the user states any condition an asset must satisfy, "
+        "such as a valuation, yield, size, growth, margin, or performance "
+        "threshold. The condition decides this kind, not the phrasing: "
+        "'show me', 'find me', and 'what are' all count. "
+        "screening_criteria: each stated condition in the user's own words, "
+        "one per entry, including the category or sector when they named "
+        "one.\n"
+        "- sector_radar: asks what is happening in an industry, sector, or "
+        "theme, how it is performing, or what is driving it. "
+        "sector_of_interest: the sector or theme named.\n"
+        "- find_assets: asks only for names or ideas of assets by similarity "
+        "or category, stating no condition they must satisfy and asking "
+        "nothing about how they are performing, and the user has not named "
+        "all the assets they want. If the user states any threshold or "
+        "condition, it is screening, not find_assets. "
         "discovery_category: the user's own category or theme phrase, when "
         "one exists.\n"
         "- market_stats: asks about the historical performance, statistics, "

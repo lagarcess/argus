@@ -59,6 +59,7 @@ from argus.domain.research.config import (
 from argus.domain.research.contracts import (
     CapabilityClass,
     QuestionShape,
+    ResearchNamePair,
     ResearchPacket,
     ResearchUnavailableError,
 )
@@ -101,7 +102,7 @@ async def grounded_result(
 ) -> StageResult | None:
     spec = RESEARCH_CONFIG_SPECS[shape]
     capability_class = capability_class_for_shape(
-        shape, screening=query.question_kind == "screening"
+        shape, screening=is_market_survey(query.question_kind)
     )
     language = language_tag(user.language_preference)
     prompt = _research_prompt(
@@ -109,6 +110,9 @@ async def grounded_result(
         subjects=subjects,
         period=query.period_of_interest,
         language=language,
+        question_kind=query.question_kind,
+        criteria=list(getattr(query, "screening_criteria", []) or []),
+        sector=getattr(query, "sector_of_interest", None),
     )
     key = _cache_key_for(
         query=query,
@@ -167,6 +171,7 @@ async def grounded_result(
         user=user,
         cache_status=cache_status,
         period_of_interest=query.period_of_interest,
+        question_kind=query.question_kind,
     )
 
 
@@ -181,15 +186,38 @@ def _packet_stage_result(
     user: UserState,
     cache_status: str,
     period_of_interest: str | None = None,
+    question_kind: str | None = None,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
     shared cache, for any shape."""
-    peers = verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
+    survey = is_market_survey(question_kind)
+    candidates = list(packet.name_pairs)
+    if survey:
+        # A survey's answer names its assets in the results themselves, not
+        # only in a lookup table; the resolver still gates every one.
+        seen = {pair.symbol.upper() for pair in candidates}
+        candidates.extend(
+            ResearchNamePair(symbol=symbol, name=symbol)
+            for symbol in packet.tickers
+            if symbol.upper() not in seen
+        )
+    peers = verified_peers(candidates, exclude={s["symbol"] for s in subjects})
+    if not subjects and peers:
+        # A survey names no subject: what the provider found, once the
+        # resolver verifies it, is what the user can test. Promoting the
+        # first verified name keeps every answer one tap from a test.
+        subjects = peers[:1]
+        peers = peers[1:]
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
     answer = packet.answer_markdown
+    # A survey that never called the tool answered from model knowledge, and
+    # the one thing a market survey must not do is present that as current.
+    ungrounded = survey and packet.usage.invocations == 0
+    if ungrounded:
+        answer = f"{answer}\n\n*{_ungrounded_survey_note(language)}*"
     if not rows:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     return research_stage_result(
@@ -204,6 +232,7 @@ def _packet_stage_result(
         subjects=subjects,
         cache_status=cache_status,
         period_of_interest=period_of_interest,
+        degraded_code="survey_not_grounded" if ungrounded else None,
     )
 
 
@@ -222,7 +251,7 @@ def thorough_job_result(
     inline, with no job, no wait, and no provider spend."""
     language = language_tag(user.language_preference)
     capability_class = capability_class_for_shape(
-        "thorough", screening=query.question_kind == "screening"
+        "thorough", screening=is_market_survey(query.question_kind)
     )
     key = _cache_key_for(
         query=query,
@@ -330,7 +359,7 @@ async def off_coverage_result(
         user=user,
         capability_class=capability_class_for_shape(
             shape_for_kind(query.question_kind),
-            screening=query.question_kind == "screening",
+            screening=is_market_survey(query.question_kind),
         ),
         shape=shape_for_kind(query.question_kind),
         packet=packet,
@@ -384,7 +413,7 @@ async def exhausted_result(
         user=user,
         capability_class=capability_class_for_shape(
             shape_for_kind(query.question_kind),
-            screening=query.question_kind == "screening",
+            screening=is_market_survey(query.question_kind),
         ),
         shape=shape_for_kind(query.question_kind),
         packet=packet,
@@ -419,7 +448,7 @@ def unavailable_result(
         user=user,
         capability_class=capability_class_for_shape(
             shape_for_kind(query.question_kind),
-            screening=query.question_kind == "screening",
+            screening=is_market_survey(query.question_kind),
         ),
         shape=shape_for_kind(query.question_kind),
         packet=packet,
@@ -435,7 +464,7 @@ def unavailable_result(
 def shape_for_kind(kind: str) -> QuestionShape:
     if kind == "live_quote":
         return "fast"
-    if kind in ("company_lookup", "etf_constituents"):
+    if kind in ("company_lookup", "etf_constituents") or is_market_survey(kind):
         return "balanced"
     return "thorough"
 
@@ -481,12 +510,43 @@ def _client():
     return PerplexityAgentClient(api_key)
 
 
+# Survey shapes name no subject, so the answer must carry the assets it found
+# and the conditions it actually applied; a screen that ignores the stated
+# threshold is worse than no screen.
+_SURVEY_GUIDANCE: dict[str, str] = {
+    "market_pulse": (
+        "Report what the market is actually doing right now: name the "
+        "specific gainers, losers, and most active names with their real "
+        "figures and the as-of time. Name the tickers explicitly."
+    ),
+    "screening": (
+        "Apply every stated condition and say plainly which condition each "
+        "named asset satisfies, with the figure that proves it. Name the "
+        "tickers explicitly. If a condition cannot be evaluated from "
+        "available data, say so rather than dropping it silently."
+    ),
+    "sector_radar": (
+        "Explain what is actually happening in this sector right now: how it "
+        "is performing, what is driving it, and which names lead or lag, with "
+        "real figures. Name the tickers explicitly. This is sector analysis, "
+        "not a list of company descriptions."
+    ),
+}
+
+
+def is_market_survey(question_kind: str | None) -> bool:
+    return str(question_kind or "") in _SURVEY_GUIDANCE
+
+
 def _research_prompt(
     *,
     message: str,
     subjects: list[dict[str, str]],
     period: str | None,
     language: str,
+    question_kind: str | None = None,
+    criteria: list[str] | None = None,
+    sector: str | None = None,
 ) -> str:
     """Documented prompt guidance: business question first, then tickers and
     the time window; state the desired outcome, let the tool pick fields."""
@@ -495,8 +555,15 @@ def _research_prompt(
         lines.append(
             "Tickers: " + ", ".join(f"{s['name']} ({s['symbol']})" for s in subjects)
         )
+    if sector:
+        lines.append(f"Sector or theme: {sector}")
+    for condition in criteria or []:
+        lines.append(f"Required condition: {condition}")
     if period:
         lines.append(f"Time window: {period}")
+    survey_guidance = _SURVEY_GUIDANCE.get(str(question_kind or ""))
+    if survey_guidance:
+        lines.append(survey_guidance)
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "
@@ -538,6 +605,20 @@ def _exhausted_note(language: str) -> str:
         "Today's shared research capacity is used up, so this answer comes "
         "from Argus's own data and what I already know. Ask again tomorrow "
         "for a live read; testing ideas is still available."
+    )
+
+
+def _ungrounded_survey_note(language: str) -> str:
+    if language == "es-419":
+        return (
+            "No pude confirmar estas cifras con datos de mercado en vivo en "
+            "este momento, así que trátalas como referencia general y no como "
+            "el estado actual del mercado."
+        )
+    return (
+        "I could not confirm these figures against live market data just now, "
+        "so treat them as general background rather than the current state of "
+        "the market."
     )
 
 
@@ -613,6 +694,12 @@ def compose_completed_research(
         if isinstance(s, dict) and s.get("symbol")
     ]
     peers = verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
+    if not subjects and peers:
+        # A survey names no subject: what the provider found, once the
+        # resolver verifies it, is what the user can test. Promoting the
+        # first verified name keeps every answer one tap from a test.
+        subjects = peers[:1]
+        peers = peers[1:]
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
