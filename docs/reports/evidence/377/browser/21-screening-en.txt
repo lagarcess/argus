@@ -1,0 +1,32 @@
+argus
+New chat
+Search
+Recents
+Settings
+Semiconductor stocks under 20 P/E
+Show me semiconductor stocks under a 20 P/E
+Semiconductor stocks with a positive P/E below 20
+
+As of the latest market close, August 7, 2026; data retrieved August 9, 2026.
+
+TICKER	COMPANY	SEMICONDUCTOR CONDITION	P/E CONDITION
+SIMO	Silicon Motion Technology	Satisfied: classified in the Semiconductors industry; designs NAND-flash controllers	Satisfied: 7.50 P/E, below 20
+UMC	United Microelectronics	Satisfied: classified in the Semiconductors industry; operates semiconductor foundries	Satisfied: 17.44 P/E, below 20
+QCOM	Qualcomm	Satisfied: classified in the Semiconductors industry; develops and supplies integrated circuits	Satisfied: 19.16 P/E, below 20
+
+These are confirmed matches among the stocks checked, not necessarily an exhaustive worldwide list.
+
+Important data note: SIMO’s supplied P/E figure is 7.50, but other quote fields returned alongside it were not internally consistent with that ratio. Therefore, although the reported P/E satisfies the screen, it deserves independent verification before being relied upon.
+
+Companies with negative P/E figures, such as INTC and MX, were not included. A negative P/E generally indicates losses or an unusable earnings comparison; it should not be interpreted as an attractively low positive P/E.
+
+No investment advice.
+
+TRY NEXT
+↳
+Test QUALCOMM QCOM over the last 3 years
+↳
+Test QUALCOMM QCOM vs Skyworks Solutions SWKS, United Microelectronic UMC and STMicroelectronics N.V STM
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

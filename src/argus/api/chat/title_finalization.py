@@ -119,6 +119,7 @@ def schedule_artifact_naming_after_stream(
             run_id=run_id,
             viewport=viewport,
         )
+
     try:
         asyncio.get_running_loop().create_task(_run())
     except RuntimeError:

@@ -39,6 +39,7 @@ describe("Try next rows (issue #249)", () => {
         sendText: null,
         labelShort: null,
         labelShortKey: null,
+        labelParts: null,
       },
     ]);
     expect(
@@ -144,5 +145,73 @@ describe("Try next rows (issue #249)", () => {
       source.indexOf('role="status"'),
     );
     expect(failureBranch).not.toContain("factHeadingLabel");
+  });
+});
+
+describe("ticker badges on suggestion rows", () => {
+  test("typed label parts survive projection and keep a plain-text label", () => {
+    const rows = nextExperimentRowsFromMetadata({
+      next_experiments: {
+        version: NEXT_EXPERIMENTS_VERSION,
+        rows: [
+          {
+            kind: "research_test_single",
+            label: "Test Netflix (NFLX) over the last 3 years",
+            label_key: "chat.next_experiments.labels.research_dynamic",
+            label_parts: [
+              { type: "text", value: "Test " },
+              { type: "text", value: "Netflix" },
+              { type: "ticker", value: "NFLX" },
+              { type: "text", value: " over the last 3 years" },
+            ],
+          },
+        ],
+      },
+    });
+    expect(rows?.[0].labelParts).toEqual([
+      { type: "text", value: "Test " },
+      { type: "text", value: "Netflix" },
+      { type: "ticker", value: "NFLX" },
+      { type: "text", value: " over the last 3 years" },
+    ]);
+    // The plain label stays the sentence the badge row shows, so aria labels
+    // and analytics read the same thing the eye does.
+    expect(rows?.[0].label).toBe("Test Netflix (NFLX) over the last 3 years");
+  });
+
+  test("malformed or empty parts degrade to the plain label", () => {
+    const rows = nextExperimentRowsFromMetadata({
+      next_experiments: {
+        version: NEXT_EXPERIMENTS_VERSION,
+        rows: [
+          {
+            kind: "research_test_single",
+            label: "Test Netflix (NFLX) over the last 3 years",
+            label_key: "chat.next_experiments.labels.research_dynamic",
+            label_parts: [{ type: "text", value: "" }, "nonsense", 7],
+          },
+        ],
+      },
+    });
+    expect(rows?.[0].labelParts).toBeNull();
+    expect(rows?.[0].label).toBe("Test Netflix (NFLX) over the last 3 years");
+  });
+});
+
+describe("research citations reach the live turn", () => {
+  test("the stream path attaches typed sources, not only hydration", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    // A turn that cited pages must offer them when it lands, not after a
+    // reload: the panel is fed from the final payload too.
+    expect(chat).toContain("researchSourcesForFinalPayload(finalPayload)");
+    expect(chat).toContain("researchSources: finalResearchSources");
+    const merge = readFileSync(
+      join(import.meta.dir, "../lib/chat-final-message.ts"),
+      "utf-8",
+    );
+    expect(merge).toContain("researchSources ?? message.researchSources");
   });
 });

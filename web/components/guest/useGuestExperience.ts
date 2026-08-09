@@ -33,6 +33,7 @@ import {
   type GuestDecisionResumeTarget,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
+import { randomId } from "@/lib/random-id";
 
 export type GuestResumeSend = (
   text: string,
@@ -162,7 +163,7 @@ export function useGuestExperience({
       conversion.requestConversion("save_decision", {
         reason: "save_decision",
         conversationId,
-        actionId: crypto.randomUUID(),
+        actionId: randomId(),
         target,
       });
     },
@@ -180,7 +181,7 @@ export function useGuestExperience({
           ? {
               reason: "keep_history",
               conversationId,
-              actionId: crypto.randomUUID(),
+              actionId: randomId(),
             }
           : null,
       );
@@ -253,15 +254,20 @@ export function useGuestExperience({
               exactReplay: isExactGuestRunReplay(messages, action),
             });
             if (decision.kind === "convert") {
-              if (!conversationId) return false;
+              // The prompt is the answer to a spent allowance, so it opens
+              // whether or not there is a conversation to replay into. Only
+              // the pending action needs one; gating the prompt on it left a
+              // returning guest pressing send against silence.
               conversion.requestConversion(
                 decision.reason,
-                {
-                  reason: "simulation_limit",
-                  conversationId,
-                  actionId: crypto.randomUUID(),
-                  action,
-                },
+                conversationId
+                  ? {
+                      reason: "simulation_limit",
+                      conversationId,
+                      actionId: randomId(),
+                      action,
+                    }
+                  : null,
                 "signup",
                 guestSimulationPrecheckResetAt(usage.allowances.backtests),
                 "daily",
@@ -274,14 +280,18 @@ export function useGuestExperience({
               availableNow: usage.allowances.messages.available_now,
             });
             if (decision.kind === "convert") {
-              if (!conversationId) return false;
-              conversion.requestConversion(decision.reason, {
-                reason: "message_limit",
-                conversationId,
-                actionId: crypto.randomUUID(),
-                text,
-                mentions,
-              });
+              conversion.requestConversion(
+                decision.reason,
+                conversationId
+                  ? {
+                      reason: "message_limit",
+                      conversationId,
+                      actionId: randomId(),
+                      text,
+                      mentions,
+                    }
+                  : null,
+              );
               return false;
             }
           }
@@ -341,7 +351,7 @@ export function useGuestExperience({
       {
         reason: "new_conversation",
         conversationId,
-        actionId: crypto.randomUUID(),
+        actionId: randomId(),
       },
       newConversationConversionMode(
         conversion.publicAccountAccessEnabled,
@@ -363,7 +373,7 @@ export function useGuestExperience({
         {
           reason: "simulation_limit",
           conversationId,
-          actionId: crypto.randomUUID(),
+          actionId: randomId(),
           action,
         },
         "signup",

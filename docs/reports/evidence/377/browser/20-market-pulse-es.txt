@@ -1,0 +1,46 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Acciones con mayor movimiento
+¿Cuáles son las acciones que más se mueven hoy?
+
+Hoy, domingo 9 de agosto de 2026, las bolsas de EE. UU. están cerradas. Por eso no hay movimientos en tiempo real. Estos son los principales movimientos de la última sesión regular, cerrada el viernes 7 de agosto de 2026 a las 4:00 p. m. ET, entre acciones cotizadas en EE. UU.
+
+Mayores alzas
+TICKER	EMPRESA	CIERRE	VARIACIÓN	VOLUMEN
+YJ	Yunji	US$3.400	+176.42%	51,181,780
+MB	MasterBeef Group	US$8.92	+137.87%	32,001,843
+WWR	Westwater Resources	US$0.767	+87.76%	131,558,392
+RCEL	AVITA Medical	US$7.77	+63.58%	7,274,963
+VATE	INNOVATE Corp.	US$12.11	+63.43%	14,276,050
+Mayores bajas
+TICKER	EMPRESA	CIERRE	VARIACIÓN	VOLUMEN
+PN	PN Smart Energy	US$3.210	−61.28%	2,568,782
+CVRX	CVRx	US$2.390	−59.76%	14,773,430
+WYHG	Wing Yip Food Holdings	US$4.430	−54.93%	1,501,448
+INHD	Inno Holdings	US$5.15	−42.39%	1,915,197
+FCUV	Focus Universal	US$5.20	−36.66%	347,877
+Más activas por número de acciones negociadas
+TICKER	EMPRESA	VOLUMEN	CIERRE	VARIACIÓN
+YYAI	AiRWA	247,418,178	US$0.0780	−2.13%
+SPCX	Space Exploration Technologies	241,900,067	US$133.11	+15.83%
+HTZ	Hertz Global Holdings	227,217,785	US$2.270	+12.38%
+TTD	The Trade Desk	133,458,224	US$13.80	−21.90%
+WWR	Westwater Resources	131,558,392	US$0.767	+87.76%
+
+Lectura rápida: los movimientos porcentuales extremos se concentraron principalmente en acciones pequeñas y de bajo precio, que suelen ser más volátiles. Entre compañías más conocidas destacaron TEAM (+35.31%, US$149.07), DOCS (+32.62%, US$27.40), TWLO (+24.89%, US$241.28) y TTD (−21.90%, US$13.80).
+
+Datos de cierre publicados por Stock Analysis para el 7 de agosto. La hora exacta de actualización del proveedor no está disponible; no son cotizaciones en vivo. Esto es información de mercado, no asesoría de inversión.
+
+No pude confirmar estas cifras con datos de mercado en vivo en este momento, así que trátalas como referencia general y no como el estado actual del mercado.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar Yunji Inc. American Depository Shares YJ en los últimos 3 años
+↳
+Probar Yunji Inc. American Depository Shares YJ frente a MasterBeef MB, Westwater Resources WWR y Avita Medical RCEL
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

@@ -40,6 +40,9 @@ def public_backtest_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "conversation_id",
         "request_message_id",
         "confirmation_message_id",
+        # Additive: lets clients tell research jobs from backtest jobs; absent
+        # on legacy rows, which clients treat as chat.run_backtest.
+        "operation_scope",
         "status",
         "result_run_id",
         "failure_code",

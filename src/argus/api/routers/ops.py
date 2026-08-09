@@ -191,9 +191,7 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
             detail="Access request is not eligible for approval.",
         )
 
-    language: Language = (
-        "es-419" if requested.get("language") == "es-419" else "en"
-    )
+    language: Language = "es-419" if requested.get("language") == "es-419" else "en"
     try:
         signup_url = _approval_signup_url()
         send_access_approval_email(

@@ -1,0 +1,265 @@
+{
+  "digest": "55bb1b89ce5493c5e4f5c2374b5e043b24eb792e499676344c64f9dcef91b8b7",
+  "observed": [
+    {
+      "frames": [
+        {
+          "stage": "interpret",
+          "type": "stage_start"
+        },
+        {
+          "outcome": "ready_to_respond",
+          "type": "stage_outcome"
+        },
+        {
+          "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+          "type": "token"
+        },
+        {
+          "payload": {
+            "artifact_references": [],
+            "assistant_response": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+            "message_id": "<VOLATILE>",
+            "recovery": {
+              "code": "interpreter_unavailable",
+              "retryable": true
+            },
+            "stage_outcome": "ready_to_respond"
+          },
+          "type": "final"
+        },
+        "[DONE]"
+      ],
+      "status": 200,
+      "turn": "EDU what is a drawdown?"
+    },
+    {
+      "frames": [
+        {
+          "stage": "interpret",
+          "type": "stage_start"
+        },
+        {
+          "outcome": "ready_to_respond",
+          "type": "stage_outcome"
+        },
+        {
+          "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+          "type": "token"
+        },
+        {
+          "payload": {
+            "artifact_references": [],
+            "assistant_response": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+            "message_id": "<VOLATILE>",
+            "recovery": {
+              "code": "interpreter_unavailable",
+              "retryable": true
+            },
+            "stage_outcome": "ready_to_respond"
+          },
+          "type": "final"
+        },
+        "[DONE]"
+      ],
+      "status": 200,
+      "turn": "STATS how has the S&P 500 performed lately?"
+    },
+    {
+      "frames": [
+        {
+          "stage": "interpret",
+          "type": "stage_start"
+        },
+        {
+          "outcome": "ready_to_respond",
+          "type": "stage_outcome"
+        },
+        {
+          "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+          "type": "token"
+        },
+        {
+          "payload": {
+            "artifact_references": [],
+            "assistant_response": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+            "message_id": "<VOLATILE>",
+            "recovery": {
+              "code": "interpreter_unavailable",
+              "retryable": true
+            },
+            "stage_outcome": "ready_to_respond"
+          },
+          "type": "final"
+        },
+        "[DONE]"
+      ],
+      "status": 200,
+      "turn": "PLAIN let's think about an idea"
+    },
+    {
+      "transcript": {
+        "items": [
+          {
+            "content": "EDU what is a drawdown?",
+            "conversation_id": "<VOLATILE>",
+            "created_at": "<VOLATILE>",
+            "id": "<VOLATILE>",
+            "metadata": {
+              "agent_runtime_turn": {
+                "conversation_id": "<VOLATILE>",
+                "request_id": "<VOLATILE>",
+                "started_at": "<VOLATILE>",
+                "status": "started"
+              }
+            },
+            "role": "user"
+          },
+          {
+            "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+            "conversation_id": "<VOLATILE>",
+            "created_at": "<VOLATILE>",
+            "id": "<VOLATILE>",
+            "metadata": {
+              "agent_runtime_stage_outcome": "ready_to_respond",
+              "agent_runtime_turn": {
+                "failure_code": null,
+                "reconciled_outcome": null,
+                "request_id": "<VOLATILE>",
+                "retryable": false,
+                "status": "completed",
+                "terminal": true,
+                "turn_id": "<VOLATILE>"
+              },
+              "conversation_mode": "guide",
+              "recovery": {
+                "code": "interpreter_unavailable",
+                "retryable": true
+              }
+            },
+            "role": "assistant"
+          },
+          {
+            "content": "STATS how has the S&P 500 performed lately?",
+            "conversation_id": "<VOLATILE>",
+            "created_at": "<VOLATILE>",
+            "id": "<VOLATILE>",
+            "metadata": {
+              "agent_runtime_turn": {
+                "conversation_id": "<VOLATILE>",
+                "request_id": "<VOLATILE>",
+                "started_at": "<VOLATILE>",
+                "status": "started"
+              }
+            },
+            "role": "user"
+          },
+          {
+            "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+            "conversation_id": "<VOLATILE>",
+            "created_at": "<VOLATILE>",
+            "id": "<VOLATILE>",
+            "metadata": {
+              "agent_runtime_stage_outcome": "ready_to_respond",
+              "agent_runtime_turn": {
+                "failure_code": null,
+                "reconciled_outcome": null,
+                "request_id": "<VOLATILE>",
+                "retryable": false,
+                "status": "completed",
+                "terminal": true,
+                "turn_id": "<VOLATILE>"
+              },
+              "conversation_mode": "guide",
+              "recovery": {
+                "code": "interpreter_unavailable",
+                "retryable": true
+              }
+            },
+            "role": "assistant"
+          },
+          {
+            "content": "PLAIN let's think about an idea",
+            "conversation_id": "<VOLATILE>",
+            "created_at": "<VOLATILE>",
+            "id": "<VOLATILE>",
+            "metadata": {
+              "agent_runtime_turn": {
+                "conversation_id": "<VOLATILE>",
+                "request_id": "<VOLATILE>",
+                "started_at": "<VOLATILE>",
+                "status": "started"
+              }
+            },
+            "role": "user"
+          },
+          {
+            "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+            "conversation_id": "<VOLATILE>",
+            "created_at": "<VOLATILE>",
+            "id": "<VOLATILE>",
+            "metadata": {
+              "agent_runtime_stage_outcome": "ready_to_respond",
+              "agent_runtime_turn": {
+                "failure_code": null,
+                "reconciled_outcome": null,
+                "request_id": "<VOLATILE>",
+                "retryable": false,
+                "status": "completed",
+                "terminal": true,
+                "turn_id": "<VOLATILE>"
+              },
+              "conversation_mode": "guide",
+              "recovery": {
+                "code": "interpreter_unavailable",
+                "retryable": true
+              }
+            },
+            "role": "assistant"
+          }
+        ],
+        "next_cursor": null
+      }
+    },
+    {
+      "usage": {
+        "allowances": {
+          "backtests": {
+            "available_now": true,
+            "day": {
+              "limit": 50,
+              "period_end": "<VOLATILE>",
+              "remaining": 50,
+              "used": 0
+            },
+            "guest_session": null,
+            "hour": {
+              "limit": 10,
+              "period_end": "<VOLATILE>",
+              "remaining": 10,
+              "used": 0
+            },
+            "limiting_window": "hour"
+          },
+          "messages": {
+            "available_now": true,
+            "day": {
+              "limit": 200,
+              "period_end": "<VOLATILE>",
+              "remaining": 197,
+              "used": 3
+            },
+            "guest_session": null,
+            "hour": {
+              "limit": 60,
+              "period_end": "<VOLATILE>",
+              "remaining": 57,
+              "used": 3
+            },
+            "limiting_window": "hour"
+          }
+        }
+      }
+    }
+  ]
+}

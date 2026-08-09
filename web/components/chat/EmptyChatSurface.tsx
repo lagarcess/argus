@@ -4,12 +4,13 @@ import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import ChatInput from "./ChatInput";
 import ChatLegalNotice from "./ChatLegalNotice";
+import EmptyChatGreeting from "./EmptyChatGreeting";
 import EmptyChatHeading from "./EmptyChatHeading";
 import StarterActions, {
   type StarterSelectionMetadata,
 } from "./StarterActions";
 import type { ChatMention } from "./types";
-import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
+import { researchRailEnabled } from "@/lib/private-alpha-flags";
 
 type EmptyChatSurfaceProps = {
   isGuest: boolean;
@@ -48,6 +49,8 @@ export default function EmptyChatSurface({
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
+  const showSignedInGreeting = researchRailEnabled && !isGuest;
+
   // The tall top inset belongs to tablet and up. Expressing it as a min-width
   // variant rather than overriding a base value keeps `sm:` from winning the
   // cascade between 400 and 719px, where most phones actually sit.
@@ -57,12 +60,20 @@ export default function EmptyChatSurface({
           settles the pills and the composer onto the bottom edge where a thumb
           rests. Above it, the surface keeps its centered composition. */}
       <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
-        <EmptyChatHeading isGuest={isGuest} />
+        {showSignedInGreeting ? (
+          <EmptyChatGreeting />
+        ) : (
+          <EmptyChatHeading isGuest={isGuest} />
+        )}
       </div>
 
       <div
         aria-busy={guestSubmissionPending}
-        className="order-3 w-full max-w-2xl tablet:order-2"
+        className={
+          showSignedInGreeting
+            ? "order-3 w-full max-w-2xl"
+            : "order-3 w-full max-w-2xl tablet:order-2"
+        }
       >
         <ChatInput
           key="new-conversation"
@@ -104,52 +115,42 @@ export default function EmptyChatSurface({
         <ChatLegalNotice
           expiresAt={expiresAt}
           isGuest={isGuest}
+          showRegisteredDisclaimer={showSignedInGreeting}
+          showGuestSafetyLine={researchRailEnabled}
           variant="before_message"
         />
       </div>
 
-      {/* Thumb-reachable above the composer on narrow screens, and in its
-          familiar place under the composer from tablet up. */}
-      <div className="order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3">
-        <StarterActions
-          disabled={disabled}
-          onSelect={onSend}
-          layout={isBelowTablet ? "scroll" : "wrap"}
-        />
-      </div>
+      {/* One owner for the chips. Flag off, this is integration's shipped
+          placement: thumb-reachable above the composer on narrow screens,
+          under it from tablet up. Flag on, spec section 10 keeps the
+          suggestions above the composer at every width, behind the toggle. */}
+      {(!showSignedInGreeting || showSuggestions) && (
+        <div
+          className={
+            showSignedInGreeting
+              ? "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:mb-2"
+              : "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3"
+          }
+        >
+          <StarterActions
+            disabled={disabled}
+            onSelect={onSend}
+            layout={isBelowTablet ? "scroll" : "wrap"}
+          />
+        </div>
+      )}
 
-      {chatExploratorySuggestionsEnabled && (
+      {showSignedInGreeting && (
         <div className="order-4 mt-4">
           <button
             onClick={onToggleSuggestions}
-            className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+            className="min-h-11 rounded-full px-3 text-[14px] font-medium text-black/60 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white/60 dark:hover:text-white dark:focus-visible:ring-white/25"
           >
             {showSuggestions
               ? t("chat.hide_suggestions")
               : t("chat.show_suggestions")}
           </button>
-        </div>
-      )}
-
-      {chatExploratorySuggestionsEnabled && showSuggestions && (
-        <div className="order-5 mt-8 flex flex-col items-center gap-4 text-center">
-          {(["q1", "q2", "q3"] as const).map((queryKey) => {
-            const fallback = {
-              q1: "What if I bought Apple after big drops?",
-              q2: "What if I bought Bitcoin when it starts rising?",
-              q3: "What if I bought Tesla every month?",
-            }[queryKey];
-            const prompt = t(`chat.example_queries.${queryKey}`, fallback);
-            return (
-              <button
-                key={queryKey}
-                onClick={() => onSend(prompt)}
-                className="text-[14px] text-black/50 transition-colors hover:text-black hover:underline dark:text-white/50 dark:hover:text-white"
-              >
-                {prompt}
-              </button>
-            );
-          })}
         </div>
       )}
     </div>

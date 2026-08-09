@@ -135,72 +135,6 @@ body {
   }
 }
 
-@keyframes argus_welcome_sweep {
-  0% {
-    background-position: 8% 50%;
-    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.18));
-  }
-  50% {
-    background-position: 92% 50%;
-    filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.46));
-  }
-  100% {
-    background-position: 8% 50%;
-    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.18));
-  }
-}
-
-@keyframes argus_welcome_type {
-  from {
-    width: 0;
-  }
-  to {
-    width: 23ch;
-  }
-}
-
-@keyframes argus_welcome_caret {
-  0%,
-  49% {
-    border-color: var(--fg);
-  }
-  50%,
-  100% {
-    border-color: transparent;
-  }
-}
-
-.argus-welcome-typed {
-  display: inline-block;
-  width: 23ch;
-  overflow: hidden;
-  white-space: nowrap;
-  border-right: 1px solid var(--fg);
-  color: transparent;
-  background-clip: text;
-  -webkit-background-clip: text;
-  background-size: 220% 100%;
-  background-image: linear-gradient(
-    to right,
-    rgba(0, 0, 0, 0.7),
-    rgba(0, 0, 0, 1),
-    rgba(0, 0, 0, 0.7)
-  );
-  animation:
-    argus_welcome_sweep 3.2s ease-in-out infinite,
-    argus_welcome_type 2s steps(23, end) both,
-    argus_welcome_caret 750ms step-end infinite;
-}
-
-.dark .argus-welcome-typed {
-  background-image: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0.7),
-    rgba(255, 255, 255, 1),
-    rgba(255, 255, 255, 0.7)
-  );
-}
-
 .argus-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -222,19 +156,25 @@ body {
   background-color: var(--argus-scroll-indicator-dark);
 }
 
-@keyframes argus_swoosh_up {
+@keyframes argus_chip_appear {
   0% {
-    transform: translateY(0);
-    opacity: 1;
+    opacity: 0;
+    transform: scale(0.86);
   }
   100% {
-    transform: translateY(-24px);
-    opacity: 0;
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-.animate-argus-swoosh-up {
-  animation: argus_swoosh_up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.argus-chip-appear {
+  animation: argus_chip_appear 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .argus-chip-appear {
+    animation: none;
+  }
 }
 
 @keyframes argus_confirmation_reveal {
@@ -467,6 +407,129 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Research answers author richer markdown; every element gets calm Argus
+ * treatment: flat surfaces, hairline borders, muted tones, no terminal noise.
+ * A wide table scrolls inside its own container instead of breaking the
+ * layout; display: block on the table makes it its own scroll region while
+ * rows keep table layout, so nothing else on the page moves. */
+.prose table {
+  display: block;
+  max-width: 100%;
+  width: max-content;
+  overflow-x: auto;
+  margin: 0.75rem 0 1.25rem;
+  border: 1px solid rgba(201, 201, 205, 0.6);
+  border-radius: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9em;
+  line-height: 1.45;
+  -webkit-overflow-scrolling: touch;
+}
+.dark .prose table {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.prose thead th {
+  font-size: 0.78em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(80, 90, 99, 0.95);
+  background: rgba(0, 0, 0, 0.025);
+  text-align: start;
+}
+.dark .prose thead th {
+  color: rgba(141, 150, 158, 0.95);
+  background: rgba(255, 255, 255, 0.04);
+}
+.prose th,
+.prose td {
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid rgba(201, 201, 205, 0.38);
+  vertical-align: top;
+  min-width: 5.5ch;
+}
+.dark .prose th,
+.dark .prose td {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+.prose tbody tr:last-child td {
+  border-bottom: none;
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 1.25rem 0 0.5rem;
+}
+.prose h1:first-child,
+.prose h2:first-child,
+.prose h3:first-child,
+.prose h4:first-child {
+  margin-top: 0;
+}
+.prose h1 {
+  font-size: 1.25em;
+  letter-spacing: -0.01em;
+}
+.prose h2 {
+  font-size: 1.15em;
+  letter-spacing: -0.01em;
+}
+.prose h3,
+.prose h4 {
+  font-size: 1.05em;
+}
+.prose blockquote {
+  margin: 0.75rem 0 1rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 2px solid rgba(91, 168, 151, 0.55);
+  color: rgba(0, 0, 0, 0.65);
+}
+.dark .prose blockquote {
+  color: rgba(255, 255, 255, 0.65);
+}
+.prose hr {
+  margin: 1.25rem 0;
+  border: none;
+  border-top: 1px solid rgba(201, 201, 205, 0.5);
+}
+.dark .prose hr {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+.prose a {
+  color: #376cd5;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(55, 108, 213, 0.4);
+}
+.prose a:hover {
+  text-decoration-color: currentColor;
+}
+.dark .prose a {
+  color: #7da0ca;
+  text-decoration-color: rgba(125, 160, 202, 0.4);
+}
+.prose pre {
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 201, 205, 0.5);
+  background: rgba(0, 0, 0, 0.03);
+  overflow-x: auto;
+}
+.dark .prose pre {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+
 .argus-result-readout {
   position: relative;
   max-width: 64ch;
@@ -684,19 +747,11 @@ body {
 }
 
 /*
- * Safety net only. The backend supplies a short form for narrow screens, so
- * this clamp should rarely engage; two lines, never a single-line ellipsis,
- * because one clipped line reads as broken rather than as abbreviated.
+ * Rows wrap at every width. A clamped reason is decoration: the user cannot
+ * read it and cannot expand it, and the clamp's own fade left ghost slivers
+ * of the next line under each row on phones. Identity leads the row, so a
+ * wrapped reason stays legible instead of becoming a puzzle.
  */
-@media (max-width: 44.99rem) {
-  .argus-next-move-text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-  }
-}
 
 /*
  * Reach is decided by width, never by asking about the pointer.

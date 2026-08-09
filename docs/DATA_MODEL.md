@@ -1127,7 +1127,8 @@ canonical immutable `backtest_runs` row and reference it through
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
 - `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
   `backtests.run`; references the retained immutable confirmation `messages.id`)
-- `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
+- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
+  `chat.research`)
 - `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
   operation's canonical identity object)
@@ -1152,7 +1153,10 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
-- **operation_scope**: `chat.run_backtest`, `backtests.run`
+- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`
+  (thorough research runs ride this same lifecycle; a succeeded research job
+  keeps `result_run_id` null and references its answer message through
+  `execution_metadata.research_result_message_id`)
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 - A new `chat.run_backtest` row starts `queued` with `queued_at` set and

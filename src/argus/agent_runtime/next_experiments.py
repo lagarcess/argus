@@ -354,7 +354,11 @@ def detect_next_experiment_acceptance(
     normalized = message.strip().casefold()
     if not normalized:
         return None
-    sends = thread_metadata.get("next_experiments_offered_texts") if isinstance(thread_metadata, dict) else None
+    sends = (
+        thread_metadata.get("next_experiments_offered_texts")
+        if isinstance(thread_metadata, dict)
+        else None
+    )
     if isinstance(sends, dict):
         for kind, send_text in sends.items():
             if (
@@ -401,9 +405,7 @@ def _prebake_params(result_facts: dict[str, Any]) -> dict[str, Any] | None:
         or ([resolved_strategy["symbol"]] if resolved_strategy.get("symbol") else None)
     )
     symbol = (
-        str(symbols[0]).strip().upper()
-        if isinstance(symbols, list) and symbols
-        else ""
+        str(symbols[0]).strip().upper() if isinstance(symbols, list) and symbols else ""
     )
     date_range = config.get("date_range") or resolved_params.get("date_range")
     start = end = ""
@@ -510,9 +512,7 @@ def _peer_is_grounded(
 
     executor = ThreadPoolExecutor(max_workers=1)
     try:
-        return bool(
-            executor.submit(_probe).result(timeout=_PREBAKE_PROBE_BUDGET_SECONDS)
-        )
+        return bool(executor.submit(_probe).result(timeout=_PREBAKE_PROBE_BUDGET_SECONDS))
     except Exception:
         return False
     finally:

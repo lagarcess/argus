@@ -843,7 +843,7 @@ describe("activity rail and starter pills", () => {
     // after it from tablet up.
     expect(surface.match(/<StarterActions/g)?.length).toBe(1);
     expect(surface).toContain("order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3");
-    expect(surface).toContain('className="order-3 w-full max-w-2xl tablet:order-2"');
+    expect(surface).toContain('"order-3 w-full max-w-2xl tablet:order-2"');
     expect(surface).toContain('layout={isBelowTablet ? "scroll" : "wrap"}');
   });
 
@@ -863,10 +863,16 @@ describe("activity rail and starter pills", () => {
     expect(surface).not.toContain("pt-[24vh]");
   });
 
-  test("suggestion rows clamp to two lines, never one", () => {
-    expect(globalsCss).toContain(".argus-next-move-text");
-    expect(globalsCss).toContain("line-clamp: 2;");
+  test("suggestion rows never clamp: a reason you cannot read is decoration", () => {
+    // The clamp's fade also left ghost slivers of the next line under each
+    // row on phones. Identity leads the row, so a wrapped reason is legible.
+    expect(globalsCss).not.toContain("line-clamp: 2;");
     expect(globalsCss).not.toContain("line-clamp: 1;");
+    const rowComponent = readFileSync(
+      join(import.meta.dir, "../components/chat/NextMoveRow.tsx"),
+      "utf-8",
+    );
+    expect(rowComponent).toContain("[overflow-wrap:anywhere]");
   });
 });
 

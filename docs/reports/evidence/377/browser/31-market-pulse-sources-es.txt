@@ -1,0 +1,44 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Acciones con mayor movimiento
+¿Cuáles son las acciones que más se mueven hoy?
+
+Hoy, domingo 9 de agosto de 2026, el mercado estadounidense está cerrado. Estos son los principales movimientos de la última sesión regular, al cierre del viernes 7 de agosto de 2026, 4:00 p. m. ET.
+
+Mayores alzas
+TICKER	EMPRESA	CIERRE	CAMBIO	VOLUMEN
+YJ	Yunji	US$3.400	+176.42%	51,181,780
+MB	MasterBeef Group	US$8.92	+137.87%	32,001,843
+WWR	Westwater Resources	US$0.767	+87.76%	131,558,392
+RCEL	AVITA Medical	US$7.77	+63.58%	7,274,963
+VATE	INNOVATE Corp.	US$12.11	+63.43%	14,276,050
+Mayores bajas
+TICKER	EMPRESA	CIERRE	CAMBIO	VOLUMEN
+PN	PN Smart Energy	US$3.210	−61.28%	2,568,782
+CVRX	CVRx	US$2.390	−59.76%	14,773,430
+WYHG	Wing Yip Food Holdings	US$4.430	−54.93%	1,501,448
+INHD	Inno Holdings	US$5.15	−42.39%	1,915,197
+FCUV	Focus Universal	US$5.20	−36.66%	347,877
+Más activas por volumen
+TICKER	EMPRESA	VOLUMEN	CIERRE	CAMBIO
+YYAI	AiRWA	247,418,178	US$0.0780	−2.13%
+SPCX	Space Exploration Technologies	241,900,067	US$133.11	+15.83%
+HTZ	Hertz Global	227,217,785	US$2.270	+12.38%
+TTD	The Trade Desk	133,458,224	US$13.80	−21.90%
+WWR	Westwater Resources	131,558,392	US$0.767	+87.76%
+
+Los movimientos porcentuales más extremos están concentrados principalmente en acciones pequeñas y de baja capitalización, que suelen ser mucho más volátiles.
+
+No pude confirmar estas cifras con datos de mercado en vivo en este momento, así que trátalas como referencia general y no como el estado actual del mercado.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar Yunji Inc. American Depository Shares YJ en los últimos 3 años
+↳
+Probar Yunji Inc. American Depository Shares YJ frente a MasterBeef MB, Westwater Resources WWR y Avita Medical RCEL desde abril de 2025
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

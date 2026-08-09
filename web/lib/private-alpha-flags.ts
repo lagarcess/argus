@@ -1,8 +1,11 @@
 export const omnisearchEnabled =
   process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false";
 
-export const chatExploratorySuggestionsEnabled =
-  process.env.NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED === "true";
+// Research rail presentation: entry copy, range-spanning chips, the signed-in
+// empty-chat greeting, and confirmation peer offers. Default off; flag-off
+// behavior stays byte-identical to the pre-rail surface.
+export const researchRailEnabled =
+  process.env.NEXT_PUBLIC_RESEARCH_RAIL_ENABLED === "true";
 
 export function guestAccessEnabledFromEnv(value: string | undefined): boolean {
   if (value === undefined || value.trim() === "") return true;

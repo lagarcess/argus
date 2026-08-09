@@ -211,9 +211,7 @@ def _strategy_from_values(values: dict[str, Any]) -> StrategySummary:
     payload = {
         key: value
         for key, value in values.items()
-        if key in allowed
-        and not _blank(value)
-        and _strategy_field_accepts(key, value)
+        if key in allowed and not _blank(value) and _strategy_field_accepts(key, value)
     }
     return StrategySummary.model_validate(payload)
 

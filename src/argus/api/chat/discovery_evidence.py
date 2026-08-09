@@ -6,7 +6,7 @@ from typing import Any
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.domain.discovery_search import discovery_search_config
+from argus.domain.research.search import discovery_search_config
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     GLOBAL_DISCOVERY_CEILING_SUBJECT,
@@ -182,9 +182,7 @@ def discovery_allowance_available(
         )
         limits = discovery_usage_limits(is_guest=is_guest)
         if is_guest and api_state.supabase_gateway is not None:
-            return _visitor_within_limits(
-                visitor_key=subject, limits=limits, now=now
-            )
+            return _visitor_within_limits(visitor_key=subject, limits=limits, now=now)
         return _subject_within_limits(subject=subject, limits=limits, now=now)
     except Exception as exc:
         # Fail closed: without readable allowance truth, no spend is allowed.
@@ -193,6 +191,56 @@ def discovery_allowance_available(
             error=str(exc),
         )
         return False
+
+
+def discovery_allowance_for_turn(
+    user_id: str,
+    *,
+    is_guest: bool = False,
+    client_identity: str | None = None,
+) -> bool:
+    """Pre-turn discovery availability under the one-meter rule (spec 11b).
+
+    Rail on, the find operation reads the shared research ceiling instead,
+    so this returns True without paying the discovery read; the separate
+    discovery allowance serves only the flag-off act-gated path."""
+    from argus.domain.research.config import research_rail_enabled
+
+    if research_rail_enabled():
+        return True
+    return discovery_allowance_available(
+        user_id, is_guest=is_guest, client_identity=client_identity
+    )
+
+
+def settle_discovery_turn(
+    *,
+    usage: Any,
+    user_id: str,
+    conversation_id: str | None,
+    message_id: str | None,
+    request_id: str | None,
+    is_guest: bool = False,
+    client_identity: str | None = None,
+) -> None:
+    """Post-terminal discovery settlement under the one-meter rule.
+
+    Rail on, find-operation spend settles through the research scheme
+    (capability-classed ledger rows, shared ceiling); recording it here too
+    would double-meter the same attempt."""
+    from argus.domain.research.config import research_rail_enabled
+
+    if research_rail_enabled():
+        return
+    record_discovery_search_evidence(
+        usage=usage,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        request_id=request_id,
+        is_guest=is_guest,
+        client_identity=client_identity,
+    )
 
 
 def record_discovery_search_evidence(

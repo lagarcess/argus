@@ -159,11 +159,7 @@ def _dca_contract_missing_fields(
         present_fields.add("cadence")
     required_fields = ["asset_universe", "date_range", "capital_amount", "cadence"]
     missing = list(dict.fromkeys([*missing, *required_fields]))
-    return [
-        field
-        for field in missing
-        if _field_path_base(field) not in present_fields
-    ]
+    return [field for field in missing if _field_path_base(field) not in present_fields]
 
 
 def _capability_required_missing_fields_for_canonical_strategy(
@@ -252,7 +248,8 @@ def _response_needs_dca_contribution_role_audit(
     return (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
         and draft.capital_amount is not None
-        and response.semantic_turn_act not in {
+        and response.semantic_turn_act
+        not in {
             "approval",
             "result_followup",
             "retry_failed_action",

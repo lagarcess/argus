@@ -35,11 +35,7 @@ def strategy_with_separate_benchmark_symbol(
     updated.comparison_baseline = benchmark
     assets = [_normalized_symbol(symbol) for symbol in updated.asset_universe]
     normalized_assets = [symbol for symbol in assets if symbol is not None]
-    filtered_assets = [
-        symbol
-        for symbol in normalized_assets
-        if symbol != benchmark
-    ]
+    filtered_assets = [symbol for symbol in normalized_assets if symbol != benchmark]
     if len(filtered_assets) == len(normalized_assets):
         return updated, []
     if not filtered_assets and _traded_asset_is_user_owned(

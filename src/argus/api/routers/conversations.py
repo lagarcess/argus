@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -32,6 +33,8 @@ from argus.api.message_store import (
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
+    ConfirmationPeerAssetsRequest,
+    ConfirmationPeerAssetsResponse,
     Conversation,
     ConversationCreate,
     ConversationPatch,
@@ -328,8 +331,7 @@ def list_conversations(
         reconcile=True,
     )
     page_items = [
-        item.model_copy(update={"activity": activities[item.id]})
-        for item in page_items
+        item.model_copy(update={"activity": activities[item.id]}) for item in page_items
     ]
     next_cursor = None
     if has_more and page_items:
@@ -428,9 +430,7 @@ def patch_conversation(
         data["updated_at"] = utcnow()
         updated = Conversation.model_validate(data)
         api_state.store.conversations[conversation_id] = updated
-    return ConversationResponse(
-        conversation=_with_activity(updated, user_id=user.id)
-    )
+    return ConversationResponse(conversation=_with_activity(updated, user_id=user.id))
 
 
 @router.delete("/conversations/{conversation_id}", response_model=SuccessResponse)
@@ -484,17 +484,13 @@ def delete_conversation(
         400: {
             "description": "The pagination cursor is invalid or stale.",
             "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/Error"}
-                }
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
             },
         },
         404: {
             "description": "The conversation was not found.",
             "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/Error"}
-                }
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
             },
         },
     },
@@ -528,11 +524,7 @@ def list_run_dossiers(
             allow_unowned=False,
         )
     )
-    if (
-        conversation is None
-        or conversation.deleted_at is not None
-        or not memory_owned
-    ):
+    if conversation is None or conversation.deleted_at is not None or not memory_owned:
         raise problem(
             request,
             status_code=404,
@@ -571,10 +563,7 @@ def list_run_dossiers(
             cursor_completed_at = datetime.fromisoformat(raw_completed_at)
         except ValueError:
             raise invalid_cursor_problem(request) from None
-        if (
-            cursor_completed_at.tzinfo is None
-            or cursor_completed_at.utcoffset() is None
-        ):
+        if cursor_completed_at.tzinfo is None or cursor_completed_at.utcoffset() is None:
             raise invalid_cursor_problem(request)
 
     try:
@@ -803,3 +792,244 @@ def list_messages(
         last = page_items[-1]
         next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedMessages(items=page_items, next_cursor=next_cursor)
+
+
+@router.post(
+    "/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets",
+    response_model=ConfirmationPeerAssetsResponse,
+)
+def add_confirmation_peer_assets(
+    conversation_id: str,
+    confirmation_id: str,
+    payload: ConfirmationPeerAssetsRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConfirmationPeerAssetsResponse:
+    """Grow or restore the active confirmation's basket without a turn.
+
+    Deterministic by construction: no LLM call, no message allowance, no
+    interpretation. Only symbols the active turn offered as peer rows are
+    addable, restore undoes the latest add from the card's own typed
+    adjustment data, and every patched draft re-passes the same execution and
+    coverage validation every confirmation passes. The result is a new
+    superseding card; motion, chips, and inline period disclosure carry the
+    change, never a narration banner.
+    """
+    from argus.agent_runtime.research_basket import (
+        confirmation_symbols_restoration,
+        peer_add_rows,
+        peer_added_confirmation_preparation,
+    )
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.api.chat.recovery import _recent_messages_for_conversation
+    from argus.api.chat.research_evidence import record_research_turn_evidence
+    from argus.api.message_store import create_message
+    from argus.domain.research.config import research_rail_enabled
+
+    if not research_rail_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
+    invalid_state = problem(
+        request,
+        status_code=409,
+        code="artifact_action_invalid_state",
+        title="Conflict",
+        detail="The confirmation is no longer active.",
+    )
+    messages = _recent_messages_for_conversation(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    active_id = latest_active_confirmation_id(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        recent_messages=messages,
+    )
+    if active_id is None or active_id != confirmation_id:
+        raise invalid_state
+    source_payload: dict[str, Any] | None = None
+    offered_symbols: list[str] = []
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        card = message.metadata.get("confirmation_card")
+        if (
+            not isinstance(card, dict)
+            or str(card.get("confirmation_id") or "") != confirmation_id
+        ):
+            continue
+        candidate_payload = message.metadata.get("confirmation_payload")
+        if isinstance(candidate_payload, dict):
+            source_payload = candidate_payload
+        rows_sidecar = message.metadata.get("next_experiments")
+        rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
+        for row in rows or []:
+            if not isinstance(row, dict) or not str(row.get("kind") or "").startswith(
+                "research_add_peer"
+            ):
+                continue
+            why = row.get("why")
+            params = why.get("params") if isinstance(why, dict) else None
+            for symbol in (params or {}).get("symbols") or []:
+                normalized = str(symbol).strip().upper()
+                if normalized and normalized not in offered_symbols:
+                    offered_symbols.append(normalized)
+        break
+    if source_payload is None:
+        raise invalid_state
+    language = str(getattr(user, "language", None) or "en")
+
+    if payload.restore_previous:
+        preparation = confirmation_symbols_restoration(source_payload, language=language)
+        restored = set(offered_symbols)
+        adjustment = source_payload.get("assets_adjustment")
+        if isinstance(adjustment, dict):
+            previous = {
+                str(symbol).strip().upper()
+                for symbol in adjustment.get("previous_symbols") or []
+            }
+            current = {
+                str(symbol).strip().upper()
+                for symbol in (source_payload.get("strategy") or {}).get("asset_universe")
+                or []
+            }
+            restored |= current - previous
+        remaining_symbols = sorted(restored)
+    else:
+        requested = [str(symbol).strip().upper() for symbol in payload.symbols or []]
+        # Every candidate passed the resolver before it became a row;
+        # anything else is not addable, whoever asks.
+        if not requested or any(symbol not in offered_symbols for symbol in requested):
+            raise invalid_state
+        added = _resolved_peer_identities(dict.fromkeys(requested))
+        if added is None:
+            raise invalid_state
+        preparation = peer_added_confirmation_preparation(
+            source_payload,
+            added=added,
+            language=language,
+        )
+        remaining_symbols = [
+            symbol for symbol in offered_symbols if symbol not in set(requested)
+        ]
+
+    if preparation.confirmation_payload is None:
+        error_code = preparation.error_code or "confirmation_not_executable"
+        if error_code == "market_data_unavailable":
+            raise problem(
+                request,
+                status_code=503,
+                code="market_data_unavailable",
+                title="Service Unavailable",
+                detail="Market data is unavailable for the requested basket.",
+            )
+        if error_code in {
+            "no_common_data_window",
+            "insufficient_common_data",
+            "asset_maximum_reached",
+            "asset_class_mismatch",
+        }:
+            raise problem(
+                request,
+                status_code=422,
+                code=error_code,
+                title="Validation Error",
+                detail="The requested basket cannot run as one test.",
+            )
+        raise invalid_state
+    new_payload = preparation.confirmation_payload
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": new_payload,
+        },
+        confirmation_id=str(new_payload.get("confirmation_id")),
+        conversation_id=conversation_id,
+        language=language,
+    )
+    if card is None:
+        raise invalid_state
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+
+    reference = confirmation_artifact_reference(
+        confirmation_id=str(card.get("confirmation_id")),
+        confirmation_payload=new_payload,
+        confirmation_card=card,
+    )
+    metadata: dict[str, Any] = {
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "await_approval",
+        "confirmation_card": card,
+        "confirmation_payload": new_payload,
+        "active_confirmation_reference": reference.model_dump(mode="python"),
+        "artifact_references": [reference.model_dump(mode="python")],
+    }
+    remaining_peers = _resolved_peer_identities(remaining_symbols) or []
+    basket = [
+        str(symbol).strip().upper()
+        for symbol in (new_payload.get("strategy") or {}).get("asset_universe") or []
+    ]
+    peer_rows = peer_add_rows(
+        remaining_peers,
+        basket_symbols=basket,
+        basket_asset_class=str(
+            (new_payload.get("strategy") or {}).get("asset_class") or "equity"
+        ),
+        language=language,
+    )
+    if peer_rows is not None:
+        metadata["next_experiments"] = peer_rows
+    created = create_message(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        role="assistant",
+        content=str(card.get("summary") or ""),
+        metadata=metadata,
+        settle_usage=None,
+    )
+    record_research_turn_evidence(
+        research={
+            "capability_class": "peer_expansion",
+            "shape": None,
+            "usage": {
+                "cache_status": "bypass",
+                "cost_usd": 0.0,
+                "invocations": 0,
+                "latency_ms": 0,
+            },
+        },
+        user_id=user.id,
+        conversation_id=conversation_id,
+        message_id=created.id,
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return ConfirmationPeerAssetsResponse(message=created)
+
+
+def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:
+    """Resolver-owned identity for peer symbols; None when any fails."""
+    from argus.domain.market_data.assets import resolve_asset
+
+    resolved: list[dict[str, str]] = []
+    for symbol in symbols:
+        try:
+            asset = resolve_asset(str(symbol))
+        except Exception:  # noqa: BLE001
+            return None
+        resolved.append(
+            {
+                "symbol": asset.canonical_symbol.upper(),
+                "name": asset.name or asset.canonical_symbol.upper(),
+                "asset_class": asset.asset_class,
+            }
+        )
+    return resolved

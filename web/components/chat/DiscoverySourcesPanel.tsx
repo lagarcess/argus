@@ -7,9 +7,15 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import type { DiscoverySidecar } from "./types";
 
+/** Everything the panel renders: sources and when they were retrieved. */
+export type SourcesPanelSidecar = Pick<
+  DiscoverySidecar,
+  "sources" | "retrieved_at"
+>;
+
 type DiscoverySourcesPanelProps = {
   onClose: () => void;
-  sidecar: DiscoverySidecar;
+  sidecar: SourcesPanelSidecar;
   /** Opens scrolled to this source, so a row chip lands on its evidence. */
   anchorIndex?: number | null;
 };

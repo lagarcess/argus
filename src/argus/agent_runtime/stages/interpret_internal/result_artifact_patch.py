@@ -211,8 +211,7 @@ def _result_followup_patch_changes_executable_result_fields(
     patched: StrategySummary,
 ) -> bool:
     return bool(
-        artifact_patch_changed_fields(patched)
-        & RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS
+        artifact_patch_changed_fields(patched) & RESULT_FOLLOWUP_EXECUTABLE_PATCH_FIELDS
     )
 
 
@@ -305,9 +304,7 @@ def _stage_result_from_result_artifact_patch(
         constraints=decision.unsupported_constraints,
     )
     has_blocking_validation = bool(
-        missing_fields
-        or decision.ambiguous_fields
-        or unsupported_constraints
+        missing_fields or decision.ambiguous_fields or unsupported_constraints
     )
     refined_decision = decision.model_copy(
         update={
@@ -336,12 +333,8 @@ def _stage_result_from_result_artifact_patch(
     }
     return StageResult(
         outcome=(
-            "needs_clarification"
-            if has_blocking_validation
-            else "ready_for_confirmation"
+            "needs_clarification" if has_blocking_validation else "ready_for_confirmation"
         ),
         decision=refined_decision,
         stage_patch=stage_patch,
     )
-
-

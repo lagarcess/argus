@@ -9,7 +9,6 @@ import {
   type DiscoverySearchStatus,
 } from "@/lib/chat-discovery-panel";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
 import {
   composerMentions,
   deleteTokenBeforeOffset,
@@ -42,7 +41,6 @@ export type DiscoverySection = {
 
 export const DISCOVERY_SEARCH_LIMIT = 20;
 
-const EMPTY_CHAT_PROMPTS: string[] = [];
 const COMPOSER_TEXT_TRANSFER_TYPES = new Set(["text/plain", "text/uri-list"]);
 const COMPOSER_RICH_TEXT_COMPANION_TYPES = new Set(["text/html"]);
 
@@ -88,7 +86,6 @@ export default function ChatInput({
   const [composerHasContent, setComposerHasContent] = useState(false);
   const [composerRawText, setComposerRawText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [typedText, setTypedText] = useState("");
   const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [discoveryItems, setDiscoveryItems] = useState<DiscoveryItem[]>([]);
   const [discoveryItemsQuery, setDiscoveryItemsQuery] = useState<string | null>(null);
@@ -96,10 +93,7 @@ export default function ChatInput({
     useState<DiscoverySearchStatus>("idle");
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
   const [activeDiscoveryItemId, setActiveDiscoveryItemId] = useState<string | null>(null);
-  const [animState, setAnimState] = useState<"idle" | "typing" | "waiting" | "exiting">("idle");
-  const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
-  const activityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const pendingCaretOffsetRef = useRef<number | null>(null);
   const activeMentionOffsetRef = useRef<number | null>(null);
@@ -107,11 +101,6 @@ export default function ChatInput({
   const buttonDiscoveryQueryEndOffsetRef = useRef<number | null>(null);
   const composerIsEmpty = !composerHasContent;
 
-  const localizedPrompts = useMemo(() => {
-    const p = t("chat.placeholder_prompts", { returnObjects: true });
-    return Array.isArray(p) ? p : [];
-  }, [t]);
-  const prompts = chatExploratorySuggestionsEnabled ? localizedPrompts : EMPTY_CHAT_PROMPTS;
   const inputPlaceholder = placeholder ?? t("chat.input_placeholder");
   const discoverySections = useMemo(
     () => discoverySectionsForDisplay(discoveryItems, discoveryQuery),
@@ -153,64 +142,6 @@ export default function ChatInput({
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!isMounted) return;
-
-    if (!composerIsEmpty || isFocused) {
-      setAnimState("idle");
-      setTypedText("");
-      if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-      return;
-    }
-
-    const startCycle = () => {
-      if (prompts.length === 0) return;
-      setCurrentPromptIndex((prev) => (prev + 1) % prompts.length);
-      setAnimState("typing");
-    };
-
-    if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-    activityTimerRef.current = setTimeout(startCycle, 2000);
-
-    return () => {
-      if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-    };
-  }, [composerIsEmpty, isFocused, prompts.length, isMounted]);
-
-  useEffect(() => {
-    if (!isMounted || animState === "idle") return;
-
-    if (animState === "typing") {
-      const prompt = prompts[currentPromptIndex];
-      if (!prompt) return;
-
-      let i = 0;
-      const interval = setInterval(() => {
-        setTypedText(prompt.slice(0, i + 1));
-        i++;
-        if (i >= prompt.length) {
-          clearInterval(interval);
-          setAnimState("waiting");
-        }
-      }, 40);
-      return () => clearInterval(interval);
-    }
-
-    if (animState === "waiting") {
-      const timer = setTimeout(() => setAnimState("exiting"), 3000);
-      return () => clearTimeout(timer);
-    }
-
-    if (animState === "exiting") {
-      const timer = setTimeout(() => {
-        setTypedText("");
-        setCurrentPromptIndex((prev) => (prev + 1) % prompts.length);
-        setAnimState("typing");
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [animState, currentPromptIndex, prompts, isMounted]);
 
   useEffect(() => {
     if (!isDiscoveryOpen) return;
@@ -667,21 +598,9 @@ export default function ChatInput({
           className="min-h-[1.45em] flex-1 whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] font-medium leading-[1.45] tracking-tight text-black outline-none dark:text-white"
         />
 
-        {isMounted && animState === "idle" && composerIsEmpty && !isFocused && (
+        {isMounted && composerIsEmpty && !isFocused && (
           <div className="pointer-events-none absolute inset-y-0 left-14 flex items-center text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 transition-opacity group-focus-within:invisible group-focus-within:opacity-0 dark:text-gray-500">
             {inputPlaceholder}
-          </div>
-        )}
-
-        {isMounted && animState !== "idle" && composerIsEmpty && (
-          <div
-            key={`${currentPromptIndex}-${animState === "exiting"}`}
-            className={`pointer-events-none absolute inset-y-0 left-14 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 transition-opacity group-focus-within:invisible group-focus-within:opacity-0 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
-          >
-            {typedText}
-            {animState === "typing" && (
-              <span className="ml-0.5 h-4 w-[2px] animate-pulse bg-black/30 dark:bg-white/30" />
-            )}
           </div>
         )}
       </div>

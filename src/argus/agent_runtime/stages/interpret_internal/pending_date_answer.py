@@ -51,10 +51,7 @@ def pending_date_answer_interpretation(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    if (
-        snapshot.latest_backtest_result_reference is not None
-        and not allow_result_anchor
-    ):
+    if snapshot.latest_backtest_result_reference is not None and not allow_result_anchor:
         return None
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
@@ -69,9 +66,7 @@ def pending_date_answer_interpretation(
     if not text:
         return None
     prior_endpoints = _date_range_endpoints(prior.date_range)
-    prior_has_complete_date_range = prior_endpoints is not None and all(
-        prior_endpoints
-    )
+    prior_has_complete_date_range = prior_endpoints is not None and all(prior_endpoints)
     languages = dateparser_languages_for_user_language(language)
     resolved_range = resolve_date_range_text(
         text,

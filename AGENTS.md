@@ -361,6 +361,7 @@ These principles come from the recent modular monolith / LangGraph migration pla
 - **Composer mentions are provenance, not shortcuts around validation**: The `@` tool must use provider-backed asset discovery and the supported indicator catalog, not a tiny static menu. Selected mentions help bound ambiguous references for the backend, but normal LLM interpretation and backend validation still own executable meaning. Browser-session discovery caching is acceptable; durable Supabase discovery/market-data caches require explicit schema, freshness, and invalidation design.
 - **No Alpha RAG/vector overreach**: Do not add embeddings, pgvector, semantic memory, or agentic RAG for the launch chat/backtest loop. Use provider catalogs, structured state, run metadata, typed idea/evidence records, and text search until a concrete Beta need exists.
 - **Provider details stay internal**: Users should hear capability truth ("I can test BTC over that period" or "that data range is not available for this instrument"), not vendor-specific implementation details unless the product explicitly decides otherwise.
+- **Research informs, Argus providers execute (truth-boundary lock, same standing as S10)**: quoting research-grounded prices, figures, or valuations to the reader is correct and encouraged, but no `finance_search` value may ever reach a simulation. A test launched from a research answer re-grounds through Argus market-data providers, research turns never write strategy/confirmation/execution state, and the shared research cache is public-market data only, never reusable for anything user-scoped. Guarded by `tests/research/test_research_truth_boundary.py`.
 
 ---
 
@@ -653,7 +654,7 @@ regression check:
 
 ```bash
 NEXT_PUBLIC_OMNISEARCH_ENABLED=true
-NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 ```
 
 ### Frontend Environment (web/.env.local)
@@ -666,14 +667,14 @@ For fast Dev Mode:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=true
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
-NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 ```
 
 For QA Mode with real Supabase auth:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=false
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
-NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 ```
 
 ---
