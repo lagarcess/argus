@@ -209,3 +209,75 @@ operation's source-backed path. Which legitimately show the empty line:
 answers built purely from the finance data channel, such as a live quote or
 an ETF holdings pull, where the only citations are provider pages the
 identity scrub removes.
+
+## A real guest, end to end (`browser/50-` through `browser/58-`)
+
+Captured 2026-08-09 against a local Supabase with real providers and real
+guest identities: no mock auth, no seeded state, guest allowances charged
+against the visitor exactly as deployed. Each language ran as its own visitor
+(the allowance is keyed to the caller, so one run must not spend the other's).
+Every frame's text was read.
+
+- `50-guest-entry-{en,es}`: the stranger's first screen, both languages, with
+  the starter chips and the legal disclosure.
+- `51-guest-chip1-{en,es}`: chip one tapped organically. A grounded answer
+  ending on `Test Netflix NFLX over the last 3 years`.
+- `52-guest-comparison-{en,es}`, `53-guest-sector-{en,es}`: typed follow-ups
+  reaching the thorough and sector-radar shapes with real figures as of the
+  session's last close, honest gaps named (a stale CYBR quote excluded by
+  date, a year-to-date figure the retrieved data did not carry).
+- `54-guest-confirmation-{en,es}`: a research row tapped; the builder shows a
+  real configuration (CIBR, buy and hold, 9 Aug 2023 to 7 Aug 2026, SPY
+  benchmark) plus Add rows for the verified peers.
+- `55-guest-backtest-launched-es`, `56-guest-backtest-result-{en,es}`: the
+  guest's backtest runs and returns: +117.7%, beating SPY by 44.2 percentage
+  points, with Try-next rows under it. The English run has only the result
+  frame because the run finished inside the first capture window, so its two
+  captures were byte-identical and the duplicate was dropped rather than
+  presented as a second state. A `chat.research` job for the guest was
+  confirmed `succeeded` in the database for the same session.
+- `57-guest-allowance-ceiling-{en,es}`: the message allowance spent. The
+  composer stops and the conversion prompt explains early access.
+- `58-guest-research-ceiling-{en,es}`: the section 9b allowance. Three
+  research questions land, the fourth is answered from Argus's own market data
+  under the honest note ("You've used today's free research questions… Create
+  an account to keep researching; testing ideas is still available", and its
+  Spanish twin), still ending on a runnable row. The counter reads 3 of 3 for
+  that visitor and the shared ceiling is untouched.
+
+Three defects were found by reading these frames rather than by any test, and
+all three are fixed in this branch:
+
+1. A returning guest at their ceiling got **silence**: the send was dropped
+   before the conversion prompt because the gate required a conversation that
+   a fresh page did not have yet. No message, no signup path, and no request
+   made. Verified with a network trace showing `/chat/stream` was never
+   called. Fixed and re-proved in the browser:
+   `59-guest-silence-fixed-{en,es}` is the same scenario, an exhausted visitor
+   on a fresh page typing and pressing send, now answered by the conversion
+   prompt with request-access, sign-up and sign-in paths, in both languages.
+   `/chat/stream` is still correctly not called; the difference is that the
+   person can see why.
+
+   The same shape was swept rather than patched twice. Every refusal in the
+   send handler now either surfaces something or is one of two named
+   exceptions that stay silent because nothing was asked (empty input, and a
+   send while one is already in flight with the composer disabled). Three
+   further silent drops were found and fixed that way: an unresolved
+   conversation id, a locked conversation, and a request session another turn
+   already owned. The last two share one sentence through
+   `SEND_BUSY_FALLBACK`. `web/__tests__/guest-capability-gates.test.ts` holds
+   the invariant over the whole handler, so a new silent refusal fails the
+   suite instead of reaching a stranger.
+2. `CrowdStrike Holdings, Inc. Class A` sat in a row beside a clean
+   `Fortinet`: a preserved share class blocked the shortener from reaching the
+   legal form in front of it.
+3. The succeeded research card rendered **"Research ready" twice**, because
+   its status chip pointed at the title key while every other status pointed
+   at a short status word.
+
+One honest correction: an earlier read of frame 57 treated two failed turns as
+the allowance message. Counting the settled units showed they were the ninth
+and tenth messages, still inside the allowance, and the failure was the known
+intermittent interpreter rejection upstream of the rail. The ceiling itself
+was already honest.

@@ -190,6 +190,30 @@ the default path changes the volume profile, so **re-address the ceiling**, and
 make ceiling exhaustion an honest, localized message rather than a silent
 capability disappearance.
 
+### 9b. Amendment 2026-08-09: a guest's research is its own allowance
+
+Flat metering holds for signed-in users; their message allowance is their
+meter. It does not hold for guests. A guest has ten free messages and no
+account, so ten thorough comparisons is a bill nobody sized, charged to a
+stranger who may never return.
+
+**A guest gets three research questions a day**, keyed to the visitor rather
+than the workspace, on the same counters the message and simulation allowances
+already use, so a renewed workspace grants nothing new.
+
+- **One ceiling for every shape**, not one per tier. A stranger cannot tell a
+  fast lookup from a thorough comparison, and the rail decides the tier, so the
+  rail owns that cost rather than the guest.
+- **Three is deliberately conservative because the recorded cost is wrong**:
+  the ledger's per-call figure is not yet trustworthy (issue #409). Raising the
+  number later is cheap; refunding a month of underpriced strangers is not.
+- **Exhaustion names the bound that actually closed.** A guest who spent their
+  own three is told so and pointed at an account; they are never told the
+  shared capacity ran out, and a shared outage is never blamed on them. Either
+  way the turn still answers from Argus's own data and still ends on a runnable
+  row.
+- **Cache hits and signed-in turns never charge it.**
+
 ## 10. Signed-in empty chat
 
 Registered accounts only. Guests keep the current entry.

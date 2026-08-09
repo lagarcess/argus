@@ -1,0 +1,142 @@
+argus
+New chat
+Search
+Recents
+Netflix Revenue Streams Explained
+Sign in
+How does Netflix make money?
+
+Netflix makes money mainly by charging recurring monthly subscription fees. Advertising on its lower-priced ad-supported plan is a smaller but growing second revenue stream.
+
+REVENUE SOURCE	HOW IT WORKS
+Subscriptions	Members pay monthly for plans that vary by advertising, video quality, simultaneous streams and other features. Revenue grows when Netflix adds members, reduces cancellations or raises prices.
+Advertising	Advertisers pay to show commercials to members using the ad-supported plan. Netflix earns both the member’s lower subscription fee and advertising revenue.
+Extra-member access	In supported markets, account holders can pay an additional fee for someone outside their household. This converts some password sharing into revenue.
+Minor/indirect sources	Consumer products, licensing and other partnerships contribute, but they are not the core business. Games and most live programming primarily make the service more attractive rather than generating separate user fees.
+How the business turns revenue into profit
+
+Netflix spends heavily to produce, license and market films, series, live events and games. Because the same content can be delivered digitally to millions of additional viewers at relatively low incremental cost, higher subscription and advertising revenue can improve profit once content and operating costs are covered.
+
+Content serves several purposes:
+
+attracting new members;
+retaining existing members;
+supporting price increases by improving perceived value;
+creating more viewing inventory for advertisements;
+generating attention and sign-ups through live events.
+
+In 2025, Netflix generated $45.183 billion in revenue, $13.327 billion in operating profit and $10.981 billion in net income. For Q2 2026, reported on July 16, 2026, revenue was $12.560 billion. Netflix said growth was driven primarily by membership and pricing growth, plus higher advertising revenue.
+
+Netflix does not publicly disclose a precise current dollar split between subscription and advertising revenue, so an exact live percentage for each is unavailable. As of August 9, 2026, subscriptions remain the economic core, while advertising is an increasingly important additional source.
+
+These figures come from market data rather than linked articles, so there are no source links to open.
+
+Compare Costco against Walmart and Target
+Costco vs. Walmart vs. Target, At a Glance
+
+Bottom line: Walmart is the giant by revenue, Costco is the growth and quality darling that the market rewards with a premium valuation, and Target is the smaller, cheaper, higher-yielding turnaround story that's been struggling to grow.
+
+Market snapshot (as of Aug 7, 2026 close)
+	COSTCO (COST)	WALMART (WMT)	TARGET (TGT)
+Price	$947.82	$111.85	$149.70
+Market cap	~$420B	~$890B	~$68B
+P/E ratio	47.7	39.3	19.8
+Dividend yield	~1.0%	~1.0%	~3.0%
+52-week range	$844, $1,097	$95, $135	$83, $150
+Business scale & profitability (most recent fiscal year)
+	COSTCO (FY25, ENDED AUG '25)	WALMART (FY26, ENDED JAN '26)	TARGET (FY25, ENDED JAN '26)
+Revenue	$275B	$713B	$105B
+Revenue growth YoY	+8.2%	+4.7%	−1.7%
+Gross margin	~13%	~25%	~28%
+Operating margin	~3.8%	~4.2%	~4.9%
+Net income	$8.1B	$22.3B	$3.7B
+Net margin	~2.9%	~3.1%	~3.5%
+What each company is really about
+
+Costco, A membership warehouse club. Revenue is nearly 3× Target's and growing high-single-digits. Gross margins look thin because Costco deliberately keeps prices low; the real profit engine is highly recurring membership fees. Investors pay a premium multiple (~48× earnings) for the consistency and loyalty.
+
+Walmart, The world's largest retailer by sales. Massive scale, steady mid-single-digit growth, a booming e-commerce and advertising business, and Sam's Club as its own warehouse arm. Trades at a rich multiple (~39×) for a company this large, reflecting confidence in its digital and ads flywheel.
+
+Target, General-merchandise-heavy department retailer. Revenue actually shrank slightly last fiscal year, and it's the only one of the three going backward on the top line. In exchange, you get the highest gross margins (product mix), the best dividend yield (~3%), and by far the cheapest valuation (~20×).
+
+Key takeaways for a casual comparison
+If you care about growth: Costco is winning, Walmart is steady, Target is stalled.
+If you care about margins: Target > Walmart > Costco on gross margin, but they end up in a narrow band (~3-4%) on net margin because Costco's low-price model funnels savings back to members.
+If you care about price paid for earnings: Target is the cheapest by a wide margin; Costco is the most expensive.
+If you care about income: Target's ~3% yield roughly triples what Costco and Walmart pay.
+Size pecking order: Walmart ($890B market cap) > Costco ($420B) > Target (~$68B).
+
+Not investment advice.
+
+These figures come from market data rather than linked articles, so there are no source links to open.
+
+What's happening in cybersecurity stocks?
+
+Cybersecurity stocks are in a strong upswing. All four major cybersecurity ETFs advanced on Friday, August 7, 2026, and remain within 2.5% of their 52-week highs. The rally is being driven by rising security budgets, AI-related threats and workloads, and evidence that large customers are consolidating spending with broad security platforms.
+
+Sector performance
+ETF	AUG. 7 CLOSE	DAILY MOVE	BELOW 52-WEEK HIGH
+CIBR	$97.85	+1.51%	2.12%
+HACK	$115.42	+1.97%	1.16%
+BUG	$41.68	+2.36%	2.41%
+IHAK	$65.58	+1.77%	1.03%
+
+Figures are as of the August 7, 2026 close, the latest session before Sunday, August 9.
+
+What is driving it
+AI is creating demand as well as competition. Enterprises need protection for AI applications, agents, cloud workloads and machine identities, while attackers are also using AI. A recent industry forecast put 2026 global information-security spending at $248.9 billion, up 12.7% in constant currency.
+Cloud security is growing faster than traditional security categories. That favors companies selling cloud, zero-trust, identity and secure-networking platforms.
+Earnings are validating the theme. Cloudflare (NET) was Friday’s standout, rising 5.57% after reporting Q2 revenue of $696.1 million, up 35.9% year over year, and raising its full-year revenue outlook to $2.864 billion, $2.870 billion.
+Platform consolidation matters. Customers increasingly prefer fewer vendors covering endpoint, network, cloud, identity and data security. This helps scaled platforms such as PANW, CRWD and FTNT, but can pressure narrower products.
+Expectations are elevated. Several leaders are already close to their 52-week highs, so earnings guidance and growth quality, not merely revenue beats, are producing sharp individual moves.
+Leaders and laggards
+TICKER	PRICE	AUG. 7 MOVE	52-WEEK HIGH	READING
+NET	$300.27	+5.57%	$324.73	Immediate leader after a beat-and-raise quarter
+ZS	$168.68	+3.74%	$336.99	Strong Friday rebound, but still 49.94% below its high
+CRWD	$214.42	+3.39%	$219.35	Major platform leader, 2.25% below its high
+OKTA	$148.32	+3.35%	$157.00	Identity-security momentum; 5.53% below its high
+S	$21.40	+3.08%	$21.50	Just 0.47% below its high
+PANW	$363.86	+1.22%	$376.98	Sector heavyweight, 3.48% below its high
+FTNT	$159.64	−0.29%	$172.09	Friday’s large-cap laggard, despite remaining near its high
+TENB	$36.38	+0.58%	$43.67	Participating less strongly; 16.69% below its high
+CHKP	$127.82	+2.03%	$210.66	Up Friday but still 39.33% below its high
+
+Market capitalizations reinforce the concentration at the top: PANW $296.55 billion, CRWD $218.34 billion, FTNT $117.13 billion and NET $106.58 billion as of August 7.
+
+Bottom line: this is a broad sector rally, not one isolated stock move. However, the market is rewarding companies that can connect AI demand to faster revenue and stronger guidance, currently NET, CRWD, PANW, OKTA and S, while ZS, CHKP and TENB remain meaningful longer-term laggards relative to their 52-week highs. A current CYBR figure was unavailable.
+
+5 sources ›
+Test buying and holding CIBR over the last three years
+CIBR
+Buy and Hold
+Ready to run
+STARTING CAPITAL
+$1,000
+PERIOD
+Aug 9, 2023 → Aug 7, 2026
+Stocks
+Daily data
+Through Aug 7
+No fees
+No slippage
+Benchmark: SPY
+Edit costs
+Run backtest
+Change dates
+Change asset
+Adjust assumptions
+Cancel
+
+Review the assumptions, then run the test.
+
+TRY NEXT
+↳
+Add Amplify Cybersecurity ETF HACK to this test
+↳
+Add Global X Cybersecurity ETF BUG to this test
+↳
+Add iShares Cybersecurity and Tech ETF IHAK to this test
+
+Argus can make mistakes. For education only. Not financial advice. Terms · Privacy.
+
+Temporary chat · available until Aug 16, 2026
