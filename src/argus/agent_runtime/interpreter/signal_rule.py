@@ -81,8 +81,7 @@ def _response_has_signal_rule_shape(response: LLMInterpretationResponse) -> bool
         _field_path_base(field) in {"entry_logic", "exit_logic", "rule_spec"}
         for field in response.missing_required_fields
     ) or any(
-        _field_path_base(field.field_name)
-        in {"entry_logic", "exit_logic", "rule_spec"}
+        _field_path_base(field.field_name) in {"entry_logic", "exit_logic", "rule_spec"}
         for field in response.ambiguous_fields
     )
 
@@ -112,11 +111,7 @@ def _asset_recovery_query_is_explicit_ticker(query: str) -> bool:
     candidate = str(query or "").strip().lstrip("$")
     if not candidate:
         return False
-    compact = "".join(
-        character
-        for character in candidate
-        if character.isalnum()
-    )
+    compact = "".join(character for character in candidate if character.isalnum())
     return (
         len(compact) >= 2
         and any(character.isalpha() for character in compact)

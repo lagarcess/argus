@@ -73,6 +73,7 @@ async def _threaded_runtime_event_source(
         asyncio.set_event_loop(worker_loop)
 
         try:
+
             def run_in_context() -> None:
                 worker_task = worker_loop.create_task(consume())
                 worker_task_box["task"] = worker_task

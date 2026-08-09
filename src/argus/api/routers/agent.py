@@ -63,8 +63,8 @@ from argus.api.chat.cancellation import (
     prepare_confirmation_cancellation,
 )
 from argus.api.chat.discovery_evidence import (
-    discovery_allowance_available,
-    record_discovery_search_evidence,
+    discovery_allowance_for_turn,
+    settle_discovery_turn,
 )
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
@@ -1256,7 +1256,7 @@ async def chat_stream(
                     ):
                         runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
-                record_discovery_search_evidence(
+                settle_discovery_turn(
                     usage=discovery_usage_evidence,
                     user_id=user.id,
                     is_guest=turn_account.kind == "guest",
@@ -1431,7 +1431,7 @@ async def chat_stream(
                     user=runtime_user,
                     message=request_message,
                     recent_thread_history=recent_thread_history,
-                    discovery_allowance_available=discovery_allowance_available(
+                    discovery_allowance_available=discovery_allowance_for_turn(
                         user.id,
                         is_guest=turn_account.kind == "guest",
                         client_identity=client_identity(request),

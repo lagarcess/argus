@@ -62,9 +62,7 @@ def stale_confirmation_action_response(
     snapshot: TaskSnapshot | None,
     language: str | None = None,
 ) -> str | None:
-    reference = (
-        snapshot.active_confirmation_reference if snapshot is not None else None
-    )
+    reference = snapshot.active_confirmation_reference if snapshot is not None else None
     if reference is None:
         return None
     payload = dict(action.payload or {})
@@ -136,16 +134,12 @@ def active_confirmation_effective_strategy(
     reference = snapshot.active_confirmation_reference
     if reference is None:
         return fallback.model_copy(deep=True)
-    payload = confirmation_payload_dict(
-        reference.metadata.get("confirmation_payload")
-    )
+    payload = confirmation_payload_dict(reference.metadata.get("confirmation_payload"))
     strategy_payload = payload.get("strategy")
     if isinstance(strategy_payload, dict):
         allowed_fields = set(StrategySummary.model_fields)
         strategy_values = {
-            key: value
-            for key, value in strategy_payload.items()
-            if key in allowed_fields
+            key: value for key, value in strategy_payload.items() if key in allowed_fields
         }
         try:
             strategy = StrategySummary.model_validate(strategy_values)
@@ -415,9 +409,7 @@ def strategy_from_failed_action_snapshot(
     snapshot: TaskSnapshot | None,
 ) -> StrategySummary:
     strategy = strategy_from_failed_launch_payload(payload)
-    authoritative = (
-        snapshot.pending_strategy_summary if snapshot is not None else None
-    )
+    authoritative = snapshot.pending_strategy_summary if snapshot is not None else None
     if authoritative is None:
         return strategy
     authoritative_parameters = dict(authoritative.extra_parameters)

@@ -335,10 +335,7 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(run_state, RunState):
         return result
     explicit_prompt = result.get("assistant_prompt")
-    if (
-        isinstance(explicit_prompt, str)
-        and explicit_prompt.strip()
-    ):
+    if isinstance(explicit_prompt, str) and explicit_prompt.strip():
         assistant_response = result.get("assistant_response")
         if assistant_response == explicit_prompt:
             return result

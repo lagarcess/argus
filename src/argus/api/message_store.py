@@ -398,8 +398,7 @@ def claim_response_option_action(
             preceding = [
                 message
                 for message in conversation_messages
-                if (message.created_at, message.id)
-                < (existing.created_at, existing.id)
+                if (message.created_at, message.id) < (existing.created_at, existing.id)
             ]
             replay_source = (
                 max(preceding, key=lambda item: (item.created_at, item.id))
@@ -755,13 +754,10 @@ def _recent_persisted_messages_for_guard(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    if (
-        not messages
-        or (
-            dev_memory_fallback_enabled()
-            and conversation_id in api_state.store.conversations
-            and api_state.store.messages.get(conversation_id)
-        )
+    if not messages or (
+        dev_memory_fallback_enabled()
+        and conversation_id in api_state.store.conversations
+        and api_state.store.messages.get(conversation_id)
     ):
         messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
     return sorted(messages, key=lambda item: (item.created_at, item.id))

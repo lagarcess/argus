@@ -27,6 +27,11 @@ DEFAULT_TURN_DEADLINE_SECONDS = 120.0
 # fallback, interpretation primary and fallback, focused repair, then
 # clarification primary and fallback.
 DEFAULT_TURN_CALL_ALLOWANCE = 7
+# The research rail's routing classification postdates that calibration. It is
+# a required single call, not an enrichment, so with the rail on it holds one
+# reserved slot outside the corridor: interpreter audits can never starve the
+# router into a silent pre-rail fallback.
+_ROUTING_RESERVED_TASK = "knowledge_route"
 _EXPLICIT_PROGRESS_TERMINALS: frozenset[ProgressOutcome] = frozenset(
     {
         "clarification",
@@ -61,6 +66,7 @@ class TurnExecutionContext:
     call_allowance: int
     entry_fingerprint: str | None
     calls_reserved: int = 0
+    routing_reserved: bool = False
     terminal: ProgressOutcome | None = None
     terminal_reason: str | None = None
     exit_fingerprint: str | None = None
@@ -141,6 +147,15 @@ def reserve_provider_call(
         execution.deadline_exhausted = True
         execution.blocked_tasks.append(task_name)
         return None
+    if task_name == _ROUTING_RESERVED_TASK and not execution.routing_reserved:
+        from argus.domain.research.config import research_rail_enabled
+
+        if research_rail_enabled():
+            execution.routing_reserved = True
+            timeout_seconds = remaining_seconds
+            if task_timeout_seconds is not None:
+                timeout_seconds = min(timeout_seconds, float(task_timeout_seconds))
+            return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
     if execution.calls_reserved >= execution.call_allowance:
         execution.call_allowance_exhausted = True
         execution.blocked_tasks.append(task_name)
@@ -347,10 +362,7 @@ async def runtime_events_with_keepalive(
                     timeout=wait_seconds,
                 )
                 next_event = None
-                if (
-                    execution is not None
-                    and execution.remaining_deadline_seconds() <= 0
-                ):
+                if execution is not None and execution.remaining_deadline_seconds() <= 0:
                     raise _turn_deadline_error(
                         execution,
                         runtime_keepalive_seconds,
@@ -358,10 +370,7 @@ async def runtime_events_with_keepalive(
                         last_event,
                     )
             except asyncio.TimeoutError:
-                if (
-                    execution is not None
-                    and execution.remaining_deadline_seconds() <= 0
-                ):
+                if execution is not None and execution.remaining_deadline_seconds() <= 0:
                     if next_event is not None:
                         await _cancel_runtime_event_task(next_event)
                     next_event = None

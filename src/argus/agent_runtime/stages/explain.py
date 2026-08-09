@@ -814,9 +814,11 @@ def _metric_numeric_tokens(value: str | None) -> list[str]:
             continue
         raw_token, end = token
         suffix = text[end : end + 24].casefold()
-        if not suffix.lstrip().startswith("%") and not suffix.lstrip().startswith(
-            "percentage point"
-        ) and not suffix.lstrip().startswith("puntos porcentual"):
+        if (
+            not suffix.lstrip().startswith("%")
+            and not suffix.lstrip().startswith("percentage point")
+            and not suffix.lstrip().startswith("puntos porcentual")
+        ):
             continue
         normalized = _normalize_numeric_token(raw_token)
         if normalized is None:
@@ -1328,7 +1330,9 @@ def _result_readout_markdown(
         f"- Tested: {tested}.",
     ]
     if execution_note:
-        lines.append(f"- Signal: {_compact_execution_note(execution_note, language=language)}")
+        lines.append(
+            f"- Signal: {_compact_execution_note(execution_note, language=language)}"
+        )
     else:
         lines.append(f"- What that means: {interpretation}")
     next_check = next_check_override or _next_check_line(

@@ -331,8 +331,7 @@ def list_conversations(
         reconcile=True,
     )
     page_items = [
-        item.model_copy(update={"activity": activities[item.id]})
-        for item in page_items
+        item.model_copy(update={"activity": activities[item.id]}) for item in page_items
     ]
     next_cursor = None
     if has_more and page_items:
@@ -431,9 +430,7 @@ def patch_conversation(
         data["updated_at"] = utcnow()
         updated = Conversation.model_validate(data)
         api_state.store.conversations[conversation_id] = updated
-    return ConversationResponse(
-        conversation=_with_activity(updated, user_id=user.id)
-    )
+    return ConversationResponse(conversation=_with_activity(updated, user_id=user.id))
 
 
 @router.delete("/conversations/{conversation_id}", response_model=SuccessResponse)
@@ -487,17 +484,13 @@ def delete_conversation(
         400: {
             "description": "The pagination cursor is invalid or stale.",
             "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/Error"}
-                }
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
             },
         },
         404: {
             "description": "The conversation was not found.",
             "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/Error"}
-                }
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
             },
         },
     },
@@ -531,11 +524,7 @@ def list_run_dossiers(
             allow_unowned=False,
         )
     )
-    if (
-        conversation is None
-        or conversation.deleted_at is not None
-        or not memory_owned
-    ):
+    if conversation is None or conversation.deleted_at is not None or not memory_owned:
         raise problem(
             request,
             status_code=404,
@@ -574,10 +563,7 @@ def list_run_dossiers(
             cursor_completed_at = datetime.fromisoformat(raw_completed_at)
         except ValueError:
             raise invalid_cursor_problem(request) from None
-        if (
-            cursor_completed_at.tzinfo is None
-            or cursor_completed_at.utcoffset() is None
-        ):
+        if cursor_completed_at.tzinfo is None or cursor_completed_at.utcoffset() is None:
             raise invalid_cursor_problem(request)
 
     try:
@@ -885,9 +871,9 @@ def add_confirmation_peer_assets(
         rows_sidecar = message.metadata.get("next_experiments")
         rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
         for row in rows or []:
-            if not isinstance(row, dict) or not str(
-                row.get("kind") or ""
-            ).startswith("research_add_peer"):
+            if not isinstance(row, dict) or not str(row.get("kind") or "").startswith(
+                "research_add_peer"
+            ):
                 continue
             why = row.get("why")
             params = why.get("params") if isinstance(why, dict) else None
@@ -901,9 +887,7 @@ def add_confirmation_peer_assets(
     language = str(getattr(user, "language", None) or "en")
 
     if payload.restore_previous:
-        preparation = confirmation_symbols_restoration(
-            source_payload, language=language
-        )
+        preparation = confirmation_symbols_restoration(source_payload, language=language)
         restored = set(offered_symbols)
         adjustment = source_payload.get("assets_adjustment")
         if isinstance(adjustment, dict):
@@ -913,22 +897,16 @@ def add_confirmation_peer_assets(
             }
             current = {
                 str(symbol).strip().upper()
-                for symbol in (source_payload.get("strategy") or {}).get(
-                    "asset_universe"
-                )
+                for symbol in (source_payload.get("strategy") or {}).get("asset_universe")
                 or []
             }
             restored |= current - previous
         remaining_symbols = sorted(restored)
     else:
-        requested = [
-            str(symbol).strip().upper() for symbol in payload.symbols or []
-        ]
+        requested = [str(symbol).strip().upper() for symbol in payload.symbols or []]
         # Every candidate passed the resolver before it became a row;
         # anything else is not addable, whoever asks.
-        if not requested or any(
-            symbol not in offered_symbols for symbol in requested
-        ):
+        if not requested or any(symbol not in offered_symbols for symbol in requested):
             raise invalid_state
         added = _resolved_peer_identities(dict.fromkeys(requested))
         if added is None:

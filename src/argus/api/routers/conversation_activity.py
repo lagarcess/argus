@@ -22,9 +22,7 @@ from argus.domain.conversation_activity import CursorShapeError, decode_attentio
 
 router = APIRouter(prefix="/api/v1", tags=["conversation-activity"])
 
-_ERROR_CONTENT = {
-    "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
-}
+_ERROR_CONTENT = {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
 
 
 def _not_found(request: Request) -> HTTPException:

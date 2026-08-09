@@ -178,6 +178,8 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
                     _append_public_source(sources, url)
                 if category == "tickers_lookup":
                     pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
+                elif category == "etf_holdings":
+                    pairs.extend(_pairs_from_holdings(str(result.get("content") or "")))
         elif item_type == "message":
             for chunk in item.get("content") or []:
                 if isinstance(chunk, dict) and chunk.get("type") == "output_text":
@@ -230,6 +232,41 @@ def _append_public_source(sources: list[str], url: Any) -> None:
         return
     if candidate not in sources:
         sources.append(candidate)
+
+
+def _pairs_from_holdings(content: str) -> list[ResearchNamePair]:
+    """Parse the provider's ``etf_holdings`` markdown table.
+
+    Machine-generated fixed format: a header row naming ``symbol`` and
+    ``name`` columns, then one holding per row, top weights first. Row order
+    is preserved so the heaviest constituents become the offerable pairs;
+    the resolver still gates every one before anything is tappable, which is
+    what grounds exposure vehicles whose tickers collide.
+    """
+    pairs: list[ResearchNamePair] = []
+    symbol_index: int | None = None
+    name_index: int | None = None
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        lowered = [cell.lower() for cell in cells]
+        if symbol_index is None:
+            if "symbol" in lowered and "name" in lowered:
+                symbol_index = lowered.index("symbol")
+                name_index = lowered.index("name")
+            continue
+        if name_index is None or len(cells) <= max(symbol_index, name_index):
+            continue
+        ticker = cells[symbol_index].strip("*").upper()
+        if not ticker or set(ticker) <= {"-", " ", ":"}:
+            continue
+        if not re.fullmatch(r"[A-Z0-9.\-/]{1,12}", ticker):
+            continue
+        display = cells[name_index] or ticker
+        pairs.append(ResearchNamePair(symbol=ticker, name=display.title()))
+    return pairs
 
 
 def _pairs_from_lookup(content: str) -> list[ResearchNamePair]:

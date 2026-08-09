@@ -242,11 +242,7 @@ def _resolve_company_name_asset(
             confidence="low",
         )
     best_key, best_asset = ranked[0]
-    tied = [
-        asset
-        for key, asset in ranked
-        if key[:4] == best_key[:4]
-    ]
+    tied = [asset for key, asset in ranked if key[:4] == best_key[:4]]
     if len(tied) > 1:
         return _asset_resolution(
             status="ambiguous",

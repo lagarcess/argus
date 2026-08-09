@@ -69,9 +69,7 @@ def apply_cost_fidelity(
             draft.field_provenance[draft_field] = "explicit_user"
             changed = True
         validated_marker = (rate, evidence_span)
-        if draft._validated_execution_cost_evidence.get(
-            draft_field
-        ) != validated_marker:
+        if draft._validated_execution_cost_evidence.get(draft_field) != validated_marker:
             draft._validated_execution_cost_evidence[draft_field] = validated_marker
             changed = True
 
@@ -247,7 +245,6 @@ def _unit_equivalent_cost(candidate: object, rate: object) -> bool:
     if stated is None or target is None:
         return False
     return any(stated / divisor == target for divisor in _COST_UNIT_DIVISORS)
-
 
 
 def _decimal_or_none(value: object) -> Decimal | None:

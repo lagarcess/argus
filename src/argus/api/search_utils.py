@@ -27,9 +27,7 @@ def search_rank_key(
     updated_at: datetime,
     item_id: str,
 ) -> tuple[int, int, int, int, datetime, int, int, str]:
-    pinned_rank, exact_rank, symbol_rank, layer_rank, text_rank = _score_rank_parts(
-        score
-    )
+    pinned_rank, exact_rank, symbol_rank, layer_rank, text_rank = _score_rank_parts(score)
     return (
         pinned_rank,
         exact_rank,

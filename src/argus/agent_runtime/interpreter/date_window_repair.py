@@ -259,9 +259,7 @@ def _response_with_post_result_window_inherited(
             "candidate_strategy_draft": draft,
             "missing_required_fields": missing_required_fields,
             "reason_codes": list(
-                dict.fromkeys(
-                    [*response.reason_codes, "latest_result_window_bound"]
-                )
+                dict.fromkeys([*response.reason_codes, "latest_result_window_bound"])
             ),
         }
     )
@@ -270,9 +268,7 @@ def _response_with_post_result_window_inherited(
 def _request_has_pending_date_answer_context(
     request: InterpretationRequest,
 ) -> bool:
-    if request.selected_thread_metadata.get("last_stage_outcome") != (
-        "await_user_reply"
-    ):
+    if request.selected_thread_metadata.get("last_stage_outcome") != ("await_user_reply"):
         return False
     requested_field = _field_path_base(
         str(request.selected_thread_metadata.get("requested_field") or "")
@@ -408,8 +404,7 @@ def _response_with_latest_result_window_bound(
             "canonical window available has_snapshot={} has_reference={}",
             request.latest_task_snapshot is not None,
             request.latest_task_snapshot is not None
-            and request.latest_task_snapshot.latest_backtest_result_reference
-            is not None,
+            and request.latest_task_snapshot.latest_backtest_result_reference is not None,
         )
         return response
     logger.debug(
@@ -441,9 +436,7 @@ def _response_with_latest_result_window_bound(
             "candidate_strategy_draft": bound_draft,
             "missing_required_fields": missing_required_fields,
             "reason_codes": list(
-                dict.fromkeys(
-                    [*response.reason_codes, "latest_result_window_bound"]
-                )
+                dict.fromkeys([*response.reason_codes, "latest_result_window_bound"])
             ),
         }
     )
@@ -506,8 +499,7 @@ def _response_has_repairable_recovery_date_gap(
 def _complete_date_range_matches_resolved_intent(draft: LLMStrategyDraft) -> bool:
     normalized = normalize_date_range_candidate(draft.date_range)
     if not (
-        isinstance(normalized, dict)
-        and _has_complete_date_range_payload(normalized)
+        isinstance(normalized, dict) and _has_complete_date_range_payload(normalized)
     ):
         return False
     resolved = resolve_date_range_intent(draft.date_range_intent)
@@ -573,9 +565,7 @@ def response_with_recovery_intent_window_materialized(
     repaired = response.model_copy(deep=True)
     repaired.candidate_strategy_draft.date_range = intent_resolution.payload
     repaired.reason_codes = list(
-        dict.fromkeys(
-            [*repaired.reason_codes, "recovery_intent_window_materialized"]
-        )
+        dict.fromkeys([*repaired.reason_codes, "recovery_intent_window_materialized"])
     )
     return repaired
 
@@ -723,9 +713,7 @@ def _response_from_focused_date_window_extraction(
             draft.date_range = None
             changed = True
         else:
-            intent_resolution = resolve_date_range_intent(
-                extraction.date_range_intent
-            )
+            intent_resolution = resolve_date_range_intent(extraction.date_range_intent)
             if intent_resolution is None:
                 return None
             draft.date_range_intent = extraction.date_range_intent

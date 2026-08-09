@@ -164,9 +164,7 @@ def safe_capability_context(
     if not isinstance(value, dict):
         return {}
     raw_failure_value = value.get("failure_reason") or value.get("failure_code")
-    raw_failure_reason = (
-        str(raw_failure_value) if raw_failure_value is not None else None
-    )
+    raw_failure_reason = str(raw_failure_value) if raw_failure_value is not None else None
     safe_context = {
         str(key): nested
         for key, nested in value.items()

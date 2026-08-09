@@ -267,14 +267,10 @@ def _message_explicitly_mentions_symbol(
     token_map = str.maketrans({char: " " for char in punctuation})
     tokens = set(message.translate(token_map).split())
     cashtag_tokens = {
-        token.lstrip("$").casefold()
-        for token in tokens
-        if token.startswith("$")
+        token.lstrip("$").casefold() for token in tokens if token.startswith("$")
     }
     return any(
-        symbol in tokens
-        or f"${symbol}" in tokens
-        or symbol.casefold() in cashtag_tokens
+        symbol in tokens or f"${symbol}" in tokens or symbol.casefold() in cashtag_tokens
         for symbol in symbols
     )
 
@@ -483,8 +479,8 @@ def _strategy_with_supported_indicator_simplification(
         strategy=updated,
         spec=spec,
     )
-    rewrite_threshold_logic = (
-        prior_strategy_type != "indicator_threshold" or bool(incoming_indicator_parameters)
+    rewrite_threshold_logic = prior_strategy_type != "indicator_threshold" or bool(
+        incoming_indicator_parameters
     )
     if rewrite_threshold_logic or not updated.entry_logic:
         updated.entry_logic = spec.format_threshold_rule(
@@ -529,7 +525,9 @@ def _indicator_key_from_strategy(strategy: StrategySummary) -> str | None:
     return None
 
 
-def _active_strategy_from_snapshot(snapshot: TaskSnapshot | None) -> StrategySummary | None:
+def _active_strategy_from_snapshot(
+    snapshot: TaskSnapshot | None,
+) -> StrategySummary | None:
     if snapshot is None:
         return None
     return snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
@@ -710,9 +708,7 @@ def _grounded_symbols_have_name_support(
         symbol in symbol_set and grounded_asset_mention_has_name_support(mention)
         for mention in mentions
         if (
-            symbol := _normalized_symbol(
-                getattr(mention.asset, "canonical_symbol", None)
-            )
+            symbol := _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
         )
     )
 
@@ -761,7 +757,9 @@ def _without_weak_implicit_current_symbols(
     )
     if not weak_symbols:
         return current_symbols
-    stronger_symbols = [symbol for symbol in current_symbols if symbol not in weak_symbols]
+    stronger_symbols = [
+        symbol for symbol in current_symbols if symbol not in weak_symbols
+    ]
     return stronger_symbols or current_symbols
 
 
@@ -1208,12 +1206,9 @@ def _missing_fields_for_interpretation(
         strategy,
         contract=contract,
     )
-    if (
-        "pending_response_option_selected" in interpretation.reason_codes
-        and (
-            executable_strategy_type(strategy) == "indicator_threshold"
-            or strategy_has_executable_signal_rule(strategy)
-        )
+    if "pending_response_option_selected" in interpretation.reason_codes and (
+        executable_strategy_type(strategy) == "indicator_threshold"
+        or strategy_has_executable_signal_rule(strategy)
     ):
         required_missing_fields = [
             field for field in required_missing_fields if field != "strategy_thesis"
@@ -1283,12 +1278,15 @@ def _fresh_complete_restatement_started_new_confirmation(
         return False
     if interpretation.task_relation != "new_task":
         return False
-    return _strategy_is_semantically_confirmable(
-        expects_strategy_route=expects_strategy_route,
-        ambiguous_fields=ambiguous_fields,
-        unsupported_constraints=unsupported_constraints,
-        missing_required_fields=missing_required_fields,
-    ) and not requires_clarification
+    return (
+        _strategy_is_semantically_confirmable(
+            expects_strategy_route=expects_strategy_route,
+            ambiguous_fields=ambiguous_fields,
+            unsupported_constraints=unsupported_constraints,
+            missing_required_fields=missing_required_fields,
+        )
+        and not requires_clarification
+    )
 
 
 def _strategy_route_expected(

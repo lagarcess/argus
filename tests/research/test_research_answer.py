@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime import research_answer as ra
+from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
@@ -46,7 +47,7 @@ def _classify(monkeypatch: pytest.MonkeyPatch, **fields: Any) -> None:
 def _wire_client(monkeypatch: pytest.MonkeyPatch, documents) -> RecordingTransport:
     transport = RecordingTransport(documents)
     monkeypatch.setattr(
-        ra, "_client", lambda: PerplexityAgentClient("k", transport=transport)
+        grounded, "_client", lambda: PerplexityAgentClient("k", transport=transport)
     )
     return transport
 
@@ -277,7 +278,7 @@ def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
         def run_research(self, prompt, spec):
             raise ResearchUnavailableError("timeout")
 
-    monkeypatch.setattr(ra, "_client", lambda: FailingClient())
+    monkeypatch.setattr(grounded, "_client", lambda: FailingClient())
 
     result = _run("What is Apple at?")
 

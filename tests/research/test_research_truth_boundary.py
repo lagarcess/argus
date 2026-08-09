@@ -22,6 +22,7 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime import research_answer as ra
+from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.research_basket import peer_added_confirmation_preparation
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
@@ -36,12 +37,16 @@ SENTINEL_PRICE = "987654.32"
 # The full set of keys a research turn may write. Anything outside this set,
 # especially pending_strategy / confirmation_payload / execute state, is a
 # truth-boundary breach. Peers ride the research sidecar; the transcript is
-# their only cross-turn home.
+# their only cross-turn home. The absorbed find operation adds the discovery
+# sidecar pair and typed recovery: still prose, sidecars, and rows only.
 ALLOWED_RESEARCH_PATCH_KEYS = {
     "assistant_response",
     "research",
     "research_job_request",
     "next_experiments",
+    "discovery",
+    "discovery_usage",
+    "recovery",
 }
 
 
@@ -71,7 +76,7 @@ def _run_with_sentinel(monkeypatch: pytest.MonkeyPatch):
         ]
     )
     monkeypatch.setattr(
-        ra, "_client", lambda: PerplexityAgentClient("k", transport=transport)
+        grounded, "_client", lambda: PerplexityAgentClient("k", transport=transport)
     )
     state = RunState.new(
         current_user_message="What is Netflix at?", recent_thread_history=[]
@@ -151,6 +156,8 @@ def test_research_launched_test_regrounds_in_argus_providers(monkeypatch) -> Non
 RESEARCH_SOURCES = [
     REPO_ROOT / "src" / "argus" / "domain" / "research",
     REPO_ROOT / "src" / "argus" / "agent_runtime" / "research_answer.py",
+    REPO_ROOT / "src" / "argus" / "agent_runtime" / "research_grounded.py",
+    REPO_ROOT / "src" / "argus" / "agent_runtime" / "research_find.py",
     REPO_ROOT / "src" / "argus" / "agent_runtime" / "research_rows.py",
 ]
 # Simulation entry points research code must never touch. fetch_price_series

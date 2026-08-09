@@ -108,9 +108,7 @@ def _prior_strategy_symbols(request: InterpretationRequest) -> set[str]:
             strategy_from_result_reference,
         )
 
-        prior = strategy_from_result_reference(
-            snapshot.latest_backtest_result_reference
-        )
+        prior = strategy_from_result_reference(snapshot.latest_backtest_result_reference)
     if prior is None:
         return set()
     return {

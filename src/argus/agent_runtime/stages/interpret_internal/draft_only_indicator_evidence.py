@@ -24,9 +24,7 @@ def explicit_draft_only_indicator_evidence(
     if not isinstance(evidence_spans, dict):
         evidence_spans = {}
     indicator_is_user_explicit = field_provenance.get("indicator") == "explicit_user"
-    period_is_user_explicit = (
-        field_provenance.get("indicator_period") == "explicit_user"
-    )
+    period_is_user_explicit = field_provenance.get("indicator_period") == "explicit_user"
     candidates: list[Any] = []
     if isinstance(evidence_spans.get("indicator"), str):
         candidates.append(evidence_spans.get("indicator"))

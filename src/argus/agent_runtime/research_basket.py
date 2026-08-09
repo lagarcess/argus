@@ -336,9 +336,7 @@ def peer_add_rows(
                 "label_key": _DYNAMIC_LABEL_KEY,
                 "why": {
                     "code": "research_add_peer",
-                    "params": {
-                        "symbols": [offer["symbol"] for offer in offers]
-                    },
+                    "params": {"symbols": [offer["symbol"] for offer in offers]},
                 },
             }
         )

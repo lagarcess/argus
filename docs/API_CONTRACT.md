@@ -2799,7 +2799,25 @@ Behind `ARGUS_RESEARCH_RAIL_ENABLED` (default off; flag-off behavior is
 byte-identical to the pre-rail router), a question turn the interpreter
 classifies as a finance question is grounded through the Perplexity Agent
 API's `finance_search` tool, selected by question shape with no user-visible
-mode. The assistant message may carry an additive `research` sidecar in its
+mode.
+
+**One rail, not two (spec section 11b).** With the flag on, one classifier
+owns question shape for everything previously split between grounded
+discovery and research: typed `asset_discovery` turns enter the same router,
+a comparison whose assets the user has all named becomes grounded
+cross-company research, and discovery's asset-finding runs as the rail's
+`find` operation. One Perplexity provider layer (`research.search` for the
+direct Search API, `research.perplexity_agent` for the Agent API), one
+shared cache under the per-class TTL table, one meter: find turns record
+capability-classed ledger rows (`peer_expansion` with anchors, `screening`
+for categories) and their source-backed searches are gated by the shared
+research ceiling instead of the separate discovery allowance. The discovery
+sidecar, its typed action rows, and the guest experience are unchanged; find
+turns additionally carry the `research` sidecar below with `shape: "find"`.
+Flag off, the pre-rail act-gated discovery path runs byte-identically,
+including its own allowance and ledger rows.
+
+The assistant message may carry an additive `research` sidecar in its
 final payload and persisted metadata:
 
 ```json
@@ -2815,6 +2833,13 @@ final payload and persisted metadata:
       {"symbol": "DIS", "name": "The Walt Disney Company", "asset_class": "equity"}
     ],
     "usage": {"invocations": 1, "latency_ms": 640, "cost_usd": 0.005, "cache_status": "miss"},
+    "memory": {
+      "schema_version": "argus_research_memory/v1",
+      "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
+      "comparison_set": [],
+      "peer_suggestions": ["DIS"],
+      "open_thread": {"shape": "fast", "period_of_interest": null}
+    },
     "degraded": {"code": "asset_class_not_covered"}
   }
 }
@@ -2832,6 +2857,17 @@ Contract rules:
   turn on the cost ledger even for cache hits and degraded turns.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
+- `memory` is the typed producer seam for the personalization-memory
+  program (spec section 11): research subjects, the comparison set when two
+  or more subjects were compared, peer suggestions, and the open thread, in
+  a consumable shape. The rail only emits; nothing reads or writes memory
+  here, and consumption ships in the memory lane.
+- `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
+  ground through the balanced shape; the provider's `etf_holdings` table is
+  parsed deterministically, weight order preserved, and each named holding
+  passes provider-backed resolution before becoming a peer or a runnable
+  row. This is the exposure-vehicle grounding path: collision-prone tickers
+  are verified through the holdings table instead of being dropped.
 - `anchor_symbols` names the research subjects. The persisted sidecar is the
   **only** cross-turn home for researched peers: inline turns, the dev
   synchronous fallback, and the background job finalizer all persist it, and
