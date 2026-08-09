@@ -266,12 +266,19 @@ Each carries a sequencing constraint, because small does not mean parallel. Most
 of these touch a file a main lane already owns, and two agents in one file is
 how the last split brain happened.
 
-### Retire the show/hide suggestions toggle
+### Empty chat polish
 
-**Sequencing: after pillar 1 merges.** It touches
-`web/components/chat/EmptyChatSurface.tsx` and
-`web/components/chat/ChatInterface.tsx`, both owned by the research rail lane
-today.
+**Sequencing: after pillar 1 merges, then parallel-safe with the mention tags
+lane.** It touches `EmptyChatSurface.tsx`, `ChatInterface.tsx`,
+`EmptyChatGreeting.tsx`, and both locale files. The rail owns all four today and
+created the greeting component. PR #406 touches none of them, so once the rail
+lands these two run at the same time.
+
+Three pieces travel together because they share the same surface and the same
+two locale files. Split into separate lanes they would have to be serial with
+each other anyway, so splitting buys nothing and costs a merge.
+
+#### Piece 1: retire the show/hide suggestions toggle
 
 No major assistant ships this control. ChatGPT, Claude, Gemini, Perplexity, and
 Grok all put starter suggestions in the empty state and let them disappear on
@@ -304,6 +311,107 @@ state that does not exist.
 rail spec section 10 makes prebaked suggestions part of the signed-in empty
 chat. That is one flag too many. Retiring an env flag is a release-contract move
 and all four files travel together, so it is a founder call.
+
+#### Piece 2: the greeting needs variety it does not have
+
+Four greetings exist, all keyed on time of day, one string per slot:
+
+| Hours | English | Spanish |
+| --- | --- | --- |
+| 05:00 to 08:59 | Hey, early bird. What should we look at? | Madrugaste hoy. ¿Qué miramos? |
+| 09:00 to 17:59 | What should we try today? | ¿Qué probamos hoy? |
+| 18:00 to 22:59 | What should we look into tonight? | ¿Qué exploramos esta noche? |
+| 23:00 to 04:59 | Hello, night owl. What are you curious about? | Hola, noctámbulo. ¿Qué te da curiosidad? |
+
+Rail spec section 10 asked for time of day, memory, and geography. Only time of
+day was built.
+
+**The defect is repetition, not slot count.** The day window is nine hours wide,
+so anyone opening Argus during a workday sees one identical sentence forever.
+Adding a fifth slot does not fix that.
+
+**Pool size.** Five or six per slot for `day`, since a weekday user lives
+entirely in it and three would cycle visibly inside a week. Fewer elsewhere is
+fine; nobody is in the 3am slot on a schedule.
+
+**Rotation is day-stable, never per page load.** Refreshing into a different
+greeting is exactly what makes these read as generated. Seed from the date so
+one line holds all day and changes tomorrow, with no consecutive repeat.
+
+**Market session lines are pool members, not overrides.** Time of day describes
+the user, market session describes the market, and they decouple outside Eastern
+time: 5am to 9am local overlaps pre-market only for an Eastern user. So when a
+session is active its lines become eligible candidates inside the current slot's
+pool, and the same day-stable seed picks from the widened set. Nothing overrides
+anything, a session line cannot appear outside its session, and the generic lines
+stay in play.
+
+Weight them unevenly. Weekend and holiday closure is a two-day state where the
+market fact is the most useful thing Argus can say, so it should speak often.
+Pre-market and after-hours are transient and mostly irrelevant to backtesting, so
+they surface occasionally rather than as a headline. The one place they genuinely
+matter is the fast quote shape, which already returns pre and after-hours
+figures.
+
+**Closed markets must stay true for every asset class.** Argus supports crypto
+and currency pairs, which do not close, so a bare "markets are closed" is wrong
+for those users. Say both: stocks are closed for the weekend, crypto does not
+stop. That is true for everyone, useful to everyone, and teaches a real
+difference between the asset classes Argus actually supports.
+
+**The data already exists, including the part most likely to be faked.**
+`src/argus/domain/market_data/capabilities.py` already carries
+`fetch_alpaca_market_clock()`, returning `is_open`, `next_open`, `next_close`,
+`is_market_day`, and `phase`, and `fetch_alpaca_market_calendar()`, which hits
+the real trading calendar. No new integration, credential, or provider.
+
+Two traps: session is computed in Eastern time, never the user's clock, because
+someone in London at 2pm is in US pre-market and a local-time calculation gets
+that backwards. And holidays come from the calendar endpoint, never a weekday
+check. That assumption has already bitten this repo once, where synthetic
+fixtures placed bars on weekends and holidays so date logic passed every test and
+broke against a real calendar.
+
+**Geography, as named in rail spec section 10, means market session here.**
+Location data is a real privacy cost for a cosmetic gain, and knowing someone's
+city says nothing about what they should ask. Knowing whether the market is open
+does.
+
+**Memory-driven greetings are the highest-value addition and are already half
+built.** The rail emits research subjects, open threads, and comparison sets, and
+nothing reads them. "You looked at Netflix last week and never tested it" is both
+a greeting and the return hook, and it is the same seam the follow-up pillar
+needs. A greeting is voicing, so this stays inside the S10 lock. Same rule as the
+chips governs: memory-driven when memory has something, the rotating static pool
+otherwise, guests always static.
+
+**Keep it warm, not clever.** "Hola, noctámbulo" works because it is warm without
+performing. A greeting that tries harder becomes a mascot, and the product
+posture is the opposite of a mascot.
+
+#### Piece 3: ask what to call the user, in its own field
+
+Add a profile field, "What should Argus call you?", rather than reusing
+`display_name`.
+
+`display_name` exists and is editable, so reuse is free, and it is still wrong.
+It is an identity field. People fill it with a legal name or whatever their email
+gave them, because it is for the account rather than for being spoken to. "What
+is next, Luis Garces?" reads like a form letter.
+
+Being addressed by name is also not universally welcome, and some people find it
+presumptuous from software. A dedicated optional field makes it a choice the user
+made rather than a side effect of having an account. Blank means the greeting
+uses no name, which needs no special handling because most of the pool will not
+use one.
+
+**The name appears in some pool members, not all.** Every greeting using someone's
+name gets grating in about three days.
+
+**This is a setting, never a memory.** Argus does not infer what to call you from
+conversation. Memory infers, settings are stated, and guessing a nickname from
+how someone types would be the creepiest thing in the product. Guests have no
+profile and fall back to the nameless pool.
 
 ### Ticker mention entity tags
 
