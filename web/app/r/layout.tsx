@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 /**
  * The public receipt shell. Deliberately not the app shell: no sidebar, no chat
@@ -12,6 +12,14 @@ import type { Metadata } from "next";
  * noindex lives here as well as in each page's metadata, so a future page added
  * under /r inherits it rather than having to remember it.
  */
+export const viewport: Viewport = {
+  // The action bar sits against the bottom edge, so it has to know how tall the iOS
+  // home indicator is. env(safe-area-inset-*) reports zero unless the viewport opts
+  // into the full screen, and this is set on the receipt route only: the app shell's
+  // own viewport belongs to the responsive-shell lane.
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   robots: {
     index: false,

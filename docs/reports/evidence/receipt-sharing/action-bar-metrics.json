@@ -1,0 +1,86 @@
+{
+  "10a-bar-phone-en-shortest-recurring": {
+    "pageHeight": 1023,
+    "viewport": 812,
+    "barVisibleAtFold": true,
+    "barTop": 741,
+    "barHeight": 71,
+    "mainBottomPadding": "112px",
+    "mainBottom": 1023,
+    "atEnd": {
+      "barTop": 741,
+      "lastContentBottom": 700,
+      "covered": false
+    }
+  },
+  "10b-bar-phone-es-shortest-recurring": {
+    "pageHeight": 1023,
+    "viewport": 812,
+    "barVisibleAtFold": true,
+    "barTop": 741,
+    "barHeight": 71,
+    "mainBottomPadding": "112px",
+    "mainBottom": 1023,
+    "atEnd": {
+      "barTop": 741,
+      "lastContentBottom": 700,
+      "covered": false
+    }
+  },
+  "11a-bar-phone-en-longest-crossover-exit": {
+    "pageHeight": 1152,
+    "viewport": 812,
+    "barVisibleAtFold": true,
+    "barTop": 741,
+    "barHeight": 71,
+    "mainBottomPadding": "112px",
+    "mainBottom": 1152,
+    "atEnd": {
+      "barTop": 741,
+      "lastContentBottom": 700,
+      "covered": false
+    }
+  },
+  "11b-bar-phone-es-longest-crossover-exit": {
+    "pageHeight": 1152,
+    "viewport": 812,
+    "barVisibleAtFold": true,
+    "barTop": 741,
+    "barHeight": 71,
+    "mainBottomPadding": "112px",
+    "mainBottom": 1152,
+    "atEnd": {
+      "barTop": 741,
+      "lastContentBottom": 700,
+      "covered": false
+    }
+  },
+  "12a-bar-phone-en-tombstone": {
+    "pageHeight": 812,
+    "viewport": 812,
+    "barVisibleAtFold": true,
+    "barTop": 741,
+    "barHeight": 71,
+    "mainBottomPadding": "112px",
+    "mainBottom": 348,
+    "atEnd": {
+      "barTop": 741,
+      "lastContentBottom": 236,
+      "covered": false
+    }
+  },
+  "12b-bar-phone-es-tombstone": {
+    "pageHeight": 812,
+    "viewport": 812,
+    "barVisibleAtFold": true,
+    "barTop": 741,
+    "barHeight": 71,
+    "mainBottomPadding": "112px",
+    "mainBottom": 348,
+    "atEnd": {
+      "barTop": 741,
+      "lastContentBottom": 236,
+      "covered": false
+    }
+  }
+}

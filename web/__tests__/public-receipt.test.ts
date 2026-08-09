@@ -24,7 +24,7 @@ const RECEIPT_ROUTE = join(WEB_ROOT, "app/r/[receiptId]/page.tsx");
 const RECEIPT_LAYOUT = join(WEB_ROOT, "app/r/layout.tsx");
 const OG_IMAGE_ROUTE = join(WEB_ROOT, "app/r/[receiptId]/opengraph-image.tsx");
 const RECEIPT_BODY = join(WEB_ROOT, "components/receipt/ReceiptBody.tsx");
-const CTA = join(WEB_ROOT, "components/receipt/TryArgusCallToAction.tsx");
+const ACTION_BAR = join(WEB_ROOT, "components/receipt/ReceiptActionBar.tsx");
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
@@ -364,7 +364,7 @@ describe("the rendered page", () => {
 
 describe("try argus", () => {
   test("lands on bare guest entry with no carried state and no new parameter", () => {
-    const body = source(CTA);
+    const body = source(ACTION_BAR);
     expect(body).toContain('href="/"');
     expect(body).not.toContain("?");
     expect(body).not.toContain("searchParams");
@@ -482,7 +482,7 @@ describe("the public route escapes the client i18n gate", () => {
     for (const file of [
       "components/receipt/ReceiptBody.tsx",
       "components/receipt/ReceiptNotice.tsx",
-      "components/receipt/TryArgusCallToAction.tsx",
+      "components/receipt/ReceiptActionBar.tsx",
       "components/receipt/ProvenanceMark.tsx",
     ]) {
       expect(source(join(WEB_ROOT, file))).not.toContain("useTranslation");
@@ -643,5 +643,105 @@ describe("the plan sentence", () => {
       metrics: [{ key: "total_return_pct", label: "Total return", value: "n/a" }],
     };
     expect(benchmarkVerdict(unparseable, copy)).toBeNull();
+  });
+});
+
+describe("the action bar", () => {
+  test("is fixed to the bottom and clears the iOS home indicator", () => {
+    const bar = source(ACTION_BAR);
+    expect(bar).toContain("fixed inset-x-0 bottom-0");
+    expect(bar).toContain("pb-[env(safe-area-inset-bottom)]");
+    // env() reports zero unless the viewport opts into the full screen, so the
+    // inset handling above is dead without this.
+    expect(source(RECEIPT_LAYOUT)).toContain('viewportFit: "cover"');
+  });
+
+  test("never ships the button without the framing attached", () => {
+    // A permanently visible call to action on a page a stranger did not ask for is
+    // only acceptable paired with what the page actually is.
+    const bar = source(ACTION_BAR);
+    expect(bar).toContain("framing");
+    // Not optional and not defaulted: the prop is required by the type.
+    expect(bar).toContain("framing: string;");
+    expect(bar).not.toContain("framing?");
+    for (const surface of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
+      expect(source(surface)).toContain("framing={copy.framing.headline}");
+    }
+  });
+
+  test("the clearance constant does not live in a client module", () => {
+    // A "use client" module turns every export into a client reference, so a server
+    // component importing a plain string from it gets a stub. The stub stringifies
+    // into the class attribute as a JavaScript error message and the padding never
+    // applies, which is invisible to a source scan and visible in the rendered page.
+    // Comments stripped: this module documents the directive it must not carry.
+    const layout = code(join(WEB_ROOT, "lib/receipt-layout.ts"));
+    expect(layout).toContain("RECEIPT_ACTION_BAR_CLEARANCE");
+    expect(layout).not.toContain("use client");
+    expect(code(ACTION_BAR)).not.toContain("RECEIPT_ACTION_BAR_CLEARANCE");
+  });
+
+  test("the clearance is valid CSS calc, spaces and all", () => {
+    // calc() requires whitespace around its operators, and Tailwind writes that as
+    // an underscore. Without it the declaration is dropped silently.
+    const layout = source(join(WEB_ROOT, "lib/receipt-layout.ts"));
+    expect(layout).toContain("calc(112px_+_env(safe-area-inset-bottom))");
+  });
+
+  test("both surfaces leave room for it, from one shared value", () => {
+    // A page that renders the bar without the clearance hides its own last line,
+    // and two hand-copied paddings would drift.
+    for (const surface of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
+      const body = source(surface);
+      expect(body).toContain("RECEIPT_ACTION_BAR_CLEARANCE");
+      expect(body).not.toContain("pb-14");
+      expect(body).not.toContain("pb-16");
+    }
+    expect(source(ACTION_BAR)).toContain("pb-[env(safe-area-inset-bottom)]");
+  });
+
+  test("its position owes nothing to JavaScript", () => {
+    // No scroll listener and no reveal, so it cannot behave differently before
+    // hydration than after it. The click beacon is the funnel contract and stays.
+    const bar = code(ACTION_BAR);
+    for (const forbidden of [
+      "addEventListener",
+      "useEffect",
+      "useState",
+      "scrollY",
+      "IntersectionObserver",
+    ]) {
+      expect(bar).not.toContain(forbidden);
+    }
+    expect(bar).toContain("reportReceiptFunnelStage");
+  });
+
+  test("the tombstone gets it too", () => {
+    const notice = source(join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx"));
+    expect(notice).toContain("ReceiptActionBar");
+  });
+
+  test("the in-flow call to action block is gone from both surfaces", () => {
+    // It was about 200px on every page and put the only action 1.4 screens down.
+    for (const surface of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
+      const body = source(surface);
+      expect(body).not.toContain("TryArgusCallToAction");
+      expect(body).not.toContain("copy.cta.headline");
+      expect(body).not.toContain("copy.cta.detail");
+    }
+  });
+
+  test("the framing on the bar is not the paragraph already in flow", () => {
+    // Layered, not duplicated: the in-flow block explains what the page is, the bar
+    // carries the standing caveat.
+    for (const bundle of [enCommon.receipt, esCommon.receipt]) {
+      expect(bundle.framing.headline).not.toBe(bundle.framing.detail);
+      expect(bundle.framing.headline.length).toBeLessThan(
+        bundle.framing.detail.length,
+      );
+    }
+    // And the in-flow block no longer repeats the headline the bar now carries.
+    expect(source(RECEIPT_BODY)).not.toContain("copy.framing.headline}{\" \"}");
+    expect(source(RECEIPT_BODY)).toContain("{copy.framing.detail}");
   });
 });

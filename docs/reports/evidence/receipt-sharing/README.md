@@ -26,6 +26,23 @@ crossover, at 375 px. English and Spanish for each.
 | `08a-phone-en-tombstone.png` &middot; `08b-phone-es-tombstone.png` | Revoked. Honest, permanent, still offers Try Argus. |
 
 `09-desktop-en-crossover-differing-exit.png` is the densest case at 1280 px.
+
+## The action bar, at both extremes
+
+`10a`/`10b` are the shortest shape (recurring buys) and `11a`/`11b` the longest
+(a crossover exiting on other windows), each captured twice: `-fold` before any
+scrolling and `-end` scrolled to the bottom. `12a`/`12b` are the tombstone.
+`action-bar-metrics.json` records what was measured rather than eyeballed.
+
+| Frame | Page | Bar | On screen at the fold | Main padding | Covers last line |
+| :--- | ---: | ---: | :--- | ---: | :--- |
+| shortest, en and es | 1023px | 71px | yes | 112px | no |
+| longest, en and es | 1152px | 71px | yes | 112px | no |
+| tombstone, en and es | 812px | 71px | yes | 112px | no |
+
+Before the bar, the only action sat 1.34 to 1.50 screens down and the pages ran
+1201 to 1330px. Removing the in-flow block and adding the clearance leaves them
+1023 to 1152px with the action reachable from the first paint.
 `card-01` to `card-08` are the real preview images a platform fetches, at
 1200&times;630.
 
@@ -58,6 +75,25 @@ because the form has to argue for the numbers on a page nobody reached through A
   return, the comparison and the not-a-tip line.
 - **Metric labels render in the viewer's language** for the keys Argus owns, so a
   Spanish page no longer reads "Max drawdown" among its own numbers.
+- **The only action is fixed to the bottom, with the caveat attached to it.** A
+  permanently visible call to action is mildly promotional on a page a stranger did
+  not ask for, so it never ships without the framing beside it. That also inverts the
+  old arrangement, where the caveat was scrolled past and the button was found.
+
+## Still English on a Spanish page
+
+Two frozen strings, and both are frozen prose rather than chrome:
+
+- The assumptions, `Long only, no leverage.` and `Modeled commissions and slippage.`
+  They are generated as English prose by the result-card builder at run time and
+  frozen into the payload, so unlike a metric label there is no key to render from.
+  Fixing it properly means freezing them as keyed facts the way `strategy_facts`
+  already are, which is a payload contract change and a change to a generator this
+  lane does not own.
+- The tested window, `Jan 2, 2024 to Mar 1, 2024`, frozen as the run formatted it.
+
+The idea title stays in whatever language it was written in, which is deliberate and
+marked with `lang` so a screen reader pronounces it correctly.
 
 ## Standing checks
 

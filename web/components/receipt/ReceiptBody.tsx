@@ -7,10 +7,11 @@ import {
 } from "@/lib/receipt-plan";
 import type { ArgusLanguage } from "@/lib/language-features";
 import { formatReceiptDate } from "@/lib/receipt-copy";
+import { RECEIPT_ACTION_BAR_CLEARANCE } from "@/lib/receipt-layout";
 import ProvenanceMark from "./ProvenanceMark";
+import ReceiptActionBar from "./ReceiptActionBar";
 import ReceiptChart from "./ReceiptChart";
 import ReceiptViewBeacon from "./ReceiptViewBeacon";
-import TryArgusCallToAction from "./TryArgusCallToAction";
 
 type ReceiptBodyProps = {
   payload: PublicReceiptPayload;
@@ -65,7 +66,10 @@ export default function ReceiptBody({
   const isNegative = Boolean(headline?.value.trim().startsWith("-"));
 
   return (
-    <main className="mx-auto flex w-full max-w-[620px] flex-col px-5 pb-16 pt-5 sm:px-8 sm:pt-9">
+    <>
+      <main
+        className={`mx-auto flex w-full max-w-[620px] flex-col px-5 pt-5 sm:px-8 sm:pt-9 ${RECEIPT_ACTION_BAR_CLEARANCE}`}
+      >
       <ReceiptViewBeacon />
 
       <div className="flex items-center justify-between gap-3">
@@ -167,15 +171,15 @@ export default function ReceiptBody({
 
       <div className={`mt-5 pt-4 ${RULE}`}>
         <p className="text-[12.5px] leading-relaxed text-[#c2a44d]">
-          {copy.framing.headline} {copy.framing.detail}
+          {copy.framing.detail}
         </p>
       </div>
 
-      <TryArgusCallToAction
-        headline={copy.cta.headline}
-        detail={copy.cta.detail}
+      </main>
+      <ReceiptActionBar
+        framing={copy.framing.headline}
         action={copy.cta.action}
       />
-    </main>
+    </>
   );
 }
