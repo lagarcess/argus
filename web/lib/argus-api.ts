@@ -881,7 +881,7 @@ export async function runBacktest(payload: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": randomId(),
     },
     body: JSON.stringify(payload),
   });
@@ -912,7 +912,7 @@ export async function streamChatMessage(
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-  const submittedRequestId = options.requestId ?? crypto.randomUUID();
+  const submittedRequestId = options.requestId ?? randomId();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -933,7 +933,7 @@ export async function streamChatMessage(
       "X-Request-Id": submittedRequestId,
       "Idempotency-Key":
         (typeof input !== "string" && runActionIdempotencyKey(input)) ||
-        crypto.randomUUID(),
+        randomId(),
       ...authHeaders,
     },
     body: JSON.stringify({
@@ -1147,6 +1147,7 @@ export async function postFeedback(payload: {
   });
 }
 import type { UserResponse } from "./guest-account";
+import { randomId } from "./random-id";
 
 export type {
   AccountCapabilities,

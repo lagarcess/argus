@@ -295,7 +295,8 @@
       },
       "succeeded": {
         "title": "Research ready",
-        "body": "The full answer is below."
+        "body": "The full answer is below.",
+        "status": "Ready"
       },
       "failed": {
         "title": "Research didn't finish",
@@ -839,7 +840,8 @@
       "proposal_decline": "No thanks",
       "proposal_error": "Could not update memory. Try again.",
       "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
-    }
+    },
+    "send_busy": "Argus is still finishing the last message. Try again in a moment."
   },
   "settings": {
     "title": "Settings",

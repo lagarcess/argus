@@ -209,6 +209,8 @@ import {
   settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
+import { randomId } from "@/lib/random-id";
+import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/send-refusal";
 type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
@@ -971,6 +973,8 @@ export default function ChatInterface() {
   ) => {
     const trimmed = text.trim();
     let guestSubmissionHandedToStream = false;
+    // Never decline a real message in silence; see lib/send-refusal.ts.
+    const refuseSend = sendRefusal(showToast, t);
     if (!trimmed) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
@@ -1061,9 +1065,11 @@ export default function ChatInterface() {
       }
     }
 
-    if (!targetConversationId) return false;
+    if (!targetConversationId) {
+      return refuseSend("chat.error_generic", SEND_GENERIC_FALLBACK);
+    }
     if (conversationActivity.isConversationLocked(targetConversationId)) {
-      return false;
+      return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     }
     const transcriptMutation: TranscriptMutation =
       action?.type === "retry_last_turn"
@@ -1084,7 +1090,7 @@ export default function ChatInterface() {
     const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: "user",
       kind: action?.type ? "action" : "text",
       content: action?.type ? actionDisplayLabel(action) : trimmed,
@@ -1092,7 +1098,7 @@ export default function ChatInterface() {
       selectedAction: action,
       retestReceiptPending: action?.type === RETEST_ACTION_TYPE,
     };
-    const assistantId = replacementAssistantId ?? crypto.randomUUID();
+    const assistantId = replacementAssistantId ?? randomId();
     const retryLastTurnAction = action?.type
       ? null
       : retryLastTurnActionFromMessage(trimmed, {
@@ -1134,7 +1140,7 @@ export default function ChatInterface() {
       targetConversationId,
       requestKind,
     );
-    if (!initialRequestSession) return false;
+    if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);

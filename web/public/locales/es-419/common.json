@@ -295,7 +295,8 @@
       },
       "succeeded": {
         "title": "Investigación lista",
-        "body": "La respuesta completa está abajo."
+        "body": "La respuesta completa está abajo.",
+        "status": "Listo"
       },
       "failed": {
         "title": "La investigación no terminó",
@@ -839,7 +840,8 @@
       "proposal_decline": "No, gracias",
       "proposal_error": "No se pudo actualizar la memoria. Intenta de nuevo.",
       "proposal_saved": "Guardado en memoria. Adminístralo en Controles de datos, en Personalización."
-    }
+    },
+    "send_busy": "Argus todavía está terminando el mensaje anterior. Inténtalo en un momento."
   },
   "settings": {
     "title": "Ajustes",
