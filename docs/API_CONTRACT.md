@@ -2502,6 +2502,7 @@ Contract rules:
       "description": "Crypto",
       "insert_text": "BTC",
       "provider": "kraken",
+      "message_range": { "start": 4, "end": 7 },
       "support_status": "supported"
     }
   ],
@@ -2524,6 +2525,16 @@ preserve the user's chosen asset identity. Backend resolution still validates
 extracted candidates after interpretation. `provider` is optional machine
 provenance for resolver/debugging continuity; it must not be rendered as
 assistant-facing copy or used to bypass execution validation.
+
+`mentions[].message_range` is optional display-only provenance for the final
+serialized `message`. It is a UTF-16 `{ start, end }` span whose substring must
+equal the mention's `insert_text`. The composer calculates it after its existing
+whitespace normalization, so duplicate symbols remain unambiguous in the
+transcript. Admission accepts an ordinary turn even when this display metadata
+is malformed, stale, or out of bounds: it simply omits the range from durable
+metadata. A valid range is rendered on the submitted user message only; it does
+not enter `ResolutionProvenance`, context hints, LangGraph input, provider
+resolution, execution state, message content, or Omnisearch indexing/querying.
 
 **Conditional Header:**
 - `Idempotency-Key` is required when `action.type = run_backtest`, and its value

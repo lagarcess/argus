@@ -1116,12 +1116,13 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
     )
     client = _client()
     conversation = _conversation(client)
+    message = "Buy and hold BTC over the past year"
 
     response = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "message": "Buy and hold BTC over the past year",
+            "message": message,
             "mentions": [
                 {
                     "id": "asset:BTC",
@@ -1130,6 +1131,7 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
                     "symbol": "BTC",
                     "description": "Crypto",
                     "insert_text": "BTC",
+                    "message_range": {"start": 13, "end": 16},
                     "support_status": "supported",
                 }
             ],
@@ -1138,7 +1140,7 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
     )
 
     assert response.status_code == 200
-    assert seen["message"] == "Buy and hold BTC over the past year"
+    assert seen["message"] == message
     assert seen["context_hints"][0]["source"] == "user_mention"
     assert seen["context_hints"][0]["canonical_symbol"] == "BTC"
     assert seen["context_hints"][0]["asset_class"] == "crypto"
@@ -1147,8 +1149,13 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
     user_message = client.get(
         f"/api/v1/conversations/{conversation['id']}/messages"
     ).json()["items"][0]
-    assert user_message["content"] == "Buy and hold BTC over the past year"
+    assert user_message["content"] == message
+    assert user_message["content"].encode("utf-8") == message.encode("utf-8")
     assert user_message["metadata"]["mentions"][0]["symbol"] == "BTC"
+    assert user_message["metadata"]["mentions"][0]["message_range"] == {
+        "start": 13,
+        "end": 16,
+    }
     assert user_message["metadata"]["resolution_provenance"][0]["source"] == (
         "user_mention"
     )
@@ -1157,6 +1164,7 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
         user_message["metadata"]["resolution_provenance"][0]["validated_by"]
         == "client_mention"
     )
+    assert "message_range" not in user_message["metadata"]["resolution_provenance"][0]
 
 
 def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(

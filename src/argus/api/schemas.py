@@ -804,6 +804,11 @@ class ChatActionPayload(BaseModel):
         return payload
 
 
+class ChatMentionTextRange(BaseModel):
+    start: int
+    end: int
+
+
 class ChatMentionPayload(BaseModel):
     id: str = Field(max_length=CHAT_STREAM_MAX_MENTION_ID_LENGTH)
     type: Literal["asset", "indicator"]
@@ -822,7 +827,28 @@ class ChatMentionPayload(BaseModel):
         default=None,
         max_length=CHAT_STREAM_MAX_MENTION_PROVIDER_LENGTH,
     )
+    message_range: ChatMentionTextRange | None = None
     support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+    @field_validator("message_range", mode="before")
+    @classmethod
+    def discard_malformed_message_range(cls, value: Any) -> Any:
+        if isinstance(value, ChatMentionTextRange):
+            start, end = value.start, value.end
+        elif isinstance(value, dict):
+            start, end = value.get("start"), value.get("end")
+        else:
+            return None
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+            or start < 0
+            or end < start
+        ):
+            return None
+        return {"start": start, "end": end}
 
 
 class ChatStreamRequest(BaseModel):

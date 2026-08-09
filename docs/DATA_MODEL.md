@@ -387,6 +387,13 @@ Represents individual messages within a conversation.
   it is not projected into later model history or `last_message_preview`, so
   Recents and conversation search do not expose the fallback language. Exact
   `llm_generated` prose remains eligible for those continuity surfaces.
+- User-message `metadata.mentions` may additionally preserve a selected asset
+  or indicator's optional `message_range: { start, end }`. This is a UTF-16
+  display span into immutable `content`, stored only when it exactly matches
+  that mention's `insert_text`. It lets the transcript render the selected
+  occurrence of repeated text after reload. A missing or malformed range falls
+  back to legacy best-effort display matching; it is not resolution provenance,
+  runtime state, or an Omnisearch input, and needs no migration.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
