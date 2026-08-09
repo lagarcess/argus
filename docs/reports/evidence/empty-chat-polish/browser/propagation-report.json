@@ -5,11 +5,10 @@
     "viewport": "1280x900",
     "greetingBeforeSave": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test.",
     "greetingAfterSave": "Still up, Lucas. What are you curious about?",
-    "changedWithoutReload": true,
     "documentLoadsAtRead": 1,
     "documentLoadsAtEnd": 1,
     "documentReloaded": false,
-    "softNavigations": 3,
+    "changedWithoutReload": true,
     "consoleErrors": []
   },
   {
@@ -18,11 +17,10 @@
     "viewport": "390x844",
     "greetingBeforeSave": "La bolsa está cerrada por el fin de semana. Las criptos no paran, así que hay mucho por probar.",
     "greetingAfterSave": "Todavía por aquí, Lucas. ¿Qué te da curiosidad?",
-    "changedWithoutReload": true,
     "documentLoadsAtRead": 1,
     "documentLoadsAtEnd": 1,
     "documentReloaded": false,
-    "softNavigations": 14,
+    "changedWithoutReload": true,
     "consoleErrors": []
   }
 ]

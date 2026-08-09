@@ -75,6 +75,14 @@ Frames 01 through 12 were captured at `2d97df3a`. Two review findings landed on
 that commit, and `1c45ab65` fixed them. Frames 07, 08, 13 and 14 are re-captured
 at the fixed head; the rest are unaffected by those fixes and stand.
 
+A third finding then landed on `2bb53f5d` and `190eeac5` fixed it: the browser
+counted a name in UTF-16 code units while the API and the database count code
+points, so a name of 21 emoji measured 42 and was refused despite both of them
+accepting it. **Frames 13 and 14 were re-run at `190eeac5`** rather than assumed
+unaffected, and the rendered text is byte-identical to the capture above. The
+emoji case is proven over the wire instead: `PATCH /api/v1/me` with 21 emoji
+returns `200` and stores 21 code points.
+
 `13` and `14` are the propagation proof, and they are three frames each: the
 greeting before the save, the dialog with the name saved, and the greeting
 after, all in one page session.
