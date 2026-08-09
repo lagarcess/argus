@@ -391,6 +391,72 @@ def test_env_example_declares_render_api_key_once() -> None:
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
+    assert set(_contract_array("ARGUS_RENDER_CRON_ENV")) == set(
+        _render_env("argus-maintenance")
+    )
+
+
+def _cron_service() -> dict[str, object]:
+    render_config = yaml.safe_load(_source("render.yaml"))
+    for service in render_config["services"]:
+        if service["name"] == "argus-maintenance":
+            return service
+    raise AssertionError("argus-maintenance cron service missing from render.yaml")
+
+
+def test_render_blueprint_schedules_maintenance_on_the_contract_cadence() -> None:
+    service = _cron_service()
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert service["type"] == "cron"
+    assert service["schedule"] == "*/15 * * * *"
+    assert service["autoDeployTrigger"] is False
+    assert 'ARGUS_RENDER_CRON_SCHEDULE="*/15 * * * *"' in env_contract
+    assert (
+        'ARGUS_RENDER_CRON_START_COMMAND="poetry run python '
+        'scripts/ops/scheduled_maintenance.py"'
+    ) in env_contract
+    assert service["startCommand"] == (
+        "poetry run python scripts/ops/scheduled_maintenance.py"
+    )
+
+
+def test_maintenance_cron_builds_exactly_like_the_api_it_imports() -> None:
+    service = _cron_service()
+    api_service = next(
+        entry
+        for entry in yaml.safe_load(_source("render.yaml"))["services"]
+        if entry["name"] == "argus-api"
+    )
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert service["buildCommand"] == api_service["buildCommand"]
+    assert 'ARGUS_RENDER_CRON_BUILD_COMMAND="$ARGUS_RENDER_API_BUILD_COMMAND"' in (
+        env_contract
+    )
+
+
+def test_maintenance_cron_keeps_deleting_credentials_manual() -> None:
+    cron_env = _render_env("argus-maintenance")
+
+    for key in (
+        "DATABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "RENDER_API_KEY",
+        "POSTHOG_PROJECT_TOKEN",
+    ):
+        assert cron_env[key] == {"key": key, "sync": False}
+    assert "SUPABASE_JWT_SECRET" not in cron_env
+    assert "ARGUS_OPS_TOKEN" not in cron_env
+
+
+def test_scheduled_maintenance_env_contract_is_documented_in_env_example() -> None:
+    env_example = _source(".env.example")
+
+    assert "scripts/ops/scheduled_maintenance.py" in env_example
+    assert "ARGUS_RENDER_CRON_ENV" in env_example
+    for key in _contract_array("ARGUS_RENDER_CRON_ENV"):
+        assert key in env_example
 
 
 def test_render_web_declares_exact_server_only_https_app_origin() -> None:

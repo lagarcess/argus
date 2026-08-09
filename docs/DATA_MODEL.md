@@ -1337,8 +1337,8 @@ foreign key to `profiles.id`.
   reaches the purge: `purge_expired_visitor_usage` is registered in
   `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every non-dry-run
   `scripts/ops/cleanup_expired_guest_workspaces.py`. Retention therefore holds
-  exactly as often as that job is run; the runbook requires it daily, and no
-  repo-side schedule runs it (see #401).
+  exactly as often as that job is run, and the `argus-maintenance` Render cron
+  service runs it every fifteen minutes in each deployed environment.
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the
@@ -1387,8 +1387,9 @@ user-keyed milestone would re-fire on every renewal. Like
   in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
   non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
   never returns is deleted by that job, not by the takeover path. Retention
-  therefore holds exactly as often as that job is run; the runbook requires it
-  daily, and no repo-side schedule runs it (see #401).
+  therefore holds exactly as often as that job is run, and the
+  `argus-maintenance` Render cron service runs it every fifteen minutes in each
+  deployed environment.
 - `claim_guest_funnel_milestone` also takes over an already-expired claim in the
   same statement, so a returning visitor is correct even between purge runs.
 

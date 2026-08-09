@@ -210,7 +210,9 @@ name the candidate SHA, deployed API/web SHAs, `workflow_task`,
 `real_workflow_task`, backtest service mode, workflow-service proof for
 `argus-backtests`, canary evidence, rollback target, and approver.
 
-If you need to run only the stale job scan during incident triage:
+The stale job scan runs on its own every fifteen minutes on the
+`argus-maintenance` cron service (see Scheduled Maintenance). Run it by hand
+only to triage an incident sooner than the next scheduled pass:
 
 ```bash
 .github/stale-backtest-jobs.sh --json
@@ -288,6 +290,58 @@ profiles.
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
 
+## Scheduled Maintenance
+
+The Render cron service `argus-maintenance` is the accountable trigger for every
+recurring janitor. It is declared in `render.yaml` and runs one entry point:
+
+```bash
+poetry run python scripts/ops/scheduled_maintenance.py
+```
+
+That pass runs guest workspace retention first, then stale and stranded backtest
+job reconciliation, in that order. Every job runs even when an earlier one
+fails, so one failure never hides another.
+
+| Field | Value |
+| --- | --- |
+| Service | `argus-maintenance` (Render cron, `region: virginia`, `plan: starter`) |
+| Schedule | `*/15 * * * *`, UTC |
+| Owner | Render workspace owner for `lagarcess/argus` |
+| Alert destination | Render service notifications for `argus-maintenance`, set to notify on failure; record the delivered-to address in the release manifest |
+| Env contract | `ARGUS_RENDER_CRON_ENV` in `.github/argus-env.sh`, cron surface of `.github/private-alpha-release-profile.json` |
+
+Every fifteen minutes, not daily, because the reconciler's own stale thresholds
+are fifteen minutes (`DEFAULT_STALE_QUEUED_SECONDS` and
+`DEFAULT_STALE_RUNNING_SECONDS`). A slower schedule would mean a user whose job
+was stranded by a deploy waits the threshold plus the schedule gap. The same
+cadence raises the retention ceiling from one bounded batch per day to ninety
+six, so the seven-day guest window in `DATA_MODEL.md` holds under load instead
+of only at low volume. Both jobs are no-ops on an empty window and safe to run
+twice, so a retry costs a few cheap Supabase queries.
+
+This runs on Render, not as a GitHub Actions cron, because the job deletes
+production rows. Actions would put a production service-role key in a CI runner
+and make write access to a workflow file equal to production delete access.
+Render keeps the destructive step inside the boundary where that key already
+lives.
+
+The pass exits nonzero if any job fails, and prints a final JSON summary line
+with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
+`"status": "degraded"`. Keep the per-job output: guest cleanup prints its
+`selected`/`auth_deleted`/`auth_delete_failed`/`purge_failed` counts, and the
+reconciler prints its scan report.
+
+Secrets stay manual on this service, same as `argus-api`: `DATABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `RENDER_API_KEY`, and `POSTHOG_PROJECT_TOKEN` are
+`sync: false` and must be set in Render before the first run. `RENDER_API_KEY`
+is what lets the reconciler read terminal task runs; without it the stale scan
+reports errors instead of reconciling.
+
+To close a promotion, record one real scheduled run: the run timestamp, the
+summary line, and either nonzero selected/purged counts or documented zeros on
+an empty window.
+
 ## Runtime Tuning Flags
 
 These are optional runtime knobs (not secrets). Defaults are safe for
@@ -349,23 +403,29 @@ site key, non-loopback production preserves the auth landing rather than
 beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
 as part of a code promotion.
 
-Run guest cleanup first as a dry run:
+Guest cleanup is not a manual step. The `argus-maintenance` cron service runs a
+bounded batch every fifteen minutes, which is the scheduled trusted operations
+environment for this deletion; the owner, schedule, and alert destination are
+recorded under Scheduled Maintenance. That satisfies the at-least-daily floor
+this section previously asked an operator to remember.
+
+To inspect what the next scheduled pass would select, without deleting:
 
 ```bash
 poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
 ```
 
-Then, only from the scheduled trusted operations environment:
+Run the deleting form by hand only to drain a backlog faster than the schedule,
+and only against an environment you intend to delete rows in:
 
 ```bash
 poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
 ```
 
-Schedule a bounded batch at least daily after public guest exposure. Record the
-owner, effective schedule, selected/deleted/preserved/failed counts, oldest
-eligible expiry, and alert destination. A nonzero `auth_delete_failed` result
-or a failed cleanup transaction must alert and retry; never compensate by
-deleting product rows manually.
+Record the selected/deleted/preserved/failed counts and oldest eligible expiry
+in the release manifest. A nonzero `auth_delete_failed` result or a failed
+cleanup transaction must alert and retry; never compensate by deleting product
+rows manually.
 
 The same run is the retention boundary for the visitor-keyed tables, which are
 deliberately not foreign-key bound and so have no owner to cascade from. It
