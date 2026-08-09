@@ -1,4 +1,4 @@
-"""Shared cache locks: cross-user hits, per-class TTL, no user identity."""
+"""Shared cache locks: cross-user hits, per-data-class TTL, no user identity."""
 
 from __future__ import annotations
 
@@ -7,12 +7,13 @@ import time
 
 from argus.domain.research import cache as research_cache
 from argus.domain.research.cache import (
-    CLOSED_PERIOD_TTL_SECONDS,
+    DATA_CLASS_TTL_SECONDS,
     cache_get,
     cache_put,
     cache_stats,
+    data_class_for,
     research_cache_key,
-    ttl_for,
+    ttl_for_packet,
 )
 from argus.domain.research.contracts import ResearchPacket
 
@@ -45,7 +46,11 @@ def test_cross_user_hit_shares_one_provider_answer() -> None:
 
     packet = ResearchPacket(answer_markdown="AAPL at $312.41")
     assert cache_get(key_user_a) is None
-    cache_put(key_user_a, packet, ttl_seconds=ttl_for("fast_quote", closed_period=False))
+    cache_put(
+        key_user_a,
+        packet,
+        ttl_seconds=ttl_for_packet(question_kind="live_quote"),
+    )
     served = cache_get(key_user_b)
     assert served is not None
     assert served.answer_markdown == "AAPL at $312.41"
@@ -53,21 +58,80 @@ def test_cross_user_hit_shares_one_provider_answer() -> None:
     assert stats["hits"] == 1 and stats["misses"] == 1
 
 
-def test_per_class_ttls_match_the_spec_tolerances() -> None:
-    assert ttl_for("fast_quote", closed_period=False) == 120.0
-    assert ttl_for("screening", closed_period=False) == 300.0
-    assert ttl_for("balanced_lookup", closed_period=False) == 900.0
-    assert ttl_for("thorough_research", closed_period=False) == 21_600.0
-    # A closed historical window is effectively immutable.
-    for capability_class in ("fast_quote", "balanced_lookup", "thorough_research"):
-        assert ttl_for(capability_class, closed_period=True) == CLOSED_PERIOD_TTL_SECONDS
-    # The ladder orders freshness tolerance exactly as the spec table does.
+def test_the_seven_data_classes_match_the_section_7_table() -> None:
+    """One row per spec table row; the ladder orders tolerance exactly."""
+    assert DATA_CLASS_TTL_SECONDS["quotes"] == 120.0
+    assert DATA_CLASS_TTL_SECONDS["movers"] == 300.0
+    assert DATA_CLASS_TTL_SECONDS["analyst_estimates"] == 259_200.0
+    assert DATA_CLASS_TTL_SECONDS["peers_constituents"] == 5_184_000.0
+    assert DATA_CLASS_TTL_SECONDS["fundamentals"] == 7_776_000.0
+    assert DATA_CLASS_TTL_SECONDS["closed_ohlcv"] == 7_776_000.0
+    assert DATA_CLASS_TTL_SECONDS["filings_transcripts"] == 7_776_000.0
+    assert len(DATA_CLASS_TTL_SECONDS) == 7
     assert (
-        ttl_for("fast_quote", closed_period=False)
-        < ttl_for("screening", closed_period=False)
-        < ttl_for("balanced_lookup", closed_period=False)
-        < ttl_for("thorough_research", closed_period=False)
-        < CLOSED_PERIOD_TTL_SECONDS
+        DATA_CLASS_TTL_SECONDS["quotes"]
+        < DATA_CLASS_TTL_SECONDS["movers"]
+        < DATA_CLASS_TTL_SECONDS["analyst_estimates"]
+        < DATA_CLASS_TTL_SECONDS["peers_constituents"]
+        <= DATA_CLASS_TTL_SECONDS["fundamentals"]
+    )
+
+
+def test_question_kinds_map_to_their_dominant_data_class() -> None:
+    assert data_class_for(question_kind="live_quote") == "quotes"
+    assert data_class_for(question_kind="screening") == "movers"
+    assert data_class_for(question_kind="find_assets") == "movers"
+    assert data_class_for(question_kind="etf_constituents") == "peers_constituents"
+    assert data_class_for(question_kind="company_lookup") == "fundamentals"
+    assert data_class_for(question_kind="cross_company") == "analyst_estimates"
+    # Unknown kinds stay conservative, never long-lived.
+    assert data_class_for(question_kind="something_new") == "movers"
+
+
+def test_uniform_packet_categories_decide_the_class_over_the_kind() -> None:
+    """A holdings-only pull is constituents data whatever the question was;
+    an estimates-only pull is estimates data. Mixed packets keep the
+    question's dominant need, so a genuinely current ask stays fresh."""
+    assert (
+        data_class_for(question_kind="company_lookup", categories=("etf_holdings",))
+        == "peers_constituents"
+    )
+    assert (
+        data_class_for(question_kind="company_lookup", categories=("analyst_estimates",))
+        == "analyst_estimates"
+    )
+    assert (
+        data_class_for(
+            question_kind="company_lookup", categories=("earnings_transcript",)
+        )
+        == "filings_transcripts"
+    )
+    # A fast answer mixing a quote with its verification table stays a quote.
+    assert (
+        data_class_for(question_kind="live_quote", categories=("quote", "tickers_lookup"))
+        == "quotes"
+    )
+    # price_target is an estimate before it is a price.
+    assert (
+        data_class_for(question_kind="live_quote", categories=("price_target",))
+        == "analyst_estimates"
+    )
+
+
+def test_closed_period_rule_wins_over_everything() -> None:
+    for kind in ("live_quote", "company_lookup", "cross_company", "screening"):
+        assert data_class_for(question_kind=kind, closed_period=True) == "closed_ohlcv"
+    assert (
+        data_class_for(
+            question_kind="live_quote",
+            categories=("quote",),
+            closed_period=True,
+        )
+        == "closed_ohlcv"
+    )
+    assert (
+        ttl_for_packet(question_kind="live_quote", closed_period=True)
+        == DATA_CLASS_TTL_SECONDS["closed_ohlcv"]
     )
 
 

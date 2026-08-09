@@ -50,7 +50,7 @@ from argus.domain.research.cache import (
     cache_get,
     cache_put,
     research_cache_key,
-    ttl_for,
+    ttl_for_packet,
 )
 from argus.domain.research.config import (
     RESEARCH_CONFIG_SPECS,
@@ -151,8 +151,10 @@ async def grounded_result(
         cache_put(
             key,
             packet,
-            ttl_seconds=ttl_for(
-                capability_class, closed_period=query.period_is_closed_window
+            ttl_seconds=ttl_for_packet(
+                question_kind=query.question_kind,
+                categories=packet.categories,
+                closed_period=query.period_is_closed_window,
             ),
         )
     return _packet_stage_result(
@@ -272,6 +274,7 @@ def thorough_job_result(
                 "subjects": subjects,
                 "period_of_interest": query.period_of_interest,
                 "period_is_closed_window": query.period_is_closed_window,
+                "question_kind": query.question_kind,
                 # The exact key computed at classification time; completion
                 # paths store under it verbatim so later identical questions
                 # hit without recomputation drift.
@@ -580,12 +583,12 @@ def store_research_packet_for_job(
     key = str(job_request.get("cache_key") or "")
     if not key:
         return
-    capability_class = str(job_request.get("capability_class") or "thorough_research")
     cache_put(
         key,
         packet,
-        ttl_seconds=ttl_for(
-            capability_class,
+        ttl_seconds=ttl_for_packet(
+            question_kind=str(job_request.get("question_kind") or "cross_company"),
+            categories=packet.categories,
             closed_period=bool(job_request.get("period_is_closed_window")),
         ),
     )

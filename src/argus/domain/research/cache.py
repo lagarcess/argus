@@ -1,4 +1,4 @@
-"""Shared research cache with per-class TTL.
+"""Shared research cache with per-data-class TTL.
 
 SHARED ACROSS USERS BY DESIGN. finance_search returns public market data, so
 one user's answer may serve another user's identical question, and that is the
@@ -8,20 +8,29 @@ or conversation identity, and values must only ever be provider packets about
 public markets. Memory, preferences, drafts, and any personalized content are
 forbidden here, whatever the TTL.
 
-TTL is per capability class, mapped from the spec section 7 tolerance table:
+TTL is per data class, the seven rows of the spec section 7 table:
 
-- ``fast_quote``        120s   (quotes, pre/after hours: seconds to minutes)
-- ``screening``         300s   (gainers, losers, most active: minutes)
-- ``balanced_lookup``   900s   (mixes statements with current figures; bounded
-                                by the freshest ingredient, matching the
-                                ``ohlcv_recent`` freshness policy)
-- ``thorough_research`` 6h     (fundamentals and multi-year work; kept well
-                                under the quarterly tolerance because thorough
-                                answers may still quote current levels)
-- closed historical periods    30d (effectively immutable once closed)
+- ``quotes``               120s  (quotes, pre and after hours: seconds to minutes)
+- ``movers``               300s  (top gainers, losers, most active: minutes)
+- ``analyst_estimates``    3d    (analyst estimates: days)
+- ``peers_constituents``   60d   (peers, ETF constituents and weights: months)
+- ``fundamentals``         90d   (fundamentals and statements: quarterly)
+- ``closed_ohlcv``         90d   (closed historical OHLCV: effectively immutable)
+- ``filings_transcripts``  90d   (earnings transcripts, SEC filings: immutable
+                                  once published)
 
-The cache key includes the period of interest, so a specific past close is a
-different entry from a trailing window.
+The two immutable rows share the 90-day value because this cache lives in
+process memory: immutability is real, retention is bounded. The class of an
+entry comes from what the packet actually contains when its result categories
+are uniform (a holdings-only pull is constituents data whatever the question
+was), and from the question's dominant data need otherwise; the most volatile
+ingredient of a genuinely current ask (a live quote) keeps its short
+tolerance because the question kind carries it there.
+
+The closed-period rule stands: a question about an entirely closed window is
+``closed_ohlcv`` regardless of anything else. The cache key includes the
+period of interest, so a specific past close is a different entry from a
+trailing window.
 """
 
 from __future__ import annotations
@@ -29,18 +38,102 @@ from __future__ import annotations
 import hashlib
 import threading
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 from argus.domain.research.contracts import CapabilityClass, ResearchPacket
 
-_BASE_TTL_SECONDS: dict[str, float] = {
-    "fast_quote": 120.0,
-    "screening": 300.0,
-    "balanced_lookup": 900.0,
-    "thorough_research": 21_600.0,
+DataClass = Literal[
+    "quotes",
+    "movers",
+    "analyst_estimates",
+    "fundamentals",
+    "peers_constituents",
+    "closed_ohlcv",
+    "filings_transcripts",
+]
+
+DATA_CLASS_TTL_SECONDS: dict[DataClass, float] = {
+    "quotes": 120.0,
+    "movers": 300.0,
+    "analyst_estimates": 259_200.0,
+    "peers_constituents": 5_184_000.0,
+    "fundamentals": 7_776_000.0,
+    "closed_ohlcv": 7_776_000.0,
+    "filings_transcripts": 7_776_000.0,
 }
-CLOSED_PERIOD_TTL_SECONDS = 2_592_000.0  # 30 days
+
+# Ordered: the first family a category matches decides it, so
+# "earnings_transcript" is a filing before it is fundamentals and
+# "price_target" is an estimate before it is a quote.
+_CATEGORY_FAMILIES: tuple[tuple[DataClass, tuple[str, ...]], ...] = (
+    ("filings_transcripts", ("transcript", "filing", "sec_")),
+    ("peers_constituents", ("holding", "peer", "constituent", "tickers_lookup")),
+    ("analyst_estimates", ("estimate", "price_target", "recommendation", "rating")),
+    ("movers", ("gainer", "loser", "most_active", "mover", "screen")),
+    (
+        "fundamentals",
+        ("financial", "income", "balance", "cash", "statement", "ratio", "profile"),
+    ),
+    ("quotes", ("quote", "price", "market_cap")),
+)
+
+# The question's dominant data need, used when the packet mixes families.
+# Comparisons lean on estimates and statements (days); lookups lean on
+# statements (quarterly); current-facts finds and screens are movers-fresh.
+_KIND_DATA_CLASS: dict[str, DataClass] = {
+    "live_quote": "quotes",
+    "screening": "movers",
+    "find_assets": "movers",
+    "etf_constituents": "peers_constituents",
+    "company_lookup": "fundamentals",
+    "cross_company": "analyst_estimates",
+}
+
 _MAX_ENTRIES = 512
+
+
+def _family_for_category(category: str) -> DataClass | None:
+    lowered = category.strip().lower()
+    for family, needles in _CATEGORY_FAMILIES:
+        if any(needle in lowered for needle in needles):
+            return family
+    return None
+
+
+def data_class_for(
+    *,
+    question_kind: str | None,
+    categories: Sequence[str] = (),
+    closed_period: bool = False,
+) -> DataClass:
+    """The section 7 data class governing one cache entry."""
+    if closed_period:
+        return "closed_ohlcv"
+    families = {
+        family
+        for family in (_family_for_category(category) for category in categories)
+        if family is not None
+    }
+    if len(families) == 1:
+        return next(iter(families))
+    return _KIND_DATA_CLASS.get(str(question_kind or ""), "movers")
+
+
+def ttl_for_packet(
+    *,
+    question_kind: str | None,
+    categories: Sequence[str] = (),
+    closed_period: bool = False,
+) -> float:
+    return DATA_CLASS_TTL_SECONDS[
+        data_class_for(
+            question_kind=question_kind,
+            categories=categories,
+            closed_period=closed_period,
+        )
+    ]
 
 
 @dataclass
@@ -54,12 +147,6 @@ _CACHE: dict[str, _Entry] = {}
 _LOCK = threading.Lock()
 _HITS = 0
 _MISSES = 0
-
-
-def ttl_for(capability_class: CapabilityClass, *, closed_period: bool) -> float:
-    if closed_period:
-        return CLOSED_PERIOD_TTL_SECONDS
-    return _BASE_TTL_SECONDS.get(capability_class, 900.0)
 
 
 def research_cache_key(

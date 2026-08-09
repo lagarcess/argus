@@ -27,7 +27,7 @@ from argus.domain.research.cache import (
     cache_get,
     cache_put,
     research_cache_key,
-    ttl_for,
+    ttl_for_packet,
 )
 from argus.domain.research.contracts import CapabilityClass
 
@@ -35,13 +35,15 @@ from argus.domain.research.contracts import CapabilityClass
 class _FindPacketCache:
     """Shared-cache adapter for the composer's provider seam.
 
-    Search packets obey the same per-class TTL table as every other
+    Search packets obey the same per-data-class TTL table as every other
     Perplexity result; the key carries no user identity, so a packet one
-    person paid for serves the next person's identical question."""
+    person paid for serves the next person's identical question. A find
+    search only runs when the interpreter said current facts are required,
+    so its results are movers-fresh by definition, never months-stable
+    peers data."""
 
-    def __init__(self, key: str, capability_class: CapabilityClass) -> None:
+    def __init__(self, key: str) -> None:
         self._key = key
-        self._capability_class = capability_class
 
     def get(self) -> Any:
         return cache_get(self._key)
@@ -50,7 +52,7 @@ class _FindPacketCache:
         cache_put(
             self._key,
             packet,
-            ttl_seconds=ttl_for(self._capability_class, closed_period=False),
+            ttl_seconds=ttl_for_packet(question_kind="find_assets"),
         )
 
 
@@ -91,7 +93,7 @@ async def find_assets_stage_result(
             question_fingerprint=" ".join(state.current_user_message.lower().split()),
             language=grounded.language_tag(user.language_preference),
         )
-        packet_cache = _FindPacketCache(key, capability_class)
+        packet_cache = _FindPacketCache(key)
     result = await discovery_operation_result(
         decision=effective_decision,
         request=request,

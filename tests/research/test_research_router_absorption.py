@@ -128,9 +128,7 @@ class _FakeSearchProvider:
         return self._packet
 
 
-def _wire_find(
-    monkeypatch: pytest.MonkeyPatch, *, provider: _FakeSearchProvider
-) -> None:
+def _wire_find(monkeypatch: pytest.MonkeyPatch, *, provider: _FakeSearchProvider) -> None:
     monkeypatch.setattr(
         selection_module,
         "search_provider_for_config",
@@ -284,9 +282,9 @@ def test_find_turns_share_the_research_cache_across_users(monkeypatch) -> None:
     assert second.stage_patch["research"]["usage"]["cache_status"] == "hit"
     assert second.stage_patch["research"]["usage"]["invocations"] == 0
     # The rendered discovery experience is unchanged on a hit.
-    assert [
-        c["symbol"] for c in second.stage_patch["discovery"]["candidates"]
-    ] == ["CRWD"]
+    assert [c["symbol"] for c in second.stage_patch["discovery"]["candidates"]] == [
+        "CRWD"
+    ]
 
 
 def test_exhausted_research_ceiling_degrades_find_to_cheap_verified_rows(
@@ -387,18 +385,18 @@ def test_routing_classification_holds_a_reserved_permit(monkeypatch) -> None:
         assert turn_execution.reserve_provider_call("interpretation") is None
         permit = turn_execution.reserve_provider_call("knowledge_route")
         assert permit is not None, "routing must never be starved by audits"
-        assert turn_execution.reserve_provider_call("knowledge_route") is None, (
-            "the reservation is one-shot; repeats compete in the corridor"
-        )
+        assert (
+            turn_execution.reserve_provider_call("knowledge_route") is None
+        ), "the reservation is one-shot; repeats compete in the corridor"
         execution.terminal = "finished"
 
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
     with turn_execution.turn_execution_scope(entry_state={}) as execution:
         for _ in range(execution.call_allowance):
             assert turn_execution.reserve_provider_call("interpretation") is not None
-        assert turn_execution.reserve_provider_call("knowledge_route") is None, (
-            "flag off keeps the exact pre-rail competition"
-        )
+        assert (
+            turn_execution.reserve_provider_call("knowledge_route") is None
+        ), "flag off keeps the exact pre-rail competition"
         execution.terminal = "finished"
 
 
@@ -479,3 +477,61 @@ def test_memory_producer_block_rides_every_research_sidecar(monkeypatch) -> None
     assert memory["comparison_set"] == ["NFLX", "AAPL"]
     assert memory["open_thread"]["shape"] == "thorough"
     assert memory["open_thread"]["period_of_interest"] == "last three years"
+
+
+def test_grounded_puts_store_under_the_data_class_ttls(monkeypatch) -> None:
+    """The section 7 table governs what gets stored: a holdings answer lives
+    for months, a live quote for two minutes."""
+    from argus.domain.research.cache import DATA_CLASS_TTL_SECONDS
+
+    recorded: list[float] = []
+    real_put = grounded.cache_put
+
+    def spy(key, packet, *, ttl_seconds):
+        recorded.append(ttl_seconds)
+        real_put(key, packet, ttl_seconds=ttl_seconds)
+
+    monkeypatch.setattr(grounded, "cache_put", spy)
+
+    _classify(monkeypatch, question_kind="etf_constituents", symbols=["SPY"])
+    holdings_document = agent_response(text="SPY top holdings.", tickers=["SPY"])
+    holdings_document["output"][1]["results"][0] = {
+        "category": "etf_holdings",
+        "content": (
+            "| etf | symbol | name | weight |\n| --- | --- | --- | --- |\n"
+            "| SPY | NVDA | NVIDIA CORP | 7.99 |\n"
+        ),
+        "sources": [],
+        "tickers": ["SPY"],
+    }
+    holdings_document["output"][1]["categories"] = ["etf_holdings"]
+    transport = RecordingTransport([holdings_document])
+    monkeypatch.setattr(
+        grounded, "_client", lambda: PerplexityAgentClient("k", transport=transport)
+    )
+    result = asyncio.run(
+        ra.research_answer_stage_result(
+            interpretation=_interpretation(),
+            state=_state("What are the top holdings inside SPY?"),
+            user=USER,
+        )
+    )
+    assert result is not None
+    assert recorded[-1] == DATA_CLASS_TTL_SECONDS["peers_constituents"]
+
+    _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
+    quote_transport = RecordingTransport([agent_response()])
+    monkeypatch.setattr(
+        grounded,
+        "_client",
+        lambda: PerplexityAgentClient("k", transport=quote_transport),
+    )
+    result = asyncio.run(
+        ra.research_answer_stage_result(
+            interpretation=_interpretation(),
+            state=_state("What is Apple trading at right now?"),
+            user=USER,
+        )
+    )
+    assert result is not None
+    assert recorded[-1] == DATA_CLASS_TTL_SECONDS["quotes"]

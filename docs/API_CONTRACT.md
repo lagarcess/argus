@@ -2808,7 +2808,10 @@ a comparison whose assets the user has all named becomes grounded
 cross-company research, and discovery's asset-finding runs as the rail's
 `find` operation. One Perplexity provider layer (`research.search` for the
 direct Search API, `research.perplexity_agent` for the Agent API), one
-shared cache under the per-class TTL table, one meter: find turns record
+shared cache under the section 7 per-data-class TTL table (seven classes,
+from seconds-fresh quotes and minutes-fresh movers through days-fresh
+estimates, months-stable peers and constituents, quarterly fundamentals,
+and the two effectively immutable rows), one meter: find turns record
 capability-classed ledger rows (`peer_expansion` with anchors, `screening`
 for categories) and their source-backed searches are gated by the shared
 research ceiling instead of the separate discovery allowance. The discovery
