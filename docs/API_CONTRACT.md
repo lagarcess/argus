@@ -2857,7 +2857,23 @@ Contract rules:
   write strategy, confirmation, or execution state.
 - `capability_class` is one of `fast_quote`, `balanced_lookup`,
   `thorough_research`, `screening`, `peer_expansion`, recorded per research
-  turn on the cost ledger even for cache hits and degraded turns.
+  turn on the cost ledger even for cache hits and degraded turns. The class
+  describes the work, not the configuration tier it ran on: a market survey
+  is `screening` whether it grounded on the balanced tier or the thorough
+  one, so retuning a shape never moves its metering.
+- Section 2's five shapes are one rail. Market pulse ("what's moving
+  today"), screening ("semiconductor stocks under a 20 P/E"), and sector
+  radar ("what's happening in cybersecurity") ground through
+  `finance_search` on the balanced tier and cache as `movers`. Screening
+  carries every stated condition into the provider call and the answer names
+  which condition each asset satisfies; a screen that silently drops the
+  user's threshold is a defect, not a simplification. Sector radar answers
+  with sector analysis, not a list of company descriptions. These shapes name
+  no subject, so their runnable rows come from the assets the answer itself
+  found, each passed through provider-backed resolution first.
+- A survey that returns zero `finance_search` invocations answered from model
+  knowledge. It carries `degraded.code = "survey_not_grounded"` and says so
+  in prose rather than presenting itself as the current state of the market.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `memory` is the typed producer seam for the personalization-memory
