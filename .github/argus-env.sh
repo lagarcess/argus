@@ -8,6 +8,10 @@ ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="$ARGUS_PRIVATE_LAUNCH_APP_URL"
 ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID="srv-d78tanmuk2gs73e17nn0"
 ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID="srv-d7ap6bmslomc73eqp8m0"
 ARGUS_RENDER_BACKTESTS_WORKFLOW_ID="wfl-d8hpsmuq1p3s73duv3q0"
+# Blueprint-created, so it has no id until first apply. Release tooling resolves
+# it by name, which makes "absent" a fact read back from Render rather than an
+# id someone forgot to record.
+ARGUS_RENDER_MAINTENANCE_SERVICE_NAME="argus-maintenance"
 ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"
 ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"
 ARGUS_RENDER_POETRY_VERSION="2.1.3"

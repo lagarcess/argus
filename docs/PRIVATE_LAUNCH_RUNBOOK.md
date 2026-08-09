@@ -90,20 +90,28 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Manually deploy `argus-api`, then `argus-app` from the candidate commit.
+8. Manually deploy `argus-api`, then `argus-app`, then `argus-maintenance` from
+   the candidate commit. The cron has `autoDeployTrigger: off` like the other
+   two, so skipping it leaves destructive maintenance code on its last manual
+   deploy.
 
-9. Confirm the live `argus-api` and `argus-app` deploy commits match the
-   candidate commit you intend to test and that both latest deploys are `live`:
+9. Confirm the live `argus-api`, `argus-app`, and `argus-maintenance` deploy
+   commits match the candidate commit you intend to test and that the latest
+   deploys are `live`:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh api-deploy-status
 .github/render-env-sync.sh web-deploy-status
+.github/render-env-sync.sh cron-deploy-status
 ```
 
-If either commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
+If any commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
 before running the strict canaries. The canary script enforces the same deployed
-SHA/status check with `ARGUS_CANARY_SHA`.
+SHA/status check with `ARGUS_CANARY_SHA`. `cron-deploy-status` reports
+`status=absent` only when the Render API has no `argus-maintenance` service,
+which means the blueprint has not been applied yet and no scheduled deletion is
+running.
 
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -308,7 +316,7 @@ fails, so one failure never hides another.
 | Service | `argus-maintenance` (Render cron, `region: virginia`, `plan: starter`) |
 | Schedule | `*/15 * * * *`, UTC |
 | Owner | Render workspace owner for `lagarcess/argus` |
-| Alert destination | Render service notifications for `argus-maintenance`, set to notify on failure; record the delivered-to address in the release manifest |
+| Alert destination | `support@get-argus.com`, via Render service notifications for `argus-maintenance` set to notify on failure |
 | Env contract | `ARGUS_RENDER_CRON_ENV` in `.github/argus-env.sh`, cron surface of `.github/private-alpha-release-profile.json` |
 
 Every fifteen minutes, not daily, because the reconciler's own stale thresholds
@@ -337,6 +345,14 @@ Secrets stay manual on this service, same as `argus-api`: `DATABASE_URL`,
 `sync: false` and must be set in Render before the first run. `RENDER_API_KEY`
 is what lets the reconciler read terminal task runs; without it the stale scan
 reports errors instead of reconciling.
+
+The cron is part of the release, not a side service. Promotion deploys it with
+`argus-api` and `argus-app`, and both the canary and `release-config-audit`
+verify it: `cron-deploy-status` must report the candidate SHA, and
+`cron_env_status` must be `ready`. Until the blueprint has been applied for the
+first time, Render has no such service and both report `absent`, which is read
+back from the Render API rather than assumed, so a forgotten deploy shows up as
+a mismatch instead of a skipped check.
 
 To close a promotion, record one real scheduled run: the run timestamp, the
 summary line, and either nonzero selected/purged counts or documented zeros on

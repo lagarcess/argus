@@ -107,18 +107,27 @@ def test_canary_requires_exact_deployed_sha_and_warmup_profile() -> None:
     assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in workflow_source
 
 
-def test_deployed_sha_resolver_requires_all_services_to_match_exactly() -> None:
-    deployed_sha = "a" * 40
-    stale_sha = "b" * 40
-    api_status = f"status=live\ncommit={deployed_sha}\n"
-    web_status = f"status=live\ncommit={deployed_sha}\n"
-    workflow_status = (
-        f"status=ready\ncommit={deployed_sha}\n"
-        "workflow_version_id=workflow-version\n"
-        "expected_workflow_version_id=workflow-version\n"
-    )
+DEPLOYED_SHA = "a" * 40
+STALE_SHA = "b" * 40
+API_STATUS = f"status=live\ncommit={DEPLOYED_SHA}\n"
+WEB_STATUS = f"status=live\ncommit={DEPLOYED_SHA}\n"
+WORKFLOW_STATUS = (
+    f"status=ready\ncommit={DEPLOYED_SHA}\n"
+    "workflow_version_id=workflow-version\n"
+    "expected_workflow_version_id=workflow-version\n"
+)
+CRON_STATUS = f"status=live\ncommit={DEPLOYED_SHA}\n"
+CRON_ABSENT_STATUS = "status=absent\ncommit=<absent>\n"
 
-    matched = subprocess.run(
+
+def _resolve_sha(
+    *,
+    api_status: str = API_STATUS,
+    web_status: str = WEB_STATUS,
+    workflow_status: str = WORKFLOW_STATUS,
+    cron_status: str = CRON_STATUS,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         [
             sys.executable,
             ".github/canary-deployed-sha.py",
@@ -128,22 +137,8 @@ def test_deployed_sha_resolver_requires_all_services_to_match_exactly() -> None:
             web_status,
             "--workflow-status",
             workflow_status,
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    stale = subprocess.run(
-        [
-            sys.executable,
-            ".github/canary-deployed-sha.py",
-            "--api-status",
-            api_status,
-            "--web-status",
-            web_status,
-            "--workflow-status",
-            workflow_status.replace(deployed_sha, stale_sha),
+            "--cron-status",
+            cron_status,
         ],
         cwd=ROOT,
         capture_output=True,
@@ -151,10 +146,56 @@ def test_deployed_sha_resolver_requires_all_services_to_match_exactly() -> None:
         check=False,
     )
 
+
+def test_deployed_sha_resolver_requires_all_services_to_match_exactly() -> None:
+    matched = _resolve_sha()
+    stale = _resolve_sha(
+        workflow_status=WORKFLOW_STATUS.replace(DEPLOYED_SHA, STALE_SHA)
+    )
+
     assert matched.returncode == 0, matched.stderr
-    assert matched.stdout.strip() == deployed_sha
+    assert matched.stdout.strip() == DEPLOYED_SHA
     assert stale.returncode == 1
     assert "workflow_commit_mismatch" in stale.stderr
+
+
+def test_a_cron_lagging_the_release_fails_the_deployed_sha_resolver() -> None:
+    stale = _resolve_sha(cron_status=f"status=live\ncommit={STALE_SHA}\n")
+    not_live = _resolve_sha(cron_status=f"status=build_failed\ncommit={DEPLOYED_SHA}\n")
+
+    assert stale.returncode == 1
+    assert "cron_commit_mismatch" in stale.stderr
+    assert not_live.returncode == 1
+    assert "cron_deploy_not_live" in not_live.stderr
+
+
+def test_an_absent_cron_is_the_only_exemption_and_still_resolves() -> None:
+    absent = _resolve_sha(cron_status=CRON_ABSENT_STATUS)
+
+    assert absent.returncode == 0, absent.stderr
+    assert absent.stdout.strip() == DEPLOYED_SHA
+
+
+def test_the_resolver_refuses_to_run_without_a_cron_status() -> None:
+    missing = subprocess.run(
+        [
+            sys.executable,
+            ".github/canary-deployed-sha.py",
+            "--api-status",
+            API_STATUS,
+            "--web-status",
+            WEB_STATUS,
+            "--workflow-status",
+            WORKFLOW_STATUS,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert missing.returncode != 0
+    assert "--cron-status" in missing.stderr
 
 
 def test_canary_language_and_inputs_are_profile_owned() -> None:

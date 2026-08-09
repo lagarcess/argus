@@ -54,10 +54,12 @@ jobs:
           api_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh api-deploy-status)"
           web_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh web-deploy-status)"
           workflow_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh workflow-version-status)"
+          cron_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh cron-deploy-status)"
           deployed_sha="$(python3 .github/canary-deployed-sha.py \
             --api-status "$api_status" \
             --web-status "$web_status" \
-            --workflow-status "$workflow_status")"
+            --workflow-status "$workflow_status" \
+            --cron-status "$cron_status")"
           git cat-file -e "${deployed_sha}^{commit}"
           git checkout --detach "$deployed_sha"
           candidate_sha="$(git rev-parse HEAD)"

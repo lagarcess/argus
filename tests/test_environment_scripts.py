@@ -106,6 +106,8 @@ def _run_render_release_audit(
     api_env_json: str,
     web_env_json: str,
     workflow_env_json: str | None = None,
+    cron_env_json: str | None = None,
+    cron_service_id: str | None = "srv-fake-maintenance",
     expect_mode: str = "safe-off",
     isolate: bool = False,
 ) -> subprocess.CompletedProcess[str]:
@@ -126,6 +128,8 @@ case "$*" in
   *"$FAKE_WORKFLOW_SERVICE_ID"*)
     printf "%s" "$FAKE_WORKFLOW_ENV_JSON"
     ;;
+  *type=cron_job*) printf "%s" "$FAKE_CRON_LOOKUP_JSON" ;;
+  *env-vars*) printf "%s" "$FAKE_CRON_ENV_JSON" ;;
   *)
     echo "unexpected curl request: $*" >&2
     exit 9
@@ -147,6 +151,13 @@ esac
             "FAKE_API_ENV_JSON": api_env_json,
             "FAKE_WEB_ENV_JSON": web_env_json,
             "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
+            "FAKE_CRON_LOOKUP_JSON": json.dumps(
+                [{"service": {"id": cron_service_id, "name": "argus-maintenance"}}]
+                if cron_service_id
+                else []
+            ),
+            "FAKE_CRON_ENV_JSON": cron_env_json
+            or _render_env_payload("argus-maintenance"),
             "FAKE_CURL_REQUEST_LOG": str(request_log),
         }
     )
@@ -786,11 +797,11 @@ def test_mode_scripts_pin_render_workflow_dispatch_off() -> None:
 
     # QA mode: default-off; ceremony runs opt in by exporting before qa.sh.
     assert (
-        'ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED='
+        "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED="
         '"${ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED:-false}"' in qa_block
     )
     assert (
-        'ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED='
+        "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED="
         '"${ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED:-false}"' in qa_block
     )
 
@@ -924,10 +935,7 @@ def test_render_env_sync_audit_accepts_required_turnstile_site_key(
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (
-        "ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>"
-        in result.stdout
-    )
+    assert "ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>" in result.stdout
     assert "status=ready" in result.stdout
 
 
