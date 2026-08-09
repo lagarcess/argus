@@ -130,11 +130,10 @@ const ALL_BANDS: Band[] = [390, 720, 1024];
 test.describe("guest surfaces", () => {
   for (const band of ALL_BANDS) {
     test(`guest at ${band}`, async ({ page }) => {
-      // An established session redirects `/` straight to `/chat`, so the
-      // landing surface is only reachable with the redirect suppressed.
-      await open(page, band, "/?preview=true", { account: "guest" });
-      await capture(page, `guest/entry-${band}-en-dark`);
-
+      /* The guest entry surface is NOT captured here. An established session
+         redirects `/` to `/chat` under mock auth, so this config can only ever
+         photograph the redirect. `breakpoint-audit-landing.spec.ts` owns
+         `guest/entry-*` and runs with mock auth off. */
       await open(page, band, "/chat", { account: "guest", emptyChat: true });
       await capture(page, `guest/empty-chat-${band}-en-dark`);
 
@@ -386,6 +385,33 @@ test.describe("signed-in surfaces", () => {
           }
         }
       }
+    });
+
+    /*
+     * Evidence for the Security row, which is visible and clickable at every
+     * band but only navigates at desktop. Below 1024 the click closes the
+     * settings sheet and leaves the user on /chat, so the before/after pair and
+     * the URL are the proof; a single screenshot would not show it.
+     */
+    test(`account security navigation at ${band}`, async ({ page }) => {
+      await open(page, band, "/chat", { emptyChat: true });
+      await openSettings(page, band);
+      if (!(await clickByName(page, /^(data controls|controles de datos)$/i)))
+        return;
+      await capture(page, `findings/security-${band}-before-click`);
+
+      const security = page.getByRole("button", { name: /^(security|seguridad)$/i }).first();
+      if (!(await security.count())) return;
+      await security.click();
+      // Generous: a client route change plus a paint.
+      await page.waitForTimeout(2_500);
+      await capture(page, `findings/security-${band}-after-click`);
+
+      await writeFile(
+        join(OUT_DIR, `findings/security-${band}-url.txt`),
+        `${new URL(page.url()).pathname}\n`,
+        "utf8",
+      );
     });
 
     test(`legal and auth at ${band}`, async ({ page }) => {
