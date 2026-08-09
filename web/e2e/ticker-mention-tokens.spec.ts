@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 const CONVERSATION_ID = "ticker-mention-conversation";
 const NOW = "2026-08-09T12:00:00.000Z";
@@ -32,6 +32,7 @@ type StreamRequest = {
 type Fixture = {
   streamRequests: StreamRequest[];
   unexpectedRequests: string[];
+  showResult: () => void;
 };
 
 const asset = {
@@ -79,6 +80,29 @@ const confirmation = {
   display_facts: { benchmark_symbol: "SPY" },
   assumptions: ["Long-only", "Benchmark: SPY"],
   actions: [],
+};
+
+const result = {
+  title: "AAPL relative-strength result",
+  symbols: ["AAPL"],
+  strategy_label: "RSI strategy",
+  asset_class: "equity",
+  date_range: {
+    start: "2024-01-01",
+    end: "2024-12-31",
+    display: "January 1, 2024 to December 31, 2024",
+  },
+  status_label: "Simulation Complete",
+  rows: [
+    { key: "ending_value", label: "Ending value", value: "$11,420" },
+    { key: "total_return_pct", label: "Total return", value: "14.2%" },
+    { key: "benchmark_delta_pct", label: "Vs benchmark", value: "2.3 pts" },
+    { key: "max_drawdown_pct", label: "Max drawdown", value: "-8.4%" },
+  ],
+  benchmark_note: "AAPL finished 2.3 percentage points ahead of SPY.",
+  assumptions: ["Long-only", "Benchmark: SPY"],
+  actions: [],
+  chart: null,
 };
 
 function json(route: Route, body: unknown, status = 200) {
@@ -132,14 +156,42 @@ function userMessage(metadata: JsonRecord): ApiMessage {
   };
 }
 
-async function capture(page: Page, filename: string) {
+async function capture(
+  frame: Locator,
+  filename: string,
+  options: { topInset?: number } = {},
+) {
   if (!EVIDENCE_DIR) return;
   mkdirSync(EVIDENCE_DIR, { recursive: true });
-  await page.mouse.move(0, 0);
-  await page.screenshot({
+  await frame.scrollIntoViewIfNeeded();
+  if (options.topInset) {
+    await frame.evaluate((element, topInset) => {
+      const transcript = element.closest(
+        '[data-testid="conversation-transcript-region"]',
+      );
+      if (!transcript) return;
+
+      const elementTop =
+        element.getBoundingClientRect().top -
+        transcript.getBoundingClientRect().top;
+      const offset = Math.min(
+        Math.max(0, topInset - elementTop),
+        transcript.scrollTop,
+      );
+      transcript.scrollTop -= offset;
+    }, options.topInset);
+    await frame.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+  }
+  await frame.screenshot({
     path: `${EVIDENCE_DIR}/${filename}`,
-    fullPage: true,
   });
+  writeFileSync(
+    `${EVIDENCE_DIR}/${filename.replace(/\.png$/, ".txt")}`,
+    `${await frame.innerText()}\n`,
+    "utf8",
+  );
 }
 
 async function installFixture(
@@ -282,7 +334,30 @@ async function installFixture(
     return json(route, { detail: "Unexpected fixture request" }, 501);
   });
 
-  return { streamRequests, unexpectedRequests };
+  return {
+    streamRequests,
+    unexpectedRequests,
+    showResult: () => {
+      messages.splice(
+        0,
+        messages.length,
+        userMessage({ mentions: streamRequests[0]?.mentions ?? [] }),
+        {
+          id: "ticker-mention-result-message",
+          conversation_id: CONVERSATION_ID,
+          role: "assistant",
+          content: "AAPL finished ahead of the benchmark in this mock result.",
+          created_at: NOW,
+          metadata: {
+            latest_run_id: "ticker-mention-result-run",
+            result_conversation_id: CONVERSATION_ID,
+            result_run_id: "ticker-mention-result-run",
+            result_card: result,
+          },
+        },
+      );
+    },
+  };
 }
 
 async function selectAssetAndIndicator(page: Page) {
@@ -331,25 +406,25 @@ const cases = [
     name: "English desktop",
     language: "en" as const,
     viewport: { width: 1280, height: 900 },
-    screenshot: "en-desktop.png",
+    framePrefix: "en-desktop",
   },
   {
     name: "English mobile",
     language: "en" as const,
     viewport: { width: 390, height: 844 },
-    screenshot: "en-mobile.png",
+    framePrefix: "en-mobile",
   },
   {
     name: "Spanish desktop",
     language: "es-419" as const,
     viewport: { width: 1280, height: 900 },
-    screenshot: "es-419-desktop.png",
+    framePrefix: "es-419-desktop",
   },
   {
     name: "Spanish mobile",
     language: "es-419" as const,
     viewport: { width: 390, height: 844 },
-    screenshot: "es-419-mobile.png",
+    framePrefix: "es-419-mobile",
   },
 ];
 
@@ -429,7 +504,34 @@ test.describe("exact ticker mention entity tags", () => {
       await expect(
         page.getByText(MESSAGE, { exact: true }),
       ).toBeVisible();
-      await capture(page, scenario.screenshot);
+      await capture(
+        page.getByText(MESSAGE, { exact: true }),
+        `${scenario.framePrefix}-message.png`,
+      );
+      await capture(
+        page
+          .locator('[data-confirmation-status="ready_to_run"]')
+          .locator("xpath=ancestor::section[1]"),
+        `${scenario.framePrefix}-confirmation.png`,
+      );
+
+      fixture.showResult();
+      await page.reload({ waitUntil: "networkidle" });
+      const resultCard = page.getByRole("region", {
+        name: "Hero + Delta Evidence Card",
+      });
+      await expect(resultCard).toBeVisible();
+      await expect(
+        resultCard.locator(
+          '[data-entity-token-surface="card"][data-entity-token-kind="asset"]',
+        ),
+      ).toHaveCount(1);
+      await resultCard.evaluate((element) =>
+        Promise.all(element.getAnimations().map((animation) => animation.finished)),
+      );
+      await capture(resultCard, `${scenario.framePrefix}-result.png`, {
+        topInset: 104,
+      });
 
       expect(fixture.unexpectedRequests).toEqual([]);
     });
