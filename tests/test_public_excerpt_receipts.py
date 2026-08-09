@@ -50,6 +50,8 @@ from tests.public_excerpt_factories import (
     BUY_THE_DIP_CONFIG_SNAPSHOT,
     CONVERSATION_ID,
     CROSSOVER_CONFIG_SNAPSHOT,
+    CROSSOVER_DIFFERING_EXIT_CONFIG_SNAPSHOT,
+    CROSSOVER_FOREIGN_EXIT_CONFIG_SNAPSHOT,
     DCA_CONFIG_SNAPSHOT,
     ENGINE_CONFIG_SNAPSHOT,
     GENERIC_RULE_SPEC_CONFIG_SNAPSHOT,
@@ -744,7 +746,7 @@ def test_two_crossovers_with_different_windows_do_not_look_identical() -> None:
     assert payload_digest(first) != payload_digest(second)
 
 
-def test_a_crossover_missing_one_window_describes_nothing() -> None:
+def test_a_crossover_missing_one_window_refuses_to_publish() -> None:
     """Half a crossover is not a truthful record of a crossover."""
     half = {
         **CROSSOVER_CONFIG_SNAPSHOT,
@@ -757,7 +759,8 @@ def test_a_crossover_missing_one_window_describes_nothing() -> None:
             },
         },
     }
-    assert _payload(run_config_snapshot=half).strategy_facts == []
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=half)
 
 
 def test_a_macd_receipt_freezes_all_three_of_its_periods() -> None:
@@ -787,16 +790,21 @@ def test_a_run_configured_through_the_engine_path_still_describes_itself() -> No
     assert facts["cadence"] == "weekly"
 
 
-def test_a_generic_rule_spec_is_left_undescribed_rather_than_flattened() -> None:
-    """A condition tree cannot round-trip into flat facts, so it claims nothing."""
-    assert (
-        _payload(run_config_snapshot=GENERIC_RULE_SPEC_CONFIG_SNAPSHOT).strategy_facts
-        == []
-    )
+def test_a_generic_rule_spec_refuses_rather_than_publishing_a_generic_label() -> None:
+    """A condition tree cannot round-trip into flat facts, so it is not shareable.
+
+    Returning no facts and letting creation continue published a page that named a
+    strategy this module had declined to describe, which is the failure mode a receipt
+    exists to prevent.
+    """
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=GENERIC_RULE_SPEC_CONFIG_SNAPSHOT)
 
 
-def test_a_run_with_no_config_yields_no_strategy_facts() -> None:
-    assert _payload(run_config_snapshot=None).strategy_facts == []
+def test_a_run_with_no_config_refuses_rather_than_publishing() -> None:
+    """No frozen configuration means no way to state what ran."""
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=None)
 
 
 def test_strategy_facts_carry_only_readable_scalars() -> None:
@@ -809,10 +817,10 @@ def test_strategy_facts_carry_only_readable_scalars() -> None:
         },
         "resolved_strategy": {"strategy_type": "indicator_threshold"},
     }
-    payload = _payload(run_config_snapshot=hostile)
-    # Fails closed for the shape rather than keeping the name of a strategy whose
-    # parameters it could not read.
-    assert payload.strategy_facts == []
+    # Fails closed rather than keeping the name of a strategy whose parameters it
+    # could not read.
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=hostile)
 
 
 def test_strategy_facts_are_audited_like_the_rest_of_the_payload() -> None:
@@ -933,6 +941,15 @@ CREDENTIAL_NOTES: tuple[tuple[str, str], ...] = (
     ("private key banner", "-----BEGIN RSA PRIVATE KEY-----"),
     ("url userinfo", _shaped("admin:", "notarealpassword", "from https://{}@host/x")),
     ("keyed opaque value", _shaped("api_key = ", "a1b2c3d4e5f6g7")),
+    # The key is the signal, so none of these depend on the value's size or its
+    # character class. Each of the three evaded a length or charset guard.
+    ("short keyed password", _shaped("password=", "hunter2")),
+    ("punctuated keyed password", _shaped("password=", "P@ssw0rd")),
+    ("one character keyed secret", _shaped("PASSWORD = ", "x")),
+    ("short keyed api key", _shaped("api_key: ", "abc")),
+    ("keyed token", _shaped("token: ", "a")),
+    ("keyed client secret", _shaped("client_secret = ", "shh")),
+    ("keyed access key", _shaped("access_key: ", "q")),
 )
 
 # Notes a real owner might write. Several deliberately name a credential without
@@ -948,6 +965,13 @@ ORDINARY_NOTES: tuple[str, ...] = (
     "AAPL and SPY only, monthly buys of 500 dollars, no leverage anywhere.",
     "Authorization from nobody needed, this is just my own money and my own idea.",
     "Probé esto en español y el resultado fue peor que comprar y mantener.",
+    # Naming a credential is not carrying one. Redaction that eats ordinary notes
+    # defeats the feature, so these are as load-bearing as the cases above.
+    "the password reset flow is what finally convinced me to try this",
+    "my api key expired last week so the data stops in March",
+    "token economics were the whole reason I looked at this one",
+    "I wrote my password down somewhere safe and moved on",
+    "the secret: patience. Nothing clever, just not selling.",
 )
 
 
@@ -985,3 +1009,116 @@ def test_the_credential_grammar_has_one_home() -> None:
     assert (
         prose_evidence.UPPERCASE_KEY_PATTERN is credential_shapes.UPPERCASE_KEY_PATTERN
     )
+
+
+# ── Fail closed: complete strategy facts, or no receipt ───────────────────────
+
+
+def test_an_unsupported_strategy_shape_refuses_instead_of_publishing() -> None:
+    """The guard that keeps this class closed.
+
+    A shape nobody has taught the projection is unknown by definition, so it cannot be
+    described faithfully. Refusing is the only honest outcome, and it is what makes a
+    future strategy a refusal rather than a page that misstates what ran.
+    """
+    unknown = {
+        "template": "some_strategy_invented_next_quarter",
+        "resolved_strategy": {"strategy_type": "some_strategy_invented_next_quarter"},
+        "resolved_parameters": {"timeframe": "1D"},
+    }
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=unknown)
+
+
+def test_the_refusal_reaches_the_owner_as_a_readable_reason() -> None:
+    """A refusal the owner cannot read is a dead end, so the message says what to do."""
+    with pytest.raises(PublicExcerptSourceError) as caught:
+        _payload(run_config_snapshot=GENERIC_RULE_SPEC_CONFIG_SNAPSHOT)
+    message = str(caught.value)
+    assert "cannot be shared" in message
+    # Owner-facing copy, so no internals and no jargon from the runtime.
+    for internal in ("rule_spec", "config_snapshot", "strategy_facts", "projection"):
+        assert internal not in message
+
+
+def test_a_crossover_that_exits_on_other_windows_states_both_sides() -> None:
+    """The defect: the exit side was read from the entry rule, so it could be wrong.
+
+    Entry and exit are compiled independently, so a receipt that reports only the entry
+    windows can state an exit that never ran.
+    """
+    payload = _payload(run_config_snapshot=CROSSOVER_DIFFERING_EXIT_CONFIG_SNAPSHOT)
+    facts = {fact.key: fact.value for fact in payload.strategy_facts}
+    assert facts["fast_indicator"] == "sma"
+    assert facts["fast_period"] == "20"
+    assert facts["slow_period"] == "50"
+    # Taken from the exit rule, not inherited from the entry rule.
+    assert facts["exit_fast_indicator"] == "ema"
+    assert facts["exit_fast_period"] == "9"
+    assert facts["exit_slow_indicator"] == "ema"
+    assert facts["exit_slow_period"] == "21"
+
+
+def test_a_matching_exit_adds_no_redundant_facts() -> None:
+    """When the exit repeats the entry's windows there is nothing extra to say."""
+    facts = {
+        fact.key
+        for fact in _payload(run_config_snapshot=CROSSOVER_CONFIG_SNAPSHOT).strategy_facts
+    }
+    assert not any(key.startswith("exit_") for key in facts)
+
+
+def test_a_crossover_with_a_foreign_exit_rule_refuses() -> None:
+    """A crossover entry with a MACD exit is a shape with no faithful projection."""
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(run_config_snapshot=CROSSOVER_FOREIGN_EXIT_CONFIG_SNAPSHOT)
+
+
+def test_no_publishable_payload_ever_carries_an_empty_strategy_block() -> None:
+    """The class-level invariant, asserted over every shape a fixture can build.
+
+    Any snapshot either yields a named strategy with its defining parameters, or raises.
+    There is no third outcome, which is what stops a partial or absent block reaching a
+    public page.
+    """
+    snapshots = [
+        BUY_AND_HOLD_CONFIG_SNAPSHOT,
+        BUY_THE_DIP_CONFIG_SNAPSHOT,
+        INDICATOR_CONFIG_SNAPSHOT,
+        CROSSOVER_CONFIG_SNAPSHOT,
+        CROSSOVER_DIFFERING_EXIT_CONFIG_SNAPSHOT,
+        CROSSOVER_FOREIGN_EXIT_CONFIG_SNAPSHOT,
+        MACD_CONFIG_SNAPSHOT,
+        DCA_CONFIG_SNAPSHOT,
+        ENGINE_CONFIG_SNAPSHOT,
+        GENERIC_RULE_SPEC_CONFIG_SNAPSHOT,
+        None,
+        {},
+        {"template": "buy_and_hold"},
+        {"resolved_strategy": {"strategy_type": "signal_strategy"}},
+    ]
+    for snapshot in snapshots:
+        try:
+            payload = _payload(run_config_snapshot=snapshot)
+        except PublicExcerptSourceError:
+            continue
+        keys = [fact.key for fact in payload.strategy_facts]
+        assert keys, f"published with no strategy facts: {snapshot}"
+        assert keys[0] == "strategy_type", f"published unnamed strategy: {snapshot}"
+
+
+def test_a_differing_exit_is_covered_by_the_registry_walk_too() -> None:
+    """The registry names one crossover; the compiler admits two variants of it.
+
+    The walk above proves the matching-exit variant. This proves the other one, so
+    neither reading of "moving_average_crossover" is left unchecked.
+    """
+    facts = {
+        fact.key: fact.value
+        for fact in _payload(
+            run_config_snapshot=CROSSOVER_DIFFERING_EXIT_CONFIG_SNAPSHOT
+        ).strategy_facts
+    }
+    for key in ("fast_indicator", "fast_period", "slow_indicator", "slow_period"):
+        assert key in facts
+        assert f"exit_{key}" in facts

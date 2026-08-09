@@ -38,6 +38,15 @@ MAX_METRICS = 8
 MAX_SYMBOLS = 5
 MAX_TEXT_LENGTH = 240
 
+CROSSOVER_WINDOW_KEYS = ("fast_indicator", "fast_period", "slow_indicator", "slow_period")
+
+# Owner-facing. A receipt exists to be a truthful frozen record, so a strategy this
+# module cannot describe completely is refused rather than published partially.
+_UNDESCRIBABLE_STRATEGY = (
+    "Argus cannot describe this strategy on a shared page yet, so this result "
+    "cannot be shared."
+)
+
 # §3 of the sharing spec, from decision memo §15.7. Absolute.
 NEVER_EXPOSE_KEY_MARKERS = (
     "conversation_id",
@@ -470,15 +479,13 @@ def _strategy_facts(config_snapshot: object) -> list[PublicExcerptStrategyFact]:
     exit_rule = _mapping(resolved_strategy.get("exit_rule"))
     parameters = {**engine_parameters, **resolved_parameters}
 
-    shape = _strategy_shape(
+    label, required, optional = _strategy_shape(
         snapshot=snapshot,
         resolved_strategy=resolved_strategy,
         entry_rule=entry_rule,
+        exit_rule=exit_rule,
         parameters=parameters,
     )
-    if shape is None:
-        return []
-    label, required, optional = shape
 
     facts: list[PublicExcerptStrategyFact] = [
         PublicExcerptStrategyFact(key="strategy_type", value=label)
@@ -494,9 +501,7 @@ def _strategy_facts(config_snapshot: object) -> list[PublicExcerptStrategyFact]:
             )
         )
         if value is None:
-            # Incomplete for this shape, so the whole block goes rather than a
-            # subset that misdescribes the run.
-            return []
+            raise PublicExcerptSourceError(_UNDESCRIBABLE_STRATEGY)
         facts.append(PublicExcerptStrategyFact(key=key, value=value))
     for key in optional:
         value = _strategy_fact_value(
@@ -518,8 +523,9 @@ def _strategy_shape(
     snapshot: dict[str, Any],
     resolved_strategy: dict[str, Any],
     entry_rule: dict[str, Any],
+    exit_rule: dict[str, Any],
     parameters: dict[str, Any],
-) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     """Resolve the executed shape: its truthful name, then the set that defines it.
 
     Keyed on the typed rule before the execution type, because the rule is what the
@@ -527,6 +533,10 @@ def _strategy_shape(
     ``signal_strategy`` covers both a moving average crossover and an arbitrary rule
     spec, and naming a crossover "signal strategy" would be true of the runtime and
     useless to a reader.
+
+    Raises rather than returning nothing for a shape it cannot describe. A caller that
+    had to interpret an empty result published a page describing a strategy this
+    module had declined to describe.
     """
     template = (_text(snapshot.get("template")) or "").lower()
     strategy_type = (_text(resolved_strategy.get("strategy_type")) or "").lower()
@@ -536,7 +546,9 @@ def _strategy_shape(
     if rule_type == "moving_average_crossover":
         return (
             "moving average crossover",
-            ("fast_indicator", "fast_period", "slow_indicator", "slow_period"),
+            _crossover_required_keys(entry_rule=entry_rule, exit_rule=exit_rule),
+            # The entry side's direction. A crossover's exit direction is its opposite
+            # by construction, so it is not a second fact.
             ("direction",),
         )
     if rule_type == "macd_crossover":
@@ -565,10 +577,38 @@ def _strategy_shape(
             ("indicator", "indicator_period", "entry_threshold", "exit_threshold"),
             ("direction",),
         )
-    # A generic rule spec is a condition tree. Flattening one into key and value
-    # pairs cannot round-trip it, so it goes undescribed rather than described
-    # wrongly, and an unrecognised shape takes the same path.
-    return None
+    # A generic rule spec is a condition tree, and an unrecognised shape is unknown by
+    # definition. Neither can be flattened into key and value pairs without inventing
+    # something, so neither is shareable.
+    raise PublicExcerptSourceError(_UNDESCRIBABLE_STRATEGY)
+
+
+def _crossover_required_keys(
+    *,
+    entry_rule: dict[str, Any],
+    exit_rule: dict[str, Any],
+) -> tuple[str, ...]:
+    """The crossover facts a receipt owes, entry side plus exit side when they differ.
+
+    The rule compiler builds entry and exit independently and never requires them to
+    match, so reading the windows from the entry rule alone can state an exit that did
+    not run. When the exit rule is absent the engine derives it by flipping the entry
+    direction, so the windows are the entry's and there is nothing extra to say.
+    """
+    if not exit_rule:
+        return CROSSOVER_WINDOW_KEYS
+    if (_text(exit_rule.get("type")) or "").lower() != "moving_average_crossover":
+        # A crossover entry paired with some other kind of exit is a shape this module
+        # has no faithful projection for.
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_STRATEGY)
+    differs = any(
+        _strategy_fact_value(exit_rule.get(key))
+        != _strategy_fact_value(entry_rule.get(key))
+        for key in CROSSOVER_WINDOW_KEYS
+    )
+    if not differs:
+        return CROSSOVER_WINDOW_KEYS
+    return (*CROSSOVER_WINDOW_KEYS, *(f"exit_{key}" for key in CROSSOVER_WINDOW_KEYS))
 
 
 def _strategy_source_value(
@@ -617,6 +657,9 @@ def _strategy_source_value(
             entry_rule.get("direction"),
             resolved_strategy.get("direction"),
         )
+    elif key.startswith("exit_") and key[len("exit_") :] in CROSSOVER_WINDOW_KEYS:
+        # Only the exit rule may speak for the exit side.
+        candidates = (exit_rule.get(key[len("exit_") :]),)
     else:
         # fast_indicator, fast_period, slow_indicator, slow_period, signal_period:
         # the typed rule is the only place these are frozen.

@@ -53,13 +53,35 @@ _CREDENTIAL_KEY = (
     r"|id[_-]?token|auth[_-]?token|private[_-]?key)"
 )
 CREDENTIAL_KEY_PATTERN = _CREDENTIAL_KEY
-# A credential key name beside a value that is itself credential-shaped: eight or
-# more characters mixing letters and digits with no space. The mixing is what
-# separates `api_key = a1b2c3d4e5` from `the secret: consistency`, so naming a
-# credential in a sentence does not make the sentence one.
-KEYED_OPAQUE_VALUE_PATTERN = re.compile(
-    rf"(?i)\b{_CREDENTIAL_KEY}\b[\"']?\s*[:=]\s*[\"']?"
-    r"(?=[^\s\"']*[A-Za-z])(?=[^\s\"']*\d)[A-Za-z0-9_\-./+=]{8,}"
+
+# Keys that name a credential outright, in the spellings people actually type.
+_ASSIGNED_CREDENTIAL_KEY = (
+    r"(?:api[_-]?keys?|apikeys?|access[_-]?keys?|access[_-]?tokens?"
+    r"|client[_-]?secrets?|secrets?|tokens?|passwords?|passwd|pwd"
+    r"|credentials?|private[_-]?keys?|auth|authorization|signature"
+    r"|session[_-]?tokens?|refresh[_-]?tokens?|id[_-]?tokens?|auth[_-]?tokens?)"
+)
+
+# The key is the signal, so the value is not inspected at all. Anything after the
+# separator is the secret, whatever its length or characters: a one character
+# password is still a password, and `P@ssw0rd` is not less of one for containing
+# punctuation. Guarding on the value's size or its character class is what let
+# `password=hunter2` and `password=P@ssw0rd` through.
+_CREDENTIAL_ASSIGNMENT_RE = re.compile(
+    rf"(?i)(?P<lead>\b\w+[ \t]+)?"
+    rf"[\"']?\b(?P<key>{_ASSIGNED_CREDENTIAL_KEY})\b[\"']?[ \t]*"
+    r"(?P<separator>[:=])[ \t]*(?P<value>\S)"
+)
+
+# `secret: consistency` is a sentence and `api_key: abc` is an assignment, and the
+# difference is the article in front. Only the colon form needs this: prose does not
+# write `secret = something`, so `=` is taken at face value.
+_PROSE_DETERMINERS = frozenset(
+    {
+        "the", "a", "an", "my", "our", "your", "his", "her", "their", "its",
+        "this", "that", "these", "those", "no", "any", "some", "every", "each",
+        "one", "another", "whose",
+    }
 )
 
 # Ordered narrowest first so the reported kind names the most specific match.
@@ -70,8 +92,24 @@ CREDENTIAL_SHAPE_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("api_key", PREFIXED_KEY_PATTERN),
     ("api_key", UPPERCASE_KEY_PATTERN),
     ("url_userinfo", URL_USERINFO_PATTERN),
-    ("keyed_secret", KEYED_OPAQUE_VALUE_PATTERN),
 )
+
+
+def keyed_credential_in(text: str) -> bool:
+    """True when the text assigns a value to something that names a credential.
+
+    Additive to the shape rules above, which cover an unkeyed secret like a bare AWS
+    key id. This covers the other direction: a value that looks like nothing on its
+    own, announced by its key.
+    """
+    for match in _CREDENTIAL_ASSIGNMENT_RE.finditer(text):
+        if match.group("separator") == "=":
+            return True
+        lead = (match.group("lead") or "").strip().lower()
+        if lead in _PROSE_DETERMINERS:
+            continue
+        return True
+    return False
 
 
 def credential_shape_in(text: object) -> str | None:
@@ -81,6 +119,8 @@ def credential_shape_in(text: object) -> str | None:
     for kind, pattern in CREDENTIAL_SHAPE_RULES:
         if pattern.search(text):
             return kind
+    if keyed_credential_in(text):
+        return "keyed_secret"
     for secret in environment_secret_values():
         if secret in text:
             return "environment_secret"

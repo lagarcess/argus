@@ -934,3 +934,72 @@ def test_a_non_uuid_id_answers_not_found_rather_than_failing(
     response = client.request(method, path, json={} if method == "POST" else None)
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
+
+
+def test_an_undescribable_strategy_is_refused_with_a_readable_reason(
+    sharing_on: None,
+) -> None:
+    """Fail closed at the API boundary, not just in the projection.
+
+    A run whose strategy cannot be described completely must not produce a receipt at
+    all, and the owner has to be told why in words they can act on.
+    """
+    client = _client()
+    user_id = api_state.store.get_or_create_dev_user().id
+    conversation = build_conversation()
+    artifact = build_artifact()
+    run = build_run().model_copy(
+        update={
+            "config_snapshot": {
+                "template": "signal_strategy",
+                "parameters": {
+                    "rule_spec": {
+                        "entry": {
+                            "conditions": [
+                                {
+                                    "left": {
+                                        "kind": "indicator",
+                                        "key": "ema",
+                                        "period": 9,
+                                    },
+                                    "operator": "cross_above",
+                                    "right": {
+                                        "kind": "indicator",
+                                        "key": "ema",
+                                        "period": 21,
+                                    },
+                                }
+                            ]
+                        },
+                        "exit": {
+                            "conditions": [
+                                {
+                                    "left": {
+                                        "kind": "indicator",
+                                        "key": "rsi",
+                                        "period": 14,
+                                    },
+                                    "operator": "gte",
+                                    "right": 65,
+                                }
+                            ]
+                        },
+                    }
+                },
+            }
+        }
+    )
+    api_state.store.conversations[conversation.id] = conversation
+    api_state.store.conversation_owners[conversation.id] = user_id
+    api_state.store.evidence_artifacts[artifact.id] = artifact
+    api_state.store.evidence_artifact_owners[artifact.id] = user_id
+    api_state.store.backtest_runs[run.id] = run
+    api_state.store.backtest_run_owners[run.id] = user_id
+
+    response = client.post(CREATE_PATH, json={})
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "receipt_source_unsupported"
+    assert "cannot be shared" in body["detail"]
+    # Nothing was persisted, so no half-described receipt exists to be read later.
+    assert api_state.store.public_excerpt_snapshots == {}

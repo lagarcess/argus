@@ -664,10 +664,20 @@ Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user 
 and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
 per hour per client identity.
 
-Error codes specific to this surface: `receipt_note_rejected` (422, the note
-contains an identifier or a credential-shaped token), `receipt_source_unsupported`
-(422, not a completed backtest result), and `receipt_sanitization_failed` (500, the
-payload could not be proven free of never-expose data, so nothing was published).
+Error codes specific to this surface: `receipt_note_rejected` (422, the note carries
+an identifier, a credential-shaped value, or a value assigned to something that names
+a credential), `receipt_source_unsupported` (422, not a completed backtest result, or
+a strategy the public projection cannot describe completely), and
+`receipt_sanitization_failed` (500, the payload could not be proven free of
+never-expose data, so nothing was published).
+
+A receipt either states the strategy that ran, in full, or it is not created. The
+projection covers buy and hold, recurring contributions, indicator thresholds, buy
+the dip, moving average crossovers (including a crossover whose exit windows differ
+from its entry windows, which the rule compiler allows), and MACD crossovers. A
+generic `rule_spec` condition tree, or any shape added later without a projection,
+answers `receipt_source_unsupported` rather than publishing a page that names a
+strategy without describing it.
 
 ## Admin Bypass
 

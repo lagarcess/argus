@@ -3914,6 +3914,10 @@ components:
           - fast_period
           - slow_indicator
           - slow_period
+          - exit_fast_indicator
+          - exit_fast_period
+          - exit_slow_indicator
+          - exit_slow_period
           - signal_period
           - direction
         value:

@@ -255,6 +255,32 @@ CROSSOVER_CONFIG_SNAPSHOT: dict[str, Any] = {
     "resolved_parameters": {"timeframe": "1D"},
 }
 
+# The compiler builds entry and exit independently and never requires them to match,
+# so a run can legitimately exit on windows it did not enter on.
+CROSSOVER_DIFFERING_EXIT_CONFIG_SNAPSHOT: dict[str, Any] = {
+    **CROSSOVER_CONFIG_SNAPSHOT,
+    "resolved_strategy": {
+        **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"],
+        "exit_rule": {
+            "type": "moving_average_crossover",
+            "fast_indicator": "ema",
+            "fast_period": 9,
+            "slow_indicator": "ema",
+            "slow_period": 21,
+            "direction": "bearish",
+        },
+    },
+}
+
+# A crossover entry paired with an exit of another kind: no faithful projection.
+CROSSOVER_FOREIGN_EXIT_CONFIG_SNAPSHOT: dict[str, Any] = {
+    **CROSSOVER_CONFIG_SNAPSHOT,
+    "resolved_strategy": {
+        **CROSSOVER_CONFIG_SNAPSHOT["resolved_strategy"],
+        "exit_rule": {"type": "macd_crossover", "fast_period": 12, "slow_period": 26},
+    },
+}
+
 MACD_CONFIG_SNAPSHOT: dict[str, Any] = {
     "template": "signal_strategy",
     "resolved_strategy": {

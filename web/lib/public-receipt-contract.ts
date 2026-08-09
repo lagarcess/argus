@@ -25,6 +25,12 @@ export type PublicReceiptStrategyFactKey =
   | "fast_period"
   | "slow_indicator"
   | "slow_period"
+  // Entry and exit are compiled independently and need not match, so when they
+  // differ the exit side gets its own facts rather than being spoken for.
+  | "exit_fast_indicator"
+  | "exit_fast_period"
+  | "exit_slow_indicator"
+  | "exit_slow_period"
   | "signal_period"
   | "direction";
 
