@@ -2413,6 +2413,10 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ProfileDeleteRequestDialog.tsx"),
       "utf-8",
     );
+    const detailsDialog = readFileSync(
+      join(root, "components/sidebar/ProfileDetailsDialog.tsx"),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const en = readFileSync(
       join(root, "public/locales/en/common.json"),
@@ -2425,21 +2429,24 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(languageFeatures).toContain("languageDisplayAbbreviation");
     expect(languageFeatures).toContain("localeForLanguage");
-    expect(profileMenu).toContain("ENABLED_LANGUAGES");
-    expect(profileMenu).toContain("languageDisplayAbbreviation");
+    // The dialog's markup lives in ProfileDetailsDialog; the menu keeps the
+    // state and the requests behind it.
+    expect(detailsDialog).toContain("ENABLED_LANGUAGES");
+    expect(detailsDialog).toContain("languageDisplayAbbreviation");
     expect(profileMenu).toContain("localeForLanguage");
     expect(profileMenu).toContain("postFeedback");
     expect(profileMenu).toContain('type: "account_deletion_request"');
     expect(profileMenu).toContain('source: "profile_modal"');
-    expect(profileMenu).toContain("argus-profile-language-trigger");
-    expect(profileMenu).toContain("absolute right-0 top-full");
-    // The dialog itself lives in its own component now, because a body-portaled
+    expect(detailsDialog).toContain("argus-profile-language-trigger");
+    expect(detailsDialog).toContain("absolute right-0 top-full");
+    // Both dialogs live in their own components, because a body-portaled
     // aria-modal surface has to register its own back, Escape, and focus.
     expect(deleteRequestDialog).toContain(
       "settings.profile.request_deletion.title",
     );
+    expect(detailsDialog).toContain("useModalSurface");
     expect(profileMenu).toContain("settings.profile.language_save_error");
-    expect(profileMenu).not.toContain(
+    expect(detailsDialog).not.toContain(
       "overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]",
     );
     expect(profileMenu).not.toContain('profile?.language ?? "en"');

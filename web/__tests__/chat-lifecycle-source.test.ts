@@ -177,6 +177,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
     const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const profilePanels = readFileSync(join(root, "components/sidebar/ProfileSettingsPanels.tsx"), "utf-8");
     const settings = readFileSync(join(root, "components/views/SettingsView.tsx"), "utf-8");
     const archived = readFileSync(join(root, "components/settings/ArchivedChatsView.tsx"), "utf-8");
     const deleted = readFileSync(join(root, "components/settings/DeletedItemsView.tsx"), "utf-8");
@@ -184,7 +185,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("onHistoryMutated={refreshHistory}");
     expect(sidebar).toContain("onHistoryMutated={onHistoryMutated}");
     expect(profileMenu).toContain("onHistoryMutated?: () => void");
-    expect(profileMenu).toContain("onRestored={onHistoryMutated}");
+    // The menu threads it to the panel dispatch, which owns the panels.
+    expect(profileMenu).toContain("onHistoryMutated={onHistoryMutated}");
+    expect(profilePanels).toContain("onRestored={onHistoryMutated}");
     expect(settings).toContain("onHistoryMutated?: () => void");
     expect(settings).toContain("onHistoryMutated?.()");
     expect(archived).toContain("onRestored?: () => void");
