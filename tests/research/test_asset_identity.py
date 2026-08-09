@@ -76,3 +76,52 @@ def test_fund_listings_drop_their_repeated_issuer(listing, expected) -> None:
     assert short_display_name(listing) == expected
     # Still a substring of what the resolver returned; nothing invented.
     assert short_display_name(listing) in listing
+
+
+@pytest.mark.parametrize(
+    ("listing", "expected"),
+    [
+        # The defect: a preserved share class blocked the stripper from
+        # reaching the legal form in front of it, so this row read
+        # "CrowdStrike Holdings, Inc. Class A" beside a clean "Fortinet".
+        ("CrowdStrike Holdings, Inc. Class A", "CrowdStrike Class A"),
+        ("Alphabet Inc. Class A", "Alphabet Class A"),
+        ("Alphabet Inc. Class C", "Alphabet Class C"),
+        ("Berkshire Hathaway Inc. Class B", "Berkshire Hathaway Class B"),
+        # Nothing to lift off: unchanged.
+        ("Fortinet, Inc.", "Fortinet"),
+        # Nothing would survive the split, so the name stands whole.
+        ("Class A", "Class A"),
+    ],
+)
+def test_share_classes_survive_shortening_without_their_legal_form(
+    listing, expected
+) -> None:
+    assert short_display_name(listing) == expected
+
+
+def test_share_classes_stay_distinguishable() -> None:
+    """The reason share classes are never stripped: they are how two listings
+    of the same issuer differ."""
+    assert short_display_name("Alphabet Inc. Class A") != short_display_name(
+        "Alphabet Inc. Class C"
+    )
+
+
+@pytest.mark.parametrize(
+    "listing",
+    [
+        "CrowdStrike Holdings, Inc. Class A",
+        "Alphabet Inc. Class A",
+        "Fortinet, Inc.",
+        "The Walt Disney Company",
+        "First Trust Exchange-Traded Fund II First Trust NASDAQ Cybersecurity ETF",
+    ],
+)
+def test_shortening_never_invents_a_word(listing) -> None:
+    """Every surviving word came from the resolver, in its original order."""
+    words = short_display_name(listing).split()
+    source = [w.strip(",.") for w in listing.split()]
+    position = -1
+    for word in words:
+        position = source.index(word.strip(",."), position + 1)

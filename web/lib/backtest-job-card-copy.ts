@@ -134,7 +134,9 @@ function researchJobCardCopy(job: BacktestJob): BacktestJobCardCopy {
       detailKey: "chat.research_job.succeeded.detail",
       icon: "check",
       statusLabelFallback: "Ready",
-      statusLabelKey: "chat.research_job.succeeded.title",
+      // The status chip is the short word, like every other state; pointing it
+      // at the title rendered "Research ready" twice on the same card.
+      statusLabelKey: "chat.research_job.succeeded.status",
       titleFallback: "Research ready",
       titleKey: "chat.research_job.succeeded.title",
       tone: "neutral",
