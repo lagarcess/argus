@@ -22,9 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Scheduled workflows start from the repository default branch. The
-          # private-alpha canary must instead validate the integration candidate.
-          ref: ${{ github.event_name == 'schedule' && 'codex/private-alpha-next' || github.sha }}
+          # Render promotes main, so scheduled canaries bootstrap from that
+          # branch. Before any checks run, the workflow resolves and checks out
+          # the coherent SHA actually deployed by API, web, and workflow.
+          ref: ${{ github.event_name == 'schedule' && 'main' || github.sha }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,6 +45,27 @@ jobs:
           unzip -q "$tmpdir/render.zip" -d "$tmpdir"
           sudo mv "$tmpdir/cli_v2.20.0" /usr/local/bin/render
           render --version
+
+      - name: Resolve deployed canary release
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          set -euo pipefail
+          api_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh api-deploy-status)"
+          web_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh web-deploy-status)"
+          workflow_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh workflow-version-status)"
+          deployed_sha="$(python3 .github/canary-deployed-sha.py \
+            --api-status "$api_status" \
+            --web-status "$web_status" \
+            --workflow-status "$workflow_status")"
+          git cat-file -e "${deployed_sha}^{commit}"
+          git checkout --detach "$deployed_sha"
+          candidate_sha="$(git rev-parse HEAD)"
+          if [ "$candidate_sha" != "$deployed_sha" ]; then
+            echo "ERROR: canary deployed checkout did not resolve exactly" >&2
+            exit 1
+          fi
+          echo "canary_candidate_sha=$candidate_sha"
 
       - name: Install Poetry
         run: python -m pip install poetry==2.1.3
