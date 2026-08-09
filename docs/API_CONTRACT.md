@@ -2829,7 +2829,14 @@ final payload and persisted metadata:
     "schema_version": "argus_research/v1",
     "capability_class": "fast_quote",
     "shape": "fast",
-    "sources": ["https://example.com/filing"],
+    "sources": [
+      {
+        "title": "Netflix Q2 2026 shareholder letter",
+        "domain": "example.com",
+        "url": "https://example.com/filing",
+        "source_date": "2026-07-16"
+      }
+    ],
     "retrieved_at": "2026-08-07T15:04:05Z",
     "anchor_symbols": ["NFLX"],
     "peers": [

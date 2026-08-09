@@ -69,6 +69,23 @@ if TYPE_CHECKING:
     from argus.agent_runtime.research_answer import ResearchQueryExtraction
 
 RESEARCH_SCHEMA_VERSION = "argus_research/v1"
+# The sidecar's public surface, declared once so the documented example in
+# docs/API_CONTRACT.md can be held against it rather than described in prose
+# and drifting. `degraded` appears only on a degraded turn.
+RESEARCH_SIDECAR_KEYS = frozenset(
+    {
+        "schema_version",
+        "capability_class",
+        "shape",
+        "sources",
+        "retrieved_at",
+        "anchor_symbols",
+        "peers",
+        "usage",
+        "memory",
+        "degraded",
+    }
+)
 SURVEY_CANDIDATE_SCAN_LIMIT = 32
 
 
@@ -1010,6 +1027,7 @@ def research_stage_result(
     }
     if degraded_code:
         sidecar["degraded"] = {"code": degraded_code}
+    assert set(sidecar) <= RESEARCH_SIDECAR_KEYS, "undocumented research sidecar key"
     stage_patch: dict[str, Any] = {
         "assistant_response": answer,
         "research": sidecar,
