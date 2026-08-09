@@ -370,7 +370,7 @@ export default function ChatInput({
     const current = readCurrentSegments();
     const message = serializeComposerSegments(current);
     if (message) {
-      const accepted = await onSend(message, composerMentions(current));
+      const accepted = await onSend(message, composerMentions(current, message));
       if (accepted === false) return;
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);

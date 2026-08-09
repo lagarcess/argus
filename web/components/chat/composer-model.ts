@@ -23,7 +23,10 @@ export function serializeComposerSegments(segments: ComposerSegment[]) {
   return normalizeComposerText(rawComposerText(segments));
 }
 
-export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
+export function composerMentions(
+  segments: ComposerSegment[],
+  serializedMessage = serializeComposerSegments(segments),
+): ChatMention[] {
   const tokenSegments = segments.filter(
     (segment): segment is ComposerTokenSegment => segment.type === "token",
   );
@@ -46,19 +49,19 @@ export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
     ),
   );
   const decorated = decorateComposerSegments(segments, markers);
-  const normalized = normalizeComposerText(decorated);
+  const serializedWithMarkers = normalizeComposerText(decorated);
   const ranges = Array.from({ length: markers.length }, () => ({
     start: null as number | null,
     end: null as number | null,
   }));
   let output = "";
 
-  for (let offset = 0; offset < normalized.length; ) {
+  for (let offset = 0; offset < serializedWithMarkers.length; ) {
     const marker = Array.from(markerLookup.keys()).find((value) =>
-      normalized.startsWith(value, offset),
+      serializedWithMarkers.startsWith(value, offset),
     );
     if (!marker) {
-      output += normalized[offset];
+      output += serializedWithMarkers[offset];
       offset += 1;
       continue;
     }
@@ -67,8 +70,7 @@ export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
     offset += marker.length;
   }
 
-  const serialized = serializeComposerSegments(segments);
-  if (output !== serialized) {
+  if (output !== serializedMessage) {
     return tokenSegments.map(({ token }) => chatMentionForToken(token));
   }
 
