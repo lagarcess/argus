@@ -99,10 +99,12 @@ import {
   isMissingConversationLoadError,
   POST_TURN_TITLE_REFRESH_DELAYS_MS,
 } from "@/lib/chat-conversation-view-helpers";
+import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
+  researchSourcesForFinalPayload,
 } from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
@@ -110,7 +112,6 @@ import {
   retryableAssistantRecoveryCode,
 } from "@/lib/chat-recovery-display";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
-import { researchSourcesFromMetadata } from "@/lib/chat-discovery-sidecar";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
   loadAllConversationMessagePages,
@@ -1386,12 +1387,7 @@ export default function ChatInterface() {
             resultFactHeadingKeyFromMetadata(finalPayload);
           const finalTextNextExperiments =
             nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
-          // The typed citations must reach the live turn, not only a later
-          // hydration: an answer that cited pages should offer them now.
-          const finalResearchSources =
-            researchSourcesFromMetadata(finalPayload).length > 0
-              ? researchSourcesFromMetadata(finalPayload)
-              : undefined;
+          const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
           const finalTextPresentation =
             action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
@@ -1882,17 +1878,8 @@ export default function ChatInterface() {
   };
 
   function activeConfirmationIdFromMessages(): string | null {
-    // Read through the ref: the undo toast's handler outlives the render
-    // that created it, and a stale closure would undo the wrong card.
-    const current = latestMessagesRef.current;
-    for (let index = current.length - 1; index >= 0; index -= 1) {
-      const candidate = current[index]?.confirmation;
-      if (!candidate) continue;
-      if (candidate.confirmation_state === "active" || !candidate.confirmation_state) {
-        return candidate.confirmation_id ?? null;
-      }
-    }
-    return null;
+    // Through the ref: the undo toast outlives its render.
+    return activeConfirmationIdFrom(latestMessagesRef.current);
   }
 
   function appendSupersedingConfirmation(

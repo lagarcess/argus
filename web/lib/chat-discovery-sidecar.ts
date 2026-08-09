@@ -135,3 +135,16 @@ export function researchSourcesFromMetadata(
     .filter((source): source is DiscoverySource => source !== null)
     .slice(0, MAX_SOURCES);
 }
+
+/**
+ * Citations for a streamed turn, or undefined when it carried none.
+ *
+ * The panel must be fed by the live turn and not only by a later hydration:
+ * an answer that cited pages should offer them the moment it lands.
+ */
+export function researchSourcesForFinalPayload(
+  payload: Record<string, unknown> | null | undefined,
+): DiscoverySource[] | undefined {
+  const sources = researchSourcesFromMetadata(payload);
+  return sources.length > 0 ? sources : undefined;
+}

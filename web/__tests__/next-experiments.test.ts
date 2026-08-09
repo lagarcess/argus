@@ -206,7 +206,7 @@ describe("research citations reach the live turn", () => {
     );
     // A turn that cited pages must offer them when it lands, not after a
     // reload: the panel is fed from the final payload too.
-    expect(chat).toContain("researchSourcesFromMetadata(finalPayload)");
+    expect(chat).toContain("researchSourcesForFinalPayload(finalPayload)");
     expect(chat).toContain("researchSources: finalResearchSources");
     const merge = readFileSync(
       join(import.meta.dir, "../lib/chat-final-message.ts"),
