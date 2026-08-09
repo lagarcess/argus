@@ -370,3 +370,33 @@ def test_survey_rows_may_come_from_the_results_not_only_a_lookup_table(
     rows = json.dumps(result.stage_patch["next_experiments"]["rows"])
     assert "NVDA" in rows
     assert "NOTAREALTICKER" not in rows
+
+
+def test_a_survey_looks_past_untradable_movers_for_a_runnable_row(
+    monkeypatch,
+) -> None:
+    """Movers lists lead with micro caps the catalog cannot trade. Ending on
+    "nothing to test" while the answer names NVDA is a dead end, not honesty."""
+    _classify(monkeypatch, question_kind="market_pulse", symbols=[])
+    untradable = [f"ZZZ{index}" for index in range(14)]
+    document = agent_response(text="Small caps led; NVDA rose 2.3%.", tickers=[])
+    document["output"][1]["results"] = [
+        {
+            "category": "market_movers",
+            "content": "movers",
+            "sources": [],
+            "tickers": [*untradable, "NVDA"],
+        }
+    ]
+    document["output"][1]["categories"] = ["market_movers"]
+    document["output"][1]["tickers"] = [*untradable, "NVDA"]
+    _wire(monkeypatch, [document])
+
+    result = _run("What are the biggest movers today?")
+
+    assert result is not None
+    rows = result.stage_patch["next_experiments"]["rows"]
+    assert rows, "a survey naming a tradable asset must end somewhere runnable"
+    assert "NVDA" in json.dumps(rows)
+    for symbol in untradable:
+        assert symbol not in json.dumps(rows)

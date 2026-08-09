@@ -20,6 +20,7 @@ from loguru import logger
 from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     MAX_ANSWER_CHARS,
+    MAX_PACKET_TICKERS,
     MAX_PEER_PAIRS,
     MAX_SOURCES,
     MAX_URL_CHARS,
@@ -208,7 +209,7 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
     return ResearchPacket(
         answer_markdown=answer[:MAX_ANSWER_CHARS],
         categories=tuple(categories[:12]),
-        tickers=tuple(tickers[:12]),
+        tickers=tuple(tickers[:MAX_PACKET_TICKERS]),
         sources=tuple(sources[:MAX_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
         usage=ResearchUsage(

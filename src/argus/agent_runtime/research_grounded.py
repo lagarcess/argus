@@ -57,6 +57,7 @@ from argus.domain.research.config import (
     capability_class_for_shape,
 )
 from argus.domain.research.contracts import (
+    MAX_PEER_PAIRS,
     CapabilityClass,
     QuestionShape,
     ResearchNamePair,
@@ -68,6 +69,7 @@ if TYPE_CHECKING:
     from argus.agent_runtime.research_answer import ResearchQueryExtraction
 
 RESEARCH_SCHEMA_VERSION = "argus_research/v1"
+SURVEY_CANDIDATE_SCAN_LIMIT = 32
 
 
 def _cache_key_for(
@@ -202,7 +204,13 @@ def _packet_stage_result(
             for symbol in packet.tickers
             if symbol.upper() not in seen
         )
-    peers = verified_peers(candidates, exclude={s["symbol"] for s in subjects})
+    peers = verified_peers(
+        candidates,
+        exclude={s["symbol"] for s in subjects},
+        # Surveys name many assets and lead with whatever moved most, which
+        # is often untradable here; look past those before giving up.
+        scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
+    )
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the

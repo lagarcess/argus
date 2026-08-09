@@ -41,15 +41,21 @@ def verified_peers(
     *,
     exclude: set[str],
     probe: Callable[[str], bool] | None = None,
+    scan_limit: int = MAX_PEER_PAIRS,
 ) -> list[dict[str, str]]:
     """Resolver, asset-class, and coverage gates over provider name pairs.
 
     The resolver owns identity and display name; a name the catalog cannot
     resolve never becomes tappable, whatever the provider claimed.
+
+    ``scan_limit`` bounds how many candidates are examined, not how many
+    survive. A market survey lists whatever moved, so its first names are
+    often micro caps the catalog cannot trade; scanning further is what lets
+    the answer still end on a name the user can actually test.
     """
     peers: list[dict[str, str]] = []
     seen = {symbol.upper() for symbol in exclude}
-    for pair in list(name_pairs)[:MAX_PEER_PAIRS]:
+    for pair in list(name_pairs)[: max(scan_limit, 1)]:
         candidate = pair.symbol.strip().upper()
         if not candidate or candidate in seen:
             continue

@@ -23,6 +23,10 @@ CapabilityClass = Literal[
 MAX_ANSWER_CHARS = 20_000
 MAX_SOURCES = 5
 MAX_PEER_PAIRS = 12
+# Survey answers name many assets and lead with whatever moved most, which is
+# often untradable here; the packet keeps enough of them that the resolver can
+# still find one the user can test.
+MAX_PACKET_TICKERS = 32
 MAX_URL_CHARS = 512
 
 # Perplexity-owned hosts never appear in user-facing output: route receipts and

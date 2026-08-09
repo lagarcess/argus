@@ -493,7 +493,7 @@ export default function ChatMessage({
                     >
                       <NextMoveTitle>
                         {testVerb}
-                        {hasName ? ` ${candidate.name}` : ""}
+                        {hasName ? ` ${candidate.name}` : ""}{" "}
                         <NextMoveTicker>{candidate.symbol}</NextMoveTicker>
                       </NextMoveTitle>
                       {candidate.reason_text ? (
@@ -673,9 +673,10 @@ export default function ChatMessage({
                           {row.labelParts
                             ? row.labelParts.map((part, partIndex) =>
                                 part.type === "ticker" ? (
-                                  <NextMoveTicker key={partIndex}>
-                                    {part.value}
-                                  </NextMoveTicker>
+                                  <span key={partIndex}>
+                                    {" "}
+                                    <NextMoveTicker>{part.value}</NextMoveTicker>
+                                  </span>
                                 ) : (
                                   <span key={partIndex}>{part.value}</span>
                                 ),
