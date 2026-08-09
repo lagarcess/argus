@@ -1420,6 +1420,7 @@
     "page_title": "Probado con Argus",
     "eyebrow": "Compartido contigo",
     "provenance": "Probado con Argus",
+    "wordmark": "ARGUS",
     "framing": {
       "headline": "Esto es un qué habría pasado, no un consejo.",
       "detail": "Alguien tuvo curiosidad por saber cómo le habría ido a esta idea, así que Argus la revisó con lo que el mercado hizo de verdad en esas fechas. No se movió dinero real, nadie compró nada, y esto no dice nada sobre lo que va a pasar.",
@@ -1434,15 +1435,18 @@
     },
     "plan": {
       "heading": "Qué se ejecutó",
-      "buy_and_hold": "Compró una vez, al principio, y mantuvo hasta el final.",
-      "dca": "Compró {{cadence}}, sin importar el precio de ese día.",
+      "buy_and_hold": "Compró una vez al principio y mantuvo hasta el final. Nunca vendió.",
+      "dca": "Compró {{cadence}}, sin importar el precio de ese día. Nunca vendió.",
       "buy_the_dip": "Compró después de cada caída fuerte y vendió una semana más tarde.",
-      "indicator": "Compró cuando {{indicator}} bajó a {{entry}} y vendió cuando volvió a {{exit}}.",
-      "crossover": "Compró cuando el {{fast_indicator}} de {{fast_period}} días cruzó por encima del {{slow_indicator}} de {{slow_period}} días.",
+      "indicator_entry": "Compró cuando {{indicator}} bajó a {{entry}}.",
+      "indicator_exit": "Vendió cuando {{indicator}} volvió a {{exit}}.",
+      "crossover_entry": "Compró cuando el promedio de {{fast_period}} días subió por encima del de {{slow_period}} días.",
       "crossover_exit_mirrored": "Vendió cuando volvió a cruzar por debajo.",
-      "crossover_exit_own": "Vendió cuando el {{fast_indicator}} de {{fast_period}} días cruzó por debajo del {{slow_indicator}} de {{slow_period}} días.",
-      "macd": "Compró y vendió con cruces de MACD, {{fast_period}} contra {{slow_period}} y señal de {{signal_period}}.",
-      "unnamed": "Se ejecutó como {{label}}."
+      "crossover_exit_own": "Vendió cuando el promedio de {{fast_period}} días bajó por debajo del de {{slow_period}} días.",
+      "macd_entry": "Compró cuando el MACD cruzó por encima de su línea de señal.",
+      "macd_exit": "Vendió cuando el MACD cruzó por debajo de su línea de señal.",
+      "unnamed": "Se ejecutó como {{label}}.",
+      "long_only": "Estos números quedaron fijos y no van a cambiar."
     },
     "cadence_values": {
       "daily": "cada día",
@@ -1556,8 +1560,7 @@
       "exit_slow_period": "Ventana lenta al salir",
       "signal_period": "Ventana de señal",
       "entry_threshold": "Compra en",
-      "exit_threshold": "Vende en",
-      "direction": "Dirección"
+      "exit_threshold": "Vende en"
     }
   }
 }

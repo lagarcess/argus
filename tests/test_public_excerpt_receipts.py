@@ -681,7 +681,9 @@ def test_an_indicator_receipt_freezes_the_rules_that_produced_it() -> None:
     assert facts["indicator_period"] == "14"
     assert facts["entry_threshold"] == "30"
     assert facts["exit_threshold"] == "70"
-    assert facts["direction"] == "below"
+    # Direction is deliberately absent: Argus is long only, so a frozen "below"
+    # names which way the indicator moved and not a position taken.
+    assert "direction" not in facts
 
 
 def test_two_indicator_runs_with_different_rules_do_not_look_identical() -> None:
@@ -723,7 +725,7 @@ def test_a_crossover_receipt_freezes_both_of_its_windows() -> None:
     assert facts["fast_period"] == "20"
     assert facts["slow_indicator"] == "sma"
     assert facts["slow_period"] == "50"
-    assert facts["direction"] == "bullish"
+    assert "direction" not in facts
     # Named for what ran, not for the execution type that carried it.
     assert facts["strategy_type"] == "moving average crossover"
 
@@ -1122,3 +1124,30 @@ def test_a_differing_exit_is_covered_by_the_registry_walk_too() -> None:
     for key in ("fast_indicator", "fast_period", "slow_indicator", "slow_period"):
         assert key in facts
         assert f"exit_{key}" in facts
+
+
+def test_no_shape_publishes_a_direction() -> None:
+    """Argus executes long only, so direction cannot be published at all.
+
+    ``_build_long_only_execution_ledger`` is the whole execution path, so a frozen
+    "bearish" describes which way two averages crossed, never a short position. On a
+    public page beside a sell rule it reads as shorting a stock, which is a capability
+    Argus does not have. The rendered sentence carries the crossing direction instead.
+    """
+    from argus.api.public_excerpt_schemas import StrategyFactKey
+
+    assert "direction" not in get_args(StrategyFactKey)
+    for snapshot in (
+        INDICATOR_CONFIG_SNAPSHOT,
+        CROSSOVER_CONFIG_SNAPSHOT,
+        CROSSOVER_DIFFERING_EXIT_CONFIG_SNAPSHOT,
+        MACD_CONFIG_SNAPSHOT,
+        DCA_CONFIG_SNAPSHOT,
+        BUY_AND_HOLD_CONFIG_SNAPSHOT,
+        BUY_THE_DIP_CONFIG_SNAPSHOT,
+    ):
+        payload = _payload(run_config_snapshot=snapshot)
+        keys = {fact.key for fact in payload.strategy_facts}
+        assert "direction" not in keys, snapshot.get("template")
+        # And nothing in the payload spells it out in prose either.
+        assert "bearish" not in payload.model_dump_json().lower()

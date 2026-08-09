@@ -5,17 +5,25 @@ import type {
 import { interpolate, type ReceiptCopy } from "./receipt-copy";
 
 /**
- * Turns the frozen strategy facts into one or two sentences a person can read.
+ * Turns the frozen strategy facts into the rules a person can read.
  *
- * The facts stay frozen, closed, and complete in the payload; this composes them
- * at view time, in the viewer's language, the same way the field labels already
- * do. Twelve label and value pairs is a correct description of a crossover and
- * nobody reads it, so the same truth is stated as prose and the exact settings
- * move to the fine print.
+ * The facts stay frozen, closed and complete in the payload; this composes them at
+ * view time, in the viewer's language, the same way the field labels already do.
+ *
+ * One row per rule, and only the rules that exist. Two of the five executable
+ * strategies never sell (buy and hold and recurring buys both set every exit to
+ * false in the engine), so a fixed buy-against-sell layout would be built around
+ * the exception and leave the common case holding an empty half.
  */
+export type ReceiptPlanRow = {
+  /** The rule in plain words. */
+  text: string;
+  /** The frozen parameters behind it, or null when the rule has none to show. */
+  exact: string | null;
+};
+
 export type ReceiptPlan = {
-  /** One or two sentences, in the viewer's language. */
-  sentences: string[];
+  rows: ReceiptPlanRow[];
   /** Every frozen fact, for the fine print, in payload order. */
   settings: { key: PublicReceiptStrategyFactKey; value: string }[];
 };
@@ -26,6 +34,11 @@ function indicatorName(value: string | undefined): string {
   return /^[a-z]{2,5}$/.test(value) ? value.toUpperCase() : value;
 }
 
+function joinExact(...parts: (string | undefined)[]): string | null {
+  const kept = parts.filter((part): part is string => Boolean(part && part.trim()));
+  return kept.length ? kept.join(" · ") : null;
+}
+
 export function receiptPlan(
   payload: PublicReceiptPayload,
   copy: ReceiptCopy,
@@ -33,67 +46,94 @@ export function receiptPlan(
   const facts = new Map<string, string>(
     payload.strategy_facts.map((fact) => [fact.key, fact.value]),
   );
-  const plan = copy.plan;
   const read = (key: string) => facts.get(key);
-  const sentences: string[] = [];
-
+  const plan = copy.plan;
+  const rows: ReceiptPlanRow[] = [];
   const shape = read("strategy_type") ?? "";
+
   if (facts.has("fast_period") && facts.has("slow_period")) {
     if (shape.includes("macd")) {
-      sentences.push(
-        interpolate(plan.macd, {
-          fast_period: read("fast_period") ?? "",
-          slow_period: read("slow_period") ?? "",
-          signal_period: read("signal_period") ?? "",
-        }),
-      );
+      rows.push({
+        text: plan.macd_entry,
+        exact: joinExact(read("fast_period"), read("slow_period"), read("signal_period")),
+      });
+      rows.push({ text: plan.macd_exit, exact: null });
     } else {
-      sentences.push(
-        interpolate(plan.crossover, {
+      rows.push({
+        text: interpolate(plan.crossover_entry, {
           fast_period: read("fast_period") ?? "",
-          fast_indicator: indicatorName(read("fast_indicator")),
           slow_period: read("slow_period") ?? "",
-          slow_indicator: indicatorName(read("slow_indicator")),
         }),
-      );
-      // The exit side only carries its own facts when it differs from the entry,
-      // so its absence is the statement that it mirrors the entry.
-      sentences.push(
-        facts.has("exit_fast_period")
+        exact: joinExact(
+          [indicatorName(read("fast_indicator")), read("fast_period")]
+            .filter(Boolean)
+            .join(" "),
+          [indicatorName(read("slow_indicator")), read("slow_period")]
+            .filter(Boolean)
+            .join(" "),
+        ),
+      });
+      // The exit side only carries its own facts when it differs from the entry, so
+      // their absence is the statement that it mirrors the entry.
+      const ownExit = facts.has("exit_fast_period");
+      rows.push({
+        text: ownExit
           ? interpolate(plan.crossover_exit_own, {
               fast_period: read("exit_fast_period") ?? "",
-              fast_indicator: indicatorName(read("exit_fast_indicator")),
               slow_period: read("exit_slow_period") ?? "",
-              slow_indicator: indicatorName(read("exit_slow_indicator")),
             })
           : plan.crossover_exit_mirrored,
-      );
+        exact: ownExit
+          ? joinExact(
+              [indicatorName(read("exit_fast_indicator")), read("exit_fast_period")]
+                .filter(Boolean)
+                .join(" "),
+              [indicatorName(read("exit_slow_indicator")), read("exit_slow_period")]
+                .filter(Boolean)
+                .join(" "),
+            )
+          : null,
+      });
     }
   } else if (facts.has("indicator") && facts.has("entry_threshold")) {
-    sentences.push(
-      interpolate(plan.indicator, {
-        indicator: indicatorName(read("indicator")),
+    const indicator = indicatorName(read("indicator"));
+    rows.push({
+      text: interpolate(plan.indicator_entry, {
+        indicator,
         entry: read("entry_threshold") ?? "",
-        exit: read("exit_threshold") ?? "",
       }),
-    );
+      exact: joinExact([indicator, read("indicator_period")].filter(Boolean).join(" ")),
+    });
+    if (facts.has("exit_threshold")) {
+      rows.push({
+        text: interpolate(plan.indicator_exit, {
+          indicator,
+          exit: read("exit_threshold") ?? "",
+        }),
+        exact: null,
+      });
+    }
   } else if (facts.has("cadence")) {
     const cadence = read("cadence") ?? "";
     const phrase =
       (copy.cadence_values as Record<string, string>)[cadence] ?? cadence;
-    sentences.push(interpolate(plan.dca, { cadence: phrase }));
+    // The cadence is already the subject of the sentence, so repeating it as a
+    // parameter would say the same thing twice.
+    rows.push({ text: interpolate(plan.dca, { cadence: phrase }), exact: null });
   } else if (shape.includes("dip")) {
-    sentences.push(plan.buy_the_dip);
+    // Its trigger is fixed in the engine, so there is nothing frozen to show.
+    rows.push({ text: plan.buy_the_dip, exact: null });
   } else if (shape.includes("buy and hold")) {
-    sentences.push(plan.buy_and_hold);
+    rows.push({ text: plan.buy_and_hold, exact: null });
   } else {
-    sentences.push(
-      interpolate(plan.unnamed, { label: payload.strategy_label ?? shape }),
-    );
+    rows.push({
+      text: interpolate(plan.unnamed, { label: payload.strategy_label ?? shape }),
+      exact: null,
+    });
   }
 
   return {
-    sentences: sentences.filter(Boolean),
+    rows,
     settings: payload.strategy_facts
       .filter((fact) => fact.key !== "strategy_type")
       .map((fact) => ({ key: fact.key, value: fact.value })),
@@ -133,4 +173,14 @@ export function benchmarkVerdict(
     value: rounded,
     symbol,
   });
+}
+
+/** What the benchmark itself did, for the line beside the headline number. */
+export function benchmarkReturn(payload: PublicReceiptPayload): string | null {
+  if (!payload.benchmark_symbol) return null;
+  return (
+    payload.metrics.find((metric) =>
+      ["benchmark_return_pct", "benchmark_return"].includes(metric.key),
+    )?.value ?? null
+  );
 }

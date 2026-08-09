@@ -30,16 +30,6 @@ function source(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-/** The closed key set, read from the contract so no list is kept here by hand. */
-function strategyFactKeys(): string[] {
-  const contract = source(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
-  const start = contract.indexOf("PublicReceiptStrategyFactKey =");
-  const union = contract.slice(start, contract.indexOf(";", start));
-  const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
-  if (keys.length < 12) throw new Error("strategy fact key union not parsed");
-  return keys;
-}
-
 /**
  * Structural assertions below are about code, not prose. Comments on these files
  * legitimately name the things the code must not touch (that is what the comments
@@ -50,6 +40,18 @@ function code(path: string): string {
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "")
     .replace(/([^:])\/\/.*$/gm, "$1");
+}
+
+/** The closed key set, read from the contract so no list is kept here by hand. */
+function strategyFactKeys(): string[] {
+  // Comments are stripped first: they legitimately quote the vocabulary the union
+  // deliberately excludes, and a naive scan reads those quotes as members.
+  const contract = code(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
+  const start = contract.indexOf("PublicReceiptStrategyFactKey =");
+  const union = contract.slice(start, contract.indexOf(";", start));
+  const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
+  if (keys.length < 10) throw new Error("strategy fact key union not parsed");
+  return keys;
 }
 
 const VALID_ID = "abcdefghijklmnopqrstuvwx";
@@ -278,14 +280,21 @@ describe("the preview image inherits the never-expose list", () => {
   test("it renders a named subset of the frozen payload and nothing else", () => {
     const body = source(OG_IMAGE_ROUTE);
     expect(body).toContain("PREVIEW_FIELDS");
-    for (const field of [
-      "idea_title",
-      "symbols",
-      "date_range.display",
-      "headline_metric.label",
-      "headline_metric.value",
-    ]) {
+    for (const field of ["headline_metric.value", "benchmark_verdict"]) {
       expect(body).toContain(field);
+    }
+  });
+
+  test("the card publishes less than the page, on purpose", () => {
+    // A 1200 pixel card lands in a chat bubble around 250 to 320 pixels wide, so
+    // everything on it divides by roughly four. The title, symbols and dates were
+    // unreadable at that size, and platforms render og:title as text beside the
+    // image anyway, so keeping them inside the image only competed with the number.
+    const body = source(OG_IMAGE_ROUTE);
+    const start = body.indexOf("export const PREVIEW_FIELDS");
+    const allowlist = body.slice(start, body.indexOf("] as const", start));
+    for (const dropped of ["idea_title", "symbols", "date_range"]) {
+      expect(allowlist).not.toContain(dropped);
     }
   });
 
@@ -415,15 +424,10 @@ describe("viewer language", () => {
 });
 
 describe("the strategy a receipt shows", () => {
-  test("every frozen fact still reaches the page, in the fine print", () => {
-    // The facts moved out of the headline and into the fine print; none of them
-    // was dropped. The plan is composed from the payload, and the fine print maps
-    // over the whole set rather than a chosen subset.
+  test("the rules shown are composed from the frozen facts", () => {
     const plan = source(join(WEB_ROOT, "lib/receipt-plan.ts"));
     expect(plan).toContain("payload.strategy_facts");
-    const body = source(RECEIPT_BODY);
-    expect(body).toContain("plan.settings.map");
-    expect(body).toContain("copy.strategy_facts[fact.key]");
+    expect(source(RECEIPT_BODY)).toContain("plan.rows.map");
   });
 
   test("labels are the viewer's language and values stay frozen", () => {
@@ -437,6 +441,10 @@ describe("the strategy a receipt shows", () => {
           (bundle.strategy_facts as Record<string, string>)[key]?.length,
         ).toBeGreaterThan(0);
       }
+      // Direction is not published, so a label for it would be dead copy.
+      expect(
+        (bundle.strategy_facts as Record<string, string>).direction,
+      ).toBeUndefined();
     }
     expect(enCommon.receipt.strategy_facts.indicator).not.toBe(
       esCommon.receipt.strategy_facts.indicator,
@@ -448,7 +456,7 @@ describe("the strategy a receipt shows", () => {
     // cannot name would render as a raw identifier on a public page.
     const schema = source(
       join(WEB_ROOT, "../src/argus/api/public_excerpt_schemas.py"),
-    );
+    ).replace(/^\s*#.*$/gm, "");
     const start = schema.indexOf("StrategyFactKey = Literal[");
     const literal = schema.slice(start, schema.indexOf("]", start));
     const backend = [...literal.matchAll(/"(\w+)"/g)].map((match) => match[1]);
@@ -507,7 +515,7 @@ describe("the plan sentence", () => {
   }
 
   test("states a crossover's entry and its mirrored exit in words", () => {
-    const { sentences, settings } = receiptPlan(
+    const { rows, settings } = receiptPlan(
       withFacts([
         { key: "strategy_type", value: "moving average crossover" },
         { key: "fast_indicator", value: "sma" },
@@ -517,16 +525,19 @@ describe("the plan sentence", () => {
       ]),
       copy,
     );
-    expect(sentences[0]).toBe(
-      "Bought when the 20 day SMA crossed above the 50 day SMA.",
+    expect(rows[0].text).toBe(
+      "Bought when the 20 day average rose above the 50 day average.",
     );
-    expect(sentences[1]).toBe("Sold when it crossed back below.");
-    // Acronyms read as acronyms, and nothing frozen was lost on the way.
+    // The indicator names live on the exact line, so the sentence stays readable.
+    expect(rows[0].exact).toBe("SMA 20 · SMA 50");
+    expect(rows[1].text).toBe("Sold when it crossed back below.");
+    // A mirrored exit has no parameters of its own to state.
+    expect(rows[1].exact).toBeNull();
     expect(settings).toHaveLength(4);
   });
 
   test("states a differing exit as its own sentence", () => {
-    const { sentences } = receiptPlan(
+    const { rows } = receiptPlan(
       withFacts([
         { key: "strategy_type", value: "moving average crossover" },
         { key: "fast_indicator", value: "sma" },
@@ -540,45 +551,65 @@ describe("the plan sentence", () => {
       ]),
       copy,
     );
-    expect(sentences[1]).toBe(
-      "Sold when the 9 day EMA crossed below the 21 day EMA.",
+    expect(rows[1].text).toBe(
+      "Sold when the 9 day average fell below the 21 day average.",
     );
+    expect(rows[1].exact).toBe("EMA 9 · EMA 21");
   });
 
-  test("states an indicator threshold and a cadence in words", () => {
-    expect(
-      receiptPlan(
-        withFacts([
-          { key: "strategy_type", value: "rsi threshold" },
-          { key: "indicator", value: "RSI" },
-          { key: "indicator_period", value: "14" },
-          { key: "entry_threshold", value: "30" },
-          { key: "exit_threshold", value: "70" },
-        ]),
-        copy,
-      ).sentences[0],
-    ).toBe("Bought when RSI fell to 30, sold when it climbed back to 70.");
+  test("splits an indicator threshold into its buy and its sell", () => {
+    const { rows } = receiptPlan(
+      withFacts([
+        { key: "strategy_type", value: "rsi threshold" },
+        { key: "indicator", value: "RSI" },
+        { key: "indicator_period", value: "14" },
+        { key: "entry_threshold", value: "30" },
+        { key: "exit_threshold", value: "70" },
+      ]),
+      copy,
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text).toBe("Bought when RSI fell to 30.");
+    expect(rows[0].exact).toBe("RSI 14");
+    expect(rows[1].text).toBe("Sold when RSI climbed back to 70.");
+  });
 
-    expect(
-      receiptPlan(
-        withFacts([
-          { key: "strategy_type", value: "dca accumulation" },
-          { key: "cadence", value: "monthly" },
-        ]),
-        copy,
-      ).sentences[0],
-    ).toBe("Bought every month, whatever the price was that day.");
+  test("a strategy that never sells says so and stops at one rule", () => {
+    // buy_and_hold and dca_accumulation both set every exit to false in the engine,
+    // so there is no sell rule to describe and no empty half to fill.
+    const held = receiptPlan(
+      withFacts([{ key: "strategy_type", value: "buy and hold" }]),
+      copy,
+    );
+    expect(held.rows).toHaveLength(1);
+    expect(held.rows[0].text).toContain("never sold");
+
+    const recurring = receiptPlan(
+      withFacts([
+        { key: "strategy_type", value: "dca accumulation" },
+        { key: "cadence", value: "monthly" },
+      ]),
+      copy,
+    );
+    expect(recurring.rows).toHaveLength(1);
+    expect(recurring.rows[0].text).toBe(
+      "Bought every month, whatever the price was that day. It never sold.",
+    );
+    // The cadence is the subject of the sentence, so restating it would repeat.
+    expect(recurring.rows[0].exact).toBeNull();
   });
 
   test("reads in the viewer's language while the values stay frozen", () => {
-    const { sentences } = receiptPlan(
+    const { rows } = receiptPlan(
       withFacts([
         { key: "strategy_type", value: "dca accumulation" },
         { key: "cadence", value: "monthly" },
       ]),
       spanish,
     );
-    expect(sentences[0]).toBe("Compró cada mes, sin importar el precio de ese día.");
+    expect(rows[0].text).toBe(
+      "Compró cada mes, sin importar el precio de ese día. Nunca vendió.",
+    );
   });
 
   test("the comparison is stated as a verdict, not left as two numbers", () => {

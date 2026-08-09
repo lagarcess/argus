@@ -534,6 +534,12 @@ def _strategy_shape(
     spec, and naming a crossover "signal strategy" would be true of the runtime and
     useless to a reader.
 
+    Direction is deliberately not among any shape's facts. Argus executes long only
+    (see ``_build_long_only_execution_ledger``), so a frozen "bearish" names which way
+    two averages crossed and not a position taken; published beside a sell rule it
+    reads as shorting a stock. The rendered sentence carries the crossing direction
+    already.
+
     Raises rather than returning nothing for a shape it cannot describe. A caller that
     had to interpret an empty result published a page describing a strategy this
     module had declined to describe.
@@ -547,15 +553,13 @@ def _strategy_shape(
         return (
             "moving average crossover",
             _crossover_required_keys(entry_rule=entry_rule, exit_rule=exit_rule),
-            # The entry side's direction. A crossover's exit direction is its opposite
-            # by construction, so it is not a second fact.
-            ("direction",),
+            (),
         )
     if rule_type == "macd_crossover":
         return (
             "macd crossover",
             ("fast_period", "slow_period", "signal_period"),
-            ("direction",),
+            (),
         )
     if "dca_accumulation" in identity:
         return ("dca accumulation", ("cadence",), ())
@@ -575,7 +579,7 @@ def _strategy_shape(
         return (
             name,
             ("indicator", "indicator_period", "entry_threshold", "exit_threshold"),
-            ("direction",),
+            (),
         )
     # A generic rule spec is a condition tree, and an unrecognised shape is unknown by
     # definition. Neither can be flattened into key and value pairs without inventing
@@ -651,11 +655,6 @@ def _strategy_source_value(
             parameters.get("exit_threshold"),
             parameters.get("indicator_exit_threshold"),
             exit_rule.get("threshold"),
-        )
-    elif key == "direction":
-        candidates = (
-            entry_rule.get("direction"),
-            resolved_strategy.get("direction"),
         )
     elif key.startswith("exit_") and key[len("exit_") :] in CROSSOVER_WINDOW_KEYS:
         # Only the exit rule may speak for the exit side.

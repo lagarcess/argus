@@ -31,8 +31,9 @@ export type PublicReceiptStrategyFactKey =
   | "exit_fast_period"
   | "exit_slow_indicator"
   | "exit_slow_period"
-  | "signal_period"
-  | "direction";
+  // Direction is not published: Argus executes long only, so a frozen "bearish"
+  // names which way two averages crossed and not a position taken.
+  | "signal_period";
 
 export type PublicReceiptStrategyFact = {
   key: PublicReceiptStrategyFactKey;

@@ -62,7 +62,6 @@ StrategyFactKey = Literal[
     "exit_slow_indicator",
     "exit_slow_period",
     "signal_period",
-    "direction",
 ]
 
 

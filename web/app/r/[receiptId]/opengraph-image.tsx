@@ -31,15 +31,13 @@ export const alt = "Tested with Argus";
 
 // The whole of what may appear on the card. Adding to this list is a deliberate
 // change to what Argus publishes, and it is asserted by test.
+// Deliberately shorter than the page. A 1200 pixel card is displayed in a chat
+// bubble around 250 to 320 pixels wide, so everything divides by about four and
+// anything under roughly eleven effective pixels is decoration. The title, the
+// symbols and the dates came off: platforms render og:title as text beside the
+// image, so putting it inside the image only competed with the number.
 export const PREVIEW_FIELDS = [
-  "idea_title",
-  "symbols",
-  "date_range.display",
-  "headline_metric.label",
   "headline_metric.value",
-  // The comparison is the point of the card. It is composed at render time from
-  // metrics already on this list plus the frozen benchmark symbol, so it discloses
-  // no field the page does not already show.
   "benchmark_verdict",
 ] as const;
 
@@ -66,17 +64,13 @@ function cardCopy(language: "en" | "es-419") {
     framing: copy.framing.short,
     provenance: copy.provenance,
     gone: copy.tombstone.title,
+    wordmark: copy.wordmark,
   };
 }
 
 function previewFacts(payload: PublicReceiptPayload, language: "en" | "es-419") {
-  const headline = headlineReceiptMetric(payload);
   return {
-    title: payload.idea_title,
-    symbols: payload.symbols.join(", "),
-    dates: payload.date_range.display,
-    metricLabel: headline?.label ?? "",
-    metricValue: headline?.value ?? "",
+    metricValue: headlineReceiptMetric(payload)?.value ?? "",
     verdict: benchmarkVerdict(payload, receiptCopy(language)) ?? "",
   };
 }
@@ -170,50 +164,63 @@ export default async function Image({
 
   const copy = cardCopy(result.payload.content_language);
   const facts = previewFacts(result.payload, result.payload.content_language);
+  const negative = facts.metricValue.trim().startsWith("-");
   return new ImageResponse(
     (
       <Frame>
-        <ProvenanceRow label={copy.provenance} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div
             style={{
               display: "flex",
-              fontSize: 40,
-              lineHeight: 1.15,
+              width: 26,
+              height: 26,
+              borderRadius: 999,
+              background: ACCENT,
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              fontSize: 46,
               fontWeight: 500,
-              letterSpacing: -0.8,
-              color: "rgba(255,255,255,0.88)",
+              letterSpacing: 1,
+              color: FOREGROUND,
             }}
           >
-            {facts.title}
+            {copy.wordmark}
           </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {facts.metricValue ? (
             <div
               style={{
                 display: "flex",
-                fontSize: 150,
-                lineHeight: 1.02,
+                fontSize: 200,
+                lineHeight: 0.94,
                 fontWeight: 500,
-                letterSpacing: -6,
-                color: facts.metricValue.trim().startsWith("-")
-                  ? NEGATIVE
-                  : ACCENT,
+                letterSpacing: -8,
+                color: negative ? NEGATIVE : ACCENT,
               }}
             >
               {facts.metricValue}
             </div>
           ) : null}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {facts.verdict ? (
-            <div style={{ display: "flex", fontSize: 34, color: FOREGROUND }}>
+            <div
+              style={{
+                display: "flex",
+                fontSize: 56,
+                fontWeight: 500,
+                letterSpacing: -1,
+                color: FOREGROUND,
+              }}
+            >
               {facts.verdict}
             </div>
           ) : null}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", fontSize: 28, color: FOREGROUND }}>
-            {[facts.symbols, facts.dates].filter(Boolean).join("  ·  ")}
-          </div>
-          <div style={{ display: "flex", fontSize: 24, color: MUTED }}>
+          <div style={{ display: "flex", fontSize: 44, color: MUTED }}>
             {copy.framing}
           </div>
         </div>

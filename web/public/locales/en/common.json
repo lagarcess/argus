@@ -1420,6 +1420,7 @@
     "page_title": "Tested with Argus",
     "eyebrow": "Shared with you",
     "provenance": "Tested with Argus",
+    "wordmark": "ARGUS",
     "framing": {
       "headline": "This is a what if, not a tip.",
       "detail": "Someone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.",
@@ -1434,15 +1435,18 @@
     },
     "plan": {
       "heading": "What ran",
-      "buy_and_hold": "Bought once, at the start, and held the whole way.",
-      "dca": "Bought {{cadence}}, whatever the price was that day.",
+      "buy_and_hold": "Bought once at the start and held to the end. It never sold.",
+      "dca": "Bought {{cadence}}, whatever the price was that day. It never sold.",
       "buy_the_dip": "Bought after each sharp drop, then sold about a week later.",
-      "indicator": "Bought when {{indicator}} fell to {{entry}}, sold when it climbed back to {{exit}}.",
-      "crossover": "Bought when the {{fast_period}} day {{fast_indicator}} crossed above the {{slow_period}} day {{slow_indicator}}.",
+      "indicator_entry": "Bought when {{indicator}} fell to {{entry}}.",
+      "indicator_exit": "Sold when {{indicator}} climbed back to {{exit}}.",
+      "crossover_entry": "Bought when the {{fast_period}} day average rose above the {{slow_period}} day average.",
       "crossover_exit_mirrored": "Sold when it crossed back below.",
-      "crossover_exit_own": "Sold when the {{fast_period}} day {{fast_indicator}} crossed below the {{slow_period}} day {{slow_indicator}}.",
-      "macd": "Bought and sold on MACD crossovers, {{fast_period}} against {{slow_period}} with a {{signal_period}} signal.",
-      "unnamed": "Ran as {{label}}."
+      "crossover_exit_own": "Sold when the {{fast_period}} day average fell below the {{slow_period}} day average.",
+      "macd_entry": "Bought when MACD crossed above its signal line.",
+      "macd_exit": "Sold when MACD crossed back below its signal line.",
+      "unnamed": "Ran as {{label}}.",
+      "long_only": "These numbers are locked and will not change."
     },
     "cadence_values": {
       "daily": "every day",
@@ -1556,8 +1560,7 @@
       "exit_slow_period": "Slow window on exit",
       "signal_period": "Signal window",
       "entry_threshold": "Buys at",
-      "exit_threshold": "Sells at",
-      "direction": "Direction"
+      "exit_threshold": "Sells at"
     }
   }
 }
