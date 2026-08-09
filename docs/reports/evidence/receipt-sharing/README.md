@@ -29,6 +29,10 @@ these captures exist only to show what the surface does once it is turned on.
 | `16-receipt-phone-es-crossover.png` | The crossover receipt in Spanish. The window labels translate, the frozen values do not. |
 | `17-preview-card-crossover.png` | The crossover receipt's preview card. |
 | `18-data-controls-phone-es.png` | The receipt list in Spanish inside the mobile sheet. |
+| `19-receipt-phone-en-crossover-exit.png` | A crossover whose exit windows differ from its entry windows, which the rule compiler allows. Entry sma 20/50, then ema 9/21 on exit. Reading the windows from the entry rule alone would have stated an exit that never ran. |
+| `20-receipt-phone-es-crossover-exit.png` | The same receipt in Spanish. The exit labels translate, the frozen values do not. |
+| `21-preview-card-crossover-exit.png` | Its preview card. |
+| `crossover-differing-exit-rendered-text.json` | The rendered body text of both, so the entry and exit values can be compared without opening an image. |
 | `crossover-rendered-text.json` | The crossover receipt's rendered body text in both languages, so the parameter labels and frozen values can be read without opening an image. |
 | `data-controls-capture-steps.json` | The click path each Data Controls capture actually took, and the rendered text at the end of it. |
 | `flag-off-byte-identity.json` | Nine flag-off probes with status, header names and body, and the digest they hash to. The same digest comes out at base `01044cda`, where no receipt code exists at all. |
@@ -103,3 +107,18 @@ than restated.
   the profile's language, so `18` sets it through `PATCH /me` the way the language
   picker does. The receipt page itself is server-rendered from the request header,
   so `04`, `07` and `16` are genuine header-driven captures.
+
+## Fail closed, and what is therefore not capturable
+
+A receipt now either states the strategy in full or is never created. There is no
+screenshot of a partially described receipt because that state no longer exists: a
+generic `rule_spec` condition tree, or any shape without a projection, answers `422`
+`receipt_source_unsupported` and nothing is persisted. That refusal is covered by
+`tests/test_public_excerpt_api.py`, which asserts the status, the code, the
+owner-facing wording, and that no snapshot was written.
+
+Every screenshot in this directory was verified by reading its rendered text, not by
+looking at the file. Two capture attempts in this lane produced plausible-looking
+images that were wrong, one from intercepting a request that a server-rendered page
+never makes and one from pointing the web server at the wrong API variable, so the
+text is the check and the image is the illustration.
