@@ -873,6 +873,10 @@
       "delete_account": "Eliminar cuenta",
       "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
       "display_name_save_error": "No pudimos guardar ese nombre todavía.",
+      "preferred_name": "¿Cómo quieres que Argus te llame?",
+      "preferred_name_placeholder": "Déjalo vacío para no usar nombre",
+      "preferred_name_unset": "Sin definir",
+      "preferred_name_save_error": "No se pudo guardar ese nombre todavía.",
       "language_save_error": "No pudimos actualizar el idioma todavía.",
       "avatar_theme": {
         "label": "Color del avatar",

@@ -559,8 +559,13 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
+  /** Empty clears it, which is how a user opts out of being addressed by name. */
+  preferred_name?: string | null;
   avatar_theme?: AvatarTheme;
 };
+
+/** Matches the backend's `PREFERRED_NAME_MAX_LENGTH`. */
+export const PREFERRED_NAME_MAX_LENGTH = 40;
 
 export async function getMe() {
   return apiFetch<UserResponse>("/me");

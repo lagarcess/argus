@@ -19,6 +19,8 @@ type EmptyChatSurfaceProps = {
   guestSubmissionError: boolean;
   isStreamingResponse: boolean;
   isHydratingConversation: boolean;
+  /** A setting the user stated, never something Argus inferred. */
+  preferredName?: string | null;
   placeholder: string;
   onSend: (
     text: string,
@@ -35,6 +37,7 @@ export default function EmptyChatSurface({
   guestSubmissionError,
   isStreamingResponse,
   isHydratingConversation,
+  preferredName,
   placeholder,
   onSend,
   onRetryGuestSubmission,
@@ -57,7 +60,9 @@ export default function EmptyChatSurface({
           rests. Above it, the surface keeps its centered composition. */}
       <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
         {showSignedInGreeting ? (
-          <EmptyChatGreeting />
+          // Guests have no profile, so they never reach this and always get the
+          // nameless pool.
+          <EmptyChatGreeting preferredName={preferredName} />
         ) : (
           <EmptyChatHeading isGuest={isGuest} />
         )}

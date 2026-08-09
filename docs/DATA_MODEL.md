@@ -139,6 +139,7 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `email`: `text` (Nullable only for a verified anonymous Auth user)
 - `username`: `text` (Unique, Nullable)
 - `display_name`: `text` (Nullable)
+- `preferred_name`: `text` (Nullable; 1 to 40 characters when present)
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
@@ -172,7 +173,14 @@ product behavior reads it, and no API path writes it.
   the profile creation path. Browser detection is only a pre-auth hint; after
   authentication this row is authoritative and no frontend repair update is
   required.
-- `display_name` is used for personalization.
+- `display_name` is an identity field. It is what the account is called.
+- `preferred_name` is what Argus calls the user when it addresses them, and
+  it is deliberately separate from `display_name`: people fill an identity
+  field with a legal name. It is optional, and null means surfaces use no
+  name. It is stated in settings and never inferred from conversation, so no
+  runtime path writes it. A registered-account preference: restrictive
+  policies read the trusted `is_anonymous` JWT claim to keep it off the guest
+  surface, because anonymous Auth users share the `authenticated` role.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.

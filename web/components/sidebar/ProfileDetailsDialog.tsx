@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Check, ChevronUp, Edit2, X } from "lucide-react";
 
 import { useModalSurface } from "@/components/layout/useModalSurface";
-import type { ApiUser } from "@/lib/argus-api";
+import { PREFERRED_NAME_MAX_LENGTH, type ApiUser } from "@/lib/argus-api";
 import {
   AVATAR_THEMES,
   avatarThemeStyle,
@@ -72,6 +72,15 @@ type ProfileDetailsDialogProps = {
   isSavingName: boolean;
   nameError: string | null;
 
+  editingPreferredName: boolean;
+  preferredNameValue: string;
+  setPreferredNameValue: (value: string) => void;
+  setEditingPreferredName: (editing: boolean) => void;
+  handleStartEditPreferredName: () => void;
+  handleSavePreferredName: () => void | Promise<void>;
+  isSavingPreferredName: boolean;
+  preferredNameError: string | null;
+
   languagePickerRef: React.RefObject<HTMLDivElement | null>;
   isLanguagePickerOpen: boolean;
   setIsLanguagePickerOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -109,6 +118,14 @@ export default function ProfileDetailsDialog({
   handleSaveName,
   isSavingName,
   nameError,
+  editingPreferredName,
+  preferredNameValue,
+  setPreferredNameValue,
+  setEditingPreferredName,
+  handleStartEditPreferredName,
+  handleSavePreferredName,
+  isSavingPreferredName,
+  preferredNameError,
   languagePickerRef,
   isLanguagePickerOpen,
   setIsLanguagePickerOpen,
@@ -398,6 +415,98 @@ export default function ProfileDetailsDialog({
                 </div>
               </div>
             )}
+
+          {/* What to call you. Its own field rather than display_name, which is
+              an identity field people fill with a legal name. Optional, because
+              being addressed by name is not universally welcome. */}
+          {accountKind === "registered" && (
+            <div className="mt-2 flex flex-col gap-1.5 border-t border-black/5 pt-3 dark:border-white/5">
+              <label
+                htmlFor="argus-profile-preferred-name"
+                className="text-[13px] text-black/50 dark:text-white/50"
+              >
+                {t(
+                  "settings.profile.preferred_name",
+                  "What should Argus call you?",
+                )}
+              </label>
+              {editingPreferredName ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    id="argus-profile-preferred-name"
+                    type="text"
+                    value={preferredNameValue}
+                    onChange={(event) =>
+                      setPreferredNameValue(
+                        event.target.value.slice(0, PREFERRED_NAME_MAX_LENGTH),
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void handleSavePreferredName();
+                      if (event.key === "Escape") setEditingPreferredName(false);
+                    }}
+                    disabled={isSavingPreferredName}
+                    maxLength={PREFERRED_NAME_MAX_LENGTH}
+                    className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+                    placeholder={t(
+                      "settings.profile.preferred_name_placeholder",
+                      "Leave blank for no name",
+                    )}
+                  />
+                  <button
+                    onClick={() => void handleSavePreferredName()}
+                    disabled={isSavingPreferredName}
+                    className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                    title={t("common.save", "Save")}
+                    aria-label={t("common.save", "Save")}
+                  >
+                    <Check
+                      className={`h-3.5 w-3.5 text-[#5ba897] ${
+                        isSavingPreferredName ? "opacity-40" : ""
+                      }`}
+                    />
+                  </button>
+                  <button
+                    onClick={() => setEditingPreferredName(false)}
+                    disabled={isSavingPreferredName}
+                    className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                    title={t("common.cancel", "Cancel")}
+                    aria-label={t("common.cancel", "Cancel")}
+                  >
+                    <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  id="argus-profile-preferred-name"
+                  type="button"
+                  onClick={handleStartEditPreferredName}
+                  className="group flex min-h-11 items-center gap-1.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/25"
+                >
+                  <span
+                    className={`text-[14px] ${
+                      profile?.preferred_name
+                        ? "text-black dark:text-white"
+                        : "text-black/35 dark:text-white/35"
+                    }`}
+                  >
+                    {profile?.preferred_name ||
+                      t("settings.profile.preferred_name_unset", "Not set")}
+                  </span>
+                  <Edit2
+                    className="h-3 w-3 text-black/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 dark:text-white/40"
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
+              {preferredNameError && (
+                <span className="text-[12px] text-[#d66d75]">
+                  {preferredNameError}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Info */}
           <div className="mt-2 flex flex-col gap-2 text-[13px]">

@@ -3605,6 +3605,11 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        preferred_name:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
         language:
           anyOf:
           - type: string
@@ -4172,6 +4177,11 @@ components:
         display_name:
           anyOf:
           - type: string
+          - type: 'null'
+        preferred_name:
+          anyOf:
+          - type: string
+            maxLength: 40
           - type: 'null'
         language:
           type: string

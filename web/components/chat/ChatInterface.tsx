@@ -2403,6 +2403,7 @@ export default function ChatInterface() {
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
+                preferredName={account?.user.preferred_name}
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}

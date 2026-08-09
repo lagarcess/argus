@@ -1,0 +1,161 @@
+"""`preferred_name` is what to call the user, and it is not `display_name`.
+
+`display_name` is an identity field people fill with a legal name or whatever
+their email gave them. Reusing it puts "What is next, Lucas Garces?" on the
+empty chat. This one is optional, stated, and separate.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+import yaml
+from argus.api.main import app
+from argus.api.schemas import (
+    PREFERRED_NAME_MAX_LENGTH,
+    ProfilePatch,
+    User,
+    guest_safe_user,
+)
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _memory_store(monkeypatch: pytest.MonkeyPatch):
+    from argus.api import state as api_state
+
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    yield
+
+
+def _client() -> TestClient:
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    return client
+
+
+def _user(**overrides) -> User:
+    now = datetime.now(timezone.utc)
+    return User(
+        id="user-1",
+        email="a@b.c",
+        created_at=now,
+        updated_at=now,
+        **overrides,
+    )
+
+
+def test_it_is_a_separate_field_from_display_name() -> None:
+    user = _user(display_name="Lucas Garces", preferred_name="Lucas")
+
+    assert user.display_name == "Lucas Garces"
+    assert user.preferred_name == "Lucas"
+
+
+def test_unset_is_the_default_and_means_no_name() -> None:
+    assert _user().preferred_name is None
+
+
+def test_blank_and_whitespace_clear_it_rather_than_storing_a_name() -> None:
+    assert _user(preferred_name="   ").preferred_name is None
+    assert ProfilePatch(preferred_name="").preferred_name is None
+    assert ProfilePatch(preferred_name="  Lucas  ").preferred_name == "Lucas"
+
+
+def test_it_is_bounded() -> None:
+    with pytest.raises(ValidationError):
+        ProfilePatch(preferred_name="x" * (PREFERRED_NAME_MAX_LENGTH + 1))
+    assert (
+        ProfilePatch(preferred_name="x" * PREFERRED_NAME_MAX_LENGTH).preferred_name
+        is not None
+    )
+
+
+def test_guests_do_not_carry_one() -> None:
+    # Guests have no profile and fall back to the nameless pool.
+    projected = guest_safe_user(_user(preferred_name="Lucas")).model_dump()
+
+    assert "preferred_name" not in projected
+
+
+def test_patch_round_trips_through_the_api() -> None:
+    client = _client()
+
+    saved = client.patch("/api/v1/me", json={"preferred_name": "  Lucas  "})
+    assert saved.status_code == 200
+    assert saved.json()["user"]["preferred_name"] == "Lucas"
+
+    read = client.get("/api/v1/me")
+    assert read.json()["user"]["preferred_name"] == "Lucas"
+
+
+def test_clearing_it_is_a_supported_edit() -> None:
+    client = _client()
+    client.patch("/api/v1/me", json={"preferred_name": "Lucas"})
+
+    cleared = client.patch("/api/v1/me", json={"preferred_name": ""})
+
+    assert cleared.status_code == 200
+    assert cleared.json()["user"]["preferred_name"] is None
+
+
+def test_a_patch_that_omits_it_leaves_it_alone() -> None:
+    # Partial update semantics: editing the language must not wipe the name.
+    client = _client()
+    client.patch("/api/v1/me", json={"preferred_name": "Lucas"})
+
+    client.patch("/api/v1/me", json={"language": "es-419", "locale": "es-419"})
+
+    assert client.get("/api/v1/me").json()["user"]["preferred_name"] == "Lucas"
+
+
+def test_an_over_long_name_is_rejected_by_the_api() -> None:
+    response = _client().patch(
+        "/api/v1/me",
+        json={"preferred_name": "x" * (PREFERRED_NAME_MAX_LENGTH + 1)},
+    )
+
+    assert response.status_code == 422
+
+
+def test_the_contract_declares_it_on_user_but_not_on_guest_user() -> None:
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+    schemas = openapi["components"]["schemas"]
+
+    assert "preferred_name" in schemas["User"]["properties"]
+    assert "preferred_name" not in schemas["GuestUser"]["properties"]
+    assert "preferred_name" in schemas["ProfilePatch"]["properties"]
+
+
+def test_the_migration_bounds_it_and_keeps_it_off_the_guest_surface() -> None:
+    migration = (
+        ROOT / "supabase" / "migrations" / "20260809140000_add_preferred_name.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "add column if not exists preferred_name text" in migration
+    assert f"between 1 and {PREFERRED_NAME_MAX_LENGTH}" in migration
+    # Anonymous Auth users share the authenticated role, so the restrictive
+    # policies read the trusted JWT claim rather than the role.
+    assert migration.count("as restrictive") == 2
+    assert "'is_anonymous') is distinct from 'true'" in migration
+
+
+def test_nothing_infers_a_preferred_name_from_conversation() -> None:
+    # This is a setting, never a memory. Guessing a nickname from how someone
+    # types would be the creepiest thing in the product.
+    writers = [
+        path
+        for path in (ROOT / "src").rglob("*.py")
+        if "preferred_name" in path.read_text(encoding="utf-8")
+    ]
+
+    assert {path.relative_to(ROOT).as_posix() for path in writers} == {
+        "src/argus/api/schemas.py"
+    }

@@ -691,7 +691,8 @@ Application-facing user object.
   "id": "uuid",
   "email": "user@email.com",
   "username": "lucas",
-  "display_name": "Lucas",
+  "display_name": "Lucas Garces",
+  "preferred_name": "Lucas",
   "language": "en",
   "locale": "en-US",
   "theme": "dark",
@@ -708,7 +709,18 @@ Application-facing user object.
 ```
 
 **Notes:**
-- `display_name` is used for personalization.
+- `display_name` is an identity field. It is what the account is called.
+- `preferred_name` is what Argus calls the user when it addresses them, and it
+  is deliberately not `display_name`: people fill an identity field with a legal
+  name, and "What is next, Lucas Garces?" reads like a form letter. It is
+  optional, because being addressed by name is not universally welcome. Null or
+  absent means surfaces use no name, which needs no special handling.
+  - Stated, never inferred. It is a setting; nothing derives it from
+    conversation, and no runtime writes it.
+  - Bounded at 40 characters. Blank or whitespace clears it, which is how a user
+    opts out after opting in.
+  - A registered-account preference. Guest responses omit it entirely, and the
+    database policies keep it off the guest surface.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -1952,7 +1964,8 @@ Update profile preferences. Partial update semantics are supported.
 **Request:**
 ```json
 {
-  "display_name": "Lucas",
+  "display_name": "Lucas Garces",
+  "preferred_name": "Lucas",
   "language": "es",
   "locale": "es-419",
   "theme": "dark",
@@ -1971,6 +1984,9 @@ Update profile preferences. Partial update semantics are supported.
 - Clients may send only the fields that changed.
 - Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- `preferred_name` is bounded at 40 characters; longer values return 422. An
+  empty or whitespace-only value clears it rather than storing a blank name.
+  Omitting it leaves it untouched, so editing another preference cannot wipe it.
 - `avatar_theme` accepts only `ocean`, `plum`, `teal`, `ember`, `gold`,
   `indigo`, or `slate`; it cannot be `null`, and invalid values return 422.
 - Avatar themes are registered-account preferences. Guests cannot update a

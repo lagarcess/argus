@@ -140,6 +140,12 @@ export default function ProfileMenu({
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [editingPreferredName, setEditingPreferredName] = useState(false);
+  const [preferredNameValue, setPreferredNameValue] = useState("");
+  const [isSavingPreferredName, setIsSavingPreferredName] = useState(false);
+  const [preferredNameError, setPreferredNameError] = useState<string | null>(
+    null,
+  );
   const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string | null>(null);
@@ -190,6 +196,7 @@ export default function ProfileMenu({
   useEffect(() => {
     if (isOpen) {
       setNameError(null);
+      setPreferredNameError(null);
       setLanguageError(null);
       getMe()
         .then(({ user, account_kind }) => {
@@ -421,6 +428,45 @@ export default function ProfileMenu({
       setIsSavingName(false);
     }
   }, [nameValue, profile, t]);
+
+  /*
+   * What to call the user, which is a setting and never a memory.
+   *
+   * Argus does not infer this from how someone types. Blank clears it, and the
+   * greeting then uses no name, which needs no special handling because most of
+   * the pool does not use one.
+   */
+  const handleSavePreferredName = useCallback(async () => {
+    const trimmed = preferredNameValue.trim();
+    const current = profile?.preferred_name ?? "";
+    if (trimmed === current) {
+      setEditingPreferredName(false);
+      return;
+    }
+    setIsSavingPreferredName(true);
+    setPreferredNameError(null);
+    try {
+      const { user } = await patchMe({ preferred_name: trimmed || null });
+      setProfile(user);
+      setEditingPreferredName(false);
+    } catch (err) {
+      console.error("Failed to update preferred name", err);
+      setPreferredNameError(
+        t(
+          "settings.profile.preferred_name_save_error",
+          "Could not save that name yet.",
+        ),
+      );
+    } finally {
+      setIsSavingPreferredName(false);
+    }
+  }, [preferredNameValue, profile, t]);
+
+  const handleStartEditPreferredName = useCallback(() => {
+    setPreferredNameValue(profile?.preferred_name ?? "");
+    setPreferredNameError(null);
+    setEditingPreferredName(true);
+  }, [profile]);
 
   const currentLanguage = normalizeEnabledLanguage(
     profile?.language ?? i18n.language,
@@ -776,6 +822,14 @@ export default function ProfileMenu({
         handleSaveName={handleSaveName}
         isSavingName={isSavingName}
         nameError={nameError}
+        editingPreferredName={editingPreferredName}
+        preferredNameValue={preferredNameValue}
+        setPreferredNameValue={setPreferredNameValue}
+        setEditingPreferredName={setEditingPreferredName}
+        handleStartEditPreferredName={handleStartEditPreferredName}
+        handleSavePreferredName={handleSavePreferredName}
+        isSavingPreferredName={isSavingPreferredName}
+        preferredNameError={preferredNameError}
         languagePickerRef={languagePickerRef}
         isLanguagePickerOpen={isLanguagePickerOpen}
         setIsLanguagePickerOpen={setIsLanguagePickerOpen}
