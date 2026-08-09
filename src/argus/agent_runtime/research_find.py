@@ -169,7 +169,7 @@ def _research_sidecar_for_find(
             "cost_usd": usage.get("cost_usd"),
             "cache_status": cache_status,
         },
-        "memory": grounded.research_memory_block(
+        "follow_up": grounded.research_follow_up_block(
             subjects=[
                 {"symbol": symbol.strip().upper(), "name": symbol.strip().upper()}
                 for symbol in (request.anchor_symbols if request else [])

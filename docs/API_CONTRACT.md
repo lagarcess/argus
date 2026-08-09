@@ -2854,8 +2854,8 @@ final payload and persisted metadata:
       {"symbol": "DIS", "name": "The Walt Disney Company", "asset_class": "equity"}
     ],
     "usage": {"invocations": 1, "latency_ms": 640, "cost_usd": 0.005, "cache_status": "miss"},
-    "memory": {
-      "schema_version": "argus_research_memory/v1",
+    "follow_up": {
+      "schema_version": "argus_research_follow_up/v1",
       "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
       "comparison_set": [],
       "peer_suggestions": ["DIS"],
@@ -2910,10 +2910,11 @@ Contract rules:
   for its assets. A full window says so, a shorter one names its real start
   ("since March 2026"), and unknown coverage drops the window wording
   entirely. The row's `send_text` carries the same window it displays.
-- `memory` is the typed producer seam for the personalization-memory
+- `follow_up` is the typed producer seam for the personalization-memory
   program (spec section 11): research subjects, the comparison set when two
   or more subjects were compared, peer suggestions, and the open thread, in
-  a consumable shape. The rail only emits; nothing reads or writes memory
+  a consumable shape. It is not a memory record and carries none of the four
+  memory categories. The rail only emits; nothing reads or writes memory
   here, and consumption ships in the memory lane.
 - `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
   ground through the balanced shape; the provider's `etf_holdings` table is
