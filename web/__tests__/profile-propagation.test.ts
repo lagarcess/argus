@@ -11,6 +11,7 @@ import {
   PREFERRED_NAME_MAX_LENGTH,
   normalizeProfileName,
   profileNameExceeds,
+  profileNameLength,
 } from "../lib/profile-names";
 import type { ApiUser, UserResponse } from "../lib/guest-account";
 
@@ -148,6 +149,25 @@ describe("a name is measured after it is normalized", () => {
   test("both name fields use the one rule", () => {
     const padded = ` ${"x".repeat(DISPLAY_NAME_MAX_LENGTH)}`;
     expect(profileNameExceeds(padded, DISPLAY_NAME_MAX_LENGTH)).toBe(false);
+  });
+
+  test("a name is measured in the units the bound is stated in", () => {
+    // String.length counts UTF-16 code units, so anything outside the BMP counts
+    // twice and the browser refused names the API and the database both take.
+    const emoji = "👍".repeat(21);
+    expect(emoji.length).toBe(42);
+    expect(profileNameLength(emoji)).toBe(21);
+    expect(profileNameExceeds(emoji, PREFERRED_NAME_MAX_LENGTH)).toBe(false);
+
+    // And it is still a bound: code points past it are refused.
+    const tooMany = "👍".repeat(PREFERRED_NAME_MAX_LENGTH + 1);
+    expect(profileNameExceeds(tooMany, PREFERRED_NAME_MAX_LENGTH)).toBe(true);
+    // Exactly at the bound is allowed, padded or not.
+    const exact = "👍".repeat(PREFERRED_NAME_MAX_LENGTH);
+    expect(profileNameExceeds(exact, PREFERRED_NAME_MAX_LENGTH)).toBe(false);
+    expect(profileNameExceeds(`  ${exact}  `, PREFERRED_NAME_MAX_LENGTH)).toBe(
+      false,
+    );
   });
 
   test("neither input truncates what the user typed", () => {

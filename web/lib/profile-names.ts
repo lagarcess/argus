@@ -28,7 +28,19 @@ export function normalizeProfileName(value: string): string {
   return value.trim();
 }
 
+/**
+ * Length in code points, which is what the bound is stated in.
+ *
+ * `String.length` counts UTF-16 code units, so every character outside the BMP
+ * counts twice: a name of 21 emoji measures 42 here and 21 to `len()` in Python
+ * and to `char_length` in Postgres. Measuring in code units made the browser
+ * refuse names the API and the database both accept.
+ */
+export function profileNameLength(value: string): number {
+  return Array.from(value).length;
+}
+
 /** Measured after normalizing, never before. */
 export function profileNameExceeds(value: string, maxLength: number): boolean {
-  return normalizeProfileName(value).length > maxLength;
+  return profileNameLength(normalizeProfileName(value)) > maxLength;
 }
