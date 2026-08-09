@@ -19,8 +19,13 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * Run and refresh with:
  *
- *   bunx playwright test -c e2e/breakpoint-baselines.playwright.config.ts
- *   bunx playwright test -c e2e/breakpoint-baselines.playwright.config.ts -u
+ *   bun run test:e2e:breakpoints
+ *   bun run test:e2e:breakpoints:update
+ *
+ * Use those scripts rather than `bunx playwright`. `bunx` resolves the latest
+ * published playwright, not the version pinned in package.json, so it would
+ * quietly re-render every baseline the day a new minor ships. `bun run` uses
+ * node_modules/.bin, which is the pinned one.
  *
  * Baselines are platform-suffixed, so a run on one OS never argues with another
  * OS's committed set. The committed set is darwin. CI is ubuntu and does not
