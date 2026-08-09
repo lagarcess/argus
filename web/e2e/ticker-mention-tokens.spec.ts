@@ -135,6 +135,7 @@ function userMessage(metadata: JsonRecord): ApiMessage {
 async function capture(page: Page, filename: string) {
   if (!EVIDENCE_DIR) return;
   mkdirSync(EVIDENCE_DIR, { recursive: true });
+  await page.mouse.move(0, 0);
   await page.screenshot({
     path: `${EVIDENCE_DIR}/${filename}`,
     fullPage: true,
