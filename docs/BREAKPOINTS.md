@@ -38,9 +38,11 @@ dark, plus one crossed cell per surface at 390 in Spanish light. That crossed
 cell is where the two things most likely to break meet: the longest copy and the
 inverted theme.
 
-Run it, and refresh baselines, with the command in the header of
+Run it, and refresh baselines, with the commands in the header of
 `web/e2e/breakpoint-baselines.playwright.config.ts`. Baselines are suffixed by
-platform, so a macOS run never argues with the committed Linux set.
+platform, so a run on one OS never argues with another OS's committed set. The
+committed set is macOS. CI is Linux and does not run this spec yet; the same
+header says how to generate the Linux set before it does.
 
 ## What is not enforced, and why
 

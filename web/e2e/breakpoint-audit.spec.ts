@@ -189,6 +189,19 @@ test.describe("guest surfaces", () => {
       });
       await capture(page, `guest/exhausted-${band}-en-dark`);
 
+      /* Exhaustion is not a banner. It surfaces when the guest tries to spend
+         the allowance they no longer have, so the capture has to run the
+         action rather than just load the exhausted state. */
+      const run = page
+        .getByRole("button", { name: /run backtest|ejecutar/i })
+        .first();
+      if (await run.count()) {
+        await run.scrollIntoViewIfNeeded();
+        await run.click();
+        await page.waitForTimeout(1200);
+        await capture(page, `guest/exhausted-prompt-${band}-en-dark`);
+      }
+
       /* A guest cannot open a second conversation, so New chat is the gated
          action that raises the conversion prompt without needing a live turn. */
       await open(page, band, "/chat?conversation=conversation-alpha", {

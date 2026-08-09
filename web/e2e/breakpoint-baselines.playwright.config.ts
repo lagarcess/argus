@@ -17,14 +17,26 @@ import { defineConfig, devices } from "@playwright/test";
  *  - a per-pixel `threshold` plus a small `maxDiffPixelRatio`, which absorbs
  *    font antialiasing without absorbing a moved element.
  *
- * Baselines are platform-suffixed. CI is ubuntu, so the committed set is the
- * linux one, generated in the Playwright image that matches the pinned version:
+ * Run and refresh with:
  *
- *   docker run --rm -v "$PWD":/w -w /w/web mcr.microsoft.com/playwright:v1.59.1-noble \
- *     npx playwright test -c e2e/breakpoint-baselines.playwright.config.ts --update-snapshots
+ *   bunx playwright test -c e2e/breakpoint-baselines.playwright.config.ts
+ *   bunx playwright test -c e2e/breakpoint-baselines.playwright.config.ts -u
  *
- * Run locally the same way to refresh them; a darwin run writes its own set and
- * leaves the committed linux baselines alone.
+ * Baselines are platform-suffixed, so a run on one OS never argues with another
+ * OS's committed set. The committed set is darwin. CI is ubuntu and does not
+ * run this spec; before adding it, generate the linux set from the repo root in
+ * the image matching the pinned version:
+ *
+ *   docker run --rm --add-host=host.docker.internal:host-gateway -v "$PWD":/w \
+ *     -w /w/web -e PLAYWRIGHT_BASE_URL=http://host.docker.internal:3195 \
+ *     mcr.microsoft.com/playwright:v1.59.1-noble \
+ *     node ./node_modules/@playwright/test/cli.js \
+ *     -c e2e/breakpoint-baselines.playwright.config.ts --update-snapshots
+ *
+ * That path is not proven end to end: legal and auth capture cleanly, but the
+ * settings walk needs a /chat boot and timed out against a host-side dev server.
+ * Running the dev server inside the container instead is the likely fix, and is
+ * work for whoever wires this into CI.
  */
 
 const repositoryRoot = path.resolve(__dirname, "../..");
