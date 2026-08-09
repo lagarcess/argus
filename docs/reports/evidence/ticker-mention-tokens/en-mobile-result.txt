@@ -1,0 +1,21 @@
+AAPL
+RSI strategy
+
+Jan 1, 2024 → Dec 31, 2024
+
+Simulation Complete
+
+Ending value
+
+$11,420
+
++14.2%
+
+Compared with SPY
+2.3 percentage points
+Worst drop
+-8.4%
+
+Historical simulation · No fees/slippage · Not advice
+
+View details

@@ -10,6 +10,7 @@ import {
 } from "@/lib/chat-discovery-panel";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
+  composerTokenAtCaret,
   composerMentions,
   deleteTokenBeforeOffset,
   findMentionAtOffset,
@@ -22,6 +23,7 @@ import {
   serializeComposerSegments,
   type ComposerSegment,
 } from "./composer-model";
+import { entityTokenClassName } from "./entity-token";
 import type { ChatMention } from "./types";
 
 type ChatInputProps = {
@@ -216,15 +218,23 @@ export default function ChatInput({
     writeSegmentsToEditor(editorRef.current, segments);
     setComposerHasContent(!isComposerEmpty(segments));
     setComposerRawText(rawComposerText(segments));
-    if (pendingCaretOffsetRef.current === null) return;
-    const offset = pendingCaretOffsetRef.current;
-    pendingCaretOffsetRef.current = null;
-    setCaretTextOffset(editorRef.current, offset);
+    if (pendingCaretOffsetRef.current !== null) {
+      const offset = pendingCaretOffsetRef.current;
+      pendingCaretOffsetRef.current = null;
+      setCaretTextOffset(editorRef.current, offset);
+    }
+    syncComposerTokenFocus(editorRef.current, segments);
   }, [segments]);
 
   const readCurrentSegments = () => {
     const current = readSegmentsFromEditor(editorRef.current);
     return current.length > 0 ? current : segments;
+  };
+
+  const scheduleComposerTokenFocus = () => {
+    window.requestAnimationFrame(() => {
+      syncComposerTokenFocus(editorRef.current, readCurrentSegments());
+    });
   };
 
   const updateDiscoveryState = (current: ComposerSegment[], cursor: number | null) => {
@@ -291,7 +301,7 @@ export default function ChatInput({
     const current = readCurrentSegments();
     const message = serializeComposerSegments(current);
     if (message) {
-      const accepted = await onSend(message, composerMentions(current));
+      const accepted = await onSend(message, composerMentions(current, message));
       if (accepted === false) return;
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);
@@ -379,6 +389,7 @@ export default function ChatInput({
     setComposerHasContent(!isComposerEmpty(current));
     setComposerRawText(rawComposerText(current));
     updateDiscoveryState(current, cursor);
+    scheduleComposerTokenFocus();
   };
 
   const handleComposerDataTransfer = (dataTransfer: ComposerDataTransferLike) => {
@@ -519,9 +530,18 @@ export default function ChatInput({
           aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}
           contentEditable={!disabled}
           suppressContentEditableWarning
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={() => {
+            setIsFocused(true);
+            scheduleComposerTokenFocus();
+          }}
+          onBlur={() => {
+            setIsFocused(false);
+            clearComposerTokenFocus(editorRef.current);
+          }}
           onInput={handleEditorInput}
+          onSelect={scheduleComposerTokenFocus}
+          onKeyUp={scheduleComposerTokenFocus}
+          onMouseUp={scheduleComposerTokenFocus}
           onPaste={(e) => {
             e.preventDefault();
             handleComposerDataTransfer(e.clipboardData);
@@ -807,20 +827,29 @@ function isSupportedDiscoveryItem(item: DiscoveryItem) {
 function writeSegmentsToEditor(root: HTMLDivElement | null, segments: ComposerSegment[]) {
   if (!root) return;
   root.replaceChildren();
+  let offset = 0;
   for (const segment of segments) {
     if (segment.type === "text") {
       root.appendChild(document.createTextNode(segment.text));
+      offset += segment.text.length;
       continue;
     }
-    root.appendChild(createTokenElement(segment.token));
+    root.appendChild(createTokenElement(segment.token, offset));
+    offset += segmentLength(segment);
   }
 }
 
-function createTokenElement(item: DiscoveryItem) {
+function createTokenElement(item: DiscoveryItem, start: number) {
   const token = document.createElement("span");
   token.contentEditable = "false";
   token.dataset.composerToken = "true";
+  token.dataset.entityToken = "true";
+  token.dataset.entityTokenFocused = "false";
+  token.dataset.entityTokenKind = item.type;
+  token.dataset.entityTokenSurface = "composer";
   token.dataset.tokenId = item.id;
+  token.dataset.tokenStart = String(start);
+  token.dataset.tokenEnd = String(start + item.insert_text.length);
   token.dataset.tokenType = item.type;
   token.dataset.tokenLabel = item.label;
   token.dataset.tokenSymbol = item.symbol ?? "";
@@ -828,13 +857,40 @@ function createTokenElement(item: DiscoveryItem) {
   token.dataset.tokenDescription = displayDiscoveryDescription(item);
   token.dataset.tokenInsertText = item.insert_text;
   token.dataset.tokenProvider = item.provider;
-  token.className = tokenClassName(item.type);
+  token.className = entityTokenClassName(item.type, "composer");
 
   const label = document.createElement("span");
   label.className = "truncate";
   label.textContent = item.type === "asset" ? item.insert_text : item.label;
   token.appendChild(label);
   return token;
+}
+
+function syncComposerTokenFocus(root: HTMLDivElement | null, segments: ComposerSegment[]) {
+  if (!root) return;
+  const selection = window.getSelection();
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+  const offset =
+    selection?.isCollapsed && range && root.contains(range.startContainer)
+      ? getCaretTextOffset(root)
+      : null;
+  const focused = offset === null ? null : composerTokenAtCaret(segments, offset);
+  root.querySelectorAll<HTMLElement>("[data-composer-token]").forEach((token) => {
+    token.dataset.entityTokenFocused =
+      focused &&
+      token.dataset.tokenStart === String(focused.start) &&
+      token.dataset.tokenEnd === String(focused.end)
+        ? "true"
+        : "false";
+  });
+}
+
+function clearComposerTokenFocus(root: HTMLDivElement | null) {
+  root
+    ?.querySelectorAll<HTMLElement>("[data-composer-token]")
+    .forEach((token) => {
+      token.dataset.entityTokenFocused = "false";
+    });
 }
 
 function displayDiscoveryDescription(item: DiscoveryItem) {
@@ -862,16 +918,6 @@ function discoveryDescriptionLabel(item: DiscoveryItem, t: TFunction) {
     return t("chat.discovery.descriptions.currency_pair", description);
   }
   return description;
-}
-
-function tokenClassName(type: DiscoveryItem["type"]) {
-  const base =
-    "mx-0.5 inline-flex max-w-40 select-none items-center rounded-sm px-0.5 py-0 text-[1em] font-semibold leading-[1.35] align-baseline";
-  const asset =
-    "text-[#c2a44d]";
-  const indicator =
-    "text-[#494fdf] dark:text-[#8f93ff]";
-  return `${base} ${type === "asset" ? asset : indicator}`;
 }
 
 function assetClassFromDataset(value: string | undefined): DiscoveryItem["asset_class"] {
@@ -941,6 +987,14 @@ function getCaretTextOffset(root: HTMLDivElement | null) {
 }
 
 function countOffset(root: Node, target: Node, targetOffset: number) {
+  if (root === target) {
+    let rootOffset = 0;
+    for (let index = 0; index < targetOffset; index += 1) {
+      const child = root.childNodes[index];
+      if (child) rootOffset += nodeTextLength(child);
+    }
+    return rootOffset;
+  }
   let offset = 0;
   let found = false;
 

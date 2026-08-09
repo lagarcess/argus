@@ -48,6 +48,7 @@ import {
   type StrategyConfirmationStatus,
 } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import { EntityToken } from "./entity-token";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
@@ -473,11 +474,11 @@ function AssetSymbols({
           data-testid={
             animatedSymbols?.has(symbol) ? "confirmation-added-chip" : undefined
           }
-          className={`rounded-[7px] border border-[#c9c9cd]/65 px-2 py-1 text-[12px] font-medium leading-none tracking-[0.16px] text-[#505a63] dark:border-white/14 dark:text-[#8d969e]${
-            animatedSymbols?.has(symbol) ? " argus-chip-appear" : ""
-          }`}
+          className={animatedSymbols?.has(symbol) ? "argus-chip-appear" : undefined}
         >
-          {symbol}
+          <EntityToken kind="asset" surface="card">
+            {symbol}
+          </EntityToken>
         </span>
       ))}
     </span>

@@ -1,0 +1,7 @@
+AAPL
+RSI strategy
+Ready to run
+Benchmark
+SPY
+Stocks
+Benchmark: SPY

@@ -20,6 +20,7 @@ import {
 import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
 import type {
   ChatActionOption,
+  ChatMention,
   Message,
   StrategyPathContext,
 } from "@/components/chat/types";
@@ -350,6 +351,52 @@ export function stringArrayOrNull(value: unknown): string[] | null {
   return values.length > 0 ? values : null;
 }
 
+function chatMentionsFromMetadata(value: unknown): ChatMention[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(chatMentionFromMetadata)
+    .filter((mention): mention is ChatMention => mention !== null);
+}
+
+function chatMentionFromMetadata(value: unknown): ChatMention | null {
+  const record = recordOrNull(value);
+  const type = record?.type;
+  const id = stringOrNull(record?.id);
+  const label = stringOrNull(record?.label);
+  const insertText = stringOrNull(record?.insert_text);
+  if ((type !== "asset" && type !== "indicator") || !id || !label || !insertText) {
+    return null;
+  }
+  const mention: ChatMention = {
+    id,
+    type,
+    label,
+    symbol: stringOrNull(record?.symbol),
+    description: stringOrNull(record?.description),
+    insert_text: insertText,
+    provider: stringOrNull(record?.provider),
+  };
+  if (type === "asset") {
+    const assetClass = record?.asset_class;
+    mention.asset_class =
+      assetClass === "equity" || assetClass === "crypto" || assetClass === "currency_pair"
+        ? assetClass
+        : null;
+  }
+  const range = recordOrNull(record?.message_range);
+  if (
+    typeof range?.start === "number" &&
+    Number.isInteger(range.start) &&
+    typeof range.end === "number" &&
+    Number.isInteger(range.end) &&
+    range.start >= 0 &&
+    range.end > range.start
+  ) {
+    mention.message_range = { start: range.start, end: range.end };
+  }
+  return mention;
+}
+
 export function isHydratableResultCard(
   value: unknown,
 ): value is ConversationResultCard {
@@ -461,12 +508,15 @@ export function hydrateTextMessageFromApi(
     );
     if (compositionRetry) actions.push(compositionRetry);
   }
+  const mentions =
+    message.role === "user" ? chatMentionsFromMetadata(metadata.mentions) : [];
 
   return {
     id: message.id,
     role: message.role === "user" ? "user" : "ai",
     kind: "text",
     content: message.content,
+    mentions: mentions.length > 0 ? mentions : undefined,
     actions: actions.length > 0 ? actions : undefined,
     contentPresentation: isAssistant
       ? runtimeFailureContentPresentation(metadata, options.contentPresentation)

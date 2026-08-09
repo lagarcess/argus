@@ -339,9 +339,7 @@ def _ordinary_request_message(
         }
     }
     if mention_provenance:
-        user_metadata["mentions"] = [
-            mention.model_dump(mode="python") for mention in payload.mentions
-        ]
+        user_metadata["mentions"] = persisted_chat_mentions(payload, display_message)
         user_metadata["resolution_provenance"] = [
             item.model_dump(mode="python") for item in mention_provenance
         ]
@@ -355,3 +353,57 @@ def _ordinary_request_message(
         content=display_message,
         metadata=user_metadata,
     )
+
+
+def persisted_chat_mentions(
+    payload: ChatStreamRequest,
+    display_message: str,
+) -> list[dict[str, Any]]:
+    mentions: list[dict[str, Any]] = []
+    for mention in payload.mentions:
+        persisted = mention.model_dump(mode="python")
+        message_range = persisted.get("message_range")
+        if not _is_exact_mention_display_range(
+            message_range,
+            display_message,
+            str(persisted.get("insert_text") or ""),
+        ):
+            persisted.pop("message_range", None)
+        mentions.append(persisted)
+    return mentions
+
+
+def _is_exact_mention_display_range(
+    message_range: Any,
+    display_message: str,
+    insert_text: str,
+) -> bool:
+    if not isinstance(message_range, dict):
+        return False
+    start = message_range.get("start")
+    end = message_range.get("end")
+    start_index = _python_index_from_utf16_offset(display_message, start)
+    end_index = _python_index_from_utf16_offset(display_message, end)
+    return (
+        isinstance(start, int)
+        and not isinstance(start, bool)
+        and isinstance(end, int)
+        and not isinstance(end, bool)
+        and start_index is not None
+        and end_index is not None
+        and start_index < end_index
+        and display_message[start_index:end_index] == insert_text
+    )
+
+
+def _python_index_from_utf16_offset(value: str, offset: Any) -> int | None:
+    if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+        return None
+    units = 0
+    for index, character in enumerate(value):
+        if units == offset:
+            return index
+        units += 2 if ord(character) > 0xFFFF else 1
+        if units > offset:
+            return None
+    return len(value) if units == offset else None
