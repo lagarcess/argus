@@ -1,0 +1,42 @@
+argus
+New chat
+Search
+Recents
+Settings
+Today's Biggest Stock Movers
+What are the biggest movers today?
+
+U.S. markets are closed today, Sunday, August 9, 2026. The latest figures are from the Friday, August 7 regular-session close at 4:00 p.m. ET.
+
+Biggest gainers
+TICKER	COMPANY	CLOSE	CHANGE	VOLUME
+YJ	Yunji	$3.400	+176.42%	51,181,780
+MB	MasterBeef Group	$8.92	+137.87%	32,001,843
+WWR	Westwater Resources	$0.767	+87.76%	131,558,392
+RCEL	AVITA Medical	$7.77	+63.58%	7,274,963
+VATE	INNOVATE	$12.11	+63.43%	14,276,050
+Biggest losers
+TICKER	COMPANY	CLOSE	CHANGE	VOLUME
+PN	PN Smart Energy	$3.210	−61.28%	2,568,782
+CVRX	CVRx	$2.390	−59.76%	14,773,430
+WYHG	Wing Yip Food Holdings	$4.430	−54.93%	1,501,448
+INHD	Inno Holdings	$5.15	−42.39%	1,915,197
+FCUV	Focus Universal	$5.20	−36.66%	347,877
+Most active by share volume
+TICKER	COMPANY	VOLUME	CLOSE	CHANGE
+YYAI	AiRWA	247,418,178	$0.0780	−2.13%
+SPCX	Space Exploration Technologies	241,900,067	$133.11	+15.83%
+HTZ	Hertz Global	227,217,785	$2.270	+12.38%
+TTD	The Trade Desk	133,458,224	$13.80	−21.90%
+WWR	Westwater Resources	131,558,392	$0.767	+87.76%
+
+I could not confirm these figures against live market data just now, so treat them as general background rather than the current state of the market.
+
+TRY NEXT
+↳
+Test Yunji Inc. American Depository Shares YJ over the last 3 years
+↳
+Test Yunji Inc. American Depository Shares YJ vs MasterBeef MB, Westwater Resources WWR and Avita Medical RCEL since April 2025
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

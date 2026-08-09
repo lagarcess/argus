@@ -146,3 +146,35 @@ Each shape reaches the rail from an organic question in both languages,
 grounds through finance_search, ends on a resolver-verified runnable row,
 records `screening` (surveys) or its shape's class, and caches under the
 section 7 data class for its data.
+
+## Founder follow-ups (`browser/30-` through `browser/33-`)
+
+Captured 2026-08-09 at the follow-ups head, live providers, default
+configuration, both languages. Every frame's text was read before it was
+kept, and screened for a prose "Sources:" line and for provider tool names;
+none appear in any frame.
+
+- `30-sector-radar-sources`, `31-market-pulse-sources`: the shapes that used
+  to write their own citations. The inline markdown links and the plain-text
+  source line are gone. Where a grounded answer has nothing linkable, it says
+  so: "These figures come from market data rather than linked articles, so
+  there are no source links to open."
+- `32-recent-ipo-window`: the promise defect, fixed. The row reads
+  `Test Swarmer SWMR since March 2026`, the asset's real coverage, where it
+  previously promised three years and let reconciliation quietly shorten the
+  run. Spanish reads `Probar Swarmer SWMR desde marzo de 2026`.
+- `33-sources-panel-en`: the typed sources panel populated, opened from a
+  source-backed find turn. Real publisher domains and dates
+  (`www.stocktitan.net`, `cybersecurityventures.com`, `www.investing.com`,
+  `www.fool.com`), each a link the packet returned.
+
+**Why the research shapes show the honest line rather than a populated
+panel.** Every source URL `finance_search` returns points at
+`perplexity.ai` (verified across all eleven committed probes: the only
+source values present are provider finance pages). Argus scrubs provider
+hosts by policy, so a `finance_search` answer structurally has no public
+source to link. The typed path is wired and test-pinned for the case where
+sources exist; in practice these shapes have none, and saying that plainly
+is the honest alternative to the citation lines the model used to invent.
+The Search-API path, which does return publisher pages, populates the same
+panel, as frame 33 shows.
