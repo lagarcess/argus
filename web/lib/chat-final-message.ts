@@ -1,6 +1,7 @@
 import type {
   ChatActionOption,
   DiscoverySidecar,
+  DiscoverySource,
   Message,
 } from "@/components/chat/types";
 import type { NextExperimentRow } from "./chat-next-experiments";
@@ -17,6 +18,8 @@ type MergeFinalTextOptions = {
   strategyPathContext?: Message["strategyPathContext"];
   assistantRecoveryCode?: string | null;
   discovery?: DiscoverySidecar | null;
+  /** Typed citations for this turn; the panel's only input. */
+  researchSources?: DiscoverySource[] | null;
   memoryRecalls?: MemoryRecallItem[] | null;
   nextExperiments?: NextExperimentRow[] | null;
 };
@@ -33,6 +36,7 @@ export function mergeFinalTextMessage(
     strategyPathContext,
     assistantRecoveryCode,
     discovery,
+    researchSources,
     memoryRecalls,
     nextExperiments,
   }: MergeFinalTextOptions,
@@ -52,6 +56,7 @@ export function mergeFinalTextMessage(
       strategyPathContext ?? message.strategyPathContext,
     assistantRecoveryCode: assistantRecoveryCode ?? message.assistantRecoveryCode,
     discovery: discovery ?? message.discovery,
+    researchSources: researchSources ?? message.researchSources,
     memoryRecalls: memoryRecalls ?? message.memoryRecalls,
     nextExperiments: nextExperiments ?? message.nextExperiments,
   };

@@ -28,6 +28,7 @@ from argus.domain.research.contracts import (
     BackgroundPoll,
     ResearchNamePair,
     ResearchPacket,
+    ResearchSource,
     ResearchUnavailableError,
     ResearchUsage,
 )
@@ -155,7 +156,7 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
     text_blocks: list[str] = []
     categories: list[str] = []
     tickers: list[str] = []
-    sources: list[str] = []
+    sources: list[ResearchSource] = []
     pairs: list[ResearchNamePair] = []
     invocations = 0
     for item in output:
@@ -176,17 +177,30 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
                 if isinstance(category, str) and category not in categories:
                     categories.append(category)
                 for url in result.get("sources") or []:
-                    _append_public_source(sources, url)
+                    _append_public_source(sources, {"url": url})
                 if category == "tickers_lookup":
                     pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
                 elif category == "etf_holdings":
                     pairs.extend(_pairs_from_holdings(str(result.get("content") or "")))
+        elif item_type == "search_results":
+            # Web search citations live in their own output items: title,
+            # url, and the publisher's own date. This is the channel the
+            # sector and comparison shapes fill.
+            for result in item.get("results") or []:
+                if isinstance(result, dict):
+                    _append_public_source(sources, result)
         elif item_type == "message":
             for chunk in item.get("content") or []:
-                if isinstance(chunk, dict) and chunk.get("type") == "output_text":
-                    text = chunk.get("text")
-                    if isinstance(text, str) and text.strip():
-                        text_blocks.append(text)
+                if not isinstance(chunk, dict) or chunk.get("type") != "output_text":
+                    continue
+                text = chunk.get("text")
+                if isinstance(text, str) and text.strip():
+                    text_blocks.append(text)
+                # Some models carry their citations as annotations on the
+                # same chunk instead of as search_results items.
+                for annotation in chunk.get("annotations") or []:
+                    if isinstance(annotation, dict):
+                        _append_public_source(sources, annotation)
     usage = document.get("usage")
     if isinstance(usage, dict):
         details = usage.get("tool_calls_details")
@@ -251,17 +265,35 @@ def symbols_from_answer_tables(markdown: str) -> list[str]:
     return symbols
 
 
-def _append_public_source(sources: list[str], url: Any) -> None:
-    if not isinstance(url, str):
+def _append_public_source(sources: list[ResearchSource], entry: Any) -> None:
+    """One citation, bounded and scrubbed.
+
+    Accepts either channel's shape: a search result, an annotation, or a
+    bare finance URL. Provider-identity hosts never survive, so Argus never
+    cites the tool that answered it.
+    """
+    if not isinstance(entry, dict):
         return
-    candidate = url.strip()
+    raw_url = entry.get("url") or entry.get("link") or entry.get("uri")
+    if not isinstance(raw_url, str):
+        return
+    candidate = raw_url.strip()
     if not candidate.startswith("https://") or len(candidate) > MAX_URL_CHARS:
         return
     host = urlparse(candidate).netloc.lower()
     if any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS):
         return
-    if candidate not in sources:
-        sources.append(candidate)
+    if any(source.url == candidate for source in sources):
+        return
+    title = entry.get("title") or entry.get("name") or ""
+    published = entry.get("date") or entry.get("last_updated") or None
+    sources.append(
+        ResearchSource(
+            url=candidate,
+            title=str(title)[:200].strip(),
+            source_date=str(published)[:10] if published else None,
+        )
+    )
 
 
 def _pairs_from_holdings(content: str) -> list[ResearchNamePair]:

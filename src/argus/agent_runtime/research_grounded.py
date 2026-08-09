@@ -881,23 +881,31 @@ def typed_sources(packet: ResearchPacket) -> list[dict[str, Any]]:
     from urllib.parse import urlparse
 
     entries: list[dict[str, Any]] = []
-    for url in packet.sources:
-        domain = urlparse(url).netloc.lower()
+    for source in packet.sources:
+        domain = urlparse(source.url).netloc.lower()
         if not domain:
             continue
         entries.append(
-            {"title": domain, "domain": domain, "url": url, "source_date": None}
+            {
+                # The publisher's own title when the citation carried one;
+                # the domain otherwise, because inventing a title would be
+                # the same defect as letting the model write the citation.
+                "title": source.title or domain,
+                "domain": domain,
+                "url": source.url,
+                "source_date": source.source_date,
+            }
         )
     return entries
 
 
 def unsourced_figures_note(language: str) -> str:
-    """Said only when a grounded answer carries no linkable sources.
+    """Said only when a grounded answer genuinely carries nothing to link.
 
-    Market data arrives as structured figures rather than articles, so a
-    grounded answer often has nothing to link. Saying that plainly is the
-    honest alternative to the model writing a citation line for pages it
-    never fetched."""
+    A pure market-data answer cites figures, not articles, and for those the
+    line is true. It must never render when the packet did carry citations:
+    Argus asserting there is nothing to open, while holding publisher URLs
+    it discarded, is a worse failure than the sloppy prose it replaced."""
     if language == "es-419":
         return (
             "Estas cifras vienen de datos de mercado, no de artículos, así "

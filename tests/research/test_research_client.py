@@ -43,8 +43,8 @@ def test_run_research_builds_documented_request_and_parses_packet() -> None:
     assert body["max_output_tokens"] == 1024
     assert packet.usage.invocations == 1
     assert packet.usage.cost_usd == pytest.approx(0.005)
-    # Provider hosts are scrubbed; public sources survive.
-    assert packet.sources == ("https://www.sec.gov/a",)
+    # Provider hosts are scrubbed; public sources survive as typed citations.
+    assert [source.url for source in packet.sources] == ["https://www.sec.gov/a"]
     # NOT_FOUND and header rows never become candidates.
     assert [pair.symbol for pair in packet.name_pairs] == ["DIS"]
 

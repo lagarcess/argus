@@ -197,3 +197,21 @@ describe("ticker badges on suggestion rows", () => {
     expect(rows?.[0].label).toBe("Test Netflix (NFLX) over the last 3 years");
   });
 });
+
+describe("research citations reach the live turn", () => {
+  test("the stream path attaches typed sources, not only hydration", () => {
+    const chat = readFileSync(
+      join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    // A turn that cited pages must offer them when it lands, not after a
+    // reload: the panel is fed from the final payload too.
+    expect(chat).toContain("researchSourcesFromMetadata(finalPayload)");
+    expect(chat).toContain("researchSources: finalResearchSources");
+    const merge = readFileSync(
+      join(import.meta.dir, "../lib/chat-final-message.ts"),
+      "utf-8",
+    );
+    expect(merge).toContain("researchSources ?? message.researchSources");
+  });
+});

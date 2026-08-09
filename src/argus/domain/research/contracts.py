@@ -64,13 +64,28 @@ class ResearchNamePair(BaseModel):
     symbol: str
 
 
+class ResearchSource(BaseModel):
+    """One citation the packet actually returned.
+
+    Web search citations arrive in their own output items and, for some
+    models, as annotations on the answer chunk. Both are the same evidence
+    and both land here; provider-identity URLs never do.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    url: str
+    title: str = ""
+    source_date: str | None = None
+
+
 class ResearchPacket(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     answer_markdown: str
     categories: tuple[str, ...] = ()
     tickers: tuple[str, ...] = ()
-    sources: tuple[str, ...] = ()
+    sources: tuple[ResearchSource, ...] = ()
     name_pairs: tuple[ResearchNamePair, ...] = ()
     usage: ResearchUsage = Field(default_factory=ResearchUsage)
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

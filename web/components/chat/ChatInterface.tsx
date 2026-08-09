@@ -110,6 +110,7 @@ import {
   retryableAssistantRecoveryCode,
 } from "@/lib/chat-recovery-display";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
+import { researchSourcesFromMetadata } from "@/lib/chat-discovery-sidecar";
 import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
 import {
   loadAllConversationMessagePages,
@@ -1385,6 +1386,12 @@ export default function ChatInterface() {
             resultFactHeadingKeyFromMetadata(finalPayload);
           const finalTextNextExperiments =
             nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
+          // The typed citations must reach the live turn, not only a later
+          // hydration: an answer that cited pages should offer them now.
+          const finalResearchSources =
+            researchSourcesFromMetadata(finalPayload).length > 0
+              ? researchSourcesFromMetadata(finalPayload)
+              : undefined;
           const finalTextPresentation =
             action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
@@ -1400,6 +1407,7 @@ export default function ChatInterface() {
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
                   memoryRecalls: finalMemoryRecalls,
+                  researchSources: finalResearchSources,
                   nextExperiments: finalTextNextExperiments,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
@@ -1418,6 +1426,7 @@ export default function ChatInterface() {
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
                 memoryRecalls: finalMemoryRecalls,
+                researchSources: finalResearchSources,
                 nextExperiments: finalTextNextExperiments,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
