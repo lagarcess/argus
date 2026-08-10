@@ -12,6 +12,10 @@ import { createPortal } from "react-dom";
 import { useModalSurface } from "../layout/useModalSurface";
 import { useOverlayLayer } from "../layout/overlayStack";
 import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
+import ProfileDetailsDialog from "./ProfileDetailsDialog";
+import ProfileSettingsPanels, {
+  type SettingsPanel,
+} from "./ProfileSettingsPanels";
 import {
   SHEET_SUBMENU_CLASS,
   profileMenuClass,
@@ -23,7 +27,6 @@ import {
   Archive,
   Brain,
   ChevronRight,
-  ChevronUp,
   Database,
   HelpCircle,
   Keyboard,
@@ -39,14 +42,17 @@ import {
   Bug,
   Lightbulb,
   MessageCircle,
-  Check,
-  X,
-  Edit2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  PREFERRED_NAME_MAX_LENGTH,
+  normalizeProfileName,
+  profileNameExceeds,
+} from "@/lib/profile-names";
 import {
   AVATAR_THEMES,
   avatarThemeClassName,
@@ -54,18 +60,10 @@ import {
   type AvatarTheme,
 } from "@/lib/avatar-theme";
 import {
-  ENABLED_LANGUAGES,
   languageDisplayAbbreviation,
   localeForLanguage,
   normalizeEnabledLanguage,
 } from "@/lib/language-features";
-
-import AppearanceModal from "@/components/settings/AppearanceModal";
-import LanguageModal from "@/components/settings/LanguageModal";
-import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
-import DeletedItemsView from "@/components/settings/DeletedItemsView";
-import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
-import UsageModal from "@/components/settings/UsageModal";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
@@ -79,6 +77,8 @@ type ProfileMenuProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
+  /** Every successful patch reports upward, not just the fields a surface reads. */
+  onProfileUpdated?: (user: ApiUser) => void;
   onOpenSidebarPreference?: () => void;
   onOpenKeyboardShortcuts?: () => void;
   /** Anchor position */
@@ -92,15 +92,8 @@ type ProfileMenuProps = {
   placement?: "rail" | "drawer";
 };
 
-type ActiveModal =
-  | null
-  | "appearance"
-  | "language"
-  | "archived"
-  | "deleted"
-  | "usage"
-  | "memory"
-  | "profile";
+// Derived from the panel registry, so a new settings panel needs no edit here.
+type ActiveModal = null | SettingsPanel | "profile";
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
 
@@ -114,23 +107,6 @@ type ProfileQuickJumpItem = {
 const SUPPORT_EMAIL =
   process.env.NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL ?? "support@argus.local";
 
-function profileHandle(profile: ApiUser | null) {
-  const explicitUsername = profile?.username?.trim().replace(/^@+/, "");
-  if (explicitUsername) return `@${explicitUsername}`;
-
-  const emailLocalPart = profile?.email?.split("@")[0]?.trim();
-  return emailLocalPart ? `@${emailLocalPart}` : null;
-}
-
-function profileInitial(profile: ApiUser | null) {
-  const source =
-    profile?.display_name?.trim() ||
-    profile?.username?.trim() ||
-    profile?.email?.trim() ||
-    "A";
-  return source.charAt(0).toUpperCase();
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProfileMenu({
@@ -140,6 +116,7 @@ export default function ProfileMenu({
   onFeedback,
   onDeleteAllConversations,
   onHistoryMutated,
+  onProfileUpdated,
   onOpenSidebarPreference,
   onOpenKeyboardShortcuts,
   anchorRef,
@@ -157,9 +134,7 @@ export default function ProfileMenu({
   const asSheet = isBelowDesktop;
   const isDrawerPlacement = placement === "drawer";
   const menuOverlayId = useId();
-  const profileModalOverlayId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
-  const profileModalRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
   const avatarTriggerRef = useRef<HTMLButtonElement>(null);
   const avatarThemeDrawerRef = useRef<HTMLDivElement>(null);
@@ -174,6 +149,12 @@ export default function ProfileMenu({
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [editingPreferredName, setEditingPreferredName] = useState(false);
+  const [preferredNameValue, setPreferredNameValue] = useState("");
+  const [isSavingPreferredName, setIsSavingPreferredName] = useState(false);
+  const [preferredNameError, setPreferredNameError] = useState<string | null>(
+    null,
+  );
   const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const [isSavingLanguage, setIsSavingLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string | null>(null);
@@ -206,10 +187,67 @@ export default function ProfileMenu({
     setIsAvatarPickerOpen(true);
   }, [accountKind, closeAvatarPicker, isAvatarPickerOpen]);
 
+  // The error renders in read mode too, so leaving an edit clears it.
+  const stopEditingName = useCallback(() => {
+    setEditingName(false);
+    setNameError(null);
+  }, []);
+
+  const stopEditingPreferredName = useCallback(() => {
+    setEditingPreferredName(false);
+    setPreferredNameError(null);
+  }, []);
+
+  // Closing does not cancel a request already on the wire, and this menu stays
+  // mounted, so post-await edit state is written only for the edit that began it.
+  const editSessionRef = useRef(0);
+  const isCurrentEditSession = useCallback(
+    (session: number) => session === editSessionRef.current,
+    [],
+  );
+
   const closeProfileModal = useCallback(() => {
     setIsAvatarPickerOpen(false);
+    // Per-edit state belongs to the dialog, which unmounts here.
+    editSessionRef.current += 1;
+    stopEditingName();
+    stopEditingPreferredName();
+    setNameValue("");
+    setPreferredNameValue("");
+    setIsSavingName(false);
+    setIsSavingPreferredName(false);
     setActiveModal(null);
-  }, []);
+  }, [stopEditingName, stopEditingPreferredName]);
+
+  // The one way a saved profile leaves this menu.
+  /*
+   * One record, one request at a time.
+   *
+   * Every read and write of the profile queues here, so responses arrive in the
+   * order they were issued and the last one is the newest. Reconciling the
+   * interleaving instead needs a generation per field, and a field added later
+   * would not have one.
+   */
+  const profileRequestChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const serializeProfileRequest = useCallback(
+    <T,>(request: () => Promise<T>): Promise<T> => {
+      const queued = profileRequestChainRef.current.then(request, request);
+      profileRequestChainRef.current = queued.then(
+        () => undefined,
+        () => undefined,
+      );
+      return queued;
+    },
+    [],
+  );
+
+  const applyPatchedProfile = useCallback(
+    (user: ApiUser) => {
+      setProfile(user);
+      onProfileUpdated?.(user);
+    },
+    [onProfileUpdated],
+  );
 
   useEffect(() => {
     if (!isAvatarPickerOpen) return;
@@ -224,15 +262,18 @@ export default function ProfileMenu({
   useEffect(() => {
     if (isOpen) {
       setNameError(null);
+      setPreferredNameError(null);
       setLanguageError(null);
-      getMe()
+      // Queued too, so it cannot snapshot a row before a pending write and
+      // answer after it.
+      serializeProfileRequest(() => getMe())
         .then(({ user, account_kind }) => {
-          setProfile(user);
+          applyPatchedProfile(user);
           setAccountKind(account_kind);
         })
         .catch(() => null);
     }
-  }, [isOpen]);
+  }, [applyPatchedProfile, isOpen, serializeProfileRequest]);
 
   // Reset submenu state when menu closes
   useEffect(() => {
@@ -301,36 +342,35 @@ export default function ProfileMenu({
     },
   });
 
-  // Opening this closes the menu, so the registration above has already stood
-  // down by the time the dialog paints. It needs its own or nothing owns back,
-  // Escape, or focus for it. Scoped to the panel rather than the backdrop, so
-  // focus does not open on an invisible dismiss control.
-  useModalSurface({
-    isOpen: activeModal === "profile",
-    overlayId: profileModalOverlayId,
-    containerRef: profileModalRef,
-    onDismiss: closeProfileModal,
-    // The pickers inside this dialog are nested state rather than layers of
-    // their own, so the registry cannot see them. Defaulting Escape to
-    // onDismiss threw the whole dialog away while a picker was open.
-    onEscape: () => {
-      if (isLanguagePickerOpen) {
-        setIsLanguagePickerOpen(false);
-        return;
-      }
-      if (isAvatarPickerOpen) {
-        closeAvatarPicker();
-        return;
-      }
-      if (isDeleteRequestOpen) {
-        if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
-        return;
-      }
-      closeProfileModal();
-    },
-    returnFocusRef: anchorRef,
-  });
-
+  /*
+   * Escape inside the Profile dialog, which registers its own layer.
+   *
+   * The pickers inside it are nested state rather than layers of their own, so
+   * the registry cannot see them. Defaulting Escape to onDismiss threw the
+   * whole dialog away while a picker was open.
+   */
+  const handleProfileModalEscape = useCallback(() => {
+    if (isLanguagePickerOpen) {
+      setIsLanguagePickerOpen(false);
+      return;
+    }
+    if (isAvatarPickerOpen) {
+      closeAvatarPicker();
+      return;
+    }
+    if (isDeleteRequestOpen) {
+      if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
+      return;
+    }
+    closeProfileModal();
+  }, [
+    closeAvatarPicker,
+    closeProfileModal,
+    deleteRequestState,
+    isAvatarPickerOpen,
+    isDeleteRequestOpen,
+    isLanguagePickerOpen,
+  ]);
 
 
   useEffect(() => {
@@ -433,29 +473,105 @@ export default function ProfileMenu({
   }, [profile]);
 
   const handleSaveName = useCallback(async () => {
-    const trimmed = nameValue.trim();
+    const trimmed = normalizeProfileName(nameValue);
     if (!trimmed || trimmed === profile?.display_name) {
-      setEditingName(false);
+      stopEditingName();
       return;
     }
+    // Measured after trimming, and refused rather than truncated.
+    if (profileNameExceeds(nameValue, DISPLAY_NAME_MAX_LENGTH)) {
+      setNameError(
+        t("settings.profile.display_name_too_long", {
+          defaultValue: "Keep this to {{count}} characters or fewer.",
+          count: DISPLAY_NAME_MAX_LENGTH,
+        }),
+      );
+      return;
+    }
+    const session = editSessionRef.current;
     setIsSavingName(true);
     setNameError(null);
     try {
-      const { user } = await patchMe({ display_name: trimmed });
-      setProfile(user);
-      setEditingName(false);
+      const { user } = await serializeProfileRequest(() => patchMe({ display_name: trimmed }));
+      // Ordered by generation, not by the edit session: a save that outlived
+      // its dialog still happened.
+      applyPatchedProfile(user);
+      if (isCurrentEditSession(session)) stopEditingName();
     } catch (err) {
       console.error("Failed to update display name", err);
-      setNameError(
-        t(
-          "settings.profile.display_name_save_error",
-          "Could not save that name yet.",
-        ),
-      );
+      if (isCurrentEditSession(session)) {
+        setNameError(
+          t(
+            "settings.profile.display_name_save_error",
+            "Could not save that name yet.",
+          ),
+        );
+      }
     } finally {
-      setIsSavingName(false);
+      if (isCurrentEditSession(session)) setIsSavingName(false);
     }
-  }, [nameValue, profile, t]);
+  }, [
+    applyPatchedProfile,
+    isCurrentEditSession,
+    nameValue,
+    profile,
+    serializeProfileRequest,
+    stopEditingName,
+    t,
+  ]);
+
+  // A setting, never a memory: nothing infers this. Blank clears it.
+  const handleSavePreferredName = useCallback(async () => {
+    const trimmed = normalizeProfileName(preferredNameValue);
+    const current = profile?.preferred_name ?? "";
+    if (trimmed === current) {
+      stopEditingPreferredName();
+      return;
+    }
+    if (profileNameExceeds(preferredNameValue, PREFERRED_NAME_MAX_LENGTH)) {
+      setPreferredNameError(
+        t("settings.profile.preferred_name_too_long", {
+          defaultValue: "Keep this to {{count}} characters or fewer.",
+          count: PREFERRED_NAME_MAX_LENGTH,
+        }),
+      );
+      return;
+    }
+    const session = editSessionRef.current;
+    setIsSavingPreferredName(true);
+    setPreferredNameError(null);
+    try {
+      const { user } = await serializeProfileRequest(() => patchMe({ preferred_name: trimmed || null }));
+      applyPatchedProfile(user);
+      if (isCurrentEditSession(session)) stopEditingPreferredName();
+    } catch (err) {
+      console.error("Failed to update preferred name", err);
+      if (isCurrentEditSession(session)) {
+        setPreferredNameError(
+          t(
+            "settings.profile.preferred_name_save_error",
+            "Could not save that name yet.",
+          ),
+        );
+      }
+    } finally {
+      if (isCurrentEditSession(session)) setIsSavingPreferredName(false);
+    }
+  }, [
+    applyPatchedProfile,
+    isCurrentEditSession,
+    preferredNameValue,
+    profile,
+    serializeProfileRequest,
+    stopEditingPreferredName,
+    t,
+  ]);
+
+  const handleStartEditPreferredName = useCallback(() => {
+    setPreferredNameValue(profile?.preferred_name ?? "");
+    setPreferredNameError(null);
+    setEditingPreferredName(true);
+  }, [profile]);
 
   const currentLanguage = normalizeEnabledLanguage(
     profile?.language ?? i18n.language,
@@ -478,7 +594,8 @@ export default function ProfileMenu({
       );
       if (isSavingLanguage) return;
 
-      setIsSavingLanguage(true);
+      const session = editSessionRef.current;
+        setIsSavingLanguage(true);
       setLanguageError(null);
       setProfile((current) =>
         current
@@ -492,12 +609,14 @@ export default function ProfileMenu({
       await i18n.changeLanguage(nextLanguage);
 
       try {
-        const { user } = await patchMe({
-          language: nextLanguage,
-          locale: localeForLanguage(nextLanguage),
-        });
-        setProfile(user);
-        setIsLanguagePickerOpen(false);
+        const { user } = await serializeProfileRequest(() =>
+          patchMe({
+            language: nextLanguage,
+            locale: localeForLanguage(nextLanguage),
+          }),
+        );
+        applyPatchedProfile(user);
+        if (isCurrentEditSession(session)) setIsLanguagePickerOpen(false);
       } catch (err) {
         console.error("Failed to update language", err);
         await i18n.changeLanguage(previousLanguage);
@@ -510,17 +629,27 @@ export default function ProfileMenu({
               }
             : current,
         );
-        setLanguageError(
-          t(
-            "settings.profile.language_save_error",
-            "Could not update language yet.",
-          ),
-        );
+        if (isCurrentEditSession(session)) {
+          setLanguageError(
+            t(
+              "settings.profile.language_save_error",
+              "Could not update language yet.",
+            ),
+          );
+        }
       } finally {
         setIsSavingLanguage(false);
       }
     },
-    [i18n, isSavingLanguage, profile, t],
+    [
+      applyPatchedProfile,
+      i18n,
+      isCurrentEditSession,
+      isSavingLanguage,
+      profile,
+      serializeProfileRequest,
+      t,
+    ],
   );
 
   const handleAvatarThemeSelect = useCallback(
@@ -528,31 +657,42 @@ export default function ProfileMenu({
       if (!profile || accountKind !== "registered" || isSavingAvatarTheme) return;
 
       const previousTheme = profile.avatar_theme;
-      setAvatarThemeError(null);
+      const session = editSessionRef.current;
+        setAvatarThemeError(null);
       setIsSavingAvatarTheme(true);
       setProfile((current) =>
         current ? { ...current, avatar_theme: avatarTheme } : current,
       );
 
       try {
-        const { user } = await patchMe({ avatar_theme: avatarTheme });
-        setProfile(user);
+        const { user } = await serializeProfileRequest(() => patchMe({ avatar_theme: avatarTheme }));
+        applyPatchedProfile(user);
       } catch (err) {
         console.error("Failed to update avatar theme", err);
         setProfile((current) =>
           current ? { ...current, avatar_theme: previousTheme } : current,
         );
-        setAvatarThemeError(
-          t(
-            "settings.profile.avatar_theme.save_error",
-            "Could not update your avatar color yet.",
-          ),
-        );
+        if (isCurrentEditSession(session)) {
+          setAvatarThemeError(
+            t(
+              "settings.profile.avatar_theme.save_error",
+              "Could not update your avatar color yet.",
+            ),
+          );
+        }
       } finally {
         setIsSavingAvatarTheme(false);
       }
     },
-    [accountKind, isSavingAvatarTheme, profile, t],
+    [
+      accountKind,
+      applyPatchedProfile,
+      isCurrentEditSession,
+      isSavingAvatarTheme,
+      profile,
+      serializeProfileRequest,
+      t,
+    ],
   );
 
   const handleAvatarThemeKeyDown = useCallback(
@@ -766,423 +906,69 @@ export default function ProfileMenu({
   if (!isOpen && !activeModal && !isDeleteRequestOpen) return null;
 
   // ── Active modal rendering ──────────────────────────────────────────────
-  if (activeModal === "appearance") {
+  if (activeModal !== null && activeModal !== "profile") {
     return (
-      <AppearanceModal
-        onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("settings");
-        } : undefined}
-        backLabel={t("settings.app.title", "Preferences")}
-      />
-    );
-  }
-  if (activeModal === "language") {
-    return (
-      <LanguageModal
-        onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("settings");
-        } : undefined}
-        backLabel={t("settings.app.title", "Preferences")}
-      />
-    );
-  }
-  if (activeModal === "archived") {
-    return (
-      <ArchivedChatsView
-        onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
-        onRestored={onHistoryMutated}
-      />
-    );
-  }
-  if (activeModal === "deleted") {
-    return (
-      <DeletedItemsView
-        onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
-        onRestored={onHistoryMutated}
-      />
-    );
-  }
-  if (activeModal === "usage") {
-    return (
-      <UsageModal
+      <ProfileSettingsPanels
+        panel={activeModal}
+        asSheet={asSheet}
         locale={localeForLanguage(
           normalizeEnabledLanguage(i18n.resolvedLanguage),
         )}
+        anchorRef={anchorRef}
         onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
+        onBack={(parent) => {
           setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
-        returnFocusRef={anchorRef}
-      />
-    );
-  }
-  if (activeModal === "memory") {
-    return (
-      <MemoryControlsModal
-        locale={localeForLanguage(
-          normalizeEnabledLanguage(i18n.resolvedLanguage),
-        )}
-        onClose={() => setActiveModal(null)}
-        onBack={asSheet ? () => {
-          setActiveModal(null);
-          setActiveSubmenu("data");
-        } : undefined}
-        backLabel={t("settings.data.title", "Data Controls")}
-        returnFocusRef={anchorRef}
+          setActiveSubmenu(parent);
+        }}
+        onHistoryMutated={onHistoryMutated}
       />
     );
   }
   if (activeModal === "profile") {
     return (
-      <>
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
-          <button
-        tabIndex={-1}
-            className="absolute inset-0"
-            onClick={closeProfileModal}
-            aria-label={t("settings.profile.close", "Close profile")}
-          />
-          <div
-            ref={profileModalRef}
-            className="relative w-full max-w-sm overflow-visible rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="argus-profile-modal-title"
-          >
-            {/* Header */}
-            <div className="mb-4 flex items-center justify-between">
-              <h2
-                id="argus-profile-modal-title"
-                className="font-display text-[16px] font-medium text-black dark:text-white"
-              >
-                {t("settings.profile.title", "Profile")}
-              </h2>
-              <button
-                onClick={closeProfileModal}
-                className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
-                aria-label={t("settings.profile.close", "Close profile")}
-              >
-                <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              {/* Avatar + Name */}
-              <div className="flex items-center gap-3">
-                {accountKind === "registered" ? (
-                  <button
-                    ref={avatarTriggerRef}
-                    type="button"
-                    onClick={toggleAvatarPicker}
-                    className="group relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50"
-                    aria-label={t(
-                      "settings.profile.avatar_theme.change",
-                      "Edit avatar",
-                    )}
-                    aria-expanded={isAvatarPickerOpen}
-                    aria-controls="argus-avatar-theme-drawer"
-                    data-avatar-theme-trigger
-                  >
-                    <span
-                      className={`flex h-full w-full items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
-                      style={avatarStyle}
-                    >
-                      {profileInitial(profile)}
-                    </span>
-                    <span
-                      className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-black ring-1 ring-black/10 dark:bg-[#2b2e33] dark:text-white dark:ring-white/15"
-                      aria-hidden="true"
-                    >
-                      <Edit2 className="h-2.5 w-2.5" />
-                    </span>
-                  </button>
-                ) : (
-                  <div
-                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${avatarClassName}`}
-                    style={avatarStyle}
-                  >
-                    {profileInitial(profile)}
-                  </div>
-                )}
-                <div className="flex min-w-0 flex-1 flex-col">
-                  {/* Display Name - editable */}
-                  {editingName ? (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={nameValue}
-                        onChange={(e) =>
-                          setNameValue(e.target.value.slice(0, 60))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void handleSaveName();
-                          if (e.key === "Escape") setEditingName(false);
-                        }}
-                        disabled={isSavingName}
-                        className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] font-medium outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
-                        maxLength={60}
-                        placeholder={t(
-                          "settings.profile.display_name",
-                          "Display name",
-                        )}
-                      />
-                      <button
-                        onClick={() => void handleSaveName()}
-                        disabled={isSavingName}
-                        className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                        title={t("common.save", "Save")}
-                        aria-label={t("common.save", "Save")}
-                      >
-                        <Check
-                          className={`h-3.5 w-3.5 text-[#5ba897] ${
-                            isSavingName ? "opacity-40" : ""
-                          }`}
-                        />
-                      </button>
-                      <button
-                        onClick={() => setEditingName(false)}
-                        disabled={isSavingName}
-                        className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                        title={t("common.cancel", "Cancel")}
-                        aria-label={t("common.cancel", "Cancel")}
-                      >
-                        <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="group flex items-center gap-1.5">
-                      <span className="font-display truncate text-[15px] font-medium text-black dark:text-white">
-                        {profile?.display_name ??
-                          t("settings.profile.default_user", "User")}
-                      </span>
-                      <button
-                        onClick={handleStartEditName}
-                        className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
-                        title={t(
-                          "settings.profile.edit_display_name",
-                          "Edit display name",
-                        )}
-                        aria-label={t(
-                          "settings.profile.edit_display_name",
-                          "Edit display name",
-                        )}
-                      >
-                        <Edit2 className="h-3 w-3 text-black/40 dark:text-white/40" />
-                      </button>
-                    </div>
-                  )}
-                  {nameError && (
-                    <span className="mt-1 text-[12px] text-[#d66d75]">
-                      {nameError}
-                    </span>
-                  )}
-                  {/* Username */}
-                  {profileHandle(profile) && (
-                    <span className="text-[13px] text-black/40 dark:text-white/40">
-                      {profileHandle(profile)}
-                    </span>
-                  )}
-                  <span className="text-[13px] text-black/40 dark:text-white/40">
-                    {profile?.email ?? ""}
-                  </span>
-                </div>
-              </div>
-
-              {accountKind === "registered" && (
-                <div
-                  id="argus-avatar-theme-drawer"
-                  ref={avatarThemeDrawerRef}
-                  className={`grid transition-[grid-template-rows,margin,opacity] duration-200 ease-out motion-reduce:transition-none ${
-                    isAvatarPickerOpen
-                      ? "mt-0 grid-rows-[1fr] opacity-100"
-                      : "mt-0 grid-rows-[0fr] opacity-0"
-                  }`}
-                  aria-hidden={!isAvatarPickerOpen}
-                  inert={!isAvatarPickerOpen}
-                >
-                  <div className="min-h-0 overflow-hidden">
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={closeAvatarPicker}
-                        className="flex h-11 w-full items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30"
-                        aria-label={t(
-                          "settings.profile.avatar_theme.close",
-                          "Hide avatar colors",
-                        )}
-                      >
-                        <span className="whitespace-nowrap text-[13px] text-black/50 dark:text-white/50">
-                          {t(
-                            "settings.profile.avatar_theme.label",
-                            "Avatar color",
-                          )}
-                        </span>
-                        <span
-                          className="h-px flex-1 bg-black/10 dark:bg-white/10"
-                          aria-hidden="true"
-                        />
-                        <span className="text-[11px] text-black/35 dark:text-white/35">
-                          {t(
-                            "settings.profile.avatar_theme.hide",
-                            "Hide",
-                          )}
-                        </span>
-                        <ChevronUp
-                          className="h-3.5 w-3.5 text-black/35 dark:text-white/35"
-                          aria-hidden="true"
-                        />
-                      </button>
-                      <div
-                        className="grid grid-cols-8 place-items-center gap-y-2 sm:grid-cols-7"
-                        role="radiogroup"
-                        aria-busy={isSavingAvatarTheme || undefined}
-                        aria-label={t(
-                          "settings.profile.avatar_theme.label",
-                          "Avatar color",
-                        )}
-                      >
-                        {AVATAR_THEMES.map((theme, index) => {
-                          const selected =
-                            (profile?.avatar_theme ?? "ocean") === theme.token;
-                          const themeLabel = t(
-                            `settings.profile.avatar_theme.themes.${theme.token}`,
-                            theme.token,
-                          );
-                          return (
-                            <button
-                              key={theme.token}
-                              type="button"
-                              role="radio"
-                              aria-checked={selected}
-                              aria-label={themeLabel}
-                              title={themeLabel}
-                              aria-disabled={isSavingAvatarTheme || undefined}
-                              onClick={() => void handleAvatarThemeSelect(theme.token)}
-                              onKeyDown={(event) =>
-                                handleAvatarThemeKeyDown(event, index)
-                              }
-                              tabIndex={selected ? 0 : -1}
-                              className={`col-span-2 flex h-11 w-11 items-center justify-center rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-black/30 dark:focus-visible:ring-white/50 sm:col-span-1 ${
-                                isSavingAvatarTheme
-                                  ? "cursor-wait opacity-60"
-                                  : ""
-                              } ${
-                                index === 4 ? "col-start-2 sm:col-auto" : ""
-                              }`}
-                            >
-                              <span
-                                className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-bold ${theme.className} ${
-                                  theme.token === "ocean"
-                                    ? "border-black/20 dark:border-white/20"
-                                    : "border-transparent"
-                                } ${
-                                  selected
-                                    ? "ring-2 ring-black/70 dark:ring-white/80"
-                                    : ""
-                                }`}
-                                style={avatarThemeStyle(theme.token, "picker")}
-                                aria-hidden="true"
-                              >
-                                {profileInitial(profile)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {avatarThemeError && (
-                        <span className="mt-3 block text-[12px] text-[#d66d75]">
-                          {avatarThemeError}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            {/* Info */}
-            <div className="mt-2 flex flex-col gap-2 text-[13px]">
-              <div
-                ref={languagePickerRef}
-                className="relative flex items-center justify-between py-1"
-              >
-                <span className="text-black/50 dark:text-white/50">
-                  {t("settings.app.language", "Language")}
-                </span>
-                <button
-                  id="argus-profile-language-trigger"
-                  type="button"
-                  onClick={() => setIsLanguagePickerOpen((open) => !open)}
-                  className="-mr-1 rounded-md px-1.5 py-0.5 text-black outline-none transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white dark:hover:bg-white/[0.06] dark:focus-visible:ring-white/20"
-                  aria-haspopup="listbox"
-                  aria-expanded={isLanguagePickerOpen}
-                  aria-controls="argus-profile-language-picker"
-                  aria-label={t("settings.app.language", "App language")}
-                >
-                  {currentLanguageAbbreviation}
-                </button>
-                {isLanguagePickerOpen && (
-                  <div
-                    id="argus-profile-language-picker"
-                    role="listbox"
-                    aria-labelledby="argus-profile-language-trigger"
-                    className="absolute right-0 top-full z-30 mt-1 min-w-[136px] rounded-[10px] border border-black/10 bg-white py-1 shadow-[0_12px_28px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-[#23262a]"
-                  >
-                    {ENABLED_LANGUAGES.map((entry) => {
-                      const entryLanguage = normalizeEnabledLanguage(entry.code);
-                      const selected = entryLanguage === currentLanguage;
-                      return (
-                        <button
-                          key={entry.code}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          onClick={() => void handleLanguageSelect(entry.code)}
-                          disabled={isSavingLanguage}
-                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] text-black transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-60 dark:text-white dark:hover:bg-white/5"
-                        >
-                          <span>{entry.name}</span>
-                          {selected ? (
-                            <Check className="h-3.5 w-3.5 text-black dark:text-white" />
-                          ) : (
-                            <span className="text-black/35 dark:text-white/35">
-                              {languageDisplayAbbreviation(entryLanguage)}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              {languageError && (
-                <span className="text-[12px] text-[#d66d75]">
-                  {languageError}
-                </span>
-              )}
-            </div>
-
-          </div>
-        </div>
-      </div>
-      {deleteRequestDialog}
-      </>
+      <ProfileDetailsDialog
+        profile={profile}
+        accountKind={accountKind}
+        closeProfileModal={closeProfileModal}
+        onEscape={handleProfileModalEscape}
+        returnFocusRef={anchorRef}
+        avatarClassName={avatarClassName}
+        avatarStyle={avatarStyle}
+        avatarTriggerRef={avatarTriggerRef}
+        avatarThemeDrawerRef={avatarThemeDrawerRef}
+        isAvatarPickerOpen={isAvatarPickerOpen}
+        toggleAvatarPicker={toggleAvatarPicker}
+        closeAvatarPicker={closeAvatarPicker}
+        isSavingAvatarTheme={isSavingAvatarTheme}
+        avatarThemeError={avatarThemeError}
+        handleAvatarThemeSelect={handleAvatarThemeSelect}
+        handleAvatarThemeKeyDown={handleAvatarThemeKeyDown}
+        editingName={editingName}
+        nameValue={nameValue}
+        setNameValue={setNameValue}
+        stopEditingName={stopEditingName}
+        handleStartEditName={handleStartEditName}
+        handleSaveName={handleSaveName}
+        isSavingName={isSavingName}
+        nameError={nameError}
+        editingPreferredName={editingPreferredName}
+        preferredNameValue={preferredNameValue}
+        setPreferredNameValue={setPreferredNameValue}
+        stopEditingPreferredName={stopEditingPreferredName}
+        handleStartEditPreferredName={handleStartEditPreferredName}
+        handleSavePreferredName={handleSavePreferredName}
+        isSavingPreferredName={isSavingPreferredName}
+        preferredNameError={preferredNameError}
+        languagePickerRef={languagePickerRef}
+        isLanguagePickerOpen={isLanguagePickerOpen}
+        setIsLanguagePickerOpen={setIsLanguagePickerOpen}
+        currentLanguage={currentLanguage}
+        currentLanguageAbbreviation={currentLanguageAbbreviation}
+        handleLanguageSelect={handleLanguageSelect}
+        isSavingLanguage={isSavingLanguage}
+        languageError={languageError}
+        deleteRequestDialog={deleteRequestDialog}
+      />
     );
   }
 

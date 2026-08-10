@@ -1184,6 +1184,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/market/session:
+    get:
+      tags:
+      - market
+      description: 'Backend-owned session truth for surfaces that speak about the market.
+
+
+        Eastern time and the real trading calendar both live behind this, so no
+
+        caller has to know the difference between a holiday and a Thursday.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketSessionResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/me:
     get:
       tags:
@@ -2947,6 +2972,39 @@ components:
       - email
       - password
       - captcha_token
+    MarketSession:
+      properties:
+        phase:
+          type: string
+          enum:
+          - pre_market
+          - open
+          - after_hours
+          - closed_weekend
+          - closed_holiday
+          - closed
+        is_market_day:
+          type: boolean
+        as_of:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - phase
+      - is_market_day
+      - as_of
+      description: Which session US equities are in, resolved in Eastern time.
+    MarketSessionResponse:
+      properties:
+        session:
+          anyOf:
+          - $ref: '#/components/schemas/MarketSession'
+          - type: 'null'
+          description: Null when the trading calendar is unreachable. Callers say nothing
+            about the market rather than guessing an open or a holiday.
+      type: object
+      required:
+      - session
     MemoryAvailabilityResponse:
       properties:
         available:
@@ -3561,6 +3619,11 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        preferred_name:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
         language:
           anyOf:
           - type: string
@@ -4128,6 +4191,11 @@ components:
         display_name:
           anyOf:
           - type: string
+          - type: 'null'
+        preferred_name:
+          anyOf:
+          - type: string
+            maxLength: 40
           - type: 'null'
         language:
           type: string

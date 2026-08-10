@@ -204,7 +204,12 @@ describe("private-alpha usage allowance", () => {
     expect(usageLib).toContain("backtests: UsageAllowance");
     expect(usageLib).toContain('limiting_window: "hour" | "day"');
     expect(profileMenu).toContain('openModal("usage")');
-    expect(profileMenu).toContain("<UsageModal");
+    expect(
+      readFileSync(
+        join(root, "components/sidebar/ProfileSettingsPanels.tsx"),
+        "utf-8",
+      ),
+    ).toContain("<UsageModal");
     expect(modal).toContain("getUsageAllowances");
     expect(modal).toContain("usage.allowances.messages");
     expect(modal).toContain("usage.allowances.backtests");

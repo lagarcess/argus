@@ -456,6 +456,23 @@ needs. A greeting is voicing, so this stays inside the S10 lock. Same rule as th
 chips governs: memory-driven when memory has something, the rotating static pool
 otherwise, guests always static.
 
+**Correction, 2026-08-09: this is not half built, and it is not memory.**
+`research_memory_block()` in `src/argus/agent_runtime/research_grounded.py`
+writes a field named `memory` into the research sidecar at
+`messages.metadata["research"]`. That is a sidecar field, not a memory record:
+the memory system's four categories are in `src/argus/memory/contracts.py`
+(`personalization_preference`, `workflow_preference`, `explicit_decision_note`,
+`past_session_anchor`) and none of them is a research subject, an open thread,
+or a comparison set.
+
+The corpus is also empty. That block is emitted only on a research turn,
+research is gated by `research_rail_enabled()`, and `ARGUS_RESEARCH_RAIL_ENABLED`
+is `false` in `render.yaml`, so zero open threads exist today and none will until
+the flag flips, which is itself gated on #411 and #412. The lane therefore built
+the rotating static pool and the market-session lines only, and left the seam
+marked in `web/components/chat/greetingPool.ts` for a reader that has something
+to read.
+
 **Keep it warm, not clever.** "Hola, noctámbulo" works because it is warm without
 performing. A greeting that tries harder becomes a mascot, and the product
 posture is the opposite of a mascot.

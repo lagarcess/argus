@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import { getMarketSession } from "@/lib/argus-api";
+import {
+  greetingSlotForHour,
+  pickGreetingKey,
+  type MarketSessionPhase,
+} from "./greetingPool";
+
 
 /* The signed-in empty chat: the muted mark reuses the treatment from
  * ConversationRetrievalState (currentColor at low alpha), and the typewriter
@@ -10,28 +17,60 @@ import { ArgusLogo } from "@/components/ArgusLogo";
  * sentence once through a polite status region, never character by character;
  * reduced motion renders the sentence instantly. */
 
-type GreetingSlot = "early" | "day" | "evening" | "night";
-
-export function greetingSlotForHour(hour: number): GreetingSlot {
-  if (hour >= 5 && hour < 9) return "early";
-  if (hour >= 9 && hour < 18) return "day";
-  if (hour >= 18 && hour < 23) return "evening";
-  return "night";
-}
-
 const TYPE_INTERVAL_MS = 35;
 
-export default function EmptyChatGreeting() {
+// Cosmetic, so it speaks without the session rather than waiting on it.
+const SESSION_TIMEOUT_MS = 2_000;
+
+export default function EmptyChatGreeting({
+  preferredName,
+}: {
+  /** What the user asked to be called. Blank means the nameless pool. */
+  preferredName?: string | null;
+}) {
   const { t } = useTranslation();
   const [greeting, setGreeting] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(0);
   const [done, setDone] = useState(false);
+  const [session, setSession] = useState<MarketSessionPhase | null>(null);
+  const [sessionSettled, setSessionSettled] = useState(false);
+
+  // Session is backend truth in Eastern time; the client never computes it.
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      SESSION_TIMEOUT_MS,
+    );
+    getMarketSession(controller.signal)
+      .then((response) => setSession(response.session?.phase ?? null))
+      .catch(() => setSession(null))
+      .finally(() => {
+        window.clearTimeout(timeout);
+        setSessionSettled(true);
+      });
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
+    if (!sessionSettled) return;
     // Local clock only after mount: the server cannot know the visitor's hour,
     // and a mismatched SSR greeting would flash-correct on hydration.
-    const slot = greetingSlotForHour(new Date().getHours());
-    const text = t(`chat.greeting.${slot}`, "What should we try today?");
+    const now = new Date();
+    const name = preferredName?.trim() ?? "";
+    const key = pickGreetingKey({
+      slot: greetingSlotForHour(now.getHours()),
+      session,
+      hasName: name.length > 0,
+      at: now,
+    });
+    const text = t(`chat.greeting.${key}`, {
+      defaultValue: "What should we try today?",
+      name,
+    });
     setGreeting(text);
     const reduceMotion = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
@@ -51,7 +90,7 @@ export default function EmptyChatGreeting() {
       }
     }, TYPE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [t]);
+  }, [preferredName, session, sessionSettled, t]);
 
   return (
     <div
@@ -64,9 +103,9 @@ export default function EmptyChatGreeting() {
       />
       <p
         aria-hidden="true"
-        className="font-display min-h-[1.4em] text-center text-[24px] font-medium leading-[1.3] tracking-[-0.24px] text-black/80 sm:text-[28px] dark:text-white/80"
+        className="font-display min-h-[1.4em] text-balance text-center text-[24px] font-medium leading-[1.3] tracking-[-0.24px] text-black/80 sm:text-[28px] dark:text-white/80"
       >
-        {greeting ? greeting.slice(0, visibleCount) : " "}
+        {greeting ? greeting.slice(0, visibleCount) : " "}
         {greeting && !done ? (
           <span
             aria-hidden="true"

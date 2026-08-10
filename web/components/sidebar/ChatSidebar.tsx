@@ -42,7 +42,7 @@ import {
   type RecentChatGroupKey,
 } from "@/lib/chat-recents";
 
-import type { HistoryItem, SearchConversationItem } from "@/lib/argus-api";
+import type { ApiUser, HistoryItem, SearchConversationItem } from "@/lib/argus-api";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import { sidebarShortcutHintsVisible } from "@/lib/sidebar-shortcuts";
 
@@ -101,6 +101,8 @@ export type ChatSidebarProps = {
   onOpenSearch: () => void;
   /** Callback when a chat is mutated (pin/archive/delete/rename) so parent can refresh */
   onHistoryMutated?: () => void;
+  /** Callback when a profile setting is saved, so the shell's account copy follows */
+  onProfileUpdated?: (user: ApiUser) => void;
   /** Callback when archive/delete removes a chat from the active recents surface */
   onConversationRemoved?: (conversationId: string) => void;
   /** Callback when every non-deleted conversation is moved to Recently Deleted */
@@ -156,6 +158,7 @@ export default function ChatSidebar({
   onLoadMoreHistory,
   onOpenSearch,
   onHistoryMutated,
+  onProfileUpdated,
   onConversationRemoved,
   onAllConversationsDeleted,
   onToast,
@@ -903,6 +906,7 @@ export default function ChatSidebar({
             onFeedback={onFeedback}
             onDeleteAllConversations={handleRequestDeleteAllConversations}
             onHistoryMutated={onHistoryMutated}
+            onProfileUpdated={onProfileUpdated}
             onOpenSidebarPreference={sidebarPreferenceHandler}
             onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
             anchorRef={profileButtonRef}

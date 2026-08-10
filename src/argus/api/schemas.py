@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
@@ -129,11 +130,33 @@ class OnboardingState(BaseModel):
     ) = None
 
 
+PREFERRED_NAME_MAX_LENGTH = 40
+
+
+def _blank_preferred_name_is_no_name(value: Any) -> Any:
+    """Whitespace is not a name, and clearing the field is the way to opt out."""
+
+    if not isinstance(value, str):
+        return value
+    return value.strip() or None
+
+
+# Normalize first, then enforce the bound: `max_length` measures the trimmed
+# value. One annotation serves the read model and the patch, so it cannot drift.
+PreferredName = Annotated[
+    Annotated[str, Field(max_length=PREFERRED_NAME_MAX_LENGTH)] | None,
+    BeforeValidator(_blank_preferred_name_is_no_name),
+]
+
+
 class User(BaseModel):
     id: str
     email: str | None
     username: str | None = None
     display_name: str | None = None
+    #: What the user asked Argus to call them, distinct from `display_name`,
+    #: which is an identity field. Null means greetings use no name.
+    preferred_name: PreferredName = None
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
@@ -241,6 +264,7 @@ class UsageAllowanceResponse(BaseModel):
 
 class ProfilePatch(BaseModel):
     display_name: str | None = None
+    preferred_name: PreferredName = None
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
@@ -937,6 +961,34 @@ class DiscoveryItem(BaseModel):
 
 class DiscoveryResponse(BaseModel):
     items: list[DiscoveryItem]
+
+
+class MarketSession(BaseModel):
+    """Which session US equities are in, resolved in Eastern time."""
+
+    model_config = ConfigDict(frozen=True)
+
+    phase: Literal[
+        "pre_market",
+        "open",
+        "after_hours",
+        "closed_weekend",
+        "closed_holiday",
+        "closed",
+    ]
+    is_market_day: bool
+    as_of: datetime
+
+
+class MarketSessionResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    session: MarketSession | None = Field(
+        description=(
+            "Null when the trading calendar is unreachable. Callers say nothing "
+            "about the market rather than guessing an open or a holiday."
+        )
+    )
 
 
 class FeedbackRequest(BaseModel):

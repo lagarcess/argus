@@ -226,6 +226,9 @@ Registered accounts only. Guests keep the current entry.
 - Below it, prebaked suggestions, reusing `chat.show_suggestions`,
   `chat.hide_suggestions`, and `chat.example_queries`. The current q1 to q3
   strings may be stale; verify them.
+  **Superseded by Empty chat polish:** the toggle is retired and both of those
+  keys are deleted. The suggestions render whenever the empty chat surface
+  renders and stop when it stops. Only `chat.example_queries` survives.
 - Composer at the bottom.
 
 **Every suggestion must be genuinely runnable**, built from memory, recent

@@ -690,8 +690,9 @@ Application-facing user object.
 {
   "id": "uuid",
   "email": "user@email.com",
-  "username": "lucas",
-  "display_name": "Lucas",
+  "username": "alex",
+  "display_name": "Alexandra",
+  "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
   "theme": "dark",
@@ -708,7 +709,19 @@ Application-facing user object.
 ```
 
 **Notes:**
-- `display_name` is used for personalization.
+- `display_name` is an identity field. It is what the account is called.
+- `preferred_name` is what Argus calls the user when it addresses them, and it
+  is deliberately not `display_name`: people fill an identity field with a legal
+  name, so a greeting built from it addresses the account rather than the
+  person. It is optional, because being addressed by name is not universally
+  welcome. Null or absent means surfaces use no name, which needs no special
+  handling.
+  - Stated, never inferred. It is a setting; nothing derives it from
+    conversation, and no runtime writes it.
+  - Bounded at 40 characters. Blank or whitespace clears it, which is how a user
+    opts out after opting in.
+  - A registered-account preference. Guest responses omit it entirely, and the
+    database policies keep it off the guest surface.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -1643,8 +1656,8 @@ Create account.
   "email": "user@email.com",
   "password": "string",
   "captcha_token": "bounded-turnstile-token",
-  "display_name": "Lucas",
-  "username": "lucas",
+  "display_name": "Alex",
+  "username": "alex",
   "language": "es-419"
 }
 ```
@@ -1788,8 +1801,8 @@ Retrieve the current authenticated user profile and preferences.
   "user": {
     "id": "uuid",
     "email": "user@email.com",
-    "username": "lucas",
-    "display_name": "Lucas",
+    "username": "alex",
+    "display_name": "Alex",
     "language": "en",
     "locale": "en-US",
     "theme": "dark",
@@ -1904,6 +1917,47 @@ window.
 - `500 Server Error`: durable usage truth is unavailable outside the explicit
   development fallback mode.
 
+## `GET /market/session`
+
+Return which session US equities are in. Owner-authenticated read; it holds no
+per-account state.
+
+**Response:**
+```json
+{
+  "session": {
+    "phase": "closed_weekend",
+    "is_market_day": false,
+    "as_of": "2026-08-09T13:04:22-04:00"
+  }
+}
+```
+
+**Session semantics:**
+- `phase` is one of `pre_market`, `open`, `after_hours`, `closed_weekend`,
+  `closed_holiday`, or `closed`. `closed` is the overnight lull on a trading
+  day, which is neither a weekend nor a holiday.
+- The session is resolved in Eastern time, never in the caller's timezone.
+  Someone in London at 2pm is in US pre-market, and a local-time calculation
+  reports that backwards.
+- Closure comes from the trading calendar, never from a weekday check. The
+  weekday is consulted only after the calendar has already ruled the day
+  closed, and only to choose between `closed_weekend` and `closed_holiday`.
+- `pre_market` runs from 04:00 Eastern to the session open, and `after_hours`
+  from the session close to 20:00 Eastern. The regular open and close come from
+  the calendar per session, because half days move them.
+- One calendar read covers a whole day: a past or present calendar day's
+  session never changes, so it is cached by date rather than on a TTL.
+- `session` is `null` when the trading calendar is unreachable. Clients say
+  nothing about the market rather than guessing an open or a holiday. Argus
+  supports crypto and currency pairs, which do not close, so any client copy
+  about a closure must stay true for those asset classes too.
+
+**Error rules:**
+- `401 Unauthorized`: authentication is missing or invalid.
+- A provider or calendar failure is not an error response. It returns `200`
+  with `session: null`.
+
 ## `PATCH /me`
 
 Update profile preferences. Partial update semantics are supported.
@@ -1911,7 +1965,8 @@ Update profile preferences. Partial update semantics are supported.
 **Request:**
 ```json
 {
-  "display_name": "Lucas",
+  "display_name": "Alexandra",
+  "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
   "theme": "dark",
@@ -1930,6 +1985,9 @@ Update profile preferences. Partial update semantics are supported.
 - Clients may send only the fields that changed.
 - Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- `preferred_name` is bounded at 40 characters; longer values return 422. An
+  empty or whitespace-only value clears it rather than storing a blank name.
+  Omitting it leaves it untouched, so editing another preference cannot wipe it.
 - `avatar_theme` accepts only `ocean`, `plum`, `teal`, `ember`, `gold`,
   `indigo`, or `slate`; it cannot be `null`, and invalid values return 422.
 - Avatar themes are registered-account preferences. Guests cannot update a
