@@ -66,8 +66,13 @@ beforeAll(async () => {
       const at = listeners.indexOf(listener);
       if (at >= 0) listeners.splice(at, 1);
     },
-    get location() {
-      return { href: currentHref() };
+    location: {
+      get href() {
+        return currentHref();
+      },
+      replace(value: string) {
+        stack[cursor] = new URL(value, currentHref()).href;
+      },
     },
     history: {
       get state() {
@@ -117,6 +122,20 @@ function navigateTo(href: string): void {
 }
 
 describe("back after navigating out of nested overlays", () => {
+  test("route navigation spends the overlay before its close callback", () => {
+    openOverlay("settings");
+    let closed = false;
+
+    subject.navigateFromOverlay(DEST, () => {
+      closed = true;
+    });
+
+    expect(closed).toBe(true);
+    expect(currentHref()).toBe(DEST);
+    expect(stack).toEqual([SOURCE, DEST]);
+    expect(subject.claimOverlayEntry("settings")).toBe(false);
+  });
+
   test("one press is one step, with no dead press in between", () => {
     openOverlay("palette");
     openOverlay("dossier");

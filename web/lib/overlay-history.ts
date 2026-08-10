@@ -207,6 +207,24 @@ export function consumeOverlayEntriesForNavigation(): void {
   }
 }
 
+/**
+ * Leave an overlay for another page without letting its close cleanup undo it.
+ *
+ * Sheet cleanup normally spends its same-URL history entry with `back()`. A
+ * route change has to claim that entry first, then close the sheet, so the
+ * deferred cleanup cannot send the user back to the page they just left.
+ * Replacing that temporary entry also keeps the original page one Back away.
+ */
+export function navigateFromOverlay(
+  href: string,
+  beforeNavigate?: () => void,
+): void {
+  if (typeof window === "undefined") return;
+  consumeOverlayEntriesForNavigation();
+  beforeNavigate?.();
+  window.location.replace(href);
+}
+
 export function overlayHistoryState(
   currentState: unknown,
   overlayId: string,

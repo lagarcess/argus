@@ -2724,9 +2724,8 @@ describe("Argus Alpha frontend contract", () => {
       securityLabel,
     );
     expect(securityButton).toContain(
-      'window.location.href = "/account/security"',
+      'navigateFromOverlay("/account/security", onClose)',
     );
-    expect(securityButton).toContain("onClose()");
     expect(securityButton).not.toContain("disabled");
     expect(securityButton).not.toContain("cursor-not-allowed");
     expect(en.settings.data.security).toBeTruthy();

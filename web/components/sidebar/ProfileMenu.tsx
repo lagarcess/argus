@@ -67,6 +67,7 @@ import {
 } from "@/lib/language-features";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
+import { navigateFromOverlay } from "@/lib/overlay-history";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
@@ -755,10 +756,8 @@ export default function ProfileMenu({
         { id: "deleted", onSelect: () => openModal("deleted") },
         {
           id: "security",
-          onSelect: () => {
-            onClose();
-            window.location.href = "/account/security";
-          },
+          onSelect: () =>
+            navigateFromOverlay("/account/security", onClose),
         },
         { id: "usage", onSelect: () => openModal("usage") },
         { id: "delete-all", onSelect: handleDeleteAllConversations },
@@ -1109,10 +1108,9 @@ export default function ProfileMenu({
               <span className="ml-auto flex shrink-0">{quickJumpBadge("deleted")}</span>
             </button>
             <button
-              onClick={() => {
-                onClose();
-                window.location.href = "/account/security";
-              }}
+              onClick={() =>
+                navigateFromOverlay("/account/security", onClose)
+              }
               className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Shield className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
