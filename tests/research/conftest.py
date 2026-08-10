@@ -27,6 +27,11 @@ def agent_response(
     lookup_rows: list[tuple[str, str, str]] | None = None,
     sources: list[str] | None = None,
     invocations: int = 1,
+    web_search_invocations: int = 0,
+    fetch_url_invocations: int = 0,
+    input_tokens: int = 1_000,
+    output_tokens: int = 500,
+    model: str = "openai/gpt-5.6-sol",
     response_id: str = "resp_test",
     status: str | None = None,
 ) -> dict[str, Any]:
@@ -45,9 +50,18 @@ def agent_response(
             f"| {query} | {ticker} | {name} |" for query, ticker, name in lookup_rows
         )
         results.append({"category": "tickers_lookup", "content": table, "sources": []})
+    tool_calls_details: dict[str, dict[str, int]] = {
+        "finance_search": {"invocation": invocations}
+    }
+    if web_search_invocations:
+        # The request tool is web_search; Agent API usage currently reports
+        # the provider-owned response key as search_web.
+        tool_calls_details["search_web"] = {"invocation": web_search_invocations}
+    if fetch_url_invocations:
+        tool_calls_details["fetch_url"] = {"invocation": fetch_url_invocations}
     document: dict[str, Any] = {
         "id": response_id,
-        "model": "openai/gpt-5.6-sol",
+        "model": model,
         "output": [
             {"type": "skill_loaded", "name": "finance"},
             {
@@ -62,7 +76,12 @@ def agent_response(
                 "content": [{"type": "output_text", "text": text}],
             },
         ],
-        "usage": {"tool_calls_details": {"finance_search": {"invocation": invocations}}},
+        "usage": {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+            "tool_calls_details": tool_calls_details,
+        },
     }
     if status is not None:
         document["status"] = status

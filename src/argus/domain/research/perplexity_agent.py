@@ -32,11 +32,9 @@ from argus.domain.research.contracts import (
     ResearchUnavailableError,
     ResearchUsage,
 )
+from argus.domain.research.pricing import derive_research_cost_usd
 
 PERPLEXITY_AGENT_URL = "https://api.perplexity.ai/v1/agent"
-# Published tool pricing: $5 per 1,000 finance_search invocations. Token costs
-# bill separately; the ledger records this floor as provider_reported.
-DOCUMENTED_FINANCE_SEARCH_COST_USD = 0.005
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
 
@@ -158,7 +156,6 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
     tickers: list[str] = []
     sources: list[ResearchSource] = []
     pairs: list[ResearchNamePair] = []
-    invocations = 0
     for item in output:
         if not isinstance(item, dict):
             continue
@@ -201,16 +198,7 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
                         _append_public_source(sources, annotation)
-    usage = document.get("usage")
-    if isinstance(usage, dict):
-        details = usage.get("tool_calls_details")
-        if isinstance(details, dict):
-            finance = details.get("finance_search")
-            if isinstance(finance, dict):
-                try:
-                    invocations = int(finance.get("invocation") or 0)
-                except (TypeError, ValueError):
-                    invocations = 0
+    usage = _usage_from_response(document, latency_ms=latency_ms)
     answer = _sanitize_answer("\n\n".join(text_blocks))
     seen: set[str] = set()
     unique_pairs = []
@@ -226,14 +214,87 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
         tickers=tuple(tickers[:MAX_PACKET_TICKERS]),
         sources=tuple(sources[:MAX_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
-        usage=ResearchUsage(
-            invocations=invocations,
-            model=str(document.get("model") or ""),
-            latency_ms=latency_ms,
-            cost_usd=round(invocations * DOCUMENTED_FINANCE_SEARCH_COST_USD, 6),
-        ),
+        usage=usage,
         background_id=str(document.get("id") or "") or None,
     )
+
+
+def _usage_from_response(document: dict[str, Any], *, latency_ms: int) -> ResearchUsage:
+    model = document.get("model")
+    if not isinstance(model, str) or not model.strip():
+        raise ResearchUnavailableError("malformed_response", "missing model")
+    usage = document.get("usage")
+    if not isinstance(usage, dict):
+        raise ResearchUnavailableError("malformed_response", "missing usage")
+    input_tokens = _required_nonnegative_int(
+        usage, "input_tokens", path="usage.input_tokens"
+    )
+    output_tokens = _required_nonnegative_int(
+        usage, "output_tokens", path="usage.output_tokens"
+    )
+    details = usage.get("tool_calls_details")
+    if details is None:
+        details = {}
+    if not isinstance(details, dict):
+        raise ResearchUnavailableError(
+            "malformed_response", "invalid usage.tool_calls_details"
+        )
+    finance_search_invocations = _tool_invocation_count(details, "finance_search")
+    web_search_invocations = _tool_invocation_count(details, "web_search", "search_web")
+    fetch_url_invocations = _tool_invocation_count(details, "fetch_url")
+    cost_usd = derive_research_cost_usd(
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        finance_search_invocations=finance_search_invocations,
+        web_search_invocations=web_search_invocations,
+        fetch_url_invocations=fetch_url_invocations,
+    )
+    return ResearchUsage(
+        invocations=finance_search_invocations,
+        finance_search_invocations=finance_search_invocations,
+        web_search_invocations=web_search_invocations,
+        fetch_url_invocations=fetch_url_invocations,
+        model=model,
+        latency_ms=latency_ms,
+        cost_usd=cost_usd,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+
+def _tool_invocation_count(details: dict[str, Any], *provider_keys: str) -> int:
+    counts: list[int] = []
+    for key in provider_keys:
+        if key not in details:
+            continue
+        entry = details[key]
+        if not isinstance(entry, dict):
+            raise ResearchUnavailableError(
+                "malformed_response", f"invalid usage.tool_calls_details.{key}"
+            )
+        counts.append(
+            _required_nonnegative_int(
+                entry,
+                "invocation",
+                path=f"usage.tool_calls_details.{key}.invocation",
+            )
+        )
+    if not counts:
+        return 0
+    if any(count != counts[0] for count in counts[1:]):
+        joined = ", ".join(provider_keys)
+        raise ResearchUnavailableError(
+            "malformed_response", f"conflicting tool counts: {joined}"
+        )
+    return counts[0]
+
+
+def _required_nonnegative_int(values: dict[str, Any], key: str, *, path: str) -> int:
+    value = values.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+    return value
 
 
 # Ticker-shaped cell: 1-5 uppercase letters, optionally a class suffix. Cells
