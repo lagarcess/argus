@@ -486,12 +486,21 @@ Two things a builder needs to know:
   tuple and an `expected_names` map that reject a profile whose service set
   differs. A job riding the existing pass pays none of that.
 
-Isolation comes from the pass itself rather than from a separate schedule.
-`run_maintenance()` runs each job in its own child process and runs every job
-even after an earlier one fails, so qualification is appended after retention
-and reconciliation and cannot delay or take down work that already ran. A failed
-qualification leaves the pass `degraded` and its own report intact in the cron
-log.
+Isolation comes from ordering plus a runtime bound, not from a separate
+schedule. `run_maintenance()` runs each job in its own child process and runs
+every job even after an earlier one fails, so qualification appended after
+retention and reconciliation cannot take down or delay work that already ran in
+that pass. A failed qualification leaves the pass `degraded` with its own report
+intact in the cron log.
+
+**Ordering alone is not enough, and the gap is the next pass.** Render runs at
+most one execution of a cron job at a time and delays the next scheduled run
+until the current one finishes, while `run_job()` calls `subprocess.run()` with
+no timeout. An unbounded qualification child would therefore push out the
+following retention and reconciliation passes, and Render's own backstop stops a
+run only after twelve hours. **Qualification must carry its own timeout and be
+killed at it**, sized well inside the fifteen-minute period, and a qualification
+that times out is a degraded pass rather than a delayed janitor.
 
 There is no second scheduling mechanism to build. A builder who thinks this
 feature needs one should stop and report instead.
@@ -549,6 +558,8 @@ second scheduler, no public sharing, and no urgency in any copy in any language.
 - At most three items per send, and no send when nothing qualifies.
 - Qualification exhausts free signals before any provider call, and a pass
   refuses to exceed its declared ceiling.
+- Qualification carries a runtime bound and is killed at it, proven by test, so
+  a slow pass cannot delay the next retention and reconciliation run.
 - Follow-ups charge no message allowance; qualification cost lands in
   `cost_ledger_entries` under its own capability class.
 - No `finance_search` number reaches a simulation. A test launched from a
