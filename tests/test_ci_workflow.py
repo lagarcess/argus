@@ -233,9 +233,11 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert prepare_index < warmup_index
     assert ": > temp/canary-evidence/es-419-capture.json" in joined_steps
     assert "rm -f temp/canary-evidence/es-419-capture.json" in joined_steps
+    # A failing canary must show as a failing step, not a green tick beside a
+    # red aggregate gate.
     assert (
-        steps_by_name["Run authoritative Spanish release canary"]["continue-on-error"]
-        is True
+        "continue-on-error"
+        not in steps_by_name["Run authoritative Spanish release canary"]
     )
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
     assert "temp/canary-evidence/es-419.exit" in joined_steps
@@ -257,6 +259,36 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert steps_by_name["Upload failed canary capture"]["with"]["path"] == (
         "temp/canary-evidence/es-419-capture.json"
     )
+    browser_context = steps_by_name["Upload browser canary failure context"]
+    assert browser_context["with"]["path"] == "web/temp/playwright-results/**"
+    assert browser_context["with"]["if-no-files-found"] == "ignore"
+    assert "private-alpha-canary-browser-context" in workflow_source
+    # The canary script masks its own credentials, so the upload stays secretless.
+    assert "env" not in browser_context
+    # A deployed tree without the redaction pass leaves no marker, so the browser
+    # artifacts are skipped rather than published with raw input values.
+    redaction_gate = steps_by_name["Check browser canary context redaction"]
+    assert redaction_gate["id"] == "browser_context"
+    assert "web/temp/playwright-results/.redacted" in redaction_gate["run"]
+    assert browser_context["if"] == (
+        "failure() && steps.browser_context.outputs.ready == 'true'"
+    )
+    redaction_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Check browser canary context redaction"
+    )
+    gate_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Require authoritative private-alpha canary"
+    )
+    browser_context_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Upload browser canary failure context"
+    )
+    assert gate_index < redaction_index < browser_context_index
 
 
 def test_private_alpha_canary_schedule_uses_main_as_the_deployment_candidate() -> None:
