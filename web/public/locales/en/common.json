@@ -791,7 +791,7 @@
         "run_backtest": "Run backtest",
         "change_dates": "Change dates",
         "change_asset": "Change asset",
-        "adjust_assumptions": "Adjust assumptions",
+        "adjust_assumptions": "Change assumptions",
         "cancel": "Cancel"
       },
       "assumptions": {

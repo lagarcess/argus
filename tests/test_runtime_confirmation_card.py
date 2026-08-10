@@ -149,6 +149,7 @@ def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
     assert card is not None
     assert card["display_facts"] == {
         "benchmark_symbol": "SPY",
+        "capital": 1000.0,
         "fees": 0.0,
         "slippage": 0.0,
         "timeframe": "1D",
@@ -232,6 +233,7 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
     assert card["strategy_type"] == "dca_accumulation"
     assert card["display_facts"] == {
         "benchmark_symbol": "BTC",
+        "capital": 500.0,
         "fees": 0.0,
         "slippage": 0.0,
         "timeframe": "1D",
@@ -436,6 +438,7 @@ def test_runtime_confirmation_card_shows_execution_realism_values(
     assert card is not None
     assert card["display_facts"] == {
         "benchmark_symbol": "SPY",
+        "capital": 1000.0,
         "fees": 0.001,
         "slippage": 0.0005,
         "timeframe": "1D",
@@ -496,6 +499,7 @@ def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -
     assert card["asset_class"] == "crypto"
     assert card["display_facts"] == {
         "benchmark_symbol": "BTC",
+        "capital": 100000.0,
         "fees": 0.0,
         "slippage": 0.0,
         "timeframe": "1D",
@@ -521,8 +525,6 @@ def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -
     assert {action["labelKey"] for action in card["actions"]} == {
         "chat.confirmation.actions.adjust_assumptions",
         "chat.confirmation.actions.cancel",
-        "chat.confirmation.actions.change_asset",
-        "chat.confirmation.actions.change_dates",
         "chat.confirmation.actions.run_backtest",
     }
     assert "$100,000 starting capital" in card["assumptions"]
@@ -949,7 +951,7 @@ def test_runtime_confirmation_card_carries_active_confirmation_identity() -> Non
     assert run_action["payload"]["confirmation_id"] == "confirm-1"
 
 
-def test_runtime_confirmation_card_flag_off_omits_capabilities(
+def test_runtime_confirmation_card_flag_off_omits_cost_editing_capability(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "false")
@@ -957,7 +959,8 @@ def test_runtime_confirmation_card_flag_off_omits_capabilities(
     card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
 
     assert card is not None
-    assert "capabilities" not in card
+    assert "execution_costs_editable" not in card["capabilities"]
+    assert card["capabilities"]["direct_edits"] == ["capital", "dates"]
 
 
 def test_runtime_confirmation_card_flag_on_marks_execution_costs_editable(
@@ -968,7 +971,10 @@ def test_runtime_confirmation_card_flag_on_marks_execution_costs_editable(
     card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
 
     assert card is not None
-    assert card["capabilities"] == {"execution_costs_editable": True}
+    assert card["capabilities"] == {
+        "execution_costs_editable": True,
+        "direct_edits": ["capital", "dates"],
+    }
 
 
 def test_confirmation_card_discloses_reconciled_benchmark() -> None:

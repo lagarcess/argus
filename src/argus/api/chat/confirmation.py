@@ -188,27 +188,17 @@ def runtime_confirmation_card(
     }
     if owner_conversation_id:
         action_payload["conversation_id"] = owner_conversation_id
+    # §3.1 end state: Run backtest, Change assumptions, Cancel. The scoped
+    # change_dates/change_asset entry points are retired from emission only,
+    # gated on the §3.2 compound-edit contract: the general entry point now
+    # applies every stated change or discloses what it could not, and capital
+    # and dates additionally have the direct drawer. The action types stay in
+    # the schema and the renderer so durable transcripts keep hydrating.
     actions = [
-        {
-            "id": "change-dates",
-            "type": "change_dates",
-            "label": "Change dates",
-            "labelKey": "chat.confirmation.actions.change_dates",
-            "presentation": "confirmation",
-            "payload": action_payload,
-        },
-        {
-            "id": "change-asset",
-            "type": "change_asset",
-            "label": "Change asset",
-            "labelKey": "chat.confirmation.actions.change_asset",
-            "presentation": "confirmation",
-            "payload": action_payload,
-        },
         {
             "id": "adjust-assumptions",
             "type": "adjust_assumptions",
-            "label": "Adjust assumptions",
+            "label": "Change assumptions",
             "labelKey": "chat.confirmation.actions.adjust_assumptions",
             "presentation": "confirmation",
             "payload": action_payload,
