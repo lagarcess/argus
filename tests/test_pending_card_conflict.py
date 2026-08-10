@@ -72,6 +72,7 @@ def test_stale_writer_conflicts_and_rolls_nothing_back() -> None:
             content="stale rewrite",
             metadata={"conversation_mode": "confirm"},
             expected_source_metadata=stale_read,
+            expected_latest_message_id=winner.id,
         )
 
     stored = _card_message(conversation["id"])
@@ -80,6 +81,42 @@ def test_stale_writer_conflicts_and_rolls_nothing_back() -> None:
     assert (
         payload["strategy"]["capital_amount"] == 25000
     ), "the losing writer must not roll back the winning edit"
+
+
+def test_an_append_between_read_and_write_conflicts() -> None:
+    """Every superseding event appends a message; a write whose activity
+    expectation predates an append must conflict, because the caller's
+    active-confirmation check may no longer hold."""
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"])
+    owner = api_state.store.conversation_owners[conversation["id"]]
+    card = _card_message(conversation["id"])
+    stale_view = copy.deepcopy(card.metadata)
+    stale_latest = card.id
+
+    create_message(
+        user_id=owner,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="a superseding turn landed here",
+    )
+
+    with pytest.raises(StaleMessageArtifactError):
+        update_message_artifact(
+            user_id=owner,
+            conversation_id=conversation["id"],
+            message_id=card.id,
+            content="rewrite past a superseding append",
+            metadata={"conversation_mode": "confirm"},
+            expected_source_metadata=stale_view,
+            expected_latest_message_id=stale_latest,
+        )
+
+    stored = _card_message(conversation["id"])
+    assert (
+        stored.content == card.content
+    ), "an edit that lost to an append must leave the card untouched"
 
 
 def test_edit_carries_the_preview_while_the_card_is_latest() -> None:
@@ -104,6 +141,10 @@ def test_edit_carries_the_preview_while_the_card_is_latest() -> None:
 
 
 def test_edit_of_a_non_latest_card_leaves_the_preview_alone() -> None:
+    """A card behind later messages is still editable through the route,
+    because the route's expectations come from its own fresh read: the
+    activity guard rejects interleaved appends, never standing history.
+    The preview stays with the true latest message."""
     client = _client()
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"])

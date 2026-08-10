@@ -98,6 +98,7 @@ def test_update_message_artifact_rewrites_the_same_row() -> None:
                 "confirmation_payload": {"strategy": {"capital_amount": 25000}},
             },
             expected_source_metadata=created.metadata,
+            expected_latest_message_id=created.id,
         )
         assert updated.id == created.id, "in place means the same row"
         assert updated.content == "Buy and hold NFLX, edited"
@@ -140,6 +141,7 @@ def test_update_message_artifact_enforces_ownership() -> None:
                 content="hijacked",
                 metadata={},
                 expected_source_metadata=None,
+                expected_latest_message_id=None,
             )
         stored = gateway.get_message(
             user_id=owner["user_id"],
@@ -181,6 +183,7 @@ def test_update_message_artifact_conflicts_on_a_stale_read() -> None:
                 "confirmation_payload": {"strategy": {"capital_amount": 25000}},
             },
             expected_source_metadata=created.metadata,
+            expected_latest_message_id=created.id,
         )
         with pytest.raises(StaleMessageArtifactError):
             gateway.update_message_artifact(
@@ -190,6 +193,7 @@ def test_update_message_artifact_conflicts_on_a_stale_read() -> None:
                 content="stale rewrite",
                 metadata={"conversation_mode": "confirm"},
                 expected_source_metadata=stale_read,
+                expected_latest_message_id=created.id,
             )
         stored = gateway.get_message(
             user_id=owner["user_id"],
@@ -236,6 +240,7 @@ def test_update_message_artifact_carries_the_preview_when_latest() -> None:
             content="Buy and hold NFLX, edited",
             metadata={"conversation_mode": "confirm"},
             expected_source_metadata=created.metadata,
+            expected_latest_message_id=created.id,
             preview="Buy and hold NFLX, edited",
         )
         after_preview, after_updated_at = _conversation_row(
@@ -260,7 +265,7 @@ def test_update_message_artifact_keeps_preview_when_not_latest() -> None:
             content="Buy and hold NFLX",
             metadata={"conversation_mode": "confirm"},
         )
-        gateway.create_message(
+        follow_up = gateway.create_message(
             user_id=owner["user_id"],
             conversation_id=owner["conversation_id"],
             role="user",
@@ -273,9 +278,51 @@ def test_update_message_artifact_keeps_preview_when_not_latest() -> None:
             content="Buy and hold NFLX, edited",
             metadata={"conversation_mode": "confirm"},
             expected_source_metadata=card.metadata,
+            expected_latest_message_id=follow_up.id,
             preview="Buy and hold NFLX, edited",
         )
         preview, _updated_at = _conversation_row(connection, owner["conversation_id"])
         assert (
             preview == "How risky is this idea?"
         ), "editing an older card must not overwrite the newer preview"
+
+
+def test_update_message_artifact_conflicts_when_an_append_intervened() -> None:
+    """The activity guard: a write whose latest-message expectation predates
+    an append conflicts on real Postgres, and the card row is untouched."""
+    from argus.domain.supabase_conversation_messages import (
+        StaleMessageArtifactError,
+    )
+
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        card = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={"conversation_mode": "confirm"},
+        )
+        gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="a superseding turn landed here",
+        )
+        with pytest.raises(StaleMessageArtifactError):
+            gateway.update_message_artifact(
+                user_id=owner["user_id"],
+                conversation_id=owner["conversation_id"],
+                message_id=card.id,
+                content="rewrite past a superseding append",
+                metadata={"conversation_mode": "confirm"},
+                expected_source_metadata=card.metadata,
+                expected_latest_message_id=card.id,
+            )
+        stored = gateway.get_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+        )
+        assert stored is not None and stored.content == "Buy and hold NFLX"

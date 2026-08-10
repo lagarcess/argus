@@ -3170,12 +3170,17 @@ change (this endpoint, and peer add/undo above) spent nothing, so nothing
 new appears; only run finalization mints an `IdeaVersion`. Every non-turn
 producer writes through one backend path (`apply_pending_card_update`), so a
 future producer cannot append by omission. That path is serialized and
-guarded: the write locks the owned conversation row, applies only while the
-card's metadata still matches what the request read (`409
-confirmation_changed` otherwise, so concurrent writers conflict instead of
-silently rolling each other back), and when the card is the conversation's
-latest message the denormalized `last_message_preview` follows the rewrite,
-without touching `updated_at` or reordering recents.
+guarded: the write locks the owned conversation row and applies only while
+what the request read still holds, in two parts. The row guard compares the
+card's metadata; the activity guard compares the conversation's latest
+message id, because every superseding event (a turn, a run result, a
+cancellation) appends a message while a non-turn edit appends nothing, so
+an interleaved append means the request's active-confirmation check may no
+longer hold. Either mismatch is `409 confirmation_changed`, so concurrent
+writers conflict instead of silently rolling each other back, and a retry
+re-reads and re-checks. When the card is the conversation's latest message
+the denormalized `last_message_preview` follows the rewrite, without
+touching `updated_at` or reordering recents.
 
 **Request:** at least one field.
 - `capital`: positive number. Starting capital, or the recurring

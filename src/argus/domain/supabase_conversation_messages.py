@@ -115,6 +115,7 @@ class ConversationMessagePersistenceMixin:
         content: str,
         metadata: dict[str, Any],
         expected_source_metadata: dict[str, Any] | None,
+        expected_latest_message_id: str | None,
         preview: str | None = None,
     ) -> Message:
         """Rewrite one owned message's content and metadata in place.
@@ -122,11 +123,15 @@ class ConversationMessagePersistenceMixin:
         In-place artifact edits update the record they describe instead of
         appending a superseding row; the row's identity and position in the
         transcript do not change. The write rides the serialized
-        conversation writer and is conditional on the metadata the caller
-        read: a concurrent change raises ``StaleMessageArtifactError``
-        instead of silently overwriting it. When the rewritten row is the
-        conversation's latest message, ``preview`` replaces the
-        conversation's denormalized preview without reordering recents.
+        conversation writer and is conditional on what the caller read, in
+        two parts: the row guard compares the card's metadata, and the
+        activity guard compares the conversation's latest message id,
+        because every superseding event appends a message while a non-turn
+        edit appends nothing. Either mismatch raises
+        ``StaleMessageArtifactError`` instead of silently overwriting the
+        other writer. When the rewritten row is the conversation's latest
+        message, ``preview`` replaces the conversation's denormalized
+        preview without reordering recents.
         """
         try:
             result = self.client.rpc(
@@ -138,6 +143,7 @@ class ConversationMessagePersistenceMixin:
                     "p_content": content,
                     "p_metadata": metadata,
                     "p_expected_source_metadata": expected_source_metadata,
+                    "p_expected_latest_message_id": expected_latest_message_id,
                     "p_preview": preview,
                 },
             ).execute()

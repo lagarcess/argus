@@ -366,12 +366,14 @@ Represents individual messages within a conversation.
 - The one sanctioned in-place rewrite, a non-turn edit of a pending
   confirmation card, uses the service-role-only
   `update_conversation_message_artifact` RPC on the same serialized spine: it
-  locks the owned conversation row, applies only while the row's `metadata`
-  still matches the caller's read (an empty result is the conflict signal,
-  never a silent last-writer win), and when the rewritten row is the
-  conversation's latest message it carries `last_message_preview` with it
-  while leaving `updated_at` untouched, so a non-turn change never reorders
-  recents.
+  locks the owned conversation row and applies only while the caller's read
+  still holds, comparing both the row's `metadata` and the conversation's
+  latest message id (every superseding event appends a message, so an
+  interleaved append invalidates the caller's active-state check; an empty
+  result is the conflict signal, never a silent last-writer win). When the
+  rewritten row is the conversation's latest message it carries
+  `last_message_preview` with it while leaving `updated_at` untouched, so a
+  non-turn change never reorders recents.
 - Conversation message order is deterministic by `(created_at DESC, id DESC)`.
   Under the conversation lock, a new append receives `created_at` at least one
   microsecond newer than the current maximum. Metadata-only updates do not

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from datetime import date
 from typing import Any
 from uuid import uuid4
@@ -330,6 +331,7 @@ def apply_pending_card_update(
     conversation_id: str,
     source_message: Any,
     expected_source_metadata: dict[str, Any] | None,
+    expected_latest_message_id: str | None,
     confirmation_id: str,
     confirmation_payload: dict[str, Any],
     language: str,
@@ -346,10 +348,15 @@ def apply_pending_card_update(
     through here; a key set to None in ``metadata_extra`` is removed so a
     consumed sidecar cannot go stale on the updated card.
 
-    The write is conditional on ``expected_source_metadata``, the metadata
-    the caller read before deciding the edit: a concurrent writer raises
-    ``StaleMessageArtifactError`` instead of being silently rolled back, and
-    callers surface that as a conflict. The rewritten card also carries its
+    The write is conditional on what the caller read:
+    ``expected_source_metadata`` guards the card's own row, and
+    ``expected_latest_message_id`` guards conversation activity, because
+    every superseding event (a turn, a run result, a cancellation) appends
+    a message while a non-turn edit appends nothing, so an interleaved
+    append means the caller's active-confirmation check may no longer hold.
+    A concurrent writer raises ``StaleMessageArtifactError`` instead of
+    being silently rolled back, and callers surface that as a conflict; a
+    retry re-reads and re-checks. The rewritten card also carries its
     projections: the conversation's denormalized preview follows the card
     when it is the latest message, and when a runtime checkpoint exists its
     pending strategy, active reference, and confirmation payload are
@@ -404,6 +411,7 @@ def apply_pending_card_update(
         content=content,
         metadata=metadata,
         expected_source_metadata=expected_source_metadata,
+        expected_latest_message_id=expected_latest_message_id,
         preview=message_preview(
             content, role=str(source_message.role), metadata=metadata
         ),
@@ -448,6 +456,12 @@ def _persisted_card_message(
     return None
 
 
+# One process-wide lock serializes checkpoint syncs. Edits are rare user
+# actions and a sync is a few checkpointer round trips, so cross-conversation
+# contention is negligible and a single lock avoids an unbounded per-key map.
+_CHECKPOINT_SYNC_LOCK = threading.Lock()
+
+
 def _sync_runtime_checkpoint_with_card(
     *,
     workflow: Any,
@@ -466,10 +480,14 @@ def _sync_runtime_checkpoint_with_card(
     drift this sync exists to close.
 
     Guarded writes serialize the persisted card, but the checkpoint write
-    happens after it, so two winners in a row could sync out of order. After
-    writing, the sync re-reads the persisted card and converges on it if a
-    later writer got there first: the checkpoint always ends describing the
-    durable record.
+    happens after it, so winners could sync out of order. Syncs for a
+    process are serialized by a module lock, and after every checkpoint
+    write the sync re-reads the persisted card and repeats until the
+    payload it wrote is still the durable one, bounded at three passes. The
+    checkpointer offers no compare-and-set, so a cross-process interleave
+    inside the final read-to-write window can still stale the checkpoint;
+    that residue is detected and logged, and the next turn's metadata
+    fallback corrects it.
     """
     import asyncio
 
@@ -516,10 +534,7 @@ def _sync_runtime_checkpoint_with_card(
         )
         return True
 
-    async def _sync() -> None:
-        wrote = await _write(confirmation_payload, reference)
-        if not wrote:
-            return
+    def _durable_payload() -> tuple[dict[str, Any], dict[str, Any]] | None:
         persisted = _persisted_card_message(
             user_id=user_id,
             conversation_id=conversation_id,
@@ -527,30 +542,48 @@ def _sync_runtime_checkpoint_with_card(
         )
         metadata = getattr(persisted, "metadata", None)
         if not isinstance(metadata, dict):
-            return
-        persisted_payload = metadata.get("confirmation_payload")
-        if (
-            not isinstance(persisted_payload, dict)
-            or persisted_payload == confirmation_payload
-        ):
+            return None
+        payload = metadata.get("confirmation_payload")
+        if not isinstance(payload, dict):
+            return None
+        return payload, metadata
+
+    async def _sync() -> None:
+        wrote = await _write(confirmation_payload, reference)
+        if not wrote:
             return
         from argus.agent_runtime.confirmation_artifacts import (
             confirmation_artifact_reference,
         )
 
-        persisted_reference = confirmation_artifact_reference(
-            confirmation_id=str(persisted_payload.get("confirmation_id") or ""),
-            confirmation_payload=persisted_payload,
-            confirmation_card=(
-                metadata.get("confirmation_card")
-                if isinstance(metadata.get("confirmation_card"), dict)
-                else None
-            ),
-        )
-        await _write(persisted_payload, persisted_reference)
+        written = confirmation_payload
+        for _ in range(3):
+            durable = _durable_payload()
+            if durable is None or durable[0] == written:
+                return
+            persisted_payload, metadata = durable
+            persisted_reference = confirmation_artifact_reference(
+                confirmation_id=str(persisted_payload.get("confirmation_id") or ""),
+                confirmation_payload=persisted_payload,
+                confirmation_card=(
+                    metadata.get("confirmation_card")
+                    if isinstance(metadata.get("confirmation_card"), dict)
+                    else None
+                ),
+            )
+            await _write(persisted_payload, persisted_reference)
+            written = persisted_payload
+        durable = _durable_payload()
+        if durable is not None and durable[0] != written:
+            logger.warning(
+                "Checkpoint convergence exhausted its passes; the checkpoint "
+                "may trail the persisted card until the next turn's fallback",
+                conversation_id=conversation_id,
+            )
 
     try:
-        asyncio.run(_sync())
+        with _CHECKPOINT_SYNC_LOCK:
+            asyncio.run(_sync())
     except Exception:
         logger.opt(exception=True).warning(
             "In-place card edit could not sync the runtime checkpoint; a "

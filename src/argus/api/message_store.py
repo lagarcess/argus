@@ -611,6 +611,36 @@ def create_message(
     )
 
 
+def latest_message(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> Message | None:
+    """The conversation's newest message by (created_at, id), both stores.
+
+    The activity guard on in-place writes compares against this value, so
+    it must come from a dedicated newest-first read, never from a bounded
+    recent-window listing whose tail is not the conversation's tail.
+    """
+    if api_state.supabase_gateway is not None:
+        try:
+            return api_state.supabase_gateway.latest_message(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase latest-message read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    with api_state.store.conversation_message_lock:
+        messages = api_state.store.messages.get(conversation_id, [])
+        return max(messages, key=lambda item: (item.created_at, item.id), default=None)
+
+
 def update_message_artifact(
     *,
     user_id: str,
@@ -619,6 +649,7 @@ def update_message_artifact(
     content: str,
     metadata: dict[str, Any],
     expected_source_metadata: dict[str, Any] | None,
+    expected_latest_message_id: str | None,
     preview: str | None = None,
 ) -> Message:
     """Rewrite one owned message's content and metadata in place.
@@ -626,8 +657,12 @@ def update_message_artifact(
     The in-place half of the edit contract: a direct edit updates the card's
     own record, so the transcript gains nothing and the message identity,
     role, and position stay fixed. Turn-based edits keep superseding through
-    create_message. The write is conditional on the metadata the caller
-    read; a concurrent change raises ``StaleMessageArtifactError`` in both
+    create_message. The write is conditional on what the caller read, in
+    two parts: the row guard compares the card's metadata, and the activity
+    guard compares the conversation's latest message id, because every
+    superseding event appends a message while a non-turn edit appends
+    nothing, so an interleaved append invalidates the caller's active-state
+    check. Either mismatch raises ``StaleMessageArtifactError`` in both
     stores instead of rolling the other writer back. When the rewritten row
     is the conversation's latest message, ``preview`` follows it into the
     conversation record without touching ``updated_at``: a non-turn change
@@ -642,6 +677,7 @@ def update_message_artifact(
                 content=content,
                 metadata=metadata,
                 expected_source_metadata=expected_source_metadata,
+                expected_latest_message_id=expected_latest_message_id,
                 preview=preview,
             )
         except StaleMessageArtifactError:
@@ -660,9 +696,18 @@ def update_message_artifact(
         if api_state.store.conversation_owners.get(conversation_id) != user_id:
             raise ValueError("Conversation not found or not owned by user.")
         messages = api_state.store.messages.get(conversation_id, [])
+        latest = max(messages, key=lambda item: (item.created_at, item.id), default=None)
         for index, existing in enumerate(messages):
             if existing.id != message_id:
                 continue
+            if (
+                expected_latest_message_id is not None
+                and latest is not None
+                and latest.id != expected_latest_message_id
+            ):
+                raise StaleMessageArtifactError(
+                    "The card changed while this update was in flight."
+                )
             if (
                 expected_source_metadata is not None
                 and existing.metadata != expected_source_metadata
@@ -675,9 +720,13 @@ def update_message_artifact(
             )
             messages[index] = updated
             api_state.store.bump_search_revision()
-            latest = max(messages, key=lambda item: (item.created_at, item.id))
             conversation = api_state.store.conversations.get(conversation_id)
-            if preview and conversation and latest.id == message_id:
+            if (
+                preview
+                and conversation
+                and latest is not None
+                and latest.id == message_id
+            ):
                 api_state.store.conversations[conversation_id] = conversation.model_copy(
                     update={"last_message_preview": preview}
                 )

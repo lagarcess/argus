@@ -1,12 +1,21 @@
 -- In-place artifact updates join the serialized conversation writer.
 -- append_conversation_message declared that clients must not bypass the
 -- serialized writer; this function gives the non-turn rewrite the same
--- spine: the owned conversation row is locked for the transaction, the
--- write is conditional on the exact metadata the caller read (an empty
--- result is the conflict signal, never a silent last-writer win), and the
--- conversation's denormalized preview follows the rewritten card when that
--- card is the latest message. updated_at is untouched: a non-turn change
--- spends nothing and must not reorder recents.
+-- spine: the owned conversation row is locked for the transaction and the
+-- write is conditional on what the caller read, in two parts. The row
+-- guard compares the card's metadata. The activity guard compares the
+-- conversation's latest message id, because every superseding event in
+-- this system (a turn, a run result, a cancellation) appends a message
+-- while a non-turn edit appends nothing, so "nothing appended since the
+-- read" is exactly "the caller's active-state check is still true". An
+-- empty result is the conflict signal, never a silent last-writer win.
+-- The conversation's denormalized preview follows the rewritten card when
+-- that card is the latest message. updated_at is untouched: a non-turn
+-- change spends nothing and must not reorder recents.
+
+drop function if exists public.update_conversation_message_artifact(
+  uuid, uuid, uuid, text, jsonb, jsonb, text
+);
 
 create or replace function public.update_conversation_message_artifact(
   p_user_id uuid,
@@ -15,6 +24,7 @@ create or replace function public.update_conversation_message_artifact(
   p_content text,
   p_metadata jsonb,
   p_expected_source_metadata jsonb,
+  p_expected_latest_message_id uuid,
   p_preview text
 )
 returns table (
@@ -53,6 +63,19 @@ begin
       using errcode = 'P0002';
   end if;
 
+  select m.id
+    into v_latest_id
+    from public.messages as m
+   where m.user_id = p_user_id
+     and m.conversation_id = p_conversation_id
+   order by m.created_at desc, m.id desc
+   limit 1;
+
+  if p_expected_latest_message_id is not null
+    and v_latest_id is distinct from p_expected_latest_message_id then
+    return;
+  end if;
+
   if p_expected_source_metadata is not null
     and v_message.metadata is distinct from p_expected_source_metadata then
     return;
@@ -64,21 +87,14 @@ begin
    where m.id = p_message_id
   returning * into v_message;
 
-  if nullif(btrim(p_preview), '') is not null then
-    select m.id
-      into v_latest_id
-      from public.messages as m
-     where m.user_id = p_user_id
-       and m.conversation_id = p_conversation_id
-     order by m.created_at desc, m.id desc
-     limit 1;
-
-    if v_latest_id = p_message_id then
-      update public.conversations as c
-         set last_message_preview = p_preview
-       where c.id = p_conversation_id
-         and c.user_id = p_user_id;
-    end if;
+  -- The update changes neither created_at nor id, so v_latest_id is still
+  -- the conversation's latest message inside this lock.
+  if nullif(btrim(p_preview), '') is not null
+    and v_latest_id = p_message_id then
+    update public.conversations as c
+       set last_message_preview = p_preview
+     where c.id = p_conversation_id
+       and c.user_id = p_user_id;
   end if;
 
   return query select to_jsonb(v_message);
@@ -86,14 +102,14 @@ end;
 $$;
 
 revoke all on function public.update_conversation_message_artifact(
-  uuid, uuid, uuid, text, jsonb, jsonb, text
+  uuid, uuid, uuid, text, jsonb, jsonb, uuid, text
 ) from public;
 revoke all on function public.update_conversation_message_artifact(
-  uuid, uuid, uuid, text, jsonb, jsonb, text
+  uuid, uuid, uuid, text, jsonb, jsonb, uuid, text
 ) from anon;
 revoke all on function public.update_conversation_message_artifact(
-  uuid, uuid, uuid, text, jsonb, jsonb, text
+  uuid, uuid, uuid, text, jsonb, jsonb, uuid, text
 ) from authenticated;
 grant execute on function public.update_conversation_message_artifact(
-  uuid, uuid, uuid, text, jsonb, jsonb, text
+  uuid, uuid, uuid, text, jsonb, jsonb, uuid, text
 ) to service_role;

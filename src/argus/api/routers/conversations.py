@@ -28,6 +28,7 @@ from argus.api.dependencies import (
 from argus.api.guest_access import account_context
 from argus.api.memory_run_dossiers import list_memory_run_dossier_source_rows
 from argus.api.message_store import (
+    latest_message,
     memory_conversation,
     reconcile_reload_message_metadata,
 )
@@ -907,7 +908,12 @@ def add_confirmation_peer_assets(
         raise invalid_state
     # Snapshot what this request read; the in-place write is conditional on
     # it, so a concurrent writer surfaces as a conflict, never a rollback.
+    # The activity guard uses the conversation's true latest message: any
+    # append between this read and the write (a superseding turn, a run
+    # result, a cancellation) invalidates the active-state check above.
     expected_source_metadata = copy.deepcopy(source_message.metadata)
+    latest = latest_message(user_id=user.id, conversation_id=conversation_id)
+    expected_latest_message_id = latest.id if latest is not None else None
     language = str(getattr(user, "language", None) or "en")
 
     if payload.restore_previous:
@@ -990,6 +996,7 @@ def add_confirmation_peer_assets(
             conversation_id=conversation_id,
             source_message=source_message,
             expected_source_metadata=expected_source_metadata,
+            expected_latest_message_id=expected_latest_message_id,
             confirmation_id=confirmation_id,
             confirmation_payload=new_payload,
             language=language,
@@ -1087,7 +1094,12 @@ def direct_edit_confirmation(
         raise invalid_state
     # Snapshot what this request read; the in-place write is conditional on
     # it, so a concurrent writer surfaces as a conflict, never a rollback.
+    # The activity guard uses the conversation's true latest message: any
+    # append between this read and the write (a superseding turn, a run
+    # result, a cancellation) invalidates the active-state check above.
     expected_source_metadata = copy.deepcopy(source_message.metadata)
+    latest = latest_message(user_id=user.id, conversation_id=conversation_id)
+    expected_latest_message_id = latest.id if latest is not None else None
     language = str(getattr(user, "language", None) or "en")
 
     preparation = direct_edit_confirmation_preparation(
@@ -1131,6 +1143,7 @@ def direct_edit_confirmation(
             conversation_id=conversation_id,
             source_message=source_message,
             expected_source_metadata=expected_source_metadata,
+            expected_latest_message_id=expected_latest_message_id,
             confirmation_id=confirmation_id,
             confirmation_payload=preparation.confirmation_payload,
             language=language,
