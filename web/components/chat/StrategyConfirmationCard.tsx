@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Check,
   CheckCircle2,
   CircleSlash2,
   type LucideIcon,
@@ -12,6 +13,7 @@ import {
   Send,
   SlidersHorizontal,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useState } from "react";
@@ -48,7 +50,11 @@ import {
   type StrategyConfirmationRowKey,
   type StrategyConfirmationStatus,
 } from "./types";
-import { ConfirmationDirectEditRow } from "./ConfirmationDirectEdit";
+import {
+  ConfirmationDirectEditControls,
+  inlineEditControlClassName,
+  inlineEditFieldClassName,
+} from "./ConfirmationDirectEdit";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 import { EntityToken } from "./entity-token";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
@@ -209,7 +215,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
         </div>
       )}
 
-      {(viewModel.assumptions.length > 0 || canEditCosts) && (
+      {viewModel.assumptions.length > 0 && (
         <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {viewModel.assumptions.map((text) => (
@@ -218,6 +224,23 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
                 {text}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {(canDirectEdit || canEditCosts) && (
+        // The editing strip: one line of Edit capital, Edit dates, Edit
+        // costs between its own hairlines; the inline drawer wraps onto a
+        // full-width line of this same strip when opened.
+        <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {canDirectEdit && (
+              <ConfirmationDirectEditControls
+                confirmation={confirmation}
+                onDirectEdit={onDirectEdit}
+                t={t}
+              />
+            )}
             {canEditCosts && (
               <ExecutionCostEditor
                 displayFacts={confirmation.display_facts}
@@ -235,18 +258,8 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
         </div>
       )}
 
-      {canDirectEdit && (
-        <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
-          <ConfirmationDirectEditRow
-            confirmation={confirmation}
-            onDirectEdit={onDirectEdit}
-            t={t}
-          />
-        </div>
-      )}
-
       {activeActions.length > 0 && (
-        <div className="flex flex-wrap gap-2 border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
+        <div className="flex flex-wrap gap-2 justify-center border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
           {activeActions.map((action) => (
             <button
               key={action.id ?? action.type ?? action.label}
@@ -575,8 +588,18 @@ function ExecutionCostEditor({
     onSubmit(message);
   };
 
+  const onCostKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submit();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setIsOpen(false);
+    }
+  };
+
   return (
-    <div className="mt-1 flex w-full flex-wrap items-end gap-2" data-testid="execution-cost-editor">
+    <div className="mt-1 flex w-full flex-wrap items-end gap-x-3 gap-y-2" data-testid="execution-cost-editor">
       <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
         {t("chat.confirmation.cost_editor.fee_label", "Fee % per trade")}
         <input
@@ -586,7 +609,8 @@ function ExecutionCostEditor({
           onChange={(event) =>
             setDraft((prev) => ({ ...prev, feePercent: event.target.value }))
           }
-          className="h-8 w-24 rounded-md border border-black/12 bg-white px-2 text-[13px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-[#24282c] dark:text-white"
+          onKeyDown={onCostKeyDown}
+          className={`${inlineEditFieldClassName} w-24`}
         />
       </label>
       <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
@@ -598,24 +622,29 @@ function ExecutionCostEditor({
           onChange={(event) =>
             setDraft((prev) => ({ ...prev, slippagePercent: event.target.value }))
           }
-          className="h-8 w-24 rounded-md border border-black/12 bg-white px-2 text-[13px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-[#24282c] dark:text-white"
+          onKeyDown={onCostKeyDown}
+          className={`${inlineEditFieldClassName} w-24`}
         />
       </label>
-      <button
-        type="button"
-        onClick={submit}
-        disabled={!isValid}
-        className={`${actionClassName} disabled:cursor-not-allowed disabled:opacity-45`}
-      >
-        {t("chat.confirmation.cost_editor.apply", "Apply")}
-      </button>
-      <button
-        type="button"
-        onClick={() => setIsOpen(false)}
-        className={actionClassName}
-      >
-        {t("chat.confirmation.cost_editor.cancel", "Cancel")}
-      </button>
+      <div className="flex items-center gap-1.5 self-end pb-0.5">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!isValid}
+          aria-label={t("chat.confirmation.cost_editor.apply", "Apply")}
+          className={inlineEditControlClassName}
+        >
+          <Check aria-hidden="true" className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          aria-label={t("chat.confirmation.cost_editor.cancel", "Cancel")}
+          className={inlineEditControlClassName}
+        >
+          <X aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
       {!isValid && (
         <p role="alert" className={`w-full text-[11px] ${inlineFailureTextClass}`}>
           {t("chat.confirmation.cost_editor.invalid", {

@@ -11,11 +11,41 @@ const root = join(__dirname, "..");
 const source = (path: string) => readFileSync(join(root, path), "utf-8");
 
 describe("confirmation direct edit surface", () => {
-  test("the card gates the row on the backend capability and active state", () => {
+  test("the card gates the controls on the backend capability and active state", () => {
     const card = source("components/chat/StrategyConfirmationCard.tsx");
     expect(card).toContain("capabilities?.direct_edits");
     expect(card).toContain("canShowActions");
-    expect(card).toContain("ConfirmationDirectEditRow");
+    expect(card).toContain("ConfirmationDirectEditControls");
+  });
+
+  test("one editing line: capital, dates, costs together; actions centered", () => {
+    const card = source("components/chat/StrategyConfirmationCard.tsx");
+    // The direct-edit chips render inside the same assumptions flex row as
+    // Edit costs, capital and dates first.
+    const editingRow = card.indexOf("<ConfirmationDirectEditControls");
+    const costsEditor = card.indexOf("<ExecutionCostEditor");
+    expect(editingRow).toBeGreaterThan(-1);
+    expect(costsEditor).toBeGreaterThan(editingRow);
+    const editor = source("components/chat/ConfirmationDirectEdit.tsx");
+    expect(editor).toContain('className="contents"');
+    expect(editor).toContain("basis-full");
+    // The action row centers its three pills.
+    expect(card).toContain("flex flex-wrap gap-2 justify-center");
+  });
+
+  test("the drawer follows the monogram-edit idiom", () => {
+    const editor = source("components/chat/ConfirmationDirectEdit.tsx");
+    expect(editor).toContain("grid-rows-[0fr]");
+    expect(editor).toContain("grid-rows-[1fr]");
+    expect(editor).toContain("min-h-0 overflow-hidden");
+    expect(editor).toContain("h-px flex-1");
+    expect(editor).toContain("ChevronUp");
+    expect(editor).toContain("direct_edit.hide");
+    // Confirm/cancel are the round check/x controls; Enter and Escape work.
+    expect(editor).toContain("<Check");
+    expect(editor).toContain("<X");
+    expect(editor).toContain('event.key === "Enter"');
+    expect(editor).toContain('event.key === "Escape"');
   });
 
   test("the editor submits typed values through the no-turn endpoint, never prose", () => {
