@@ -1,20 +1,29 @@
 /**
- * Evidence capture for the master-editing lane (§6 acceptance).
+ * Browser evidence for the master-editing lane, five-findings revision:
+ * ExecutionDetails pills host in-place capital/dates/costs editing, an
+ * in-place edit updates the same card and mints nothing, actions share the
+ * card's content margin, compound disclosure still rides the card, and
+ * researched peer rows add to a pending card without a turn.
  *
- * Drives the real chat runtime (live interpretation) against the lane backend
- * on 8002 and the lane web server on 3002, saving frames plus the rendered
- * text of every frame to docs/reports/evidence/master-editing/. Each flow runs
- * in a fresh conversation. Run: bunx tsx e2e/support/master-editing-evidence.ts
+ * Run from web/: bunx tsx e2e/support/master-editing-evidence.ts
+ * Requires the lane backend on 8002 with real providers and
+ * ARGUS_RESEARCH_RAIL_ENABLED=true, and lane web on 3002.
  */
 
 import { chromium, type Browser, type Page } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 const WEB = "http://localhost:3002";
 const API = "http://127.0.0.1:8002/api/v1";
 const OUT = join(__dirname, "../../../docs/reports/evidence/master-editing");
-const TEXTS: Record<string, string> = {};
+const TEXTS: Record<string, string> = existsSync(join(OUT, "rendered-text.json"))
+  ? JSON.parse(readFileSync(join(OUT, "rendered-text.json"), "utf-8"))
+  : {};
+// EVIDENCE_FLOWS=en-peers,es-disclosure re-runs a subset into the same set.
+const ONLY = new Set(
+  (process.env.EVIDENCE_FLOWS ?? "").split(",").filter(Boolean),
+);
 
 async function apiPatchLanguage(language: "en" | "es-419") {
   const response = await fetch(`${API}/me`, {
@@ -26,7 +35,7 @@ async function apiPatchLanguage(language: "en" | "es-419") {
 }
 
 async function capture(page: Page, name: string) {
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(600);
   const text = await page.evaluate(
     () => document.querySelector("main")?.textContent ?? "",
   );
@@ -35,191 +44,188 @@ async function capture(page: Page, name: string) {
   console.log(`captured ${name}`);
 }
 
+function cards(page: Page) {
+  return page.locator("section:has([data-confirmation-status])");
+}
+
+async function waitForCards(page: Page, count: number, timeoutMs = 180000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if ((await cards(page).count()) >= count) {
+      await page.waitForTimeout(900);
+      return;
+    }
+    await page.waitForTimeout(1200);
+  }
+  throw new Error(`expected ${count} cards`);
+}
+
 async function openFreshChat(page: Page) {
   await page.goto(`${WEB}/chat`);
-  await page.waitForSelector("[data-testid], textarea, [contenteditable]", {
-    timeout: 30000,
-  });
+  await page.waitForSelector('[role="combobox"], textarea', { timeout: 30000 });
   await page.waitForTimeout(1200);
-  // A fresh conversation: the composer on /chat with no active thread starts one.
+}
+
+async function waitForComposerEnabled(page: Page, timeoutMs = 240000) {
+  // A background research job keeps the conversation busy after the answer
+  // text settles; the composer's disabled state is the honest signal.
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('[data-testid="chat-input"]');
+      return el !== null && el.getAttribute("aria-disabled") !== "true";
+    },
+    undefined,
+    { timeout: timeoutMs },
+  );
 }
 
 async function send(page: Page, message: string) {
+  await waitForComposerEnabled(page);
   const composer = page.locator('[role="combobox"], textarea').first();
   await composer.click();
   await composer.fill(message);
   await page.locator('button[type="submit"]').first().click();
 }
 
-async function waitForActiveCard(page: Page, timeoutMs = 150000) {
-  await page.waitForSelector(
-    'section:has([data-confirmation-status]) button:has-text("Run backtest"), section:has([data-confirmation-status]) button:has-text("Ejecutar backtest")',
-    { timeout: timeoutMs },
-  );
-  await page.waitForTimeout(600);
-}
-
-/** Some turns may answer with prose (a clarification or disclosure) instead
- * of a fresh card; the captured rendered text carries the truth either way. */
-async function waitForTurnSettled(page: Page, timeoutMs = 150000) {
+async function waitForAssistantSettled(page: Page, timeoutMs = 180000) {
   const started = Date.now();
-  const initialCards = await page
-    .locator("section:has([data-confirmation-status])")
-    .count();
+  let last = "";
+  let stable = 0;
   while (Date.now() - started < timeoutMs) {
-    const cards = await page
-      .locator("section:has([data-confirmation-status])")
-      .count();
-    if (cards > initialCards) {
-      await page.waitForTimeout(800);
-      return;
+    const text = await page.evaluate(
+      () => document.querySelector("main")?.textContent ?? "",
+    );
+    if (text === last && !text.includes("Thinking")) {
+      stable += 1;
+      if (stable >= 3) return;
+    } else {
+      stable = 0;
     }
-    const working = await page
-      .locator('[data-testid="chat-working"], [aria-busy="true"]')
-      .count();
-    const followup = await page
-      .locator('button[type="submit"]:not([disabled])')
-      .count();
-    if (working === 0 && followup > 0 && Date.now() - started > 20000) {
-      await page.waitForTimeout(800);
-      return;
-    }
+    last = text;
     await page.waitForTimeout(1500);
   }
 }
 
-function lastCard(page: Page) {
-  return page.locator("section:has([data-confirmation-status])").last();
+const IDEA = {
+  en: "Buy and hold NFLX with $10,000 through 2023",
+  es: "Compra y mant\u00e9n NFLX con $10,000 durante 2023",
+};
+
+async function plantCard(page: Page, lang: "en" | "es") {
+  await openFreshChat(page);
+  await send(page, IDEA[lang]);
+  await waitForCards(page, 1);
 }
 
-async function flowCardAndDrawers(page: Page, lang: "en" | "es") {
-  await openFreshChat(page);
-  await send(
-    page,
-    lang === "en"
-      ? "Buy and hold NFLX with $10,000 through 2023"
-      : "Compra y mantén NFLX con $10,000 durante 2023",
-  );
-  await waitForActiveCard(page);
-  await capture(page, `${lang}-01-card-three-actions`);
+/** Findings 1, 2, 3, 4: pills, one in-place behaviour, no minting, margins. */
+async function inPlaceEditing(page: Page, lang: "en" | "es") {
+  await plantCard(page, lang);
+  await capture(page, `${lang}-01-card-pills-and-actions`);
+  const before = await cards(page).count();
 
-  // Capital drawer: open, retype, apply; the superseding card carries $25,000.
-  await lastCard(page).getByTestId("edit-capital").click();
+  await cards(page).last().getByTestId("edit-capital").click();
   await page.waitForTimeout(400);
-  await capture(page, `${lang}-02-capital-drawer-open`);
-  await page.getByTestId("direct-edit-capital-input").last().fill("25000");
-  await page.getByTestId("direct-edit-apply").last().click();
-  await page.waitForTimeout(1500);
-  await capture(page, `${lang}-03-capital-drawer-applied`);
+  await capture(page, `${lang}-02-capital-panel-open`);
+  await page.getByTestId("direct-edit-capital-input").fill("25000");
+  await page.getByTestId("direct-edit-apply").click();
+  await page.waitForTimeout(2500);
+  if ((await cards(page).count()) !== before) {
+    throw new Error(`${lang}: capital edit minted a card`);
+  }
+  await capture(page, `${lang}-03-capital-applied-in-place`);
+  const capitalText = TEXTS[`${lang}-03-capital-applied-in-place`];
+  if (!capitalText.includes("$25,000")) {
+    throw new Error(`${lang}: edited capital not rendered`);
+  }
 
-  // Dates drawer on the superseding card.
-  await lastCard(page).getByTestId("edit-dates").click();
+  await cards(page).last().getByTestId("edit-dates").click();
   await page.waitForTimeout(400);
-  await page.getByTestId("direct-edit-start-input").last().fill("2023-02-01");
-  await page.getByTestId("direct-edit-end-input").last().fill("2023-05-31");
-  await capture(page, `${lang}-04-dates-drawer-open`);
-  await page.getByTestId("direct-edit-apply").last().click();
-  await page.waitForTimeout(1500);
-  await capture(page, `${lang}-05-dates-drawer-applied`);
-}
-
-async function flowConversationalTwin(page: Page, lang: "en" | "es") {
-  // The equivalent conversational edit produces the same canonical values the
-  // drawer produced (hash equality is proven in the backend suite).
-  await openFreshChat(page);
-  await send(
-    page,
-    lang === "en"
-      ? "Buy and hold NFLX with $10,000 through 2023"
-      : "Compra y mantén NFLX con $10,000 durante 2023",
-  );
-  await waitForActiveCard(page);
-  await send(
-    page,
-    lang === "en"
-      ? "Change the starting capital to $25,000"
-      : "Cambia el capital inicial a $25,000",
-  );
-  await waitForActiveCard(page);
-  await page.waitForTimeout(1200);
-  await capture(page, `${lang}-06-conversational-capital-twin`);
-}
-
-async function flowCompoundApplied(page: Page, lang: "en" | "es") {
-  await openFreshChat(page);
-  await send(
-    page,
-    lang === "en"
-      ? "Buy and hold NFLX with $10,000 through 2023"
-      : "Compra y mantén NFLX con $10,000 durante 2023",
-  );
-  await waitForActiveCard(page);
-  const adjust = lang === "en" ? "Change assumptions" : "Cambiar supuestos";
-  await lastCard(page).getByRole("button", { name: adjust }).click();
+  await capture(page, `${lang}-04-dates-panel-open`);
+  await page.getByTestId("direct-edit-start-input").fill("2023-02-01");
+  await page.getByTestId("direct-edit-end-input").fill("2023-05-31");
+  await page.getByTestId("direct-edit-apply").click();
   await page.waitForTimeout(2500);
-  await send(
-    page,
-    lang === "en"
-      ? "Use 2024 instead, add MSFT, and make it $5,000"
-      : "Usa 2024, agrega MSFT y hazlo con $5,000",
-  );
-  await waitForActiveCard(page);
-  await page.waitForTimeout(800);
-  await capture(page, `${lang}-07-compound-all-applied`);
+  if ((await cards(page).count()) !== before) {
+    throw new Error(`${lang}: date edit minted a card`);
+  }
+  await capture(page, `${lang}-05-dates-applied-in-place`);
+
+  await cards(page).last().getByTestId("edit-costs").click();
+  await page.waitForTimeout(400);
+  await capture(page, `${lang}-06-costs-panel-open`);
+  await page.getByTestId("direct-edit-fee-input").fill("0.2");
+  await page.getByTestId("direct-edit-slippage-input").fill("0.1");
+  await page.getByTestId("direct-edit-apply").click();
+  await page.waitForTimeout(2500);
+  if ((await cards(page).count()) !== before) {
+    throw new Error(`${lang}: cost edit minted a card`);
+  }
+  await capture(page, `${lang}-07-costs-applied-in-place`);
+  const costText = TEXTS[`${lang}-07-costs-applied-in-place`];
+  if (!/20\s?bps|0\.2\s?%|0,2\s?%/.test(costText)) {
+    throw new Error(`${lang}: edited costs not rendered`);
+  }
 }
 
-async function flowCompoundUnapplied(page: Page, lang: "en" | "es") {
-  await openFreshChat(page);
-  await send(
-    page,
-    lang === "en"
-      ? "Buy and hold NFLX with $10,000 through 2023"
-      : "Compra y mantén NFLX con $10,000 durante 2023",
-  );
-  await waitForActiveCard(page);
+/** \u00a73.2 compound disclosure still rides the card after the rework. */
+async function compoundDisclosure(page: Page, lang: "en" | "es") {
+  await plantCard(page, lang);
   const adjust = lang === "en" ? "Change assumptions" : "Cambiar supuestos";
-  await lastCard(page).getByRole("button", { name: adjust }).click();
+  await cards(page).last().getByRole("button", { name: adjust }).click();
   await page.waitForTimeout(2500);
+  const before = await cards(page).count();
   await send(
     page,
     lang === "en"
-      ? "Make it $9,000 and remove TSLA from the test"
-      : "Hazlo con $9,000 y quita TSLA de la prueba",
+      ? "Make it $9,000 and set slippage to 90%"
+      : "Hazlo con $9,000 y pon el deslizamiento en 90%",
   );
-  await waitForTurnSettled(page);
+  await waitForCards(page, before + 1);
   await capture(page, `${lang}-08-compound-unapplied-disclosed`);
+  const text = TEXTS[`${lang}-08-compound-unapplied-disclosed`];
+  if (!text.includes("could not change") && !text.includes("No pude cambiar")) {
+    throw new Error(`${lang}-08: no disclosure line rendered`);
+  }
 }
 
-async function flowFractionalDates(page: Page, lang: "en" | "es") {
+/** Finding 5: researched peer rows on a pending card, add without a turn. */
+async function peerRows(page: Page, lang: "en" | "es") {
   await openFreshChat(page);
   await send(
     page,
     lang === "en"
-      ? "Test AAPL for the last 8.5 months with $10,000"
-      : "Prueba AAPL con los últimos 8,5 meses y $10,000",
+      ? "What is happening in streaming stocks?"
+      : "\u00bfQu\u00e9 est\u00e1 pasando con las acciones de streaming?",
   );
-  await waitForActiveCard(page);
-  await capture(page, `${lang}-09-fractional-duration-card`);
+  await waitForAssistantSettled(page);
+  await waitForComposerEnabled(page);
+  await page.waitForTimeout(1500);
+  await send(page, IDEA[lang]);
+  await waitForCards(page, 1);
+  await page.waitForTimeout(1500);
+  await capture(page, `${lang}-10-peer-rows-on-card`);
+  const rowsText = TEXTS[`${lang}-10-peer-rows-on-card`];
+  const marker = lang === "en" ? "to this test" : "a esta prueba";
+  if (!rowsText.includes(marker)) {
+    throw new Error(`${lang}-10: no peer row rendered`);
+  }
+  const addRow = page.locator(`button:has-text("${marker}")`).first();
+  await addRow.click();
+  await page.waitForTimeout(3500);
+  await capture(page, `${lang}-11-peer-added-without-turn`);
 }
 
-async function mobileDrawerSheet(browser: Browser) {
+/** Mobile width: the same pills, fields on the short sheet. */
+async function mobile(browser: Browser, lang: "en" | "es") {
   const context = await browser.newContext({
     viewport: { width: 375, height: 812 },
-    hasTouch: true,
-    isMobile: true,
   });
   const page = await context.newPage();
-  await openFreshChat(page);
-  await send(page, "Buy and hold NFLX with $10,000 through 2023");
-  await waitForActiveCard(page);
-  await capture(page, "en-10-mobile-card");
-  await lastCard(page).getByTestId("edit-capital").click();
-  await page.waitForTimeout(900);
-  await capture(page, "en-11-mobile-capital-sheet");
-  await page.getByTestId("direct-edit-capital-input").last().fill("25000");
-  await page.getByTestId("direct-edit-apply").last().click();
-  await page.waitForTimeout(1800);
-  await capture(page, "en-12-mobile-capital-applied");
+  await plantCard(page, lang);
+  await capture(page, `${lang}-09-mobile-card`);
+  await cards(page).last().getByTestId("edit-capital").click();
+  await page.waitForTimeout(700);
+  await capture(page, `${lang}-09b-mobile-capital-sheet`);
   await context.close();
 }
 
@@ -231,8 +237,8 @@ async function main() {
   });
   const page = await context.newPage();
   const failures: string[] = [];
-
   async function run(name: string, flow: () => Promise<void>) {
+    if (ONLY.size > 0 && !ONLY.has(name)) return;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         await flow();
@@ -245,21 +251,18 @@ async function main() {
   }
 
   await apiPatchLanguage("en");
-  await run("en-drawers", () => flowCardAndDrawers(page, "en"));
-  await run("en-twin", () => flowConversationalTwin(page, "en"));
-  await run("en-compound", () => flowCompoundApplied(page, "en"));
-  await run("en-unapplied", () => flowCompoundUnapplied(page, "en"));
-  await run("en-fractional", () => flowFractionalDates(page, "en"));
+  await run("en-editing", () => inPlaceEditing(page, "en"));
+  await run("en-disclosure", () => compoundDisclosure(page, "en"));
+  await run("en-peers", () => peerRows(page, "en"));
+  await run("en-mobile", () => mobile(browser, "en"));
 
   await apiPatchLanguage("es-419");
   await page.reload();
-  await run("es-drawers", () => flowCardAndDrawers(page, "es"));
-  await run("es-compound", () => flowCompoundApplied(page, "es"));
-  await run("es-unapplied", () => flowCompoundUnapplied(page, "es"));
-  await run("es-fractional", () => flowFractionalDates(page, "es"));
-
+  await run("es-editing", () => inPlaceEditing(page, "es"));
+  await run("es-disclosure", () => compoundDisclosure(page, "es"));
+  await run("es-peers", () => peerRows(page, "es"));
+  await run("es-mobile", () => mobile(browser, "es"));
   await apiPatchLanguage("en");
-  await run("mobile", () => mobileDrawerSheet(browser));
 
   writeFileSync(
     join(OUT, "rendered-text.json"),
