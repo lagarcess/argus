@@ -51,17 +51,23 @@ type Ctx = {
 
 /**
  * `proof` is the marker that the surface the file is named after is actually on
- * screen. It is not decoration.
+ * screen. It is required, and that is the point.
  *
  * A capture takes whatever is rendered and files it under a name that claims a
  * surface. When the two disagree the artifact is worse than missing, because it
- * reads as coverage: a guest result-card capture once shipped byte-identical to
- * the conversation capture, and the result card it was named for was never
- * rendered at all. Failing closed turns that into a loud error instead of a
- * quiet lie, so an unreachable surface cannot be mistaken for a photographed
- * one.
+ * reads as coverage. Three of those shipped across two review rounds: a guest
+ * result card that was byte-identical to the conversation capture, two dossier
+ * captures that were transcripts, and a `settings-security` capture that was
+ * the empty chat at the two bands where that surface does not exist at all.
+ *
+ * The first round made `proof` optional, which fixed the instances and left the
+ * shape: any call site could still opt out by passing nothing, and the one that
+ * did was the surface a sibling test in this same file already documents as
+ * unreachable below 1024. So the parameter is mandatory now. A capture with no
+ * honest marker is not a capture worth filing, and a surface that cannot be
+ * reached at a band should not be photographed there.
  */
-async function capture(page: Page, name: string, proof?: RegExp) {
+async function capture(page: Page, name: string, proof: RegExp) {
   const base = join(OUT_DIR, name);
   await mkdir(dirname(base), { recursive: true });
   await page.addStyleTag({ content: FREEZE_CSS });
@@ -69,7 +75,7 @@ async function capture(page: Page, name: string, proof?: RegExp) {
   const text = await page
     .evaluate(() => document.body.innerText)
     .catch(() => "");
-  if (proof && !proof.test(text)) {
+  if (!proof.test(text)) {
     throw new Error(
       `Capture "${name}" does not contain the surface it is named for.\n` +
         `Expected to match ${proof}\nRendered text was:\n${text.slice(0, 800)}`,
@@ -94,6 +100,43 @@ const PROOF = {
   conversionPrompt: /KEEP GOING WITH ARGUS|Request access|Solicitar acceso|SIGUE|Start a new conversation|nueva conversación/i,
   settingsRoot: /Data Controls|Controles de datos/i,
   usage: /left today|available this hour|hoy|esta hora/i,
+  /* One per settings destination, each a row only that panel renders. */
+  settingsProfile: /Avatar color|Color de avatar/i,
+  settingsData: /Delete all conversations|Eliminar todas las conversaciones/i,
+  /* Not the Sidebar row: that one only exists from the tablet stop up, so it
+     cannot prove this panel at 390. Appearance is the row that is always here
+     and that the Profile panel does not also render. */
+  settingsPreferences: /Appearance|Apariencia/i,
+  settingsHelpLegal: /Keyboard shortcuts|Atajos de teclado/i,
+  /* At 390 the panel drops the keyboard shortcuts row, and its remaining rows
+     are Terms and Privacy, which the settings root also renders in its footer.
+     So the marker there is the drilled-in sheet itself: its title followed by
+     the back label, which the root never produces because the row after
+     Help & Legal at root is Feedback. */
+  settingsHelpLegalSheet:
+    /Help & Legal\s*\n\s*(Settings|Ajustes|Configuración)/i,
+  settingsArchived: /Archived chats|Chats archivados/i,
+  settingsDeleted: /currently be restored|Currently restorable|restaurar/i,
+  settingsSecurity: /Account security|Seguridad de la cuenta/i,
+  settingsLanguage: /Español/i,
+  settingsAppearance: /System|Sistema/i,
+  settingsSidebar: /Icons only|On hover|Solo íconos|Al pasar/i,
+  /* Below the desktop stop the Security row goes nowhere, so what is on screen
+     after that click is the chat shell. Named for what it is. */
+  chatShell: /Describe an investing idea|Describe una idea/i,
+  recents: /Recents|Recientes/i,
+  usageError: /Try again|Reintentar/i,
+  /* The typed question itself, which the composer renders into the DOM. */
+  typedQuestion: /drawdown/i,
+  /* Legal and auth each cross-link to the other, so the marker has to be body
+     copy rather than a heading or a nav label. */
+  privacy: /Data we collect|Datos que recopilamos/i,
+  terms: /Acceptable use|Uso aceptable/i,
+  login: /Forgot password|Olvidaste tu contraseña/i,
+  signup: /At least 8 characters|Al menos 8 caracteres/i,
+  requestAccess: /Request access to Argus|Solicitar acceso a Argus/i,
+  forgotPassword: /Recover your account|Recupera tu cuenta/i,
+  recovery: /Choose a new password|Elige una nueva contraseña/i,
 } as const;
 
 async function open(page: Page, band: Band, url: string, ctx: Ctx = {}) {
@@ -197,7 +240,7 @@ test.describe("guest surfaces", () => {
           "Compare Apple with SPY over the last twelve months and show me the drawdown",
         );
         await page.waitForTimeout(500);
-        await capture(page, `guest/first-question-${band}-en-dark`);
+        await capture(page, `guest/first-question-${band}-en-dark`, PROOF.typedQuestion);
       }
 
       await open(page, band, "/chat?conversation=conversation-alpha", {
@@ -267,7 +310,7 @@ test.describe("guest surfaces", () => {
 
       await open(page, band, "/chat", { account: "guest", emptyChat: true });
       if (await clickByName(page, /^(sign in|iniciar sesión)$/i)) {
-        await capture(page, `guest/sign-in-cta-${band}-en-dark`);
+        await capture(page, `guest/sign-in-cta-${band}-en-dark`, PROOF.conversionPrompt);
       }
     });
   }
@@ -285,7 +328,7 @@ test.describe("signed-in surfaces", () => {
       await capture(page, `signed-in/conversation-${band}-en-dark`, PROOF.transcript);
 
       await openDrawerIfNarrow(page, band);
-      await capture(page, `signed-in/recents-${band}-en-dark`);
+      await capture(page, `signed-in/recents-${band}-en-dark`, PROOF.recents);
 
       await open(page, band, "/chat?conversation=conversation-alpha", {});
       await openSearch(page, band);
@@ -302,45 +345,78 @@ test.describe("signed-in surfaces", () => {
       await openSettings(page, band);
       await capture(page, `signed-in/settings-main-${band}-en-dark`, PROOF.settingsRoot);
 
-      for (const [section, name] of [
-        ["profile", /^(profile|perfil)$/i],
-        ["data", /^(data controls|controles de datos)$/i],
-        ["preferences", /^(preferences|preferencias)$/i],
-        ["help-legal", /^(help & legal|ayuda y legal|ayuda y aviso legal)$/i],
+      for (const [section, name, proof] of [
+        ["profile", /^(profile|perfil)$/i, PROOF.settingsProfile],
+        ["data", /^(data controls|controles de datos)$/i, PROOF.settingsData],
+        ["preferences", /^(preferences|preferencias)$/i, PROOF.settingsPreferences],
+        [
+          "help-legal",
+          /^(help & legal|ayuda y legal|ayuda y aviso legal)$/i,
+          // The keyboard shortcuts row is not rendered at 390.
+          band >= 720 ? PROOF.settingsHelpLegal : PROOF.settingsHelpLegalSheet,
+        ],
       ] as const) {
         await open(page, band, "/chat", { emptyChat: true });
         await openSettings(page, band);
         if (await clickByName(page, name)) {
-          await capture(page, `signed-in/settings-${section}-${band}-en-dark`);
+          await capture(
+            page,
+            `signed-in/settings-${section}-${band}-en-dark`,
+            proof,
+          );
         }
       }
 
-      for (const [leaf, name] of [
-        ["archived", /archived chats|chats archivados/i],
-        ["deleted", /recently deleted|eliminados recientemente/i],
-        ["security", /^(security|seguridad)$/i],
-        ["usage", /^(usage|uso)$/i],
-      ] as const) {
+      /*
+       * `bands` narrows a destination that does not exist at every width.
+       * Security is desktop only, and not by design: below 1024 the row is
+       * visible and clickable and the click closes the sheet without
+       * navigating, which the `account security navigation` test in this file
+       * captures as evidence. Photographing it here anyway produced a
+       * `settings-security-720` file that was byte-identical to the empty chat.
+       * The evidence for that defect belongs to that test; this walk only
+       * records the surface where it exists.
+       */
+      for (const { leaf, name, proof, bands } of [
+        {
+          leaf: "archived",
+          name: /archived chats|chats archivados/i,
+          proof: PROOF.settingsArchived,
+        },
+        {
+          leaf: "deleted",
+          name: /recently deleted|borrados recientemente/i,
+          proof: PROOF.settingsDeleted,
+        },
+        {
+          leaf: "security",
+          name: /^(security|seguridad)$/i,
+          proof: PROOF.settingsSecurity,
+          bands: [1024] as Band[],
+        },
+        { leaf: "usage", name: /^(usage|uso)$/i, proof: PROOF.usage },
+      ]) {
+        if (bands && !bands.includes(band)) continue;
         await open(page, band, "/chat", { emptyChat: true });
         await openSettings(page, band);
         if (!(await clickByName(page, /^(data controls|controles de datos)$/i)))
           continue;
         if (await clickByName(page, name)) {
-          await capture(page, `signed-in/settings-${leaf}-${band}-en-dark`);
+          await capture(page, `signed-in/settings-${leaf}-${band}-en-dark`, proof);
         }
         await dismissDialogs(page);
       }
 
-      for (const [leaf, name] of [
-        ["language", /^(app language|idioma de la app|idioma)$/i],
-        ["appearance", /^(appearance|apariencia)$/i],
-        ["sidebar", /^(sidebar|barra lateral)$/i],
+      for (const [leaf, name, proof] of [
+        ["language", /^(app language|idioma de la app)$/i, PROOF.settingsLanguage],
+        ["appearance", /^(appearance|apariencia)$/i, PROOF.settingsAppearance],
+        ["sidebar", /^(sidebar|barra lateral)$/i, PROOF.settingsSidebar],
       ] as const) {
         await open(page, band, "/chat", { emptyChat: true });
         await openSettings(page, band);
         if (!(await clickByName(page, /^(preferences|preferencias)$/i))) continue;
         if (await clickByName(page, name)) {
-          await capture(page, `signed-in/settings-${leaf}-${band}-en-dark`);
+          await capture(page, `signed-in/settings-${leaf}-${band}-en-dark`, proof);
         }
         await dismissDialogs(page);
       }
@@ -353,7 +429,7 @@ test.describe("signed-in surfaces", () => {
       await openSettings(page, band);
       if (await clickByName(page, /^(data controls|controles de datos)$/i)) {
         if (await clickByName(page, /^(usage|uso)$/i)) {
-          await capture(page, `signed-in/usage-error-${band}-en-dark`);
+          await capture(page, `signed-in/usage-error-${band}-en-dark`, PROOF.usageError);
         }
       }
 
@@ -449,14 +525,20 @@ test.describe("signed-in surfaces", () => {
       await openSettings(page, band);
       if (!(await clickByName(page, /^(data controls|controles de datos)$/i)))
         return;
-      await capture(page, `findings/security-${band}-before-click`);
+      await capture(page, `findings/security-${band}-before-click`, PROOF.settingsData);
 
       const security = page.getByRole("button", { name: /^(security|seguridad)$/i }).first();
       if (!(await security.count())) return;
       await security.click();
       // Generous: a client route change plus a paint.
       await page.waitForTimeout(2_500);
-      await capture(page, `findings/security-${band}-after-click`);
+      await capture(
+        page,
+        `findings/security-${band}-after-click`,
+        // Asserts finding 1 in both directions: the click navigates at the
+        // desktop stop and lands back on the chat shell below it.
+        band >= 1024 ? PROOF.settingsSecurity : PROOF.chatShell,
+      );
 
       await writeFile(
         join(OUT_DIR, `findings/security-${band}-url.txt`),
@@ -467,28 +549,28 @@ test.describe("signed-in surfaces", () => {
 
     test(`legal and auth at ${band}`, async ({ page }) => {
       await open(page, band, "/privacy", {});
-      await capture(page, `chrome/privacy-${band}-en-dark`);
+      await capture(page, `chrome/privacy-${band}-en-dark`, PROOF.privacy);
 
       await open(page, band, "/terms", {});
-      await capture(page, `chrome/terms-${band}-en-dark`);
+      await capture(page, `chrome/terms-${band}-en-dark`, PROOF.terms);
 
       await open(page, band, "/?auth=login", {});
-      await capture(page, `chrome/login-${band}-en-dark`);
+      await capture(page, `chrome/login-${band}-en-dark`, PROOF.login);
 
       await open(page, band, "/?auth=signup", {});
-      await capture(page, `chrome/signup-${band}-en-dark`);
+      await capture(page, `chrome/signup-${band}-en-dark`, PROOF.signup);
 
       await open(page, band, "/?auth=request", {});
-      await capture(page, `chrome/request-access-${band}-en-dark`);
+      await capture(page, `chrome/request-access-${band}-en-dark`, PROOF.requestAccess);
 
       await open(page, band, "/auth/forgot-password", {});
-      await capture(page, `chrome/forgot-password-${band}-en-dark`);
+      await capture(page, `chrome/forgot-password-${band}-en-dark`, PROOF.forgotPassword);
 
       await open(page, band, "/auth/recovery", {});
-      await capture(page, `chrome/recovery-${band}-en-dark`);
+      await capture(page, `chrome/recovery-${band}-en-dark`, PROOF.recovery);
 
       await open(page, band, "/account/security", {});
-      await capture(page, `chrome/account-security-${band}-en-dark`);
+      await capture(page, `chrome/account-security-${band}-en-dark`, PROOF.settingsSecurity);
     });
   }
 });
