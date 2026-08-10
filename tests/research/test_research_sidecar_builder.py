@@ -43,6 +43,22 @@ def _is_builder_call(node: ast.AST) -> bool:
     )
 
 
+def _is_dict_constructor_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    constructor = node.func
+    while isinstance(constructor, ast.Subscript):
+        constructor = constructor.value
+    return (
+        isinstance(constructor, ast.Name)
+        and constructor.id == "dict"
+        or isinstance(constructor, ast.Attribute)
+        and isinstance(constructor.value, ast.Name)
+        and constructor.value.id == "builtins"
+        and constructor.attr == "dict"
+    )
+
+
 def _is_research_passthrough(node: ast.AST) -> bool:
     return (
         isinstance(node, ast.Subscript)
@@ -168,6 +184,12 @@ def _research_values(nodes: list[ast.AST]) -> list[tuple[int, ast.AST]]:
                 for target in targets
             ):
                 values.append((node.lineno, node.value))
+        elif _is_dict_constructor_call(node):
+            values.extend(
+                (node.lineno, keyword.value)
+                for keyword in node.keywords
+                if keyword.arg == "research"
+            )
     return values
 
 
@@ -287,6 +309,26 @@ def future_producer():
 )
 def test_a_builder_result_cannot_be_laundered_or_mutated(bypass: str) -> None:
     assert _producer_violations(bypass, "future_producer.py")
+
+
+@pytest.mark.parametrize("constructor", ["dict", "dict[str, object]", "builtins.dict"])
+def test_dict_keyword_producer_requires_builder(constructor: str) -> None:
+    unsafe = f"""
+import builtins
+
+def future_producer():
+    sidecar = {{"schema_version": "argus_research/v1", "unexpected": True}}
+    return {constructor}(research=sidecar)
+"""
+    safe = f"""
+import builtins
+
+def future_producer():
+    return {constructor}(research=build_research_sidecar())
+"""
+
+    assert _producer_violations(unsafe, "future_producer.py")
+    assert _producer_violations(safe, "future_producer.py") == []
 
 
 def test_every_research_sidecar_producer_uses_the_shared_builder() -> None:
