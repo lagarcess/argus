@@ -218,12 +218,22 @@ name the candidate SHA, deployed API/web SHAs, `workflow_task`,
 `real_workflow_task`, backtest service mode, workflow-service proof for
 `argus-backtests`, canary evidence, rollback target, and approver.
 
-The stale job scan runs on its own every fifteen minutes on the
-`argus-maintenance` cron service (see Scheduled Maintenance). Run it by hand
-only to triage an incident sooner than the next scheduled pass:
+The stale job scan is a manual step today. The `argus-maintenance` cron service
+that would run it every fifteen minutes is declared in `render.yaml` and
+deliberately not created (see Scheduled Maintenance), so nothing runs this scan
+automatically.
+
+**Destructive ops jobs refuse to guess their target.** `DATABASE_URL`,
+`SUPABASE_URL` (or `SUPABASE_PROJECT_URL`), and `SUPABASE_SERVICE_ROLE_KEY`
+must be set explicitly in the process environment. Dotenv discovery is disabled,
+so a job with none of them set exits 2 rather than resolving whatever `.env`
+happens to sit above it. Each job prints the resolved database and Supabase host,
+without credentials, before doing anything destructive; read that line and
+confirm it is the environment you meant.
 
 ```bash
-.github/stale-backtest-jobs.sh --json
+DATABASE_URL=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  .github/stale-backtest-jobs.sh --json
 ```
 
 For privacy-safe aggregate job health over the existing Supabase
@@ -441,14 +451,16 @@ command below.
 To inspect what the next scheduled pass would select, without deleting:
 
 ```bash
-poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
+DATABASE_URL=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
 ```
 
 Run the deleting form by hand only to drain a backlog faster than the schedule,
 and only against an environment you intend to delete rows in:
 
 ```bash
-poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
+DATABASE_URL=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
 ```
 
 Record the selected/deleted/preserved/failed counts and oldest eligible expiry
