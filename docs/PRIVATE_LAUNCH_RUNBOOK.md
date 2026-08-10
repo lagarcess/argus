@@ -218,10 +218,38 @@ because Playwright's error context records every rendered input value. Secrets
 are scoped to the operational steps that need them; install and artifact upload
 steps do not receive canary credentials or service-role keys.
 
-Since the workflow resolves and checks out the deployed release, every script it
-runs comes from the deployed tree. Only `.github/workflows/private-alpha-canary.yml`
-is read from `main`. A canary harness fix merged to `main` therefore changes
-nothing until `main` is deployed to Render. Do not read a merge as a fix.
+The canary runs in two halves, and which half a file lands in decides whether a
+fix to it is already live.
+
+Everything up to and including the resolver runs from the ref the run started
+on: Checkout, Set up Python, Set up Bun, Install Render CLI, and the first part
+of "Resolve deployed canary release". That step runs
+`.github/render-env-sync.sh`, which sources `.github/argus-env.sh`, then
+`.github/canary-deployed-sha.py`, and only after that does it
+`git checkout --detach` onto the deployed SHA. The other pre-detach steps pin
+their versions inline and read no repo file.
+
+Everything after the detach runs from the deployed release: the dependency
+installs, the Spanish static UI assertions, `.github/local-smoke.sh`,
+`.github/warmup-render.sh`, `.github/canary-render.sh` and everything it calls
+(`.github/canary-browser.sh`, `.github/canary-requested-signup-denial.py`,
+`.github/private-alpha-release-profile.py`), and the `web/e2e` specs.
+
+`.github/render-env-sync.sh` is in both halves. The resolver calls it directly
+before the detach, and `warmup-render.sh` and `canary-render.sh` call it again
+after, so one job runs that same file from two different trees.
+
+The starting ref depends on the trigger. A scheduled run takes the workflow YAML
+and the initial checkout from `main`, because cron only executes the default
+branch's YAML. A manual dispatch takes both from the ref selected for the
+dispatch, because the Checkout step uses `github.sha`. The detach happens either
+way.
+
+So a resolver or workflow-YAML fix is live on the next scheduled run as soon as
+it is on `main`, and can be exercised before that by dispatching the workflow
+from its own branch. A fix to any post-detach script, which is most of the
+canary harness, changes nothing until `main` is deployed to Render. Check which
+half a file is in before reading a merge as a fix.
 
 After the gate passes, copy the relevant command output and canary evidence into
 a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
