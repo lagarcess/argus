@@ -13,7 +13,11 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
 
-from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
+    _apply_legacy_flat_edit_fields,
+    _edit_plan_reshapes_non_recurring_strategy,
+    plan_artifact_assumption_edit,
+)
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
@@ -33,11 +37,9 @@ from argus.agent_runtime.benchmark_evidence import (
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: F401
     ARTIFACT_EDIT_PENDING_FIELDS,
-    _apply_legacy_flat_edit_fields,
     _apply_resolved_edit_to_draft,
     _current_artifact_asset_universe,
     _current_artifact_strategy,
-    _edit_plan_reshapes_non_recurring_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
     _scoped_date_reply_carries_broader_edit,

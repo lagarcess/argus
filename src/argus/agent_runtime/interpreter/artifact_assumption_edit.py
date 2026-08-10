@@ -11,6 +11,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     EditOperation,
     ResolvedArtifactEdit,
+    _apply_legacy_flat_edit_fields,
     apply_edit_operations,
     resolved_asset_operation_symbols,
     typed_unapplied_operations,
@@ -25,7 +26,6 @@ from argus.agent_runtime.asset_text_grounding import (
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     ground_planned_execution_costs,
     numeric_cost_anchor_in_message,
-    supported_cost_rate_value,
 )
 from argus.agent_runtime.interpreter.shared import (
     _RECURRING_CAPITAL_SOURCES,
@@ -742,82 +742,6 @@ def _apply_resolved_edit_to_draft(
         extra_parameters["indicator"] = "rsi"
         extra_parameters["indicator_parameters"] = indicator_parameters
         field_provenance["indicator_parameters"] = "explicit_user"
-
-
-def _apply_legacy_flat_edit_fields(
-    plan: ArtifactAssumptionEditPlan,
-    *,
-    draft: LLMStrategyDraft,
-    field_provenance: dict[str, str],
-    extra_parameters: dict[str, Any],
-) -> None:
-    if plan.asset_universe:
-        operation = normalized_asset_universe_operation(plan.asset_universe_operation)
-        draft.asset_universe = list(plan.asset_universe)
-        if operation is not None:
-            draft.asset_universe_operation = operation
-            extra_parameters["asset_universe_operation"] = operation
-        field_provenance["asset_universe"] = "explicit_user"
-    if plan.comparison_baseline is not None:
-        benchmark = str(plan.comparison_baseline or "").strip().upper()
-        if benchmark:
-            draft.comparison_baseline = benchmark
-            field_provenance["comparison_baseline"] = "explicit_user"
-    if plan.initial_capital is not None:
-        draft.initial_capital = plan.initial_capital
-        field_provenance["initial_capital"] = "starting_capital"
-    if plan.recurring_contribution_amount is not None:
-        recurring_amount = float(plan.recurring_contribution_amount)
-        draft.capital_amount = recurring_amount
-        draft.recurring_contribution = recurring_amount
-        field_provenance["capital_amount"] = "recurring_contribution"
-        field_provenance["recurring_contribution"] = "recurring_contribution"
-        extra_parameters["recurring_contribution"] = recurring_amount
-    if plan.cadence is not None:
-        cadence = _supported_dca_cadence_value(plan.cadence)
-        if cadence is not None:
-            draft.cadence = cadence
-            field_provenance["cadence"] = "explicit_user"
-            extra_parameters["recurring_cadence"] = cadence
-    if plan.timeframe is not None:
-        draft.timeframe = plan.timeframe
-        field_provenance["timeframe"] = "explicit_user"
-    if plan.fee_rate is not None:
-        fee_rate = supported_cost_rate_value(plan.fee_rate, field_name="fee_rate")
-        if fee_rate is not None:
-            extra_parameters["fee_rate"] = fee_rate
-            field_provenance["fee_rate"] = "explicit_user"
-    if plan.slippage is not None:
-        slippage = supported_cost_rate_value(plan.slippage, field_name="slippage")
-        if slippage is not None:
-            extra_parameters["slippage"] = slippage
-            field_provenance["slippage"] = "explicit_user"
-
-
-def _edit_plan_reshapes_non_recurring_strategy(
-    plan: ArtifactAssumptionEditPlan,
-    *,
-    prior_strategy_type: Any,
-) -> bool:
-    """Recurring-buy plan fields aimed at a non-recurring strategy are a
-    reshape ("make it recurring buys instead"), not an assumption edit.
-
-    The edit-operation set cannot change strategy_type, so applying such a
-    plan would silently keep the old strategy; callers must step aside and
-    let a reshape-capable interpretation path handle the turn.
-    """
-
-    proposes_recurring_fields = (
-        plan.cadence is not None
-        or plan.recurring_contribution_amount is not None
-        or any(
-            operation.target in {"cadence", "recurring_contribution"}
-            for operation in plan.operations
-        )
-    )
-    if not proposes_recurring_fields:
-        return False
-    return canonical_strategy_type(prior_strategy_type) != "dca_accumulation"
 
 
 def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
