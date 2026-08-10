@@ -971,9 +971,10 @@ def test_runtime_confirmation_card_flag_on_marks_execution_costs_editable(
     card = runtime_confirmation_card(_confirmation_result_with_draft_costs())
 
     assert card is not None
+    # Costs join the one in-place path whenever the engine can model them.
     assert card["capabilities"] == {
         "execution_costs_editable": True,
-        "direct_edits": ["capital", "dates"],
+        "direct_edits": ["capital", "dates", "costs"],
     }
 
 

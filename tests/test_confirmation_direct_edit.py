@@ -119,11 +119,16 @@ def _direct_edit(
     )
 
 
-def test_capital_edit_supersedes_without_spending_a_turn() -> None:
+def _conversation_messages(client: TestClient, conversation_id: str) -> list[dict]:
+    return client.get(f"/api/v1/conversations/{conversation_id}/messages").json()["items"]
+
+
+def test_capital_edit_updates_in_place_without_spending_a_turn() -> None:
     client = _client()
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"])
     usage_before = client.get("/api/v1/me/usage").json()
+    messages_before = _conversation_messages(client, conversation["id"])
 
     response = _direct_edit(
         client,
@@ -134,15 +139,30 @@ def test_capital_edit_supersedes_without_spending_a_turn() -> None:
     assert response.status_code == 200, response.text
     message = response.json()["message"]
     card = message["metadata"]["confirmation_card"]
-    assert card["confirmation_id"] != CONFIRMATION_ID
+    # In place means in place: same card, edited. Nothing is spent, so
+    # nothing new appears and the card keeps its identity.
+    assert card["confirmation_id"] == CONFIRMATION_ID
     assert card["confirmation_state"] == "active"
     capital_rows = [row for row in card["rows"] if row["key"] == "starting_capital"]
     assert capital_rows and capital_rows[0]["value"] == "$25,000"
     payload = message["metadata"]["confirmation_payload"]
+    assert payload["confirmation_id"] == CONFIRMATION_ID
     assert payload["launch_payload"]["capital_amount"] == 25000
     assert payload["strategy"]["capital_amount"] == 25000
     provenance = payload["strategy"]["extra_parameters"]["field_provenance"]
     assert provenance["capital_amount"] == "starting_capital"
+
+    messages_after = _conversation_messages(client, conversation["id"])
+    assert len(messages_after) == len(
+        messages_before
+    ), "an in-place edit must not mint a new message"
+    assert message["id"] in {
+        item["id"] for item in messages_before
+    }, "the edit must land on the existing card message"
+    stored = next(item for item in messages_after if item["id"] == message["id"])
+    assert (
+        stored["metadata"]["confirmation_payload"]["strategy"]["capital_amount"] == 25000
+    ), "the stored record is the edited card, not a copy"
 
     usage_after = client.get("/api/v1/me/usage").json()
     assert usage_after == usage_before, "a direct edit must not spend any allowance"
@@ -314,8 +334,9 @@ def test_direct_edit_matches_the_conversational_edit_artifact() -> None:
         f"conversational={conversational_launch}"
     )
     for field in ("capital_amount", "date_range", "asset_universe", "strategy_type"):
-        assert direct_payload["strategy"][field] == (
-            conversational_payload["strategy"][field]
+        assert (
+            direct_payload["strategy"][field]
+            == (conversational_payload["strategy"][field])
         )
 
 
@@ -334,21 +355,22 @@ def test_stale_confirmation_id_conflicts() -> None:
     assert response.json()["code"] == "artifact_action_invalid_state"
 
 
-def test_superseded_card_rejects_further_direct_edits() -> None:
+def test_repeated_direct_edits_keep_editing_the_same_card() -> None:
+    """The card's identity survives any number of in-place edits."""
     client = _client()
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"])
 
     first = _direct_edit(client, conversation["id"], CONFIRMATION_ID, {"capital": 20000})
     assert first.status_code == 200
-    second = _direct_edit(
-        client, conversation["id"], CONFIRMATION_ID, {"capital": 30000}
+    second = _direct_edit(client, conversation["id"], CONFIRMATION_ID, {"capital": 30000})
+    assert second.status_code == 200
+    message = second.json()["message"]
+    assert message["metadata"]["confirmation_card"]["confirmation_id"] == CONFIRMATION_ID
+    assert (
+        message["metadata"]["confirmation_payload"]["strategy"]["capital_amount"] == 30000
     )
-    assert second.status_code == 409
-
-    new_id = first.json()["message"]["metadata"]["confirmation_card"]["confirmation_id"]
-    third = _direct_edit(client, conversation["id"], new_id, {"capital": 30000})
-    assert third.status_code == 200
+    assert len(_conversation_messages(client, conversation["id"])) == 1
 
 
 def test_empty_and_malformed_bodies_are_validation_errors() -> None:
@@ -400,7 +422,7 @@ def test_position_size_confirmation_rejects_capital_edit() -> None:
         language="en",
     )
     assert card is not None
-    assert card["capabilities"]["direct_edits"] == ["dates"]
+    assert card["capabilities"]["direct_edits"] == ["dates", "costs"]
 
 
 def test_direct_edit_capability_is_emitted_on_ordinary_cards() -> None:
@@ -412,4 +434,116 @@ def test_direct_edit_capability_is_emitted_on_ordinary_cards() -> None:
         language="en",
     )
     assert card is not None
-    assert card["capabilities"]["direct_edits"] == ["capital", "dates"]
+    # Three edit affordances, one behaviour: costs join capital and dates on
+    # the in-place path whenever the engine can model them.
+    assert card["capabilities"]["direct_edits"] == ["capital", "dates", "costs"]
+
+
+def test_cost_edit_updates_in_place_through_the_shared_gate() -> None:
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"])
+
+    response = _direct_edit(
+        client,
+        conversation["id"],
+        CONFIRMATION_ID,
+        {"fee_rate": 0.002, "slippage": 0.001},
+    )
+    assert response.status_code == 200, response.text
+    message = response.json()["message"]
+    payload = message["metadata"]["confirmation_payload"]
+    assert payload["confirmation_id"] == CONFIRMATION_ID
+    extra = payload["strategy"]["extra_parameters"]
+    assert extra["fee_rate"] == 0.002
+    assert extra["slippage"] == 0.001
+    assert extra["field_provenance"]["fee_rate"] == "explicit_user"
+    assert extra["field_provenance"]["slippage"] == "explicit_user"
+    fees = payload["optional_parameters"]["fees"]
+    slippage = payload["optional_parameters"]["slippage"]
+    assert fees["value"] == 0.002 and fees["source"] == "user"
+    assert slippage["value"] == 0.001 and slippage["source"] == "user"
+    assert len(_conversation_messages(client, conversation["id"])) == 1
+
+
+def test_over_cap_slippage_is_a_typed_field_error() -> None:
+    """The shared resolver is the one cost gate; the drawer shows the refusal
+    at the field and the card is untouched."""
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"])
+
+    response = _direct_edit(
+        client,
+        conversation["id"],
+        CONFIRMATION_ID,
+        {"slippage": 0.9},
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "unsupported_cost_value"
+    stored = _conversation_messages(client, conversation["id"])
+    payload = stored[-1]["metadata"]["confirmation_payload"]
+    assert "slippage" not in (payload["strategy"].get("extra_parameters") or {})
+
+
+def test_cost_direct_edit_matches_the_conversational_edit_artifact() -> None:
+    """The §3.4 identity requirement extended to costs."""
+    from argus.agent_runtime.artifact_edit_planner import (
+        EditOperation,
+        apply_edit_operations,
+    )
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.confirmation_artifacts import canonical_payload_hash
+    from argus.agent_runtime.stages.confirm import confirm_stage
+    from argus.agent_runtime.stages.interpret_internal.confirmation_artifact_edits import (
+        apply_resolved_artifact_edit_to_strategy_summary,
+    )
+    from argus.agent_runtime.state.models import RunState, StrategySummary
+
+    client = _client()
+    conversation = _conversation(client)
+    source_payload = _confirmation_payload()
+    _plant_confirmation(client, conversation["id"], source_payload)
+
+    response = _direct_edit(
+        client,
+        conversation["id"],
+        CONFIRMATION_ID,
+        {"fee_rate": 0.002, "slippage": 0.001},
+    )
+    assert response.status_code == 200, response.text
+    direct_payload = response.json()["message"]["metadata"]["confirmation_payload"]
+
+    resolved = apply_edit_operations(
+        [
+            EditOperation(op="set", target="fees", number=0.002),
+            EditOperation(op="set", target="slippage", number=0.001),
+        ],
+        current_asset_universe=["NFLX"],
+    )
+    assert not resolved.unsupported
+    summary = StrategySummary.model_validate(source_payload["strategy"])
+    field_provenance: dict[str, str] = {}
+    apply_resolved_artifact_edit_to_strategy_summary(
+        resolved,
+        candidate=summary,
+        field_provenance=field_provenance,
+    )
+    summary.extra_parameters["field_provenance"] = field_provenance
+    state = RunState.new(
+        current_user_message="use a 0.2% fee and 0.1% slippage",
+        recent_thread_history=[],
+    )
+    state = state.model_copy(update={"candidate_strategy_draft": summary})
+    result = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        language="en",
+    )
+    assert result.outcome == "await_approval"
+    conversational_payload = result.stage_patch["confirmation_payload"]
+    assert canonical_payload_hash(
+        dict(direct_payload["launch_payload"])
+    ) == canonical_payload_hash(dict(conversational_payload["launch_payload"]))

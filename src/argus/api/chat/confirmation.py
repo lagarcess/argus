@@ -251,10 +251,14 @@ def runtime_confirmation_card(
         # assumptions, so the confirmation surface may offer editing them.
         capabilities["execution_costs_editable"] = True
     # Direct no-turn edits the typed endpoint accepts for this card. Capital
-    # follows the launch sizing mode; dates are always directly editable.
+    # follows the launch sizing mode; dates are always directly editable;
+    # costs join whenever the engine can model them, so all three edit
+    # affordances share one in-place behaviour.
     direct_edits = ["dates"]
     if str(launch_payload.get("sizing_mode") or "capital_amount") != "position_size":
         direct_edits.insert(0, "capital")
+    if capabilities.get("execution_costs_editable"):
+        direct_edits.append("costs")
     capabilities["direct_edits"] = direct_edits
     card["capabilities"] = capabilities
     asset_class = _confirmation_asset_class(strategy)

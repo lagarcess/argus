@@ -3147,14 +3147,22 @@ reach provider data. Failures persist nothing.
 
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit`
 
-Edits the active confirmation's capital or dates **without spending a turn**:
-no message allowance, no interpretation, no LLM call, no backtest row. The
-typed values become the same edit operations the conversational planner
-emits, applied by the same application code, and the real confirm stage
-assembles the result, so a direct edit and the equivalent conversational
-edit produce one canonical artifact. Direct edits obey the same validation,
-coverage, and disclosure gates as a conversational edit; nothing becomes
-runnable that would not have been runnable through chat.
+Edits the active confirmation's capital, dates, or costs **without spending a
+turn**: no message allowance, no interpretation, no LLM call, no backtest
+row. The typed values become the same edit operations the conversational
+planner emits, applied by the same application code, and the real confirm
+stage assembles the result, so a direct edit and the equivalent
+conversational edit produce one canonical artifact. Direct edits obey the
+same validation, coverage, and disclosure gates as a conversational edit;
+nothing becomes runnable that would not have been runnable through chat.
+
+**In place means in place.** This endpoint updates the card it edits: the
+same `confirmation_id`, the same assistant message rewritten where it
+stands, nothing new in the transcript. This is the record-creation rule of
+the edit contract stated explicitly: an in-place edit spends nothing and
+mints nothing; a turn-based edit supersedes with a new card message because
+the conversation records the change; only run finalization mints an
+`IdeaVersion`.
 
 **Request:** at least one field.
 - `capital`: positive number. Starting capital, or the recurring
@@ -3164,25 +3172,32 @@ runnable that would not have been runnable through chat.
 - `date_window`: `{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`, ordered
   ISO dates. Explicit calendar endpoints only; relative or semantic windows
   stay on the conversational path where the interpreter owns them.
+- `fee_rate`, `slippage`: decimal rates at or above zero (`0.002` is
+  0.2 percent); zero explicitly clears a cost. The shared edit resolver is
+  the one cost gate, so an unmodelable rate (slippage above the cap) is
+  refused as `422 unsupported_cost_value` and the card is untouched.
 
-**Response:** `{"message": Message}` where the message is a new assistant
-confirmation message carrying the superseding card (new `confirmation_id`,
-recomputed provider coverage, `period_adjustment` when the requested window
-clamps). Peer rows from the source card ride the superseding card unchanged
-because a capital or date edit does not change the basket. The previous card
-supersedes by ordinary latest-active projection, so its `run_backtest`
-action fails the ordinary stale-card check.
+**Response:** `{"message": Message}` where the message is the **same**
+assistant confirmation message, updated in place: same `id`, same
+`confirmation_id`, edited payload and card (recomputed provider coverage,
+`period_adjustment` when the requested window clamps). All other metadata
+the message carried, peer rows included, is preserved. The card stays the
+latest active confirmation, and its `run_backtest` action runs the edited
+values.
 
 **Errors:** `409 artifact_action_invalid_state` for a stale or non-active
 confirmation and for capital on a position-sized confirmation;
-`422 invalid_date_window | no_common_data_window | insufficient_common_data`;
-`503 market_data_unavailable`. Failures persist nothing.
+`422 invalid_date_window | no_common_data_window | insufficient_common_data
+| unsupported_cost_value`; `503 market_data_unavailable`. Failures persist
+nothing.
 
 ### Confirmation card editing surface
 
 - The active card advertises `capabilities.direct_edits` (`"capital"` when
-  the launch sizes by capital, and `"dates"` always). The frontend renders
-  the direct-edit row only from this backend truth.
+  the launch sizes by capital, `"dates"` always, and `"costs"` when the
+  engine can model execution costs). The frontend renders the edit
+  affordances only from this backend truth; all three share one in-place
+  behaviour.
 - `display_facts.capital` carries the typed number seeding the capital
   editor; card rows remain display strings and are never parsed back.
 - The card carries exactly three actions: `run_backtest` (when ready),

@@ -56,18 +56,27 @@ class ConfirmationDirectEditWindow(BaseModel):
 
 
 class ConfirmationDirectEditRequest(BaseModel):
-    """Edit the pending confirmation's capital or dates without a turn.
+    """Edit the pending confirmation's capital, dates, or costs without a turn.
 
     At least one field is required. Capital is the starting capital, or the
     recurring contribution when the pending strategy is a recurring-buy plan,
-    matching the money-role semantics of the conversational path.
+    matching the money-role semantics of the conversational path. Costs are
+    decimal rates (0.002 is 0.2 percent); zero explicitly clears a cost. The
+    slippage cap is enforced by the shared edit resolver, not re-stated here.
     """
 
     capital: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     date_window: ConfirmationDirectEditWindow | None = None
+    fee_rate: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    slippage: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def require_one_edit(self) -> "ConfirmationDirectEditRequest":
-        if self.capital is None and self.date_window is None:
-            raise ValueError("capital_or_date_window_required")
+        if (
+            self.capital is None
+            and self.date_window is None
+            and self.fee_rate is None
+            and self.slippage is None
+        ):
+            raise ValueError("at_least_one_edit_required")
         return self

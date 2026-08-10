@@ -610,6 +610,54 @@ def create_message(
     )
 
 
+def update_message_artifact(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+    content: str,
+    metadata: dict[str, Any],
+) -> Message:
+    """Rewrite one owned message's content and metadata in place.
+
+    The in-place half of the edit contract: a direct edit updates the card's
+    own record, so the transcript gains nothing and the message identity,
+    role, and position stay fixed. Turn-based edits keep superseding through
+    create_message.
+    """
+    if api_state.supabase_gateway is not None:
+        try:
+            return api_state.supabase_gateway.update_message_artifact(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=message_id,
+                content=content,
+                metadata=metadata,
+            )
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase message update failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    with api_state.store.conversation_message_lock:
+        if api_state.store.conversation_owners.get(conversation_id) != user_id:
+            raise ValueError("Conversation not found or not owned by user.")
+        messages = api_state.store.messages.get(conversation_id, [])
+        for index, existing in enumerate(messages):
+            if existing.id != message_id:
+                continue
+            updated = existing.model_copy(
+                update={"content": content, "metadata": metadata}
+            )
+            messages[index] = updated
+            api_state.store.bump_search_revision()
+            return updated
+    raise ValueError("Message not found or not owned by user.")
+
+
 def _append_idempotent_memory_message(
     *,
     user_id: str,

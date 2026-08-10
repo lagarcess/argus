@@ -97,6 +97,34 @@ class ConversationMessagePersistenceMixin:
         row = _row_one(result)
         return Message.model_validate(row) if row else None
 
+    def update_message_artifact(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+        content: str,
+        metadata: dict[str, Any],
+    ) -> Message:
+        """Rewrite one owned message's content and metadata in place.
+
+        In-place artifact edits update the record they describe instead of
+        appending a superseding row; the row's identity and position in the
+        transcript do not change.
+        """
+        updated = (
+            self.client.table("messages")
+            .update({"content": content, "metadata": metadata})
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .eq("id", message_id)
+            .execute()
+        )
+        row = _row_one(updated)
+        if row is None:
+            raise ValueError("Message not found or not owned by user.")
+        return Message.model_validate(row)
+
     def create_message(
         self,
         *,

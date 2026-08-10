@@ -35,11 +35,16 @@ class DirectEditPreparation:
     error_code: str | None = None
 
 
+_COST_EDIT_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
 def direct_edit_confirmation_preparation(
     source_payload: dict[str, Any],
     *,
     capital: float | None,
     date_window: dict[str, str] | None,
+    fee_rate: float | None = None,
+    slippage: float | None = None,
     language: str = "en",
 ) -> DirectEditPreparation:
     """Patch the canonical strategy with typed values, then re-confirm it."""
@@ -72,6 +77,14 @@ def direct_edit_confirmation_preparation(
         operations.append(
             EditOperation(op="set", target="date_window", date_window=window_intent)
         )
+    for cost_value, cost_target in (
+        (fee_rate, _COST_EDIT_TARGETS["fee_rate"]),
+        (slippage, _COST_EDIT_TARGETS["slippage"]),
+    ):
+        if cost_value is not None:
+            operations.append(
+                EditOperation(op="set", target=cost_target, number=float(cost_value))
+            )
     if not operations:
         return DirectEditPreparation(error_code="confirmation_payload_invalid")
 
@@ -79,6 +92,13 @@ def direct_edit_confirmation_preparation(
         operations,
         current_asset_universe=summary.asset_universe,
     )
+    if any(
+        entry.split(".", 1)[-1] in _COST_EDIT_TARGETS.values()
+        for entry in resolved.unsupported
+    ):
+        # The shared resolver is the one cost gate; a refused rate surfaces as
+        # a typed field error instead of a generic invalid-payload conflict.
+        return DirectEditPreparation(error_code="unsupported_cost_value")
     if resolved.unsupported or not resolved.has_changes():
         return DirectEditPreparation(error_code="confirmation_payload_invalid")
     field_provenance = _field_provenance_of(summary)

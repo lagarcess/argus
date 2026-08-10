@@ -808,7 +808,7 @@ paths:
     post:
       tags:
       - conversations
-      description: 'Edit the active confirmation''s capital or dates without a turn.
+      description: 'Edit the active confirmation''s capital, dates, or costs without a turn.
 
 
         Deterministic by construction: no LLM call, no message allowance, no
@@ -819,9 +819,13 @@ paths:
 
         assembled by the real confirm stage, so a direct edit and the equivalent
 
-        conversational edit produce one canonical artifact. The result is a new
+        conversational edit produce one canonical artifact. An in-place edit
 
-        superseding card; failures persist nothing.'
+        updates the card it edits: same confirmation id, same message, nothing new
+
+        in the transcript. Only turn-based edits supersede; failures persist
+
+        nothing.'
       parameters:
       - name: conversation_id
         in: path
@@ -2525,15 +2529,29 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ConfirmationDirectEditWindow'
           - type: 'null'
+        fee_rate:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+        slippage:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
       type: object
-      description: 'Edit the pending confirmation''s capital or dates without a turn.
+      description: 'Edit the pending confirmation''s capital, dates, or costs without a turn.
 
 
         At least one field is required. Capital is the starting capital, or the
 
         recurring contribution when the pending strategy is a recurring-buy plan,
 
-        matching the money-role semantics of the conversational path.'
+        matching the money-role semantics of the conversational path. Costs are
+
+        decimal rates (0.002 is 0.2 percent); zero explicitly clears a cost. The
+
+        slippage cap is enforced by the shared edit resolver, not re-stated here.'
     ConfirmationDirectEditResponse:
       properties:
         message:

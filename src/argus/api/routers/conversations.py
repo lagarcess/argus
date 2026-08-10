@@ -1044,14 +1044,16 @@ def direct_edit_confirmation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConfirmationDirectEditResponse:
-    """Edit the active confirmation's capital or dates without a turn.
+    """Edit the active confirmation's capital, dates, or costs without a turn.
 
     Deterministic by construction: no LLM call, no message allowance, no
     interpretation, and no backtest row. The typed values become the same edit
     operations the conversational planner emits, applied by the same code and
     assembled by the real confirm stage, so a direct edit and the equivalent
-    conversational edit produce one canonical artifact. The result is a new
-    superseding card; failures persist nothing.
+    conversational edit produce one canonical artifact. An in-place edit
+    updates the card it edits: same confirmation id, same message, nothing new
+    in the transcript. Only turn-based edits supersede; failures persist
+    nothing.
     """
     from argus.agent_runtime.confirmation_direct_edit import (
         direct_edit_confirmation_preparation,
@@ -1059,7 +1061,7 @@ def direct_edit_confirmation(
     from argus.api.chat.actions import latest_active_confirmation_id
     from argus.api.chat.confirmation import runtime_confirmation_card
     from argus.api.chat.recovery import _recent_messages_for_conversation
-    from argus.api.message_store import create_message
+    from argus.api.message_store import update_message_artifact
 
     invalid_state = problem(
         request,
@@ -1081,7 +1083,7 @@ def direct_edit_confirmation(
     if active_id is None or active_id != confirmation_id:
         raise invalid_state
     source_payload: dict[str, Any] | None = None
-    source_next_experiments: dict[str, Any] | None = None
+    source_message: Message | None = None
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):
             continue
@@ -1094,11 +1096,9 @@ def direct_edit_confirmation(
         candidate_payload = message.metadata.get("confirmation_payload")
         if isinstance(candidate_payload, dict):
             source_payload = candidate_payload
-        rows_sidecar = message.metadata.get("next_experiments")
-        if isinstance(rows_sidecar, dict):
-            source_next_experiments = rows_sidecar
+            source_message = message
         break
-    if source_payload is None:
+    if source_payload is None or source_message is None:
         raise invalid_state
     language = str(getattr(user, "language", None) or "en")
 
@@ -1110,6 +1110,8 @@ def direct_edit_confirmation(
             if payload.date_window is not None
             else None
         ),
+        fee_rate=payload.fee_rate,
+        slippage=payload.slippage,
         language=language,
     )
     if preparation.confirmation_payload is None:
@@ -1126,6 +1128,7 @@ def direct_edit_confirmation(
             "no_common_data_window",
             "insufficient_common_data",
             "invalid_date_window",
+            "unsupported_cost_value",
         }:
             raise problem(
                 request,
@@ -1136,12 +1139,17 @@ def direct_edit_confirmation(
             )
         raise invalid_state
     new_payload = preparation.confirmation_payload
+    # In place means in place: the edited card keeps its identity. The confirm
+    # stage minted a fresh id while assembling, and the id the user is looking
+    # at wins over it.
+    new_payload["confirmation_id"] = confirmation_id
+    new_payload["artifact_id"] = confirmation_id
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": new_payload,
         },
-        confirmation_id=str(new_payload.get("confirmation_id")),
+        confirmation_id=confirmation_id,
         conversation_id=conversation_id,
         language=language,
     )
@@ -1152,11 +1160,12 @@ def direct_edit_confirmation(
     )
 
     reference = confirmation_artifact_reference(
-        confirmation_id=str(card.get("confirmation_id")),
+        confirmation_id=confirmation_id,
         confirmation_payload=new_payload,
         confirmation_card=card,
     )
     metadata: dict[str, Any] = {
+        **source_message.metadata,
         "conversation_mode": "confirm",
         "agent_runtime_stage_outcome": "await_approval",
         "confirmation_card": card,
@@ -1164,19 +1173,14 @@ def direct_edit_confirmation(
         "active_confirmation_reference": reference.model_dump(mode="python"),
         "artifact_references": [reference.model_dump(mode="python")],
     }
-    if source_next_experiments is not None:
-        # A capital or date edit does not change the basket, so the offered
-        # peer rows stay valid and ride the superseding card unchanged.
-        metadata["next_experiments"] = source_next_experiments
-    created = create_message(
+    updated = update_message_artifact(
         user_id=user.id,
         conversation_id=conversation_id,
-        role="assistant",
+        message_id=source_message.id,
         content=str(card.get("summary") or ""),
         metadata=metadata,
-        settle_usage=None,
     )
-    return ConfirmationDirectEditResponse(message=created)
+    return ConfirmationDirectEditResponse(message=updated)
 
 
 def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:
