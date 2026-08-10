@@ -70,6 +70,14 @@ structured LLM clarifier with bounded facts and requested fields. Deterministic
 user-facing copy is reserved for explicit artifact-action recovery, such as a
 stale or non-retryable failed-run action, where code owns the safety boundary.
 
+Recovery copy may only speak for live artifacts. Argus never contradicts its
+own card: a confirmation that was cancelled or superseded is not "still
+ready", however much of it survives in runtime state, and recovery paths read
+pending confirmation state through one liveness accessor
+(`live_pending_confirmation`) rather than testing that a draft merely exists.
+If a recovery path cannot honestly speak for an artifact, it says so and
+offers something real.
+
 ## Language-Agnostic Prose Composition
 
 Runtime copy is composed, not templated per language. Since the B4 language-gate

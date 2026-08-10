@@ -51,12 +51,41 @@ async function send(page: Page, message: string) {
   await page.locator('button[type="submit"]').first().click();
 }
 
-async function waitForActiveCard(page: Page, timeoutMs = 90000) {
+async function waitForActiveCard(page: Page, timeoutMs = 150000) {
   await page.waitForSelector(
     'section:has([data-confirmation-status]) button:has-text("Run backtest"), section:has([data-confirmation-status]) button:has-text("Ejecutar backtest")',
     { timeout: timeoutMs },
   );
   await page.waitForTimeout(600);
+}
+
+/** Some turns may answer with prose (a clarification or disclosure) instead
+ * of a fresh card; the captured rendered text carries the truth either way. */
+async function waitForTurnSettled(page: Page, timeoutMs = 150000) {
+  const started = Date.now();
+  const initialCards = await page
+    .locator("section:has([data-confirmation-status])")
+    .count();
+  while (Date.now() - started < timeoutMs) {
+    const cards = await page
+      .locator("section:has([data-confirmation-status])")
+      .count();
+    if (cards > initialCards) {
+      await page.waitForTimeout(800);
+      return;
+    }
+    const working = await page
+      .locator('[data-testid="chat-working"], [aria-busy="true"]')
+      .count();
+    const followup = await page
+      .locator('button[type="submit"]:not([disabled])')
+      .count();
+    if (working === 0 && followup > 0 && Date.now() - started > 20000) {
+      await page.waitForTimeout(800);
+      return;
+    }
+    await page.waitForTimeout(1500);
+  }
 }
 
 function lastCard(page: Page) {
@@ -157,8 +186,7 @@ async function flowCompoundUnapplied(page: Page, lang: "en" | "es") {
       ? "Make it $9,000 and remove TSLA from the test"
       : "Hazlo con $9,000 y quita TSLA de la prueba",
   );
-  await waitForActiveCard(page);
-  await page.waitForTimeout(800);
+  await waitForTurnSettled(page);
   await capture(page, `${lang}-08-compound-unapplied-disclosed`);
 }
 
@@ -202,29 +230,46 @@ async function main() {
     viewport: { width: 1280, height: 900 },
   });
   const page = await context.newPage();
+  const failures: string[] = [];
+
+  async function run(name: string, flow: () => Promise<void>) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        await flow();
+        return;
+      } catch (error) {
+        console.error(`flow ${name} attempt ${attempt} failed:`, error);
+      }
+    }
+    failures.push(name);
+  }
 
   await apiPatchLanguage("en");
-  await flowCardAndDrawers(page, "en");
-  await flowConversationalTwin(page, "en");
-  await flowCompoundApplied(page, "en");
-  await flowCompoundUnapplied(page, "en");
-  await flowFractionalDates(page, "en");
+  await run("en-drawers", () => flowCardAndDrawers(page, "en"));
+  await run("en-twin", () => flowConversationalTwin(page, "en"));
+  await run("en-compound", () => flowCompoundApplied(page, "en"));
+  await run("en-unapplied", () => flowCompoundUnapplied(page, "en"));
+  await run("en-fractional", () => flowFractionalDates(page, "en"));
 
   await apiPatchLanguage("es-419");
   await page.reload();
-  await flowCardAndDrawers(page, "es");
-  await flowCompoundApplied(page, "es");
-  await flowCompoundUnapplied(page, "es");
-  await flowFractionalDates(page, "es");
+  await run("es-drawers", () => flowCardAndDrawers(page, "es"));
+  await run("es-compound", () => flowCompoundApplied(page, "es"));
+  await run("es-unapplied", () => flowCompoundUnapplied(page, "es"));
+  await run("es-fractional", () => flowFractionalDates(page, "es"));
 
   await apiPatchLanguage("en");
-  await mobileDrawerSheet(browser);
+  await run("mobile", () => mobileDrawerSheet(browser));
 
   writeFileSync(
     join(OUT, "rendered-text.json"),
     JSON.stringify(TEXTS, null, 2) + "\n",
   );
   await browser.close();
+  if (failures.length > 0) {
+    console.error("flows without captures:", failures.join(", "));
+    process.exit(2);
+  }
   console.log("done");
 }
 
