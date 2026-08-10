@@ -93,6 +93,20 @@ nothing to screenshot. Both are proven over the wire at `21535fa9` instead:
 for one leading space in front of a forty-character name, storing the trimmed
 forty. Both were refusals before.
 
+A fifth and sixth finding landed on `c0964d78` and `746185f2` fixed them:
+profile responses now apply in the order they were issued, and the closure copy
+stopped claiming that currencies keep trading or that the market reopens on a
+Monday. **Frames 05, 06, 07, 08, 13 and 14 were re-run at `746185f2`** and the
+rendered text is unchanged.
+
+**What the frames do not prove, and what does.** Today's rotation selects
+`session_closed_weekend_a`, which was already true and did not change. The two
+strings the copy fix actually rewrote, `session_closed_weekend_b` and
+`session_closed_holiday_a`, are not the lines a capture on this date can show.
+They are covered by a test instead: no `session_*` string in either locale may
+match currency, divisa, forex, fx, Monday, or lunes. That guards every line
+rather than the two that were wrong.
+
 `13` and `14` are the propagation proof, and they are three frames each: the
 greeting before the save, the dialog with the name saved, and the greeting
 after, all in one page session.
