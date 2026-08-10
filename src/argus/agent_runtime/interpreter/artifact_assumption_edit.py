@@ -579,6 +579,15 @@ def _stated_cost_changes(
     after planner routing; at planner time the message's own numeric anchor is
     the available grounding. Without it, a stated cost the plan omits passes
     coverage and drops silently (§3.2).
+
+    KNOWN LIMIT of the §3.2 guarantee: it holds when at least one layer, the
+    primary interpretation, the planner, or the audit, extracted the stated
+    change as a typed value. When every layer fails to extract it, this
+    function sees nothing, coverage requires nothing, and the change vanishes
+    with no disclosure. Observed once in six es-419 live capture attempts of
+    the compound slippage scenario. There is no deterministic backstop inside
+    LLM-first interpretation; see CONVERSATIONAL_RUNTIME.md, Edit Disclosure
+    Boundary.
     """
 
     provenance = draft.field_provenance or {}
@@ -1459,24 +1468,43 @@ def _response_from_artifact_assumption_edit_plan(
 
     if plan.outcome == "ready_to_confirm":
         if plan.operations and not field_provenance and not extra_parameters:
-            return LLMInterpretationResponse(
-                intent="conversation_followup",
-                task_relation="continue",
-                requires_clarification=True,
-                user_goal_summary=(
-                    plan.user_goal_summary
-                    or "The requested assumption change cannot be applied here."
-                ),
-                candidate_strategy_draft=draft,
-                assistant_response=(
-                    plan.assistant_response
-                    or "I can change RSI thresholds only on an active RSI confirmation card."
-                ),
-                confidence=plan.confidence,
-                reason_codes=["artifact_assumption_edit_planned"],
-                semantic_turn_act="unsupported_request",
-                artifact_target=artifact_target,
+            # Every operation was refused. When a refusal is impossible
+            # against the card state ("Quita TSLA" with no TSLA in the
+            # basket), no restatement can fix it, so the honest §3.2 shape is
+            # the same card re-issued with the typed disclosure; a
+            # clarification here gets swallowed by the stage because
+            # 'assumption' is not a contract field, and the card would
+            # re-issue clean. A refused cost is different: the value is
+            # correctable, so asking helps and the clarification reply stays
+            # (the #271 contract), as it does for refusals without a typed
+            # record (an indicator op dropped after the resolver).
+            disclosure_record = draft.extra_parameters.get("edit_disclosure")
+            discloses_impossible_change = isinstance(
+                disclosure_record, dict
+            ) and any(
+                isinstance(entry, dict)
+                and entry.get("target") not in ("fees", "slippage")
+                for entry in disclosure_record.get("unapplied") or []
             )
+            if not discloses_impossible_change:
+                return LLMInterpretationResponse(
+                    intent="conversation_followup",
+                    task_relation="continue",
+                    requires_clarification=True,
+                    user_goal_summary=(
+                        plan.user_goal_summary
+                        or "The requested assumption change cannot be applied here."
+                    ),
+                    candidate_strategy_draft=draft,
+                    assistant_response=(
+                        plan.assistant_response
+                        or "I can change RSI thresholds only on an active RSI confirmation card."
+                    ),
+                    confidence=plan.confidence,
+                    reason_codes=["artifact_assumption_edit_planned"],
+                    semantic_turn_act="unsupported_request",
+                    artifact_target=artifact_target,
+                )
         # A mixed edit's unapplied part must reach the user through the card:
         # card turns drop assistant prose, so the typed record carries the
         # disclosure and the planner's note rides beside it as the voice. On a

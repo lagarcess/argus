@@ -227,6 +227,30 @@ class TestUnappliedChangesAreDisclosed:
         assert card["edit_disclosure"]["unapplied"][0]["target"] == "asset"
         assert "nothing to remove" in card["edit_disclosure"]["note"]
 
+    def test_fully_refused_edit_reissues_the_card_with_the_disclosure(self) -> None:
+        """ "Quita TSLA" with no TSLA in the basket: the planner reads the
+        removal correctly, the resolver refuses it, and the reply is the same
+        card carrying the typed refusal, never a clean re-issue and never an
+        invented TSLA card."""
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[EditOperation(op="remove", target="asset", symbols=["TSLA"])],
+            assistant_response="TSLA no es parte de esta prueba.",
+        )
+        response = _response_from_artifact_assumption_edit_plan(
+            plan=plan,
+            request=_request("Quita TSLA"),
+        )
+        assert response.requires_clarification is False
+        assert response.semantic_turn_act == "answer_pending_need"
+        draft = response.candidate_strategy_draft
+        assert "TSLA" not in (draft.asset_universe or [])
+        disclosure = draft.extra_parameters["edit_disclosure"]
+        assert disclosure["unapplied"] == [
+            {"op": "remove", "target": "asset", "reason": "unsupported_operation"}
+        ]
+        assert "TSLA" in disclosure["note"]
+
 
 class TestStatedCostsCannotDropSilently:
     """A stated cost the planner leaves out of its operation list must still
