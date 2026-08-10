@@ -565,6 +565,21 @@ profile and fall back to the nameless pool.
   Carries two named amendments to the rail spec, §11c and §12b, each with a
   pointer from the paragraph it supersedes.
 
+- **Sidebar affordances answer pointer capability, not width** (#398, PR #428,
+  merged 2026-08-10 at `f14f5406`) — Recents row actions were hover-only, so a
+  touch device at 1024 and wider got a row whose controls could not be revealed
+  at all. Width was the wrong signal: a 1280px touchscreen is still a
+  touchscreen. Width now selects layout geometry while
+  `(hover: hover) and (pointer: fine)` versus `(any-pointer: coarse)` selects
+  the reachable affordance, centralized in `pointerAffordances.module.css`
+  rather than scattered.
+
+  Four hover-only controls got four decisions rather than one blanket rule,
+  because their roles differ: sole action, full-row edit, decorative hint,
+  dense cluster. The review round caught the first pass fixing touch by
+  removing hover on fine pointers, which would have traded one broken surface
+  for another.
+
 - **Destructive ops jobs refuse to guess their target** (#413, PR #427, merged
   2026-08-10 at `7ac899cd`) — `stale_backtest_jobs.py` called a bare
   `load_dotenv()`, which resolves upward from the module's own directory to the
