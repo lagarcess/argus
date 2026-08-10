@@ -249,6 +249,14 @@ export type StrategyConfirmationAssetsAdjustment = {
 
 export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
+  /** Direct no-turn edits the typed endpoint accepts for this card. */
+  direct_edits?: ("capital" | "dates")[];
+};
+
+/** Typed values the direct-edit endpoint accepts; at least one is present. */
+export type ConfirmationDirectEditPayload = {
+  capital?: number;
+  date_window?: { start: string; end: string };
 };
 
 export type StrategyPathContext = {

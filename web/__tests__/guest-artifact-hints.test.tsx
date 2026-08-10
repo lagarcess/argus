@@ -14,7 +14,7 @@ describe("guest artifact education", () => {
 
     expect(existsSync(hintPath)).toBe(true);
     expect(message).toMatch(
-      /message\.kind === "strategy_confirmation" && message\.confirmation[\s\S]{0,900}<GuestArtifactHint/,
+      /message\.kind === "strategy_confirmation" && message\.confirmation[\s\S]{0,1500}<GuestArtifactHint/,
     );
     expect(message).toMatch(
       /message\.kind === "strategy_result" && message\.result[\s\S]{0,900}<GuestArtifactHint/,

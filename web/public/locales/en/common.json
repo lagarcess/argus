@@ -810,6 +810,21 @@
         "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
         "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
       },
+      "direct_edit": {
+        "edit_capital": "Edit capital",
+        "edit_contribution": "Edit contribution",
+        "edit_dates": "Edit dates",
+        "capital_label": "Starting capital",
+        "contribution_label": "Contribution",
+        "start_label": "Start date",
+        "end_label": "End date",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "close": "Close",
+        "invalid_capital": "Enter an amount above zero.",
+        "invalid_dates": "Pick a start date on or before the end date.",
+        "failed": "That change did not go through. The card is unchanged."
+      },
       "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
     },
     "next_experiments": {

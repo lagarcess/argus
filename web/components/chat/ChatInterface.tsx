@@ -40,6 +40,7 @@ import {
 } from "@/components/guest/useGuestExperience";
 import {
   addConfirmationPeerAssets,
+  directEditConfirmation,
   restoreConfirmationAssets,
   createConversation,
   deleteConversation,
@@ -167,6 +168,7 @@ import ConversationRetrievalState, {
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import {
   type ChatActionOption,
+  type ConfirmationDirectEditPayload,
   type Message,
   type StrategyConfirmationPayload,
 } from "./types";
@@ -1916,6 +1918,27 @@ export default function ChatInterface() {
     return true;
   }
 
+  async function handleDirectEditConfirmation(
+    confirmationId: string,
+    edit: ConfirmationDirectEditPayload,
+  ): Promise<void> {
+    const targetConversationId = activeConversationIdRef.current;
+    if (!targetConversationId) {
+      throw new Error("no_active_conversation");
+    }
+    // No turn is spent: the typed endpoint patches the pending card
+    // deterministically and returns the superseding card message. Errors
+    // propagate so the drawer can show them inline next to the inputs.
+    const created = await directEditConfirmation(
+      targetConversationId,
+      confirmationId,
+      edit,
+    );
+    if (!appendSupersedingConfirmation(created)) {
+      throw new Error("superseding_confirmation_missing");
+    }
+  }
+
   async function handleUndoConfirmationPeer(): Promise<void> {
     const targetConversationId = activeConversationIdRef.current;
     const activeId = activeConfirmationIdFromMessages();
@@ -2464,6 +2487,7 @@ export default function ChatInterface() {
                           <ChatMessage
                             message={msg}
                             onAction={handleAction}
+                            onDirectEdit={handleDirectEditConfirmation}
                             onFeedback={(type, context, rating) => {
                               setFeedbackState(
                                 openFeedbackDialogState(type, context, rating, conversationId),

@@ -158,6 +158,10 @@ def runtime_confirmation_card(
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
     )
+    if display_capital is not None:
+        # Typed seed for the direct capital editor; rows carry display strings
+        # only, and the frontend must not parse them back into numbers.
+        display_facts["capital"] = display_capital
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
         assets=assets,

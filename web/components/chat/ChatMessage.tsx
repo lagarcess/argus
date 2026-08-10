@@ -19,7 +19,12 @@ import NextMoveRow, {
   NextMoveTitle,
 } from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
-import { type ChatActionOption, type ChatMention, Message } from "./types";
+import {
+  type ChatActionOption,
+  type ChatMention,
+  type ConfirmationDirectEditPayload,
+  Message,
+} from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -50,6 +55,10 @@ import { messageMentionPieces } from "./mention-rendering";
 type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
+  onDirectEdit?: (
+    confirmationId: string,
+    edit: ConfirmationDirectEditPayload,
+  ) => Promise<void>;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
@@ -73,6 +82,7 @@ const retryIconButtonClass =
 export default function ChatMessage({
   message,
   onAction,
+  onDirectEdit,
   onFeedback,
   onToast,
   isLatest,
@@ -390,7 +400,16 @@ export default function ChatMessage({
                   {confirmationBenchmarkLeadIn}
                 </p>
               ) : null}
-              <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
+              <StrategyConfirmationCard
+                confirmation={message.confirmation}
+                onAction={onAction}
+                onDirectEdit={
+                  onDirectEdit && message.confirmation.confirmation_id
+                    ? (edit) =>
+                        onDirectEdit(message.confirmation!.confirmation_id!, edit)
+                    : undefined
+                }
+              />
               {isGuest ? <GuestArtifactHint kind="confirmation" /> : null}
             </div>
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (

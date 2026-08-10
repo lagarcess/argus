@@ -767,6 +767,29 @@ export async function restoreConfirmationAssets(
   return response.message;
 }
 
+export async function directEditConfirmation(
+  conversationId: string,
+  confirmationId: string,
+  edit: {
+    capital?: number;
+    date_window?: { start: string; end: string };
+  },
+) {
+  // Direct capital/date edit: no chat turn, no allowance spend, no backtest
+  // row. The backend applies the typed values through the same edit contract
+  // and validation chain as a conversational edit and returns the
+  // superseding card message.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/direct-edit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(edit),
+    },
+  );
+  return response.message;
+}
+
 export async function patchConversation(
   conversationId: string,
   patch: {

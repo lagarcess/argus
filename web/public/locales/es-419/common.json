@@ -810,6 +810,21 @@
         "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
         "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
       },
+      "direct_edit": {
+        "edit_capital": "Editar capital",
+        "edit_contribution": "Editar aporte",
+        "edit_dates": "Editar fechas",
+        "capital_label": "Capital inicial",
+        "contribution_label": "Aporte por compra",
+        "start_label": "Fecha de inicio",
+        "end_label": "Fecha de fin",
+        "apply": "Aplicar",
+        "cancel": "Cancelar",
+        "close": "Cerrar",
+        "invalid_capital": "Ingresa un monto mayor que cero.",
+        "invalid_dates": "Elige una fecha de inicio igual o anterior a la fecha de fin.",
+        "failed": "Ese cambio no se aplicó. La tarjeta quedó igual."
+      },
       "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
     },
     "next_experiments": {

@@ -43,10 +43,12 @@ import {
 } from "@/lib/strategy-display";
 import {
   type ChatActionOption,
+  type ConfirmationDirectEditPayload,
   type StrategyConfirmationPayload,
   type StrategyConfirmationRowKey,
   type StrategyConfirmationStatus,
 } from "./types";
+import { ConfirmationDirectEditRow } from "./ConfirmationDirectEdit";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 import { EntityToken } from "./entity-token";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
@@ -63,6 +65,7 @@ import {
 type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
   onAction?: (action: ChatActionOption) => void;
+  onDirectEdit?: (edit: ConfirmationDirectEditPayload) => Promise<void>;
 };
 
 type ConfirmationCardRow = StrategyConfirmationPayload["rows"][number] & {
@@ -97,7 +100,7 @@ const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "run_complete",
 ]);
 
-export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
+export default function StrategyConfirmationCard({ confirmation, onAction, onDirectEdit }: StrategyConfirmationCardProps) {
   const { t, i18n } = useTranslation();
   const displayState = confirmationDisplayState(confirmation, t);
   const viewModel = confirmationCardViewModel(confirmation, t, i18n.language);
@@ -108,6 +111,10 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
   const canEditCosts =
     canShowActions &&
     confirmation.capabilities?.execution_costs_editable === true;
+  const canDirectEdit =
+    canShowActions &&
+    onDirectEdit !== undefined &&
+    (confirmation.capabilities?.direct_edits?.length ?? 0) > 0;
   const StatusIcon = displayState.icon;
   // Motion is the feedback for a deliberate add: freshly added chips animate
   // in, and nothing narrates the action back to the user.
@@ -225,6 +232,16 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
               />
             )}
           </div>
+        </div>
+      )}
+
+      {canDirectEdit && (
+        <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
+          <ConfirmationDirectEditRow
+            confirmation={confirmation}
+            onDirectEdit={onDirectEdit}
+            t={t}
+          />
         </div>
       )}
 
