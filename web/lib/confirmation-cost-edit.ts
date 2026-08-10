@@ -1,7 +1,4 @@
-import type { TFunction } from "i18next";
 import type { ConfirmationDisplayFacts } from "./confirmation-assumptions-display";
-
-type Translate = TFunction;
 
 export const MAX_SLIPPAGE_PERCENT = 5;
 
@@ -59,23 +56,17 @@ export function decimalRateToPercentInput(
   return String(percent);
 }
 
-export function executionCostEditMessage(
+export function costEditDraftToRates(
   draft: ExecutionCostEditDraft,
-  t: Translate,
-): string | null {
+): { fee_rate: number; slippage: number } | null {
   const fee = parseCostPercentInput(draft.feePercent);
   const slippage = parseCostPercentInput(draft.slippagePercent);
   if (!isValidFeePercent(fee) || !isValidSlippagePercent(slippage)) {
     return null;
   }
-  return t("chat.confirmation.cost_editor.message", {
-    defaultValue: "Set fees to {{fee}}% and slippage to {{slippage}}% per trade.",
-    fee: formatPercentValue(fee as number),
-    slippage: formatPercentValue(slippage as number),
-  });
-}
-
-function formatPercentValue(value: number): string {
-  const rounded = Math.round(value * 10000) / 10000;
-  return String(rounded);
+  // The endpoint takes decimal rates; percent stays a display convention.
+  return {
+    fee_rate: (fee as number) / 100,
+    slippage: (slippage as number) / 100,
+  };
 }

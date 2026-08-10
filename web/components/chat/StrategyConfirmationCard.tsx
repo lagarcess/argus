@@ -25,13 +25,6 @@ import {
 } from "@/lib/artifact-status-tones";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
-import {
-  costEditDraftFromDisplayFacts,
-  executionCostEditMessage,
-  isValidCostEditDraft,
-  MAX_SLIPPAGE_PERCENT,
-  type ExecutionCostEditDraft,
-} from "@/lib/confirmation-cost-edit";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
   retestEffectiveDurationLabel,
@@ -114,9 +107,6 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
     (confirmation.confirmation_state === "active" || !confirmation.confirmation_state) &&
     confirmationStatusAllowsActions(displayState.status);
   const activeActions = canShowActions ? confirmation.actions ?? [] : [];
-  const canEditCosts =
-    canShowActions &&
-    confirmation.capabilities?.execution_costs_editable === true;
   const canDirectEdit =
     canShowActions &&
     onDirectEdit !== undefined &&
@@ -228,38 +218,23 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
         </div>
       )}
 
-      {(canDirectEdit || canEditCosts) && (
+      {canDirectEdit && (
         // The editing strip: one line of Edit capital, Edit dates, Edit
-        // costs between its own hairlines; the inline drawer wraps onto a
-        // full-width line of this same strip when opened.
+        // costs between its own hairlines; the open editor's panel wraps
+        // onto a full-width line of this same strip.
         <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {canDirectEdit && (
-              <ConfirmationDirectEditControls
-                confirmation={confirmation}
-                onDirectEdit={onDirectEdit}
-                t={t}
-              />
-            )}
-            {canEditCosts && (
-              <ExecutionCostEditor
-                displayFacts={confirmation.display_facts}
-                onSubmit={(message) =>
-                  // A plain labeled action (no type) sends the composed edit as
-                  // a normal chat message, so it flows through the existing
-                  // natural-language edit planner rather than the generic
-                  // adjust-assumptions clarify route.
-                  onAction?.({ label: message })
-                }
-                t={t}
-              />
-            )}
+            <ConfirmationDirectEditControls
+              confirmation={confirmation}
+              onDirectEdit={onDirectEdit}
+              t={t}
+            />
           </div>
         </div>
       )}
 
       {activeActions.length > 0 && (
-        <div className="flex flex-wrap gap-2 justify-center border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
+        <div className="flex flex-wrap gap-2 border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
           {activeActions.map((action) => (
             <button
               key={action.id ?? action.type ?? action.label}
@@ -547,113 +522,3 @@ function ConfirmationActionIcon({ action }: { action: ChatActionOption }) {
   return <PencilLine className="h-3.5 w-3.5" />;
 }
 
-function ExecutionCostEditor({
-  displayFacts,
-  onSubmit,
-  t,
-}: {
-  displayFacts: StrategyConfirmationPayload["display_facts"];
-  onSubmit: (message: string) => void;
-  t: TFunction;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [draft, setDraft] = useState<ExecutionCostEditDraft>(() =>
-    costEditDraftFromDisplayFacts(displayFacts),
-  );
-  const isValid = isValidCostEditDraft(draft);
-
-  if (!isOpen) {
-    return (
-      <button
-        type="button"
-        data-testid="edit-execution-costs"
-        onClick={() => {
-          setDraft(costEditDraftFromDisplayFacts(displayFacts));
-          setIsOpen(true);
-        }}
-        className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-full border border-black/10 bg-black/[0.02] px-2 py-0.5 text-[11px] font-medium text-black/60 transition-colors hover:border-black/18 hover:text-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60 dark:hover:border-white/18 dark:hover:text-white/80"
-      >
-        <PencilLine aria-hidden="true" className="h-3 w-3" />
-        {t("chat.confirmation.cost_editor.edit_chip", "Edit costs")}
-      </button>
-    );
-  }
-
-  const submit = () => {
-    const message = executionCostEditMessage(draft, t);
-    if (!message) {
-      return;
-    }
-    setIsOpen(false);
-    onSubmit(message);
-  };
-
-  const onCostKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      submit();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      setIsOpen(false);
-    }
-  };
-
-  return (
-    <div className="mt-1 flex w-full flex-wrap items-end gap-x-3 gap-y-2" data-testid="execution-cost-editor">
-      <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
-        {t("chat.confirmation.cost_editor.fee_label", "Fee % per trade")}
-        <input
-          type="text"
-          inputMode="decimal"
-          value={draft.feePercent}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, feePercent: event.target.value }))
-          }
-          onKeyDown={onCostKeyDown}
-          className={`${inlineEditFieldClassName} w-24`}
-        />
-      </label>
-      <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
-        {t("chat.confirmation.cost_editor.slippage_label", "Slippage % per trade")}
-        <input
-          type="text"
-          inputMode="decimal"
-          value={draft.slippagePercent}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, slippagePercent: event.target.value }))
-          }
-          onKeyDown={onCostKeyDown}
-          className={`${inlineEditFieldClassName} w-24`}
-        />
-      </label>
-      <div className="flex items-center gap-1.5 self-end pb-0.5">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!isValid}
-          aria-label={t("chat.confirmation.cost_editor.apply", "Apply")}
-          className={inlineEditControlClassName}
-        >
-          <Check aria-hidden="true" className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          aria-label={t("chat.confirmation.cost_editor.cancel", "Cancel")}
-          className={inlineEditControlClassName}
-        >
-          <X aria-hidden="true" className="h-4 w-4" />
-        </button>
-      </div>
-      {!isValid && (
-        <p role="alert" className={`w-full text-[11px] ${inlineFailureTextClass}`}>
-          {t("chat.confirmation.cost_editor.invalid", {
-            defaultValue:
-              "Enter percentages of 0 or more (slippage up to {{max}}%).",
-            max: MAX_SLIPPAGE_PERCENT,
-          })}
-        </p>
-      )}
-    </div>
-  );
-}

@@ -257,13 +257,16 @@ export type StrategyConfirmationAssetsAdjustment = {
 export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
   /** Direct no-turn edits the typed endpoint accepts for this card. */
-  direct_edits?: ("capital" | "dates")[];
+  direct_edits?: ("capital" | "dates" | "costs")[];
 };
 
-/** Typed values the direct-edit endpoint accepts; at least one is present. */
+/** Typed values the direct-edit endpoint accepts; at least one is present.
+ * Costs are decimal rates, converted from the editor's percent inputs. */
 export type ConfirmationDirectEditPayload = {
   capital?: number;
   date_window?: { start: string; end: string };
+  fee_rate?: number;
+  slippage?: number;
 };
 
 export type StrategyPathContext = {

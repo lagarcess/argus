@@ -69,22 +69,29 @@ export function confirmationSupersedingHandlers(deps: () => SupersedingDeps) {
     confirmationId: string,
     edit: ConfirmationDirectEditPayload,
   ): Promise<void> {
-    const { activeConversationId } = deps();
+    const { activeConversationId, hydrate, setMessages } = deps();
     const targetConversationId = activeConversationId();
     if (!targetConversationId) {
       throw new Error("no_active_conversation");
     }
-    // No turn is spent: the typed endpoint patches the pending card
-    // deterministically and returns the superseding card message. Errors
-    // propagate so the drawer can show them inline next to the inputs.
-    const created = await directEditConfirmation(
+    // No turn is spent and nothing new appears: the typed endpoint updates
+    // the same card in place and returns the same message, edited. Errors
+    // propagate so the editor can show them inline next to the inputs.
+    const updated = await directEditConfirmation(
       targetConversationId,
       confirmationId,
       edit,
     );
-    if (!appendSupersedingConfirmation(created)) {
-      throw new Error("superseding_confirmation_missing");
+    const hydrated = hydrate([updated]).messages;
+    if (hydrated.length === 0) {
+      throw new Error("edited_confirmation_missing");
     }
+    const replacement = hydrated[0];
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === replacement.id ? replacement : message,
+      ),
+    );
   }
 
   async function handleUndoConfirmationPeer(): Promise<void> {

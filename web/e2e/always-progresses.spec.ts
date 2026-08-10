@@ -7,7 +7,6 @@ import {
 
 const CONVERSATION_ID = "continuity-conversation";
 const INITIAL_CONFIRMATION_ID = "continuity-confirmation-initial";
-const EDITED_CONFIRMATION_ID = "continuity-confirmation-costs";
 const JOB_ID = "continuity-job";
 const RUN_ID = "continuity-run";
 const CREATED_AT = "2026-07-25T12:00:00Z";
@@ -124,7 +123,10 @@ function confirmation(
       fees: feeRate,
       slippage: slippageRate,
     },
-    capabilities: { execution_costs_editable: true },
+    capabilities: {
+      execution_costs_editable: true,
+      direct_edits: ["capital", "dates", "costs"],
+    },
     assumptions: [
       "Long-only, equal-weight run",
       feeRate || slippageRate
@@ -241,6 +243,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 async function installMockApi(page: Page) {
   const messages: ApiMessage[] = [];
   const streamRequests: StreamRequest[] = [];
+  const directEditRequests: Record<string, unknown>[] = [];
   const unexpectedApiRequests: string[] = [];
   let runSubmissionCount = 0;
 
@@ -312,6 +315,35 @@ async function installMockApi(page: Page) {
     if (path === "/api/v1/chat/starter-prompts") {
       return fulfillJson(route, { prompts: [] });
     }
+    if (
+      path ===
+        `/api/v1/conversations/${CONVERSATION_ID}/confirmations/${INITIAL_CONFIRMATION_ID}/direct-edit` &&
+      request.method() === "POST"
+    ) {
+      directEditRequests.push(request.postDataJSON() as Record<string, unknown>);
+      const edited = messages.find(
+        (message) => message.id === "message-confirmation-initial",
+      );
+      if (!edited) {
+        return fulfillJson(
+          route,
+          {
+            type: "https://api.argus.app/problems/artifact-action-invalid-state",
+            title: "Conflict",
+            status: 409,
+            detail: "The confirmation is no longer active.",
+            code: "artifact_action_invalid_state",
+            request_id: "mock-continuity-request",
+          },
+          409,
+        );
+      }
+      edited.metadata.confirmation_card = confirmation(INITIAL_CONFIRMATION_ID, {
+        feeRate: 0.001,
+        slippageRate: 0.0005,
+      });
+      return fulfillJson(route, { message: edited });
+    }
     if (path === "/api/v1/chat/stream") {
       const body = request.postDataJSON() as StreamRequest;
       streamRequests.push(body);
@@ -319,7 +351,7 @@ async function installMockApi(page: Page) {
       if (body.action?.type === "run_backtest") {
         runSubmissionCount += 1;
         const activeConfirmationId = body.action.payload?.confirmation_id;
-        if (activeConfirmationId !== EDITED_CONFIRMATION_ID) {
+        if (activeConfirmationId !== INITIAL_CONFIRMATION_ID) {
           return fulfillJson(
             route,
             {
@@ -342,8 +374,8 @@ async function installMockApi(page: Page) {
             "Which date window should I use for AAPL?",
           ),
           userMessage("message-user-period", "Use calendar year 2024."),
-          assistantMessage("message-confirmation-edited", "", {
-            confirmation_card: confirmation(EDITED_CONFIRMATION_ID, {
+          assistantMessage("message-confirmation-initial", "", {
+            confirmation_card: confirmation(INITIAL_CONFIRMATION_ID, {
               feeRate: 0.001,
               slippageRate: 0.0005,
               state: "superseded",
@@ -450,45 +482,6 @@ async function installMockApi(page: Page) {
         ]);
       }
 
-      if (
-        body.message ===
-        "Set fees to 0.1% and slippage to 0.05% per trade."
-      ) {
-        const prior = messages.find(
-          (message) => message.id === "message-confirmation-initial",
-        );
-        if (prior) {
-          prior.metadata.confirmation_card = confirmation(
-            INITIAL_CONFIRMATION_ID,
-            { state: "superseded" },
-          );
-        }
-        messages.push(
-          userMessage("message-user-costs", body.message),
-          assistantMessage("message-confirmation-edited", "", {
-            confirmation_card: confirmation(EDITED_CONFIRMATION_ID, {
-              feeRate: 0.001,
-              slippageRate: 0.0005,
-            }),
-          }),
-        );
-        return fulfillSse(route, [
-          { type: "stage_start", stage: "confirm" },
-          {
-            type: "final",
-            payload: {
-              stage_outcome: "ready_for_confirmation",
-              confirmation: confirmation(EDITED_CONFIRMATION_ID, {
-                feeRate: 0.001,
-                slippageRate: 0.0005,
-              }),
-              message_id: "message-confirmation-edited",
-            },
-          },
-          "[DONE]",
-        ]);
-      }
-
       return fulfillJson(
         route,
         {
@@ -516,6 +509,7 @@ async function installMockApi(page: Page) {
 
   return {
     streamRequests,
+    directEditRequests,
     unexpectedApiRequests,
     get runSubmissionCount() {
       return runSubmissionCount;
@@ -549,21 +543,27 @@ test.describe.serial("Argus always progresses deterministic browser contract", (
     ).toBeVisible();
 
     const requestCountBeforeEdit = api.streamRequests.length;
-    await page.getByTestId("edit-execution-costs").click();
-    await expect(page.getByTestId("execution-cost-editor")).toBeVisible();
+    await page.getByTestId("edit-costs").click();
+    await expect(
+      page.getByTestId("confirmation-direct-edit-drawer"),
+    ).toBeVisible();
     expect(api.streamRequests).toHaveLength(requestCountBeforeEdit);
     expect(api.runSubmissionCount).toBe(0);
 
-    const costEditor = page.getByTestId("execution-cost-editor");
-    await costEditor.getByLabel("Fee % per trade").fill("0.1");
-    await costEditor.getByLabel("Slippage % per trade").fill("0.05");
-    await costEditor.getByRole("button", { name: "Apply" }).click();
+    await page.getByTestId("direct-edit-fee-input").fill("0.1");
+    await page.getByTestId("direct-edit-slippage-input").fill("0.05");
+    await page.getByTestId("direct-edit-apply").click();
 
-    await expect
-      .poll(() => api.streamRequests.at(-1)?.message)
-      .toBe("Set fees to 0.1% and slippage to 0.05% per trade.");
-    expect(api.streamRequests.at(-1)?.action).toBeUndefined();
+    await expect.poll(() => api.directEditRequests.length).toBe(1);
+    expect(api.directEditRequests[0]).toEqual({
+      fee_rate: 0.001,
+      slippage: 0.0005,
+    });
+    expect(api.streamRequests).toHaveLength(requestCountBeforeEdit);
     expect(api.runSubmissionCount).toBe(0);
+    await expect(
+      page.getByText("0.10% fee and 0.05% slippage per trade", { exact: false }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Run backtest", exact: true }),
     ).toBeVisible();

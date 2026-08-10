@@ -3,9 +3,11 @@ import type { StrategyConfirmationEditDisclosure } from "@/components/chat/types
 
 /**
  * §3.2 disclosure: the part of an edit that could not be applied, rendered as
- * a lead-in above the superseding card. The backend note is the voice when
- * present; otherwise the typed targets render through the locale catalog, so
- * a rejected change is named in the user's language, never dropped.
+ * a lead-in above the card. Typed refusals always win: the planner writes
+ * its note before the resolver rules on each operation, so prose can claim a
+ * change the card does not carry. When typed unapplied entries exist, the
+ * locale catalog names them in the user's language; the note is the voice
+ * only for note-only refusals, where the planner itself declined in prose.
  */
 
 const TARGET_LABEL_KEYS: Record<string, string> = {
@@ -29,10 +31,6 @@ export function confirmationEditDisclosureText(
   if (!disclosure) {
     return null;
   }
-  const note = String(disclosure.note ?? "").trim();
-  if (note) {
-    return note;
-  }
   const targets = (disclosure.unapplied ?? [])
     .map((entry) => String(entry.target ?? "").trim())
     .filter(Boolean)
@@ -43,12 +41,13 @@ export function confirmationEditDisclosureText(
         target.replace(/_/g, " "),
       ),
     );
-  if (targets.length === 0) {
-    return null;
+  if (targets.length > 0) {
+    const unique = Array.from(new Set(targets));
+    return t("chat.confirmation.edit_disclosure.unapplied", {
+      defaultValue: "I could not change {{targets}}; the rest is applied below.",
+      targets: unique.join(", "),
+    });
   }
-  const unique = Array.from(new Set(targets));
-  return t("chat.confirmation.edit_disclosure.unapplied", {
-    defaultValue: "I could not change {{targets}}; the rest is applied below.",
-    targets: unique.join(", "),
-  });
+  const note = String(disclosure.note ?? "").trim();
+  return note || null;
 }
