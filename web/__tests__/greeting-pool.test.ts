@@ -231,6 +231,24 @@ describe("greeting pool", () => {
     expect(closure(en.chat.greeting).length).toBeGreaterThanOrEqual(4);
   });
 
+  test("an extended-hours line does not say the market is shut", () => {
+    // pre_market and after_hours ARE trading windows, so a line that fires in
+    // them may not call the day done or not yet begun.
+    const shut = [/\bdone for the day\b/i, /\bclosed\b/i, /\bshut\b/i, /cerrad/i, /no opera/i];
+    for (const catalog of [en.chat.greeting, es.chat.greeting]) {
+      for (const key of ["session_pre_market_a", "session_after_hours_a"]) {
+        const text = catalog[key] as string;
+        for (const pattern of shut) {
+          expect({ key, text, shut: pattern.test(text) }).toEqual({
+            key,
+            text,
+            shut: false,
+          });
+        }
+      }
+    }
+  });
+
   test("no session line claims a fact the endpoint does not resolve", () => {
     // The session comes from the US equity calendar. Crypto never closing is a
     // property of the asset, but FX closes most of the weekend and a holiday

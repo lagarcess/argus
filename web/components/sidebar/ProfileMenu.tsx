@@ -220,15 +220,29 @@ export default function ProfileMenu({
   }, [stopEditingName, stopEditingPreferredName]);
 
   // The one way a saved profile leaves this menu.
-  const profileMutationRef = useRef(0);
-  const appliedMutationRef = useRef(0);
+  /*
+   * One record, one request at a time.
+   *
+   * Every read and write of the profile queues here, so responses arrive in the
+   * order they were issued and the last one is the newest. Reconciling the
+   * interleaving instead needs a generation per field, and a field added later
+   * would not have one.
+   */
+  const profileRequestChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const serializeProfileRequest = useCallback(
+    <T,>(request: () => Promise<T>): Promise<T> => {
+      const queued = profileRequestChainRef.current.then(request, request);
+      profileRequestChainRef.current = queued.then(
+        () => undefined,
+        () => undefined,
+      );
+      return queued;
+    },
+    [],
+  );
 
-  // Reads and writes of the profile are applied in the order they were issued,
-  // so a response overtaken by a later one is dropped rather than applied last.
   const applyPatchedProfile = useCallback(
-    (user: ApiUser, mutation: number) => {
-      if (mutation < appliedMutationRef.current) return;
-      appliedMutationRef.current = mutation;
+    (user: ApiUser) => {
       setProfile(user);
       onProfileUpdated?.(user);
     },
@@ -250,15 +264,16 @@ export default function ProfileMenu({
       setNameError(null);
       setPreferredNameError(null);
       setLanguageError(null);
-      const mutation = profileMutationRef.current;
-      getMe()
+      // Queued too, so it cannot snapshot a row before a pending write and
+      // answer after it.
+      serializeProfileRequest(() => getMe())
         .then(({ user, account_kind }) => {
-          applyPatchedProfile(user, mutation);
+          applyPatchedProfile(user);
           setAccountKind(account_kind);
         })
         .catch(() => null);
     }
-  }, [applyPatchedProfile, isOpen]);
+  }, [applyPatchedProfile, isOpen, serializeProfileRequest]);
 
   // Reset submenu state when menu closes
   useEffect(() => {
@@ -474,14 +489,13 @@ export default function ProfileMenu({
       return;
     }
     const session = editSessionRef.current;
-    const mutation = (profileMutationRef.current += 1);
     setIsSavingName(true);
     setNameError(null);
     try {
-      const { user } = await patchMe({ display_name: trimmed });
+      const { user } = await serializeProfileRequest(() => patchMe({ display_name: trimmed }));
       // Ordered by generation, not by the edit session: a save that outlived
       // its dialog still happened.
-      applyPatchedProfile(user, mutation);
+      applyPatchedProfile(user);
       if (isCurrentEditSession(session)) stopEditingName();
     } catch (err) {
       console.error("Failed to update display name", err);
@@ -501,6 +515,7 @@ export default function ProfileMenu({
     isCurrentEditSession,
     nameValue,
     profile,
+    serializeProfileRequest,
     stopEditingName,
     t,
   ]);
@@ -523,12 +538,11 @@ export default function ProfileMenu({
       return;
     }
     const session = editSessionRef.current;
-    const mutation = (profileMutationRef.current += 1);
     setIsSavingPreferredName(true);
     setPreferredNameError(null);
     try {
-      const { user } = await patchMe({ preferred_name: trimmed || null });
-      applyPatchedProfile(user, mutation);
+      const { user } = await serializeProfileRequest(() => patchMe({ preferred_name: trimmed || null }));
+      applyPatchedProfile(user);
       if (isCurrentEditSession(session)) stopEditingPreferredName();
     } catch (err) {
       console.error("Failed to update preferred name", err);
@@ -548,6 +562,7 @@ export default function ProfileMenu({
     isCurrentEditSession,
     preferredNameValue,
     profile,
+    serializeProfileRequest,
     stopEditingPreferredName,
     t,
   ]);
@@ -580,8 +595,7 @@ export default function ProfileMenu({
       if (isSavingLanguage) return;
 
       const session = editSessionRef.current;
-      const mutation = (profileMutationRef.current += 1);
-      setIsSavingLanguage(true);
+        setIsSavingLanguage(true);
       setLanguageError(null);
       setProfile((current) =>
         current
@@ -595,11 +609,13 @@ export default function ProfileMenu({
       await i18n.changeLanguage(nextLanguage);
 
       try {
-        const { user } = await patchMe({
-          language: nextLanguage,
-          locale: localeForLanguage(nextLanguage),
-        });
-        applyPatchedProfile(user, mutation);
+        const { user } = await serializeProfileRequest(() =>
+          patchMe({
+            language: nextLanguage,
+            locale: localeForLanguage(nextLanguage),
+          }),
+        );
+        applyPatchedProfile(user);
         if (isCurrentEditSession(session)) setIsLanguagePickerOpen(false);
       } catch (err) {
         console.error("Failed to update language", err);
@@ -625,7 +641,15 @@ export default function ProfileMenu({
         setIsSavingLanguage(false);
       }
     },
-    [applyPatchedProfile, i18n, isCurrentEditSession, isSavingLanguage, profile, t],
+    [
+      applyPatchedProfile,
+      i18n,
+      isCurrentEditSession,
+      isSavingLanguage,
+      profile,
+      serializeProfileRequest,
+      t,
+    ],
   );
 
   const handleAvatarThemeSelect = useCallback(
@@ -634,16 +658,15 @@ export default function ProfileMenu({
 
       const previousTheme = profile.avatar_theme;
       const session = editSessionRef.current;
-      const mutation = (profileMutationRef.current += 1);
-      setAvatarThemeError(null);
+        setAvatarThemeError(null);
       setIsSavingAvatarTheme(true);
       setProfile((current) =>
         current ? { ...current, avatar_theme: avatarTheme } : current,
       );
 
       try {
-        const { user } = await patchMe({ avatar_theme: avatarTheme });
-        applyPatchedProfile(user, mutation);
+        const { user } = await serializeProfileRequest(() => patchMe({ avatar_theme: avatarTheme }));
+        applyPatchedProfile(user);
       } catch (err) {
         console.error("Failed to update avatar theme", err);
         setProfile((current) =>
@@ -667,6 +690,7 @@ export default function ProfileMenu({
       isCurrentEditSession,
       isSavingAvatarTheme,
       profile,
+      serializeProfileRequest,
       t,
     ],
   );

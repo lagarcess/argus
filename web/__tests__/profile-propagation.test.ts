@@ -103,12 +103,11 @@ describe("a saved profile reaches the greeting", () => {
 
   test("every successful patch propagates, not just the one that was noticed", () => {
     const menu = source("components/sidebar/ProfileMenu.tsx");
-    const patches = menu.match(/await patchMe\(/g) ?? [];
-    const propagations = menu.match(/applyPatchedProfile\(user, mutation\)/g) ?? [];
+    const patches = menu.match(/patchMe\(/g) ?? [];
+    const propagations = menu.match(/applyPatchedProfile\(user\)/g) ?? [];
     expect(patches.length).toBeGreaterThanOrEqual(4);
-    // Every patch, plus the menu-open read, which is ordered against them.
+    // Every patch, plus the menu-open read, which queues behind them.
     expect(propagations.length).toBe(patches.length + 1);
-    expect(menu).toContain("const mutation = profileMutationRef.current;");
     // The menu's own copy is no longer set directly from a patch response.
     const afterHelper = menu.slice(menu.indexOf("const applyPatchedProfile"));
     expect(afterHelper).not.toContain("      setProfile(user);\n      setEditing");
@@ -252,10 +251,11 @@ describe("a name is measured after it is normalized", () => {
     // a field nobody was editing; a late success dismissed a fresh edit.
     const menu = source("components/sidebar/ProfileMenu.tsx");
 
-    // Every await of a patch captures the session it belongs to.
-    const awaits = menu.match(/await patchMe\(/g) ?? [];
+    // Every save captures the edit session it belongs to.
+    const saves = menu.match(/patchMe\(/g) ?? [];
     const captures = menu.match(/const session = editSessionRef\.current;/g) ?? [];
-    expect(captures.length).toBe(awaits.length);
+    expect(saves.length).toBeGreaterThanOrEqual(4);
+    expect(captures.length).toBe(saves.length);
     // And closing bumps it, so those captures stop matching.
     const close = menu.slice(
       menu.indexOf("const closeProfileModal = useCallback"),
@@ -277,35 +277,36 @@ describe("a name is measured after it is normalized", () => {
     }
 
     // The propagation is not gated on the edit session: a save that outlived its
-    // dialog still happened. It is ordered instead, which the next test covers.
+    // dialog still happened. Ordering is the next test's job.
     expect(menu).not.toContain("if (isCurrentEditSession(session)) applyPatchedProfile");
-    const propagations = menu.match(/applyPatchedProfile\(user, mutation\)/g) ?? [];
-    expect(propagations.length).toBe(awaits.length + 1);
   });
 
-  test("a superseded response never overwrites a newer one", () => {
-    // Guarding the propagation on the edit session would drop a save that
-    // outlived its dialog; applying every completion let an older response land
-    // last and replace a newer whole-user snapshot. Order them instead.
+  test("profile requests cannot interleave", () => {
+    // Three rounds tried to reconcile the interleaving: an edit-session guard,
+    // then a whole-response generation. Both reconciled after the fact and both
+    // left a hole, because request issue order is not server commit order and a
+    // whole-user snapshot cannot be merged field by field without a generation
+    // per field. One request at a time removes the interleaving instead.
     const menu = source("components/sidebar/ProfileMenu.tsx");
 
-    // Every write stamps a new generation; the read reuses the current one, so
-    // a patch issued after it wins even if the read answers later.
-    const issued = menu.match(/profileMutationRef\.current \+= 1/g) ?? [];
-    const awaits = menu.match(/await patchMe\(/g) ?? [];
-    expect(issued.length).toBe(awaits.length);
-    expect(menu).toContain("const mutation = profileMutationRef.current;");
+    // Every read and write of the profile goes through the queue.
+    const requests = menu.match(/(patchMe|getMe)\(/g) ?? [];
+    const queued = menu.match(/serializeProfileRequest\(\(\) =>/g) ?? [];
+    expect(requests.length).toBeGreaterThanOrEqual(5);
+    expect(queued.length).toBe(requests.length);
 
-    // And a completion applies only if nothing newer already has.
-    const gate = menu.slice(
-      menu.indexOf("const applyPatchedProfile = useCallback"),
-      menu.indexOf("setProfile(user)", menu.indexOf("const applyPatchedProfile")),
+    // The chain advances past a rejection, or one failed save would wedge every
+    // later one behind it.
+    const chain = menu.slice(
+      menu.indexOf("const serializeProfileRequest = useCallback"),
+      menu.indexOf("return queued;", menu.indexOf("const serializeProfileRequest")),
     );
-    expect(gate).toContain("if (mutation < appliedMutationRef.current) return;");
-    expect(gate).toContain("appliedMutationRef.current = mutation;");
-    // Monotonic, not equality: a newer request that fails must not strand an
-    // older success that already came back.
-    expect(gate).not.toContain("mutation !== profileMutationRef.current");
+    expect(chain).toContain("profileRequestChainRef.current.then(request, request)");
+    expect(chain).toContain("() => undefined,");
+
+    // And the reconciliation the queue replaces is gone, not merely bypassed.
+    expect(menu).not.toContain("appliedMutationRef");
+    expect(menu).not.toContain("profileMutationRef");
   });
 
   test("the bound has one frontend home", () => {
