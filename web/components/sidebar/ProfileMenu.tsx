@@ -77,13 +77,7 @@ type ProfileMenuProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
-  /**
-   * A profile setting was saved, with the server's updated user.
-   *
-   * The menu's own copy is not the one the chat shell renders from, so every
-   * successful patch reports upward rather than the one field that happened to
-   * be noticed. A surface added later cannot go stale by omission.
-   */
+  /** Every successful patch reports upward, not just the fields a surface reads. */
   onProfileUpdated?: (user: ApiUser) => void;
   onOpenSidebarPreference?: () => void;
   onOpenKeyboardShortcuts?: () => void;
@@ -193,13 +187,7 @@ export default function ProfileMenu({
     setIsAvatarPickerOpen(true);
   }, [accountKind, closeAvatarPicker, isAvatarPickerOpen]);
 
-  /*
-   * Leaving an edit is one operation, so the error leaves with it.
-   *
-   * The error renders beside the field in read mode too, so an exit that only
-   * flipped the mode left a refusal pinned under a value that no longer had
-   * anything wrong with it, and nothing in the dialog could clear it.
-   */
+  // The error renders in read mode too, so leaving an edit clears it.
   const stopEditingName = useCallback(() => {
     setEditingName(false);
     setNameError(null);
@@ -210,15 +198,8 @@ export default function ProfileMenu({
     setPreferredNameError(null);
   }, []);
 
-  /*
-   * An in-flight save belongs to the edit that started it.
-   *
-   * Closing the dialog does not cancel a request already on the wire, and the
-   * sheet keeps this menu mounted underneath, so a continuation could land after
-   * the edit was gone: a late failure pinned an error on a field nobody was
-   * editing, and a late success dismissed a fresh edit started after reopening.
-   * Post-await edit state is written only while this is still the same session.
-   */
+  // Closing does not cancel a request already on the wire, and this menu stays
+  // mounted, so post-await edit state is written only for the edit that began it.
   const editSessionRef = useRef(0);
   const isCurrentEditSession = useCallback(
     (session: number) => session === editSessionRef.current,
@@ -227,9 +208,7 @@ export default function ProfileMenu({
 
   const closeProfileModal = useCallback(() => {
     setIsAvatarPickerOpen(false);
-    // Per-edit state belongs to the dialog, which unmounts here. Left behind, a
-    // cleared-but-unsaved box reopened as an empty input claiming the name was
-    // gone, and confirming it sent the clear the user never asked for.
+    // Per-edit state belongs to the dialog, which unmounts here.
     editSessionRef.current += 1;
     stopEditingName();
     stopEditingPreferredName();
@@ -240,15 +219,16 @@ export default function ProfileMenu({
     setActiveModal(null);
   }, [stopEditingName, stopEditingPreferredName]);
 
-  /*
-   * The one way a saved profile leaves this menu.
-   *
-   * Every `patchMe` success goes through here, not just the field whose staleness
-   * someone noticed, so the shell's copy cannot drift from this one and a
-   * surface added later inherits the propagation for free.
-   */
+  // The one way a saved profile leaves this menu.
+  const profileMutationRef = useRef(0);
+  const appliedMutationRef = useRef(0);
+
+  // Reads and writes of the profile are applied in the order they were issued,
+  // so a response overtaken by a later one is dropped rather than applied last.
   const applyPatchedProfile = useCallback(
-    (user: ApiUser) => {
+    (user: ApiUser, mutation: number) => {
+      if (mutation < appliedMutationRef.current) return;
+      appliedMutationRef.current = mutation;
       setProfile(user);
       onProfileUpdated?.(user);
     },
@@ -270,14 +250,15 @@ export default function ProfileMenu({
       setNameError(null);
       setPreferredNameError(null);
       setLanguageError(null);
+      const mutation = profileMutationRef.current;
       getMe()
         .then(({ user, account_kind }) => {
-          setProfile(user);
+          applyPatchedProfile(user, mutation);
           setAccountKind(account_kind);
         })
         .catch(() => null);
     }
-  }, [isOpen]);
+  }, [applyPatchedProfile, isOpen]);
 
   // Reset submenu state when menu closes
   useEffect(() => {
@@ -482,9 +463,7 @@ export default function ProfileMenu({
       stopEditingName();
       return;
     }
-    // Measured after trimming, and refused rather than truncated. The input used
-    // to slice the raw value to the bound, which quietly dropped a character
-    // whenever the user had typed a space in front of a full-length name.
+    // Measured after trimming, and refused rather than truncated.
     if (profileNameExceeds(nameValue, DISPLAY_NAME_MAX_LENGTH)) {
       setNameError(
         t("settings.profile.display_name_too_long", {
@@ -495,14 +474,14 @@ export default function ProfileMenu({
       return;
     }
     const session = editSessionRef.current;
+    const mutation = (profileMutationRef.current += 1);
     setIsSavingName(true);
     setNameError(null);
     try {
       const { user } = await patchMe({ display_name: trimmed });
-      // The server changed whatever the dialog is doing, so this is never
-      // guarded: dropping it is how the shell's copy went stale in the first
-      // place.
-      applyPatchedProfile(user);
+      // Ordered by generation, not by the edit session: a save that outlived
+      // its dialog still happened.
+      applyPatchedProfile(user, mutation);
       if (isCurrentEditSession(session)) stopEditingName();
     } catch (err) {
       console.error("Failed to update display name", err);
@@ -526,13 +505,7 @@ export default function ProfileMenu({
     t,
   ]);
 
-  /*
-   * What to call the user, which is a setting and never a memory.
-   *
-   * Argus does not infer this from how someone types. Blank clears it, and the
-   * greeting then uses no name, which needs no special handling because most of
-   * the pool does not use one.
-   */
+  // A setting, never a memory: nothing infers this. Blank clears it.
   const handleSavePreferredName = useCallback(async () => {
     const trimmed = normalizeProfileName(preferredNameValue);
     const current = profile?.preferred_name ?? "";
@@ -550,11 +523,12 @@ export default function ProfileMenu({
       return;
     }
     const session = editSessionRef.current;
+    const mutation = (profileMutationRef.current += 1);
     setIsSavingPreferredName(true);
     setPreferredNameError(null);
     try {
       const { user } = await patchMe({ preferred_name: trimmed || null });
-      applyPatchedProfile(user);
+      applyPatchedProfile(user, mutation);
       if (isCurrentEditSession(session)) stopEditingPreferredName();
     } catch (err) {
       console.error("Failed to update preferred name", err);
@@ -606,6 +580,7 @@ export default function ProfileMenu({
       if (isSavingLanguage) return;
 
       const session = editSessionRef.current;
+      const mutation = (profileMutationRef.current += 1);
       setIsSavingLanguage(true);
       setLanguageError(null);
       setProfile((current) =>
@@ -624,7 +599,7 @@ export default function ProfileMenu({
           language: nextLanguage,
           locale: localeForLanguage(nextLanguage),
         });
-        applyPatchedProfile(user);
+        applyPatchedProfile(user, mutation);
         if (isCurrentEditSession(session)) setIsLanguagePickerOpen(false);
       } catch (err) {
         console.error("Failed to update language", err);
@@ -659,6 +634,7 @@ export default function ProfileMenu({
 
       const previousTheme = profile.avatar_theme;
       const session = editSessionRef.current;
+      const mutation = (profileMutationRef.current += 1);
       setAvatarThemeError(null);
       setIsSavingAvatarTheme(true);
       setProfile((current) =>
@@ -667,7 +643,7 @@ export default function ProfileMenu({
 
       try {
         const { user } = await patchMe({ avatar_theme: avatarTheme });
-        applyPatchedProfile(user);
+        applyPatchedProfile(user, mutation);
       } catch (err) {
         console.error("Failed to update avatar theme", err);
         setProfile((current) =>

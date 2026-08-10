@@ -19,8 +19,7 @@ import {
 
 const TYPE_INTERVAL_MS = 35;
 
-// The greeting is cosmetic, so it waits only briefly on the market session and
-// then speaks without it rather than leaving the screen wordless.
+// Cosmetic, so it speaks without the session rather than waiting on it.
 const SESSION_TIMEOUT_MS = 2_000;
 
 export default function EmptyChatGreeting({
@@ -36,9 +35,7 @@ export default function EmptyChatGreeting({
   const [session, setSession] = useState<MarketSessionPhase | null>(null);
   const [sessionSettled, setSessionSettled] = useState(false);
 
-  // Session is backend truth, computed in Eastern time against the real trading
-  // calendar. Reading it from the visitor's clock puts someone in London at 2pm
-  // in the middle of a session US pre-market has not opened yet.
+  // Session is backend truth in Eastern time; the client never computes it.
   useEffect(() => {
     const controller = new AbortController();
     const timeout = window.setTimeout(

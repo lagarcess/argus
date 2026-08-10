@@ -1,14 +1,9 @@
-"""Which session US equities are in right now, in Eastern time.
+"""Which session US equities are in right now.
 
-Two rules this module exists to hold.
-
-Session is Eastern, never the caller's clock. Someone in London at 2pm is in US
-pre-market, and a local-time calculation gets that backwards.
-
-Closure comes from the trading calendar, never from a weekday check. The
-calendar is what knows a Thursday in November is shut. The weekday is consulted
-only after the calendar has already said the market is closed, and only to
-choose which kind of closure to name.
+Two rules this module holds: the session is resolved in Eastern time, never the
+caller's clock; and closure comes from the trading calendar, never a weekday
+check. The weekday is read only after the calendar has ruled the day shut, to
+choose between a weekend and a holiday.
 """
 
 from __future__ import annotations
@@ -58,9 +53,7 @@ def _now_eastern() -> datetime:
 def _session_for(session_date: date) -> EquityMarketSession | None:
     """The trading session for one Eastern date, or None when the market is shut.
 
-    Cached by date rather than by elapsed time: a past or present calendar day's
-    session never changes, so there is no TTL to guess at and one provider call
-    covers the whole day.
+    Cached by date, not elapsed time: a calendar day's session never changes.
     """
     if session_date in _calendar_by_date:
         return _calendar_by_date[session_date]
@@ -84,8 +77,7 @@ def resolve_market_session(
 ) -> MarketSessionSnapshot | None:
     """The current session, or None when the calendar cannot be reached.
 
-    None is a real answer rather than a guess. Callers that speak about the
-    market say nothing about it instead of inventing an open or a holiday.
+    Callers say nothing about the market rather than invent an open or a holiday.
     """
     if (
         os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider"
@@ -93,8 +85,7 @@ def resolve_market_session(
         return None
     at = now or _now_eastern()
     if at.tzinfo is None:
-        # astimezone would read a naive value as system local time, which is the
-        # local-clock mistake this module exists to prevent, one layer down.
+        # astimezone would read a naive value as system local time.
         raise ValueError("market_session_requires_aware_datetime")
     at = at.astimezone(EASTERN)
     try:
@@ -103,8 +94,7 @@ def resolve_market_session(
         return None
 
     if session is None:
-        # The calendar has already ruled today closed. Saturday and Sunday only
-        # decide whether to call it a weekend or a holiday.
+        # The calendar already ruled today closed; the weekday only names it.
         weekend = at.weekday() >= 5
         return MarketSessionSnapshot(
             phase="closed_weekend" if weekend else "closed_holiday",

@@ -254,8 +254,8 @@
       "night_c": "Late one. What are we testing?",
       "night_named_a": "Still up, {{name}}. What are you curious about?",
       "session_closed_weekend_a": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test.",
-      "session_closed_weekend_b": "The stock market is shut until Monday. Crypto and currencies keep trading.",
-      "session_closed_holiday_a": "Stocks are closed for the holiday. Crypto and currencies keep trading.",
+      "session_closed_weekend_b": "The stock market is shut for the weekend. Crypto keeps going, and past data is always there to test.",
+      "session_closed_holiday_a": "Stocks are closed for the holiday. Crypto is still trading.",
       "session_closed_holiday_b": "The stock market is shut today. Crypto never closes, and past data is always there to test.",
       "session_pre_market_a": "Stocks open in a few hours. Crypto has been going all night.",
       "session_after_hours_a": "Stocks are done for the day. Crypto is still going."

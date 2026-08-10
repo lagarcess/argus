@@ -14,10 +14,10 @@ router = APIRouter(prefix="/api/v1", tags=["market"])
 def get_market_session(
     user: User = Depends(current_user),  # noqa: B008
 ) -> MarketSessionResponse:
-    """Backend-owned session truth for surfaces that speak about the market.
+    """Backend-owned session truth.
 
-    Eastern time and the real trading calendar both live behind this, so no
-    caller has to know the difference between a holiday and a Thursday.
+    Eastern time and the real trading calendar live behind this, so no caller
+    has to know a holiday from a Thursday.
     """
     del user
     try:

@@ -104,9 +104,11 @@ describe("a saved profile reaches the greeting", () => {
   test("every successful patch propagates, not just the one that was noticed", () => {
     const menu = source("components/sidebar/ProfileMenu.tsx");
     const patches = menu.match(/await patchMe\(/g) ?? [];
-    const propagations = menu.match(/applyPatchedProfile\(user\)/g) ?? [];
+    const propagations = menu.match(/applyPatchedProfile\(user, mutation\)/g) ?? [];
     expect(patches.length).toBeGreaterThanOrEqual(4);
-    expect(propagations.length).toBe(patches.length);
+    // Every patch, plus the menu-open read, which is ordered against them.
+    expect(propagations.length).toBe(patches.length + 1);
+    expect(menu).toContain("const mutation = profileMutationRef.current;");
     // The menu's own copy is no longer set directly from a patch response.
     const afterHelper = menu.slice(menu.indexOf("const applyPatchedProfile"));
     expect(afterHelper).not.toContain("      setProfile(user);\n      setEditing");
@@ -274,11 +276,36 @@ describe("a name is measured after it is normalized", () => {
       expect(menu).toContain(guarded);
     }
 
-    // The propagation is deliberately NOT guarded: the server changed whatever
-    // the dialog is doing, and dropping it is how the shell's copy went stale.
+    // The propagation is not gated on the edit session: a save that outlived its
+    // dialog still happened. It is ordered instead, which the next test covers.
     expect(menu).not.toContain("if (isCurrentEditSession(session)) applyPatchedProfile");
-    const propagations = menu.match(/applyPatchedProfile\(user\)/g) ?? [];
-    expect(propagations.length).toBe(awaits.length);
+    const propagations = menu.match(/applyPatchedProfile\(user, mutation\)/g) ?? [];
+    expect(propagations.length).toBe(awaits.length + 1);
+  });
+
+  test("a superseded response never overwrites a newer one", () => {
+    // Guarding the propagation on the edit session would drop a save that
+    // outlived its dialog; applying every completion let an older response land
+    // last and replace a newer whole-user snapshot. Order them instead.
+    const menu = source("components/sidebar/ProfileMenu.tsx");
+
+    // Every write stamps a new generation; the read reuses the current one, so
+    // a patch issued after it wins even if the read answers later.
+    const issued = menu.match(/profileMutationRef\.current \+= 1/g) ?? [];
+    const awaits = menu.match(/await patchMe\(/g) ?? [];
+    expect(issued.length).toBe(awaits.length);
+    expect(menu).toContain("const mutation = profileMutationRef.current;");
+
+    // And a completion applies only if nothing newer already has.
+    const gate = menu.slice(
+      menu.indexOf("const applyPatchedProfile = useCallback"),
+      menu.indexOf("setProfile(user)", menu.indexOf("const applyPatchedProfile")),
+    );
+    expect(gate).toContain("if (mutation < appliedMutationRef.current) return;");
+    expect(gate).toContain("appliedMutationRef.current = mutation;");
+    // Monotonic, not equality: a newer request that fails must not strand an
+    // older success that already came back.
+    expect(gate).not.toContain("mutation !== profileMutationRef.current");
   });
 
   test("the bound has one frontend home", () => {

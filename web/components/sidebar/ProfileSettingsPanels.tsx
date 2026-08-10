@@ -9,12 +9,10 @@ import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
 import UsageModal from "@/components/settings/UsageModal";
 
-/* Every settings surface the profile menu opens is registered here, once.
- *
- * A registry rather than a chain of early returns, so a new panel is an import
- * and an entry rather than an edit to a fixed set: the key set is the type, the
- * menu derives its own union from it, and the mobile-shell invariant that every
- * panel renders through a managed shell enumerates the imports above. */
+/* Every settings surface the profile menu opens, registered once. A new panel
+ * is an import and an entry: the key set is the type, and the menu derives its
+ * ActiveModal union from it. The mobile-shell invariant enumerates the imports
+ * above, so a panel cannot ship without a managed layer. */
 
 export type SettingsPanelParent = "settings" | "data";
 

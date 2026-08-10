@@ -254,8 +254,8 @@
       "night_c": "Se hizo tarde. ¿Qué probamos?",
       "night_named_a": "Todavía por aquí, {{name}}. ¿Qué te da curiosidad?",
       "session_closed_weekend_a": "La bolsa está cerrada por el fin de semana. Las criptos no paran, así que hay mucho por probar.",
-      "session_closed_weekend_b": "La bolsa no abre hasta el lunes. Las criptos y las divisas siguen operando.",
-      "session_closed_holiday_a": "La bolsa está cerrada por el feriado. Las criptos y las divisas siguen operando.",
+      "session_closed_weekend_b": "La bolsa está cerrada el fin de semana. Las criptos siguen, y los datos históricos siempre están.",
+      "session_closed_holiday_a": "La bolsa está cerrada por el feriado. Las criptos siguen operando.",
       "session_closed_holiday_b": "Hoy la bolsa no opera. Las criptos nunca cierran, y los datos históricos siempre están.",
       "session_pre_market_a": "La bolsa abre en unas horas. Las criptos llevan toda la noche operando.",
       "session_after_hours_a": "La bolsa ya cerró por hoy. Las criptos siguen."

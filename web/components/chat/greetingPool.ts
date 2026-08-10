@@ -1,33 +1,17 @@
 /**
  * Which greeting the empty chat says today.
  *
- * The defect this replaces was repetition, not slot count: the day window is
- * nine hours wide, so anyone opening Argus during a workday saw one identical
- * sentence forever. A fifth slot would not have fixed that.
+ * Rotation is stable for the whole local day and changes tomorrow; seeding from
+ * the clock would roll a new line on every refresh. Market session lines are
+ * pool members, never overrides: time of day describes the user and session
+ * describes the market, and the two decouple outside Eastern time.
  *
- * Rotation is stable for the whole local day and changes tomorrow. Seeding from
- * the clock instead would mean refreshing the page rolls a new greeting, which
- * is exactly what makes a line read as generated rather than said.
- *
- * Market session lines are pool members, never overrides. Time of day describes
- * the user and session describes the market, and the two decouple outside
- * Eastern time: 5am local overlaps US pre-market only for an Eastern user. So an
- * active session widens the current slot's pool and the same day-stable seed
- * picks from the wider set, with the generic lines still in play.
- *
- * The seam for a greeting that knows what you were looking at last week is
- * `pickGreetingKey`: a caller with something to say would choose its own line
- * and fall back here, the same rule the chips follow.
- *
- * Nothing plugs into it yet, and not for want of wiring. The candidate corpus
- * does not exist. `research_memory_block()` in
- * `src/argus/agent_runtime/research_grounded.py` writes a field named "memory"
- * into the research sidecar, but that is a sidecar field, not a memory record:
- * the memory system's four categories live in `src/argus/memory/contracts.py`
- * and none of them is a research subject, an open thread, or a comparison set.
- * That block is only emitted on a research turn, research is gated by
- * `research_rail_enabled()`, and `ARGUS_RESEARCH_RAIL_ENABLED` is false in
- * `render.yaml`, so zero open threads exist and none will until the flag flips.
+ * A memory-driven greeting would plug in at `pickGreetingKey`, choosing its own
+ * line and falling back here. Nothing does yet, and the corpus for it does not
+ * exist: the `memory` field `research_memory_block()` writes into the research
+ * sidecar is not a memory record, the four categories in
+ * `src/argus/memory/contracts.py` hold no research subject or open thread, and
+ * `ARGUS_RESEARCH_RAIL_ENABLED` is false in `render.yaml`.
  */
 
 export type GreetingSlot = "early" | "day" | "evening" | "night";
@@ -62,14 +46,8 @@ export function greetingSlotForHour(hour: number): GreetingSlot {
   return "night";
 }
 
-/*
- * Six for `day`, because a weekday user lives entirely inside it and three
- * would cycle visibly within a week. Fewer elsewhere is fine; nobody is in the
- * 3am slot on a schedule.
- *
- * Only some members carry a name. Every greeting using someone's name gets
- * grating in about three days.
- */
+/* Six for `day`, because a weekday user lives entirely inside it. Only some
+ * members carry a name; every greeting using one gets grating in a few days. */
 const SLOT_POOL: Record<GreetingSlot, PoolMember[]> = {
   early: [
     { key: "early_a" },
@@ -103,18 +81,12 @@ const SLOT_POOL: Record<GreetingSlot, PoolMember[]> = {
 };
 
 /*
- * Weighted unevenly on purpose. A closure is a two-day state where the market
- * fact is the most useful thing Argus can say, so it speaks often. Pre-market
- * and after-hours are transient and mostly irrelevant to backtesting, so they
- * surface on the odd day rather than as a headline.
+ * Weighted unevenly: a closure speaks often, pre-market and after-hours only
+ * occasionally. An open market and an overnight lull get no line at all.
  *
- * An open market gets no line: it is the default state of a weekday and saying
- * so adds nothing. Neither does overnight on a trading day, where the weekend
- * sentence would be false.
- *
- * Every closure line names both asset classes. Argus supports crypto and
- * currency pairs, which do not close, so a bare "markets are closed" is wrong
- * for those users.
+ * The session resolves the US equity calendar and nothing else, so a closure
+ * line may name only that and crypto, which genuinely never closes. FX closes
+ * most of the weekend and a holiday weekend is not always three days.
  */
 const SESSION_POOL: PoolMember[] = [
   { key: "session_closed_weekend_a", session: "closed_weekend", weight: 3 },
@@ -172,11 +144,8 @@ function eligibleMembers({
 }
 
 /**
- * The pool laid out as a ring where no two neighbours are the same line.
- *
- * Heaviest first into every other position, then the gaps. That is what keeps a
- * weight-3 closure line from landing beside itself, which a plain repeated list
- * would do and which is the one way a day-by-day walk could still repeat.
+ * The pool as a ring where no two neighbours are the same line: heaviest first
+ * into every other position, then the gaps.
  */
 function arrangeRing(members: PoolMember[]): string[] {
   const byWeight = [...members].sort(
@@ -197,13 +166,8 @@ function arrangeRing(members: PoolMember[]): string[] {
 }
 
 /**
- * The key for today. It holds all day, and tomorrow's is a different line.
- *
- * The walk is one step a day around the ring above, so consecutive days are
- * neighbours and neighbours are never equal. That is the no-repeat rule as a
- * property of the arrangement rather than as a check that has to look up what
- * yesterday actually said, which is unknowable here: yesterday's market session
- * is gone.
+ * The key for today. One step a day around the ring above, so consecutive days
+ * are neighbours and neighbours are never equal.
  */
 export function pickGreetingKey({
   slot,
@@ -218,8 +182,7 @@ export function pickGreetingKey({
 }): string {
   const members = eligibleMembers({ slot, session, hasName });
   const ring = arrangeRing(members);
-  // Two pools of the same size start at different points, so a name or an open
-  // market does not just shift everyone onto the same line.
+  // Two pools of the same size start at different points.
   const offset = hash(members.map((member) => member.key).join("|"));
   return ring[(localDayOrdinal(at) + offset) % ring.length];
 }

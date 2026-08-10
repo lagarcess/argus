@@ -217,9 +217,9 @@ describe("greeting pool", () => {
     }
   });
 
-  test("every closure line is true for crypto and currency pairs too", () => {
-    // Argus supports assets that do not close, so a bare "markets are closed"
-    // is wrong for those users.
+  test("a closure line names the asset class that keeps trading", () => {
+    // A bare "markets are closed" is wrong for the users on an asset that does
+    // not close.
     const closure = (catalog: Record<string, string>) =>
       Object.entries(catalog).filter(([key]) => key.includes("closed_"));
     for (const [, text] of closure(en.chat.greeting)) {
@@ -229,6 +229,33 @@ describe("greeting pool", () => {
       expect(text.toLowerCase()).toContain("cripto");
     }
     expect(closure(en.chat.greeting).length).toBeGreaterThanOrEqual(4);
+  });
+
+  test("no session line claims a fact the endpoint does not resolve", () => {
+    // The session comes from the US equity calendar. Crypto never closing is a
+    // property of the asset, but FX closes most of the weekend and a holiday
+    // weekend is not always three days, so neither may be asserted.
+    const forbidden = [
+      /currenc/i,
+      /\bdivisa/i,
+      /\bforex\b/i,
+      /\bfx\b/i,
+      /\bmonday\b/i,
+      /\blunes\b/i,
+    ];
+    for (const catalog of [en.chat.greeting, es.chat.greeting]) {
+      for (const [key, text] of Object.entries(catalog) as [string, string][]) {
+        if (!key.startsWith("session_")) continue;
+        for (const pattern of forbidden) {
+          expect({ key, text, pattern: String(pattern) }).toEqual({
+            key,
+            text,
+            pattern: String(pattern),
+          });
+          expect(pattern.test(text)).toBe(false);
+        }
+      }
+    }
   });
 
   test("no greeting uses an em dash", () => {

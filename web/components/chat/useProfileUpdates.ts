@@ -6,11 +6,8 @@ import { applyProfileUpdate, greetingNameFor } from "@/lib/account-profile";
 import type { ApiUser, UserResponse } from "@/lib/guest-account";
 
 /**
- * Everything the chat shell needs about the account's profile, from one place.
- *
- * The menu keeps its own copy while it is open; this is the copy surfaces read.
- * `PATCH /me` returns the whole updated user, so a save folds the response in
- * rather than spending a second request re-reading what it just carried.
+ * The shell's profile state: the greeting's name, and the callback that keeps
+ * the shell's copy current when a setting is saved.
  */
 export function useProfileUpdates(
   account: UserResponse | null,

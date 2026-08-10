@@ -17,11 +17,9 @@ import {
   normalizeEnabledLanguage,
 } from "@/lib/language-features";
 
-/* The Profile dialog. Every value it renders is owned by ProfileMenu, which
- * opens it and closes itself in the same commit; the layer registration below
- * is this file's own, because nothing else owns back, Escape, or focus for it
- * while it is up. Scoped to the panel rather than the backdrop, so focus does
- * not open on an invisible dismiss control. */
+/* The Profile dialog. ProfileMenu owns every value it renders; the layer
+ * registration is this file's own, scoped to the panel rather than the backdrop
+ * so focus does not open on an invisible dismiss control. */
 
 function profileHandle(profile: ApiUser | null) {
   const explicitUsername = profile?.username?.trim().replace(/^@+/, "");
@@ -415,13 +413,9 @@ export default function ProfileDetailsDialog({
               </div>
             )}
 
-          {/* What to call you. Its own field rather than display_name, which is
-              an identity field people fill with a legal name. Optional, because
-              being addressed by name is not universally welcome.
-
-              Neither name input caps what can be typed. The bound belongs to the
-              trimmed name, so capping the raw value dropped a character whenever
-              a space led it; the save refuses an over-long name and says so. */}
+          {/* Its own field rather than display_name, which is an identity field.
+              Optional. Neither name input caps what can be typed: the bound
+              belongs to the trimmed name, and the save refuses an over-long one. */}
           {accountKind === "registered" && (
             <div className="mt-2 flex flex-col gap-1.5 border-t border-black/5 pt-3 dark:border-white/5">
               <label

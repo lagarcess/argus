@@ -60,8 +60,7 @@ export default function EmptyChatSurface({
           rests. Above it, the surface keeps its centered composition. */}
       <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
         {showSignedInGreeting ? (
-          // Guests have no profile, so they never reach this and always get the
-          // nameless pool.
+          // Guests never reach this, so they always get the nameless pool.
           <EmptyChatGreeting preferredName={preferredName} />
         ) : (
           <EmptyChatHeading isGuest={isGuest} />
@@ -122,12 +121,9 @@ export default function EmptyChatSurface({
         />
       </div>
 
-      {/* One owner for the chips, and they are always on. Flag off, this is
-          integration's shipped placement: thumb-reachable above the composer on
-          narrow screens, under it from tablet up. Flag on, spec section 10
-          keeps them above the composer at every width. They stop on their own
-          once a conversation has a message, because this surface stops
-          rendering. */}
+      {/* One owner for the chips, always on. Flag off they sit above the
+          composer on narrow screens and under it from tablet up; flag on, above
+          at every width. They stop when this surface stops rendering. */}
       <div
         className={
           showSignedInGreeting

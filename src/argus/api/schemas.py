@@ -141,11 +141,8 @@ def _blank_preferred_name_is_no_name(value: Any) -> Any:
     return value.strip() or None
 
 
-# Normalize first, then enforce the bound. As an after-validator the trim ran
-# too late: `max_length` had already measured the raw value, so a leading space
-# in front of a forty-character name was a 422 for a name that trims to exactly
-# forty. One annotation serves the read model and the patch, so the rule cannot
-# be stated twice and drift.
+# Normalize first, then enforce the bound: `max_length` measures the trimmed
+# value. One annotation serves the read model and the patch, so it cannot drift.
 PreferredName = Annotated[
     Annotated[str, Field(max_length=PREFERRED_NAME_MAX_LENGTH)] | None,
     BeforeValidator(_blank_preferred_name_is_no_name),
