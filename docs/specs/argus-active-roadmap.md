@@ -68,9 +68,17 @@ standalone edit.
 
 ### 1. Answer the first question — SHIPPED 2026-08-09
 
-Merged as PR #396 at `ef08b25d`, 350 files, behind
-`ARGUS_RESEARCH_RAIL_ENABLED` which is `false` in `render.yaml`,
-`.github/argus-env.sh`, and the release profile. Closes #377 and #384.
+Merged as PR #396 at `ef08b25d`, 350 files. Closes #377 and #384.
+
+**Enabled 2026-08-10.** `ARGUS_RESEARCH_RAIL_ENABLED` and
+`NEXT_PUBLIC_RESEARCH_RAIL_ENABLED` are `true` in `render.yaml`,
+`.env.example`, `.github/argus-env.sh`, and the release profile, so the next
+promotion carries it live. Founder decision: answering the first question is
+the product, not an experiment, so it ships on rather than dark.
+
+That flip was made against the two conditions recorded in rail spec §13b,
+knowingly. Close #411 and #412 rather than treating the flip as having
+retired them.
 
 All five question shapes work from an organic typed question in both
 languages: market pulse, competitor analysis, screening, sector radar, and
@@ -225,7 +233,18 @@ reliable versioning and a way to read them back.
   numbers come from your evidence artifacts, Perplexity never restates a
   simulation result.
 
-### 5. Sharing (parallel, behind flag)
+### 5. Sharing — BUILT AND DARK, 2026-08-10
+
+Merged as PR #397 at `33001adc`, 101 files. Both
+`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and its `NEXT_PUBLIC_` twin stay
+`false`, and that is deliberate rather than pending.
+
+**Why it did not ship on with the rail.** The founder parked it until Argus
+reaches a subjective reliability bar they judge themselves, and #417 is an
+open flag-on blocker: the receipt freezes assumptions as English prose, so a
+Spanish reader sees English facts. Enabling this surface puts a stranger's
+first impression of Argus behind a link, which is the one place a known copy
+defect cannot be tolerated.
 
 Distribution, once there is something worth spreading.
 

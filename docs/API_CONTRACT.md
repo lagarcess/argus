@@ -2954,7 +2954,7 @@ historical `strategy_id`; no endpoint creates or mutates those records.
 
 ### Research Responses
 
-Behind `ARGUS_RESEARCH_RAIL_ENABLED` (default off; flag-off behavior is
+Behind `ARGUS_RESEARCH_RAIL_ENABLED` (enabled 2026-08-10; flag-off behavior is
 byte-identical to the pre-rail router), a question turn the interpreter
 classifies as a finance question is grounded through the Perplexity Agent
 API's `finance_search` tool, selected by question shape with no user-visible
