@@ -417,11 +417,18 @@ they surface occasionally rather than as a headline. The one place they genuinel
 matter is the fast quote shape, which already returns pre and after-hours
 figures.
 
-**Closed markets must stay true for every asset class.** Argus supports crypto
-and currency pairs, which do not close, so a bare "markets are closed" is wrong
-for those users. Say both: stocks are closed for the weekend, crypto does not
-stop. That is true for everyone, useful to everyone, and teaches a real
-difference between the asset classes Argus actually supports.
+**Closed markets must stay true for every asset class.** A bare "markets are
+closed" is wrong for a crypto user, so say both: stocks are closed for the
+weekend, crypto does not stop. That is true for everyone and teaches a real
+difference between the asset classes Argus supports.
+
+**Correction 2026-08-10: currency pairs are not in that sentence, and an
+earlier draft of this line put them there.** Crypto trades continuously; forex
+does not. It closes Friday evening and reopens Sunday evening, so a claim that
+currency pairs never stop is false, and it shipped as user-facing copy before a
+reviewer caught it. Name crypto only. Where a line covers a session boundary,
+check the asset class actually has the property being claimed rather than
+grouping it with a neighbour.
 
 **The data already exists, including the part most likely to be faked.**
 `src/argus/domain/market_data/capabilities.py` already carries
