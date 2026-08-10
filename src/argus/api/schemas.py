@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
@@ -129,11 +130,33 @@ class OnboardingState(BaseModel):
     ) = None
 
 
+PREFERRED_NAME_MAX_LENGTH = 40
+
+
+def _blank_preferred_name_is_no_name(value: Any) -> Any:
+    """Whitespace is not a name, and clearing the field is the way to opt out."""
+
+    if not isinstance(value, str):
+        return value
+    return value.strip() or None
+
+
+# Normalize first, then enforce the bound: `max_length` measures the trimmed
+# value. One annotation serves the read model and the patch, so it cannot drift.
+PreferredName = Annotated[
+    Annotated[str, Field(max_length=PREFERRED_NAME_MAX_LENGTH)] | None,
+    BeforeValidator(_blank_preferred_name_is_no_name),
+]
+
+
 class User(BaseModel):
     id: str
     email: str | None
     username: str | None = None
     display_name: str | None = None
+    #: What the user asked Argus to call them, distinct from `display_name`,
+    #: which is an identity field. Null means greetings use no name.
+    preferred_name: PreferredName = None
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
@@ -241,6 +264,7 @@ class UsageAllowanceResponse(BaseModel):
 
 class ProfilePatch(BaseModel):
     display_name: str | None = None
+    preferred_name: PreferredName = None
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
@@ -419,6 +443,9 @@ class BacktestJob(BaseModel):
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus
+    # Absent means an ordinary backtest; 'chat.research' jobs succeed without
+    # a run, so every serialized job surface must carry the scope.
+    operation_scope: str | None = None
     result_run_id: str | None = None
     failure_code: str | None = None
     failure_detail: str | None = None
@@ -801,6 +828,11 @@ class ChatActionPayload(BaseModel):
         return payload
 
 
+class ChatMentionTextRange(BaseModel):
+    start: int
+    end: int
+
+
 class ChatMentionPayload(BaseModel):
     id: str = Field(max_length=CHAT_STREAM_MAX_MENTION_ID_LENGTH)
     type: Literal["asset", "indicator"]
@@ -819,7 +851,28 @@ class ChatMentionPayload(BaseModel):
         default=None,
         max_length=CHAT_STREAM_MAX_MENTION_PROVIDER_LENGTH,
     )
+    message_range: ChatMentionTextRange | None = None
     support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+    @field_validator("message_range", mode="before")
+    @classmethod
+    def discard_malformed_message_range(cls, value: Any) -> Any:
+        if isinstance(value, ChatMentionTextRange):
+            start, end = value.start, value.end
+        elif isinstance(value, dict):
+            start, end = value.get("start"), value.get("end")
+        else:
+            return None
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+            or start < 0
+            or end < start
+        ):
+            return None
+        return {"start": start, "end": end}
 
 
 class ChatStreamRequest(BaseModel):
@@ -845,6 +898,29 @@ class ChatStreamRequest(BaseModel):
         if self.message is not None and self.message.strip():
             return self
         raise ValueError("message_or_action_required")
+
+
+class ConfirmationPeerAssetsRequest(BaseModel):
+    """Grow or restore the pending confirmation's basket without a turn.
+
+    Add mode: only symbols the active turn offered as research peer rows are
+    addable; the backend re-verifies each against the resolver and coverage
+    gates. Restore mode undoes the latest add by re-materializing the exact
+    previous asset set from the card's own typed adjustment data.
+    """
+
+    symbols: list[str] | None = Field(default=None, min_length=1, max_length=4)
+    restore_previous: bool = False
+
+    @model_validator(mode="after")
+    def require_one_mode(self) -> "ConfirmationPeerAssetsRequest":
+        if self.restore_previous == bool(self.symbols):
+            raise ValueError("symbols_or_restore_required")
+        return self
+
+
+class ConfirmationPeerAssetsResponse(BaseModel):
+    message: Message
 
 
 def _validate_chat_action_payload_value(value: Any, *, depth: int) -> None:
@@ -885,6 +961,34 @@ class DiscoveryItem(BaseModel):
 
 class DiscoveryResponse(BaseModel):
     items: list[DiscoveryItem]
+
+
+class MarketSession(BaseModel):
+    """Which session US equities are in, resolved in Eastern time."""
+
+    model_config = ConfigDict(frozen=True)
+
+    phase: Literal[
+        "pre_market",
+        "open",
+        "after_hours",
+        "closed_weekend",
+        "closed_holiday",
+        "closed",
+    ]
+    is_market_day: bool
+    as_of: datetime
+
+
+class MarketSessionResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    session: MarketSession | None = Field(
+        description=(
+            "Null when the trading calendar is unreachable. Callers say nothing "
+            "about the market rather than guessing an open or a holiday."
+        )
+    )
 
 
 class FeedbackRequest(BaseModel):

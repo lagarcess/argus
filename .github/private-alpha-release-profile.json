@@ -16,6 +16,8 @@
         "ARGUS_CHECKPOINTER_MODE": "postgres",
         "ARGUS_ENABLE_EXECUTION_REALISM": "true",
         "ARGUS_ENABLE_PERSONALIZATION_MEMORY": "false",
+        "ARGUS_RESEARCH_RAIL_ENABLED": "false",
+        "ARGUS_RESEARCH_GLOBAL_DAILY_CEILING": "5000",
         "ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL": "false",
         "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
         "ARGUS_MEMORY_EMBEDDING_MODEL": "pplx-embed-v1-0.6b",
@@ -79,7 +81,7 @@
         "NEXT_PUBLIC_MOCK_AUTH": "false",
         "NEXT_PUBLIC_ENABLE_SPANISH": "true",
         "NEXT_PUBLIC_OMNISEARCH_ENABLED": "true",
-        "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED": "false",
+        "NEXT_PUBLIC_RESEARCH_RAIL_ENABLED": "false",
         "NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
         "NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL": "support@get-argus.com"
       },
@@ -90,6 +92,25 @@
         "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY"
       ],
       "optional": ["NEXT_PUBLIC_POSTHOG_KEY"]
+    },
+    "cron": {
+      "name": "argus-maintenance",
+      "env": {
+        "APP_ENV": "production",
+        "POETRY_VERSION": "2.1.3",
+        "ARGUS_PERSISTENCE_MODE": "supabase",
+        "ARGUS_DEV_MEMORY_FALLBACK": "false",
+        "POSTHOG_REGION": "us"
+      },
+      "required_present": [
+        "POSTHOG_PROJECT_TOKEN",
+        "DATABASE_URL",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "RENDER_API_KEY"
+      ],
+      "optional": []
     },
     "workflow": {
       "name": "argus-backtests",

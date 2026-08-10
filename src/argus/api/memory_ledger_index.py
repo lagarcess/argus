@@ -24,6 +24,7 @@ states(decision_state, position) AS (
 )
 """
 
+
 class MemoryLedgerWorkLimitExceeded(RuntimeError):
     """The bounded ledger corpus cannot produce exact counts."""
 
@@ -60,9 +61,7 @@ class MemoryLedgerIndex:
             return _empty_counts()
         if self._work_limit_exceeded:
             raise MemoryLedgerWorkLimitExceeded
-        fts_query = " AND ".join(
-            _quoted_fts_token(token) for token in anchored_tokens
-        )
+        fts_query = " AND ".join(_quoted_fts_token(token) for token in anchored_tokens)
         with self._lock:
             sql, parameters = _matching_counts_query(
                 tokens=tokens,
@@ -104,9 +103,7 @@ def build_memory_ledger_index(
         for decision_state in states
         if decision_state in LEDGER_DECISION_STATES
     )
-    eligible_conversation_ids = {
-        conversation_id for conversation_id, _ in memberships
-    }
+    eligible_conversation_ids = {conversation_id for conversation_id, _ in memberships}
     all_counts = _empty_counts()
     for _, decision_state in memberships:
         all_counts[decision_state] += 1

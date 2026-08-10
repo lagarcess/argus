@@ -74,9 +74,7 @@ def incomplete_response_error(
         )
     else:
         reason = "OpenRouter interpretation returned an incomplete strategy draft"
-    return InterpretationContractError(
-        reason, corrective_hint=UNUSABLE_CORRECTIVE_HINT
-    )
+    return InterpretationContractError(reason, corrective_hint=UNUSABLE_CORRECTIVE_HINT)
 
 
 def replay_without_update_error() -> InterpretationContractError:
@@ -110,8 +108,7 @@ async def handle_candidate_failure(
         model_name=candidate_model,
         exc=exc,
         message=(
-            "Direct LLM interpretation candidate failed; "
-            "trying next configured model"
+            "Direct LLM interpretation candidate failed; " "trying next configured model"
         ),
     )
     # The banner classifies on the LATEST candidate's failure: a transient

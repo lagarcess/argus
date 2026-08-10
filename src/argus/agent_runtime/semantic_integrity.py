@@ -251,8 +251,10 @@ def _structured_money_role_evidence(
         "user",
         "explicit_user",
     }:
-        recurring = recurring if recurring is not None else _coerce_number(
-            strategy.capital_amount
+        recurring = (
+            recurring
+            if recurring is not None
+            else _coerce_number(strategy.capital_amount)
         )
     elif (
         requested_field == "capital_amount"

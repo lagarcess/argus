@@ -80,6 +80,10 @@ services:
         value: "true"
       - key: ARGUS_ENABLE_PERSONALIZATION_MEMORY
         value: "false"
+      - key: ARGUS_RESEARCH_RAIL_ENABLED
+        value: "false"
+      - key: ARGUS_RESEARCH_GLOBAL_DAILY_CEILING
+        value: "5000"
       - key: ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL
         value: "false"
       - key: ARGUS_MEMORY_EMBEDDING_MODEL
@@ -169,7 +173,46 @@ services:
         value: support@get-argus.com
       - key: NEXT_PUBLIC_OMNISEARCH_ENABLED
         value: "true"
-      - key: NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED
+      - key: NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
         value: "false"
       - key: NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED
         value: "false"
+
+  # Destructive maintenance stays inside the boundary the service-role key
+  # already lives in. A CI runner holding it would make write access to a
+  # workflow file equal to production delete access.
+  - type: cron
+    name: argus-maintenance
+    runtime: python
+    repo: https://github.com/lagarcess/argus
+    branch: main
+    rootDir: .
+    region: virginia
+    plan: starter
+    schedule: "*/15 * * * *"
+    autoDeployTrigger: off
+    buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
+    startCommand: poetry run python scripts/ops/scheduled_maintenance.py
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: POETRY_VERSION
+        value: "2.1.3"
+      - key: ARGUS_PERSISTENCE_MODE
+        value: supabase
+      - key: ARGUS_DEV_MEMORY_FALLBACK
+        value: "false"
+      - key: POSTHOG_REGION
+        value: us
+      - key: POSTHOG_PROJECT_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        value: https://lgdhvepyrzbnscqssgqq.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGh2ZXB5cnpibnNjcXNzZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzkwOTksImV4cCI6MjA4ODI1NTA5OX0.mc7KjmJYuAp01Mj96gceGsAW2UPI2_HQsv0_kyWaQmo
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false

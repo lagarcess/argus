@@ -61,9 +61,7 @@ def _strategy_from_llm(
     current_user_message: str | None = None,
 ) -> StrategySummary:
     payload = draft.model_dump(mode="python")
-    validated_execution_cost_evidence = dict(
-        draft._validated_execution_cost_evidence
-    )
+    validated_execution_cost_evidence = dict(draft._validated_execution_cost_evidence)
     field_provenance = payload.pop("field_provenance", {}) or {}
     language = _clean_optional_text(payload.pop("language", None))
     date_range_raw_text = _clean_optional_text(payload.pop("date_range_raw_text", None))
@@ -258,10 +256,7 @@ def _owned_execution_cost_provenance(
             extra_parameters.pop(field_name, None)
             updated.pop(field_name, None)
             continue
-        if (
-            field_name in extra_parameters
-            and updated.get(field_name) == "explicit_user"
-        ):
+        if field_name in extra_parameters and updated.get(field_name) == "explicit_user":
             continue
         extra_parameters.pop(field_name, None)
         updated.pop(field_name, None)

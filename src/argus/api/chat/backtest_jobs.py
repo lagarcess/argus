@@ -19,6 +19,10 @@ from argus.api.chat.backtest_job_envelopes import (
     admission_rejection_envelope,
     async_backtest_job_envelope,
 )
+from argus.api.chat.research_job_reconciliation import (
+    fail_stranded_research_job,
+    is_stranded_research_job,
+)
 from argus.domain.backtest_admission import (
     DEFAULT_GLOBAL_QUEUED_LIMIT,
     DEFAULT_GLOBAL_RUNNING_LIMIT,
@@ -485,6 +489,17 @@ def scan_stale_backtest_jobs(
                 continue
 
             try:
+                if is_stranded_research_job(job):
+                    reconciled = fail_stranded_research_job(
+                        gateway=gateway,
+                        user_id=user_id,
+                        job=job,
+                    )
+                    after = str(reconciled.get("status") or before).strip().lower()
+                    if after not in {"queued", "running"}:
+                        report["reconciled_count"] += 1
+                        continue
+
                 if _is_undispatched_workflow_job(job):
                     reconciled = fail_job_without_task_run(
                         gateway=gateway,

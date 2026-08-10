@@ -190,7 +190,7 @@ class TestNonDiscoveryTurnsStayOut:
     def test_direct_backtest_never_constructs_search_provider(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from argus.domain.discovery_search import selection as selection_module
+        from argus.domain.research.search import selection as selection_module
 
         constructed: list[str] = []
 

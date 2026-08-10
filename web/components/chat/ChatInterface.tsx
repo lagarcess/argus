@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useProfileUpdates } from "@/components/chat/useProfileUpdates";
 import { useTranslation } from "react-i18next";
 import { readStored, writeStored } from "@/lib/browser-storage";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
@@ -38,6 +39,8 @@ import {
   type GuestResumeSend,
 } from "@/components/guest/useGuestExperience";
 import {
+  addConfirmationPeerAssets,
+  restoreConfirmationAssets,
   createConversation,
   deleteConversation,
   getBacktestRun,
@@ -55,7 +58,7 @@ import {
   type SearchConversationItem,
 } from "@/lib/argus-api";
 import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";
-import { omnisearchEnabled } from "@/lib/private-alpha-flags";
+import { omnisearchEnabled, researchRailEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -97,10 +100,12 @@ import {
   isMissingConversationLoadError,
   POST_TURN_TITLE_REFRESH_DELAYS_MS,
 } from "@/lib/chat-conversation-view-helpers";
+import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
+  researchSourcesForFinalPayload,
 } from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
@@ -205,6 +210,8 @@ import {
   settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
+import { randomId } from "@/lib/random-id";
+import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/send-refusal";
 type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
@@ -229,7 +236,14 @@ export default function ChatInterface() {
     setProfileState("established");
     return nextAccount;
   }, [i18n]);
+  const { onProfileUpdated, greetingName } = useProfileUpdates(account, setAccount);
   const [messages, setMessages] = useState<Message[]>([]);
+  // Long-lived handlers (the undo toast) need the current transcript, not
+  // the render that created them.
+  const latestMessagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -268,10 +282,7 @@ export default function ChatInterface() {
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
-  // First paint waits for the authenticated profile language so a fresh
-  // browser cannot send starter prompts in the wrong language.
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const { toast, showToast } = useChatToast();
+  const { toast, showToast, hideToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
@@ -961,6 +972,8 @@ export default function ChatInterface() {
   ) => {
     const trimmed = text.trim();
     let guestSubmissionHandedToStream = false;
+    // Never decline a real message in silence; see lib/send-refusal.ts.
+    const refuseSend = sendRefusal(showToast, t);
     if (!trimmed) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
@@ -1051,9 +1064,11 @@ export default function ChatInterface() {
       }
     }
 
-    if (!targetConversationId) return false;
+    if (!targetConversationId) {
+      return refuseSend("chat.error_generic", SEND_GENERIC_FALLBACK);
+    }
     if (conversationActivity.isConversationLocked(targetConversationId)) {
-      return false;
+      return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     }
     const transcriptMutation: TranscriptMutation =
       action?.type === "retry_last_turn"
@@ -1074,7 +1089,7 @@ export default function ChatInterface() {
     const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: "user",
       kind: action?.type ? "action" : "text",
       content: action?.type ? actionDisplayLabel(action) : trimmed,
@@ -1082,7 +1097,7 @@ export default function ChatInterface() {
       selectedAction: action,
       retestReceiptPending: action?.type === RETEST_ACTION_TYPE,
     };
-    const assistantId = replacementAssistantId ?? crypto.randomUUID();
+    const assistantId = replacementAssistantId ?? randomId();
     const retryLastTurnAction = action?.type
       ? null
       : retryLastTurnActionFromMessage(trimmed, {
@@ -1124,7 +1139,7 @@ export default function ChatInterface() {
       targetConversationId,
       requestKind,
     );
-    if (!initialRequestSession) return false;
+    if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
@@ -1298,6 +1313,10 @@ export default function ChatInterface() {
           const confirmation = event.data
             .confirmation as StrategyConfirmationPayload;
           const finalAssistantId = finalMessageId ?? assistantId;
+          // Researched peer adds ride the ordinary Try-next surface below
+          // the card's turn (research rail, spec section 6).
+          const confirmationNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1309,6 +1328,7 @@ export default function ChatInterface() {
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
+                  nextExperiments: confirmationNextExperiments,
                 }),
               ),
             ),
@@ -1372,6 +1392,7 @@ export default function ChatInterface() {
             resultFactHeadingKeyFromMetadata(finalPayload);
           const finalTextNextExperiments =
             nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
+          const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
           const finalTextPresentation =
             action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
@@ -1387,6 +1408,7 @@ export default function ChatInterface() {
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
                   memoryRecalls: finalMemoryRecalls,
+                  researchSources: finalResearchSources,
                   nextExperiments: finalTextNextExperiments,
                   contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
@@ -1405,6 +1427,7 @@ export default function ChatInterface() {
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
                 memoryRecalls: finalMemoryRecalls,
+                researchSources: finalResearchSources,
                 nextExperiments: finalTextNextExperiments,
                 contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
@@ -1801,6 +1824,12 @@ export default function ChatInterface() {
       void handleCancelConfirmationAction(action);
       return;
     }
+    if (action.type === "add_confirmation_peer") {
+      // No turn is spent: the typed endpoint patches the pending card
+      // deterministically and returns the superseding card message.
+      void handleAddConfirmationPeer(action);
+      return;
+    }
     if (value === "/action:new-chat") {
       requestNewChat();
       return;
@@ -1852,6 +1881,103 @@ export default function ChatInterface() {
     }
     void handleSend(action.label || value, action.type ? action : undefined);
   };
+
+  function activeConfirmationIdFromMessages(): string | null {
+    // Through the ref: the undo toast outlives its render.
+    return activeConfirmationIdFrom(latestMessagesRef.current);
+  }
+
+  function appendSupersedingConfirmation(
+    created: Parameters<typeof hydrateMessagesFromApi>[0][number],
+  ): boolean {
+    const hydrated = hydrateMessagesFromApi([created]).messages;
+    if (hydrated.length === 0) {
+      return false;
+    }
+    setMessages((prev) => [
+      // The new card supersedes the old one; mirror the reload projection
+      // instead of leaving two active cards on screen.
+      ...prev.map((message) =>
+        message.confirmation &&
+        message.confirmation.confirmation_state !== "cancelled" &&
+        message.confirmation.confirmation_id !==
+          hydrated[0].confirmation?.confirmation_id
+          ? {
+              ...message,
+              confirmation: {
+                ...message.confirmation,
+                confirmation_state: "superseded" as const,
+              },
+            }
+          : message,
+      ),
+      ...hydrated,
+    ]);
+    return true;
+  }
+
+  async function handleUndoConfirmationPeer(): Promise<void> {
+    const targetConversationId = activeConversationIdRef.current;
+    const activeId = activeConfirmationIdFromMessages();
+    if (!targetConversationId || !activeId) return;
+    hideToast();
+    try {
+      const restored = await restoreConfirmationAssets(
+        targetConversationId,
+        activeId,
+      );
+      appendSupersedingConfirmation(restored);
+    } catch {
+      showToast(
+        t(
+          "chat.confirmation.peer_add_failed",
+          "Couldn't change that test. The card is unchanged.",
+        ),
+        "error",
+      );
+    }
+  }
+
+  async function handleAddConfirmationPeer(action: ChatActionOption): Promise<void> {
+    const payload = action.payload ?? {};
+    const symbols = Array.isArray(payload.symbols)
+      ? payload.symbols.map((symbol) => String(symbol)).filter(Boolean)
+      : [];
+    const targetConversationId = activeConversationIdRef.current;
+    const confirmationId =
+      String(payload.confirmation_id ?? "") || activeConfirmationIdFromMessages();
+    if (!targetConversationId || !confirmationId || symbols.length === 0) {
+      return;
+    }
+    try {
+      const created = await addConfirmationPeerAssets(
+        targetConversationId,
+        confirmationId,
+        symbols,
+      );
+      if (!appendSupersedingConfirmation(created)) {
+        return;
+      }
+      // Motion is the feedback; the toast carries Undo, not information.
+      // Quick successive adds replace the single toast, and each Undo steps
+      // back exactly one add.
+      showToast("", "neutral", {
+        action: {
+          label: t("chat.confirmation.undo", "Undo"),
+          onPress: () => void handleUndoConfirmationPeer(),
+        },
+        durationMs: 6000,
+      });
+    } catch {
+      showToast(
+        t(
+          "chat.confirmation.peer_add_failed",
+          "Couldn't add that asset to this test. The rest of the card is unchanged.",
+        ),
+        "error",
+      );
+    }
+  }
 
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
@@ -1981,9 +2107,20 @@ export default function ChatInterface() {
     messages,
     isStreamingResponse,
   );
+  // Spec 10b: both empty-state placeholders carry the same invitation once the
+  // rail ships; the pre-rail strings stay behind the flag so flag-off behavior
+  // is unchanged. The follow-up placeholder is deliberately untouched.
   const chatInputPlaceholder =
     messages.length === 0
-      ? t(isGuest ? "guest.shell.input_placeholder" : "chat.input_placeholder")
+      ? t(
+          isGuest
+            ? researchRailEnabled
+              ? "guest.shell.input_placeholder"
+              : "guest.shell.input_placeholder_prerail"
+            : researchRailEnabled
+              ? "chat.input_placeholder"
+              : "chat.input_placeholder_prerail",
+        )
       : t("chat.followup_placeholder", "Ask a follow-up...");
   const showEmptyChatSurface = conversationId === null && messages.length === 0;
   const conversationComposerUnavailable =
@@ -2101,6 +2238,7 @@ export default function ChatInterface() {
           }
         }}
         onHistoryMutated={refreshHistory}
+        onProfileUpdated={onProfileUpdated}
         onConversationRemoved={handleConversationRemoved}
         onAllConversationsDeleted={handleAllConversationsDeleted}
         onToast={showToast}
@@ -2268,11 +2406,10 @@ export default function ChatInterface() {
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
-                showSuggestions={showSuggestions}
+                preferredName={greetingName}
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
-                onToggleSuggestions={() => setShowSuggestions(!showSuggestions)}
                 onToast={showToast}
               />
             ) : (
@@ -2431,7 +2568,11 @@ export default function ChatInterface() {
           />
         )}
 
-        <ChatToast message={toast?.message ?? null} variant={toast?.variant} />
+        <ChatToast
+          message={toast?.message ?? null}
+          variant={toast?.variant}
+          action={toast?.action}
+        />
       </section>
 
       {/* ── Feedback Dialog ── */}

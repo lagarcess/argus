@@ -26,9 +26,7 @@ def normalized_asset_symbols(values: Any) -> list[str]:
 def same_asset_universe(left: Any, right: Any) -> bool:
     left_symbols = normalized_asset_symbols(left)
     right_symbols = normalized_asset_symbols(right)
-    return bool(left_symbols or right_symbols) and set(left_symbols) == set(
-        right_symbols
-    )
+    return bool(left_symbols or right_symbols) and set(left_symbols) == set(right_symbols)
 
 
 def normalized_asset_universe_operation(
@@ -43,11 +41,7 @@ def normalized_asset_universe_operation(
 
 
 def _symbols(values: Iterable[Any]) -> list[str]:
-    return _dedupe(
-        symbol
-        for value in values
-        if (symbol := _symbol(value)) is not None
-    )
+    return _dedupe(symbol for value in values if (symbol := _symbol(value)) is not None)
 
 
 def _dedupe(values: Iterable[str]) -> list[str]:

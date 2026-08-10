@@ -66,7 +66,34 @@ standalone edit.
 
 ## The five
 
-### 1. Answer the first question (serial, first)
+### 1. Answer the first question — SHIPPED 2026-08-09
+
+Merged as PR #396 at `ef08b25d`, 350 files, behind
+`ARGUS_RESEARCH_RAIL_ENABLED` which is `false` in `render.yaml`,
+`.github/argus-env.sh`, and the release profile. Closes #377 and #384.
+
+All five question shapes work from an organic typed question in both
+languages: market pulse, competitor analysis, screening, sector radar, and
+single-stock analysis. Grounded discovery was absorbed rather than left beside
+it, so one provider layer, one classifier, one cache, and one meter serve
+everything. Guests get their own research allowance of three per day.
+
+**Two conditions on turning the flag on**, recorded in the rail spec §13b and
+open as issues. Both are wrong-when-enabled rather than wrong-as-shipped:
+
+- **#411** the routing gate reads which execution field is set, never how it
+  was set, so it cannot tell an interpreter-injected `strategy_type` from a
+  stated one and hands the decision to a second classifier.
+- **#412** a research job whose finalizer dies is settled by a reconciler that
+  nothing schedules, so the answer is lost until an operator runs it by hand.
+
+Also left open, none blocking: **#404** the vaguest market phrasings can still
+be answered from model knowledge, honestly labelled; **#407** the source list
+caps at five by arrival order without deduping by publisher; **#409** recorded
+research cost counts tool fees only and understates a thorough turn by roughly
+40x, which is why the guest ceiling was set conservatively.
+
+The original scope, kept for the record:
 
 Argus must handle an ordinary finance question without refusing it, then turn
 the answer into something runnable.
@@ -223,6 +250,43 @@ but a receipt list so revocation is real. ChatGPT exposed roughly 100,000 shared
 conversations through a toggle users misread, and Claude shipped share links
 with no noindex at all.
 
+## Specced, not yet placed
+
+### Follow up on unfinished work
+
+**Spec is written and founder-locked:**
+[`2026-08-09-follow-up-on-unfinished-work.md`](../superpowers/specs/2026-08-09-follow-up-on-unfinished-work.md).
+Rank against the five is a founder call and is deliberately not claimed here.
+
+Argus brings a user back by finishing a turn they started and abandoned. "You
+compared Costco, Walmart and Target three weeks ago and never tested it. Costco
+reported earnings since. Want to run it now?"
+
+- **It amends the rail spec in three places, and the amendments are written
+  into that file.** "Pull on return, never push" is replaced by: Argus may
+  follow up only on something the user started and left open, and only when a
+  fact specific to that thing changed. The initiation is the user's own,
+  deferred, so an alerting product is structurally unreachable: Argus never
+  picks the subject. Rail section 11c retires the requirement that memory record
+  research subjects, open threads, and comparison sets, and rail section 12b
+  retires "autonomous monitoring" from the non-goal list.
+- **A reader over canonical records, working with memory off**, on the same
+  precedent as pillar 4. Memory is a ranking sharpener only, and
+  `MemoryCategory` does not grow.
+- **It cannot be built yet, and that is the headline.** The rail flag is false,
+  so zero open threads exist. The spec's section 0 carries four checkable
+  preconditions: rail on in production, #411 and #412 closed, real threads
+  accumulated to a stated floor, and the email decision made.
+- **Email is a hard dependency and is not approved.** Widening the
+  single-purpose Resend helper into a consented mail capability is its own lane
+  and its own founder decision.
+- **Shares one reader with the empty chat polish sidequest, Piece 2.** Ownership
+  is stated in the spec so two do not get built.
+- **Scheduler is solved and merged.** #414 landed `argus-maintenance`, a
+  `type: cron` service on `*/15 * * * *`. A Render cron service carries one
+  schedule, so this pillar rides that pass as a guarded daily branch rather than
+  a second schedule or a second surface.
+
 ## Continuous, not a lane
 
 **Conversational runtime robustness.** Keep exercising the real chat runtime and
@@ -259,7 +323,251 @@ Standing chore work, picked up alongside lanes rather than scheduled:
   no pulsing or terminal-style treatment. Today `UsageModal.tsx` and
   `ProfileMenu.tsx` reference none of those tokens.
 
+## Sidequest lanes
+
+Bounded, dispatchable work that is not one of the five and does not block them.
+Each carries a sequencing constraint, because small does not mean parallel. Most
+of these touch a file a main lane already owns, and two agents in one file is
+how the last split brain happened.
+
+### Empty chat polish
+
+**Status: built, in review as PR #415.** Sequencing note kept for the record:
+unblocked when pillar 1 merged, parallel-safe with the mention tags lane. It touches `EmptyChatSurface.tsx`, `ChatInterface.tsx`,
+`EmptyChatGreeting.tsx`, and both locale files. The rail owns all four today and
+created the greeting component. PR #406 touches none of them, so once the rail
+lands these two run at the same time.
+
+Three pieces travel together because they share the same surface and the same
+two locale files. Split into separate lanes they would have to be serial with
+each other anyway, so splitting buys nothing and costs a merge.
+
+#### Piece 1: retire the show/hide suggestions toggle
+
+No major assistant ships this control. ChatGPT, Claude, Gemini, Perplexity, and
+Grok all put starter suggestions in the empty state and let them disappear on
+first interaction. A toggle is a control for a problem that resolves itself in
+one tap, and every control costs the user a decision. That is the no-menu rule
+applied to the interface rather than to capabilities.
+
+It also renders below the legal disclaimer, in the phone thumb zone, so the
+least important element on the screen occupies the most valuable position.
+
+**Scope:** the toggle button in `EmptyChatSurface.tsx`, its `showSuggestions`
+and `onToggleSuggestions` props, the `showSuggestions` state in
+`ChatInterface.tsx`, and the `chat.show_suggestions` and `chat.hide_suggestions`
+keys in both locale files.
+
+**Behavior after:** suggestions render whenever the empty chat surface renders,
+and stop once a conversation has a message, which happens for free because the
+surface stops rendering. Nothing replaces the toggle: no dismiss gesture, no
+auto-hide timer, no settings entry.
+
+**There is no migration to write.** The state is a plain `useState` with no
+localStorage, cookie, or server field behind it, so nothing persists and no user
+is stranded. Confirm that before deleting, but do not invent a migration for
+state that does not exist.
+
+**One decision to raise, not take.** Two flags gate the same chips.
+`NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED` is `false` in `render.yaml`,
+`.github/argus-env.sh`, `.github/private-alpha-release-profile.json`, and
+`.env.example`, while the research rail's own flag governs the same surface and
+rail spec section 10 makes prebaked suggestions part of the signed-in empty
+chat. That is one flag too many. Retiring an env flag is a release-contract move
+and all four files travel together, so it is a founder call.
+
+#### Piece 2: the greeting needs variety it does not have
+
+Four greetings exist, all keyed on time of day, one string per slot:
+
+| Hours | English | Spanish |
+| --- | --- | --- |
+| 05:00 to 08:59 | Hey, early bird. What should we look at? | Madrugaste hoy. ¿Qué miramos? |
+| 09:00 to 17:59 | What should we try today? | ¿Qué probamos hoy? |
+| 18:00 to 22:59 | What should we look into tonight? | ¿Qué exploramos esta noche? |
+| 23:00 to 04:59 | Hello, night owl. What are you curious about? | Hola, noctámbulo. ¿Qué te da curiosidad? |
+
+Rail spec section 10 asked for time of day, memory, and geography. Only time of
+day was built.
+
+**The defect is repetition, not slot count.** The day window is nine hours wide,
+so anyone opening Argus during a workday sees one identical sentence forever.
+Adding a fifth slot does not fix that.
+
+**Pool size.** Five or six per slot for `day`, since a weekday user lives
+entirely in it and three would cycle visibly inside a week. Fewer elsewhere is
+fine; nobody is in the 3am slot on a schedule.
+
+**Rotation is day-stable, never per page load.** Refreshing into a different
+greeting is exactly what makes these read as generated. Seed from the date so
+one line holds all day and changes tomorrow, with no consecutive repeat.
+
+**Market session lines are pool members, not overrides.** Time of day describes
+the user, market session describes the market, and they decouple outside Eastern
+time: 5am to 9am local overlaps pre-market only for an Eastern user. So when a
+session is active its lines become eligible candidates inside the current slot's
+pool, and the same day-stable seed picks from the widened set. Nothing overrides
+anything, a session line cannot appear outside its session, and the generic lines
+stay in play.
+
+Weight them unevenly. Weekend and holiday closure is a two-day state where the
+market fact is the most useful thing Argus can say, so it should speak often.
+Pre-market and after-hours are transient and mostly irrelevant to backtesting, so
+they surface occasionally rather than as a headline. The one place they genuinely
+matter is the fast quote shape, which already returns pre and after-hours
+figures.
+
+**Closed markets must stay true for every asset class.** A bare "markets are
+closed" is wrong for a crypto user, so say both: stocks are closed for the
+weekend, crypto does not stop. That is true for everyone and teaches a real
+difference between the asset classes Argus supports.
+
+**Correction 2026-08-10: currency pairs are not in that sentence, and an
+earlier draft of this line put them there.** Crypto trades continuously; forex
+does not. It closes Friday evening and reopens Sunday evening, so a claim that
+currency pairs never stop is false, and it shipped as user-facing copy before a
+reviewer caught it. Name crypto only. Where a line covers a session boundary,
+check the asset class actually has the property being claimed rather than
+grouping it with a neighbour.
+
+**The data already exists, including the part most likely to be faked.**
+`src/argus/domain/market_data/capabilities.py` already carries
+`fetch_alpaca_market_clock()`, returning `is_open`, `next_open`, `next_close`,
+`is_market_day`, and `phase`, and `fetch_alpaca_market_calendar()`, which hits
+the real trading calendar. No new integration, credential, or provider.
+
+Two traps: session is computed in Eastern time, never the user's clock, because
+someone in London at 2pm is in US pre-market and a local-time calculation gets
+that backwards. And holidays come from the calendar endpoint, never a weekday
+check. That assumption has already bitten this repo once, where synthetic
+fixtures placed bars on weekends and holidays so date logic passed every test and
+broke against a real calendar.
+
+**Geography, as named in rail spec section 10, means market session here.**
+Location data is a real privacy cost for a cosmetic gain, and knowing someone's
+city says nothing about what they should ask. Knowing whether the market is open
+does.
+
+**Memory-driven greetings are the highest-value addition and are already half
+built.** The rail emits research subjects, open threads, and comparison sets, and
+nothing reads them. "You looked at Netflix last week and never tested it" is both
+a greeting and the return hook, and it is the same seam the follow-up pillar
+needs. A greeting is voicing, so this stays inside the S10 lock. Same rule as the
+chips governs: memory-driven when memory has something, the rotating static pool
+otherwise, guests always static.
+
+**Correction, 2026-08-09: this is not half built, and it is not memory.**
+`research_memory_block()` in `src/argus/agent_runtime/research_grounded.py`
+writes a field named `memory` into the research sidecar at
+`messages.metadata["research"]`. That is a sidecar field, not a memory record:
+the memory system's four categories are in `src/argus/memory/contracts.py`
+(`personalization_preference`, `workflow_preference`, `explicit_decision_note`,
+`past_session_anchor`) and none of them is a research subject, an open thread,
+or a comparison set.
+
+The corpus is also empty. That block is emitted only on a research turn,
+research is gated by `research_rail_enabled()`, and `ARGUS_RESEARCH_RAIL_ENABLED`
+is `false` in `render.yaml`, so zero open threads exist today and none will until
+the flag flips, which is itself gated on #411 and #412. The lane therefore built
+the rotating static pool and the market-session lines only, and left the seam
+marked in `web/components/chat/greetingPool.ts` for a reader that has something
+to read.
+
+**Keep it warm, not clever.** "Hola, noctámbulo" works because it is warm without
+performing. A greeting that tries harder becomes a mascot, and the product
+posture is the opposite of a mascot.
+
+#### Piece 3: ask what to call the user, in its own field
+
+Add a profile field, "What should Argus call you?", rather than reusing
+`display_name`.
+
+`display_name` exists and is editable, so reuse is free, and it is still wrong.
+It is an identity field. People fill it with a legal name or whatever their email
+gave them, because it is for the account rather than for being spoken to. "What
+is next, Luis Garces?" reads like a form letter.
+
+Being addressed by name is also not universally welcome, and some people find it
+presumptuous from software. A dedicated optional field makes it a choice the user
+made rather than a side effect of having an account. Blank means the greeting
+uses no name, which needs no special handling because most of the pool will not
+use one.
+
+**The name appears in some pool members, not all.** Every greeting using someone's
+name gets grating in about three days.
+
+**This is a setting, never a memory.** Argus does not infer what to call you from
+conversation. Memory infers, settings are stated, and guessing a nickname from
+how someone types would be the creepiest thing in the product. Guests have no
+profile and fall back to the nameless pool.
+
 ## Landed this cycle
+
+- **Breakpoint audit and visual baselines** (PR #420, merged 2026-08-10 at
+  `7989e62e`) — 74 committed Playwright baselines across legal, auth, and
+  settings at 390, 720, and 1024, plus `docs/BREAKPOINTS.md` as the intent
+  page pointing at the baselines as truth. Zero component edits. Its first
+  output was a bug list rather than a document: #421 (account security
+  unreachable below 1024, shipped dead in the mobile lane) and #422 (seven
+  lower-severity defects). Two harness defects fell out of the same pass, and
+  the second matters beyond this lane: `maxDiffPixelRatio: 0.01` allowed
+  roughly 3,300 pixels of drift, so a 40 by 40 element was removed from every
+  capture without the suite going red. The measured floor is zero and the
+  budget is now `maxDiffPixels: 100`.
+
+- **Ticker mention entity tags** (PR #406, merged 2026-08-09 at `d9e8a3c5`) —
+  exact mention entity tags rendered through a shared `EntityToken` across chat
+  messages, confirmation cards, and result cards. Held until the rail landed
+  because it overlapped nine files, then reconciled once against a finished
+  lane rather than a moving one.
+
+- **Scheduled maintenance cron** (PR #414, merged 2026-08-09 at `70635831`) —
+  answers #401 and the scheduled half of #412 by defining an `argus-maintenance`
+  Render cron service that runs the existing retention and reconciliation jobs
+  unchanged. **The service has deliberately not been created.** At current
+  scale there is no guest data to delete and no stranded job to rescue, so
+  paying for an always-on service would buy nothing. The definition sits inert
+  in `render.yaml` until a blueprint sync creates it, which is a decision to
+  revisit when guest volume makes running the scripts by hand impractical.
+  Two review rounds taught eleven enumeration sites that a fourth Render
+  surface exists, and closed a fail-open where a failed service lookup read as
+  "absent" and would have passed the canary green over stale destructive code.
+
+- **Research sidecar rename** (PR #418, merged 2026-08-09 at `c69e7489`) —
+  the sidecar's `memory` block became `follow_up`, because it never was a
+  memory record and the name had already misled two readers. Done before the
+  rail flag flips, since production writing the old key would have turned a
+  rename into a data migration. Spun out #419: the key guard covers one of
+  three producers.
+
+- **Follow up on unfinished work, spec only** (PR #416, merged 2026-08-10 at
+  `1ccdf825`) — the pillar is specced and parked behind four preconditions.
+  Carries two named amendments to the rail spec, §11c and §12b, each with a
+  pointer from the paragraph it supersedes.
+
+- **Answer the first question** (PR #396, merged 2026-08-09 at `ef08b25d`) —
+  350 files behind a default-off flag. Grounded discovery absorbed into one
+  rail: one provider layer, one classifier, one cache, one meter. All five
+  question shapes proven from organic typed questions in both languages, each
+  ending on a runnable next step. Guests carry their own research allowance.
+  Two conditions on enabling are open as #411 and #412; see pillar 1 above.
+
+
+- **PostHog native funnel repair** (PR #405, merged 2026-08-09 at `1b4555e2`) —
+  product events were captured server side with the business label at
+  `attributes.product_event`, which PostHog SQL can read and its native funnel
+  builder cannot filter on, so the activation funnel returned no data while the
+  events were present. A closed allowlist of categorical dimensions is now
+  projected to top level inside `_posthog_event_properties()`, derived from the
+  sanitized attributes in one place rather than written twice, so the copies
+  cannot drift. Existing top-level properties win on collision and only scalars
+  promote.
+
+  **Two acceptance criteria remain open and are not the lane's to close.** A
+  live PostHog event and a real native funnel both need a production promotion.
+  Until then the projection is proven by tests only. The urgency was never the
+  dashboard: events already sent cannot be backfilled, so every day without it
+  was history that will never appear in a native funnel.
 
 - **Memory** (PR #386) — complete loop behind a default-off flag
   scoped to `admin` and `developer` allowlist roles. Propose, confirm, inspect,

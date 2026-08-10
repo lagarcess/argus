@@ -18,6 +18,7 @@ import {
   type GuestConversionReason,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
+import { randomId } from "@/lib/random-id";
 
 type UseGuestConversionInput = {
   account: UserResponse | null;
@@ -101,7 +102,7 @@ export function useGuestConversion({
               : {
                   reason: "keep_history",
                   conversation_id: conversationId,
-                  action_id: crypto.randomUUID(),
+                  action_id: randomId(),
                 },
           });
           handoffPreparedRef.current = true;

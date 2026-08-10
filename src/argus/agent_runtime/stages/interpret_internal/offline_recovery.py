@@ -237,5 +237,7 @@ def _pending_assumption_edit_was_not_applied(
     current_user_message: str,
     selected_thread_metadata: dict[str, Any],
 ) -> bool:
-    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
     return requested_field == "assumption" and bool(current_user_message.strip())

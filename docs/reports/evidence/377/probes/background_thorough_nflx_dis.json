@@ -1,0 +1,166 @@
+{
+  "submitted": {
+    "background": true,
+    "completed_at": null,
+    "created_at": 1786099678,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_e1d52ef6-bc34-4c70-ab10-38cd3a4f18bf",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 4096,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "anthropic/claude-opus-4-7",
+    "object": "response",
+    "output": [],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "queued",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "web_search"
+      },
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "fetch_url"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": null,
+    "user": null
+  },
+  "final": {
+    "background": true,
+    "completed_at": 1786099700,
+    "created_at": 1786099700,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_e1d52ef6-bc34-4c70-ab10-38cd3a4f18bf",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 4096,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "anthropic/claude-opus-4-7",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "financials"
+        ],
+        "results": [
+          {
+            "category": "financials",
+            "content": "## NFLX FY 2022\n| date | period | income_statement_total_revenues | income_statement_operating_profit | ratio_operating_margin |\n| --- | --- | --- | --- | --- |\n| 2025-12-31 | 2025 FY | 45,183,036,000 | 13,326,603,000 | 0.29 |\n| 2024-12-31 | 2024 FY | 39,000,966,000 | 10,417,614,000 | 0.27 |\n| 2023-12-31 | 2023 FY | 33,723,297,000 | 6,954,003,000 | 0.21 |\n| 2022-12-31 | 2022 FY | 31,615,550,000 | 5,632,831,000 | 0.18 |\n\nData available in: `NFLX_annual_income_statement_cb220e.csv` (row key column: date)\n\n## DIS FY 2022\n| date | period | income_statement_total_revenues | income_statement_operating_profit | ratio_operating_margin |\n| --- | --- | --- | --- | --- |\n| 2025-09-27 | 2025 FY | 94,425,000,000 | 13,013,000,000 | 0.14 |\n| 2024-09-28 | 2024 FY | 91,361,000,000 | 8,319,000,000 | 0.09 |\n| 2023-09-30 | 2023 FY | 88,898,000,000 | 5,100,000,000 | 0.06 |\n| 2022-10-01 | 2022 FY | 82,722,000,000 | 6,533,000,000 | 0.08 |\n\nData available in: `DIS_annual_income_statement_cb220e.csv` (row key column: date)",
+            "sources": [
+              "https://www.perplexity.ai/finance/DIS/financials?period=annual&category=INCOME_STATEMENT&fromYear=2022&fromQuarter=4&toYear=2025&toQuarter=4",
+              "https://www.perplexity.ai/finance/NFLX/financials?period=annual&category=INCOME_STATEMENT&fromYear=2022&fromQuarter=4&toYear=2025&toQuarter=4"
+            ],
+            "tickers": [
+              "NFLX",
+              "DIS"
+            ]
+          }
+        ],
+        "tickers": [
+          "NFLX",
+          "DIS"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "# Netflix (NFLX) vs. Disney (DIS): 3-Year Revenue Growth & Operating Margin\n\nBoth companies just closed FY2025 (Netflix: Dec 2025; Disney: Sep 2025), so the \"last three fiscal years\" covers FY2023 \u2192 FY2025, with FY2022 shown as the prior-year base for growth calculations.\n\n## Revenue\n\n| Fiscal Year | NFLX Revenue | NFLX YoY | DIS Revenue | DIS YoY |\n|---|---|---|---|---|\n| FY2022 (base) | $31.62B | \u2014 | $82.72B | \u2014 |\n| FY2023 | $33.72B | +6.7% | $88.90B | +7.5% |\n| FY2024 | $39.00B | +15.7% | $91.36B | +2.8% |\n| FY2025 | $45.18B | +15.9% | $94.43B | +3.4% |\n\n**3-year revenue CAGR (FY22 \u2192 FY25):** NFLX **+12.7%** vs. DIS **+4.5%**.\n\n## Operating Margin\n\n| Fiscal Year | NFLX Op. Margin | NFLX Op. Profit | DIS Op. Margin | DIS Op. Profit |\n|---|---|---|---|---|\n| FY2023 | 21% | $6.95B | 6% | $5.10B |\n| FY2024 | 27% | $10.42B | 9% | $8.32B |\n| FY2025 | 29% | $13.33B | 14% | $13.01B |\n\n**Margin expansion (FY23 \u2192 FY25):** NFLX **+8 pts** (21% \u2192 29%); DIS **+8 pts** (6% \u2192 14%).\n\n## Takeaways\n\n- **Growth:** Netflix's top line is compounding roughly **3\u00d7 faster** than Disney's (12.7% vs. 4.5% CAGR). Netflix accelerated meaningfully in FY2024\u2013FY2025 (mid-teens growth), while Disney's revenue growth has been low single digits since FY2024.\n- **Margins:** Both expanded operating margin by ~8 percentage points, but Netflix now runs at **29%** \u2014 more than double Disney's **14%**. Notably, in FY2025 Netflix generated **more operating profit ($13.33B) than Disney ($13.01B)** on roughly half the revenue.\n- **Trend direction:** Netflix shows a clean, monotonic improvement in both growth and profitability. Disney's margin trajectory reversed a dip (FY2023 fell to 6% from 8% in FY2022) and has since recovered strongly, but revenue growth remains subdued.\n\nBottom line: over the trailing three fiscal years, Netflix has delivered materially better revenue growth and reached a much higher \u2014 and still-widening \u2014 operating-margin structure than Disney, though Disney's margin recovery from the FY2023 trough has been sharp.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_7918aa73-63de-4d27-bcd8-0069eb085fdd",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.07356,
+        "cache_read_cost": 0.00468,
+        "currency": "USD",
+        "input_cost": 3e-05,
+        "output_cost": 0.03088,
+        "tool_calls_cost": 0.005,
+        "tool_calls_cost_details": {
+          "finance_search": 0.005
+        },
+        "total_cost": 0.11415
+      },
+      "input_tokens": 21137,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 11770,
+        "cache_read_input_tokens": 9361,
+        "cached_tokens": 9361
+      },
+      "output_tokens": 1235,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "invocation": 1
+        }
+      },
+      "total_tokens": 22372
+    },
+    "user": null
+  },
+  "status_trail": [
+    "in_progress",
+    "in_progress",
+    "in_progress",
+    "completed"
+  ],
+  "total_s": 21.8
+}

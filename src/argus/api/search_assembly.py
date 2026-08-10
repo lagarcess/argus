@@ -110,8 +110,7 @@ def scored_supabase_search_items(
                             **action,
                             "availability": decision_action_availability,
                         }
-                        if isinstance(action, dict)
-                        and action.get("type") == "decision"
+                        if isinstance(action, dict) and action.get("type") == "decision"
                         else action
                         for action in raw_actions
                         if not (

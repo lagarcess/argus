@@ -111,10 +111,13 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
     if action_type in _BACKEND_OWNED_LABEL_ACTIONS:
         # Backend-owned product actions: the client's display copy carries no
         # authority, so the turn text always comes from the canonical label key.
-        return _localized_action_label(
-            _ACTION_TYPE_LABEL_KEYS[action_type],
-            language=language,
-        ) or _ACTION_TYPE_LABEL_KEYS[action_type]
+        return (
+            _localized_action_label(
+                _ACTION_TYPE_LABEL_KEYS[action_type],
+                language=language,
+            )
+            or _ACTION_TYPE_LABEL_KEYS[action_type]
+        )
     if action_type == "select_discovery_candidate":
         # The chip label is the exact natural-language turn the user saw and
         # tapped; the runtime interprets it as ordinary text.
@@ -166,8 +169,7 @@ def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") ->
     label_key = (
         _ACTION_TYPE_LABEL_KEYS[payload.action.type]
         if payload.action.type in _BACKEND_OWNED_LABEL_ACTIONS
-        else payload.action.label_key
-        or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
+        else payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
     )
     if label_key:
         localized = _localized_action_label(label_key, language=language)

@@ -910,9 +910,7 @@ def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
         entries["return_drag"] = _format_percentage_points(abs(return_drag))
     benchmark_treatment = str(costs.get("benchmark_treatment") or "").strip()
     if benchmark_treatment == "same_modeled_costs":
-        entries["benchmark_cost_treatment"] = (
-            "Benchmark used the same modeled costs"
-        )
+        entries["benchmark_cost_treatment"] = "Benchmark used the same modeled costs"
     return entries
 
 

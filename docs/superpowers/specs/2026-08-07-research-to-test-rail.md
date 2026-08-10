@@ -190,6 +190,30 @@ the default path changes the volume profile, so **re-address the ceiling**, and
 make ceiling exhaustion an honest, localized message rather than a silent
 capability disappearance.
 
+### 9b. Amendment 2026-08-09: a guest's research is its own allowance
+
+Flat metering holds for signed-in users; their message allowance is their
+meter. It does not hold for guests. A guest has ten free messages and no
+account, so ten thorough comparisons is a bill nobody sized, charged to a
+stranger who may never return.
+
+**A guest gets three research questions a day**, keyed to the visitor rather
+than the workspace, on the same counters the message and simulation allowances
+already use, so a renewed workspace grants nothing new.
+
+- **One ceiling for every shape**, not one per tier. A stranger cannot tell a
+  fast lookup from a thorough comparison, and the rail decides the tier, so the
+  rail owns that cost rather than the guest.
+- **Three is deliberately conservative because the recorded cost is wrong**:
+  the ledger's per-call figure is not yet trustworthy (issue #409). Raising the
+  number later is cheap; refunding a month of underpriced strangers is not.
+- **Exhaustion names the bound that actually closed.** A guest who spent their
+  own three is told so and pointed at an account; they are never told the
+  shared capacity ran out, and a shared outage is never blamed on them. Either
+  way the turn still answers from Argus's own data and still ends on a runnable
+  row.
+- **Cache hits and signed-in turns never charge it.**
+
 ## 10. Signed-in empty chat
 
 Registered accounts only. Guests keep the current entry.
@@ -202,6 +226,9 @@ Registered accounts only. Guests keep the current entry.
 - Below it, prebaked suggestions, reusing `chat.show_suggestions`,
   `chat.hide_suggestions`, and `chat.example_queries`. The current q1 to q3
   strings may be stale; verify them.
+  **Superseded by Empty chat polish:** the toggle is retired and both of those
+  keys are deleted. The suggestions render whenever the empty chat surface
+  renders and stop when it stops. Only `chat.example_queries` survives.
 - Composer at the bottom.
 
 **Every suggestion must be genuinely runnable**, built from memory, recent
@@ -338,6 +365,12 @@ assisted-not-automatic.
 Everything already locked still holds: user confirmation before anything
 durable, guest denial, the never-store classes, and S10.
 
+**Two parts of this section are superseded as of 2026-08-09.** The
+memory-must-record list is replaced by section 11c below. The hard boundary is
+replaced by `2026-08-09-follow-up-on-unfinished-work.md` section 2, and the
+matching non-goal by section 12b below. Read those before building against this
+section.
+
 ## 11b. Amendment 2026-08-07: one rail, not two
 
 **This amendment is binding and supersedes anything above that conflicts with
@@ -403,6 +436,8 @@ points with a taxonomy arbitrating between them, which is the failure.
   subjects, open threads, and comparison sets. The rail must **emit** those in a
   typed form the memory lane can consume, even though consumption ships
   separately. Without the producer the follow-up lane has to retrofit it.
+  *(Section 11c retires the memory-must-record requirement. The producer seam
+  itself is unchanged and still required; only the consumer changed.)*
 
 ### Acceptance for this amendment
 
@@ -414,11 +449,91 @@ points with a taxonomy arbitrating between them, which is the failure.
 - The rail fires at default configuration with no knob raised.
 - Research subjects and open threads are emitted in a typed, consumable shape.
 
+## 11c. Amendment 2026-08-09: the sidecar is canonical, not memory
+
+**This amendment is binding and supersedes section 11's requirement that memory
+record research subjects, open threads, and comparison sets.** It is written as
+its own numbered amendment because section 11 states that requirement as a
+locked list, and a spec that reverses it inside a paragraph in another file
+leaves two founder-locked instructions standing.
+
+Section 11 says:
+
+> New categories memory must record, beyond confirmed preferences and saved
+> decisions: **Research subjects** ... **Open threads** ... **Comparison sets**
+
+That requirement is retired. The replacement:
+
+> **Research subjects, open threads, and comparison sets are canonical records
+> the rail emits into its own sidecar. They are not memory records.** A reader
+> takes them from `messages.metadata["research"]["follow_up"]` directly, and
+> works with memory off.
+
+### Why the replacement holds
+
+Reading your own research is the same act as reading your own runs, and that
+precedent is already settled in `2026-08-07-compare-your-own-work.md` section 3:
+reading your own runs is the product, not a memory feature, and requiring
+consent for it would be absurd. A user who researched Costco and never tested it
+does not need to consent to Argus knowing that. It is in their own transcript.
+
+Routing these through memory would put a consent step in front of a retention
+feature and gate it behind memory's flag and its admin and developer role gate.
+
+**`MemoryCategory` does not grow.** Its four values in
+[`contracts.py:27`](../../../src/argus/memory/contracts.py:27) stay as they are.
+
+**Memory keeps a role, and it is smaller.** It is an optional sharpener for
+ranking, inert when disabled, never the mechanism and never a second data
+source: when several threads qualify at once, it answers which one this user
+cares about most. With memory off, ranking falls back to structured signals.
+
+Section 11b's producer seam is unchanged and still required. What changed is who
+consumes it. The consumer is the follow-up pillar,
+`2026-08-09-follow-up-on-unfinished-work.md`, section 3.
+
 ## 12. Non-goals
 
 No skill store, model picker, agent marketplace, autonomous monitoring,
 portfolio tracking, messaging channels, or trading workflow. No auth wall before
 a first test. Argus remains the pre-flight checklist.
+
+**"Autonomous monitoring" is superseded as of 2026-08-09 by section 12b below.**
+Everything else in this list stands.
+
+## 12b. Amendment 2026-08-09: initiation, not autonomous monitoring
+
+**This amendment is binding and supersedes "autonomous monitoring" in section
+12's non-goal list.** Section 11's hard boundary is amended separately, in
+`2026-08-09-follow-up-on-unfinished-work.md` section 2. This names the non-goal
+that amendment would otherwise have overridden implicitly, so no builder holds
+two founder-locked instructions at once.
+
+The replacement:
+
+> **Argus may follow up only on something the user started and left open, and
+> only when a fact specific to that thing changed. If Argus has nothing of yours
+> to point at, it sends nothing.**
+
+### Why the replacement holds
+
+The non-goal was protecting the rule that the user initiates and Argus responds.
+That rule is intact, because **the initiation is the user's own, deferred**.
+Argus finishing a turn the user opened is not Argus picking a subject.
+
+An alerting product requires Argus to choose the topic. Under this rule it
+structurally cannot, because the subject is always a record the user created.
+"PLTR is down 8 percent" is dead by construction rather than by policy: no PLTR
+thread exists in that user's history for it to attach to.
+
+### What stays a non-goal
+
+Portfolio tracking, price and threshold triggers, digests, watchlists, thesis
+warnings, and any user-authored subject or cadence. The moment a user can author
+either, this is the same product as everyone else's.
+
+**Argus never acts without you** is untouched. A follow-up ends at the ordinary
+confirmation card and is an invitation to a turn, never a turn.
 
 ## 13. Acceptance
 
@@ -439,6 +554,32 @@ a first test. Argus remains the pre-flight checklist.
 - Signed-in empty chat shows the muted mark, greeting, and runnable
   suggestions, in English and es-419.
 - Flag-off behavior is byte-identical to today.
+
+### 13b. Conditions on enabling, not on merging
+
+These are wrong-when-enabled, not wrong-as-shipped: the rail is off in
+`render.yaml`, `argus-env.sh`, and the release profile, so nothing here
+reaches a user while the flag is false. They are recorded as gates on the
+**flag decision** rather than the merge, and turning the flag on without
+closing them is a decision someone is making against this list.
+
+- **#411, routing provenance.** The rail's clarification gate tests which
+  execution-evidence field is set, never how it was set, so it forgives an
+  interpreter-injected `strategy_type` and cannot tell that default from a
+  stated one. An explicitly interpreted buy-and-hold with no other execution
+  field is therefore indistinguishable from a bare comparison and can reach
+  research instead of the builder, with the real routing decision falling to
+  a second classifier reading the raw message. Default provenance belongs in
+  the structured interpreter contract, after which the gate is a deterministic
+  check on typed output and the tolerated-defaults set collapses to empty.
+- **#412, stranded research jobs.** A research run is finalized by a
+  process-local poller, so a restart orphans it. The stale scanner now settles
+  such a row as a retryable failure instead of leaving the turn queued
+  forever, but nothing in a deployed environment runs that scanner on a
+  schedule (the same gap as #401), and the completed answer is discarded
+  rather than resumed from the background id already persisted on the job row.
+  Enabling the rail without a scheduled reconciler means a deploy can strand a
+  user's thorough turn until an operator intervenes.
 
 ## 14. Sources
 

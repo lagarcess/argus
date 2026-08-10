@@ -139,6 +139,7 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `email`: `text` (Nullable only for a verified anonymous Auth user)
 - `username`: `text` (Unique, Nullable)
 - `display_name`: `text` (Nullable)
+- `preferred_name`: `text` (Nullable; 1 to 40 characters when present)
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
@@ -172,7 +173,14 @@ product behavior reads it, and no API path writes it.
   the profile creation path. Browser detection is only a pre-auth hint; after
   authentication this row is authoritative and no frontend repair update is
   required.
-- `display_name` is used for personalization.
+- `display_name` is an identity field. It is what the account is called.
+- `preferred_name` is what Argus calls the user when it addresses them, and
+  it is deliberately separate from `display_name`: people fill an identity
+  field with a legal name. It is optional, and null means surfaces use no
+  name. It is stated in settings and never inferred from conversation, so no
+  runtime path writes it. A registered-account preference: restrictive
+  policies read the trusted `is_anonymous` JWT claim to keep it off the guest
+  surface, because anonymous Auth users share the `authenticated` role.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.
@@ -387,6 +395,13 @@ Represents individual messages within a conversation.
   it is not projected into later model history or `last_message_preview`, so
   Recents and conversation search do not expose the fallback language. Exact
   `llm_generated` prose remains eligible for those continuity surfaces.
+- User-message `metadata.mentions` may additionally preserve a selected asset
+  or indicator's optional `message_range: { start, end }`. This is a UTF-16
+  display span into immutable `content`, stored only when it exactly matches
+  that mention's `insert_text`. It lets the transcript render the selected
+  occurrence of repeated text after reload. A missing or malformed range falls
+  back to legacy best-effort display matching; it is not resolution provenance,
+  runtime state, or an Omnisearch input, and needs no migration.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
@@ -1230,7 +1245,8 @@ canonical immutable `backtest_runs` row and reference it through
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
 - `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
   `backtests.run`; references the retained immutable confirmation `messages.id`)
-- `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
+- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
+  `chat.research`)
 - `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
   operation's canonical identity object)
@@ -1255,7 +1271,10 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
-- **operation_scope**: `chat.run_backtest`, `backtests.run`
+- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`
+  (thorough research runs ride this same lifecycle; a succeeded research job
+  keeps `result_run_id` null and references its answer message through
+  `execution_metadata.research_result_message_id`)
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 - A new `chat.run_backtest` row starts `queued` with `queued_at` set and
@@ -1436,8 +1455,10 @@ foreign key to `profiles.id`.
   reaches the purge: `purge_expired_visitor_usage` is registered in
   `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every non-dry-run
   `scripts/ops/cleanup_expired_guest_workspaces.py`. Retention therefore holds
-  exactly as often as that job is run; the runbook requires it daily, and no
-  repo-side schedule runs it (see #401).
+  exactly as often as that job is run. `render.yaml` declares an
+  `argus-maintenance` Render cron service to run it, but **that service has
+  deliberately not been created** at current scale, so today the job runs only
+  when an operator runs it. See the runbook's Scheduled Maintenance section.
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the
@@ -1486,8 +1507,9 @@ user-keyed milestone would re-fire on every renewal. Like
   in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
   non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
   never returns is deleted by that job, not by the takeover path. Retention
-  therefore holds exactly as often as that job is run; the runbook requires it
-  daily, and no repo-side schedule runs it (see #401).
+  therefore holds exactly as often as that job is run, and the
+  `argus-maintenance` cron service that would run it is declared but **not
+  created** at current scale. Today that means an operator run.
 - `claim_guest_funnel_milestone` also takes over an already-expired claim in the
   same statement, so a returning visitor is correct even between purge runs.
 

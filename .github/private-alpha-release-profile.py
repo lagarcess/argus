@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 LOCALES_DIR = ROOT / "web" / "public" / "locales"
-SURFACES = ("api", "web", "workflow")
+SURFACES = ("api", "web", "cron", "workflow")
 FORBIDDEN_KEY_FRAGMENTS = (
     "candidate_sha",
     "deploy_id",
@@ -70,8 +70,13 @@ def validate_profile(profile: dict[str, Any]) -> None:
 
     services = _require_mapping(profile.get("services"), "services")
     if set(services) != set(SURFACES):
-        raise ProfileValidationError("services must define api, web, and workflow")
-    expected_names = {"api": "argus-api", "web": "argus-app", "workflow": "argus-backtests"}
+        raise ProfileValidationError("services must define api, web, cron, and workflow")
+    expected_names = {
+        "api": "argus-api",
+        "web": "argus-app",
+        "cron": "argus-maintenance",
+        "workflow": "argus-backtests",
+    }
     for surface, expected_name in expected_names.items():
         service = _require_mapping(services.get(surface), f"services.{surface}")
         if service.get("name") != expected_name:

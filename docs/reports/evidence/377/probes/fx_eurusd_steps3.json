@@ -1,0 +1,126 @@
+{
+  "probe": "fx_eurusd_steps3",
+  "http_status": 200,
+  "elapsed_s": 10.05,
+  "response": {
+    "background": false,
+    "completed_at": 1786099557,
+    "created_at": 1786099557,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_abda83d2-bcfc-491b-8b13-0d89a8095b82",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "tickers_lookup"
+        ],
+        "results": [
+          {
+            "category": "tickers_lookup",
+            "content": "Ticker matches:\n\n| query | ticker | name |\n| --- | --- | --- |\n| EUR/USD exchange rate | NOT_FOUND |  |",
+            "tickers": null
+          }
+        ],
+        "tickers": null,
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "",
+            "tickers": [
+              "EURUSD=X"
+            ]
+          }
+        ],
+        "tickers": [
+          "EURUSD=X"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "I can\u2019t retrieve a reliable live EUR/USD quote right now\u2014the market-data response was empty. EUR/USD represents how many U.S. dollars one euro buys.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_83281bf3-8c91-4e26-a162-da63de356eff",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.03823,
+        "cache_read_cost": 0.00634,
+        "currency": "USD",
+        "input_cost": 0.00042,
+        "output_cost": 0.00543,
+        "tool_calls_cost": 0.01,
+        "tool_calls_cost_details": {
+          "finance_search": 0.01
+        },
+        "total_cost": 0.06042
+      },
+      "input_tokens": 18879,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 6116,
+        "cache_read_input_tokens": 12679,
+        "cached_tokens": 12679
+      },
+      "output_tokens": 181,
+      "output_tokens_details": {
+        "reasoning_tokens": 63
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "invocation": 2
+        }
+      },
+      "total_tokens": 19060
+    },
+    "user": null
+  }
+}

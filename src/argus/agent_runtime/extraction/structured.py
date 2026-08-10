@@ -27,10 +27,7 @@ def detect_unsupported_constraints(
     if len(symbols) > 5:
         message = "Backtests support up to 5 symbols per run."
         for rule in contract.validation_rules:
-            if (
-                rule.field_name == "asset_universe"
-                and rule.rule_type == "max_length"
-            ):
+            if rule.field_name == "asset_universe" and rule.rule_type == "max_length":
                 message = rule.message
                 break
         unsupported_constraints.append(

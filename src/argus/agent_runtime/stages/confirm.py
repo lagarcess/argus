@@ -246,15 +246,12 @@ def _strategy_with_requested_date_range_for_preflight(
     effective = extra_parameters.get("effective_date_range")
     current = strategy.get("date_range")
     if not all(
-        _is_structured_date_range(value)
-        for value in (requested, effective, current)
+        _is_structured_date_range(value) for value in (requested, effective, current)
     ):
         return strategy
     artifact_patch = extra_parameters.get("artifact_patch")
     changed_fields = (
-        artifact_patch.get("changed_fields")
-        if isinstance(artifact_patch, dict)
-        else []
+        artifact_patch.get("changed_fields") if isinstance(artifact_patch, dict) else []
     )
     if isinstance(changed_fields, list) and "date_range" in changed_fields:
         return strategy
@@ -269,9 +266,7 @@ def _strategy_with_requested_date_range_provenance(
     extra_parameters = dict(strategy.get("extra_parameters") or {})
     artifact_patch = extra_parameters.get("artifact_patch")
     changed_fields = (
-        artifact_patch.get("changed_fields")
-        if isinstance(artifact_patch, dict)
-        else []
+        artifact_patch.get("changed_fields") if isinstance(artifact_patch, dict) else []
     )
     date_was_edited = isinstance(changed_fields, list) and (
         "date_range" in changed_fields

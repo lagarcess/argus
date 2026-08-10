@@ -202,8 +202,7 @@ def _bounded_memory_search_snapshot_for_index(
     resolved_symbol = _resolve_asset_symbol(index, query=query)
     exact_symbol = (
         symbol_query
-        if symbol_query is not None
-        and symbol_query in index.conversation_ids_by_symbol
+        if symbol_query is not None and symbol_query in index.conversation_ids_by_symbol
         else None
     )
 
@@ -309,8 +308,7 @@ def _bounded_memory_search_snapshot_for_index(
             for message_id, message in index.messages_by_id.items()
             if message_id in selected_message_ids
             or (
-                str(message.get("conversation_id") or "")
-                in selected_conversation_ids
+                str(message.get("conversation_id") or "") in selected_conversation_ids
                 and message.get("role") == "assistant"
                 and (
                     str((message.get("metadata") or {}).get("result_run_id") or "")
@@ -400,14 +398,14 @@ def _build_memory_search_index(
                             getattr(message, "metadata", None)
                         )
                         or bool(
-                            (
-                                getattr(message, "metadata", None) or {}
-                            ).get("result_run_id")
+                            (getattr(message, "metadata", None) or {}).get(
+                                "result_run_id"
+                            )
                         )
                         or bool(
-                            (
-                                getattr(message, "metadata", None) or {}
-                            ).get("latest_run_id")
+                            (getattr(message, "metadata", None) or {}).get(
+                                "latest_run_id"
+                            )
                         )
                     )
                 )
@@ -433,8 +431,7 @@ def _build_memory_search_index(
                 object_id=idea.id,
                 user_id=user.id,
             )
-            and str(idea.source_conversation_id or "")
-            in visible_conversation_ids
+            and str(idea.source_conversation_id or "") in visible_conversation_ids
         ]
         evidence_refs = [
             artifact
@@ -444,8 +441,7 @@ def _build_memory_search_index(
                 object_id=artifact.id,
                 user_id=user.id,
             )
-            and str(artifact.source_conversation_id or "")
-            in visible_conversation_ids
+            and str(artifact.source_conversation_id or "") in visible_conversation_ids
         ]
         decision_refs = [
             decision
@@ -455,8 +451,7 @@ def _build_memory_search_index(
                 object_id=decision.id,
                 user_id=user.id,
             )
-            and str(decision.source_conversation_id or "")
-            in visible_conversation_ids
+            and str(decision.source_conversation_id or "") in visible_conversation_ids
         ]
 
     conversations = [row.model_dump() for row in conversation_refs]
@@ -495,9 +490,7 @@ def _build_memory_search_index(
             )
         }
 
-    candidates: dict[str, list[_Candidate]] = {
-        layer: [] for layer in _SOURCE_LAYERS
-    }
+    candidates: dict[str, list[_Candidate]] = {layer: [] for layer in _SOURCE_LAYERS}
     for conversation in conversations:
         conversation_id = str(conversation["id"])
         for suffix, text in (
@@ -583,9 +576,7 @@ def _build_memory_search_index(
             reverse=True,
         )
         asset_evidence = [
-            artifact
-            for run_id in run_ids
-            for artifact in evidence_by_run.get(run_id, [])
+            artifact for run_id in run_ids for artifact in evidence_by_run.get(run_id, [])
         ]
         asset_evidence_ids = {str(artifact["id"]) for artifact in asset_evidence}
         rollup = project_asset_rollup(
@@ -605,9 +596,7 @@ def _build_memory_search_index(
         conversation_id = decision.get("source_conversation_id")
         decision_state = decision.get("decision_state")
         if conversation_id is not None and decision_state is not None:
-            decision_states_by_conversation[str(conversation_id)].add(
-                str(decision_state)
-            )
+            decision_states_by_conversation[str(conversation_id)].add(str(decision_state))
     conversation_activity_by_id = {
         conversation_id: max(
             _mapping_activity(row)
@@ -629,10 +618,7 @@ def _build_memory_search_index(
             for run in runs_by_conversation.get(conversation_id, [])
             if run.get("status", "completed") == "completed"
             for symbol in _run_symbols(run)
-            if (
-                normalized_symbol := normalize_search_symbol(symbol)
-            )
-            is not None
+            if (normalized_symbol := normalize_search_symbol(symbol)) is not None
         )
         for conversation_id in conversation_activity_by_id
     }
@@ -642,11 +628,7 @@ def _build_memory_search_index(
             sorted(
                 rows,
                 key=lambda row: (
-                    int(
-                        bool(
-                            conversations_by_id[row.conversation_id].get("pinned")
-                        )
-                    ),
+                    int(bool(conversations_by_id[row.conversation_id].get("pinned"))),
                     conversation_activity_by_id[row.conversation_id],
                     row.activity,
                     row.conversation_id,
@@ -659,15 +641,12 @@ def _build_memory_search_index(
     }
     postings = {
         layer: build_ranked_postings(
-            (candidate.conversation_id, candidate.text)
-            for candidate in rows
+            (candidate.conversation_id, candidate.text) for candidate in rows
         )
         for layer, rows in sorted_candidates.items()
     }
     candidate_indexes_by_layer_and_conversation = {
-        layer: indexes_by_group(
-            candidate.conversation_id for candidate in rows
-        )
+        layer: indexes_by_group(candidate.conversation_id for candidate in rows)
         for layer, rows in sorted_candidates.items()
     }
     ledger_index = build_memory_ledger_index(
@@ -696,9 +675,7 @@ def _build_memory_search_index(
         str,
         defaultdict[tuple[bool, bool], list[str]],
     ] = defaultdict(lambda: defaultdict(list))
-    conversation_ids_by_decision_state: defaultdict[str, list[str]] = (
-        defaultdict(list)
-    )
+    conversation_ids_by_decision_state: defaultdict[str, list[str]] = defaultdict(list)
     for conversation_id in conversation_ids_in_seek_order:
         normalized_title = normalize_search_text(
             conversations_by_id[conversation_id].get("title") or ""
@@ -869,8 +846,7 @@ def _query_conversation_window(
         if (
             cursor_id is not None
             and cursor_updated_at is not None
-            and index.conversation_activity_by_id.get(cursor_id)
-            == cursor_updated_at
+            and index.conversation_activity_by_id.get(cursor_id) == cursor_updated_at
         )
         else None
     )
@@ -942,8 +918,7 @@ def _conversation_query_matches(
 
     cursor = (
         cursor_group_match(cursor_id)
-        if cursor_id is not None
-        and cursor_id in eligible_conversation_ids
+        if cursor_id is not None and cursor_id in eligible_conversation_ids
         else None
     )
 
@@ -1042,11 +1017,11 @@ def _exact_group_query_match(
         layer_match: _ConversationQueryMatch | None = None
         layer_index: int | None = None
         layer_count = 0
-        for candidate_index in (
-            index.candidate_indexes_by_layer_and_conversation[layer].get(
-                conversation_id,
-                (),
-            )
+        for candidate_index in index.candidate_indexes_by_layer_and_conversation[
+            layer
+        ].get(
+            conversation_id,
+            (),
         ):
             candidate = candidates[candidate_index]
             if not posting_candidate_might_match(
@@ -1065,9 +1040,8 @@ def _exact_group_query_match(
                 layer=layer,
                 layer_rank=layer_rank,
             )
-            if (
-                layer_match is None
-                or _winning_match_key(proposed) > _winning_match_key(layer_match)
+            if layer_match is None or _winning_match_key(proposed) > _winning_match_key(
+                layer_match
             ):
                 layer_match = proposed
                 layer_index = candidate_index
@@ -1149,9 +1123,7 @@ def _conversation_with_query_match(
         "layer_rank": match.layer_rank,
         "activity_at": match.candidate.activity,
         "symbol_exact_match": match.symbol_exact_match,
-        "message_id": (
-            match.candidate.source_id if match.layer == "message" else None
-        ),
+        "message_id": (match.candidate.source_id if match.layer == "message" else None),
         "match_count": match.match_count,
     }
     return projected
@@ -1224,9 +1196,7 @@ def _symbol_query_window(
         return search_rank_key(
             score=score_search_item(
                 query=query,
-                title=str(
-                    conversation.get("title") or "Untitled conversation"
-                ),
+                title=str(conversation.get("title") or "Untitled conversation"),
                 # Every id in this symbol index has a completed run containing
                 # the exact symbol, so the matched-text contribution is fixed.
                 matched_text=symbol,
@@ -1241,14 +1211,11 @@ def _symbol_query_window(
 
     def collect_ids(
         *,
-        maximum_key: tuple[int, int, int, int, datetime, int, int, str]
-        | None = None,
+        maximum_key: tuple[int, int, int, int, datetime, int, int, str] | None = None,
         cursor_tier: tuple[bool, bool] | None = None,
     ) -> list[str]:
         selected: list[str] = []
-        cursor_tier_index = (
-            tiers.index(cursor_tier) if cursor_tier is not None else 0
-        )
+        cursor_tier_index = tiers.index(cursor_tier) if cursor_tier is not None else 0
         for tier_index, tier in enumerate(tiers):
             if tier_index < cursor_tier_index:
                 continue
@@ -1274,10 +1241,7 @@ def _symbol_query_window(
                 activity = index.conversation_activity_by_id[conversation_id]
                 if cutoff_activity is not None and activity < cutoff_activity:
                     break
-                if (
-                    maximum_key is not None
-                    and rank_key(conversation_id) > maximum_key
-                ):
+                if maximum_key is not None and rank_key(conversation_id) > maximum_key:
                     continue
                 tier_ids.append(conversation_id)
                 if len(tier_ids) >= remaining:
@@ -1296,9 +1260,7 @@ def _symbol_query_window(
         conversation = index.conversations[cursor_id]
         cursor_tier = (
             bool(conversation.get("pinned")),
-            normalize_search_text(
-                conversation.get("title") or "Untitled conversation"
-            )
+            normalize_search_text(conversation.get("title") or "Untitled conversation")
             == normalize_search_text(query),
         )
         selected_ids.extend(
@@ -1332,10 +1294,7 @@ def _symbol_query_match(
         row
         for row in index.runs_by_conversation.get(conversation_id, ())
         if row.get("status", "completed") == "completed"
-        and any(
-            normalize_search_symbol(value) == symbol
-            for value in _run_symbols(row)
-        )
+        and any(normalize_search_symbol(value) == symbol for value in _run_symbols(row))
     ]
     run = max(
         matching_runs,
@@ -1439,10 +1398,9 @@ def _resolve_asset_symbol(
     if first_match == normalized_query:
         return normalized_query
     next_index = match_index + 1
-    if (
-        next_index < len(index.asset_symbols)
-        and index.asset_symbols[next_index].startswith(normalized_query)
-    ):
+    if next_index < len(index.asset_symbols) and index.asset_symbols[
+        next_index
+    ].startswith(normalized_query):
         return None
     return first_match
 
@@ -1507,9 +1465,7 @@ def _run_symbols(run: Mapping[str, Any]) -> list[str]:
     card = run.get("conversation_result_card")
     card_symbols = card.get("symbols") if isinstance(card, Mapping) else None
     return (
-        [str(symbol) for symbol in card_symbols]
-        if isinstance(card_symbols, list)
-        else []
+        [str(symbol) for symbol in card_symbols] if isinstance(card_symbols, list) else []
     )
 
 

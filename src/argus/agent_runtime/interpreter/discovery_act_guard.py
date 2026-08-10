@@ -82,9 +82,7 @@ def preserve_typed_discovery_act(
             "requires_clarification": False,
             "missing_required_fields": [],
             "reason_codes": list(
-                dict.fromkeys(
-                    [*audited.reason_codes, "typed_discovery_act_restored"]
-                )
+                dict.fromkeys([*audited.reason_codes, "typed_discovery_act_restored"])
             ),
         }
     )

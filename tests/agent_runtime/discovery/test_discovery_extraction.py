@@ -7,7 +7,7 @@ import pytest
 from argus.agent_runtime.discovery import extraction as extraction_module
 from argus.agent_runtime.discovery.extraction import extract_candidates
 from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
-from argus.domain.discovery_search import SearchResultPacket, sanitize_search_result
+from argus.domain.research.search import SearchResultPacket, sanitize_search_result
 
 
 def _packet() -> SearchResultPacket:

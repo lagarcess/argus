@@ -117,3 +117,34 @@ export function discoveryCandidateMention(
     insert_text: symbol,
   };
 }
+
+/**
+ * Sources from a research turn, in the one typed shape the sources panel
+ * renders. Every rail shape reaches this surface: the model never authors a
+ * citation line, and nothing renders that the backend sidecar did not carry.
+ */
+export function researchSourcesFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): DiscoverySource[] {
+  const raw = metadata?.research;
+  if (!raw || typeof raw !== "object") return [];
+  const record = raw as Record<string, unknown>;
+  if (!Array.isArray(record.sources)) return [];
+  return record.sources
+    .map(sourceOrNull)
+    .filter((source): source is DiscoverySource => source !== null)
+    .slice(0, MAX_SOURCES);
+}
+
+/**
+ * Citations for a streamed turn, or undefined when it carried none.
+ *
+ * The panel must be fed by the live turn and not only by a later hydration:
+ * an answer that cited pages should offer them the moment it lands.
+ */
+export function researchSourcesForFinalPayload(
+  payload: Record<string, unknown> | null | undefined,
+): DiscoverySource[] | undefined {
+  const sources = researchSourcesFromMetadata(payload);
+  return sources.length > 0 ? sources : undefined;
+}

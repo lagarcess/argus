@@ -1,0 +1,119 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Cómo gana dinero Netflix
+Iniciar sesión
+¿Cómo gana dinero Netflix?
+
+Netflix gana dinero principalmente cobrando suscripciones mensuales y, cada vez más, vendiendo publicidad. Su contenido, series, películas, eventos en vivo y juegos, sirve para atraer usuarios, mantenerlos suscritos y justificar distintos precios.
+
+FUENTE DE INGRESOS	CÓMO FUNCIONA
+Suscripciones	Cobra por planes con diferentes precios, calidad de video, dispositivos y presencia o ausencia de anuncios. Los ingresos crecen al sumar miembros y aumentar precios.
+Publicidad	En el plan más económico, los anunciantes pagan para mostrar comerciales. Netflix busca obtener ingresos tanto de la cuota del usuario como de los anuncios.
+Licencias y alianzas	Puede licenciar contenido o establecer acuerdos con productores, canales y distribuidores. Es una actividad complementaria, no el núcleo del negocio.
+La lógica económica
+Netflix invierte en contenido propio y licenciado.
+Ese catálogo atrae nuevos clientes y reduce cancelaciones.
+Los suscriptores pagan cada mes.
+En el plan con anuncios, Netflix también cobra a los anunciantes.
+Lo que queda después de contenido, tecnología, marketing, personal y otros gastos es la ganancia.
+
+Los eventos en vivo no necesitan generar tantas horas de visualización para ser valiosos: pueden provocar muchas altas, atraer anunciantes y promocionar otros programas. Los juegos y nuevos formatos cumplen principalmente una función similar de participación y retención.
+
+Cifras al 30 de junio de 2026: Netflix registró ingresos trimestrales de US$12,559.9 millones, utilidad operativa de US$4,192.6 millones y margen operativo de 33%. Prácticamente todos los ingresos reportados correspondieron al negocio de streaming.
+
+Netflix no publica actualmente un desglose preciso entre ingresos por suscripciones y publicidad, por lo que esa cifra separada no está disponible. En resumen, sigue siendo primordialmente un negocio de suscripción, con la publicidad como segundo motor de crecimiento.
+
+Estas cifras vienen de datos de mercado, no de artículos, así que no hay enlaces de fuentes para abrir.
+
+Compara Costco con Walmart y Target
+Comparación: Costco (COST) vs. Walmart (WMT) vs. Target (TGT)
+
+En resumen: Los tres son minoristas de descuento estadounidenses, pero juegan partidos muy distintos. Walmart es el gigante por volumen (ingresos ~7 veces mayores que Costco y ~7x Target). Costco es el favorito del mercado por su modelo de membresía y crecimiento estable, lo que se refleja en una valoración muy alta. Target es el más pequeño y barato en múltiplos, pero también el que más ha sufrido en ventas y utilidades recientemente.
+
+Instantánea de mercado (al cierre del 7 de agosto de 2026)
+MÉTRICA	COST	WMT	TGT
+Precio	US$947.82	US$111.85	US$149.70
+Capitalización de mercado	~US$420 mil M	~US$890 mil M	~US$68 mil M
+P/E (precio/utilidad)	47.7x	39.3x	19.8x
+EPS (utilidad por acción)	US$19.72	US$2.70	US$7.98
+Rango 52 semanas	$844, $1,097	$95, $135	$83, $150
+Rendimiento por dividendo (TTM)	~1%	~1%	~3%
+
+Walmart es la compañía más valiosa del mundo minorista por capitalización. Costco cotiza al múltiplo más elevado (los inversionistas pagan mucho por cada dólar de utilidad), mientras que Target luce como el "value" del grupo.
+
+Tamaño y rentabilidad (último año fiscal reportado)
+MÉTRICA	COST (FY2025, CERRÓ AGO-2025)	WMT (FY2026, CERRÓ ENE-2026)	TGT (FY2025, CERRÓ ENE-2026)
+Ingresos totales	US$275.2 mil M	US$713.2 mil M	US$104.8 mil M
+Crecimiento vs. año previo	+8.2%	+4.7%	−1.7%
+Utilidad bruta	US$35.3 mil M (13%)	US$177.8 mil M (25%)	US$29.3 mil M (28%)
+Utilidad operativa	US$10.4 mil M (~3.8%)	US$29.8 mil M (~4.2%)	US$5.1 mil M (~4.9%)
+Utilidad neta	US$8.1 mil M	US$22.3 mil M	US$3.7 mil M
+Margen neto	~2.9%	~3.1%	~3.5%
+
+Lo interesante de los márgenes: aunque Costco tiene el margen bruto más bajo (vende barato a propósito, ese es su gancho), su margen operativo termina siendo similar al de Walmart porque opera con muy poco gasto y gana dinero adicional con las membresías. Target, curiosamente, tiene los mejores márgenes brutos y operativos porcentuales, pero su problema es que las ventas están estancadas.
+
+Modelo de negocio y escala
+	COST	WMT	TGT
+Modelo	Membresía / clubes mayoristas	Supercenters, Sam's Club, e-commerce global	Tiendas generales de descuento "chic"
+Empleados	~341,000	~2,100,000	~415,000
+CEO	Ron Vachris	John R. Furner	Michael J. Fiddelke
+Presencia	Global (14 países)	Global	Solo EE. UU.
+¿Qué diferencia realmente a cada uno?
+Costco vende a precios muy bajos y compensa con las cuotas anuales de los socios. Menos SKUs, tiendas gigantes, lealtad altísima. El mercado lo trata más como una empresa de suscripción que como un minorista, de ahí el P/E cercano a 48x.
+Walmart es la máquina de escala: precios bajos, cadena de suministro imbatible y una operación de e-commerce que ya compite en serio con Amazon. Crecimiento moderado pero constante.
+Target ofrece una experiencia de compra más "aspiracional" con marcas propias fuertes, pero ha perdido tracción: ingresos cayeron ~2% en el último año fiscal y su acción cotiza a un múltiplo mucho más bajo, reflejando ese estancamiento. Su dividendo (~3%) es el más generoso de los tres.
+
+Estas cifras vienen de datos de mercado, no de artículos, así que no hay enlaces de fuentes para abrir.
+
+¿Qué está pasando en el sector de ciberseguridad?
+
+La ciberseguridad está en una fase alcista, pero muy desigual. Los ETF sectoriales cotizan cerca de sus máximos de 52 semanas, señal de que el mercado sigue premiando el gasto defensivo en seguridad. Dentro del sector, el liderazgo se concentra en plataformas grandes y en algunas empresas que están recuperando crecimiento; Zscaler (ZS) es la excepción más visible.
+
+Cifras al cierre del viernes 7 de agosto de 2026, último mercado disponible.
+
+El sector en bolsa
+ETF	PRECIO	VARIACIÓN DIARIA	RANGO DE 52 SEMANAS
+CIBR	US$97.85	+1.51%	US$60.07-99.97
+HACK	US$115.42	+1.97%	US$69.66-116.78
+BUG	US$41.68	+2.36%	US$23.14-42.71
+
+Los tres cerraron a menos de US$2.50 de sus máximos anuales. Eso confirma fortaleza amplia, no solamente un salto aislado en una acción. El rendimiento acumulado de 2026 no está disponible en las cifras recuperadas.
+
+Quiénes lideran y quiénes se rezagan
+EMPRESA	TICKER	PRECIO	DÍA	MÁXIMO 52 SEM.	CAPITALIZACIÓN
+Palo Alto Networks	PANW	US$363.86	+1.22%	US$376.98	US$296,545.9 millones
+CrowdStrike	CRWD	US$214.42	+3.39%	US$219.35	US$218,335.2 millones
+Fortinet	FTNT	US$159.64	-0.29%	US$172.09	US$117,130.0 millones
+Zscaler	ZS	US$168.68	+3.74%	US$336.99	US$27,277.2 millones
+Okta	OKTA	US$148.32	+3.35%	US$157.00	US$24,638.9 millones
+SentinelOne	S	US$21.40	+3.08%	US$21.50	US$7,206.3 millones
+Liderazgo estructural: PANW y CRWD. Son, por gran diferencia, las mayores compañías del grupo por valor bursátil y ambas cotizan cerca de sus máximos anuales.
+Mejor posición relativa reciente: S está apenas US$0.10 debajo de su máximo de 52 semanas; OKTA también está cerca del suyo.
+Rezago claro: aunque ZS tuvo la mejor sesión del grupo, con +3.74%, su precio sigue muy lejos de su máximo de US$336.99. Es un rebote fuerte dentro de una trayectoria comparativamente débil.
+FTNT sigue siendo una empresa grande y rentable, pero ese día fue la única que cayó y permanece más alejada de su máximo que PANW, CRWD, OKTA o S.
+CYBR ya no ofrece una cotización corriente comparable: la última cifra disponible es del 13 de febrero de 2026, por lo que no sirve para medir el mercado actual.
+Qué está impulsando el sector
+
+La IA aumenta tanto la amenaza como el gasto defensivo. Facilita ataques automatizados, phishing más convincente y creación rápida de malware, pero también aumenta la demanda de detección y respuesta automatizadas.
+
+Consolidación de proveedores. Las empresas quieren reducir la cantidad de herramientas separadas y comprar plataformas integradas. Esto favorece especialmente a PANW, CRWD y FTNT, que pueden vender varios módulos al mismo cliente.
+
+Migración a nube, identidad y “zero trust”. El trabajo híbrido y las aplicaciones en múltiples nubes mantienen la demanda de seguridad de acceso. Aquí compiten principalmente ZS, OKTA, PANW y CRWD.
+
+El mercado distingue crecimiento de rentabilidad. FTNT destaca por un margen operativo de 32% en sus últimos datos de doce meses disponibles, frente a 14% para PANW. Por el contrario, CRWD y ZS todavía mostraban márgenes operativos contables negativos de 8% y 5%, respectivamente. Eso explica por qué sus acciones pueden reaccionar con más violencia a cambios en crecimiento o expectativas.
+
+En síntesis: el sector está fuerte y cerca de máximos, pero no sube de manera uniforme. PANW y CRWD dominan por escala; OKTA y S muestran fortaleza relativa; FTNT aporta la rentabilidad más sólida; y ZS sigue siendo el principal rezagado pese a su rebote reciente. Esto es análisis sectorial, no asesoría de inversión.
+
+Estas cifras vienen de datos de mercado, no de artículos, así que no hay enlaces de fuentes para abrir.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar First Trust NASDAQ Cybersecurity ETF CIBR en los últimos 3 años
+↳
+Probar First Trust NASDAQ Cybersecurity ETF CIBR frente a Palo Alto Networks PANW, CrowdStrike Holdings, Inc. Class A CRWD y Fortinet FTNT en los últimos 3 años
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera. Términos · Privacidad.
+
+Chat temporal · disponible hasta 16 ago 2026

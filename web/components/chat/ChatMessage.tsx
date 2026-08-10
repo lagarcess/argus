@@ -12,7 +12,12 @@ import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
 import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
 import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
-import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
+import NextMoveRow, {
+  NextMoveDetail,
+  NextMoveSeparator,
+  NextMoveTicker,
+  NextMoveTitle,
+} from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import type { DecisionState } from "@/lib/argus-api";
@@ -38,6 +43,8 @@ import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
+import { EntityToken } from "./entity-token";
+import { messageMentionPieces } from "./mention-rendering";
 
 
 type ChatMessageProps = {
@@ -452,6 +459,12 @@ export default function ChatMessage({
                     symbol: candidate.symbol,
                     defaultValue: "Backtest {{symbol}}",
                   });
+                  // One row vocabulary: the same verb the rail's rows use,
+                  // with the name leading and the ticker as its badge. The
+                  // sent text stays the backend-owned action string.
+                  const testVerb = t("chat.next_experiments.test_verb", {
+                    defaultValue: "Test",
+                  });
                   const hasName =
                     Boolean(candidate.name) && candidate.name !== candidate.symbol;
                   // One chip per row: the first corroborating source. Cheap
@@ -480,13 +493,11 @@ export default function ChatMessage({
                         })
                       }
                     >
-                      <NextMoveTitle>{sendText}</NextMoveTitle>
-                      {hasName ? (
-                        <>
-                          <NextMoveSeparator>·</NextMoveSeparator>
-                          <NextMoveDetail>{candidate.name}</NextMoveDetail>
-                        </>
-                      ) : null}
+                      <NextMoveTitle>
+                        {testVerb}
+                        {hasName ? ` ${candidate.name}` : ""}{" "}
+                        <NextMoveTicker>{candidate.symbol}</NextMoveTicker>
+                      </NextMoveTitle>
                       {candidate.reason_text ? (
                         <>
                           <NextMoveSeparator>·</NextMoveSeparator>
@@ -603,6 +614,41 @@ export default function ChatMessage({
             </div>
           )}
 
+          {/* One sources surface for every rail shape: the model never writes
+              a citation line, and this renders only what the backend sidecar
+              carried. */}
+          {!message.discovery && (message.researchSources?.length ?? 0) > 0 ? (
+            <div className="mt-2 flex w-full max-w-[min(100%,660px)]">
+              <button
+                type="button"
+                onClick={() => setShowSources(true)}
+                data-testid="research-sources-open"
+                className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
+              >
+                {t("chat.discovery_results.sources_panel_open", {
+                  count: message.researchSources?.length ?? 0,
+                  defaultValue: "{{count}} sources ›",
+                  defaultValue_one: "{{count}} source ›",
+                })}
+              </button>
+            </div>
+          ) : null}
+
+          {!message.discovery &&
+          showSources &&
+          (message.researchSources?.length ?? 0) > 0 ? (
+            <DiscoverySourcesPanel
+              onClose={() => {
+                setShowSources(false);
+                setAnchorSourceIndex(null);
+              }}
+              sidecar={{
+                sources: message.researchSources ?? [],
+                retrieved_at: "",
+              }}
+            />
+          ) : null}
+
           {message.discovery && showSources ? (
             <DiscoverySourcesPanel
               onClose={() => {
@@ -660,7 +706,20 @@ export default function ChatMessage({
                           )
                         }
                       >
-                        <NextMoveTitle>{narrowLabel}</NextMoveTitle>
+                        <NextMoveTitle>
+                          {row.labelParts
+                            ? row.labelParts.map((part, partIndex) =>
+                                part.type === "ticker" ? (
+                                  <span key={partIndex}>
+                                    {" "}
+                                    <NextMoveTicker>{part.value}</NextMoveTicker>
+                                  </span>
+                                ) : (
+                                  <span key={partIndex}>{part.value}</span>
+                                ),
+                              )
+                            : narrowLabel}
+                        </NextMoveTitle>
                         {row.detail ? (
                           <>
                             <NextMoveSeparator>·</NextMoveSeparator>
@@ -864,74 +923,24 @@ function ResultBreakdown({
 
 function UserMessageContent({ content, mentions }: { content: string; mentions: ChatMention[] }) {
   if (mentions.length === 0) return <>{content}</>;
-
-  const pieces: Array<string | ChatMention> = [];
-  let cursor = 0;
-  const remainingMentions = [...mentions];
-
-  while (cursor < content.length) {
-    let nextMatch:
-      | {
-          index: number;
-          mention: ChatMention;
-          text: string;
-          mentionIndex: number;
-        }
-      | null = null;
-
-    for (let mentionIndex = 0; mentionIndex < remainingMentions.length; mentionIndex++) {
-      const mention = remainingMentions[mentionIndex];
-      const candidates = [mention.insert_text, mention.symbol ?? "", mention.label]
-        .filter(Boolean)
-        .sort((a, b) => b.length - a.length);
-      for (const candidate of candidates) {
-        const index = content.indexOf(candidate, cursor);
-        if (index < 0) continue;
-        if (nextMatch === null || index < nextMatch.index) {
-          nextMatch = { index, mention, text: candidate, mentionIndex };
-        }
-      }
-    }
-
-    if (nextMatch === null) {
-      pieces.push(content.slice(cursor));
-      break;
-    }
-
-    if (nextMatch.index > cursor) {
-      pieces.push(content.slice(cursor, nextMatch.index));
-    }
-    pieces.push(nextMatch.mention);
-    cursor = nextMatch.index + nextMatch.text.length;
-    remainingMentions.splice(nextMatch.mentionIndex, 1);
-  }
+  const pieces = messageMentionPieces(content, mentions);
 
   return (
     <>
       {pieces.map((piece, index) =>
-        typeof piece === "string" ? (
-          <span key={`text-${index}`}>{piece}</span>
+        piece.kind === "text" ? (
+          <span key={`text-${index}`}>{piece.text}</span>
         ) : (
-          <MentionText key={`${piece.id}-${index}`} mention={piece} />
+          <EntityToken
+            key={`${piece.mention.id}-${index}`}
+            kind={piece.mention.type}
+            surface="transcript"
+            title={piece.mention.description ?? piece.mention.label}
+          >
+            {piece.text}
+          </EntityToken>
         ),
       )}
     </>
-  );
-}
-
-function MentionText({ mention }: { mention: ChatMention }) {
-  const label = mention.type === "asset" ? mention.insert_text : mention.label;
-  const color =
-    mention.type === "asset"
-      ? "text-[#c2a44d]"
-      : "text-[#494fdf] dark:text-[#8f93ff]";
-
-  return (
-    <span
-      className={`mx-0.5 inline-flex select-none items-baseline rounded-sm px-0.5 font-semibold ${color}`}
-      title={mention.description ?? mention.label}
-    >
-      {label}
-    </span>
   );
 }

@@ -16,6 +16,7 @@ import { isConversationMemoryOptOut } from "./memory-privacy";
 import { currentViewportBand } from "./responsive-layout";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { MarketSessionPhase } from "@/components/chat/greetingPool";
 import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
@@ -173,6 +174,8 @@ export type BacktestJob = {
   conversation_id: string;
   request_message_id?: string | null;
   confirmation_message_id?: string | null;
+  // Absent on legacy rows; treat missing as a backtest job.
+  operation_scope?: "chat.run_backtest" | "backtests.run" | "chat.research" | null;
   status: BacktestJobStatus;
   result_run_id?: string | null;
   failure_code?: string | null;
@@ -556,6 +559,8 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
+  /** Empty clears it, which is how a user opts out of being addressed by name. */
+  preferred_name?: string | null;
   avatar_theme?: AvatarTheme;
 };
 
@@ -565,6 +570,23 @@ export async function getMe() {
 
 export async function getUsageAllowances() {
   return apiFetch<UsageAllowanceResponse>("/me/usage");
+}
+
+export type MarketSessionResponse = {
+  session: {
+    phase: MarketSessionPhase;
+    is_market_day: boolean;
+    as_of: string;
+  } | null;
+};
+
+/**
+ * Which session US equities are in, resolved by the backend in Eastern time
+ * against the real trading calendar. `session` is null when that calendar is
+ * unreachable, and callers say nothing about the market rather than guessing.
+ */
+export async function getMarketSession(signal?: AbortSignal) {
+  return apiFetch<MarketSessionResponse>("/market/session", { signal });
 }
 
 export async function patchMe(patch: ProfilePatch) {
@@ -710,6 +732,41 @@ export async function getConversationMessages(
   );
 }
 
+export async function addConfirmationPeerAssets(
+  conversationId: string,
+  confirmationId: string,
+  symbols: string[],
+) {
+  // Deterministic basket growth: no chat turn, no allowance spend. The
+  // backend re-validates every symbol against the active turn's peer rows.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    },
+  );
+  return response.message;
+}
+
+export async function restoreConfirmationAssets(
+  conversationId: string,
+  confirmationId: string,
+) {
+  // Undo for a peer add: the backend re-materializes the exact previous
+  // asset set from the card's own typed adjustment data.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restore_previous: true }),
+    },
+  );
+  return response.message;
+}
+
 export async function patchConversation(
   conversationId: string,
   patch: {
@@ -844,7 +901,7 @@ export async function runBacktest(payload: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": randomId(),
     },
     body: JSON.stringify(payload),
   });
@@ -875,7 +932,7 @@ export async function streamChatMessage(
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-  const submittedRequestId = options.requestId ?? crypto.randomUUID();
+  const submittedRequestId = options.requestId ?? randomId();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -896,7 +953,7 @@ export async function streamChatMessage(
       "X-Request-Id": submittedRequestId,
       "Idempotency-Key":
         (typeof input !== "string" && runActionIdempotencyKey(input)) ||
-        crypto.randomUUID(),
+        randomId(),
       ...authHeaders,
     },
     body: JSON.stringify({
@@ -1110,6 +1167,7 @@ export async function postFeedback(payload: {
   });
 }
 import type { UserResponse } from "./guest-account";
+import { randomId } from "./random-id";
 
 export type {
   AccountCapabilities,

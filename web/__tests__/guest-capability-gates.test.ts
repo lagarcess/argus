@@ -145,3 +145,99 @@ describe("guest capability gate policy", () => {
     );
   });
 });
+
+describe("a spent allowance always explains itself", () => {
+  // The defect: `if (!conversationId) return false` ran before the conversion
+  // prompt, so a guest returning on a fresh page typed a question, pressed
+  // send, and got silence: no message, no signup path, no request made.
+  const source = readFileSync(
+    join(import.meta.dir, "../components/guest/useGuestExperience.ts"),
+    "utf-8",
+  );
+
+  test("neither gate drops the send before requesting conversion", () => {
+    const start = source.indexOf("const usage = await getUsageAllowances()");
+    // Anchor on the call site; the bare name also appears in the imports, and
+    // slicing from there produced an empty body that asserted nothing.
+    const end = source.indexOf("return true;", source.indexOf("decideGuestMessageGate({"));
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    const gateBody = source.slice(start, end);
+    expect(gateBody).toContain("decideGuestSimulationGate({");
+    expect(gateBody).toContain("decideGuestMessageGate({");
+    expect(gateBody).not.toContain("if (!conversationId) return false;");
+  });
+
+  test("the pending action is what needs a conversation, not the prompt", () => {
+    for (const reason of ["simulation_limit", "message_limit"]) {
+      const at = source.indexOf(`reason: "${reason}"`);
+      expect(at).toBeGreaterThan(-1);
+      // The payload is built conditionally and collapses to null without a
+      // conversation, rather than the whole prompt being skipped.
+      const around = source.slice(Math.max(0, at - 400), at + 400);
+      expect(around).toContain("conversationId");
+      expect(around).toContain(": null,");
+    }
+  });
+});
+
+describe("no send is refused in silence", () => {
+  // The class, not the two instances: any path that declines a real message
+  // has to leave the person something to react to. Two refusals are allowed
+  // to stay quiet because nothing was asked of Argus, and they are named here
+  // so a new silent one cannot hide among them.
+  const chat = readFileSync(
+    join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
+    "utf-8",
+  );
+  const SILENT_BY_DESIGN = [
+    "if (!trimmed) return false;",
+    "if (sendAdmissionInFlightRef.current || isStreamingResponse) {",
+  ];
+
+  function sendHandlerBody() {
+    const start = chat.indexOf("const handleSend = async (");
+    expect(start).toBeGreaterThan(-1);
+    const end = chat.indexOf("\n  const ", start + 40);
+    expect(end).toBeGreaterThan(start);
+    return chat.slice(start, end);
+  }
+
+  test("every bare refusal in the send handler is one of the named exceptions", () => {
+    const body = sendHandlerBody();
+    const lines = body.split("\n");
+    const bare: string[] = [];
+    let scanned = 0;
+    lines.forEach((line, index) => {
+      if (!/^\s*return false;\s*$/.test(line)) return;
+      scanned += 1;
+      // Surfaced here, or delegated to admitSend, which surfaces on its own
+      // for every refusal that is not a superseded admission. The sibling
+      // block above is what holds admitSend to that.
+      const preceding = lines.slice(Math.max(0, index - 8), index + 1).join("\n");
+      if (
+        /refuseSend|showToast|setGuestSubmissionError|onGateError|admitSend/.test(
+          preceding,
+        )
+      ) {
+        return;
+      }
+      if (SILENT_BY_DESIGN.some((allowed) => preceding.includes(allowed))) return;
+      bare.push(
+        `${index + 1}: ${lines.slice(Math.max(0, index - 1), index + 1).join(" / ").trim()}`,
+      );
+    });
+    // Guards the scan itself: an empty result has to mean every refusal was
+    // classified, not that the slice found none to look at.
+    expect(lines.length).toBeGreaterThan(200);
+    expect(scanned).toBeGreaterThanOrEqual(3);
+    expect(bare).toEqual([]);
+  });
+
+  test("the busy refusal says the same thing on both paths", () => {
+    const body = sendHandlerBody();
+    const busy = body.match(/refuseSend\("chat\.send_busy", SEND_BUSY_FALLBACK\)/g) ?? [];
+    expect(busy.length).toBe(2);
+  });
+});

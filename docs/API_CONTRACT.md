@@ -780,8 +780,9 @@ Application-facing user object.
 {
   "id": "uuid",
   "email": "user@email.com",
-  "username": "lucas",
-  "display_name": "Lucas",
+  "username": "alex",
+  "display_name": "Alexandra",
+  "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
   "theme": "dark",
@@ -798,7 +799,19 @@ Application-facing user object.
 ```
 
 **Notes:**
-- `display_name` is used for personalization.
+- `display_name` is an identity field. It is what the account is called.
+- `preferred_name` is what Argus calls the user when it addresses them, and it
+  is deliberately not `display_name`: people fill an identity field with a legal
+  name, so a greeting built from it addresses the account rather than the
+  person. It is optional, because being addressed by name is not universally
+  welcome. Null or absent means surfaces use no name, which needs no special
+  handling.
+  - Stated, never inferred. It is a setting; nothing derives it from
+    conversation, and no runtime writes it.
+  - Bounded at 40 characters. Blank or whitespace clears it, which is how a user
+    opts out after opting in.
+  - A registered-account preference. Guest responses omit it entirely, and the
+    database policies keep it off the guest surface.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -1733,8 +1746,8 @@ Create account.
   "email": "user@email.com",
   "password": "string",
   "captcha_token": "bounded-turnstile-token",
-  "display_name": "Lucas",
-  "username": "lucas",
+  "display_name": "Alex",
+  "username": "alex",
   "language": "es-419"
 }
 ```
@@ -1878,8 +1891,8 @@ Retrieve the current authenticated user profile and preferences.
   "user": {
     "id": "uuid",
     "email": "user@email.com",
-    "username": "lucas",
-    "display_name": "Lucas",
+    "username": "alex",
+    "display_name": "Alex",
     "language": "en",
     "locale": "en-US",
     "theme": "dark",
@@ -1994,6 +2007,47 @@ window.
 - `500 Server Error`: durable usage truth is unavailable outside the explicit
   development fallback mode.
 
+## `GET /market/session`
+
+Return which session US equities are in. Owner-authenticated read; it holds no
+per-account state.
+
+**Response:**
+```json
+{
+  "session": {
+    "phase": "closed_weekend",
+    "is_market_day": false,
+    "as_of": "2026-08-09T13:04:22-04:00"
+  }
+}
+```
+
+**Session semantics:**
+- `phase` is one of `pre_market`, `open`, `after_hours`, `closed_weekend`,
+  `closed_holiday`, or `closed`. `closed` is the overnight lull on a trading
+  day, which is neither a weekend nor a holiday.
+- The session is resolved in Eastern time, never in the caller's timezone.
+  Someone in London at 2pm is in US pre-market, and a local-time calculation
+  reports that backwards.
+- Closure comes from the trading calendar, never from a weekday check. The
+  weekday is consulted only after the calendar has already ruled the day
+  closed, and only to choose between `closed_weekend` and `closed_holiday`.
+- `pre_market` runs from 04:00 Eastern to the session open, and `after_hours`
+  from the session close to 20:00 Eastern. The regular open and close come from
+  the calendar per session, because half days move them.
+- One calendar read covers a whole day: a past or present calendar day's
+  session never changes, so it is cached by date rather than on a TTL.
+- `session` is `null` when the trading calendar is unreachable. Clients say
+  nothing about the market rather than guessing an open or a holiday. Argus
+  supports crypto and currency pairs, which do not close, so any client copy
+  about a closure must stay true for those asset classes too.
+
+**Error rules:**
+- `401 Unauthorized`: authentication is missing or invalid.
+- A provider or calendar failure is not an error response. It returns `200`
+  with `session: null`.
+
 ## `PATCH /me`
 
 Update profile preferences. Partial update semantics are supported.
@@ -2001,7 +2055,8 @@ Update profile preferences. Partial update semantics are supported.
 **Request:**
 ```json
 {
-  "display_name": "Lucas",
+  "display_name": "Alexandra",
+  "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
   "theme": "dark",
@@ -2020,6 +2075,9 @@ Update profile preferences. Partial update semantics are supported.
 - Clients may send only the fields that changed.
 - Null values are allowed where fields are unknown.
 - Unsupported `language` or `locale` returns 422.
+- `preferred_name` is bounded at 40 characters; longer values return 422. An
+  empty or whitespace-only value clears it rather than storing a blank name.
+  Omitting it leaves it untouched, so editing another preference cannot wipe it.
 - `avatar_theme` accepts only `ocean`, `plum`, `teal`, `ember`, `gold`,
   `indigo`, or `slate`; it cannot be `null`, and invalid values return 422.
 - Avatar themes are registered-account preferences. Guests cannot update a
@@ -2592,6 +2650,7 @@ Contract rules:
       "description": "Crypto",
       "insert_text": "BTC",
       "provider": "kraken",
+      "message_range": { "start": 4, "end": 7 },
       "support_status": "supported"
     }
   ],
@@ -2614,6 +2673,16 @@ preserve the user's chosen asset identity. Backend resolution still validates
 extracted candidates after interpretation. `provider` is optional machine
 provenance for resolver/debugging continuity; it must not be rendered as
 assistant-facing copy or used to bypass execution validation.
+
+`mentions[].message_range` is optional display-only provenance for the final
+serialized `message`. It is a UTF-16 `{ start, end }` span whose substring must
+equal the mention's `insert_text`. The composer calculates it after its existing
+whitespace normalization, so duplicate symbols remain unambiguous in the
+transcript. Admission accepts an ordinary turn even when this display metadata
+is malformed, stale, or out of bounds: it simply omits the range from durable
+metadata. A valid range is rendered on the submitted user message only; it does
+not enter `ResolutionProvenance`, context hints, LangGraph input, provider
+resolution, execution state, message content, or Omnisearch indexing/querying.
 
 **Conditional Header:**
 - `Idempotency-Key` is required when `action.type = run_backtest`, and its value
@@ -2882,6 +2951,198 @@ The dedicated Strategy and Collection CRUD/list/attachment endpoints are
 removed. Existing database rows remain owner-scoped and readable through legacy
 history compatibility. The direct backtest endpoint may still resolve an owned
 historical `strategy_id`; no endpoint creates or mutates those records.
+
+### Research Responses
+
+Behind `ARGUS_RESEARCH_RAIL_ENABLED` (default off; flag-off behavior is
+byte-identical to the pre-rail router), a question turn the interpreter
+classifies as a finance question is grounded through the Perplexity Agent
+API's `finance_search` tool, selected by question shape with no user-visible
+mode.
+
+**One rail, not two (spec section 11b).** With the flag on, one classifier
+owns question shape for everything previously split between grounded
+discovery and research: typed `asset_discovery` turns enter the same router,
+a comparison whose assets the user has all named becomes grounded
+cross-company research, and discovery's asset-finding runs as the rail's
+`find` operation. One Perplexity provider layer (`research.search` for the
+direct Search API, `research.perplexity_agent` for the Agent API), one
+shared cache under the section 7 per-data-class TTL table (seven classes,
+from seconds-fresh quotes and minutes-fresh movers through days-fresh
+estimates, months-stable peers and constituents, quarterly fundamentals,
+and the two effectively immutable rows), one meter: find turns record
+capability-classed ledger rows (`peer_expansion` with anchors, `screening`
+for categories) and their source-backed searches are gated by the shared
+research ceiling instead of the separate discovery allowance. The discovery
+sidecar, its typed action rows, and the guest experience are unchanged; find
+turns additionally carry the `research` sidecar below with `shape: "find"`.
+Flag off, the pre-rail act-gated discovery path runs byte-identically,
+including its own allowance and ledger rows.
+
+The assistant message may carry an additive `research` sidecar in its
+final payload and persisted metadata:
+
+```json
+{
+  "research": {
+    "schema_version": "argus_research/v1",
+    "capability_class": "fast_quote",
+    "shape": "fast",
+    "sources": [
+      {
+        "title": "Netflix Q2 2026 shareholder letter",
+        "domain": "example.com",
+        "url": "https://example.com/filing",
+        "source_date": "2026-07-16"
+      }
+    ],
+    "retrieved_at": "2026-08-07T15:04:05Z",
+    "anchor_symbols": ["NFLX"],
+    "peers": [
+      {"symbol": "DIS", "name": "The Walt Disney Company", "asset_class": "equity"}
+    ],
+    "usage": {"invocations": 1, "latency_ms": 640, "cost_usd": 0.005, "cache_status": "miss"},
+    "follow_up": {
+      "schema_version": "argus_research_follow_up/v1",
+      "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
+      "comparison_set": [],
+      "peer_suggestions": ["DIS"],
+      "open_thread": {"shape": "fast", "period_of_interest": null}
+    },
+    "degraded": {"code": "asset_class_not_covered"}
+  }
+}
+```
+
+Contract rules:
+
+- **Truth boundary (same standing as the S10 memory lock):** research informs
+  the reader; Argus providers execute the simulation. No `finance_search`
+  value may reach a backtest; a test launched from a research answer
+  re-grounds through Argus market-data providers, and research turns never
+  write strategy, confirmation, or execution state.
+- `capability_class` is one of `fast_quote`, `balanced_lookup`,
+  `thorough_research`, `screening`, `peer_expansion`, recorded per research
+  turn on the cost ledger even for cache hits and degraded turns. The class
+  describes the work, not the configuration tier it ran on: a market survey
+  is `screening` whether it grounded on the balanced tier or the thorough
+  one, so retuning a shape never moves its metering.
+- Section 2's five shapes are one rail. Market pulse ("what's moving
+  today"), screening ("semiconductor stocks under a 20 P/E"), and sector
+  radar ("what's happening in cybersecurity") ground through
+  `finance_search` on the balanced tier and cache as `movers`. Screening
+  carries every stated condition into the provider call and the answer names
+  which condition each asset satisfies; a screen that silently drops the
+  user's threshold is a defect, not a simplification. Sector radar answers
+  with sector analysis, not a list of company descriptions. These shapes name
+  no subject, so their runnable rows come from the assets the answer itself
+  found, each passed through provider-backed resolution first.
+- A survey that returns zero `finance_search` invocations answered from model
+  knowledge. It carries `degraded.code = "survey_not_grounded"` and says so
+  in prose rather than presenting itself as the current state of the market.
+- Every `peers[]` entry passed provider-backed asset resolution before
+  emission; unresolvable names never become actionable anywhere.
+- `sources` carries the same typed shape grounded discovery emits
+  (`{title, domain, url, source_date}`), and every rail shape renders through
+  that one panel. The model never authors a citation line: prompts forbid
+  source lines and links, and only URLs the packet returned can enter the
+  typed path. A grounded answer with no linkable sources says so, because
+  market data arrives as figures rather than articles.
+- Assistant prose never contains provider tool names. The guard derives from
+  the `tools` tuples in `research.config`, so a newly configured tool is
+  covered the day it is added, and it reaches the vocabulary families around
+  those names (`finance_quotes` as well as `finance_search`). Degradation is
+  told from the typed `degraded.code`, never from the model narrating which
+  mechanism failed.
+- A Try-next row never names a window longer than the coverage Argus resolved
+  for its assets. A full window says so, a shorter one names its real start
+  ("since March 2026"), and unknown coverage drops the window wording
+  entirely. The row's `send_text` carries the same window it displays.
+- `follow_up` is the typed producer seam for the personalization-memory
+  program (spec section 11): research subjects, the comparison set when two
+  or more subjects were compared, peer suggestions, and the open thread, in
+  a consumable shape. It is not a memory record and carries none of the four
+  memory categories. The rail only emits; nothing reads or writes memory
+  here, and consumption ships in the memory lane.
+- `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
+  ground through the balanced shape; the provider's `etf_holdings` table is
+  parsed deterministically, weight order preserved, and each named holding
+  passes provider-backed resolution before becoming a peer or a runnable
+  row. This is the exposure-vehicle grounding path: collision-prone tickers
+  are verified through the holdings table instead of being dropped.
+- `anchor_symbols` names the research subjects. The persisted sidecar is the
+  **only** cross-turn home for researched peers: inline turns, the dev
+  synchronous fallback, and the background job finalizer all persist it, and
+  a later confirmation card offers remaining peers by scanning the transcript
+  newest-first for the first sidecar whose anchors or peers overlap the
+  basket. No runtime state key carries peers.
+- Crypto and currency pairs never route to `finance_search` (probe-verified
+  misresolution and empty-quote behavior); they answer from Argus's own data
+  with `degraded.code = "asset_class_not_covered"` and still offer a runnable
+  next step.
+- Runnable next steps ride the existing typed `next_experiments` surface.
+  Provider identity is absent from prose and sidecars; route receipts and the
+  cost ledger own provenance.
+- Thorough-shape questions run in provider background mode through the
+  existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
+  `operation_scope` is `"chat.research"`, and the finalized answer arrives as
+  a new assistant message referenced by the succeeded job's
+  `execution_metadata.research_result_message_id`. A succeeded research job
+  has a null `result_run_id` by design; clients refresh the transcript on
+  terminal research jobs instead of fetching a run. `operation_scope` rides
+  every serialized job surface, including the polling
+  `GET /backtest-jobs/{job_id}` payload; absent means an ordinary backtest.
+- Thorough answers join the shared research cache like every other shape:
+  the finalized packet is stored under the requesting turn's key, and an
+  identical question within the class TTL answers inline with
+  `cache_status: "hit"`, no job, and no provider spend.
+- Runnable rows name assets in one vocabulary: a short display name derived
+  from the resolver's own name (listing boilerplate like "Common Stock" or
+  "Inc." stripped, share classes kept) plus the resolver-verified ticker.
+  Rows carry an additive `label_parts` array of `{type: "text" | "ticker",
+  value}` segments so clients can render the ticker as a badge; `label`
+  remains the same sentence in plain text (`Test Netflix (NFLX) over the
+  last 3 years`) and stays authoritative for aria labels, analytics, and any
+  client that ignores parts. Row copy names the window it actually asks for;
+  `send_text` is a prompt, not display copy, and is unchanged.
+- Researched peers still outside the active basket ride the ordinary
+  `next_experiments` surface of the card-bearing message as
+  `research_add_peer` / `research_add_peer_set` rows, bounded by free asset
+  slots; each row's `why.params.symbols` carries the resolver-verified
+  identity the tap adds. The card itself never grows a peer section.
+- The superseding card carries typed `assets_adjustment` data
+  (`{code: "assets_added" | "assets_restored", added, previous_symbols,
+  symbols, period_change?}`). Clients render it as motion on the freshly
+  added chip and, when `period_change` is present, an inline note next to
+  the period field. **Deliberate user actions are never narrated back**;
+  only unpredictable consequences (a clamped shared-history window) are
+  disclosed, inline where they land.
+
+## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets`
+
+Grows or restores the active confirmation's basket **without spending a
+turn**: no message allowance, no interpretation, no LLM call. Available only
+while `ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
+
+**Request:** exactly one mode.
+- Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
+  active turn's `research_add_peer` rows, so nothing outside the
+  resolver-verified offer set is addable, whoever asks).
+- Undo: `{"restore_previous": true}` re-materializes the exact previous
+  asset set from the active card's own `assets_adjustment` data.
+
+**Response:** `{"message": Message}` where the message is a new assistant
+confirmation message carrying the superseding card (new `confirmation_id`,
+typed `assets_adjustment`, recomputed provider coverage) plus the remaining
+peer rows on its `next_experiments` metadata. The previous card supersedes by
+ordinary latest-active projection.
+
+**Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
+non-active confirmation, non-offered symbols, and restore with nothing to
+restore; `422 asset_maximum_reached | asset_class_mismatch |
+no_common_data_window | insufficient_common_data` for baskets that cannot run
+as one test; `503 market_data_unavailable` when the coverage preflight cannot
+reach provider data. Failures persist nothing.
 
 ---
 

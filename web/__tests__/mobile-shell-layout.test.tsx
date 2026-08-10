@@ -602,23 +602,37 @@ describe("omnisearch below threshold", () => {
   });
 
   test("every settings surface the profile menu opens is registered", () => {
-    // Enumerated from the menu itself rather than from a hand-kept list, so a
-    // new entry cannot be added without a layer. Three of these shipped
-    // unregistered behind the ones that had already been fixed.
+    // Enumerated from the dispatch itself rather than from a hand-kept list, so
+    // a new entry cannot be added without a layer. Three of these shipped
+    // unregistered behind the ones that had already been fixed. The menu is
+    // held to owning none of its own, or a panel could re-enter past the
+    // dispatch and out of this enumeration's sight.
+    const settingsImport = /import (\w+) from "@\/components\/settings\/([\w/]+)"/g;
+    const panels = readFileSync(
+      join(import.meta.dir, "../components/sidebar/ProfileSettingsPanels.tsx"),
+      "utf-8",
+    );
     const menu = readFileSync(
       join(import.meta.dir, "../components/sidebar/ProfileMenu.tsx"),
       "utf-8",
     );
-    const opened = [
-      ...menu.matchAll(/import (\w+) from "@\/components\/settings\/([\w/]+)"/g),
-    ].map((match) => `../components/settings/${match[2]}.tsx`);
-    expect(opened.length).toBeGreaterThanOrEqual(6);
-    const unmanaged = opened.filter(
-      (file) =>
-        !/useModalSurface|AdaptivePanel|BottomSheet/.test(
-          readFileSync(join(import.meta.dir, file), "utf-8"),
-        ),
-    );
+    expect([...menu.matchAll(settingsImport)]).toEqual([]);
+    const imported = [...panels.matchAll(settingsImport)];
+    expect(imported.length).toBeGreaterThanOrEqual(6);
+    // An import that never reaches the registry is a panel nothing can open,
+    // and it would pass the managed check below without being dispatchable.
+    const registry = panels.slice(panels.indexOf("const SETTINGS_PANELS"));
+    expect(
+      imported.map((match) => match[1]).filter((name) => !registry.includes(name)),
+    ).toEqual([]);
+    const unmanaged = imported
+      .map((match) => `../components/settings/${match[2]}.tsx`)
+      .filter(
+        (file) =>
+          !/useModalSurface|AdaptivePanel|BottomSheet/.test(
+            readFileSync(join(import.meta.dir, file), "utf-8"),
+          ),
+      );
     expect(unmanaged).toEqual([]);
   });
 
@@ -843,7 +857,7 @@ describe("activity rail and starter pills", () => {
     // after it from tablet up.
     expect(surface.match(/<StarterActions/g)?.length).toBe(1);
     expect(surface).toContain("order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3");
-    expect(surface).toContain('className="order-3 w-full max-w-2xl tablet:order-2"');
+    expect(surface).toContain('"order-3 w-full max-w-2xl tablet:order-2"');
     expect(surface).toContain('layout={isBelowTablet ? "scroll" : "wrap"}');
   });
 
@@ -863,10 +877,16 @@ describe("activity rail and starter pills", () => {
     expect(surface).not.toContain("pt-[24vh]");
   });
 
-  test("suggestion rows clamp to two lines, never one", () => {
-    expect(globalsCss).toContain(".argus-next-move-text");
-    expect(globalsCss).toContain("line-clamp: 2;");
+  test("suggestion rows never clamp: a reason you cannot read is decoration", () => {
+    // The clamp's fade also left ghost slivers of the next line under each
+    // row on phones. Identity leads the row, so a wrapped reason is legible.
+    expect(globalsCss).not.toContain("line-clamp: 2;");
     expect(globalsCss).not.toContain("line-clamp: 1;");
+    const rowComponent = readFileSync(
+      join(import.meta.dir, "../components/chat/NextMoveRow.tsx"),
+      "utf-8",
+    );
+    expect(rowComponent).toContain("[overflow-wrap:anywhere]");
   });
 });
 

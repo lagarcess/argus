@@ -14,6 +14,10 @@ const SHARE_ACTION = join(WEB_ROOT, "components/chat/ShareReceiptAction.tsx");
 const RECEIPT_LIST = join(WEB_ROOT, "components/settings/SharedReceiptsView.tsx");
 const RESULT_CARD = join(WEB_ROOT, "components/chat/StrategyResultCard.tsx");
 const PROFILE_MENU = join(WEB_ROOT, "components/sidebar/ProfileMenu.tsx");
+const PANEL_REGISTRY = join(
+  WEB_ROOT,
+  "components/sidebar/ProfileSettingsPanels.tsx",
+);
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
@@ -163,20 +167,29 @@ describe("the receipt list", () => {
 
   test("returns to Data Controls in the sheet instead of dismissing it", () => {
     // Reached from the drawer's Data Controls submenu on a phone, so it owes the
-    // same back row every sibling there offers.
+    // same back row every sibling there offers. The panel registry owns that row
+    // now: an entry declares its parent submenu and the registry supplies the
+    // handler, so the receipt list states "data" rather than copying a handler.
     expect(source(RECEIPT_LIST)).toContain("onBack");
-    const menu = source(PROFILE_MENU);
-    const mountStart = menu.indexOf('if (activeModal === "receipts")');
-    const mount = menu.slice(
-      mountStart,
-      menu.indexOf('if (activeModal ===', mountStart + 1),
+    const registry = source(PANEL_REGISTRY);
+    const entry = registry.slice(
+      registry.indexOf("  receipts: {"),
+      registry.indexOf("},", registry.indexOf("  receipts: {")),
     );
-    expect(mount).toContain("SharedReceiptsView");
-    expect(mount).toContain("onBack={backToDataControls}");
-    // The shared handler is the sheet's back row, and it returns to the submenu
-    // this panel was opened from rather than closing the drawer under it.
-    const handler = menu.slice(menu.indexOf("const backToDataControls"));
-    expect(handler).toContain("asSheet");
-    expect(handler).toContain('setActiveSubmenu("data")');
+    expect(entry).toContain('parent: "data"');
+    expect(entry).toContain("SharedReceiptsView");
+    expect(entry).toContain("onBack");
+    // And the registry only offers a way back in the sheet, which is the case that
+    // has one.
+    expect(registry).toContain("onBack: asSheet ? () => onBack(parent) : undefined");
+  });
+
+  test("the menu opens it through the registry, not its own mount", () => {
+    // The extraction is what keeps this file inside its size budget, so a mount
+    // added back here would undo it silently.
+    const menu = source(PROFILE_MENU);
+    expect(menu).toContain('openModal("receipts")');
+    expect(menu).not.toContain("SharedReceiptsView");
+    expect(menu).not.toContain("backToDataControls");
   });
 });

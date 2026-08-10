@@ -1010,6 +1010,7 @@ class SupabaseGateway(
         confirmation_message_id: str | None = None,
         idempotency_key: str | None = None,
         execution_metadata: dict[str, Any] | None = None,
+        operation_scope: str | None = None,
     ) -> dict[str, Any]:
         clean_idempotency_key = (
             idempotency_key.strip()
@@ -1048,8 +1049,48 @@ class SupabaseGateway(
             "max_attempts": 1,
             "execution_metadata": execution_metadata or {},
         }
+        if operation_scope is not None:
+            payload["operation_scope"] = operation_scope
         created = self.client.table("backtest_jobs").insert(payload).execute()
         return dict(_row_one(created) or {})
+
+    def complete_research_job(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Terminal success for a research-scope job. No run finalization:
+        the research result is an assistant message, referenced through
+        execution_metadata, and result_run_id stays null by design."""
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Research job not found or not owned by user.")
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata or {})
+        payload = {
+            "status": "succeeded",
+            "finished_at": _now_iso(),
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
+            "execution_metadata": metadata,
+            "updated_at": _now_iso(),
+        }
+        updated = (
+            self.client.table("backtest_jobs")
+            .update(payload)
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .eq("operation_scope", "chat.research")
+            .in_("status", ["queued", "running"])
+            .execute()
+        )
+        row = _row_one(updated)
+        if row is None:
+            raise ValueError("Research job is not in a completable state.")
+        return dict(row)
 
     def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
         from argus.domain import backtest_admission_gateway as jobs
