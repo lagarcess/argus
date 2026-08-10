@@ -106,6 +106,22 @@ async function waitForAssistantSettled(page: Page, timeoutMs = 180000) {
   }
 }
 
+/** The card must survive its own drawer: header, money row, period,
+ * assumptions, and actions all still rendered while the drawer is open. */
+async function assertCardSurvives(page: Page, lang: "en" | "es", when: string) {
+  const text = (
+    await page.evaluate(() => document.querySelector("main")?.textContent ?? "")
+  ).replace(/\s+/g, " ");
+  const run = lang === "en" ? "Run backtest" : "Ejecutar backtest";
+  const period = "2023";
+  const money = "$";
+  for (const needle of ["NFLX", money, period, run]) {
+    if (!text.includes(needle)) {
+      throw new Error(`${lang} ${when}: card content "${needle}" missing while drawer open`);
+    }
+  }
+}
+
 const IDEA = {
   en: "Buy and hold NFLX with $10,000 through 2023",
   es: "Compra y mant\u00e9n NFLX con $10,000 durante 2023",
@@ -125,6 +141,7 @@ async function inPlaceEditing(page: Page, lang: "en" | "es") {
 
   await cards(page).last().getByTestId("edit-capital").click();
   await page.waitForTimeout(400);
+  await assertCardSurvives(page, lang, "capital drawer");
   await capture(page, `${lang}-02-capital-panel-open`);
   await page.getByTestId("direct-edit-capital-input").fill("25000");
   await page.getByTestId("direct-edit-apply").click();
@@ -140,6 +157,7 @@ async function inPlaceEditing(page: Page, lang: "en" | "es") {
 
   await cards(page).last().getByTestId("edit-dates").click();
   await page.waitForTimeout(400);
+  await assertCardSurvives(page, lang, "dates drawer");
   await capture(page, `${lang}-04-dates-panel-open`);
   await page.getByTestId("direct-edit-start-input").fill("2023-02-01");
   await page.getByTestId("direct-edit-end-input").fill("2023-05-31");
@@ -152,6 +170,7 @@ async function inPlaceEditing(page: Page, lang: "en" | "es") {
 
   await cards(page).last().getByTestId("edit-costs").click();
   await page.waitForTimeout(400);
+  await assertCardSurvives(page, lang, "costs drawer");
   await capture(page, `${lang}-06-costs-panel-open`);
   await page.getByTestId("direct-edit-fee-input").fill("0.2");
   await page.getByTestId("direct-edit-slippage-input").fill("0.1");
@@ -209,13 +228,17 @@ async function peerRows(page: Page, lang: "en" | "es") {
   if (!rowsText.includes(marker)) {
     throw new Error(`${lang}-10: no peer row rendered`);
   }
+  const cardsBefore = await cards(page).count();
   const addRow = page.locator(`button:has-text("${marker}")`).first();
   await addRow.click();
   await page.waitForTimeout(3500);
+  if ((await cards(page).count()) !== cardsBefore) {
+    throw new Error(`${lang}: peer add minted a card; non-turn changes never do`);
+  }
   await capture(page, `${lang}-11-peer-added-without-turn`);
 }
 
-/** Mobile width: the same pills, fields on the short sheet. */
+/** Mobile width: the same in-flow drawer; the card survives it here too. */
 async function mobile(browser: Browser, lang: "en" | "es") {
   const context = await browser.newContext({
     viewport: { width: 375, height: 812 },
@@ -223,9 +246,18 @@ async function mobile(browser: Browser, lang: "en" | "es") {
   const page = await context.newPage();
   await plantCard(page, lang);
   await capture(page, `${lang}-09-mobile-card`);
+  const before = await cards(page).count();
   await cards(page).last().getByTestId("edit-capital").click();
   await page.waitForTimeout(700);
-  await capture(page, `${lang}-09b-mobile-capital-sheet`);
+  await assertCardSurvives(page, lang, "mobile capital drawer");
+  await capture(page, `${lang}-09b-mobile-capital-drawer`);
+  await cards(page).last().getByTestId("edit-costs").click();
+  await page.waitForTimeout(700);
+  await assertCardSurvives(page, lang, "mobile costs drawer");
+  await capture(page, `${lang}-09c-mobile-costs-drawer`);
+  if ((await cards(page).count()) !== before) {
+    throw new Error(`${lang}: mobile drawer changed the card count`);
+  }
   await context.close();
 }
 
