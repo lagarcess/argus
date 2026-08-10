@@ -131,7 +131,6 @@ jobs:
         run: .github/warmup-render.sh --expect-mode real-workflow
 
       - name: Run authoritative Spanish release canary
-        continue-on-error: true
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           ARGUS_OPS_TOKEN: ${{ secrets.ARGUS_OPS_TOKEN }}
@@ -182,4 +181,28 @@ jobs:
           name: private-alpha-canary-failure-capture
           path: temp/canary-evidence/es-419-capture.json
           if-no-files-found: warn
+          retention-days: 30
+
+      # The canary script masks its own credentials out of the browser artifacts
+      # and drops this marker. A deployed tree without that pass leaves no
+      # marker, so the upload below is skipped instead of publishing raw input
+      # values. That keeps this step free of canary secrets.
+      - name: Check browser canary context redaction
+        id: browser_context
+        if: always()
+        run: |
+          if [ -f web/temp/playwright-results/.redacted ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "browser_context_upload=skipped_unredacted"
+          fi
+
+      - name: Upload browser canary failure context
+        if: failure() && steps.browser_context.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-alpha-canary-browser-context
+          path: web/temp/playwright-results/**
+          if-no-files-found: ignore
           retention-days: 30

@@ -12,6 +12,8 @@ SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
 AGENT_RUNTIME_WORKFLOW_PATH = (
     ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
 )
+RUNBOOK_PATH = ROOT / "docs" / "PRIVATE_LAUNCH_RUNBOOK.md"
+CANARY_SCRIPT_REFERENCE = re.compile(r"\.github/[\w./-]+\.(?:sh|py)")
 
 
 def _workflow() -> dict:
@@ -233,9 +235,11 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert prepare_index < warmup_index
     assert ": > temp/canary-evidence/es-419-capture.json" in joined_steps
     assert "rm -f temp/canary-evidence/es-419-capture.json" in joined_steps
+    # A failing canary must show as a failing step, not a green tick beside a
+    # red aggregate gate.
     assert (
-        steps_by_name["Run authoritative Spanish release canary"]["continue-on-error"]
-        is True
+        "continue-on-error"
+        not in steps_by_name["Run authoritative Spanish release canary"]
     )
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in joined_steps
     assert "temp/canary-evidence/es-419.exit" in joined_steps
@@ -256,6 +260,70 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert steps_by_name["Upload failed canary capture"]["if"] == "failure()"
     assert steps_by_name["Upload failed canary capture"]["with"]["path"] == (
         "temp/canary-evidence/es-419-capture.json"
+    )
+    browser_context = steps_by_name["Upload browser canary failure context"]
+    assert browser_context["with"]["path"] == "web/temp/playwright-results/**"
+    assert browser_context["with"]["if-no-files-found"] == "ignore"
+    assert "private-alpha-canary-browser-context" in workflow_source
+    # The canary script masks its own credentials, so the upload stays secretless.
+    assert "env" not in browser_context
+    # A deployed tree without the redaction pass leaves no marker, so the browser
+    # artifacts are skipped rather than published with raw input values.
+    redaction_gate = steps_by_name["Check browser canary context redaction"]
+    assert redaction_gate["id"] == "browser_context"
+    assert "web/temp/playwright-results/.redacted" in redaction_gate["run"]
+    assert browser_context["if"] == (
+        "failure() && steps.browser_context.outputs.ready == 'true'"
+    )
+    redaction_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Check browser canary context redaction"
+    )
+    gate_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Require authoritative private-alpha canary"
+    )
+    browser_context_index = next(
+        index
+        for index, step in enumerate(job["steps"])
+        if step["name"] == "Upload browser canary failure context"
+    )
+    assert gate_index < redaction_index < browser_context_index
+
+
+def test_runbook_documents_every_pre_detach_canary_script() -> None:
+    # Scripts the resolver runs before the detach come from the ref the run
+    # started on, so a fix to one of them is live without a deploy. The runbook
+    # has to name them or an operator misreads which fixes are already active.
+    steps = _canary_workflow()["jobs"]["canary"]["steps"]
+    detach_index = next(
+        index
+        for index, step in enumerate(steps)
+        if "git checkout --detach" in str(step.get("run", ""))
+    )
+    pre_detach = {
+        path
+        for step in steps[: detach_index + 1]
+        for path in CANARY_SCRIPT_REFERENCE.findall(str(step.get("run", "")))
+    }
+    post_detach = {
+        path
+        for step in steps[detach_index + 1 :]
+        for path in CANARY_SCRIPT_REFERENCE.findall(str(step.get("run", "")))
+    }
+    runbook = RUNBOOK_PATH.read_text(encoding="utf-8")
+
+    assert pre_detach
+    assert post_detach
+    for path in sorted(pre_detach):
+        assert path in runbook, f"runbook omits pre-detach script {path}"
+    for path in sorted(post_detach):
+        assert path in runbook, f"runbook omits post-detach script {path}"
+    assert "every script it runs comes from the deployed tree" not in runbook
+    assert steps[0]["with"]["ref"] == (
+        "${{ github.event_name == 'schedule' && 'main' || github.sha }}"
     )
 
 

@@ -40,6 +40,7 @@ if [ -z "$CANDIDATE_SHA" ]; then
 fi
 
 BROWSER_IDENTITY_HANDOFF="$(mktemp)"
+BROWSER_PHASE_OUTPUT="$(mktemp)"
 BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
 SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
@@ -56,7 +57,7 @@ DECISION_ROWS="$(mktemp)"
 IDEA_ROWS="$(mktemp)"
 IDEA_VERSION_ROWS="$(mktemp)"
 RECEIPT_ROWS="$(mktemp)"
-chmod 600 "$BROWSER_IDENTITY_HANDOFF"
+chmod 600 "$BROWSER_IDENTITY_HANDOFF" "$BROWSER_PHASE_OUTPUT"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
 chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
@@ -74,7 +75,9 @@ cleanup() {
   if [ "${SIGNUP_IDENTITY_SETUP_ATTEMPTED:-false}" = "true" ]; then
     cleanup_signup_identity || signup_cleanup_failed=1
   fi
+  redact_browser_artifacts || true
   rm -f "$BROWSER_IDENTITY_HANDOFF"
+  rm -f "$BROWSER_PHASE_OUTPUT"
   rm -f "$BROWSER_AUTH_CURL_CONFIG"
   rm -f \
     "$SERVICE_ROLE_CURL_CONFIG" \
@@ -697,13 +700,72 @@ run_browser_canary_phase() {
     ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
     ARGUS_CANARY_BROWSER_PHASE="$phase" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
-    "$SCRIPT_DIR/canary-browser.sh"; then
+    "$SCRIPT_DIR/canary-browser.sh" 2>&1 | tee "$BROWSER_PHASE_OUTPUT"; then
     return 1
   fi
 }
 
+browser_auth_challenge_timed_out() {
+  # The rendered client only calls the auth API after Turnstile returns a token,
+  # so a timeout waiting for that call means the challenge never completed.
+  [ -s "$BROWSER_PHASE_OUTPUT" ] &&
+    grep -qF "page.waitForResponse" "$BROWSER_PHASE_OUTPUT" &&
+    grep -qF "/auth/" "$BROWSER_PHASE_OUTPUT"
+}
+
+redact_browser_artifacts() {
+  local results_dir="web/temp/playwright-results"
+  [ -d "$results_dir" ] || return 0
+  CANARY_REDACT_DIR="$results_dir" \
+  CANARY_REDACT_PASSWORD="$PASSWORD" \
+  CANARY_REDACT_EMAIL="$EMAIL" \
+    python3 - <<'PY'
+import os
+import pathlib
+
+# Playwright's failure context embeds every rendered input value, including the
+# canary password, so no browser artifact leaves this job unmasked.
+directory = pathlib.Path(os.environ["CANARY_REDACT_DIR"])
+masked_values = sorted(
+    (
+        value
+        for value in (
+            os.environ.get("CANARY_REDACT_PASSWORD", "").strip(),
+            os.environ.get("CANARY_REDACT_EMAIL", "").strip(),
+        )
+        if value
+    ),
+    key=len,
+    reverse=True,
+)
+for path in sorted(directory.rglob("*")):
+    if not path.is_file():
+        continue
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        path.unlink(missing_ok=True)
+        print(f"canary_browser_artifact_dropped={path.name}")
+        continue
+    redacted = text
+    for value in masked_values:
+        redacted = redacted.replace(value, "<redacted>")
+    if redacted != text:
+        path.write_text(redacted, encoding="utf-8")
+    path.chmod(0o600)
+# The workflow uploads these files only when this marker exists, so a deployed
+# tree without this redaction pass publishes nothing.
+(directory / ".redacted").write_text("1\n", encoding="utf-8")
+PY
+}
+
 run_requested_signup_denial_canary() {
-  run_browser_canary_phase "access-denial"
+  env -u SUPABASE_SERVICE_ROLE_KEY \
+    -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
+    CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
 }
 
 run_browser_canary() {
@@ -1496,6 +1558,9 @@ fi
 
 if ! run_browser_canary; then
   recover_browser_failure_capture_inputs || true
+  if browser_auth_challenge_timed_out; then
+    fail_canary "browser_auth" "captcha_challenge_timeout"
+  fi
   fail_canary "browser" "rendered_golden_path_failed"
 fi
 if ! verify_browser_identity_handoff; then

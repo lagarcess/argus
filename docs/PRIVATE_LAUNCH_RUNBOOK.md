@@ -127,6 +127,17 @@ hydration, Omnisearch provenance, and the deployed Spanish signup/login browser
 path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
 `MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` aliases.
 
+The requested-access denial check runs at the API layer, not in the browser.
+`.github/canary-requested-signup-denial.py` posts the pinned signup address to
+`POST /api/v1/auth/signup` with a placeholder captcha token and requires
+`400 auth_signup_failed`. The deployed handler rejects a requested-role email
+before it consults the captcha, so the probe proves the denial without a
+solvable challenge, and `verify_no_signup_auth_identity` still proves through
+the service role that no auth identity was created. Do not move this check back
+into Playwright and do not weaken Turnstile anywhere deployed: Cloudflare
+refuses tokens to headless automation by design, and that refusal is the
+control working.
+
 ```bash
 cd web && bun install --frozen-lockfile && bunx playwright install chromium
 cd ..
@@ -150,6 +161,14 @@ poetry run python scripts/ops/canary_capture_replay.py \
 If the failure happened before any final response existed, keep the capture as
 diagnostic evidence and inspect the hashed labels, failure stage, API logs, and
 route-receipt summary instead of forcing a replay or spending a second journey.
+
+Read the failure stage and reason before treating a canary red as a product
+regression. `browser_auth` / `captcha_challenge_timeout` means the rendered
+client never reached the auth API because the Turnstile challenge did not
+complete, which is a harness limit on headless runners, not a product defect.
+`browser` / `rendered_golden_path_failed` is the journey itself failing after
+auth succeeded. Do not retry a challenge timeout: a headless runner cannot
+solve it, so a retry only doubles the run.
 
 If the exact candidate reaches the API but returns the normal interpreter
 recovery response, keep the failed capture and evidence. Record the safe HTTP
@@ -191,9 +210,46 @@ is using `live_provider`. Warmup then runs the deployed `workflow_proof` task an
 `workflow_runtime_proof=ready`, proving effective workflow runtime rather than
 only saved Render env vars. It uploads the `private-alpha-canary-evidence`
 artifact containing Spanish release evidence plus its exit-code file, and it does
-not deploy or configure analytics. Secrets are scoped to the operational steps
-that need them; install and artifact upload steps do not receive canary
-credentials or service-role keys.
+not deploy or configure analytics. On failure it also uploads
+`private-alpha-canary-failure-capture` and `private-alpha-canary-browser-context`,
+the second holding Playwright's error context for the browser phase. The canary
+script masks its own credentials out of those browser files before it exits,
+because Playwright's error context records every rendered input value. Secrets
+are scoped to the operational steps that need them; install and artifact upload
+steps do not receive canary credentials or service-role keys.
+
+The canary runs in two halves, and which half a file lands in decides whether a
+fix to it is already live.
+
+Everything up to and including the resolver runs from the ref the run started
+on: Checkout, Set up Python, Set up Bun, Install Render CLI, and the first part
+of "Resolve deployed canary release". That step runs
+`.github/render-env-sync.sh`, which sources `.github/argus-env.sh`, then
+`.github/canary-deployed-sha.py`, and only after that does it
+`git checkout --detach` onto the deployed SHA. The other pre-detach steps pin
+their versions inline and read no repo file.
+
+Everything after the detach runs from the deployed release: the dependency
+installs, the Spanish static UI assertions, `.github/local-smoke.sh`,
+`.github/warmup-render.sh`, `.github/canary-render.sh` and everything it calls
+(`.github/canary-browser.sh`, `.github/canary-requested-signup-denial.py`,
+`.github/private-alpha-release-profile.py`), and the `web/e2e` specs.
+
+`.github/render-env-sync.sh` is in both halves. The resolver calls it directly
+before the detach, and `warmup-render.sh` and `canary-render.sh` call it again
+after, so one job runs that same file from two different trees.
+
+The starting ref depends on the trigger. A scheduled run takes the workflow YAML
+and the initial checkout from `main`, because cron only executes the default
+branch's YAML. A manual dispatch takes both from the ref selected for the
+dispatch, because the Checkout step uses `github.sha`. The detach happens either
+way.
+
+So a resolver or workflow-YAML fix is live on the next scheduled run as soon as
+it is on `main`, and can be exercised before that by dispatching the workflow
+from its own branch. A fix to any post-detach script, which is most of the
+canary harness, changes nothing until `main` is deployed to Render. Check which
+half a file is in before reading a merge as a fix.
 
 After the gate passes, copy the relevant command output and canary evidence into
 a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
