@@ -205,7 +205,8 @@ already use, so a renewed workspace grants nothing new.
   fast lookup from a thorough comparison, and the rail decides the tier, so the
   rail owns that cost rather than the guest.
 - **Three is deliberately conservative because the recorded cost is wrong**:
-  the ledger's per-call figure is not yet trustworthy (issue #409). Raising the
+  the ledger's per-call figure was not yet trustworthy (issue #409, closed
+  2026-08-10, so the figure is now real). Raising the
   number later is cheap; refunding a month of underpriced strangers is not.
 - **Exhaustion names the bound that actually closed.** A guest who spent their
   own three is told so and pointed at an account; they are never told the

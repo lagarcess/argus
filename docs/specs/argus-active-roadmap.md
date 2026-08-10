@@ -97,9 +97,10 @@ open as issues. Both are wrong-when-enabled rather than wrong-as-shipped:
 
 Also left open, none blocking: **#404** the vaguest market phrasings can still
 be answered from model knowledge, honestly labelled; **#407** the source list
-caps at five by arrival order without deduping by publisher; **#409** recorded
-research cost counts tool fees only and understates a thorough turn by roughly
-40x, which is why the guest ceiling was set conservatively.
+caps at five by arrival order without deduping by publisher. **#409 is now
+closed**: cost is derived from actual usage rather than tool fees alone, so the
+guest ceiling of three can be revisited against a number that is finally
+trustworthy.
 
 The original scope, kept for the record:
 
@@ -563,6 +564,29 @@ profile and fall back to the nameless pool.
   `1ccdf825`) — the pillar is specced and parked behind four preconditions.
   Carries two named amendments to the rail spec, §11c and §12b, each with a
   pointer from the paragraph it supersedes.
+
+- **Rail follow-ups, three lanes in parallel** (merged 2026-08-10) — all three
+  filed during the rail's own verification and closed after the flag went on,
+  because enabling turned each from latent into live.
+
+  **#419 / PR #424 at `42dac840`** — the sidecar key guard covered one of three
+  producers, so a partial key change would have failed loudly on one path and
+  diverged silently on two. One shared builder is now the only way to write a
+  sidecar, so a producer added later cannot bypass the invariant by omission.
+
+  **#409 / PR #425 at `171f97d6`** — recorded research cost counted the
+  `finance_search` tool fee and nothing else, understating a thorough turn by
+  roughly 40x. Cost is now derived from actual usage against a rate table.
+  Its own review round caught the fix pricing cached, cache-creation, and
+  cache-read tokens at one rate when they bill at three, so the correction was
+  itself about to be wrong.
+
+  **#421 / PR #426 at `04e6601b`** — account security was clickable at every
+  width and navigated nowhere below 1024, with password change and session
+  sign-out behind it, and it shipped that way in the mobile lane. The
+  breakpoint audit's navigation test asserted the defect in both directions;
+  it now asserts correct behaviour, and the surface has baselines at all three
+  widths for the first time.
 
 - **Answer the first question** (PR #396, merged 2026-08-09 at `ef08b25d`) —
   350 files behind a default-off flag. Grounded discovery absorbed into one
