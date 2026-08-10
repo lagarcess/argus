@@ -78,10 +78,20 @@ at the fixed head; the rest are unaffected by those fixes and stand.
 A third finding then landed on `2bb53f5d` and `190eeac5` fixed it: the browser
 counted a name in UTF-16 code units while the API and the database count code
 points, so a name of 21 emoji measured 42 and was refused despite both of them
-accepting it. **Frames 13 and 14 were re-run at `190eeac5`** rather than assumed
-unaffected, and the rendered text is byte-identical to the capture above. The
-emoji case is proven over the wire instead: `PATCH /api/v1/me` with 21 emoji
-returns `200` and stores 21 code points.
+accepting it. A fourth landed on `5b23d63c` and `21535fa9` fixed it: a save
+already on the wire could complete after the dialog closed and write state
+belonging to an edit that no longer existed.
+
+**Frames 07, 08, 13 and 14 were re-run at `21535fa9`**, the final code commit,
+rather than assumed unaffected by either fix. Rendered text is byte-identical to
+the captures above and the document still never reloads across the save. Only
+`13-…-saved-dialog.png` differs, by a caret blink.
+
+Two cases have no frame, because a request the browser used to refuse has
+nothing to screenshot. Both are proven over the wire at `21535fa9` instead:
+`PATCH /api/v1/me` returns `200` for 21 emoji, storing 21 code points, and `200`
+for one leading space in front of a forty-character name, storing the trimmed
+forty. Both were refusals before.
 
 `13` and `14` are the propagation proof, and they are three frames each: the
 greeting before the save, the dialog with the name saved, and the greeting
