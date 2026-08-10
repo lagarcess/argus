@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
  * The one inline-disclosure idiom for cards: a modest pill with a chevron
@@ -8,14 +8,18 @@ import type { ReactNode } from "react";
  * confirmation card's edit affordances use the editable shape. One
  * component, two shapes; never fork the vocabulary.
  *
- * Read-only shape: pass `details` rows and nothing else; renders a native
- * `<details>` element, uncontrolled, on its own line.
+ * Both shapes expand in normal flow, exactly like a native `<details>`
+ * element: the trigger line stays where it is and the open panel appears
+ * below it, pushing what follows down. No `display: contents`, no
+ * order/basis tricks, no overlays; the card never disappears behind its own
+ * drawer.
  *
- * Editable shape: pass `children` with `open`/`onToggle`; renders a
- * `display: contents` wrapper so the pill participates in the surrounding
- * flex row while the open panel wraps onto a full-width line of the same
- * strip (`order-last basis-full`). The caller owns single-open behaviour
- * and may divert `onToggle` to a sheet on small screens.
+ * Read-only shape: pass `details` rows; renders an uncontrolled `<details>`.
+ *
+ * Editable shape: pass `triggers` with `openKey`/`onToggle` and the open
+ * panel as `children`; renders a pill row and, when a trigger is open, the
+ * panel directly under the row. The caller owns single-open behaviour. A
+ * panel with more fields simply expands taller; the layout never changes.
  */
 
 const triggerPillClassName =
@@ -24,50 +28,62 @@ const triggerPillClassName =
 const panelClassName =
   "mt-2 rounded-[12px] bg-black/[0.018] px-3 py-2.5 dark:bg-white/[0.025]";
 
+export type ExecutionDetailsTrigger = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  testId?: string;
+};
+
 type ExecutionDetailsProps = {
-  triggerLabel: string;
+  triggerLabel?: string;
   details?: { label: string; value: string }[];
+  triggers?: ExecutionDetailsTrigger[];
+  openKey?: string | null;
+  onToggle?: (key: string) => void;
   children?: ReactNode;
-  open?: boolean;
-  onToggle?: () => void;
-  triggerIcon?: ReactNode;
-  triggerTestId?: string;
   panelTestId?: string;
 };
 
 export function ExecutionDetails({
   triggerLabel,
   details,
-  children,
-  open,
+  triggers,
+  openKey,
   onToggle,
-  triggerIcon,
-  triggerTestId,
+  children,
   panelTestId,
 }: ExecutionDetailsProps) {
-  if (children !== undefined) {
-    const isOpen = open === true;
+  const panelId = useId();
+
+  if (triggers !== undefined) {
+    const isOpen = openKey != null && children !== undefined;
     return (
-      <div className="contents">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={isOpen}
-          data-testid={triggerTestId}
-          className={`${triggerPillClassName} text-[11px] leading-snug tracking-[0.16px]`}
-        >
-          {triggerIcon}
-          {triggerLabel}
-          <ChevronDown
-            aria-hidden="true"
-            className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          />
-        </button>
+      <div className="text-[11px] leading-snug tracking-[0.16px]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {triggers.map((trigger) => (
+            <button
+              key={trigger.key}
+              type="button"
+              onClick={() => onToggle?.(trigger.key)}
+              aria-expanded={openKey === trigger.key}
+              aria-controls={openKey === trigger.key ? panelId : undefined}
+              data-testid={trigger.testId}
+              className={triggerPillClassName}
+            >
+              {trigger.icon}
+              {trigger.label}
+              <ChevronDown
+                aria-hidden="true"
+                className={`h-3 w-3 transition-transform ${
+                  openKey === trigger.key ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          ))}
+        </div>
         {isOpen && (
-          <div
-            data-testid={panelTestId}
-            className={`order-last basis-full ${panelClassName}`}
-          >
+          <div id={panelId} data-testid={panelTestId} className={panelClassName}>
             {children}
           </div>
         )}
@@ -79,9 +95,7 @@ export function ExecutionDetails({
 
   return (
     <details className="group mt-3 rounded-[14px] text-[11px] leading-snug tracking-[0.16px] text-[#8d969e]">
-      <summary
-        className={`${triggerPillClassName} marker:text-transparent`}
-      >
+      <summary className={`${triggerPillClassName} marker:text-transparent`}>
         {triggerLabel}
         <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
       </summary>

@@ -220,16 +220,14 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
 
       {canDirectEdit && (
         // The editing strip: one line of Edit capital, Edit dates, Edit
-        // costs between its own hairlines; the open editor's panel wraps
-        // onto a full-width line of this same strip.
+        // costs between its own hairlines; the open editor's drawer expands
+        // in flow directly under the pill row, pushing the actions down.
         <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <ConfirmationDirectEditControls
-              confirmation={confirmation}
-              onDirectEdit={onDirectEdit}
-              t={t}
-            />
-          </div>
+          <ConfirmationDirectEditControls
+            confirmation={confirmation}
+            onDirectEdit={onDirectEdit}
+            t={t}
+          />
         </div>
       )}
 

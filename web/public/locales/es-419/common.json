@@ -816,7 +816,6 @@
         "end_label": "Fecha de fin",
         "apply": "Aplicar",
         "cancel": "Cancelar",
-        "close": "Cerrar",
         "invalid_capital": "Ingresa un monto mayor que cero.",
         "invalid_dates": "Elige una fecha de inicio igual o anterior a la fecha de fin.",
         "failed": "Ese cambio no se aplicó. La tarjeta quedó igual.",

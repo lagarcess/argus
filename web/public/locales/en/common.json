@@ -816,7 +816,6 @@
         "end_label": "End date",
         "apply": "Apply",
         "cancel": "Cancel",
-        "close": "Close",
         "invalid_capital": "Enter an amount above zero.",
         "invalid_dates": "Pick a start date on or before the end date.",
         "failed": "That change did not go through. The card is unchanged.",

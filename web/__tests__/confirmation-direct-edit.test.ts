@@ -3,10 +3,10 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 /* In-place edits on the confirmation card (§3.4): capital, dates, and costs
- * as three ExecutionDetails pills with one behaviour, the short bottom sheet
- * below the tablet threshold, and a typed no-turn endpoint that updates the
- * same card. The frontend renders backend capability truth and never invents
- * card state. */
+ * as three ExecutionDetails pills with one behaviour at every width, and a
+ * typed no-turn endpoint that updates the same card. The drawer expands in
+ * flow inside the card, so the card never disappears behind it. The frontend
+ * renders backend capability truth and never invents card state. */
 
 const root = join(__dirname, "..");
 const source = (path: string) => readFileSync(join(root, path), "utf-8");
@@ -27,7 +27,7 @@ describe("confirmation direct edit surface", () => {
     expect(editor).toContain('"capital"');
     expect(editor).toContain('"dates"');
     expect(editor).toContain('"costs"');
-    expect(editor).toContain('className="contents"');
+    expect(editor).toContain("triggers");
     const card = source("components/chat/StrategyConfirmationCard.tsx");
     // The action pills align to the card's left content margin, on the same
     // px-4/sm:px-5 rhythm as every other section, not their own axis.
@@ -48,12 +48,18 @@ describe("confirmation direct edit surface", () => {
 
     const shared = source("components/chat/ExecutionDetails.tsx");
     // One component, two shapes: the read-only details list and the editable
-    // panel share the pill trigger and panel classes.
+    // panel share the pill trigger and panel classes, and both expand in
+    // normal flow. display: contents removed the wrapper from layout and let
+    // the panel escape the card; no layout tricks may return.
     expect(shared).toContain("triggerPillClassName");
     expect(shared).toContain("panelClassName");
     expect(shared).toContain("<details");
-    expect(shared).toContain("order-last basis-full");
     expect(shared).toContain("aria-expanded");
+    expect(shared).not.toContain('"contents"');
+    expect(shared).not.toContain("order-last");
+    expect(shared).not.toContain("basis-full");
+    expect(shared).not.toContain("fixed");
+    expect(editor).not.toContain('"contents"');
 
     const result = source("components/chat/StrategyResultCard.tsx");
     expect(result).toContain('from "./ExecutionDetails"');
@@ -76,10 +82,12 @@ describe("confirmation direct edit surface", () => {
 
     const handlers = source("components/chat/confirmation-superseding.ts");
     expect(handlers).toContain("directEditConfirmation(");
-    // In place means in place: the edited message replaces itself; nothing
-    // is appended and nothing else is marked superseded.
+    // The dividing line is whether a turn was spent: every non-turn change
+    // replaces the card's own message; nothing in this module can append.
     expect(handlers).toContain("message.id === replacement.id");
-    expect(handlers).not.toContain("appendSupersedingConfirmation(updated)");
+    expect(handlers).not.toContain("appendSupersedingConfirmation");
+    expect(handlers).toContain("replaceCardMessageInPlace(restored)");
+    expect(handlers).toContain("replaceCardMessageInPlace(updated)");
     const chat = source("components/chat/ChatInterface.tsx");
     expect(chat).toContain("confirmationSupersedingHandlers(");
 
@@ -87,11 +95,13 @@ describe("confirmation direct edit surface", () => {
     expect(api).toContain("/direct-edit");
   });
 
-  test("mobile reuses the short sheet primitive; wide screens get the inline panel", () => {
+  test("one in-flow drawer at every width; no overlay can swallow the card", () => {
     const editor = source("components/chat/ConfirmationDirectEdit.tsx");
-    expect(editor).toContain('height="short"');
-    expect(editor).toContain("BottomSheet");
-    expect(editor).toContain("isBelowTablet");
+    // BottomSheet renders fixed-position without a portal; inside the card's
+    // transform containing block it clips into a view takeover. The editors
+    // use the in-flow drawer everywhere instead.
+    expect(editor).not.toContain("BottomSheet");
+    expect(editor).not.toContain("isBelowTablet");
   });
 
   test("input seeds come from typed fields, never parsed display strings", () => {
@@ -146,7 +156,6 @@ describe("confirmation direct edit surface", () => {
         "end_label",
         "apply",
         "cancel",
-        "close",
         "invalid_capital",
         "invalid_dates",
         "failed",

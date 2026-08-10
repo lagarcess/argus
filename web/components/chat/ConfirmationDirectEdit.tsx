@@ -1,8 +1,6 @@
 import { Banknote, CalendarDays, Check, PencilLine, X } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useRef, useState } from "react";
-import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
-import { BottomSheet } from "@/components/ui/BottomSheet";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   MAX_SLIPPAGE_PERCENT,
@@ -10,7 +8,10 @@ import {
   costEditDraftToRates,
   type ExecutionCostEditDraft,
 } from "@/lib/confirmation-cost-edit";
-import { ExecutionDetails } from "./ExecutionDetails";
+import {
+  ExecutionDetails,
+  type ExecutionDetailsTrigger,
+} from "./ExecutionDetails";
 import type {
   ConfirmationDirectEditPayload,
   StrategyConfirmationPayload,
@@ -18,11 +19,12 @@ import type {
 
 /**
  * In-place editing on the confirmation card (§3.4): capital, dates, and
- * costs, three affordances with one behaviour. Each is an ExecutionDetails
- * pill, the card vocabulary for inline disclosure, whose panel hosts the
- * editable fields; below the tablet threshold the same fields ride the
- * short bottom sheet. Submits go to the typed no-turn endpoint, which
- * updates the same card in place; this component never invents card state.
+ * costs, three affordances with one behaviour at every width. The pills and
+ * the open drawer are the ExecutionDetails idiom, expanding in flow inside
+ * the card; the drawer sits under the pill row and pushes the actions down,
+ * and the card never disappears. Submits go to the typed no-turn endpoint,
+ * which updates the same card in place; this component never invents card
+ * state.
  */
 
 type DirectEditKind = "capital" | "dates" | "costs";
@@ -46,7 +48,6 @@ export function ConfirmationDirectEditControls({
   onDirectEdit,
   t,
 }: ConfirmationDirectEditControlsProps) {
-  const { isBelowTablet } = useResponsiveLayout();
   const [openKind, setOpenKind] = useState<DirectEditKind | null>(null);
   const [capitalDraft, setCapitalDraft] = useState("");
   const [startDraft, setStartDraft] = useState("");
@@ -253,90 +254,68 @@ export function ConfirmationDirectEditControls({
       </>
     );
 
-  const form = (
-    <div
-      data-testid="confirmation-direct-edit-form"
-      className="flex w-full flex-wrap items-end gap-x-3 gap-y-2"
-    >
-      {fields}
-      <div className="flex items-center gap-1.5 self-end pb-0.5">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={isSaving}
-          aria-busy={isSaving}
-          aria-label={t("chat.confirmation.direct_edit.apply", "Apply")}
-          data-testid="direct-edit-apply"
-          className={inlineEditControlClassName}
-        >
-          <Check aria-hidden="true" className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={close}
-          disabled={isSaving}
-          aria-label={t("chat.confirmation.direct_edit.cancel", "Cancel")}
-          data-testid="direct-edit-cancel"
-          className={inlineEditControlClassName}
-        >
-          <X aria-hidden="true" className="h-4 w-4" />
-        </button>
-      </div>
-      {error && (
-        <p role="alert" className={`w-full text-[11px] ${inlineFailureTextClass}`}>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-
-  const kinds: { kind: DirectEditKind; enabled: boolean; icon: React.ReactNode }[] = [
-    {
-      kind: "capital",
-      enabled: canEditCapital,
+  const triggers: ExecutionDetailsTrigger[] = [
+    canEditCapital && {
+      key: "capital",
+      label: labels.capital,
       icon: <Banknote aria-hidden="true" className="h-3 w-3" />,
+      testId: "edit-capital",
     },
-    {
-      kind: "dates",
-      enabled: canEditDates,
+    canEditDates && {
+      key: "dates",
+      label: labels.dates,
       icon: <CalendarDays aria-hidden="true" className="h-3 w-3" />,
+      testId: "edit-dates",
     },
-    {
-      kind: "costs",
-      enabled: canEditCosts,
+    canEditCosts && {
+      key: "costs",
+      label: labels.costs,
       icon: <PencilLine aria-hidden="true" className="h-3 w-3" />,
+      testId: "edit-costs",
     },
-  ];
+  ].filter(Boolean) as ExecutionDetailsTrigger[];
 
   return (
-    <div className="contents">
-      {kinds.map(({ kind, enabled, icon }) =>
-        enabled ? (
-          <ExecutionDetails
-            key={kind}
-            triggerLabel={labels[kind]}
-            triggerIcon={icon}
-            triggerTestId={`edit-${kind}`}
-            panelTestId="confirmation-direct-edit-drawer"
-            open={!isBelowTablet && openKind === kind}
-            onToggle={() => toggle(kind)}
+    <ExecutionDetails
+      triggers={triggers}
+      openKey={openKind}
+      onToggle={(key) => toggle(key as DirectEditKind)}
+      panelTestId="confirmation-direct-edit-drawer"
+    >
+      <div
+        data-testid="confirmation-direct-edit-form"
+        className="flex w-full flex-wrap items-end gap-x-3 gap-y-2"
+      >
+        {fields}
+        <div className="flex items-center gap-1.5 self-end pb-0.5">
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={isSaving}
+            aria-busy={isSaving}
+            aria-label={t("chat.confirmation.direct_edit.apply", "Apply")}
+            data-testid="direct-edit-apply"
+            className={inlineEditControlClassName}
           >
-            {form}
-          </ExecutionDetails>
-        ) : null,
-      )}
-      {isBelowTablet && (
-        <BottomSheet
-          isOpen={openKind !== null}
-          onClose={close}
-          title={openKind !== null ? labels[openKind] : ""}
-          closeLabel={t("chat.confirmation.direct_edit.close", "Close")}
-          height="short"
-          initialFocusRef={firstFieldRef}
-        >
-          <div className="px-1 py-2">{form}</div>
-        </BottomSheet>
-      )}
-    </div>
+            <Check aria-hidden="true" className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            disabled={isSaving}
+            aria-label={t("chat.confirmation.direct_edit.cancel", "Cancel")}
+            data-testid="direct-edit-cancel"
+            className={inlineEditControlClassName}
+          >
+            <X aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className={`w-full text-[11px] ${inlineFailureTextClass}`}>
+            {error}
+          </p>
+        )}
+      </div>
+    </ExecutionDetails>
   );
 }

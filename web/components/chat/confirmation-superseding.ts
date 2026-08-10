@@ -12,9 +12,11 @@ import type {
 } from "./types";
 
 /**
- * No-turn confirmation mutations: peer add, peer undo, direct capital/date
- * edit. Each calls its typed endpoint and appends the superseding card the
- * backend returns; the frontend never invents card state. Factory over a
+ * Non-turn confirmation mutations: peer add, peer undo, direct edits. The
+ * dividing line of the edit contract is whether a turn was spent, not which
+ * affordance was used: these spend nothing, so the backend rewrites the same
+ * card message and this module replaces it in place. Nothing here can append
+ * to the transcript; the frontend never invents card state. Factory over a
  * dependency getter, matching omnisearchActionHandlers, so ChatInterface
  * stays orchestration.
  */
@@ -37,54 +39,11 @@ type SupersedingDeps = {
 };
 
 export function confirmationSupersedingHandlers(deps: () => SupersedingDeps) {
-  function appendSupersedingConfirmation(created: ApiMessage): boolean {
+  function replaceCardMessageInPlace(updated: ApiMessage): boolean {
     const { hydrate, setMessages } = deps();
-    const hydrated = hydrate([created]).messages;
-    if (hydrated.length === 0) {
-      return false;
-    }
-    setMessages((prev) => [
-      // The new card supersedes the old one; mirror the reload projection
-      // instead of leaving two active cards on screen.
-      ...prev.map((message) =>
-        message.confirmation &&
-        message.confirmation.confirmation_state !== "cancelled" &&
-        message.confirmation.confirmation_id !==
-          hydrated[0].confirmation?.confirmation_id
-          ? {
-              ...message,
-              confirmation: {
-                ...message.confirmation,
-                confirmation_state: "superseded" as const,
-              },
-            }
-          : message,
-      ),
-      ...hydrated,
-    ]);
-    return true;
-  }
-
-  async function handleDirectEditConfirmation(
-    confirmationId: string,
-    edit: ConfirmationDirectEditPayload,
-  ): Promise<void> {
-    const { activeConversationId, hydrate, setMessages } = deps();
-    const targetConversationId = activeConversationId();
-    if (!targetConversationId) {
-      throw new Error("no_active_conversation");
-    }
-    // No turn is spent and nothing new appears: the typed endpoint updates
-    // the same card in place and returns the same message, edited. Errors
-    // propagate so the editor can show them inline next to the inputs.
-    const updated = await directEditConfirmation(
-      targetConversationId,
-      confirmationId,
-      edit,
-    );
     const hydrated = hydrate([updated]).messages;
     if (hydrated.length === 0) {
-      throw new Error("edited_confirmation_missing");
+      return false;
     }
     const replacement = hydrated[0];
     setMessages((prev) =>
@@ -92,6 +51,27 @@ export function confirmationSupersedingHandlers(deps: () => SupersedingDeps) {
         message.id === replacement.id ? replacement : message,
       ),
     );
+    return true;
+  }
+
+  async function handleDirectEditConfirmation(
+    confirmationId: string,
+    edit: ConfirmationDirectEditPayload,
+  ): Promise<void> {
+    const { activeConversationId } = deps();
+    const targetConversationId = activeConversationId();
+    if (!targetConversationId) {
+      throw new Error("no_active_conversation");
+    }
+    // Errors propagate so the editor can show them inline next to the inputs.
+    const updated = await directEditConfirmation(
+      targetConversationId,
+      confirmationId,
+      edit,
+    );
+    if (!replaceCardMessageInPlace(updated)) {
+      throw new Error("edited_confirmation_missing");
+    }
   }
 
   async function handleUndoConfirmationPeer(): Promise<void> {
@@ -106,7 +86,7 @@ export function confirmationSupersedingHandlers(deps: () => SupersedingDeps) {
         targetConversationId,
         activeId,
       );
-      appendSupersedingConfirmation(restored);
+      replaceCardMessageInPlace(restored);
     } catch {
       showToast(
         t(
@@ -133,12 +113,12 @@ export function confirmationSupersedingHandlers(deps: () => SupersedingDeps) {
       return;
     }
     try {
-      const created = await addConfirmationPeerAssets(
+      const updated = await addConfirmationPeerAssets(
         targetConversationId,
         confirmationId,
         symbols,
       );
-      if (!appendSupersedingConfirmation(created)) {
+      if (!replaceCardMessageInPlace(updated)) {
         return;
       }
       // Motion is the feedback; the toast carries Undo, not information.
