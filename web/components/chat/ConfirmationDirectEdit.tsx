@@ -43,6 +43,74 @@ export const inlineEditControlClassName =
 export const inlineEditFieldClassName =
   "h-9 rounded-lg border border-black/12 bg-white px-2.5 text-[16px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 tablet:h-8 tablet:text-[13px] dark:border-white/14 dark:bg-[#24282c] dark:text-white";
 
+/** Localized copy for the backend's typed refusals. Codes are the
+ * envelope's own vocabulary; anything unknown falls back to the generic
+ * failure line. */
+function directEditErrorText(
+  code: string,
+  t: TFunction,
+  constraints: NonNullable<
+    StrategyConfirmationPayload["capabilities"]
+  >["edit_constraints"],
+  isRecurring = false,
+): string {
+  const capitalMin = constraints?.capital?.min;
+  const capitalMax = constraints?.capital?.max;
+  const money = (value: number | undefined, fallback: string) =>
+    typeof value === "number" ? `$${value.toLocaleString()}` : fallback;
+  switch (code) {
+    case "invalid_starting_capital":
+      // The engine runs a recurring contribution through the same band, so
+      // the refusal names whichever money role this card edits.
+      return isRecurring
+        ? t("chat.confirmation.direct_edit.errors.invalid_contribution", {
+            defaultValue:
+              "Each contribution must be between {{min}} and {{max}}.",
+            min: money(capitalMin, "$1,000"),
+            max: money(capitalMax, "$100,000,000"),
+          })
+        : t("chat.confirmation.direct_edit.errors.invalid_starting_capital", {
+            defaultValue:
+              "Starting capital must be between {{min}} and {{max}}.",
+            min: money(capitalMin, "$1,000"),
+            max: money(capitalMax, "$100,000,000"),
+          });
+    case "future_end_date":
+      return t(
+        "chat.confirmation.direct_edit.errors.future_end_date",
+        "Pick an end date on or before today.",
+      );
+    case "invalid_chronological_date_range":
+      return t(
+        "chat.confirmation.direct_edit.errors.invalid_chronological_date_range",
+        "Pick a start date before the end date.",
+      );
+    case "provider_history_start_unavailable":
+      return t("chat.confirmation.direct_edit.errors.provider_history_start", {
+        defaultValue:
+          "Data for this test starts later; pick a start date on or after {{min}}.",
+        min: constraints?.date_window?.min_start ?? "2016-01-01",
+      });
+    case "no_common_data_window":
+    case "insufficient_common_data":
+      return t(
+        "chat.confirmation.direct_edit.errors.no_common_data",
+        "These assets do not share enough data for that window.",
+      );
+    case "unsupported_cost_value":
+      return t("chat.confirmation.cost_editor.invalid", {
+        defaultValue:
+          "Enter percentages of 0 or more (slippage up to {{max}}%).",
+        max: MAX_SLIPPAGE_PERCENT,
+      });
+    default:
+      return t(
+        "chat.confirmation.direct_edit.failed",
+        "That change did not go through. The card is unchanged.",
+      );
+  }
+}
+
 export function ConfirmationDirectEditControls({
   confirmation,
   onDirectEdit,
@@ -61,6 +129,7 @@ export function ConfirmationDirectEditControls({
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
 
   const directEdits = confirmation.capabilities?.direct_edits ?? [];
+  const constraints = confirmation.capabilities?.edit_constraints;
   const canEditCapital = directEdits.includes("capital");
   const canEditDates = directEdits.includes("dates");
   const canEditCosts = directEdits.includes("costs");
@@ -120,6 +189,22 @@ export function ConfirmationDirectEditControls({
         );
         return;
       }
+      const min = constraints?.capital?.min;
+      const max = constraints?.capital?.max;
+      if (
+        (typeof min === "number" && amount < min) ||
+        (typeof max === "number" && amount > max)
+      ) {
+        setError(
+          directEditErrorText(
+            "invalid_starting_capital",
+            t,
+            constraints,
+            isRecurring,
+          ),
+        );
+        return;
+      }
       edit = { capital: amount };
     } else if (openKind === "dates") {
       if (!startDraft || !endDraft || startDraft > endDraft) {
@@ -131,15 +216,39 @@ export function ConfirmationDirectEditControls({
         );
         return;
       }
+      const maxEnd = constraints?.date_window?.max_end;
+      if (typeof maxEnd === "string" && maxEnd && endDraft > maxEnd) {
+        setError(directEditErrorText("future_end_date", t, constraints));
+        return;
+      }
+      const minStart = constraints?.date_window?.min_start;
+      if (typeof minStart === "string" && minStart && startDraft < minStart) {
+        setError(
+          directEditErrorText("provider_history_start_unavailable", t, constraints),
+        );
+        return;
+      }
       edit = { date_window: { start: startDraft, end: endDraft } };
     } else {
-      const rates = costEditDraftToRates(costDraft);
+      const rates = costEditDraftToRates(costDraft, {
+        feeMaxPercent:
+          typeof constraints?.fees?.max === "number"
+            ? constraints.fees.max * 100
+            : undefined,
+        slippageMaxPercent:
+          typeof constraints?.slippage?.max === "number"
+            ? constraints.slippage.max * 100
+            : undefined,
+      });
       if (rates === null) {
         setError(
           t("chat.confirmation.cost_editor.invalid", {
             defaultValue:
               "Enter percentages of 0 or more (slippage up to {{max}}%).",
-            max: MAX_SLIPPAGE_PERCENT,
+            max:
+              typeof constraints?.slippage?.max === "number"
+                ? constraints.slippage.max * 100
+                : MAX_SLIPPAGE_PERCENT,
           }),
         );
         return;
@@ -152,14 +261,12 @@ export function ConfirmationDirectEditControls({
       await onDirectEdit(edit);
       setIsSaving(false);
       setOpenKind(null);
-    } catch {
+    } catch (submitError) {
       setIsSaving(false);
-      setError(
-        t(
-          "chat.confirmation.direct_edit.failed",
-          "That change did not go through. The card is unchanged.",
-        ),
+      const code = String(
+        (submitError as { code?: unknown } | null)?.code ?? "",
       );
+      setError(directEditErrorText(code, t, constraints, isRecurring));
     }
   };
 
@@ -199,6 +306,8 @@ export function ConfirmationDirectEditControls({
             ref={firstFieldRef}
             type="date"
             value={startDraft}
+            min={constraints?.date_window?.min_start}
+            max={constraints?.date_window?.max_end}
             onChange={(event) => setStartDraft(event.target.value)}
             onKeyDown={onFieldKeyDown}
             data-testid="direct-edit-start-input"
@@ -210,6 +319,8 @@ export function ConfirmationDirectEditControls({
           <input
             type="date"
             value={endDraft}
+            min={constraints?.date_window?.min_start}
+            max={constraints?.date_window?.max_end}
             onChange={(event) => setEndDraft(event.target.value)}
             onKeyDown={onFieldKeyDown}
             data-testid="direct-edit-end-input"

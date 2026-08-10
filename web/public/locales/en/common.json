@@ -819,7 +819,15 @@
         "invalid_capital": "Enter an amount above zero.",
         "invalid_dates": "Pick a start date on or before the end date.",
         "failed": "That change did not go through. The card is unchanged.",
-        "edit_costs": "Edit costs"
+        "edit_costs": "Edit costs",
+        "errors": {
+          "invalid_starting_capital": "Starting capital must be between {{min}} and {{max}}.",
+          "future_end_date": "Pick an end date on or before today.",
+          "invalid_chronological_date_range": "Pick a start date before the end date.",
+          "provider_history_start": "Data for this test starts later; pick a start date on or after {{min}}.",
+          "no_common_data": "These assets do not share enough data for that window.",
+          "invalid_contribution": "Each contribution must be between {{min}} and {{max}}."
+        }
       },
       "edit_disclosure": {
         "unapplied": "I could not change {{targets}}; the rest is applied below.",

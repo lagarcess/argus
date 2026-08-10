@@ -16,18 +16,36 @@ export function parseCostPercentInput(value: string): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-export function isValidFeePercent(value: number | null): boolean {
-  return value !== null && value >= 0;
+export type CostPercentCaps = {
+  feeMaxPercent?: number;
+  slippageMaxPercent?: number;
+};
+
+export function isValidFeePercent(
+  value: number | null,
+  maxPercent?: number,
+): boolean {
+  if (value === null || value < 0) return false;
+  return typeof maxPercent === "number" ? value <= maxPercent : true;
 }
 
-export function isValidSlippagePercent(value: number | null): boolean {
-  return value !== null && value >= 0 && value <= MAX_SLIPPAGE_PERCENT;
+export function isValidSlippagePercent(
+  value: number | null,
+  maxPercent: number = MAX_SLIPPAGE_PERCENT,
+): boolean {
+  return value !== null && value >= 0 && value <= maxPercent;
 }
 
-export function isValidCostEditDraft(draft: ExecutionCostEditDraft): boolean {
+export function isValidCostEditDraft(
+  draft: ExecutionCostEditDraft,
+  caps?: CostPercentCaps,
+): boolean {
   return (
-    isValidFeePercent(parseCostPercentInput(draft.feePercent)) &&
-    isValidSlippagePercent(parseCostPercentInput(draft.slippagePercent))
+    isValidFeePercent(parseCostPercentInput(draft.feePercent), caps?.feeMaxPercent) &&
+    isValidSlippagePercent(
+      parseCostPercentInput(draft.slippagePercent),
+      caps?.slippageMaxPercent ?? MAX_SLIPPAGE_PERCENT,
+    )
   );
 }
 
@@ -58,10 +76,17 @@ export function decimalRateToPercentInput(
 
 export function costEditDraftToRates(
   draft: ExecutionCostEditDraft,
+  caps?: CostPercentCaps,
 ): { fee_rate: number; slippage: number } | null {
   const fee = parseCostPercentInput(draft.feePercent);
   const slippage = parseCostPercentInput(draft.slippagePercent);
-  if (!isValidFeePercent(fee) || !isValidSlippagePercent(slippage)) {
+  if (
+    !isValidFeePercent(fee, caps?.feeMaxPercent) ||
+    !isValidSlippagePercent(
+      slippage,
+      caps?.slippageMaxPercent ?? MAX_SLIPPAGE_PERCENT,
+    )
+  ) {
     return null;
   }
   // The endpoint takes decimal rates; percent stays a display convention.

@@ -819,7 +819,15 @@
         "invalid_capital": "Ingresa un monto mayor que cero.",
         "invalid_dates": "Elige una fecha de inicio igual o anterior a la fecha de fin.",
         "failed": "Ese cambio no se aplicó. La tarjeta quedó igual.",
-        "edit_costs": "Editar costos"
+        "edit_costs": "Editar costos",
+        "errors": {
+          "invalid_starting_capital": "El capital inicial debe estar entre {{min}} y {{max}}.",
+          "future_end_date": "Elige una fecha de fin igual o anterior a hoy.",
+          "invalid_chronological_date_range": "Elige una fecha de inicio anterior a la fecha de fin.",
+          "provider_history_start": "Los datos de esta prueba comienzan después; elige una fecha de inicio igual o posterior a {{min}}.",
+          "no_common_data": "Estos activos no comparten datos suficientes para ese periodo.",
+          "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}."
+        }
       },
       "edit_disclosure": {
         "unapplied": "No pude cambiar {{targets}}; el resto quedó aplicado abajo.",
