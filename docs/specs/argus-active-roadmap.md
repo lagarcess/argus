@@ -332,8 +332,8 @@ how the last split brain happened.
 
 ### Empty chat polish
 
-**Sequencing: unblocked 2026-08-09 when pillar 1 merged. Parallel-safe with the mention tags
-lane.** It touches `EmptyChatSurface.tsx`, `ChatInterface.tsx`,
+**Status: built, in review as PR #415.** Sequencing note kept for the record:
+unblocked when pillar 1 merged, parallel-safe with the mention tags lane. It touches `EmptyChatSurface.tsx`, `ChatInterface.tsx`,
 `EmptyChatGreeting.tsx`, and both locale files. The rail owns all four today and
 created the greeting component. PR #406 touches none of them, so once the rail
 lands these two run at the same time.
@@ -477,22 +477,49 @@ conversation. Memory infers, settings are stated, and guessing a nickname from
 how someone types would be the creepiest thing in the product. Guests have no
 profile and fall back to the nameless pool.
 
-### Ticker mention entity tags
-
-**Sequencing: unblocked 2026-08-09 when pillar 1 merged.** PR #406 was held
-because it overlapped the research rail on nine files, including
-`ChatInput.tsx`, `ChatMessage.tsx`, `StrategyConfirmationCard.tsx`,
-`types.ts`, `src/argus/api/schemas.py`, and the API contract and OpenAPI
-documents. Merging it mid-flight would have forced a 350-file lane to merge
-forward a second time and resolve conflicts in its own active surface. It now
-merges forward once, against a landed lane instead of a moving one.
-
-It needs a reconciliation pass against the rail before merging, since those
-nine files all changed underneath it.
-
-Its spec is `docs/superpowers/specs/2026-08-09-ticker-mention-entity-tags.md`.
-
 ## Landed this cycle
+
+- **Breakpoint audit and visual baselines** (PR #420, merged 2026-08-10 at
+  `7989e62e`) — 74 committed Playwright baselines across legal, auth, and
+  settings at 390, 720, and 1024, plus `docs/BREAKPOINTS.md` as the intent
+  page pointing at the baselines as truth. Zero component edits. Its first
+  output was a bug list rather than a document: #421 (account security
+  unreachable below 1024, shipped dead in the mobile lane) and #422 (seven
+  lower-severity defects). Two harness defects fell out of the same pass, and
+  the second matters beyond this lane: `maxDiffPixelRatio: 0.01` allowed
+  roughly 3,300 pixels of drift, so a 40 by 40 element was removed from every
+  capture without the suite going red. The measured floor is zero and the
+  budget is now `maxDiffPixels: 100`.
+
+- **Ticker mention entity tags** (PR #406, merged 2026-08-09 at `d9e8a3c5`) —
+  exact mention entity tags rendered through a shared `EntityToken` across chat
+  messages, confirmation cards, and result cards. Held until the rail landed
+  because it overlapped nine files, then reconciled once against a finished
+  lane rather than a moving one.
+
+- **Scheduled maintenance cron** (PR #414, merged 2026-08-09 at `70635831`) —
+  answers #401 and the scheduled half of #412 by defining an `argus-maintenance`
+  Render cron service that runs the existing retention and reconciliation jobs
+  unchanged. **The service has deliberately not been created.** At current
+  scale there is no guest data to delete and no stranded job to rescue, so
+  paying for an always-on service would buy nothing. The definition sits inert
+  in `render.yaml` until a blueprint sync creates it, which is a decision to
+  revisit when guest volume makes running the scripts by hand impractical.
+  Two review rounds taught eleven enumeration sites that a fourth Render
+  surface exists, and closed a fail-open where a failed service lookup read as
+  "absent" and would have passed the canary green over stale destructive code.
+
+- **Research sidecar rename** (PR #418, merged 2026-08-09 at `c69e7489`) —
+  the sidecar's `memory` block became `follow_up`, because it never was a
+  memory record and the name had already misled two readers. Done before the
+  rail flag flips, since production writing the old key would have turned a
+  rename into a data migration. Spun out #419: the key guard covers one of
+  three producers.
+
+- **Follow up on unfinished work, spec only** (PR #416, merged 2026-08-10 at
+  `1ccdf825`) — the pillar is specced and parked behind four preconditions.
+  Carries two named amendments to the rail spec, §11c and §12b, each with a
+  pointer from the paragraph it supersedes.
 
 - **Answer the first question** (PR #396, merged 2026-08-09 at `ef08b25d`) —
   350 files behind a default-off flag. Grounded discovery absorbed into one

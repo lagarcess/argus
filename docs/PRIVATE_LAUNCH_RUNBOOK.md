@@ -300,8 +300,17 @@ Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 
 ## Scheduled Maintenance
 
-The Render cron service `argus-maintenance` is the accountable trigger for every
-recurring janitor. It is declared in `render.yaml` and runs one entry point:
+**The `argus-maintenance` service is declared but deliberately not created.**
+At current scale there is no accumulated guest data to delete and no stranded
+job to rescue, so an always-on paid service would buy nothing. Until it is
+created, every recurring janitor runs when an operator runs it, and the
+retention windows documented in `DATA_MODEL.md` hold exactly that often.
+
+Create it when running the scripts by hand becomes impractical, which is a
+guest-volume question rather than a date. Everything below describes the service
+as defined, so it is accurate the moment a blueprint sync creates it.
+
+It is declared in `render.yaml` and runs one entry point:
 
 ```bash
 poetry run python scripts/ops/scheduled_maintenance.py
@@ -419,11 +428,15 @@ site key, non-loopback production preserves the auth landing rather than
 beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
 as part of a code promotion.
 
-Guest cleanup is not a manual step. The `argus-maintenance` cron service runs a
-bounded batch every fifteen minutes, which is the scheduled trusted operations
-environment for this deletion; the owner, schedule, and alert destination are
-recorded under Scheduled Maintenance. That satisfies the at-least-daily floor
-this section previously asked an operator to remember.
+Guest cleanup is a manual step today. The `argus-maintenance` cron service that
+would run a bounded batch every fifteen minutes is declared in `render.yaml` but
+deliberately not created at current scale, so nothing runs this deletion
+automatically. Its owner, schedule, and alert destination are recorded under
+Scheduled Maintenance and take effect the moment the service is created.
+
+Until then the at-least-daily floor is an operator's responsibility, and the
+retention windows in `DATA_MODEL.md` hold exactly as often as someone runs the
+command below.
 
 To inspect what the next scheduled pass would select, without deleting:
 
