@@ -125,6 +125,129 @@ def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> No
     assert packet.usage.cost_usd == pytest.approx(1.53)
 
 
+@pytest.mark.parametrize(
+    ("cache_creation_input_tokens", "cache_read_input_tokens", "cost_overrides"),
+    [
+        pytest.param(
+            0,
+            0,
+            {
+                "input_cost": 1.63201,
+                "output_cost": 0.0,
+                "cache_creation_cost": 0.0,
+                "cache_read_cost": 0.0,
+                "total_cost": 1.63201,
+            },
+            id="uncached-input",
+        ),
+        pytest.param(
+            272_001,
+            0,
+            {
+                "input_cost": 0.0,
+                "output_cost": 0.0,
+                "cache_creation_cost": 2.04001,
+                "cache_read_cost": 0.0,
+                "total_cost": 2.04001,
+            },
+            id="cache-creation",
+        ),
+        pytest.param(
+            0,
+            272_001,
+            {
+                "input_cost": 0.0,
+                "output_cost": 0.0,
+                "cache_creation_cost": 0.0,
+                "cache_read_cost": 0.16320,
+                "total_cost": 0.16320,
+            },
+            id="cache-read",
+        ),
+    ],
+)
+def test_aggregated_multistep_tokens_reject_an_impossible_tier_blend(
+    cache_creation_input_tokens: int,
+    cache_read_input_tokens: int,
+    cost_overrides: dict[str, float],
+) -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=272_001,
+                output_tokens=0,
+                invocations=0,
+                cache_creation_input_tokens=cache_creation_input_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+                cost_overrides=cost_overrides,
+            )
+        ]
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("impossible blend", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_aggregated_multistep_tokens_accept_a_feasible_tier_blend() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=273_001,
+                output_tokens=100,
+                invocations=0,
+                cost_overrides={
+                    # One 272,001-token long-context call plus a 1,000-token
+                    # short-context call can produce this aggregate component.
+                    "input_cost": 2.72501,
+                    "output_cost": 0.0045,
+                    "cache_creation_cost": 0.0,
+                    "cache_read_cost": 0.0,
+                    "total_cost": 2.72951,
+                },
+            )
+        ]
+    )
+
+    packet = client.run_research("feasible blend", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(2.72951)
+
+
+@pytest.mark.parametrize(
+    ("input_cost", "output_cost", "total_cost"),
+    [
+        pytest.param(1.5, 0.045, 1.545, id="short-input-long-output"),
+        pytest.param(3.0, 0.03, 3.03, id="long-input-short-output"),
+    ],
+)
+def test_aggregated_multistep_tokens_reject_inconsistent_tiers(
+    input_cost: float, output_cost: float, total_cost: float
+) -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=300_000,
+                output_tokens=1_000,
+                invocations=0,
+                cost_overrides={
+                    "input_cost": input_cost,
+                    "output_cost": output_cost,
+                    "cache_creation_cost": 0.0,
+                    "cache_read_cost": 0.0,
+                    "total_cost": total_cost,
+                },
+            )
+        ]
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("inconsistent tiers", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
 def test_provider_total_must_match_its_cost_components() -> None:
     client, _ = _client([agent_response(cost_overrides={"total_cost": 9.99})])
 
