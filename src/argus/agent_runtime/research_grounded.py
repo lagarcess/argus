@@ -831,30 +831,29 @@ def compose_completed_research(
     if not rows:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     capability_class = str(job_request.get("capability_class") or "thorough_research")
-    sidecar = build_research_sidecar(
-        capability_class=capability_class,
-        shape="thorough",
-        sources=typed_sources(packet),
-        retrieved_at=packet.retrieved_at.isoformat(),
-        subjects=subjects,
-        peers=peers,
-        usage={
-            "invocations": packet.usage.invocations,
-            "latency_ms": packet.usage.latency_ms,
-            "cost_usd": packet.usage.cost_usd,
-            # Composition only ever runs on a packet a provider run produced;
-            # cache hits answer inline and never reach a job.
-            "cache_status": "miss",
-        },
-        period_of_interest=(
-            str(job_request.get("period_of_interest"))
-            if job_request.get("period_of_interest")
-            else None
-        ),
-    )
     return {
         "answer": answer,
-        "research": sidecar,
+        "research": build_research_sidecar(
+            capability_class=capability_class,
+            shape="thorough",
+            sources=typed_sources(packet),
+            retrieved_at=packet.retrieved_at.isoformat(),
+            subjects=subjects,
+            peers=peers,
+            usage={
+                "invocations": packet.usage.invocations,
+                "latency_ms": packet.usage.latency_ms,
+                "cost_usd": packet.usage.cost_usd,
+                # Composition only ever runs on a packet a provider run produced;
+                # cache hits answer inline and never reach a job.
+                "cache_status": "miss",
+            },
+            period_of_interest=(
+                str(job_request.get("period_of_interest"))
+                if job_request.get("period_of_interest")
+                else None
+            ),
+        ),
         "next_experiments": rows,
     }
 
@@ -1036,25 +1035,24 @@ def research_stage_result(
     decision = research_decision(
         interpretation, user, f"research_answer_{capability_class}"
     )
-    sidecar = build_research_sidecar(
-        capability_class=capability_class,
-        shape=shape,
-        sources=typed_sources(packet),
-        retrieved_at=packet.retrieved_at.isoformat(),
-        subjects=subjects,
-        peers=peers,
-        usage={
-            "invocations": packet.usage.invocations,
-            "latency_ms": packet.usage.latency_ms,
-            "cost_usd": packet.usage.cost_usd,
-            "cache_status": cache_status,
-        },
-        period_of_interest=period_of_interest,
-        degraded_code=degraded_code,
-    )
     stage_patch: dict[str, Any] = {
         "assistant_response": answer,
-        "research": sidecar,
+        "research": build_research_sidecar(
+            capability_class=capability_class,
+            shape=shape,
+            sources=typed_sources(packet),
+            retrieved_at=packet.retrieved_at.isoformat(),
+            subjects=subjects,
+            peers=peers,
+            usage={
+                "invocations": packet.usage.invocations,
+                "latency_ms": packet.usage.latency_ms,
+                "cost_usd": packet.usage.cost_usd,
+                "cache_status": cache_status,
+            },
+            period_of_interest=period_of_interest,
+            degraded_code=degraded_code,
+        ),
     }
     if rows is not None:
         stage_patch["next_experiments"] = rows
