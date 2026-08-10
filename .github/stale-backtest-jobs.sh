@@ -1,15 +1,11 @@
 #!/bin/bash
-# Read-only stale queued/running backtest job scan for private-alpha readiness.
+# Explicit-target stale queued/running backtest reconciliation for readiness.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
-
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/argus-env.sh"
-argus_load_root_env >/dev/null || true
 
 if [ -n "${ARGUS_STALE_JOBS_SUPABASE_URL:-}" ]; then
   export SUPABASE_URL="$ARGUS_STALE_JOBS_SUPABASE_URL"

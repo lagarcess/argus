@@ -565,6 +565,24 @@ profile and fall back to the nameless pool.
   Carries two named amendments to the rail spec, §11c and §12b, each with a
   pointer from the paragraph it supersedes.
 
+- **Destructive ops jobs refuse to guess their target** (#413, PR #427, merged
+  2026-08-10 at `7ac899cd`) — `stale_backtest_jobs.py` called a bare
+  `load_dotenv()`, which resolves upward from the module's own directory to the
+  repository root `.env`, a symlink into the integration worktree on a developer
+  machine. A script whose job is deleting rows silently acquired real
+  credentials and proceeded, with no flag, no prompt, and no line saying which
+  database it had chosen.
+
+  Both destructive jobs now require `DATABASE_URL`, `SUPABASE_URL`, and
+  `SUPABASE_SERVICE_ROLE_KEY` explicitly and exit 2 without them, and each
+  prints its resolved hosts before any destructive work. Discovering a
+  connection string is never right for a destructive job; being handed one is.
+
+  The review round caught the guard being bypassable through
+  `.github/stale-backtest-jobs.sh`, the wrapper the runbook itself tells
+  operators to run, and a second finding where the safety print corrupted JSON
+  stdout. Both are fixed; the print moved to stderr rather than being dropped.
+
 - **Rail follow-ups, three lanes in parallel** (merged 2026-08-10) — all three
   filed during the rail's own verification and closed after the flag went on,
   because enabling turned each from latent into live.
