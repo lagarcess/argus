@@ -6,13 +6,20 @@ import os
 import sys
 from typing import Sequence
 
-from argus.api.chat.backtest_jobs import (
-    DEFAULT_STALE_QUEUED_SECONDS,
-    DEFAULT_STALE_RUNNING_SECONDS,
-    scan_stale_backtest_jobs,
-)
-from argus.domain.supabase_gateway import SupabaseGateway
-from dotenv import load_dotenv
+if __package__:
+    from scripts.ops.destructive_database_target import (
+        DestructiveDatabaseTargetError,
+        announce_destructive_database_target,
+        pin_destructive_database_target,
+        resolve_destructive_database_target,
+    )
+else:
+    from destructive_database_target import (  # type: ignore[no-redef]
+        DestructiveDatabaseTargetError,
+        announce_destructive_database_target,
+        pin_destructive_database_target,
+        resolve_destructive_database_target,
+    )
 
 
 def _copy_first_env(target: str, candidates: Sequence[str]) -> None:
@@ -52,26 +59,53 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--queued-age-seconds",
         type=int,
-        default=DEFAULT_STALE_QUEUED_SECONDS,
+        default=None,
     )
     parser.add_argument(
         "--running-age-seconds",
         type=int,
-        default=DEFAULT_STALE_RUNNING_SECONDS,
+        default=None,
     )
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    load_dotenv()
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
     _prepare_supabase_env()
+    try:
+        target = resolve_destructive_database_target()
+    except DestructiveDatabaseTargetError as exc:
+        parser.error(str(exc))
+    pin_destructive_database_target(target)
+    announce_destructive_database_target(
+        target,
+        stream=sys.stderr if args.json else sys.stdout,
+    )
+
+    from argus.api.chat.backtest_jobs import (
+        DEFAULT_STALE_QUEUED_SECONDS,
+        DEFAULT_STALE_RUNNING_SECONDS,
+        scan_stale_backtest_jobs,
+    )
+    from argus.domain.supabase_gateway import SupabaseGateway
+
+    queued_age_seconds = (
+        args.queued_age_seconds
+        if args.queued_age_seconds is not None
+        else DEFAULT_STALE_QUEUED_SECONDS
+    )
+    running_age_seconds = (
+        args.running_age_seconds
+        if args.running_age_seconds is not None
+        else DEFAULT_STALE_RUNNING_SECONDS
+    )
 
     report = scan_stale_backtest_jobs(
         gateway=SupabaseGateway.from_env(),
-        queued_age_seconds=args.queued_age_seconds,
-        running_age_seconds=args.running_age_seconds,
+        queued_age_seconds=queued_age_seconds,
+        running_age_seconds=running_age_seconds,
         limit=args.limit,
     )
 
