@@ -20,6 +20,9 @@ from argus.agent_runtime.recovery_messages import (
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
 )
+from argus.agent_runtime.stages.artifact_context import (
+    live_pending_confirmation,
+)
 from argus.agent_runtime.stages.interpret_internal.shared import (
     _field_base,
     _selected_requested_field,
@@ -179,15 +182,26 @@ def _offline_recovery_message(
     language: str = "en",
     retryable: bool = True,
 ) -> str:
-    if snapshot is not None and snapshot.pending_strategy_summary is not None:
-        strategy = snapshot.pending_strategy_summary
+    # Liveness, not existence: guidance that invites the user to the card is
+    # only honest while the card is live. A dead confirmation falls through to
+    # the plain interpreter-unavailable copy instead of contradicting the card.
+    live = live_pending_confirmation(snapshot)
+    if live is not None or (
+        snapshot is not None
+        and snapshot.active_confirmation_reference is None
+        and snapshot.pending_strategy_summary is not None
+        and snapshot.pending_strategy_summary != StrategySummary()
+    ):
+        strategy = (
+            live.pending if live is not None else snapshot.pending_strategy_summary
+        )
         setup_phrase = _current_setup_phrase(strategy)
         if _pending_assumption_edit_was_not_applied(
             current_user_message=current_user_message,
             selected_thread_metadata=selected_thread_metadata or {},
         ):
             return recovery_message("assumption_edit_unapplied", language=language)
-        if snapshot.active_confirmation_reference is None:
+        if live is None:
             return recovery_message(
                 "setup_change_unapplied",
                 language=language,

@@ -74,6 +74,9 @@ from argus.agent_runtime.stages.artifact_context import (
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
 )
+from argus.agent_runtime.stages.artifact_context import (
+    live_pending_confirmation,
+)
 from argus.agent_runtime.stages.interpret_actions import (
     approval_stage_result_if_applicable as _approval_stage_result_if_applicable,
 )
@@ -2650,12 +2653,10 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    if (
-        snapshot is None
-        or snapshot.pending_strategy_summary is None
-        or snapshot.active_confirmation_reference is None
-        or not current_user_message.strip()
-    ):
+    # Liveness, not existence: a cancelled card can leave a leftover draft in
+    # the snapshot, and this recovery path must never speak for it.
+    live = live_pending_confirmation(snapshot)
+    if live is None or not current_user_message.strip():
         return None
     if _pending_assumption_edit_was_not_applied(
         current_user_message=current_user_message,
@@ -2672,7 +2673,7 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     )
     if planned_edit is not None:
         return planned_edit
-    strategy = snapshot.pending_strategy_summary
+    strategy = live.pending
     setup_phrase = _current_setup_phrase(strategy)
     assumptions_response = _draft_assumptions_response(snapshot)
     action_guidance = recovery_message(

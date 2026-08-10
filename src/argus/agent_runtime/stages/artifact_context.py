@@ -81,13 +81,61 @@ def stale_confirmation_action_response(
     return None
 
 
+_DEAD_CONFIRMATION_STATES = frozenset({"cancelled", "canceled", "superseded"})
+
+
+class LivePendingConfirmation:
+    """A pending confirmation a turn may honestly speak for.
+
+    Existence is not liveness: a snapshot can carry a leftover draft whose
+    card was cancelled or superseded, or an emptied draft beside a stale
+    reference. Constructing this type is the only way recovery paths obtain
+    pending confirmation state, so none can invite the user to a card that is
+    not there. Argus never contradicts its own card.
+    """
+
+    __slots__ = ("pending", "reference")
+
+    def __init__(self, pending: StrategySummary, reference: ArtifactReference) -> None:
+        self.pending = pending
+        self.reference = reference
+
+
+def live_pending_confirmation(
+    snapshot: TaskSnapshot | None,
+) -> LivePendingConfirmation | None:
+    if snapshot is None:
+        return None
+    pending = snapshot.pending_strategy_summary
+    if pending is None or pending == StrategySummary():
+        return None
+    reference = snapshot.active_confirmation_reference
+    if reference is None:
+        return None
+    if _reference_confirmation_is_dead(reference):
+        return None
+    return LivePendingConfirmation(pending=pending, reference=reference)
+
+
+def _reference_confirmation_is_dead(reference: ArtifactReference) -> bool:
+    status = str(reference.artifact_status or "").strip().casefold()
+    if status in _DEAD_CONFIRMATION_STATES:
+        return True
+    card = reference.metadata.get("confirmation_card")
+    if isinstance(card, dict):
+        card_state = str(card.get("confirmation_state") or "").strip().casefold()
+        if card_state in _DEAD_CONFIRMATION_STATES:
+            return True
+    return False
+
+
 def has_pending_confirmation_context(snapshot: TaskSnapshot | None) -> bool:
-    return bool(
+    """Whether a turn has live pending confirmation context to speak about."""
+    return live_pending_confirmation(snapshot) is not None or bool(
         snapshot is not None
-        and (
-            snapshot.active_confirmation_reference is not None
-            or snapshot.pending_strategy_summary is not None
-        )
+        and snapshot.active_confirmation_reference is None
+        and snapshot.pending_strategy_summary is not None
+        and snapshot.pending_strategy_summary != StrategySummary()
     )
 
 

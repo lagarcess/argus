@@ -289,7 +289,7 @@ export function ConfirmationDirectEditControls({
         <div
           id={drawerId}
           data-testid="confirmation-direct-edit-drawer"
-          className={`grid basis-full transition-[grid-template-rows,margin,opacity] duration-200 ease-out motion-reduce:transition-none ${
+          className={`order-last grid basis-full transition-[grid-template-rows,margin,opacity] duration-200 ease-out motion-reduce:transition-none ${
             openKind !== null
               ? "mt-1 grid-rows-[1fr] opacity-100"
               : "mt-0 grid-rows-[0fr] opacity-0"
