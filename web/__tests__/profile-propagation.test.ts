@@ -244,6 +244,43 @@ describe("a name is measured after it is normalized", () => {
     expect(close).toContain('setPreferredNameValue("")');
   });
 
+  test("a save in flight cannot reach the edit that replaced it", () => {
+    // Closing the dialog does not cancel a request already on the wire, and the
+    // sheet keeps the menu mounted underneath. A late failure pinned an error on
+    // a field nobody was editing; a late success dismissed a fresh edit.
+    const menu = source("components/sidebar/ProfileMenu.tsx");
+
+    // Every await of a patch captures the session it belongs to.
+    const awaits = menu.match(/await patchMe\(/g) ?? [];
+    const captures = menu.match(/const session = editSessionRef\.current;/g) ?? [];
+    expect(captures.length).toBe(awaits.length);
+    // And closing bumps it, so those captures stop matching.
+    const close = menu.slice(
+      menu.indexOf("const closeProfileModal = useCallback"),
+      menu.indexOf("setActiveModal(null);", menu.indexOf("const closeProfileModal")),
+    );
+    expect(close).toContain("editSessionRef.current += 1");
+    // Including the in-flight flags, or a reopened dialog would stay disabled.
+    expect(close).toContain("setIsSavingName(false)");
+    expect(close).toContain("setIsSavingPreferredName(false)");
+
+    // Every edit-local write after an await is guarded.
+    for (const guarded of [
+      "if (isCurrentEditSession(session)) stopEditingName();",
+      "if (isCurrentEditSession(session)) stopEditingPreferredName();",
+      "if (isCurrentEditSession(session)) setIsSavingName(false);",
+      "if (isCurrentEditSession(session)) setIsSavingPreferredName(false);",
+    ]) {
+      expect(menu).toContain(guarded);
+    }
+
+    // The propagation is deliberately NOT guarded: the server changed whatever
+    // the dialog is doing, and dropping it is how the shell's copy went stale.
+    expect(menu).not.toContain("if (isCurrentEditSession(session)) applyPatchedProfile");
+    const propagations = menu.match(/applyPatchedProfile\(user\)/g) ?? [];
+    expect(propagations.length).toBe(awaits.length);
+  });
+
   test("the bound has one frontend home", () => {
     // Two exported copies is the shape the finding is about; only the one in
     // profile-names.ts is pinned against the backend.

@@ -210,15 +210,33 @@ export default function ProfileMenu({
     setPreferredNameError(null);
   }, []);
 
+  /*
+   * An in-flight save belongs to the edit that started it.
+   *
+   * Closing the dialog does not cancel a request already on the wire, and the
+   * sheet keeps this menu mounted underneath, so a continuation could land after
+   * the edit was gone: a late failure pinned an error on a field nobody was
+   * editing, and a late success dismissed a fresh edit started after reopening.
+   * Post-await edit state is written only while this is still the same session.
+   */
+  const editSessionRef = useRef(0);
+  const isCurrentEditSession = useCallback(
+    (session: number) => session === editSessionRef.current,
+    [],
+  );
+
   const closeProfileModal = useCallback(() => {
     setIsAvatarPickerOpen(false);
     // Per-edit state belongs to the dialog, which unmounts here. Left behind, a
     // cleared-but-unsaved box reopened as an empty input claiming the name was
     // gone, and confirming it sent the clear the user never asked for.
+    editSessionRef.current += 1;
     stopEditingName();
     stopEditingPreferredName();
     setNameValue("");
     setPreferredNameValue("");
+    setIsSavingName(false);
+    setIsSavingPreferredName(false);
     setActiveModal(null);
   }, [stopEditingName, stopEditingPreferredName]);
 
@@ -476,24 +494,37 @@ export default function ProfileMenu({
       );
       return;
     }
+    const session = editSessionRef.current;
     setIsSavingName(true);
     setNameError(null);
     try {
       const { user } = await patchMe({ display_name: trimmed });
+      // The server changed whatever the dialog is doing, so this is never
+      // guarded: dropping it is how the shell's copy went stale in the first
+      // place.
       applyPatchedProfile(user);
-      stopEditingName();
+      if (isCurrentEditSession(session)) stopEditingName();
     } catch (err) {
       console.error("Failed to update display name", err);
-      setNameError(
-        t(
-          "settings.profile.display_name_save_error",
-          "Could not save that name yet.",
-        ),
-      );
+      if (isCurrentEditSession(session)) {
+        setNameError(
+          t(
+            "settings.profile.display_name_save_error",
+            "Could not save that name yet.",
+          ),
+        );
+      }
     } finally {
-      setIsSavingName(false);
+      if (isCurrentEditSession(session)) setIsSavingName(false);
     }
-  }, [applyPatchedProfile, nameValue, profile, stopEditingName, t]);
+  }, [
+    applyPatchedProfile,
+    isCurrentEditSession,
+    nameValue,
+    profile,
+    stopEditingName,
+    t,
+  ]);
 
   /*
    * What to call the user, which is a setting and never a memory.
@@ -518,24 +549,34 @@ export default function ProfileMenu({
       );
       return;
     }
+    const session = editSessionRef.current;
     setIsSavingPreferredName(true);
     setPreferredNameError(null);
     try {
       const { user } = await patchMe({ preferred_name: trimmed || null });
       applyPatchedProfile(user);
-      stopEditingPreferredName();
+      if (isCurrentEditSession(session)) stopEditingPreferredName();
     } catch (err) {
       console.error("Failed to update preferred name", err);
-      setPreferredNameError(
-        t(
-          "settings.profile.preferred_name_save_error",
-          "Could not save that name yet.",
-        ),
-      );
+      if (isCurrentEditSession(session)) {
+        setPreferredNameError(
+          t(
+            "settings.profile.preferred_name_save_error",
+            "Could not save that name yet.",
+          ),
+        );
+      }
     } finally {
-      setIsSavingPreferredName(false);
+      if (isCurrentEditSession(session)) setIsSavingPreferredName(false);
     }
-  }, [applyPatchedProfile, preferredNameValue, profile, stopEditingPreferredName, t]);
+  }, [
+    applyPatchedProfile,
+    isCurrentEditSession,
+    preferredNameValue,
+    profile,
+    stopEditingPreferredName,
+    t,
+  ]);
 
   const handleStartEditPreferredName = useCallback(() => {
     setPreferredNameValue(profile?.preferred_name ?? "");
@@ -564,6 +605,7 @@ export default function ProfileMenu({
       );
       if (isSavingLanguage) return;
 
+      const session = editSessionRef.current;
       setIsSavingLanguage(true);
       setLanguageError(null);
       setProfile((current) =>
@@ -583,7 +625,7 @@ export default function ProfileMenu({
           locale: localeForLanguage(nextLanguage),
         });
         applyPatchedProfile(user);
-        setIsLanguagePickerOpen(false);
+        if (isCurrentEditSession(session)) setIsLanguagePickerOpen(false);
       } catch (err) {
         console.error("Failed to update language", err);
         await i18n.changeLanguage(previousLanguage);
@@ -596,17 +638,19 @@ export default function ProfileMenu({
               }
             : current,
         );
-        setLanguageError(
-          t(
-            "settings.profile.language_save_error",
-            "Could not update language yet.",
-          ),
-        );
+        if (isCurrentEditSession(session)) {
+          setLanguageError(
+            t(
+              "settings.profile.language_save_error",
+              "Could not update language yet.",
+            ),
+          );
+        }
       } finally {
         setIsSavingLanguage(false);
       }
     },
-    [applyPatchedProfile, i18n, isSavingLanguage, profile, t],
+    [applyPatchedProfile, i18n, isCurrentEditSession, isSavingLanguage, profile, t],
   );
 
   const handleAvatarThemeSelect = useCallback(
@@ -614,6 +658,7 @@ export default function ProfileMenu({
       if (!profile || accountKind !== "registered" || isSavingAvatarTheme) return;
 
       const previousTheme = profile.avatar_theme;
+      const session = editSessionRef.current;
       setAvatarThemeError(null);
       setIsSavingAvatarTheme(true);
       setProfile((current) =>
@@ -628,17 +673,26 @@ export default function ProfileMenu({
         setProfile((current) =>
           current ? { ...current, avatar_theme: previousTheme } : current,
         );
-        setAvatarThemeError(
-          t(
-            "settings.profile.avatar_theme.save_error",
-            "Could not update your avatar color yet.",
-          ),
-        );
+        if (isCurrentEditSession(session)) {
+          setAvatarThemeError(
+            t(
+              "settings.profile.avatar_theme.save_error",
+              "Could not update your avatar color yet.",
+            ),
+          );
+        }
       } finally {
         setIsSavingAvatarTheme(false);
       }
     },
-    [accountKind, applyPatchedProfile, isSavingAvatarTheme, profile, t],
+    [
+      accountKind,
+      applyPatchedProfile,
+      isCurrentEditSession,
+      isSavingAvatarTheme,
+      profile,
+      t,
+    ],
   );
 
   const handleAvatarThemeKeyDown = useCallback(
