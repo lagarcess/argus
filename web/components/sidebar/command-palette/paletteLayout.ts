@@ -1,9 +1,9 @@
 /**
  * What Omnisearch shows at a given width.
  *
- * Width, never pointer type. A pointer check was how the palette used to
- * decide this, which gave a touch laptop the phone layout and a stylus tablet
- * the desktop one; the spec settles it on the DESIGN.md stops instead.
+ * Geometry follows width, never pointer type. Pointer capability may choose an
+ * affordance inside a layout, but it must not turn a wide touch device into the
+ * phone layout or a narrow fine-pointer device into the desktop layout.
  */
 export type LayoutMode = "expanded" | "collapsed";
 export type RowActionVariant = "menu" | "hover";
@@ -17,9 +17,9 @@ export function effectivePaletteLayout(
 }
 
 /**
- * Hover reveal is an affordance, not a gate. Every width below the desktop stop
- * gets the explicit menu, whose trigger and items are 44px, so reach never
- * depends on knowing what kind of pointer is in use.
+ * Every width below the desktop stop gets the explicit 44px menu. At the
+ * desktop stop, CSS may reveal compact inline actions for a fine pointer while
+ * retaining that touch-safe menu whenever a coarse pointer is available.
  */
 export function paletteRowActionVariant(
   isBelowDesktop: boolean,

@@ -264,26 +264,28 @@ export default function ProfileDetailsDialog({
                     </button>
                   </div>
                 ) : (
-                  <div className="group flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleStartEditName}
+                    className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/25"
+                    title={t(
+                      "settings.profile.edit_display_name",
+                      "Edit display name",
+                    )}
+                    aria-label={t(
+                      "settings.profile.edit_display_name",
+                      "Edit display name",
+                    )}
+                  >
                     <span className="font-display truncate text-[15px] font-medium text-black dark:text-white">
                       {profile?.display_name ??
                         t("settings.profile.default_user", "User")}
                     </span>
-                    <button
-                      onClick={handleStartEditName}
-                      className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
-                      title={t(
-                        "settings.profile.edit_display_name",
-                        "Edit display name",
-                      )}
-                      aria-label={t(
-                        "settings.profile.edit_display_name",
-                        "Edit display name",
-                      )}
-                    >
-                      <Edit2 className="h-3 w-3 text-black/40 dark:text-white/40" />
-                    </button>
-                  </div>
+                    <Edit2
+                      className="h-3 w-3 shrink-0 text-black/40 dark:text-white/40"
+                      aria-hidden="true"
+                    />
+                  </button>
                 )}
                 {nameError && (
                   <span className="mt-1 text-[12px] text-[#d66d75]">
@@ -487,7 +489,7 @@ export default function ProfileDetailsDialog({
                       t("settings.profile.preferred_name_unset", "Not set")}
                   </span>
                   <Edit2
-                    className="h-3 w-3 text-black/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 dark:text-white/40"
+                    className="h-3 w-3 text-black/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100 dark:text-white/40"
                     aria-hidden="true"
                   />
                 </button>

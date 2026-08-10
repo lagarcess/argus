@@ -5,6 +5,7 @@ import { Edit2, MoreVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useOverlayLayer } from "@/components/layout/overlayStack";
+import pointerAffordances from "../pointerAffordances.module.css";
 
 export type CommandPaletteRowAction = {
   id: "rename" | "archive" | "delete" | "open_source";
@@ -39,6 +40,7 @@ export default function CommandPaletteRowActions({
   const overlayId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Escape and outside presses arrive from the registry, and only while this
   // menu is the topmost layer. It used to install both itself and lean on
@@ -47,43 +49,44 @@ export default function CommandPaletteRowActions({
     isOpen,
     overlayId,
     containerRef,
-    onEscape: () => setIsOpen(false),
+    onEscape: () => {
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    },
     onOutsidePointerDown: () => setIsOpen(false),
   });
 
   if (actions.length === 0) return null;
 
-  if (variant === "hover") {
-    return (
-      <div
-        className="argus-row-hover-actions absolute bottom-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-        data-row-action
-      >
-        {actions.map((action) => (
-          <Tooltip key={action.id} content={action.label} side="top" delay={120}>
-            <button
-              type="button"
-              disabled={action.disabled}
-              onClick={(event) => {
-                event.stopPropagation();
-                action.onSelect();
-              }}
-              className={
-                action.destructive
-                  ? "rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
-                  : "rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-              }
-              aria-label={action.accessibleName}
-            >
-              <action.icon className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
-        ))}
-      </div>
-    );
-  }
+  const hoverActions = (
+    <div
+      className={`argus-row-hover-actions absolute bottom-2 right-2 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${pointerAffordances.finePointerActions}`}
+      data-row-action
+    >
+      {actions.map((action) => (
+        <Tooltip key={action.id} content={action.label} side="top" delay={120}>
+          <button
+            type="button"
+            disabled={action.disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              action.onSelect();
+            }}
+            className={
+              action.destructive
+                ? "rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
+                : "rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+            }
+            aria-label={action.accessibleName}
+          >
+            <action.icon className="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
+      ))}
+    </div>
+  );
 
-  return (
+  const menuActions = (
     <div
       ref={containerRef}
       /*
@@ -93,12 +96,13 @@ export default function CommandPaletteRowActions({
        * unclickable: the menu's own z-index cannot help, since the thing
        * covering it is a sibling of the row rather than a sibling of the menu.
        */
-      className={`absolute right-0 top-1/2 flex -translate-y-1/2 items-center ${
+      className={`absolute right-0 top-1/2 -translate-y-1/2 items-center ${
         isOpen ? "z-20" : ""
-      }`}
+      } ${variant === "hover" ? pointerAffordances.touchSafeActions : "flex"}`}
       data-row-action
     >
       <button
+        ref={triggerRef}
         type="button"
         data-testid="command-palette-row-menu"
         onClick={(event) => {
@@ -144,5 +148,15 @@ export default function CommandPaletteRowActions({
       ) : null}
     </div>
   );
-}
 
+  if (variant === "hover") {
+    return (
+      <>
+        {hoverActions}
+        {menuActions}
+      </>
+    );
+  }
+
+  return menuActions;
+}

@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DecisionHistoryView } from "@/components/sidebar/command-palette/DecisionHistoryView";
 import { RunDossierView } from "@/components/sidebar/command-palette/RunDossierView";
 import CommandPaletteRowActions from "@/components/sidebar/command-palette/CommandPaletteRowActions";
+import pointerAffordances from "@/components/sidebar/pointerAffordances.module.css";
 import { commandPaletteRowActions } from "@/components/sidebar/command-palette/rowActionItems";
 import CommandPaletteDossierSheet from "@/components/sidebar/command-palette/CommandPaletteDossierSheet";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
@@ -1695,7 +1696,7 @@ export default function ChatCommandPalette({
                                 className={
                                   rowActionVariant === "menu"
                                     ? "shrink-0 self-center whitespace-nowrap text-[11px] text-black/30 dark:text-white/30"
-                                    : "absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30"
+                                    : `absolute top-3 text-[11px] text-black/30 dark:text-white/30 ${pointerAffordances.hoverLayoutDate}`
                                 }
                               >
                                 {formatRelativeDate(

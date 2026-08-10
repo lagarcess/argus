@@ -83,12 +83,12 @@ describe("responsive breakpoints", () => {
   });
 });
 
-describe("nothing asks what the device is", () => {
-  test("no stylesheet or component branches on the pointer", () => {
+describe("pointer capability stays an affordance concern", () => {
+  test("only the sidebar hover affordance stylesheet branches on the pointer", () => {
     /*
-     * Views follow the DESIGN.md widths, by feature. A pointer query answers a
-     * different question, and it shipped twice: once choosing the palette
-     * layout, once expanding row actions 14px into each other.
+     * Geometry follows the DESIGN.md widths. Pointer capability answers only
+     * whether a hover-revealed control is reachable, so it stays in one CSS
+     * module and never becomes a runtime layout branch.
      */
     const offenders: string[] = [];
     const scan = (dir: string) => {
@@ -103,7 +103,7 @@ describe("nothing asks what the device is", () => {
           .replace(/\/\*[\s\S]*?\*\//g, "")
           .replace(/^\s*\/\/.*$/gm, "");
         if (
-          /@media[^{]*pointer:\s*coarse|@media[^{]*hover:\s*none|matchMedia\([^)]*pointer/.test(
+          /@media[^{]*(?:any-)?pointer\s*:|@media[^{]*hover\s*:|matchMedia\([^)]*(?:pointer|hover)/.test(
             source,
           )
         ) {
@@ -113,6 +113,19 @@ describe("nothing asks what the device is", () => {
     };
     scan(join(import.meta.dir, "..", "components"));
     scan(join(import.meta.dir, "..", "app"));
-    expect(offenders).toEqual([]);
+    expect(offenders).toEqual([
+      "components/sidebar/pointerAffordances.module.css",
+    ]);
+
+    const affordances = readFileSync(
+      join(
+        import.meta.dir,
+        "../components/sidebar/pointerAffordances.module.css",
+      ),
+      "utf-8",
+    );
+    expect(affordances).toContain("(hover: hover) and (pointer: fine)");
+    expect(affordances).toContain("(any-pointer: coarse)");
+    expect(affordances).not.toMatch(/(?:min|max)-width/);
   });
 });
