@@ -12,14 +12,29 @@ async function openRecents(page: Page): Promise<void> {
   await page.waitForTimeout(400);
 }
 
-test("Recents owner actions stay visible without hover", async ({ page }) => {
+test("Recents owner actions reveal on hover or focus for a fine pointer", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openRegisteredChat(page);
   await openRecents(page);
+  expect(
+    await page.evaluate(
+      () =>
+        matchMedia("(hover: hover) and (pointer: fine)").matches &&
+        !matchMedia("(any-pointer: coarse)").matches,
+    ),
+  ).toBe(true);
 
   const row = page.locator('[data-conversation-id="conversation-beta"]');
+  const actions = row.locator("[data-actions]");
   await expect(row).toContainText("Weekly Nvidia buys");
-  await expect(row.locator("[data-actions]")).toHaveCSS("opacity", "1");
+  await expect(actions).toHaveCSS("opacity", "0");
+  await row.hover();
+  await expect(actions).toHaveCSS("opacity", "1");
+  await page.mouse.move(0, 0);
+  await actions.focus();
+  await expect(actions).toHaveCSS("opacity", "1");
 });
 
 test("profile edit affordances remain discoverable without a mouse", async ({
@@ -64,6 +79,41 @@ test.describe("wide touch affordances", () => {
     expect(box?.width).toBeGreaterThanOrEqual(44);
     expect(box?.height).toBeGreaterThanOrEqual(44);
     await expect(page.locator(".argus-row-hover-actions").first()).toBeHidden();
+  });
+
+  test("Omnisearch keeps the wide-touch menu clear of the date", async ({
+    page,
+  }) => {
+    await openRegisteredChat(page);
+    await page.getByRole("button", { name: /^search$/i }).first().click();
+    await page.waitForTimeout(700);
+
+    const row = page.locator("[data-palette-row-index]").first();
+    const menu = row.getByTestId("command-palette-row-menu");
+    const date = row.locator(":scope > span").first();
+    const menuBox = await menu.boundingBox();
+    const dateBox = await date.boundingBox();
+
+    expect(menuBox).not.toBeNull();
+    expect(dateBox).not.toBeNull();
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(menuBox!.x);
+  });
+
+  test("Escape returns focus to the wide-touch row menu trigger", async ({
+    page,
+  }) => {
+    await openRegisteredChat(page);
+    await page.getByRole("button", { name: /^search$/i }).first().click();
+    await page.waitForTimeout(700);
+
+    const trigger = page.getByTestId("command-palette-row-menu").first();
+    await trigger.click();
+    const firstItem = page.getByRole("menuitem").first();
+    await firstItem.focus();
+    await page.keyboard.press("Escape");
+
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(trigger).toBeFocused();
   });
 });
 

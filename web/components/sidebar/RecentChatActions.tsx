@@ -5,6 +5,7 @@ import { Archive, Edit2, Mail, MailOpen, MoreVertical, Pin, Trash2 } from "lucid
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { HistoryItem } from "@/lib/argus-api";
+import pointerAffordances from "./pointerAffordances.module.css";
 
 type RecentChatActionsProps = {
   item: HistoryItem;
@@ -104,7 +105,7 @@ export default function RecentChatActions({
             event.stopPropagation();
             setIsMenuOpen((open) => !open);
           }}
-          className="flex h-11 w-11 items-center justify-center rounded-md opacity-100 transition-colors duration-150 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 dark:hover:bg-white/10 dark:focus-visible:ring-white/40"
+          className={`flex h-11 w-11 items-center justify-center rounded-md transition-[opacity,background-color,color] duration-150 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 dark:hover:bg-white/10 dark:focus-visible:ring-white/40 ${pointerAffordances.recentsOwnerAction}`}
           aria-label={t("common.more", "More")}
           aria-haspopup="menu"
           aria-expanded={isMenuOpen}

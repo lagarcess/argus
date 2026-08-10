@@ -12,13 +12,11 @@ const sidebar = readFileSync(
 );
 
 describe("RecentChatActions unread control", () => {
-  test("keeps one persistent touch-safe ellipsis outside quick-jump mode", () => {
+  test("keeps one pointer-aware touch-safe ellipsis outside quick-jump mode", () => {
     expect(source.match(/<MoreVertical/g)).toHaveLength(1);
     expect(source).toContain("h-11 w-11");
     expect(source).toContain('MoreVertical className="h-3.5 w-3.5');
-    expect(source).toContain("opacity-100 transition-colors");
-    expect(source).not.toContain("group-hover:opacity-100");
-    expect(source).not.toContain("focus-visible:opacity-100");
+    expect(source).toContain("pointerAffordances.recentsOwnerAction");
     expect(source).toContain("isMenuOpen || isTriggerFocused || !quickJumpHint");
     expect(source).toContain('w-[88px]');
     expect(source).not.toContain("ConversationActivityIndicator");

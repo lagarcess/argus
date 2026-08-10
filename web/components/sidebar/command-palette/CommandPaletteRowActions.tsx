@@ -40,6 +40,7 @@ export default function CommandPaletteRowActions({
   const overlayId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Escape and outside presses arrive from the registry, and only while this
   // menu is the topmost layer. It used to install both itself and lean on
@@ -48,7 +49,10 @@ export default function CommandPaletteRowActions({
     isOpen,
     overlayId,
     containerRef,
-    onEscape: () => setIsOpen(false),
+    onEscape: () => {
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    },
     onOutsidePointerDown: () => setIsOpen(false),
   });
 
@@ -98,6 +102,7 @@ export default function CommandPaletteRowActions({
       data-row-action
     >
       <button
+        ref={triggerRef}
         type="button"
         data-testid="command-palette-row-menu"
         onClick={(event) => {
