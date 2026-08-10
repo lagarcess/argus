@@ -2,6 +2,7 @@ import { Banknote, CalendarDays, Check, PencilLine, X } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useRef, useState } from "react";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
+import { effectiveMaxEndDate } from "@/lib/date-edit-bounds";
 import {
   MAX_SLIPPAGE_PERCENT,
   costEditDraftFromDisplayFacts,
@@ -130,6 +131,9 @@ export function ConfirmationDirectEditControls({
 
   const directEdits = confirmation.capabilities?.direct_edits ?? [];
   const constraints = confirmation.capabilities?.edit_constraints;
+  // A backtest tests the past: no card may offer a date after today, with or
+  // without an advertised envelope, and the picker itself must say so.
+  const maxEndDate = effectiveMaxEndDate(constraints?.date_window?.max_end);
   const canEditCapital = directEdits.includes("capital");
   const canEditDates = directEdits.includes("dates");
   const canEditCosts = directEdits.includes("costs");
@@ -216,8 +220,7 @@ export function ConfirmationDirectEditControls({
         );
         return;
       }
-      const maxEnd = constraints?.date_window?.max_end;
-      if (typeof maxEnd === "string" && maxEnd && endDraft > maxEnd) {
+      if (endDraft > maxEndDate || startDraft > maxEndDate) {
         setError(directEditErrorText("future_end_date", t, constraints));
         return;
       }
@@ -307,7 +310,7 @@ export function ConfirmationDirectEditControls({
             type="date"
             value={startDraft}
             min={constraints?.date_window?.min_start}
-            max={constraints?.date_window?.max_end}
+            max={maxEndDate}
             onChange={(event) => setStartDraft(event.target.value)}
             onKeyDown={onFieldKeyDown}
             data-testid="direct-edit-start-input"
@@ -320,7 +323,7 @@ export function ConfirmationDirectEditControls({
             type="date"
             value={endDraft}
             min={constraints?.date_window?.min_start}
-            max={constraints?.date_window?.max_end}
+            max={maxEndDate}
             onChange={(event) => setEndDraft(event.target.value)}
             onKeyDown={onFieldKeyDown}
             data-testid="direct-edit-end-input"

@@ -112,6 +112,20 @@ describe("confirmation direct edit surface", () => {
     expect(editor).not.toContain("rows.find");
   });
 
+  test("the date picker never offers a day the engine cannot test", () => {
+    const editor = source("components/chat/ConfirmationDirectEdit.tsx");
+    // Both inputs clamp to the effective max (the earlier of the advertised
+    // bound and the browser's today), with or without an envelope, and the
+    // submit check compares against the exact same value.
+    expect(editor).toContain("effectiveMaxEndDate");
+    expect(editor).toContain("max={maxEndDate}");
+    expect(
+      editor.split("max={maxEndDate}").length - 1,
+    ).toBe(2);
+    expect(editor).toContain("endDraft > maxEndDate || startDraft > maxEndDate");
+    expect(editor).not.toContain("max={constraints?.date_window?.max_end}");
+  });
+
   test("unapplied edit changes disclose above the card in both locales", () => {
     const message = source("components/chat/ChatMessage.tsx");
     expect(message).toContain("confirmationEditDisclosureText");
