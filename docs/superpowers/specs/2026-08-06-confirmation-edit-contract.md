@@ -120,6 +120,22 @@ so that lane does not invent a second primitive. See
 [`2026-08-06-mobile-pwa-responsive-shell.md`](2026-08-06-mobile-pwa-responsive-shell.md)
 section 3.
 
+### 3.4b Amendment 2026-08-10: one in-flow drawer at every width
+
+**This amendment is binding and supersedes the mobile row of the table above.**
+During the founder's hands-on review the sheet path failed in the exact way a
+second primitive fails: `BottomSheet` renders fixed-position without a portal,
+so inside the card's transform containing block it clipped into a view
+takeover that replaced the card. The founder's direction was one disclosure
+idiom, no exceptions.
+
+The shipped behavior at every width is the editable `ExecutionDetails` shape:
+the pill row stays where it is, the drawer expands downward in normal flow
+inside the card, pushing the content below it down, and closing rolls it back
+up. The mobile sheet reservation in the responsive-shell spec is unused by
+this surface. A drawer with more fields is simply taller; the layout never
+changes.
+
 Direct edits are ordinary edits: they obey the same validation, the same
 coverage and resolver gates, and the same disclosure rules as a conversational
 edit. Nothing becomes runnable that would not have been runnable through chat.

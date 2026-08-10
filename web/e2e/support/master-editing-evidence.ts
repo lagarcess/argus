@@ -261,6 +261,51 @@ async function mobile(browser: Browser, lang: "en" | "es") {
   await context.close();
 }
 
+
+/** §6 acceptance: a scoped date prompt answered with more than a date serves
+ * the whole request. */
+async function scopedWiden(page: Page, lang: "en" | "es") {
+  await openFreshChat(page);
+  await send(
+    page,
+    lang === "en"
+      ? "Buy and hold NFLX with $10,000"
+      : "Compra y mantén NFLX con $10,000",
+  );
+  await waitForAssistantSettled(page);
+  await send(
+    page,
+    lang === "en"
+      ? "Use calendar year 2023 and change the capital to $25,000"
+      : "Usa el año 2023 y cambia el capital a $25,000",
+  );
+  await waitForCards(page, 1);
+  await capture(page, `${lang}-15-scoped-widen-served-whole`);
+  const text = TEXTS[`${lang}-15-scoped-widen-served-whole`];
+  if (!text.includes("$25,000") || !text.includes("2023")) {
+    throw new Error(`${lang}-15: widened request not fully served`);
+  }
+}
+
+/** §6 acceptance: a fractional duration stays fractional (#332). */
+async function fractionalDate(page: Page, lang: "en" | "es") {
+  await openFreshChat(page);
+  await send(
+    page,
+    lang === "en"
+      ? "Buy and hold NFLX with $10,000 for the last 8.5 months"
+      : "Compra y mantén NFLX con $10,000 durante los últimos 8,5 meses",
+  );
+  await waitForCards(page, 1);
+  await capture(page, `${lang}-16-fractional-duration-card`);
+  const text = TEXTS[`${lang}-16-fractional-duration-card`].toLowerCase();
+  if (!text.includes("2025") || !text.includes("nov")) {
+    throw new Error(
+      `${lang}-16: 8.5 months back from 2026-08 must start late November 2025`,
+    );
+  }
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
@@ -284,6 +329,8 @@ async function main() {
 
   await apiPatchLanguage("en");
   await run("en-editing", () => inPlaceEditing(page, "en"));
+  await run("en-widen", () => scopedWiden(page, "en"));
+  await run("en-fraction", () => fractionalDate(page, "en"));
   await run("en-disclosure", () => compoundDisclosure(page, "en"));
   await run("en-peers", () => peerRows(page, "en"));
   await run("en-mobile", () => mobile(browser, "en"));
@@ -291,6 +338,8 @@ async function main() {
   await apiPatchLanguage("es-419");
   await page.reload();
   await run("es-editing", () => inPlaceEditing(page, "es"));
+  await run("es-widen", () => scopedWiden(page, "es"));
+  await run("es-fraction", () => fractionalDate(page, "es"));
   await run("es-disclosure", () => compoundDisclosure(page, "es"));
   await run("es-peers", () => peerRows(page, "es"));
   await run("es-mobile", () => mobile(browser, "es"));
