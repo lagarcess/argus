@@ -690,9 +690,9 @@ Application-facing user object.
 {
   "id": "uuid",
   "email": "user@email.com",
-  "username": "lucas",
-  "display_name": "Lucas Garces",
-  "preferred_name": "Lucas",
+  "username": "alex",
+  "display_name": "Alexandra",
+  "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
   "theme": "dark",
@@ -712,9 +712,10 @@ Application-facing user object.
 - `display_name` is an identity field. It is what the account is called.
 - `preferred_name` is what Argus calls the user when it addresses them, and it
   is deliberately not `display_name`: people fill an identity field with a legal
-  name, and "What is next, Lucas Garces?" reads like a form letter. It is
-  optional, because being addressed by name is not universally welcome. Null or
-  absent means surfaces use no name, which needs no special handling.
+  name, so a greeting built from it addresses the account rather than the
+  person. It is optional, because being addressed by name is not universally
+  welcome. Null or absent means surfaces use no name, which needs no special
+  handling.
   - Stated, never inferred. It is a setting; nothing derives it from
     conversation, and no runtime writes it.
   - Bounded at 40 characters. Blank or whitespace clears it, which is how a user
@@ -1655,8 +1656,8 @@ Create account.
   "email": "user@email.com",
   "password": "string",
   "captcha_token": "bounded-turnstile-token",
-  "display_name": "Lucas",
-  "username": "lucas",
+  "display_name": "Alex",
+  "username": "alex",
   "language": "es-419"
 }
 ```
@@ -1800,8 +1801,8 @@ Retrieve the current authenticated user profile and preferences.
   "user": {
     "id": "uuid",
     "email": "user@email.com",
-    "username": "lucas",
-    "display_name": "Lucas",
+    "username": "alex",
+    "display_name": "Alex",
     "language": "en",
     "locale": "en-US",
     "theme": "dark",
@@ -1964,8 +1965,8 @@ Update profile preferences. Partial update semantics are supported.
 **Request:**
 ```json
 {
-  "display_name": "Lucas Garces",
-  "preferred_name": "Lucas",
+  "display_name": "Alexandra",
+  "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
   "theme": "dark",

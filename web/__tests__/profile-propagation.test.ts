@@ -22,8 +22,8 @@ const source = (relativePath: string) =>
 const user = (overrides: Partial<ApiUser> = {}): ApiUser => ({
   id: "user-1",
   email: "a@b.c",
-  username: "lucas",
-  display_name: "Lucas Garces",
+  username: "alex",
+  display_name: "Alexandra",
   preferred_name: null,
   language: "en",
   locale: "en-US",
@@ -60,9 +60,9 @@ describe("a saved profile reaches the greeting", () => {
     const loaded = account({ preferred_name: null });
     expect(greetingNameFor(loaded)).toBeNull();
 
-    const saved = applyProfileUpdate(loaded, user({ preferred_name: "Lucas" }));
+    const saved = applyProfileUpdate(loaded, user({ preferred_name: "Alex" }));
 
-    expect(greetingNameFor(saved)).toBe("Lucas");
+    expect(greetingNameFor(saved)).toBe("Alex");
     // Same snapshot the surface reads, not a second request.
     expect(saved).not.toBe(loaded);
     expect(saved?.account_kind).toBe("registered");
@@ -70,8 +70,8 @@ describe("a saved profile reaches the greeting", () => {
   });
 
   test("clearing the name reaches the greeting the same way", () => {
-    const named = account({ preferred_name: "Lucas" });
-    expect(greetingNameFor(named)).toBe("Lucas");
+    const named = account({ preferred_name: "Alex" });
+    expect(greetingNameFor(named)).toBe("Alex");
 
     const cleared = applyProfileUpdate(named, user({ preferred_name: null }));
 
@@ -81,15 +81,15 @@ describe("a saved profile reaches the greeting", () => {
   test("a save that is not the name still refreshes the shell's copy", () => {
     // Propagation is per patch, not per field, so a surface added later cannot
     // go stale by omission.
-    const loaded = account({ display_name: "Lucas Garces" });
+    const loaded = account({ display_name: "Alexandra" });
 
     const saved = applyProfileUpdate(
       loaded,
-      user({ display_name: "L. Garces", preferred_name: "Lucas" }),
+      user({ display_name: "A. Rivera", preferred_name: "Alex" }),
     );
 
-    expect(saved?.user.display_name).toBe("L. Garces");
-    expect(greetingNameFor(saved)).toBe("Lucas");
+    expect(saved?.user.display_name).toBe("A. Rivera");
+    expect(greetingNameFor(saved)).toBe("Alex");
   });
 
   test("a guest with no profile resolves to the nameless pool", () => {
@@ -98,7 +98,7 @@ describe("a saved profile reaches the greeting", () => {
   });
 
   test("nothing to apply to is left alone rather than invented", () => {
-    expect(applyProfileUpdate(null, user({ preferred_name: "Lucas" }))).toBeNull();
+    expect(applyProfileUpdate(null, user({ preferred_name: "Alex" }))).toBeNull();
   });
 
   test("every successful patch propagates, not just the one that was noticed", () => {

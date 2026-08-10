@@ -1,8 +1,8 @@
 """`preferred_name` is what to call the user, and it is not `display_name`.
 
 `display_name` is an identity field people fill with a legal name or whatever
-their email gave them. Reusing it puts "What is next, Lucas Garces?" on the
-empty chat. This one is optional, stated, and separate.
+their email gave them, so a greeting reusing it addresses the account rather
+than the person. This one is optional, stated, and separate.
 """
 
 from __future__ import annotations
@@ -51,10 +51,10 @@ def _user(**overrides) -> User:
 
 
 def test_it_is_a_separate_field_from_display_name() -> None:
-    user = _user(display_name="Lucas Garces", preferred_name="Lucas")
+    user = _user(display_name="Alexandra", preferred_name="Alex")
 
-    assert user.display_name == "Lucas Garces"
-    assert user.preferred_name == "Lucas"
+    assert user.display_name == "Alexandra"
+    assert user.preferred_name == "Alex"
 
 
 def test_unset_is_the_default_and_means_no_name() -> None:
@@ -64,7 +64,7 @@ def test_unset_is_the_default_and_means_no_name() -> None:
 def test_blank_and_whitespace_clear_it_rather_than_storing_a_name() -> None:
     assert _user(preferred_name="   ").preferred_name is None
     assert ProfilePatch(preferred_name="").preferred_name is None
-    assert ProfilePatch(preferred_name="  Lucas  ").preferred_name == "Lucas"
+    assert ProfilePatch(preferred_name="  Alex  ").preferred_name == "Alex"
 
 
 def test_it_is_bounded() -> None:
@@ -120,7 +120,7 @@ def test_the_read_model_and_the_patch_state_the_rule_once() -> None:
 
 def test_guests_do_not_carry_one() -> None:
     # Guests have no profile and fall back to the nameless pool.
-    projected = guest_safe_user(_user(preferred_name="Lucas")).model_dump()
+    projected = guest_safe_user(_user(preferred_name="Alex")).model_dump()
 
     assert "preferred_name" not in projected
 
@@ -128,17 +128,17 @@ def test_guests_do_not_carry_one() -> None:
 def test_patch_round_trips_through_the_api() -> None:
     client = _client()
 
-    saved = client.patch("/api/v1/me", json={"preferred_name": "  Lucas  "})
+    saved = client.patch("/api/v1/me", json={"preferred_name": "  Alex  "})
     assert saved.status_code == 200
-    assert saved.json()["user"]["preferred_name"] == "Lucas"
+    assert saved.json()["user"]["preferred_name"] == "Alex"
 
     read = client.get("/api/v1/me")
-    assert read.json()["user"]["preferred_name"] == "Lucas"
+    assert read.json()["user"]["preferred_name"] == "Alex"
 
 
 def test_clearing_it_is_a_supported_edit() -> None:
     client = _client()
-    client.patch("/api/v1/me", json={"preferred_name": "Lucas"})
+    client.patch("/api/v1/me", json={"preferred_name": "Alex"})
 
     cleared = client.patch("/api/v1/me", json={"preferred_name": ""})
 
@@ -149,11 +149,11 @@ def test_clearing_it_is_a_supported_edit() -> None:
 def test_a_patch_that_omits_it_leaves_it_alone() -> None:
     # Partial update semantics: editing the language must not wipe the name.
     client = _client()
-    client.patch("/api/v1/me", json={"preferred_name": "Lucas"})
+    client.patch("/api/v1/me", json={"preferred_name": "Alex"})
 
     client.patch("/api/v1/me", json={"language": "es-419", "locale": "es-419"})
 
-    assert client.get("/api/v1/me").json()["user"]["preferred_name"] == "Lucas"
+    assert client.get("/api/v1/me").json()["user"]["preferred_name"] == "Alex"
 
 
 def test_an_over_long_name_is_rejected_by_the_api() -> None:

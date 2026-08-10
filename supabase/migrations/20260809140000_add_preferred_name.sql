@@ -1,6 +1,6 @@
 -- What the user asked Argus to call them, which is not who their account says
 -- they are. `display_name` is an identity field people fill with a legal name,
--- so reusing it would put "What is next, Lucas Garces?" on the empty chat.
+-- so a greeting reusing it addresses the account rather than the person.
 --
 -- Optional by design: being addressed by name is not universally welcome, and a
 -- dedicated field makes it a choice the user made rather than a side effect of
