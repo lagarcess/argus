@@ -17,12 +17,20 @@ describe("date edit bounds", () => {
     expect(effectiveMaxEndDate("", now)).toBe("2026-08-10");
   });
 
-  test("the earlier of the server bound and local today wins", () => {
+  test("a stale advertisement never tightens below the current day", () => {
     const now = new Date(2026, 7, 10, 12, 0, 0);
-    // Server trails the browser around midnight: its bound tightens.
-    expect(effectiveMaxEndDate("2026-08-09", now)).toBe("2026-08-09");
-    // A server bound at or past local today never loosens the clamp.
+    // The advertised bound is the server's today at card build. A card
+    // reopened days later must offer everything up to the current day.
+    expect(effectiveMaxEndDate("2026-08-07", now)).toBe("2026-08-10");
+    expect(effectiveMaxEndDate("2026-08-09", now)).toBe("2026-08-10");
+    // Same-day advertisement changes nothing.
     expect(effectiveMaxEndDate("2026-08-10", now)).toBe("2026-08-10");
-    expect(effectiveMaxEndDate("2026-08-11", now)).toBe("2026-08-10");
+  });
+
+  test("an advertisement ahead of the local clock still extends", () => {
+    // Midnight skew: the server's day rolled over first. Its word for the
+    // current day wins; the server re-validates on submit either way.
+    const now = new Date(2026, 7, 10, 23, 58, 0);
+    expect(effectiveMaxEndDate("2026-08-11", now)).toBe("2026-08-11");
   });
 });

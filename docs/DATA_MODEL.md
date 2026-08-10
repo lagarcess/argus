@@ -363,6 +363,15 @@ Represents individual messages within a conversation.
   row, inserts the message, and updates `last_message_preview` in one
   transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
   function or mutate `messages` directly.
+- The one sanctioned in-place rewrite, a non-turn edit of a pending
+  confirmation card, uses the service-role-only
+  `update_conversation_message_artifact` RPC on the same serialized spine: it
+  locks the owned conversation row, applies only while the row's `metadata`
+  still matches the caller's read (an empty result is the conflict signal,
+  never a silent last-writer win), and when the rewritten row is the
+  conversation's latest message it carries `last_message_preview` with it
+  while leaving `updated_at` untouched, so a non-turn change never reorders
+  recents.
 - Conversation message order is deterministic by `(created_at DESC, id DESC)`.
   Under the conversation lock, a new append receives `created_at` at least one
   microsecond newer than the current maximum. Metadata-only updates do not

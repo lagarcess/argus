@@ -3141,10 +3141,13 @@ transcript; see the record-creation rule under the direct-edit endpoint.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
 non-active confirmation, non-offered symbols, and restore with nothing to
-restore; `422 asset_maximum_reached | asset_class_mismatch |
-no_common_data_window | insufficient_common_data` for baskets that cannot run
-as one test; `503 market_data_unavailable` when the coverage preflight cannot
-reach provider data. Failures persist nothing.
+restore; `409 confirmation_changed` when a concurrent writer changed the
+card between this request's read and its write (nothing was applied; a
+retry re-reads the current card); `422 asset_maximum_reached |
+asset_class_mismatch | no_common_data_window | insufficient_common_data`
+for baskets that cannot run as one test; `503 market_data_unavailable` when
+the coverage preflight cannot reach provider data. Failures persist
+nothing.
 
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit`
 
@@ -3166,7 +3169,13 @@ a new card message because the conversation records the change; a non-turn
 change (this endpoint, and peer add/undo above) spent nothing, so nothing
 new appears; only run finalization mints an `IdeaVersion`. Every non-turn
 producer writes through one backend path (`apply_pending_card_update`), so a
-future producer cannot append by omission.
+future producer cannot append by omission. That path is serialized and
+guarded: the write locks the owned conversation row, applies only while the
+card's metadata still matches what the request read (`409
+confirmation_changed` otherwise, so concurrent writers conflict instead of
+silently rolling each other back), and when the card is the conversation's
+latest message the denormalized `last_message_preview` follows the rewrite,
+without touching `updated_at` or reordering recents.
 
 **Request:** at least one field.
 - `capital`: positive number. Starting capital, or the recurring
@@ -3192,6 +3201,9 @@ values.
 
 **Errors:** `409 artifact_action_invalid_state` for a stale or non-active
 confirmation and for capital on a position-sized confirmation;
+`409 confirmation_changed` when a concurrent writer changed the card
+between this request's read and its write (nothing was applied; a retry
+re-reads the current card and composes cleanly);
 `503 market_data_unavailable`; every other refusal is a typed `422` carrying
 the exact code, including `invalid_starting_capital`, `future_end_date`,
 `invalid_chronological_date_range`, `invalid_date_window`,

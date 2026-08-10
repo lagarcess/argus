@@ -97,6 +97,7 @@ def test_update_message_artifact_rewrites_the_same_row() -> None:
                 "conversation_mode": "confirm",
                 "confirmation_payload": {"strategy": {"capital_amount": 25000}},
             },
+            expected_source_metadata=created.metadata,
         )
         assert updated.id == created.id, "in place means the same row"
         assert updated.content == "Buy and hold NFLX, edited"
@@ -138,6 +139,7 @@ def test_update_message_artifact_enforces_ownership() -> None:
                 message_id=created.id,
                 content="hijacked",
                 metadata={},
+                expected_source_metadata=None,
             )
         stored = gateway.get_message(
             user_id=owner["user_id"],
@@ -145,3 +147,135 @@ def test_update_message_artifact_enforces_ownership() -> None:
             message_id=created.id,
         )
         assert stored is not None and stored.content == "owned card"
+
+
+def test_update_message_artifact_conflicts_on_a_stale_read() -> None:
+    """The write is conditional on the metadata the caller read: a
+    concurrent change surfaces as a conflict on real Postgres, and the
+    winner's row is untouched."""
+    from argus.domain.supabase_conversation_messages import (
+        StaleMessageArtifactError,
+    )
+
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        created = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={
+                "conversation_mode": "confirm",
+                "confirmation_payload": {"strategy": {"capital_amount": 10000}},
+            },
+        )
+        stale_read = dict(created.metadata)
+        winner = gateway.update_message_artifact(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=created.id,
+            content="Buy and hold NFLX, edited",
+            metadata={
+                "conversation_mode": "confirm",
+                "confirmation_payload": {"strategy": {"capital_amount": 25000}},
+            },
+            expected_source_metadata=created.metadata,
+        )
+        with pytest.raises(StaleMessageArtifactError):
+            gateway.update_message_artifact(
+                user_id=owner["user_id"],
+                conversation_id=owner["conversation_id"],
+                message_id=created.id,
+                content="stale rewrite",
+                metadata={"conversation_mode": "confirm"},
+                expected_source_metadata=stale_read,
+            )
+        stored = gateway.get_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=created.id,
+        )
+        assert stored is not None
+        assert stored.content == winner.content
+        assert (
+            stored.metadata["confirmation_payload"]["strategy"]["capital_amount"] == 25000
+        ), "the losing writer must not roll back the winning edit"
+
+
+def _conversation_row(connection, conversation_id: str):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select last_message_preview, updated_at from public.conversations"
+            " where id = %s",
+            (conversation_id,),
+        )
+        return cursor.fetchone()
+
+
+def test_update_message_artifact_carries_the_preview_when_latest() -> None:
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        created = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={"conversation_mode": "confirm"},
+        )
+        before_preview, before_updated_at = _conversation_row(
+            connection, owner["conversation_id"]
+        )
+        assert before_preview == "Buy and hold NFLX"
+
+        gateway.update_message_artifact(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=created.id,
+            content="Buy and hold NFLX, edited",
+            metadata={"conversation_mode": "confirm"},
+            expected_source_metadata=created.metadata,
+            preview="Buy and hold NFLX, edited",
+        )
+        after_preview, after_updated_at = _conversation_row(
+            connection, owner["conversation_id"]
+        )
+        assert (
+            after_preview == "Buy and hold NFLX, edited"
+        ), "recents must describe the edited card"
+        assert (
+            after_updated_at == before_updated_at
+        ), "a non-turn change must not reorder recents"
+
+
+def test_update_message_artifact_keeps_preview_when_not_latest() -> None:
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        card = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={"conversation_mode": "confirm"},
+        )
+        gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="user",
+            content="How risky is this idea?",
+        )
+        gateway.update_message_artifact(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+            content="Buy and hold NFLX, edited",
+            metadata={"conversation_mode": "confirm"},
+            expected_source_metadata=card.metadata,
+            preview="Buy and hold NFLX, edited",
+        )
+        preview, _updated_at = _conversation_row(connection, owner["conversation_id"])
+        assert (
+            preview == "How risky is this idea?"
+        ), "editing an older card must not overwrite the newer preview"

@@ -123,6 +123,56 @@ def test_conversational_turn_after_direct_edit_reads_edited_values() -> None:
     assert run_state.confirmation_payload.strategy.capital_amount == 25000
 
 
+def test_late_sync_converges_to_the_persisted_card() -> None:
+    """A checkpoint sync that lost the write race re-reads the persisted
+    card and converges on it: whatever order syncs land in, the checkpoint
+    ends describing the durable record."""
+    client = _client()
+    conversation = _conversation(client)
+    payload = _confirmation_payload()
+    _plant_confirmation(client, conversation["id"], payload)
+    workflow = api_state_module.get_agent_runtime_workflow(SimpleNamespace(app=app))
+    _seed_checkpoint(workflow, conversation["id"], payload)
+
+    response = _direct_edit(
+        client, conversation["id"], CONFIRMATION_ID, {"capital": 25000}
+    )
+    assert response.status_code == 200, response.text
+    message_id = response.json()["message"]["id"]
+
+    # Replay the pre-edit sync as if it had been delayed past the edit's own.
+    from argus.api.chat.confirmation import _sync_runtime_checkpoint_with_card
+
+    stale_payload = _confirmation_payload()
+    stale_payload["confirmation_id"] = CONFIRMATION_ID
+    stale_payload["artifact_id"] = CONFIRMATION_ID
+    stale_reference = confirmation_artifact_reference(
+        confirmation_id=CONFIRMATION_ID,
+        confirmation_payload=stale_payload,
+    )
+    owner = api_state_module.store.conversation_owners[conversation["id"]]
+    _sync_runtime_checkpoint_with_card(
+        workflow=workflow,
+        user_id=owner,
+        conversation_id=conversation["id"],
+        message_id=message_id,
+        confirmation_payload=stale_payload,
+        reference=stale_reference,
+    )
+
+    values = _checkpoint_values(workflow, conversation["id"])
+    snapshot = values.get("latest_task_snapshot")
+    assert isinstance(snapshot, TaskSnapshot)
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.capital_amount == 25000, (
+        "a delayed stale sync must converge to the persisted card, not "
+        "clobber the newer edit"
+    )
+    channel_payload = values.get("confirmation_payload")
+    assert isinstance(channel_payload, dict)
+    assert channel_payload["strategy"]["capital_amount"] == 25000
+
+
 def test_edit_without_a_checkpoint_still_succeeds() -> None:
     """A card planted outside the runtime (no checkpoint) edits normally;
     the sync is a consistency obligation, not a precondition."""

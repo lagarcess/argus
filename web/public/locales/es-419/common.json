@@ -826,7 +826,8 @@
           "invalid_chronological_date_range": "Elige una fecha de inicio anterior a la fecha de fin.",
           "provider_history_start": "Los datos de esta prueba comienzan después; elige una fecha de inicio igual o posterior a {{min}}.",
           "no_common_data": "Estos activos no comparten datos suficientes para ese periodo.",
-          "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}."
+          "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}.",
+          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo."
         }
       },
       "edit_disclosure": {

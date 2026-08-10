@@ -1,11 +1,16 @@
 /**
  * Date bounds for the in-place date editor. A backtest tests the past, so no
- * card, with or without an advertised envelope, may offer a date after the
- * current day: the picker clamps to today and anything typed past it refuses
- * immediately, before any round trip. The server's advertised bound can only
- * tighten this further (its today may trail the browser's around midnight);
- * the earlier of the two wins, so the client never offers a date the backend
- * will refuse.
+ * card may offer a date after the current day: the picker clamps to today and
+ * anything typed past it refuses immediately, before any round trip.
+ *
+ * The advertised `max_end` is the server's word for the current day at the
+ * moment the card was built, not a durable data limit. A pending card can be
+ * reopened days later, so a stale advertisement must never tighten the bound
+ * below the browser's current day; the later of the two wins. When the
+ * advertisement is ahead of the local clock (midnight skew), it still
+ * extends the bound, and the server re-validates every submit either way,
+ * with its typed refusal rendered on the card. A genuine data-coverage
+ * ceiling would need its own advertised field, not this one.
  */
 
 export function localTodayIso(now: Date = new Date()): string {
@@ -21,7 +26,7 @@ export function effectiveMaxEndDate(
 ): string {
   const today = localTodayIso(now);
   if (typeof advertisedMaxEnd === "string" && advertisedMaxEnd) {
-    return advertisedMaxEnd < today ? advertisedMaxEnd : today;
+    return advertisedMaxEnd > today ? advertisedMaxEnd : today;
   }
   return today;
 }

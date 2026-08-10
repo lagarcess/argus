@@ -104,6 +104,11 @@ function directEditErrorText(
           "Enter percentages of 0 or more (slippage up to {{max}}%).",
         max: MAX_SLIPPAGE_PERCENT,
       });
+    case "confirmation_changed":
+      return t(
+        "chat.confirmation.direct_edit.errors.confirmation_changed",
+        "Another change landed at the same time. Try again.",
+      );
     default:
       return t(
         "chat.confirmation.direct_edit.failed",

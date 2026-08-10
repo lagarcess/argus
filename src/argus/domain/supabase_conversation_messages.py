@@ -14,6 +14,15 @@ from argus.domain.store import utcnow
 from supabase import Client
 
 
+class StaleMessageArtifactError(ValueError):
+    """The message changed after the caller read it; nothing was written.
+
+    In-place artifact updates are conditional on the exact metadata the
+    caller read, so a concurrent writer surfaces as this conflict instead
+    of a silent last-writer rollback.
+    """
+
+
 def _row_one(result: Any) -> dict[str, Any] | None:
     data = getattr(result, "data", None)
     if not data:
@@ -105,25 +114,43 @@ class ConversationMessagePersistenceMixin:
         message_id: str,
         content: str,
         metadata: dict[str, Any],
+        expected_source_metadata: dict[str, Any] | None,
+        preview: str | None = None,
     ) -> Message:
         """Rewrite one owned message's content and metadata in place.
 
         In-place artifact edits update the record they describe instead of
         appending a superseding row; the row's identity and position in the
-        transcript do not change.
+        transcript do not change. The write rides the serialized
+        conversation writer and is conditional on the metadata the caller
+        read: a concurrent change raises ``StaleMessageArtifactError``
+        instead of silently overwriting it. When the rewritten row is the
+        conversation's latest message, ``preview`` replaces the
+        conversation's denormalized preview without reordering recents.
         """
-        updated = (
-            self.client.table("messages")
-            .update({"content": content, "metadata": metadata})
-            .eq("user_id", user_id)
-            .eq("conversation_id", conversation_id)
-            .eq("id", message_id)
-            .execute()
-        )
-        row = _row_one(updated)
+        try:
+            result = self.client.rpc(
+                "update_conversation_message_artifact",
+                {
+                    "p_user_id": user_id,
+                    "p_conversation_id": conversation_id,
+                    "p_message_id": message_id,
+                    "p_content": content,
+                    "p_metadata": metadata,
+                    "p_expected_source_metadata": expected_source_metadata,
+                    "p_preview": preview,
+                },
+            ).execute()
+        except Exception as exc:
+            if getattr(exc, "code", None) == "P0002":
+                raise ValueError("Message not found or not owned by user.") from exc
+            raise
+        row = _row_one(result)
         if row is None:
-            raise ValueError("Message not found or not owned by user.")
-        return Message.model_validate(row)
+            raise StaleMessageArtifactError(
+                "The card changed while this update was in flight."
+            )
+        return Message.model_validate(row["message"])
 
     def create_message(
         self,

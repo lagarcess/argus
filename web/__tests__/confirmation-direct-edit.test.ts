@@ -183,8 +183,28 @@ describe("confirmation direct edit surface", () => {
         expect(typeof costEditor[key]).toBe("string");
         expect(costEditor[key]).not.toContain("—");
       }
+      for (const key of [
+        "invalid_starting_capital",
+        "future_end_date",
+        "invalid_chronological_date_range",
+        "provider_history_start",
+        "no_common_data",
+        "invalid_contribution",
+        "confirmation_changed",
+      ]) {
+        expect(typeof directEdit.errors[key]).toBe("string");
+        expect(directEdit.errors[key].length).toBeGreaterThan(0);
+        expect(directEdit.errors[key]).not.toContain("—");
+      }
     }
     expect(es.chat.confirmation.direct_edit.edit_dates).toBe("Editar fechas");
     expect(es.chat.confirmation.direct_edit.edit_costs).toBe("Editar costos");
+  });
+
+  test("a concurrent-writer conflict has its own refusal copy", () => {
+    // The backend's 409 confirmation_changed means the losing writer was
+    // refused, not that the card died; the copy says retry, not give up.
+    const component = source("components/chat/ConfirmationDirectEdit.tsx");
+    expect(component).toContain('case "confirmation_changed"');
   });
 });

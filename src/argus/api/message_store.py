@@ -20,6 +20,7 @@ from argus.domain.chat_turn_lifecycle import (
     TurnStatus,
 )
 from argus.domain.store import utcnow
+from argus.domain.supabase_conversation_messages import StaleMessageArtifactError
 from argus.domain.usage_limits import settle_memory_usage
 
 _AUTHORITATIVE_ARTIFACT_KEYS = {
@@ -617,13 +618,20 @@ def update_message_artifact(
     message_id: str,
     content: str,
     metadata: dict[str, Any],
+    expected_source_metadata: dict[str, Any] | None,
+    preview: str | None = None,
 ) -> Message:
     """Rewrite one owned message's content and metadata in place.
 
     The in-place half of the edit contract: a direct edit updates the card's
     own record, so the transcript gains nothing and the message identity,
     role, and position stay fixed. Turn-based edits keep superseding through
-    create_message.
+    create_message. The write is conditional on the metadata the caller
+    read; a concurrent change raises ``StaleMessageArtifactError`` in both
+    stores instead of rolling the other writer back. When the rewritten row
+    is the conversation's latest message, ``preview`` follows it into the
+    conversation record without touching ``updated_at``: a non-turn change
+    spends nothing and must not reorder recents.
     """
     if api_state.supabase_gateway is not None:
         try:
@@ -633,7 +641,13 @@ def update_message_artifact(
                 message_id=message_id,
                 content=content,
                 metadata=metadata,
+                expected_source_metadata=expected_source_metadata,
+                preview=preview,
             )
+        except StaleMessageArtifactError:
+            # A conflict is an answer, not an outage; it must never be
+            # retried against the memory fallback.
+            raise
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -649,11 +663,24 @@ def update_message_artifact(
         for index, existing in enumerate(messages):
             if existing.id != message_id:
                 continue
+            if (
+                expected_source_metadata is not None
+                and existing.metadata != expected_source_metadata
+            ):
+                raise StaleMessageArtifactError(
+                    "The card changed while this update was in flight."
+                )
             updated = existing.model_copy(
                 update={"content": content, "metadata": metadata}
             )
             messages[index] = updated
             api_state.store.bump_search_revision()
+            latest = max(messages, key=lambda item: (item.created_at, item.id))
+            conversation = api_state.store.conversations.get(conversation_id)
+            if preview and conversation and latest.id == message_id:
+                api_state.store.conversations[conversation_id] = conversation.model_copy(
+                    update={"last_message_preview": preview}
+                )
             return updated
     raise ValueError("Message not found or not owned by user.")
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -61,6 +62,7 @@ from argus.domain.backtest_message_projection import (
 from argus.domain.postgres_run_dossier_reader import RunDossierCursorError
 from argus.domain.run_dossiers import project_run_dossier
 from argus.domain.store import utcnow
+from argus.domain.supabase_conversation_messages import StaleMessageArtifactError
 from argus.domain.supabase_gateway import (
     ConversationCursorError,
     MessageAnchorError,
@@ -903,6 +905,9 @@ def add_confirmation_peer_assets(
         break
     if source_payload is None or source_message is None:
         raise invalid_state
+    # Snapshot what this request read; the in-place write is conditional on
+    # it, so a concurrent writer surfaces as a conflict, never a rollback.
+    expected_source_metadata = copy.deepcopy(source_message.metadata)
     language = str(getattr(user, "language", None) or "en")
 
     if payload.restore_previous:
@@ -979,16 +984,20 @@ def add_confirmation_peer_assets(
         language=language,
     )
     # peer_rows=None removes a fully consumed offer set from the updated card.
-    updated = apply_pending_card_update(
-        user_id=user.id,
-        conversation_id=conversation_id,
-        source_message=source_message,
-        confirmation_id=confirmation_id,
-        confirmation_payload=new_payload,
-        language=language,
-        metadata_extra={"next_experiments": peer_rows},
-        runtime_workflow=api_state.get_agent_runtime_workflow(request),
-    )
+    try:
+        updated = apply_pending_card_update(
+            user_id=user.id,
+            conversation_id=conversation_id,
+            source_message=source_message,
+            expected_source_metadata=expected_source_metadata,
+            confirmation_id=confirmation_id,
+            confirmation_payload=new_payload,
+            language=language,
+            metadata_extra={"next_experiments": peer_rows},
+            runtime_workflow=api_state.get_agent_runtime_workflow(request),
+        )
+    except StaleMessageArtifactError as exc:
+        raise _confirmation_changed_conflict(request) from exc
     if updated is None:
         raise invalid_state
     record_research_turn_evidence(
@@ -1076,6 +1085,9 @@ def direct_edit_confirmation(
         break
     if source_payload is None or source_message is None:
         raise invalid_state
+    # Snapshot what this request read; the in-place write is conditional on
+    # it, so a concurrent writer surfaces as a conflict, never a rollback.
+    expected_source_metadata = copy.deepcopy(source_message.metadata)
     language = str(getattr(user, "language", None) or "en")
 
     preparation = direct_edit_confirmation_preparation(
@@ -1113,18 +1125,38 @@ def direct_edit_confirmation(
             title="Validation Error",
             detail="The requested change cannot run as one test.",
         )
-    updated = apply_pending_card_update(
-        user_id=user.id,
-        conversation_id=conversation_id,
-        source_message=source_message,
-        confirmation_id=confirmation_id,
-        confirmation_payload=preparation.confirmation_payload,
-        language=language,
-        runtime_workflow=api_state.get_agent_runtime_workflow(request),
-    )
+    try:
+        updated = apply_pending_card_update(
+            user_id=user.id,
+            conversation_id=conversation_id,
+            source_message=source_message,
+            expected_source_metadata=expected_source_metadata,
+            confirmation_id=confirmation_id,
+            confirmation_payload=preparation.confirmation_payload,
+            language=language,
+            runtime_workflow=api_state.get_agent_runtime_workflow(request),
+        )
+    except StaleMessageArtifactError as exc:
+        raise _confirmation_changed_conflict(request) from exc
     if updated is None:
         raise invalid_state
     return ConfirmationDirectEditResponse(message=updated)
+
+
+def _confirmation_changed_conflict(request: Request):
+    """A guarded in-place write lost to a concurrent writer.
+
+    The card the request read is no longer the card on record, so nothing
+    was applied; a retry re-reads the current card and composes cleanly.
+    """
+    return problem(
+        request,
+        status_code=409,
+        code="confirmation_changed",
+        title="Conflict",
+        detail="The card changed while this request was in flight. "
+        "Nothing was applied.",
+    )
 
 
 def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:

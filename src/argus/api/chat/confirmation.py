@@ -329,6 +329,7 @@ def apply_pending_card_update(
     user_id: str,
     conversation_id: str,
     source_message: Any,
+    expected_source_metadata: dict[str, Any] | None,
     confirmation_id: str,
     confirmation_payload: dict[str, Any],
     language: str,
@@ -345,10 +346,14 @@ def apply_pending_card_update(
     through here; a key set to None in ``metadata_extra`` is removed so a
     consumed sidecar cannot go stale on the updated card.
 
-    The persisted message and the runtime checkpoint describe the same fact,
-    so this write keeps both consistent: when a checkpoint exists for the
-    conversation, its pending strategy, active reference, and confirmation
-    payload are rewritten to the edited card. Without this, a later turn
+    The write is conditional on ``expected_source_metadata``, the metadata
+    the caller read before deciding the edit: a concurrent writer raises
+    ``StaleMessageArtifactError`` instead of being silently rolled back, and
+    callers surface that as a conflict. The rewritten card also carries its
+    projections: the conversation's denormalized preview follows the card
+    when it is the latest message, and when a runtime checkpoint exists its
+    pending strategy, active reference, and confirmation payload are
+    rewritten to the edited card. Without the checkpoint sync, a later turn
     whose metadata fallback carries no snapshot reads the pre-edit strategy
     from the checkpoint, and correctness depends on a caller remembering the
     fallback. Returns the updated message, or None when the card cannot be
@@ -357,7 +362,7 @@ def apply_pending_card_update(
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
     )
-    from argus.api.message_store import update_message_artifact
+    from argus.api.message_store import message_preview, update_message_artifact
 
     confirmation_payload["confirmation_id"] = confirmation_id
     confirmation_payload["artifact_id"] = confirmation_id
@@ -391,27 +396,64 @@ def apply_pending_card_update(
             metadata.pop(key, None)
         else:
             metadata[key] = value
+    content = str(card.get("summary") or "")
     updated = update_message_artifact(
         user_id=user_id,
         conversation_id=conversation_id,
         message_id=source_message.id,
-        content=str(card.get("summary") or ""),
+        content=content,
         metadata=metadata,
+        expected_source_metadata=expected_source_metadata,
+        preview=message_preview(
+            content, role=str(source_message.role), metadata=metadata
+        ),
     )
     if runtime_workflow is not None:
         _sync_runtime_checkpoint_with_card(
             workflow=runtime_workflow,
+            user_id=user_id,
             conversation_id=conversation_id,
+            message_id=source_message.id,
             confirmation_payload=confirmation_payload,
             reference=reference,
         )
     return updated
 
 
+def _persisted_card_message(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+) -> Any | None:
+    """Fresh read of the persisted card, for post-sync verification only."""
+    from argus.api import state as api_state
+
+    gateway = api_state.supabase_gateway
+    if gateway is not None:
+        try:
+            message = gateway.get_message(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=message_id,
+            )
+            if message is not None:
+                return message
+        except Exception:  # noqa: BLE001
+            pass
+    with api_state.store.conversation_message_lock:
+        for existing in api_state.store.messages.get(conversation_id, []):
+            if existing.id == message_id:
+                return existing
+    return None
+
+
 def _sync_runtime_checkpoint_with_card(
     *,
     workflow: Any,
+    user_id: str,
     conversation_id: str,
+    message_id: str,
     confirmation_payload: dict[str, Any],
     reference: Any,
 ) -> None:
@@ -422,6 +464,12 @@ def _sync_runtime_checkpoint_with_card(
     failure degrades to the old conditional behaviour instead of failing the
     edit. The failure is logged loudly because it reintroduces the two-source
     drift this sync exists to close.
+
+    Guarded writes serialize the persisted card, but the checkpoint write
+    happens after it, so two winners in a row could sync out of order. After
+    writing, the sync re-reads the persisted card and converges on it if a
+    later writer got there first: the checkpoint always ends describing the
+    durable record.
     """
     import asyncio
 
@@ -431,15 +479,15 @@ def _sync_runtime_checkpoint_with_card(
         TaskSnapshot,
     )
 
-    async def _sync() -> None:
+    async def _write(payload: dict[str, Any], active_reference: Any) -> bool:
         config = {"configurable": {"thread_id": conversation_id}}
         state = await workflow.aget_state(config)
         values = getattr(state, "values", None)
         if not isinstance(values, dict) or not values:
-            return
-        strategy = StrategySummary.model_validate(confirmation_payload["strategy"])
+            return False
+        strategy = StrategySummary.model_validate(payload["strategy"])
         updates: dict[str, Any] = {
-            "confirmation_payload": dict(confirmation_payload),
+            "confirmation_payload": dict(payload),
         }
         snapshot = values.get("latest_task_snapshot")
         if isinstance(snapshot, dict):
@@ -448,7 +496,7 @@ def _sync_runtime_checkpoint_with_card(
             updates["latest_task_snapshot"] = snapshot.model_copy(
                 update={
                     "pending_strategy_summary": strategy,
-                    "active_confirmation_reference": reference,
+                    "active_confirmation_reference": active_reference,
                 }
             )
         run_state = values.get("run_state")
@@ -456,9 +504,7 @@ def _sync_runtime_checkpoint_with_card(
             updates["run_state"] = run_state.model_copy(
                 update={
                     "candidate_strategy_draft": strategy,
-                    "confirmation_payload": ConfirmationPayload.model_validate(
-                        confirmation_payload
-                    ),
+                    "confirmation_payload": ConfirmationPayload.model_validate(payload),
                 }
             )
         # The write is attributed to the terminal node so a resumed graph
@@ -468,6 +514,40 @@ def _sync_runtime_checkpoint_with_card(
         await workflow.aupdate_state(
             config, updates, as_node=WorkflowNode.NEXT_STEP.value
         )
+        return True
+
+    async def _sync() -> None:
+        wrote = await _write(confirmation_payload, reference)
+        if not wrote:
+            return
+        persisted = _persisted_card_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
+        metadata = getattr(persisted, "metadata", None)
+        if not isinstance(metadata, dict):
+            return
+        persisted_payload = metadata.get("confirmation_payload")
+        if (
+            not isinstance(persisted_payload, dict)
+            or persisted_payload == confirmation_payload
+        ):
+            return
+        from argus.agent_runtime.confirmation_artifacts import (
+            confirmation_artifact_reference,
+        )
+
+        persisted_reference = confirmation_artifact_reference(
+            confirmation_id=str(persisted_payload.get("confirmation_id") or ""),
+            confirmation_payload=persisted_payload,
+            confirmation_card=(
+                metadata.get("confirmation_card")
+                if isinstance(metadata.get("confirmation_card"), dict)
+                else None
+            ),
+        )
+        await _write(persisted_payload, persisted_reference)
 
     try:
         asyncio.run(_sync())

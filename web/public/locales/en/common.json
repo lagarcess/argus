@@ -826,7 +826,8 @@
           "invalid_chronological_date_range": "Pick a start date before the end date.",
           "provider_history_start": "Data for this test starts later; pick a start date on or after {{min}}.",
           "no_common_data": "These assets do not share enough data for that window.",
-          "invalid_contribution": "Each contribution must be between {{min}} and {{max}}."
+          "invalid_contribution": "Each contribution must be between {{min}} and {{max}}.",
+          "confirmation_changed": "Another change landed at the same time. Try again."
         }
       },
       "edit_disclosure": {
