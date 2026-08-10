@@ -107,15 +107,17 @@ async def find_assets_stage_result(
     )
     if result is None:
         return None
-    result.stage_patch["research"] = _research_sidecar_for_find(
-        stage_patch=result.stage_patch,
-        request=request,
-        capability_class=capability_class,
+    result.stage_patch["research"] = grounded.build_research_sidecar(
+        **_research_sidecar_inputs_for_find(
+            stage_patch=result.stage_patch,
+            request=request,
+            capability_class=capability_class,
+        )
     )
     return result
 
 
-def _research_sidecar_for_find(
+def _research_sidecar_inputs_for_find(
     *,
     stage_patch: dict[str, Any],
     request: AssetDiscoveryRequest | None,
@@ -143,8 +145,17 @@ def _research_sidecar_for_find(
     ]
     attempted = usage.get("search_attempted") is True
     cache_status = str(usage.get("cache_status") or ("miss" if attempted else "bypass"))
-    sidecar: dict[str, Any] = {
-        "schema_version": grounded.RESEARCH_SCHEMA_VERSION,
+    subjects = (
+        [
+            {"symbol": symbol.strip().upper(), "name": symbol.strip().upper()}
+            for symbol in request.anchor_symbols
+            if symbol.strip()
+        ]
+        if request is not None
+        else []
+    )
+    fallback_code = usage.get("fallback_code")
+    return {
         "capability_class": capability_class,
         "shape": "find",
         # The discovery sidecar owns the rich source list; duplicating it
@@ -153,15 +164,7 @@ def _research_sidecar_for_find(
         "retrieved_at": str(
             discovery.get("retrieved_at") or datetime.now(timezone.utc).isoformat()
         ),
-        "anchor_symbols": (
-            [
-                symbol.strip().upper()
-                for symbol in request.anchor_symbols
-                if symbol.strip()
-            ]
-            if request is not None
-            else []
-        ),
+        "subjects": subjects,
         "peers": peers,
         "usage": {
             "invocations": 1 if attempted else 0,
@@ -169,19 +172,7 @@ def _research_sidecar_for_find(
             "cost_usd": usage.get("cost_usd"),
             "cache_status": cache_status,
         },
-        "follow_up": grounded.research_follow_up_block(
-            subjects=[
-                {"symbol": symbol.strip().upper(), "name": symbol.strip().upper()}
-                for symbol in (request.anchor_symbols if request else [])
-                if symbol.strip()
-            ],
-            peers=peers,
-            shape="find",
-            period_of_interest=None,
-            category=(request.category_description if request else None),
-        ),
+        "period_of_interest": None,
+        "category": request.category_description if request else None,
+        "degraded_code": str(fallback_code) if fallback_code else None,
     }
-    fallback_code = usage.get("fallback_code")
-    if fallback_code:
-        sidecar["degraded"] = {"code": str(fallback_code)}
-    return sidecar
