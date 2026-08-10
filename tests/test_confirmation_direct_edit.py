@@ -229,6 +229,8 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
         _confirmation_payload(strategy_type="dca_accumulation", cadence="weekly"),
     )
 
+    # A recurring contribution is exempt from the bankroll floor (the launch
+    # adapter's rule), so an ordinary small DCA amount stays valid here.
     response = _direct_edit(
         client,
         conversation["id"],
@@ -246,6 +248,10 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
     card = message["metadata"]["confirmation_card"]
     contribution_rows = [row for row in card["rows"] if row["key"] == "contribution"]
     assert contribution_rows and contribution_rows[0]["value"] == "$250"
+    constraints = card["capabilities"]["edit_constraints"]
+    assert "min" not in constraints["capital"], (
+        "a recurring card must not advertise the bankroll floor"
+    )
 
 
 def test_direct_edit_matches_the_conversational_edit_artifact() -> None:
@@ -547,3 +553,87 @@ def test_cost_direct_edit_matches_the_conversational_edit_artifact() -> None:
     assert canonical_payload_hash(
         dict(direct_payload["launch_payload"])
     ) == canonical_payload_hash(dict(conversational_payload["launch_payload"]))
+
+
+def test_out_of_envelope_values_refuse_with_their_exact_codes() -> None:
+    """The engine's accepted-value envelope, enforced before a card can mint.
+
+    Every bound is the engine's own (imported constants, never restated); a
+    ready card may never promise a run the run-time validator refuses, and
+    every refusal names its code so the editor can say why.
+    """
+    from argus.domain.backtesting.config import (
+        MAX_FEE_RATE,
+        MAX_STARTING_CAPITAL,
+        MIN_STARTING_CAPITAL,
+    )
+
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"])
+
+    refusals = [
+        ({"capital": MIN_STARTING_CAPITAL - 1}, "invalid_starting_capital"),
+        ({"capital": MAX_STARTING_CAPITAL + 1}, "invalid_starting_capital"),
+        (
+            {"date_window": {"start": "2029-01-01", "end": "2030-01-01"}},
+            "future_end_date",
+        ),
+        (
+            {"date_window": {"start": "2023-03-01", "end": "2023-03-01"}},
+            "invalid_chronological_date_range",
+        ),
+        ({"fee_rate": MAX_FEE_RATE + 0.01}, "unsupported_cost_value"),
+    ]
+    for body, expected_code in refusals:
+        response = _direct_edit(client, conversation["id"], CONFIRMATION_ID, body)
+        assert response.status_code == 422, (body, response.text)
+        assert response.json()["code"] == expected_code, (body, response.text)
+
+    stored = _conversation_messages(client, conversation["id"])
+    assert len(stored) == 1
+    payload = stored[0]["metadata"]["confirmation_payload"]
+    assert payload["strategy"]["capital_amount"] == 10000, (
+        "a refused value must leave the card untouched"
+    )
+    boundary = _direct_edit(
+        client, conversation["id"], CONFIRMATION_ID, {"capital": MIN_STARTING_CAPITAL}
+    )
+    assert boundary.status_code == 200, boundary.text
+
+
+def test_card_advertises_the_engine_envelope() -> None:
+    """The card's edit constraints are the engine's bounds by import, so the
+    client renders backend truth without owning it."""
+    from datetime import date
+
+    from argus.domain.backtesting.config import (
+        MAX_FEE_RATE,
+        MAX_SLIPPAGE_RATE,
+        MAX_STARTING_CAPITAL,
+        MIN_STARTING_CAPITAL,
+    )
+    from argus.domain.market_data.capabilities import ALPACA_EQUITY_HISTORY_START
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": _confirmation_payload(),
+        },
+        confirmation_id=CONFIRMATION_ID,
+        conversation_id="c1",
+        language="en",
+    )
+    assert card is not None
+    constraints = card["capabilities"]["edit_constraints"]
+    assert constraints["capital"] == {
+        "min": MIN_STARTING_CAPITAL,
+        "max": MAX_STARTING_CAPITAL,
+    }
+    assert constraints["fees"] == {"min": 0.0, "max": MAX_FEE_RATE}
+    assert constraints["slippage"] == {"min": 0.0, "max": MAX_SLIPPAGE_RATE}
+    assert constraints["date_window"]["max_end"] == date.today().isoformat()
+    assert (
+        constraints["date_window"]["min_start"]
+        == ALPACA_EQUITY_HISTORY_START.isoformat()
+    )

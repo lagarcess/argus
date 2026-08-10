@@ -13,6 +13,12 @@ from argus.agent_runtime.confirmation_artifacts import (
 )
 from argus.agent_runtime.coverage_recovery import coverage_recovery_stage_patch
 from argus.agent_runtime.stages.interpret import StageResult
+from argus.agent_runtime.stages.launch_validation_recovery import (  # noqa: F401
+    _launch_validation_failure,
+    _tagged_launch_validation_failure,
+    _validate_launch_envelope,
+    _with_unsupported_constraint,
+)
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
@@ -203,16 +209,17 @@ def _validated_launch_payload(
         )
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
+        _validate_launch_envelope(request)
     except ValidationError as exc:
-        return _launch_validation_failure(_validation_error_code(exc))
+        return _tagged_launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
-        return _launch_validation_failure(
+        return _tagged_launch_validation_failure(
             str(exc),
             raw_value=launch_payload.get("timeframe"),
             optional_parameter_status=state.optional_parameter_status,
         )
     except Exception:
-        return _launch_validation_failure("missing_rule_group")
+        return _tagged_launch_validation_failure("missing_rule_group")
     return {
         "outcome": "ready_to_confirm",
         "launch_payload": launch_payload,
@@ -338,162 +345,6 @@ def _validation_error_code(exc: ValidationError) -> str:
         if code in text:
             return code
     return "missing_rule_group"
-
-
-def _launch_validation_failure(
-    error_code: str,
-    *,
-    raw_value: Any | None = None,
-    optional_parameter_status: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    if error_code == "unsupported_timeframe":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["timeframe"],
-            "requested_field": "timeframe",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                dict(optional_parameter_status or {}),
-                {
-                    "category": "unsupported_time_granularity",
-                    "raw_value": raw_value or error_code,
-                    "explanation": (
-                        "That bar size is not supported by the current backtest "
-                        "engine. Choose a supported timeframe to keep the rest of "
-                        "the strategy unchanged."
-                    ),
-                    "simplification_options": [
-                        {
-                            "label": "Retry with daily bars",
-                            "replacement_values": {"timeframe": "1D"},
-                        },
-                        {
-                            "label": "Retry with 1-hour bars",
-                            "replacement_values": {"timeframe": "1h"},
-                        },
-                    ],
-                },
-            ),
-        }
-    if error_code == "future_end_date":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["date_range"],
-            "requested_field": "date_range",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "future_date_window",
-                    "raw_value": error_code,
-                    "explanation": (
-                        "The requested end date is after the latest available "
-                        "data Argus can test."
-                    ),
-                    "simplification_options": [
-                        {"label": "Use the latest available date"},
-                        {"label": "Choose an earlier end date"},
-                        {"label": "Change the date range"},
-                    ],
-                },
-            ),
-        }
-    if error_code == "invalid_chronological_date_range":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["date_range"],
-            "requested_field": "date_range",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "invalid_date_window",
-                    "raw_value": "selected date range",
-                    "explanation": (
-                        "The requested window is not usable because the start "
-                        "date is not before the end date."
-                    ),
-                    "simplification_options": [
-                        {"label": "Choose a new start date"},
-                        {"label": "Choose a new end date"},
-                        {"label": "Change the date range"},
-                    ],
-                },
-            ),
-        }
-    if error_code == "indicator_data_insufficient":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["date_range"],
-            "requested_field": "date_range",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "data_window_too_short_for_rule",
-                    "raw_value": "selected date range",
-                    "explanation": (
-                        "The selected window does not provide enough bars for "
-                        "the confirmed signal rule."
-                    ),
-                    "simplification_options": [
-                        {"label": "Use a longer date range"},
-                        {"label": "Use a shorter indicator period"},
-                        {"label": "Choose a simpler supported rule"},
-                    ],
-                },
-            ),
-        }
-    if error_code in {
-        "missing_rule_group",
-        "unsupported_rule_operator",
-        "unsupported_indicator",
-        "unsupported_indicator_threshold",
-    }:
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["entry_logic"],
-            "requested_field": "entry_logic",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "unsupported_indicator_rule",
-                    "raw_value": error_code,
-                    "explanation": (
-                        "The strategy direction is understandable, but the "
-                        "entry rule is not executable as structured."
-                    ),
-                    "simplification_options": [
-                        {"label": "Use a supported RSI threshold rule"},
-                        {"label": "Use a supported moving-average crossover"},
-                        {"label": "Keep the full idea as a draft"},
-                    ],
-                },
-            ),
-        }
-    return {
-        "outcome": "needs_clarification",
-        "missing_required_fields": [],
-        "requested_field": None,
-        "assistant_prompt": None,
-        "optional_parameter_status": _with_unsupported_constraint(
-            {},
-            {
-                "category": "launch_payload_not_executable",
-                "raw_value": error_code,
-                "explanation": (
-                    "One part of the draft is not executable in the current "
-                    "backtest engine."
-                ),
-                "simplification_options": [
-                    {"label": "Adjust the strategy rule"},
-                    {"label": "Adjust the asset"},
-                    {"label": "Adjust the date range"},
-                ],
-            },
-        ),
-    }
 
 
 def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, Any]:
@@ -987,21 +838,6 @@ def _recoverable_constraint_patch(
             optional_parameter_status,
             constraint,
         ),
-    }
-
-
-def _with_unsupported_constraint(
-    optional_parameter_status: dict[str, Any],
-    constraint: dict[str, Any],
-) -> dict[str, Any]:
-    unsupported_constraints = [
-        item
-        for item in optional_parameter_status.get("unsupported_constraints", [])
-        if isinstance(item, dict)
-    ]
-    return {
-        **optional_parameter_status,
-        "unsupported_constraints": [*unsupported_constraints, constraint],
     }
 
 

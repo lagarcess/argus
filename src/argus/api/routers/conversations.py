@@ -950,19 +950,20 @@ def add_confirmation_peer_assets(
                 detail="Market data is unavailable for the requested basket.",
             )
         if error_code in {
-            "no_common_data_window",
-            "insufficient_common_data",
-            "asset_maximum_reached",
-            "asset_class_mismatch",
+            "confirmation_payload_invalid",
+            "nothing_to_restore",
+            "no_new_assets",
         }:
-            raise problem(
-                request,
-                status_code=422,
-                code=error_code,
-                title="Validation Error",
-                detail="The requested basket cannot run as one test.",
-            )
-        raise invalid_state
+            # State conflicts: the request does not fit the card as it stands;
+            # no value change would help.
+            raise invalid_state
+        raise problem(
+            request,
+            status_code=422,
+            code=error_code,
+            title="Validation Error",
+            detail="The requested basket cannot run as one test.",
+        )
     new_payload = preparation.confirmation_payload
     remaining_peers = _resolved_peer_identities(remaining_symbols) or []
     basket = [
@@ -1098,20 +1099,19 @@ def direct_edit_confirmation(
                 title="Service Unavailable",
                 detail="Market data is unavailable for the requested test.",
             )
-        if error_code in {
-            "no_common_data_window",
-            "insufficient_common_data",
-            "invalid_date_window",
-            "unsupported_cost_value",
-        }:
-            raise problem(
-                request,
-                status_code=422,
-                code=error_code,
-                title="Validation Error",
-                detail="The requested change cannot run as one test.",
-            )
-        raise invalid_state
+        if error_code in {"confirmation_payload_invalid", "capital_not_applicable"}:
+            # The card cannot host this edit at all; a value change would not
+            # help, so this stays a state conflict rather than a field error.
+            raise invalid_state
+        # Every other refusal is a typed value rejection: the field survives,
+        # the value does not, and the client renders the exact reason.
+        raise problem(
+            request,
+            status_code=422,
+            code=error_code,
+            title="Validation Error",
+            detail="The requested change cannot run as one test.",
+        )
     updated = apply_pending_card_update(
         user_id=user.id,
         conversation_id=conversation_id,

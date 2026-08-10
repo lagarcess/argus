@@ -260,6 +260,7 @@ def runtime_confirmation_card(
     if capabilities.get("execution_costs_editable"):
         direct_edits.append("costs")
     capabilities["direct_edits"] = direct_edits
+    capabilities["edit_constraints"] = _edit_constraints(strategy)
     card["capabilities"] = capabilities
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
@@ -287,6 +288,38 @@ def runtime_confirmation_card(
         # typed record is the only channel that reaches the user.
         card["edit_disclosure"] = dict(edit_disclosure)
     return card
+
+
+def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
+    """The accepted-value envelope this card's edits must satisfy.
+
+    Backend canonical truth: the values are the engine's own bounds, imported
+    rather than restated, so the client can render and pre-check them without
+    ever owning them. The date floor follows the card's asset class because
+    provider history does.
+    """
+    from argus.domain.backtesting.config import (
+        MAX_FEE_RATE,
+        MAX_SLIPPAGE_RATE,
+        MAX_STARTING_CAPITAL,
+        MIN_STARTING_CAPITAL,
+    )
+    from argus.domain.market_data.capabilities import ALPACA_EQUITY_HISTORY_START
+
+    date_window: dict[str, Any] = {"max_end": date.today().isoformat()}
+    if str(strategy.get("asset_class") or "") == "equity":
+        date_window["min_start"] = ALPACA_EQUITY_HISTORY_START.isoformat()
+    # A recurring contribution reuses the capital field but is exempt from
+    # the bankroll floor (the launch adapter's rule); the ceiling holds.
+    capital: dict[str, Any] = {"max": MAX_STARTING_CAPITAL}
+    if str(strategy.get("strategy_type") or "") != "dca_accumulation":
+        capital["min"] = MIN_STARTING_CAPITAL
+    return {
+        "capital": capital,
+        "fees": {"min": 0.0, "max": MAX_FEE_RATE},
+        "slippage": {"min": 0.0, "max": MAX_SLIPPAGE_RATE},
+        "date_window": date_window,
+    }
 
 
 def apply_pending_card_update(

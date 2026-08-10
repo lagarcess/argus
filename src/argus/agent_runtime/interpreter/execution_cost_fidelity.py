@@ -216,11 +216,18 @@ def _supported_cost_rate(
 
 
 def supported_cost_rate_value(rate: float, *, field_name: str) -> float | None:
-    """One rate-sanity rule for every channel that can own a modeled cost."""
+    """One rate-sanity rule for every channel that can own a modeled cost.
+
+    The caps are the engine envelope's, imported rather than restated, so the
+    resolver can never admit a rate the run-time validator refuses.
+    """
+    from argus.domain.backtesting.config import MAX_FEE_RATE, MAX_SLIPPAGE_RATE
 
     if not math.isfinite(rate) or rate < 0.0:
         return None
-    if field_name == "slippage" and rate > 0.05:
+    if field_name == "slippage" and rate > MAX_SLIPPAGE_RATE:
+        return None
+    if field_name == "fee_rate" and rate > MAX_FEE_RATE:
         return None
     return rate
 

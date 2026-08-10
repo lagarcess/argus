@@ -127,6 +127,11 @@ def direct_edit_confirmation_preparation(
         language=language,
     )
     if result.outcome != "await_approval":
+        # The confirm stage names its refusal; hand the exact code to the
+        # endpoint instead of degrading every failure into one conflict.
+        launch_code = result.stage_patch.get("launch_validation_code")
+        if isinstance(launch_code, str) and launch_code:
+            return DirectEditPreparation(error_code=launch_code)
         recovery = coverage_recovery_from_status(
             result.stage_patch.get("optional_parameter_status")
         )

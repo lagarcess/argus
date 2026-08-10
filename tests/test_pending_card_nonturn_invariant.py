@@ -141,6 +141,24 @@ def test_no_nonturn_change_ever_grows_the_transcript(
             "increase the transcript's message count"
         )
 
+    out_of_envelope = [
+        ("capital below the engine minimum", f"{base}/direct-edit", {"capital": 50}),
+        (
+            "future end date",
+            f"{base}/direct-edit",
+            {"date_window": {"start": "2029-01-01", "end": "2030-01-01"}},
+        ),
+        ("fee above the cap", f"{base}/direct-edit", {"fee_rate": 7.5}),
+    ]
+    for name, url, body in out_of_envelope:
+        response = client.post(url, json=body)
+        assert response.status_code == 422, f"{name}: {response.text}"
+        after = transcript()
+        assert len(after) == len(baseline), (
+            f"{name}: a refused non-turn change must also leave the "
+            "transcript untouched"
+        )
+
     assert (
         client.get("/api/v1/me/usage").json() == usage_before
     ), "no non-turn change may spend any allowance"

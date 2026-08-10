@@ -3178,8 +3178,9 @@ future producer cannot append by omission.
   stay on the conversational path where the interpreter owns them.
 - `fee_rate`, `slippage`: decimal rates at or above zero (`0.002` is
   0.2 percent); zero explicitly clears a cost. The shared edit resolver is
-  the one cost gate, so an unmodelable rate (slippage above the cap) is
-  refused as `422 unsupported_cost_value` and the card is untouched.
+  the one cost gate, so a rate above the engine cap (five percent for either
+  cost) is refused as `422 unsupported_cost_value` and the card is
+  untouched.
 
 **Response:** `{"message": Message}` where the message is the **same**
 assistant confirmation message, updated in place: same `id`, same
@@ -3191,8 +3192,11 @@ values.
 
 **Errors:** `409 artifact_action_invalid_state` for a stale or non-active
 confirmation and for capital on a position-sized confirmation;
-`422 invalid_date_window | no_common_data_window | insufficient_common_data
-| unsupported_cost_value`; `503 market_data_unavailable`. Failures persist
+`503 market_data_unavailable`; every other refusal is a typed `422` carrying
+the exact code, including `invalid_starting_capital`, `future_end_date`,
+`invalid_chronological_date_range`, `invalid_date_window`,
+`provider_history_start_unavailable`, `no_common_data_window`,
+`insufficient_common_data`, and `unsupported_cost_value`. Failures persist
 nothing.
 
 ### Confirmation card editing surface
@@ -3202,6 +3206,16 @@ nothing.
   engine can model execution costs). The frontend renders the edit
   affordances only from this backend truth; all three share one in-place
   behaviour.
+- The card also advertises `capabilities.edit_constraints`, the engine's own
+  accepted-value envelope: `capital.min`/`capital.max` (the run-time
+  starting-capital band; `min` is absent on recurring cards because a
+  contribution is exempt from the bankroll floor), `fees.max` and
+  `slippage.max` (decimal rate caps), and `date_window.max_end` plus a
+  per-asset-class `date_window.min_start` provider history floor. The
+  client renders and pre-checks against these values and never restates
+  them; the confirm preflight enforces the same imported constants, so a
+  card whose `validation.status` is `ready_to_run` can never violate
+  run-time validation.
 - `display_facts.capital` carries the typed number seeding the capital
   editor; card rows remain display strings and are never parsed back.
 - The card carries exactly three actions: `run_backtest` (when ready),
