@@ -68,6 +68,7 @@ from argus.domain.supabase_message_reads import (
 from argus.domain.supabase_message_reads import (
     MessageCursorError as MessageCursorError,
 )
+from argus.domain.supabase_public_excerpts import SupabasePublicExcerptMixin
 from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
@@ -134,6 +135,7 @@ class SupabaseGateway(
     ChatTurnLifecycleGatewayMixin,
     SupabaseConversationActivityMixin,
     SupabaseMessageReadMixin,
+    SupabasePublicExcerptMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
 ):

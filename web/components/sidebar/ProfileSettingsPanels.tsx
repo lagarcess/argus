@@ -7,6 +7,7 @@ import LanguageModal from "@/components/settings/LanguageModal";
 import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
 import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import MemoryControlsModal from "@/components/settings/MemoryControlsModal";
+import SharedReceiptsView from "@/components/settings/SharedReceiptsView";
 import UsageModal from "@/components/settings/UsageModal";
 
 /* Every settings surface the profile menu opens, registered once. A new panel
@@ -85,6 +86,17 @@ const SETTINGS_PANELS = {
     render: ({ locale, onClose, onBack, backLabel, anchorRef }) => (
       <MemoryControlsModal
         locale={locale}
+        onClose={onClose}
+        onBack={onBack}
+        backLabel={backLabel}
+        returnFocusRef={anchorRef}
+      />
+    ),
+  },
+  receipts: {
+    parent: "data",
+    render: ({ onClose, onBack, backLabel, anchorRef }) => (
+      <SharedReceiptsView
         onClose={onClose}
         onBack={onBack}
         backLabel={backLabel}

@@ -20,11 +20,13 @@ The corpus is empty. Not small. Empty.
 [`research_grounded.py:953`](../../../src/argus/agent_runtime/research_grounded.py:953)
 only fires on a research turn. Research is gated by `research_rail_enabled()`
 ([`conversations.py:830`](../../../src/argus/api/routers/conversations.py:830)),
-and `ARGUS_RESEARCH_RAIL_ENABLED` is `false` in `render.yaml`,
-`.github/argus-env.sh`, and the release profile. Zero open threads exist in
-production. They begin accumulating the day that flag flips, that flip is
-gated on #411 and #412 per rail spec section 13b, and then real time has to
-pass before any thread is old enough to be worth following up on.
+and `ARGUS_RESEARCH_RAIL_ENABLED` was `false` when this spec was written.
+
+**Update 2026-08-10: that flag is now `true` across all four release surfaces,
+so precondition 1 below is met from the next promotion onward.** Threads begin
+accumulating the moment the rail is live in production. Preconditions 2 through
+4 still stand, and the volume floor in precondition 3 is the binding one: real
+time has to pass before any thread is old enough to be worth following up on.
 
 A builder who starts before the conditions below are true is guessing what "a
 fact specific to that thing changed" means against zero real examples. That

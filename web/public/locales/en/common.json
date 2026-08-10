@@ -1052,6 +1052,7 @@
         "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
         "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
       },
+      "shared_links": "Shared links",
       "close_archived": "Close archived chats",
       "close_deleted": "Close recently deleted"
     },
@@ -1493,6 +1494,153 @@
       "confirmation": "Review the assumptions, then run the test.",
       "result": "Change the chart range or ask a follow-up.",
       "dismiss": "Dismiss hint"
+    }
+  },
+  "receipt": {
+    "page_title": "Tested with Argus",
+    "eyebrow": "Shared with you",
+    "provenance": "Tested with Argus",
+    "wordmark": "ARGUS",
+    "framing": {
+      "headline": "This is a what if, not a tip.",
+      "detail": "Someone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.",
+      "short": "A what if, run on past market data. Not a tip."
+    },
+    "sections": {
+      "result": "How it went",
+      "what_was_tested": "What they tried",
+      "assumptions": "What Argus assumed",
+      "note": "They left a note",
+      "chart": "How the test money moved"
+    },
+    "plan": {
+      "heading": "What ran",
+      "buy_and_hold": "Bought once at the start and held to the end. It never sold.",
+      "dca": "Bought {{cadence}}, whatever the price was that day. It never sold.",
+      "buy_the_dip": "Bought after each sharp drop, then sold about a week later.",
+      "indicator_entry": "Bought when {{indicator}} fell to {{entry}}.",
+      "indicator_exit": "Sold when {{indicator}} climbed back to {{exit}}.",
+      "crossover_entry": "Bought when the {{fast_period}} day average rose above the {{slow_period}} day average.",
+      "crossover_exit_mirrored": "Sold when it crossed back below.",
+      "crossover_exit_own": "Sold when the {{fast_period}} day average fell below the {{slow_period}} day average.",
+      "macd_entry": "Bought when MACD crossed above its signal line.",
+      "macd_exit": "Sold when MACD crossed back below its signal line.",
+      "unnamed": "Ran as {{label}}.",
+      "long_only": "These numbers are locked and will not change."
+    },
+    "cadence_values": {
+      "daily": "every day",
+      "weekly": "every week",
+      "biweekly": "every two weeks",
+      "monthly": "every month",
+      "quarterly": "every quarter"
+    },
+    "metric_labels": {
+      "total_return_pct": "Total return",
+      "total_return": "Total return",
+      "benchmark_return_pct": "Benchmark",
+      "max_drawdown_pct": "Worst dip",
+      "max_drawdown": "Worst dip",
+      "win_rate_pct": "Win rate"
+    },
+    "hero": {
+      "ahead": "{{value}} ahead of {{symbol}}",
+      "behind": "{{value}} behind {{symbol}}",
+      "vs": "{{symbol}} did {{value}}",
+      "window": "{{range}}",
+      "drawdown": "Worst dip along the way: {{value}}"
+    },
+    "fine_print": {
+      "heading": "The fine print",
+      "settings": "Exact settings",
+      "assumed": "What Argus assumed"
+    },
+    "fields": {
+      "asset": "What",
+      "asset_class": "Kind",
+      "strategy": "The plan",
+      "dates": "When",
+      "benchmark": "Compared with"
+    },
+    "asset_class_values": {
+      "equity": "Stocks",
+      "crypto": "Crypto",
+      "currency_pair": "Currency pair"
+    },
+    "frozen_note": "Saved on {{date}}. These numbers are locked, so they will look the same whenever you come back.",
+    "frozen_note_undated": "These numbers were locked when the link was made, so they will look the same whenever you come back.",
+    "chart_unavailable": "No chart was saved with this one.",
+    "cta": {
+      "headline": "Got an idea? Try it.",
+      "detail": "Tell Argus an idea in your own words and it will show you how it would have gone. Free to try, no account needed.",
+      "action": "Test your own idea"
+    },
+    "tombstone": {
+      "title": "This one is gone",
+      "detail": "The person who shared it took the link down, or deleted the result behind it. There is nothing left to show.",
+      "cta_detail": "You can still try Argus for yourself."
+    },
+    "unavailable": {
+      "title": "We could not load this one",
+      "detail": "Something went wrong on our end, not yours. The link may well still work, so try again in a moment."
+    },
+    "owner": {
+      "share": "Share this",
+      "share_hint": "Makes a link anyone can open. It shows these numbers, locked as they are right now. Your chat, your name, and anything Argus remembers all stay out of it.",
+      "note_label": "Add a note if you want",
+      "note_placeholder": "Why is this worth a look?",
+      "note_public_warning": "Anyone with the link can read this. Keep it free of anything private.",
+      "note_counter": "{{count}} of {{max}} characters",
+      "create": "Make the link",
+      "creating": "Making the link...",
+      "cancel": "Never mind",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "copy_failed": "Copying did not work. Select the link and copy it.",
+      "created_note": "Your name is not on it, search engines cannot find it, and you can take it down any time from Data Controls.",
+      "errors": {
+        "create": "Argus could not make that link. Try again.",
+        "note_rejected": "That note cannot go public. Take out any keys or long codes.",
+        "rate_limited": "You have made a lot of links just now. Try again shortly."
+      }
+    },
+    "list": {
+      "menu": "Shared links",
+      "title": "Shared links",
+      "close": "Close shared links",
+      "intro": "Everything you have shared. Each link shows locked numbers and nothing about you.",
+      "loading": "Loading your links...",
+      "load_error": "Your shared links did not load.",
+      "load_more": "Show older links",
+      "retry": "Try again",
+      "empty": "You have not shared anything yet.",
+      "created_on": "Shared {{date}}",
+      "revoked_on": "Taken down {{date}}",
+      "revoked_by_source": "Taken down on its own when you deleted the chat behind it.",
+      "open": "Open it",
+      "copy": "Copy link",
+      "revoke": "Take it down",
+      "revoking": "Taking it down...",
+      "confirm_revoke": "Sure?",
+      "revoke_error": "That link did not come down. Try again.",
+      "cache_note": "The link dies on Argus right away. Chat apps sometimes keep an old preview card in threads where it was already pasted, and Argus cannot reach into those."
+    },
+    "strategy_facts": {
+      "strategy_type": "Strategy",
+      "cadence": "How often",
+      "indicator": "Indicator",
+      "indicator_period": "Indicator period",
+      "fast_indicator": "Fast average",
+      "fast_period": "Fast window",
+      "slow_indicator": "Slow average",
+      "slow_period": "Slow window",
+      "exit_fast_indicator": "Fast average on exit",
+      "exit_fast_period": "Fast window on exit",
+      "exit_slow_indicator": "Slow average on exit",
+      "exit_slow_period": "Slow window on exit",
+      "signal_period": "Signal window",
+      "entry_threshold": "Buys at",
+      "exit_threshold": "Sells at"
     }
   }
 }

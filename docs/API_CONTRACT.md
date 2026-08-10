@@ -589,6 +589,96 @@ assistant bubble and has no message id. No synthetic assistant message is
 inserted into the API response, and no placeholder assistant message is
 persisted solely to represent abandonment.
 
+### Public evidence receipts
+
+Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
+off, every path below answers exactly as a route that does not exist: status 404
+with body `{"detail":"Not Found"}`, produced by the same handler an unmatched path
+uses. A distinctive problem body would still advertise that receipt code is
+deployed, so the flag-off response is byte-identical to a deployment without this
+lane, and that is pinned by test.
+
+Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
+
+| Method   | Path                                               | Purpose |
+| :------- | :------------------------------------------------- | :------ |
+| `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Freeze a receipt from an owned completed backtest |
+| `GET`    | `/public-excerpts`                                 | The owner's receipt list for Data Controls |
+| `DELETE` | `/public-excerpts/{snapshot_id}`                   | Revoke, immediately and irreversibly |
+
+Public endpoints, unauthenticated:
+
+| Method | Path                           | Purpose |
+| :----- | :----------------------------- | :------ |
+| `GET`  | `/public/receipts/{public_id}` | Read one frozen receipt |
+| `POST` | `/public/receipt-funnel`       | Record one viewer-side funnel stage |
+
+A result whose conversation has been deleted is no longer shareable: creation answers
+`404` with the ordinary not-available detail, and the database refuses the insert even
+if the deletion lands mid-request. Revoking is idempotent, and only the state
+transition emits `receipt_revoked`.
+
+`POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
+`{"owner_note": string | null}`, bounded at 280 characters, and returns
+`{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
+has a live one returns that receipt rather than minting a second link, including
+when two concurrent requests race on the insert. Only a real insert emits the
+`receipt_created` funnel event, so a retry or a reload cannot inflate the
+acquisition funnel's creation stage.
+
+`PublicExcerptListItem` is `{id, public_id, path, title, symbols,
+date_range_display, created_at, revoked_at, revocation_reason}`. It carries no
+source conversation, run, or artifact id. Clients compose the shareable url as
+`origin + path`, so the backend owns no origin configuration.
+
+`GET /public-excerpts` is paginated, newest first, with `limit` (default 50, max
+200) and an opaque `cursor`, returning `{items, next_cursor}`. It is paginated
+rather than capped on purpose: this list is the only place an owner can find a
+snapshot id to revoke, so a row hidden behind a cap would be a public page they
+cannot take down. The cursor is keyset on `(created_at, id)` so identical
+timestamps cannot drop or repeat a row across pages.
+
+`GET /public/receipts/{public_id}` returns
+`{public_id, status, indexing, created_at, payload}`:
+
+- `status` is `available` or `revoked`; `indexing` is always `noindex, nofollow`.
+- A revoked receipt returns `200` with `status: "revoked"`, `payload: null`, and
+  no `created_at`. It is a tombstone, not a `404`: the viewer already holds the
+  link, and a not-found page only makes the sender look careless.
+- An unknown `public_id` returns the same tombstone. With unguessable ids there is
+  nothing to enumerate, so making unknown and revoked indistinguishable removes an
+  oracle and gives a viewer with a stale link an honest page instead of a broken
+  one.
+- The request carries no credentials, and `payload` is the closed set documented in
+  `docs/DATA_MODEL.md` section 12.1.3.
+
+`POST /public/receipt-funnel` takes `{"stage": "viewed" | "try_argus"}` and returns
+`204`. It stores nothing and carries no identifier. `viewed` is reported by the
+rendered page rather than counted when the receipt is read, because that read also
+answers the metadata pass and the preview image; a link pasted into a chat would
+otherwise log views nobody caused. It exists because the Try Argus tap
+happens on a page nobody is signed in to, and the alternative, a marker on the
+guest entry url, is ruled out: sharing adds no new parameter to that surface.
+
+Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user id
+and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
+per hour per client identity.
+
+Error codes specific to this surface: `receipt_note_rejected` (422, the note carries
+an identifier, a credential-shaped value, or a value assigned to something that names
+a credential), `receipt_source_unsupported` (422, not a completed backtest result, or
+a strategy the public projection cannot describe completely), and
+`receipt_sanitization_failed` (500, the payload could not be proven free of
+never-expose data, so nothing was published).
+
+A receipt either states the strategy that ran, in full, or it is not created. The
+projection covers buy and hold, recurring contributions, indicator thresholds, buy
+the dip, moving average crossovers (including a crossover whose exit windows differ
+from its entry windows, which the rule compiler allows), and MACD crossovers. A
+generic `rule_spec` condition tree, or any shape added later without a projection,
+answers `receipt_source_unsupported` rather than publishing a page that names a
+strategy without describing it.
+
 ## Admin Bypass
 
 If `profiles.is_admin = true`, backend quota and rate-limit restrictions are bypassed.
@@ -2865,7 +2955,7 @@ historical `strategy_id`; no endpoint creates or mutates those records.
 
 ### Research Responses
 
-Behind `ARGUS_RESEARCH_RAIL_ENABLED` (default off; flag-off behavior is
+Behind `ARGUS_RESEARCH_RAIL_ENABLED` (enabled 2026-08-10; flag-off behavior is
 byte-identical to the pre-rail router), a question turn the interpreter
 classifies as a finance question is grounded through the Perplexity Agent
 API's `finance_search` tool, selected by question shape with no user-visible

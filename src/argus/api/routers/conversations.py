@@ -31,6 +31,10 @@ from argus.api.message_store import (
     reconcile_reload_message_metadata,
 )
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
+from argus.api.public_excerpts import (
+    revoke_all_receipts,
+    revoke_receipts_for_conversation,
+)
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
     ConfirmationDirectEditRequest,
@@ -373,6 +377,11 @@ def delete_all_conversations(
                 update={"deleted_at": now, "updated_at": now},
             )
             deleted_count += 1
+        # Supabase revokes inside the same statement, through the deleted_at
+        # trigger. Repeating it here would add a request after the delete already
+        # committed, and a timeout on that request would report 500 for work that
+        # durably succeeded.
+        revoke_all_receipts(user_id=user.id)
     return BulkConversationDeleteResponse(success=True, deleted_count=deleted_count)
 
 
@@ -475,6 +484,13 @@ def delete_conversation(
     else:
         api_state.store.conversations[conversation_id] = conversation.model_copy(
             update={"deleted_at": utcnow(), "updated_at": utcnow()}
+        )
+        # In-memory only. Supabase revokes in the same statement via the
+        # deleted_at trigger, so calling this after the delete committed would add
+        # a failure window that could turn a successful delete into a 500.
+        revoke_receipts_for_conversation(
+            user_id=user.id,
+            conversation_id=conversation_id,
         )
     return SuccessResponse(success=True)
 
