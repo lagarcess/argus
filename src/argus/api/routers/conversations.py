@@ -987,6 +987,7 @@ def add_confirmation_peer_assets(
         confirmation_payload=new_payload,
         language=language,
         metadata_extra={"next_experiments": peer_rows},
+        runtime_workflow=api_state.get_agent_runtime_workflow(request),
     )
     if updated is None:
         raise invalid_state
@@ -1119,6 +1120,7 @@ def direct_edit_confirmation(
         confirmation_id=confirmation_id,
         confirmation_payload=preparation.confirmation_payload,
         language=language,
+        runtime_workflow=api_state.get_agent_runtime_workflow(request),
     )
     if updated is None:
         raise invalid_state

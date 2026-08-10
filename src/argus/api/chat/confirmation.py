@@ -4,6 +4,8 @@ from datetime import date
 from typing import Any
 from uuid import uuid4
 
+from loguru import logger
+
 from argus.agent_runtime.confirmation_artifacts import (
     canonical_payload_hash,
     confirmation_id_from_payload,
@@ -331,6 +333,7 @@ def apply_pending_card_update(
     confirmation_payload: dict[str, Any],
     language: str,
     metadata_extra: dict[str, Any] | None = None,
+    runtime_workflow: Any | None = None,
 ):
     """The only write path for a non-turn change to a pending confirmation.
 
@@ -340,8 +343,16 @@ def apply_pending_card_update(
     card it changed is the record, rewritten in place: same confirmation id,
     same message, nothing appended. Every non-turn producer must write
     through here; a key set to None in ``metadata_extra`` is removed so a
-    consumed sidecar cannot go stale on the updated card. Returns the updated
-    message, or None when the card cannot be assembled.
+    consumed sidecar cannot go stale on the updated card.
+
+    The persisted message and the runtime checkpoint describe the same fact,
+    so this write keeps both consistent: when a checkpoint exists for the
+    conversation, its pending strategy, active reference, and confirmation
+    payload are rewritten to the edited card. Without this, a later turn
+    whose metadata fallback carries no snapshot reads the pre-edit strategy
+    from the checkpoint, and correctness depends on a caller remembering the
+    fallback. Returns the updated message, or None when the card cannot be
+    assembled.
     """
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
@@ -380,13 +391,92 @@ def apply_pending_card_update(
             metadata.pop(key, None)
         else:
             metadata[key] = value
-    return update_message_artifact(
+    updated = update_message_artifact(
         user_id=user_id,
         conversation_id=conversation_id,
         message_id=source_message.id,
         content=str(card.get("summary") or ""),
         metadata=metadata,
     )
+    if runtime_workflow is not None:
+        _sync_runtime_checkpoint_with_card(
+            workflow=runtime_workflow,
+            conversation_id=conversation_id,
+            confirmation_payload=confirmation_payload,
+            reference=reference,
+        )
+    return updated
+
+
+def _sync_runtime_checkpoint_with_card(
+    *,
+    workflow: Any,
+    conversation_id: str,
+    confirmation_payload: dict[str, Any],
+    reference: Any,
+) -> None:
+    """Rewrite the checkpoint's view of the pending card to the edited one.
+
+    Best-effort by design: the persisted message is the durable truth and the
+    metadata fallback still corrects a missed sync, so a checkpoint write
+    failure degrades to the old conditional behaviour instead of failing the
+    edit. The failure is logged loudly because it reintroduces the two-source
+    drift this sync exists to close.
+    """
+    import asyncio
+
+    from argus.agent_runtime.state.models import (
+        ConfirmationPayload,
+        StrategySummary,
+        TaskSnapshot,
+    )
+
+    async def _sync() -> None:
+        config = {"configurable": {"thread_id": conversation_id}}
+        state = await workflow.aget_state(config)
+        values = getattr(state, "values", None)
+        if not isinstance(values, dict) or not values:
+            return
+        strategy = StrategySummary.model_validate(confirmation_payload["strategy"])
+        updates: dict[str, Any] = {
+            "confirmation_payload": dict(confirmation_payload),
+        }
+        snapshot = values.get("latest_task_snapshot")
+        if isinstance(snapshot, dict):
+            snapshot = TaskSnapshot.model_validate(snapshot)
+        if isinstance(snapshot, TaskSnapshot):
+            updates["latest_task_snapshot"] = snapshot.model_copy(
+                update={
+                    "pending_strategy_summary": strategy,
+                    "active_confirmation_reference": reference,
+                }
+            )
+        run_state = values.get("run_state")
+        if run_state is not None:
+            updates["run_state"] = run_state.model_copy(
+                update={
+                    "candidate_strategy_draft": strategy,
+                    "confirmation_payload": ConfirmationPayload.model_validate(
+                        confirmation_payload
+                    ),
+                }
+            )
+        # The write is attributed to the terminal node so a resumed graph
+        # never re-enters mid-flight; each turn starts fresh from its input.
+        from argus.agent_runtime.graph.workflow import WorkflowNode
+
+        await workflow.aupdate_state(
+            config, updates, as_node=WorkflowNode.NEXT_STEP.value
+        )
+
+    try:
+        asyncio.run(_sync())
+    except Exception:
+        logger.opt(exception=True).warning(
+            "In-place card edit could not sync the runtime checkpoint; a "
+            "fallback-less turn may read the pre-edit strategy",
+            conversation_id=conversation_id,
+        )
 
 
 def attach_research_peer_rows(

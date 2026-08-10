@@ -463,3 +463,34 @@ def test_add_peer_is_absent_with_the_flag_off(monkeypatch: pytest.MonkeyPatch) -
 
     response = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert response.status_code == 404
+
+
+def test_peer_rows_survive_a_direct_edit_of_the_same_card() -> None:
+    """A capital edit does not change the basket, so the offered peer rows
+    ride the updated card unchanged; both writes share the same metadata
+    path, and neither may drop the other's sidecar."""
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
+
+    response = client.post(
+        f"/api/v1/conversations/{conversation['id']}/confirmations/"
+        f"{CONFIRMATION_ID}/direct-edit",
+        json={"capital": 25000},
+    )
+    assert response.status_code == 200, response.text
+    message = response.json()["message"]
+    payload = message["metadata"]["confirmation_payload"]
+    assert payload["strategy"]["capital_amount"] == 25000
+    rows = message["metadata"]["next_experiments"]["rows"]
+    offered = sorted(
+        symbol
+        for row in rows
+        if row["kind"].startswith("research_add_peer")
+        and not row["kind"].endswith("_set")
+        for symbol in row["why"]["params"]["symbols"]
+    )
+    assert offered == [
+        "AAPL",
+        "MSFT",
+    ], "the peer offers must survive an in-place edit of the same card"
