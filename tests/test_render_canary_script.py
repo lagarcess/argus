@@ -194,13 +194,28 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     ) < main_body.index("run_browser_canary")
 
     assert "ARGUS_CANARY_BROWSER_PHASE" in runner_source
-    assert "access-denial" in runner_source
     assert "full" in runner_source
     assert "env -u SUPABASE_SERVICE_ROLE_KEY" in runner_source
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in runner_source
     assert 'ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="' not in runner_source
     assert "if ! env -u SUPABASE_SERVICE_ROLE_KEY" in shell_source
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
+
+
+def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    denial_body = shell_source.split("run_requested_signup_denial_canary() {", 1)[
+        1
+    ].split("\n}", 1)[0]
+
+    assert "canary-requested-signup-denial.py" in denial_body
+    assert 'CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL"' in denial_body
+    assert 'CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL"' in denial_body
+    assert 'CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE"' in denial_body
+    assert "env -u SUPABASE_SERVICE_ROLE_KEY" in denial_body
+    assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in denial_body
+    assert "run_browser_canary_phase" not in denial_body
+    assert "access-denial" not in shell_source
 
 
 def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:
@@ -677,6 +692,114 @@ def test_browser_failure_recovers_replay_inputs_before_writing_capture() -> None
         "require_browser_session_for_read_only_api_postconditions"
     )
     assert receipt_probe < browser_session_check
+
+
+def test_browser_auth_challenge_timeout_is_named_before_a_journey_failure() -> None:
+    source = _source(".github/canary-render.sh")
+    browser_failure = source.split("if ! run_browser_canary; then", 1)[1].split(
+        "\nfi", 1
+    )[0]
+    classifier = source.split("browser_auth_challenge_timed_out() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+
+    assert 'fail_canary "browser_auth" "captcha_challenge_timeout"' in browser_failure
+    assert browser_failure.index("browser_auth_challenge_timed_out") < (
+        browser_failure.index('fail_canary "browser" "rendered_golden_path_failed"')
+    )
+    assert 'grep -qF "page.waitForResponse"' in classifier
+    assert 'grep -qF "/auth/"' in classifier
+    assert 'tee "$BROWSER_PHASE_OUTPUT"' in source
+
+
+def test_cleanup_redacts_browser_artifacts_before_the_job_uploads_them() -> None:
+    source = _source(".github/canary-render.sh")
+    cleanup_body = source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
+
+    assert "redact_browser_artifacts || true" in cleanup_body
+    assert cleanup_body.index("redact_browser_artifacts") < cleanup_body.index(
+        'rm -f "$BROWSER_IDENTITY_HANDOFF"'
+    )
+
+
+def test_browser_artifact_redaction_masks_canary_credentials(tmp_path: Path) -> None:
+    source = _source(".github/canary-render.sh")
+    function_body = source.split("redact_browser_artifacts() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
+    results = tmp_path / "playwright-results" / "case"
+    results.mkdir(parents=True)
+    context_path = results / "error-context.md"
+    context_path.write_text(
+        '- textbox "Contrasena": canary-password-value\n'
+        '- textbox "Correo": operator@example.test\n'
+        '- textbox "Correo": delivered@resend.dev\n',
+        encoding="utf-8",
+    )
+    screenshot_path = results / "test-failed-1.png"
+    screenshot_path.write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe\x00")
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "CANARY_REDACT_DIR": str(tmp_path / "playwright-results"),
+            "CANARY_REDACT_PASSWORD": "canary-password-value",
+            "CANARY_REDACT_EMAIL": "operator@example.test",
+        }
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", python_source],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    redacted = context_path.read_text(encoding="utf-8")
+    assert "canary-password-value" not in redacted
+    assert "operator@example.test" not in redacted
+    assert redacted.count("<redacted>") == 2
+    # The pinned signup address is public and stays readable for triage.
+    assert "delivered@resend.dev" in redacted
+    assert not screenshot_path.exists()
+    assert stat.S_IMODE(context_path.stat().st_mode) == 0o600
+    assert (tmp_path / "playwright-results" / ".redacted").is_file()
+
+
+def test_browser_artifact_redaction_leaves_no_marker_without_a_results_dir(
+    tmp_path: Path,
+) -> None:
+    source = _source(".github/canary-render.sh")
+    function_body = source.split("redact_browser_artifacts() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
+    results_dir = tmp_path / "playwright-results"
+    results_dir.mkdir()
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "CANARY_REDACT_DIR": str(results_dir),
+            "CANARY_REDACT_PASSWORD": "",
+            "CANARY_REDACT_EMAIL": "",
+        }
+    )
+    subprocess.run(
+        [sys.executable, "-c", python_source],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert 'local results_dir="web/temp/playwright-results"' in function_body
+    assert '[ -d "$results_dir" ] || return 0' in function_body
+    assert (results_dir / ".redacted").is_file()
 
 
 def test_failed_browser_run_is_reported_as_failed_not_not_run() -> None:
