@@ -40,6 +40,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _edit_plan_reshapes_non_recurring_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
+    _scoped_date_reply_carries_broader_edit,
     _request_targets_post_result_artifact_edit,
     _required_edit_targets_from_primary_draft,
     _response_from_artifact_assumption_edit_plan,
@@ -2701,6 +2702,9 @@ async def _ready_active_artifact_edit_planned_response(
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
         or _request_targets_post_result_artifact_edit(request)
+        or _scoped_date_reply_carries_broader_edit(
+            request, response.candidate_strategy_draft
+        )
     ):
         return None
     if response.semantic_turn_act in {
@@ -3418,6 +3422,7 @@ async def _plan_pending_artifact_assumption_edit(
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
         or _request_targets_post_result_artifact_edit(request)
+        or _scoped_date_reply_carries_broader_edit(request, primary_draft)
     ):
         return None
     if (

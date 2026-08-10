@@ -825,6 +825,22 @@
         "invalid_dates": "Pick a start date on or before the end date.",
         "failed": "That change did not go through. The card is unchanged."
       },
+      "edit_disclosure": {
+        "unapplied": "I could not change {{targets}}; the rest is applied below.",
+        "targets": {
+          "asset": "the assets",
+          "benchmark": "the benchmark",
+          "cadence": "the cadence",
+          "capital": "the starting capital",
+          "date_window": "the dates",
+          "fees": "the fees",
+          "recurring_contribution": "the contribution",
+          "slippage": "the slippage",
+          "strategy_family": "the strategy",
+          "timeframe": "the timeframe",
+          "generic": "that part"
+        }
+      },
       "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
     },
     "next_experiments": {

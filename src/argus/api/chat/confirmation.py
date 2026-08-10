@@ -286,6 +286,12 @@ def runtime_confirmation_card(
         # and the inline period disclosure; the deliberate add itself is not
         # narrated back to the user.
         card["assets_adjustment"] = dict(assets_adjustment)
+    edit_disclosure = payload.get("edit_disclosure")
+    if isinstance(edit_disclosure, dict):
+        # §3.2: the part of an edit that could not be applied is disclosed on
+        # the card the edit produced. Card turns drop assistant prose, so the
+        # typed record is the only channel that reaches the user.
+        card["edit_disclosure"] = dict(edit_disclosure)
     return card
 
 

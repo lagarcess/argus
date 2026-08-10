@@ -825,6 +825,22 @@
         "invalid_dates": "Elige una fecha de inicio igual o anterior a la fecha de fin.",
         "failed": "Ese cambio no se aplicó. La tarjeta quedó igual."
       },
+      "edit_disclosure": {
+        "unapplied": "No pude cambiar {{targets}}; el resto quedó aplicado abajo.",
+        "targets": {
+          "asset": "los activos",
+          "benchmark": "el benchmark",
+          "cadence": "la frecuencia",
+          "capital": "el capital inicial",
+          "date_window": "las fechas",
+          "fees": "las comisiones",
+          "recurring_contribution": "el aporte",
+          "slippage": "el deslizamiento",
+          "strategy_family": "la estrategia",
+          "timeframe": "el intervalo",
+          "generic": "esa parte"
+        }
+      },
       "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
     },
     "next_experiments": {

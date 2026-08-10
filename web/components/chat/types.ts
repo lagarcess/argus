@@ -208,6 +208,12 @@ export type StrategyConfirmationBenchmarkAdjustment = {
   effective_benchmark: string;
 };
 
+/** §3.2: requested changes the edit turn could not apply, with reasons. */
+export type StrategyConfirmationEditDisclosure = {
+  unapplied: { op: string; target: string; reason: string }[];
+  note?: string | null;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -229,6 +235,7 @@ export type StrategyConfirmationPayload = {
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
   assets_adjustment?: StrategyConfirmationAssetsAdjustment;
+  edit_disclosure?: StrategyConfirmationEditDisclosure;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];

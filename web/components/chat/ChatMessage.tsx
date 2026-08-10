@@ -47,6 +47,7 @@ import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
+import { confirmationEditDisclosureText } from "@/lib/confirmation-edit-disclosure";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 import { EntityToken } from "./entity-token";
 import { messageMentionPieces } from "./mention-rendering";
@@ -296,6 +297,10 @@ export default function ChatMessage({
     message.confirmation?.benchmark_adjustment,
     (key, options) => t(key, options),
   );
+  const confirmationEditDisclosureLeadIn = confirmationEditDisclosureText(
+    message.confirmation?.edit_disclosure,
+    t,
+  );
 
   if (isUser && message.kind === "action") {
     const actionText =
@@ -398,6 +403,14 @@ export default function ChatMessage({
               {confirmationBenchmarkLeadIn ? (
                 <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
                   {confirmationBenchmarkLeadIn}
+                </p>
+              ) : null}
+              {confirmationEditDisclosureLeadIn ? (
+                <p
+                  data-testid="confirmation-edit-disclosure"
+                  className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75"
+                >
+                  {confirmationEditDisclosureLeadIn}
                 </p>
               ) : null}
               <StrategyConfirmationCard

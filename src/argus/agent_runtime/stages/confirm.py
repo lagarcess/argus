@@ -107,6 +107,12 @@ def confirm_stage(
         "strategy": strategy,
         "optional_parameters": optional_parameters,
     }
+    edit_disclosure = _popped_edit_disclosure(strategy)
+    if edit_disclosure is not None:
+        # §3.2: a change the edit turn could not apply is disclosed on the
+        # card it produced. Single-use by construction: popped from the
+        # persisted strategy so it cannot outlive this transition.
+        confirmation_payload["edit_disclosure"] = edit_disclosure
     confirmation_id = new_confirmation_id()
     validation_result = _validated_launch_payload(
         state=state,
@@ -494,6 +500,37 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     if isinstance(strategy, StrategySummary):
         return strategy.model_dump(mode="python")
     return dict(strategy)
+
+
+def _popped_edit_disclosure(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    disclosure = extra_parameters.pop("edit_disclosure", None)
+    if not isinstance(disclosure, dict):
+        return None
+    unapplied = disclosure.get("unapplied")
+    note = str(disclosure.get("note") or "").strip()
+    if not isinstance(unapplied, list):
+        unapplied = []
+    if not unapplied and not note:
+        return None
+    cleaned: dict[str, Any] = {
+        "unapplied": [
+            {
+                "op": str(entry.get("op") or "set"),
+                "target": str(entry.get("target") or ""),
+                "reason": str(entry.get("reason") or "unsupported_operation"),
+            }
+            for entry in unapplied
+            if isinstance(entry, dict) and str(entry.get("target") or "").strip()
+        ],
+    }
+    if note:
+        cleaned["note"] = note
+    if not cleaned["unapplied"] and "note" not in cleaned:
+        return None
+    return cleaned
 
 
 def _strategy_with_runtime_language(

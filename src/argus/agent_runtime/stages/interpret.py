@@ -121,6 +121,9 @@ from argus.agent_runtime.stages.interpret_internal.answer_composition import (  
     _token_sequence_spans,
 )
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.shared import (
+    carries_broader_edit_than_dates,
+)
 from argus.agent_runtime.knowledge_answer import knowledge_answer_stage_result
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # noqa: F401
     _USER_GROUNDED_CADENCE_SOURCES,
@@ -1705,6 +1708,11 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         )
     ):
         return interpretation
+    if _interpretation_carries_broader_edit_than_dates(interpretation):
+        # §3.3: a scoped date prompt answered with more than a date is a
+        # compound edit. Replacing it with a date-only reading would drop the
+        # rest of the request, so the broader turn keeps its interpretation.
+        return interpretation
     repaired = _pending_date_answer_interpretation(
         current_user_message=current_user_message,
         language=language,
@@ -1727,6 +1735,13 @@ def _repair_pending_date_answer_route_when_pending_need_is_active(
         dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
     )
     return repaired
+
+
+def _interpretation_carries_broader_edit_than_dates(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    """The current turn states more than the date the scoped prompt asked for."""
+    return carries_broader_edit_than_dates(interpretation.candidate_strategy_draft)
 
 
 def _repair_pending_date_answer_noop_from_current_message(

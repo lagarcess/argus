@@ -31,6 +31,7 @@ from argus.agent_runtime.interpreter.shared import (
     _field_path_base,
     _latest_result_date_window,
     _supported_dca_cadence_value,
+    carries_broader_edit_than_dates,
 )
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
@@ -55,7 +56,10 @@ ResolveAssetCandidate = Callable[..., AssetResolution | None]
 # Pending requested_field values whose next user reply edits the pending
 # artifact. The result-card "Refine idea" action ("refinement",
 # api/chat/result_actions.py) and the confirmation-card assumption prompts are
-# two entry points into the same typed edit contract.
+# two entry points into the same typed edit contract. date_range is
+# deliberately absent: a pure date answer keeps its specialized paths, and a
+# broadened reply on the change-dates prompt reaches the planner through the
+# response-conditioned §3.3 clause in the routing layer instead.
 ARTIFACT_EDIT_PENDING_FIELDS = frozenset(
     {
         "assumption",
@@ -71,6 +75,37 @@ def _normalized_ticker_symbol(value: Any) -> str | None:
         return None
     symbol = value.strip().upper()
     return symbol or None
+
+
+def _scoped_date_reply_carries_broader_edit(
+    request: InterpretationRequest,
+    draft: LLMStrategyDraft | None,
+) -> bool:
+    """§3.3: a change-dates prompt answered with more than a date widens.
+
+    The planner serves the whole request instead of holding the user to the
+    button they pressed; a pure date answer keeps its specialized paths.
+    """
+    if draft is None:
+        return False
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
+    if requested_field != "date_range":
+        return False
+    last_stage_outcome = str(
+        request.selected_thread_metadata.get("last_stage_outcome") or ""
+    )
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return False
+    snapshot = request.latest_task_snapshot
+    if snapshot is None or not (
+        snapshot.pending_strategy_summary
+        or snapshot.confirmed_strategy_summary
+        or snapshot.active_confirmation_reference
+    ):
+        return False
+    return carries_broader_edit_than_dates(draft)
 
 
 def _request_targets_pending_artifact_assumption_edit(
@@ -1352,6 +1387,34 @@ def _canonical_draft_date_request(
     return None
 
 
+_DROPPED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def _typed_unapplied_operations(
+    *,
+    resolved_unsupported: list[str],
+    dropped_cost_fields: list[str],
+) -> list[dict[str, str]]:
+    """Typed record of requested changes that did not land, with reasons."""
+    unapplied: list[dict[str, str]] = []
+    for entry in resolved_unsupported:
+        op, _, target = str(entry).partition(".")
+        if not target:
+            op, target = "set", op
+        unapplied.append(
+            {"op": op, "target": target, "reason": "unsupported_operation"}
+        )
+    for field_name in dropped_cost_fields:
+        unapplied.append(
+            {
+                "op": "set",
+                "target": _DROPPED_COST_TARGETS.get(field_name, field_name),
+                "reason": "cost_evidence_ungrounded",
+            }
+        )
+    return unapplied
+
+
 def _materialized_artifact_edit(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -1365,6 +1428,7 @@ def _materialized_artifact_edit(
         draft.strategy_type = current_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     extra_parameters: dict[str, Any] = {}
+    resolved: ResolvedArtifactEdit | None = None
     if plan.operations:
         resolved = apply_edit_operations(
             plan.operations,
@@ -1390,13 +1454,22 @@ def _materialized_artifact_edit(
         draft.extra_parameters.update(extra_parameters)
     if field_provenance:
         draft.field_provenance = field_provenance
-    ground_planned_execution_costs(
+    dropped_costs = ground_planned_execution_costs(
         draft,
         current_message=request.current_user_message,
         primary_draft=primary_draft,
         extra_parameters=extra_parameters,
         field_provenance=field_provenance,
     )
+    unapplied = _typed_unapplied_operations(
+        resolved_unsupported=resolved.unsupported if resolved is not None else [],
+        dropped_cost_fields=dropped_costs,
+    )
+    if unapplied:
+        # §3.2: every requested change is applied or surfaced with a reason.
+        # The typed record rides the draft so the card can disclose it even
+        # though card turns drop assistant prose.
+        draft.extra_parameters["edit_disclosure"] = {"unapplied": unapplied}
     return draft, field_provenance, extra_parameters
 
 
@@ -1444,6 +1517,18 @@ def _response_from_artifact_assumption_edit_plan(
                 semantic_turn_act="unsupported_request",
                 artifact_target=artifact_target,
             )
+        # A mixed edit's unapplied part must reach the user through the card:
+        # card turns drop assistant prose, so the typed record carries the
+        # disclosure and the planner's note rides beside it as the voice. On a
+        # ready outcome the planner only writes a note for what it could not
+        # change, so a note without a rejected operation still discloses.
+        note = str(plan.assistant_response or "").strip()
+        disclosure = draft.extra_parameters.get("edit_disclosure")
+        if note:
+            if not isinstance(disclosure, dict):
+                disclosure = {"unapplied": []}
+                draft.extra_parameters["edit_disclosure"] = disclosure
+            disclosure["note"] = note
         return LLMInterpretationResponse(
             intent="backtest_execution",
             task_relation="continue",
@@ -1453,9 +1538,6 @@ def _response_from_artifact_assumption_edit_plan(
                 or "User changed a visible confirmation assumption."
             ),
             candidate_strategy_draft=draft,
-            # Surface the model's note when an applied edit also had a part it could
-            # not change (mixed supported/unsupported), so the reply never silently
-            # drops the unsupported part. None for a clean edit.
             assistant_response=plan.assistant_response,
             confidence=plan.confidence,
             reason_codes=["artifact_assumption_edit_planned"],

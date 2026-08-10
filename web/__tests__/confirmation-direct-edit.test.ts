@@ -53,6 +53,34 @@ describe("confirmation direct edit surface", () => {
     expect(editor).not.toContain("rows.find");
   });
 
+  test("unapplied edit changes disclose above the card in both locales", () => {
+    const message = source("components/chat/ChatMessage.tsx");
+    expect(message).toContain("confirmationEditDisclosureText");
+    expect(message).toContain("confirmation-edit-disclosure");
+
+    const lib = source("lib/confirmation-edit-disclosure.ts");
+    expect(lib).toContain("edit_disclosure.targets");
+
+    const en = JSON.parse(source("public/locales/en/common.json"));
+    const es = JSON.parse(source("public/locales/es-419/common.json"));
+    for (const bundle of [en, es]) {
+      const disclosure = bundle.chat.confirmation.edit_disclosure;
+      expect(disclosure.unapplied).toContain("{{targets}}");
+      for (const target of [
+        "asset",
+        "benchmark",
+        "capital",
+        "date_window",
+        "fees",
+        "slippage",
+        "generic",
+      ]) {
+        expect(typeof disclosure.targets[target]).toBe("string");
+        expect(disclosure.targets[target]).not.toContain("—");
+      }
+    }
+  });
+
   test("both locales carry the editor strings, without em dashes", () => {
     const en = JSON.parse(source("public/locales/en/common.json"));
     const es = JSON.parse(source("public/locales/es-419/common.json"));
