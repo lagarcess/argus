@@ -88,6 +88,18 @@ async function click(page: Page, name: RegExp) {
   await page.waitForTimeout(500);
 }
 
+async function captureMarkedBaseline(
+  surface: Locator,
+  marker: Locator,
+  name: string,
+) {
+  await expect(
+    marker,
+    `Refusing to capture ${name} without its surface marker`,
+  ).toBeVisible();
+  await expect(surface).toHaveScreenshot(name);
+}
+
 /* ------------------------------------------------------- legal and auth --- */
 
 const PAGES: Array<[string, string]> = [
@@ -111,6 +123,31 @@ for (const cell of SPINE) {
     }
   });
 }
+
+/* ---------------------------------------------- pointer-capability proof --- */
+
+test.describe("sidebar actions 1024-touch-en-dark", () => {
+  test.use({ hasTouch: true });
+
+  test("recents actions", async ({ page }) => {
+    const cell = { band: 1024, language: "en", theme: "dark" } as const;
+    await open(page, cell, "/chat");
+    expect(
+      await page.evaluate(() => matchMedia("(any-pointer: coarse)").matches),
+    ).toBe(true);
+
+    await page.getByRole("button", { name: /^recents$/i }).first().click();
+    await page.waitForTimeout(400);
+
+    const sidebar = page.locator("aside").first();
+    const marker = sidebar.getByText("Weekly Nvidia buys", { exact: true });
+    await captureMarkedBaseline(
+      sidebar,
+      marker,
+      "sidebar-recents-actions-1024-touch-en-dark.png",
+    );
+  });
+});
 
 /* --------------------------------------------------------------- settings --- */
 

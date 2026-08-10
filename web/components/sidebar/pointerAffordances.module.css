@@ -1,0 +1,32 @@
+.finePointerActions {
+  display: none;
+}
+
+.touchSafeActions {
+  display: flex;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .finePointerActions {
+    display: flex;
+  }
+
+  .touchSafeActions {
+    display: none;
+  }
+}
+
+/*
+ * A hybrid laptop can expose both a fine pointer and touch. The touch-safe
+ * menu wins whenever any coarse pointer exists, so every available input can
+ * reach the row actions.
+ */
+@media (any-pointer: coarse) {
+  .finePointerActions {
+    display: none;
+  }
+
+  .touchSafeActions {
+    display: flex;
+  }
+}

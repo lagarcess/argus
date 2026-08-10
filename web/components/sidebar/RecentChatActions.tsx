@@ -104,11 +104,7 @@ export default function RecentChatActions({
             event.stopPropagation();
             setIsMenuOpen((open) => !open);
           }}
-          className={`flex h-11 w-11 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 dark:hover:bg-white/10 dark:focus-visible:ring-white/40 ${
-            isMenuOpen || isTriggerFocused
-              ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100"
-          }`}
+          className="flex h-11 w-11 items-center justify-center rounded-md opacity-100 transition-colors duration-150 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 dark:hover:bg-white/10 dark:focus-visible:ring-white/40"
           aria-label={t("common.more", "More")}
           aria-haspopup="menu"
           aria-expanded={isMenuOpen}
