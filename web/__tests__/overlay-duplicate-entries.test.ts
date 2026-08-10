@@ -66,8 +66,20 @@ beforeAll(async () => {
       const at = listeners.indexOf(listener);
       if (at >= 0) listeners.splice(at, 1);
     },
-    get location() {
-      return { href: currentHref() };
+    location: {
+      get href() {
+        return currentHref();
+      },
+      assign(value: string) {
+        stack = [
+          ...stack.slice(0, cursor + 1),
+          new URL(value, currentHref()).href,
+        ];
+        cursor = stack.length - 1;
+      },
+      replace(value: string) {
+        stack[cursor] = new URL(value, currentHref()).href;
+      },
     },
     history: {
       get state() {
@@ -117,6 +129,35 @@ function navigateTo(href: string): void {
 }
 
 describe("back after navigating out of nested overlays", () => {
+  test("navigation from a history-less popover preserves the source page", () => {
+    let closed = false;
+
+    subject.navigateFromOverlay(DEST, () => {
+      closed = true;
+    });
+
+    expect(closed).toBe(true);
+    expect(currentHref()).toBe(DEST);
+    expect(stack).toEqual([SOURCE, DEST]);
+
+    userBack();
+    expect(currentHref()).toBe(SOURCE);
+  });
+
+  test("route navigation spends the overlay before its close callback", () => {
+    openOverlay("settings");
+    let closed = false;
+
+    subject.navigateFromOverlay(DEST, () => {
+      closed = true;
+    });
+
+    expect(closed).toBe(true);
+    expect(currentHref()).toBe(DEST);
+    expect(stack).toEqual([SOURCE, DEST]);
+    expect(subject.claimOverlayEntry("settings")).toBe(false);
+  });
+
   test("one press is one step, with no dead press in between", () => {
     openOverlay("palette");
     openOverlay("dossier");

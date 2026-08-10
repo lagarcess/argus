@@ -67,6 +67,7 @@ import {
 } from "@/lib/language-features";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
+import { navigateFromOverlay } from "@/lib/overlay-history";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
@@ -135,6 +136,22 @@ export default function ProfileMenu({
    */
   const asSheet = isBelowDesktop;
   const isDrawerPlacement = placement === "drawer";
+  const handlePageLinkClick = useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      event.preventDefault();
+      navigateFromOverlay(href, onClose);
+    },
+    [onClose],
+  );
   const menuOverlayId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
   const languagePickerRef = useRef<HTMLDivElement>(null);
@@ -755,10 +772,8 @@ export default function ProfileMenu({
         { id: "deleted", onSelect: () => openModal("deleted") },
         {
           id: "security",
-          onSelect: () => {
-            onClose();
-            window.location.href = "/account/security";
-          },
+          onSelect: () =>
+            navigateFromOverlay("/account/security", onClose),
         },
         { id: "usage", onSelect: () => openModal("usage") },
         { id: "delete-all", onSelect: handleDeleteAllConversations },
@@ -790,15 +805,11 @@ export default function ProfileMenu({
         },
         {
           id: "terms",
-          onSelect: () => {
-            window.location.href = "/terms";
-          },
+          onSelect: () => navigateFromOverlay("/terms", onClose),
         },
         {
           id: "privacy",
-          onSelect: () => {
-            window.location.href = "/privacy";
-          },
+          onSelect: () => navigateFromOverlay("/privacy", onClose),
         },
       ];
     }
@@ -1109,10 +1120,9 @@ export default function ProfileMenu({
               <span className="ml-auto flex shrink-0">{quickJumpBadge("deleted")}</span>
             </button>
             <button
-              onClick={() => {
-                onClose();
-                window.location.href = "/account/security";
-              }}
+              onClick={() =>
+                navigateFromOverlay("/account/security", onClose)
+              }
               className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Shield className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
@@ -1270,14 +1280,22 @@ export default function ProfileMenu({
               <span className="ml-auto flex shrink-0">{quickJumpBadge("keyboard-shortcuts")}</span>
             </button>
             )}
-            <a href="/terms" className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+            <a
+              href="/terms"
+              onClick={(event) => handlePageLinkClick(event, "/terms")}
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+            >
               <FileText className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">
                 {t("settings.help.terms", "Terms of Use")}
               </span>
               <span className="ml-auto flex shrink-0">{quickJumpBadge("terms")}</span>
             </a>
-            <a href="/privacy" className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+            <a
+              href="/privacy"
+              onClick={(event) => handlePageLinkClick(event, "/privacy")}
+              className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+            >
               <Shield className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">
                 {t("settings.help.privacy", "Privacy Policy")}
@@ -1375,11 +1393,19 @@ export default function ProfileMenu({
       {/* Footer links */}
       <div className={`my-1 border-t border-black/5 dark:border-white/5${rootRow}`} />
       <div className={`flex items-center gap-1 px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25${rootRow}`}>
-        <a href="/terms" className="transition-colors hover:text-black dark:hover:text-white">
+        <a
+          href="/terms"
+          onClick={(event) => handlePageLinkClick(event, "/terms")}
+          className="transition-colors hover:text-black dark:hover:text-white"
+        >
           {t("settings.help.terms", "Terms of Use")}
         </a>
         <span aria-hidden="true">·</span>
-        <a href="/privacy" className="transition-colors hover:text-black dark:hover:text-white">
+        <a
+          href="/privacy"
+          onClick={(event) => handlePageLinkClick(event, "/privacy")}
+          className="transition-colors hover:text-black dark:hover:text-white"
+        >
           {t("settings.help.privacy", "Privacy Policy")}
         </a>
       </div>

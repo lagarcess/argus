@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   FREEZE_CSS,
   installBreakpointFixture,
@@ -13,12 +13,12 @@ import {
 /**
  * Capture pass for the breakpoint audit.
  *
- * This spec asserts nothing. It walks every guest and signed-in surface at the
- * DESIGN.md section 8 bands and writes a PNG plus the rendered text of each
- * capture, because reading the text is what catches clipping and duplication
- * that a passing assertion does not. Enforcement lives in
- * `breakpoint-baselines.spec.ts`; this file is the evidence the audit is read
- * from. Run with:
+ * This spec walks every guest and signed-in surface at the DESIGN.md section 8
+ * bands and writes a PNG plus the rendered text of each capture, because
+ * reading the text is what catches clipping and duplication that a passing
+ * assertion does not. Focused navigation regressions also assert their route.
+ * Visual enforcement lives in `breakpoint-baselines.spec.ts`; this file is the
+ * evidence the audit is read from. Run with:
  *   bunx playwright test e2e/breakpoint-audit.spec.ts
  */
 
@@ -55,14 +55,14 @@ type Ctx = {
  *
  * A capture takes whatever is rendered and files it under a name that claims a
  * surface. When the two disagree the artifact is worse than missing, because it
- * reads as coverage. Three of those shipped across two review rounds: a guest
- * result card that was byte-identical to the conversation capture, two dossier
- * captures that were transcripts, and a `settings-security` capture that was
- * the empty chat at the two bands where that surface does not exist at all.
+ * reads as coverage. Three of those had shipped across two review rounds: a
+ * guest result card that was byte-identical to the conversation capture, two
+ * dossier captures that were transcripts, and a `settings-security` capture
+ * that was the empty chat at the two bands where that surface did not exist.
  *
  * The first round made `proof` optional, which fixed the instances and left the
  * shape: any call site could still opt out by passing nothing, and the one that
- * did was the surface a sibling test in this same file already documents as
+ * did was the surface a sibling test in this same file documented as
  * unreachable below 1024. So the parameter is mandatory now. A capture with no
  * honest marker is not a capture worth filing, and a surface that cannot be
  * reached at a band should not be photographed there.
@@ -367,16 +367,7 @@ test.describe("signed-in surfaces", () => {
         }
       }
 
-      /*
-       * `bands` narrows a destination that does not exist at every width.
-       * Security is desktop only, and not by design: below 1024 the row is
-       * visible and clickable and the click closes the sheet without
-       * navigating, which the `account security navigation` test in this file
-       * captures as evidence. Photographing it here anyway produced a
-       * `settings-security-720` file that was byte-identical to the empty chat.
-       * The evidence for that defect belongs to that test; this walk only
-       * records the surface where it exists.
-       */
+      /* `bands` narrows a destination that does not exist at every width. */
       for (const { leaf, name, proof, bands } of [
         {
           leaf: "archived",
@@ -392,7 +383,6 @@ test.describe("signed-in surfaces", () => {
           leaf: "security",
           name: /^(security|seguridad)$/i,
           proof: PROOF.settingsSecurity,
-          bands: [1024] as Band[],
         },
         { leaf: "usage", name: /^(usage|uso)$/i, proof: PROOF.usage },
       ]) {
@@ -514,14 +504,9 @@ test.describe("signed-in surfaces", () => {
       }
     });
 
-    /*
-     * Evidence for the Security row, which is visible and clickable at every
-     * band but only navigates at desktop. Below 1024 the click closes the
-     * settings sheet and leaves the user on /chat, so the before/after pair and
-     * the URL are the proof; a single screenshot would not show it.
-     */
+    /* The visible Security row reaches the same account surface at every band. */
     test(`account security navigation at ${band}`, async ({ page }) => {
-      await open(page, band, "/chat", { emptyChat: true });
+      await open(page, band, "/chat?conversation=conversation-alpha", {});
       await openSettings(page, band);
       if (!(await clickByName(page, /^(data controls|controles de datos)$/i)))
         return;
@@ -532,18 +517,24 @@ test.describe("signed-in surfaces", () => {
       await security.click();
       // Generous: a client route change plus a paint.
       await page.waitForTimeout(2_500);
+      await expect(page).toHaveURL(/\/account\/security$/);
       await capture(
         page,
         `findings/security-${band}-after-click`,
-        // Asserts finding 1 in both directions: the click navigates at the
-        // desktop stop and lands back on the chat shell below it.
-        band >= 1024 ? PROOF.settingsSecurity : PROOF.chatShell,
+        PROOF.settingsSecurity,
       );
 
       await writeFile(
         join(OUT_DIR, `findings/security-${band}-url.txt`),
         `${new URL(page.url()).pathname}\n`,
         "utf8",
+      );
+
+      // The sheet contributes a temporary entry below 1024; the rail popover
+      // does not. Either way, one Back must restore the exact conversation.
+      await page.goBack();
+      await expect(page).toHaveURL(
+        /\/chat\?conversation=conversation-alpha$/,
       );
     });
 

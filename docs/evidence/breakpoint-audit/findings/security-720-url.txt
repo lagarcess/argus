@@ -1,1 +1,1 @@
-/chat
+/account/security

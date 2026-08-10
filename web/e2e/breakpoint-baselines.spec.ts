@@ -124,15 +124,17 @@ const SECTIONS: Array<[string, RegExp]> = [
 ];
 
 /**
- * Leaves reached from Data Controls, and from Preferences. `bands` narrows a
- * leaf that does not exist at every width: the sidebar preference appears from
- * the tablet stop up, because below it there is no sidebar to configure.
+ * Leaves reached from Data Controls, and from Preferences. `bands` can narrow
+ * an intentional coverage slice: the sidebar preference exists only from the
+ * tablet stop up, while the route-derived Security baseline targets the two
+ * widths where sheet navigation had regressed.
  */
 const LEAVES: Array<{
   name: string;
   section: RegExp;
   leaf: RegExp;
   bands?: Band[];
+  pageUrl?: RegExp;
 }> = [
   {
     name: "settings-archived",
@@ -143,6 +145,13 @@ const LEAVES: Array<{
     name: "settings-deleted",
     section: /^(data controls|controles de datos)$/i,
     leaf: /recently deleted|borrados recientemente/i,
+  },
+  {
+    name: "settings-security",
+    section: /^(data controls|controles de datos)$/i,
+    leaf: /^(security|seguridad)$/i,
+    bands: [390, 720],
+    pageUrl: /\/account\/security$/,
   },
   {
     name: "settings-usage",
@@ -180,13 +189,31 @@ for (const cell of SPINE) {
       });
     }
 
-    for (const { name, section, leaf, bands } of LEAVES) {
+    for (const { name, section, leaf, bands, pageUrl } of LEAVES) {
       if (bands && !bands.includes(cell.band)) continue;
       test(name, async ({ page }) => {
         await open(page, cell, "/chat");
         await openSettings(page, cell.band);
         await click(page, section);
         await click(page, leaf);
+        if (pageUrl) {
+          await expect(page).toHaveURL(pageUrl);
+          await page.waitForLoadState("networkidle");
+          // A document navigation drops the CSS installed by `open`.
+          await page.addStyleTag({ content: FREEZE_CSS });
+          await page.waitForTimeout(600);
+          await page.locator("nextjs-portal").evaluateAll((portals) => {
+            for (const portal of portals) {
+              (portal as HTMLElement).style.setProperty(
+                "display",
+                "none",
+                "important",
+              );
+            }
+          });
+          await expect(page).toHaveScreenshot(`${name}-${tag(cell)}.png`);
+          return;
+        }
         await expect(settingsPanel(page)).toHaveScreenshot(
           `${name}-${tag(cell)}.png`,
         );
