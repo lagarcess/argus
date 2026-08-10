@@ -1,0 +1,11 @@
+{
+  "note": "Captured with the backend process stopped, so the server-side read genuinely failed. An earlier attempt intercepted requests in the browser, which does not affect a server-rendered image and produced a normal card; that capture was discarded.",
+  "status": 503,
+  "headers": {
+    "cache-control": "no-store, max-age=0",
+    "retry-after": "120",
+    "x-robots-tag": "noindex, nofollow, noimageindex",
+    "content-type": null
+  },
+  "bodyBytes": 0
+}

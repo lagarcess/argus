@@ -30,6 +30,7 @@ import {
   Database,
   HelpCircle,
   Keyboard,
+  Link2,
   LogOut,
   MessageSquareText,
   Palette,
@@ -65,6 +66,7 @@ import {
   normalizeEnabledLanguage,
 } from "@/lib/language-features";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
+import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 
@@ -145,6 +147,11 @@ export default function ProfileMenu({
     null,
   );
   const [memoryControlsAvailable, setMemoryControlsAvailable] = useState(false);
+  // Every receipt endpoint requires the registered-only can_save_decision
+  // capability, so showing this to a guest offers a modal whose only action is a
+  // retry that can never succeed.
+  const receiptsAvailable =
+    evidenceReceiptSharingEnabled && accountKind === "registered";
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -741,6 +748,9 @@ export default function ProfileMenu({
         ...(memoryControlsAvailable
           ? [{ id: "memory", onSelect: () => openModal("memory") }]
           : []),
+        ...(receiptsAvailable
+          ? [{ id: "receipts", onSelect: () => openModal("receipts") }]
+          : []),
         { id: "archived", onSelect: () => openModal("archived") },
         { id: "deleted", onSelect: () => openModal("deleted") },
         {
@@ -831,6 +841,7 @@ export default function ProfileMenu({
     handleOpenKeyboardShortcuts,
     handleSubmenuToggle,
     memoryControlsAvailable,
+    receiptsAvailable,
     onClose,
     onFeedback,
     onOpenSidebarPreference,
@@ -1061,6 +1072,20 @@ export default function ProfileMenu({
                   {t("settings.data.personalization.menu", "Personalization")}
                 </span>
                 <span className="ml-auto flex shrink-0">{quickJumpBadge("memory")}</span>
+              </button>
+            ) : null}
+            {receiptsAvailable ? (
+              <button
+                onClick={() => openModal("receipts")}
+                className="flex min-h-[38px] w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+              >
+                <Link2 className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
+                <span className="whitespace-nowrap">
+                  {t("settings.data.shared_links", "Shared links")}
+                </span>
+                <span className="ml-auto flex shrink-0">
+                  {quickJumpBadge("receipts")}
+                </span>
               </button>
             ) : null}
             <button

@@ -54,6 +54,8 @@ services:
         value: "5"
       - key: ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT
         value: "10"
+      - key: ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED
+        value: "false"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKET_BUDGET_SECONDS
@@ -172,6 +174,8 @@ services:
       - key: NEXT_PUBLIC_OMNISEARCH_ENABLED
         value: "true"
       - key: NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
+        value: "false"
+      - key: NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED
         value: "false"
 
   # Destructive maintenance stays inside the boundary the service-role key

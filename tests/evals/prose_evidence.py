@@ -8,9 +8,19 @@ string handed to the judge.
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from typing import Any
+
+from argus.domain.credential_shapes import (
+    BEARER_PATTERN,
+    CREDENTIAL_KEY_PATTERN,
+    JWT_PATTERN,
+    PREFIXED_KEY_PATTERN,
+    PRIVATE_KEY_BANNER_PATTERN,
+    UPPERCASE_KEY_PATTERN,
+    URL_USERINFO_PATTERN,
+    environment_secret_values,
+)
 
 # The response-style contract asks for one or two short paragraphs, so this
 # budget keeps conforming prose whole and clips only degenerate output.
@@ -20,16 +30,7 @@ PROSE_TEXT_RETENTION_LIMIT = 4000
 PROSE_TEXT_RETENTION_TAIL = 1500
 PROSE_TEXT_ELISION_TEMPLATE = "\n[... {count} characters elided ...]\n"
 
-_MIN_ENVIRONMENT_SECRET_LENGTH = 12
-_SECRET_ENVIRONMENT_NAME = re.compile(
-    r"API_?KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|PRIVATE_KEY|SERVICE_ROLE"
-)
-_CREDENTIAL_KEY = (
-    r"(?:api[_-]?key|access[_-]?key|access[_-]?token|client[_-]?secret|secret"
-    r"|token|password|passwd|authorization|signature|session[_-]?id"
-    r"|session[_-]?token|csrf[_-]?token|xsrf[_-]?token|refresh[_-]?token"
-    r"|id[_-]?token|auth[_-]?token|private[_-]?key)"
-)
+_CREDENTIAL_KEY = CREDENTIAL_KEY_PATTERN
 _CREDENTIAL_ASSIGNMENT = rf"[\"']?{_CREDENTIAL_KEY}[\"']?\s*[:=]\s*"
 # An auth value is a scheme followed by its credentials, so the space after the
 # scheme name does not end the value.
@@ -57,30 +58,33 @@ _MARKER_PREFIX = "[redacted:"
 # quoted assignments run before unquoted ones.
 _REDACTION_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     (
-        # A JWS carries three segments and a JWE five, so consume every segment
-        # rather than a fixed three.
+        "private_key",
+        PRIVATE_KEY_BANNER_PATTERN,
+        "[redacted:private_key]",
+    ),
+    (
         "jwt",
-        re.compile(r"eyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+){2,}"),
+        JWT_PATTERN,
         "[redacted:jwt]",
     ),
     (
         "bearer_token",
-        re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{12,}"),
+        BEARER_PATTERN,
         r"\1 [redacted:bearer_token]",
     ),
     (
         "api_key",
-        re.compile(r"\b(?:sk|pk|rk|ak|xoxb|xoxp|ghp|ghs)[-_][A-Za-z0-9._-]{12,}"),
+        PREFIXED_KEY_PATTERN,
         "[redacted:api_key]",
     ),
     (
         "api_key",
-        re.compile(r"\b(?:PK|AK|CK)[A-Z0-9]{16,}\b"),
+        UPPERCASE_KEY_PATTERN,
         "[redacted:api_key]",
     ),
     (
         "url_userinfo",
-        re.compile(r"(?<=://)[^\s/:@]+:[^\s/@]+@"),
+        URL_USERINFO_PATTERN,
         "[redacted:url_userinfo]@",
     ),
     (
@@ -160,7 +164,7 @@ def redact_sensitive_text(text: str) -> tuple[str, list[dict[str, Any]]]:
     """Strip credential-shaped and user-identifying spans from committed text."""
     counts: dict[str, int] = {}
     redacted = text
-    for secret in _environment_secret_values():
+    for secret in environment_secret_values():
         occurrences = redacted.count(secret)
         if occurrences:
             redacted = redacted.replace(secret, "[redacted:environment_secret]")
@@ -207,12 +211,3 @@ def truncate_retained_text(text: str) -> tuple[str, int]:
     )
 
 
-def _environment_secret_values() -> list[str]:
-    values = {
-        value.strip()
-        for name, value in os.environ.items()
-        if _SECRET_ENVIRONMENT_NAME.search(name.upper())
-        and len(value.strip()) >= _MIN_ENVIRONMENT_SECRET_LENGTH
-    }
-    # Longest first, so a secret that contains a shorter one is replaced whole.
-    return sorted(values, key=len, reverse=True)

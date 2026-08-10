@@ -1,0 +1,186 @@
+import type {
+  PublicReceiptPayload,
+  PublicReceiptStrategyFactKey,
+} from "./public-receipt-contract";
+import { interpolate, type ReceiptCopy } from "./receipt-copy";
+
+/**
+ * Turns the frozen strategy facts into the rules a person can read.
+ *
+ * The facts stay frozen, closed and complete in the payload; this composes them at
+ * view time, in the viewer's language, the same way the field labels already do.
+ *
+ * One row per rule, and only the rules that exist. Two of the five executable
+ * strategies never sell (buy and hold and recurring buys both set every exit to
+ * false in the engine), so a fixed buy-against-sell layout would be built around
+ * the exception and leave the common case holding an empty half.
+ */
+export type ReceiptPlanRow = {
+  /** The rule in plain words. */
+  text: string;
+  /** The frozen parameters behind it, or null when the rule has none to show. */
+  exact: string | null;
+};
+
+export type ReceiptPlan = {
+  rows: ReceiptPlanRow[];
+  /** Every frozen fact, for the fine print, in payload order. */
+  settings: { key: PublicReceiptStrategyFactKey; value: string }[];
+};
+
+/** Indicator names are frozen lowercase; they are acronyms and read as such. */
+function indicatorName(value: string | undefined): string {
+  if (!value) return "";
+  return /^[a-z]{2,5}$/.test(value) ? value.toUpperCase() : value;
+}
+
+function joinExact(...parts: (string | undefined)[]): string | null {
+  const kept = parts.filter((part): part is string => Boolean(part && part.trim()));
+  return kept.length ? kept.join(" · ") : null;
+}
+
+export function receiptPlan(
+  payload: PublicReceiptPayload,
+  copy: ReceiptCopy,
+): ReceiptPlan {
+  const facts = new Map<string, string>(
+    payload.strategy_facts.map((fact) => [fact.key, fact.value]),
+  );
+  const read = (key: string) => facts.get(key);
+  const plan = copy.plan;
+  const rows: ReceiptPlanRow[] = [];
+  const shape = read("strategy_type") ?? "";
+
+  if (facts.has("fast_period") && facts.has("slow_period")) {
+    if (shape.includes("macd")) {
+      rows.push({
+        text: plan.macd_entry,
+        exact: joinExact(read("fast_period"), read("slow_period"), read("signal_period")),
+      });
+      rows.push({ text: plan.macd_exit, exact: null });
+    } else {
+      rows.push({
+        text: interpolate(plan.crossover_entry, {
+          fast_period: read("fast_period") ?? "",
+          slow_period: read("slow_period") ?? "",
+        }),
+        exact: joinExact(
+          [indicatorName(read("fast_indicator")), read("fast_period")]
+            .filter(Boolean)
+            .join(" "),
+          [indicatorName(read("slow_indicator")), read("slow_period")]
+            .filter(Boolean)
+            .join(" "),
+        ),
+      });
+      // The exit side only carries its own facts when it differs from the entry, so
+      // their absence is the statement that it mirrors the entry.
+      const ownExit = facts.has("exit_fast_period");
+      rows.push({
+        text: ownExit
+          ? interpolate(plan.crossover_exit_own, {
+              fast_period: read("exit_fast_period") ?? "",
+              slow_period: read("exit_slow_period") ?? "",
+            })
+          : plan.crossover_exit_mirrored,
+        exact: ownExit
+          ? joinExact(
+              [indicatorName(read("exit_fast_indicator")), read("exit_fast_period")]
+                .filter(Boolean)
+                .join(" "),
+              [indicatorName(read("exit_slow_indicator")), read("exit_slow_period")]
+                .filter(Boolean)
+                .join(" "),
+            )
+          : null,
+      });
+    }
+  } else if (facts.has("indicator") && facts.has("entry_threshold")) {
+    const indicator = indicatorName(read("indicator"));
+    rows.push({
+      text: interpolate(plan.indicator_entry, {
+        indicator,
+        entry: read("entry_threshold") ?? "",
+      }),
+      exact: joinExact([indicator, read("indicator_period")].filter(Boolean).join(" ")),
+    });
+    if (facts.has("exit_threshold")) {
+      rows.push({
+        text: interpolate(plan.indicator_exit, {
+          indicator,
+          exit: read("exit_threshold") ?? "",
+        }),
+        exact: null,
+      });
+    }
+  } else if (facts.has("cadence")) {
+    const cadence = read("cadence") ?? "";
+    const phrase =
+      (copy.cadence_values as Record<string, string>)[cadence] ?? cadence;
+    // The cadence is already the subject of the sentence, so repeating it as a
+    // parameter would say the same thing twice.
+    rows.push({ text: interpolate(plan.dca, { cadence: phrase }), exact: null });
+  } else if (shape.includes("dip")) {
+    // Its trigger is fixed in the engine, so there is nothing frozen to show.
+    rows.push({ text: plan.buy_the_dip, exact: null });
+  } else if (shape.includes("buy and hold")) {
+    rows.push({ text: plan.buy_and_hold, exact: null });
+  } else {
+    rows.push({
+      text: interpolate(plan.unnamed, { label: payload.strategy_label ?? shape }),
+      exact: null,
+    });
+  }
+
+  return {
+    rows,
+    settings: payload.strategy_facts
+      .filter((fact) => fact.key !== "strategy_type")
+      .map((fact) => ({ key: fact.key, value: fact.value })),
+  };
+}
+
+/**
+ * The one comparison the page exists to make, stated as a phrase.
+ *
+ * Both numbers are frozen display strings, so this parses them for the delta and
+ * says nothing rather than guessing when either will not parse.
+ */
+export function benchmarkVerdict(
+  payload: PublicReceiptPayload,
+  copy: ReceiptCopy,
+): string | null {
+  const symbol = payload.benchmark_symbol;
+  if (!symbol) return null;
+  const find = (...keys: string[]) =>
+    payload.metrics.find((metric) => keys.includes(metric.key))?.value ?? null;
+  const mine = find("total_return_pct", "total_return");
+  const theirs = find("benchmark_return_pct", "benchmark_return");
+  if (!theirs) return null;
+
+  const parse = (value: string) => {
+    const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+    return match ? Number.parseFloat(match[0]) : null;
+  };
+  const left = mine ? parse(mine) : null;
+  const right = parse(theirs);
+  if (left === null || right === null) {
+    return interpolate(copy.hero.vs, { symbol, value: theirs });
+  }
+  const delta = left - right;
+  const rounded = `${Math.abs(delta).toFixed(1)} pts`;
+  return interpolate(delta >= 0 ? copy.hero.ahead : copy.hero.behind, {
+    value: rounded,
+    symbol,
+  });
+}
+
+/** What the benchmark itself did, for the line beside the headline number. */
+export function benchmarkReturn(payload: PublicReceiptPayload): string | null {
+  if (!payload.benchmark_symbol) return null;
+  return (
+    payload.metrics.find((metric) =>
+      ["benchmark_return_pct", "benchmark_return"].includes(metric.key),
+    )?.value ?? null
+  );
+}

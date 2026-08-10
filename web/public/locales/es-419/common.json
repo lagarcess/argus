@@ -1019,6 +1019,7 @@
         "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
         "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
       },
+      "shared_links": "Enlaces compartidos",
       "close_archived": "Cerrar chats archivados",
       "close_deleted": "Cerrar borrados recientemente"
     },
@@ -1460,6 +1461,153 @@
       "confirmation": "Revisa los supuestos y luego ejecuta la prueba.",
       "result": "Cambia el rango del gráfico o haz una pregunta de seguimiento.",
       "dismiss": "Descartar sugerencia"
+    }
+  },
+  "receipt": {
+    "page_title": "Probado con Argus",
+    "eyebrow": "Compartido contigo",
+    "provenance": "Probado con Argus",
+    "wordmark": "ARGUS",
+    "framing": {
+      "headline": "Esto es un qué habría pasado, no un consejo.",
+      "detail": "Alguien tuvo curiosidad por saber cómo le habría ido a esta idea, así que Argus la revisó con lo que el mercado hizo de verdad en esas fechas. No se movió dinero real, nadie compró nada, y esto no dice nada sobre lo que va a pasar.",
+      "short": "Un qué habría pasado, con datos del mercado del pasado. No es un consejo."
+    },
+    "sections": {
+      "result": "Cómo le fue",
+      "what_was_tested": "Qué probaron",
+      "assumptions": "Qué supuso Argus",
+      "note": "Dejaron una nota",
+      "chart": "Cómo se movió el dinero de prueba"
+    },
+    "plan": {
+      "heading": "Qué se ejecutó",
+      "buy_and_hold": "Compró una vez al principio y mantuvo hasta el final. Nunca vendió.",
+      "dca": "Compró {{cadence}}, sin importar el precio de ese día. Nunca vendió.",
+      "buy_the_dip": "Compró después de cada caída fuerte y vendió una semana más tarde.",
+      "indicator_entry": "Compró cuando {{indicator}} bajó a {{entry}}.",
+      "indicator_exit": "Vendió cuando {{indicator}} volvió a {{exit}}.",
+      "crossover_entry": "Compró cuando el promedio de {{fast_period}} días subió por encima del de {{slow_period}} días.",
+      "crossover_exit_mirrored": "Vendió cuando volvió a cruzar por debajo.",
+      "crossover_exit_own": "Vendió cuando el promedio de {{fast_period}} días bajó por debajo del de {{slow_period}} días.",
+      "macd_entry": "Compró cuando el MACD cruzó por encima de su línea de señal.",
+      "macd_exit": "Vendió cuando el MACD cruzó por debajo de su línea de señal.",
+      "unnamed": "Se ejecutó como {{label}}.",
+      "long_only": "Estos números quedaron fijos y no van a cambiar."
+    },
+    "cadence_values": {
+      "daily": "cada día",
+      "weekly": "cada semana",
+      "biweekly": "cada dos semanas",
+      "monthly": "cada mes",
+      "quarterly": "cada trimestre"
+    },
+    "metric_labels": {
+      "total_return_pct": "Retorno total",
+      "total_return": "Retorno total",
+      "benchmark_return_pct": "Referencia",
+      "max_drawdown_pct": "Peor caída",
+      "max_drawdown": "Peor caída",
+      "win_rate_pct": "Aciertos"
+    },
+    "hero": {
+      "ahead": "{{value}} por encima de {{symbol}}",
+      "behind": "{{value}} por debajo de {{symbol}}",
+      "vs": "{{symbol}} hizo {{value}}",
+      "window": "{{range}}",
+      "drawdown": "Peor caída en el camino: {{value}}"
+    },
+    "fine_print": {
+      "heading": "La letra chica",
+      "settings": "Ajustes exactos",
+      "assumed": "Qué supuso Argus"
+    },
+    "fields": {
+      "asset": "Qué",
+      "asset_class": "Tipo",
+      "strategy": "El plan",
+      "dates": "Cuándo",
+      "benchmark": "Comparado con"
+    },
+    "asset_class_values": {
+      "equity": "Acciones",
+      "crypto": "Cripto",
+      "currency_pair": "Par de divisas"
+    },
+    "frozen_note": "Guardado el {{date}}. Estos números quedaron fijos, así que se verán igual cuando vuelvas.",
+    "frozen_note_undated": "Estos números quedaron fijos cuando se creó el enlace, así que se verán igual cuando vuelvas.",
+    "chart_unavailable": "No se guardó ningún gráfico con este.",
+    "cta": {
+      "headline": "¿Tienes una idea? Pruébala.",
+      "detail": "Cuéntale a Argus una idea con tus propias palabras y te mostrará cómo le habría ido. Gratis y sin cuenta.",
+      "action": "Prueba tu propia idea"
+    },
+    "tombstone": {
+      "title": "Este ya no está",
+      "detail": "La persona que lo compartió quitó el enlace, o borró el resultado que había detrás. No queda nada por mostrar.",
+      "cta_detail": "Aun así puedes probar Argus por tu cuenta."
+    },
+    "unavailable": {
+      "title": "No pudimos cargar este",
+      "detail": "Algo falló de nuestro lado, no del tuyo. El enlace probablemente sigue sirviendo, así que inténtalo de nuevo en un momento."
+    },
+    "owner": {
+      "share": "Compartir esto",
+      "share_hint": "Crea un enlace que cualquiera puede abrir. Muestra estos números, fijos tal como están ahora. Tu chat, tu nombre y todo lo que Argus recuerda se quedan fuera.",
+      "note_label": "Agrega una nota si quieres",
+      "note_placeholder": "¿Por qué vale la pena verlo?",
+      "note_public_warning": "Cualquiera con el enlace puede leer esto. No pongas nada privado.",
+      "note_counter": "{{count}} de {{max}} caracteres",
+      "create": "Crear el enlace",
+      "creating": "Creando el enlace...",
+      "cancel": "Mejor no",
+      "copy": "Copiar enlace",
+      "copied": "Copiado",
+      "copy_failed": "No se pudo copiar. Selecciona el enlace y cópialo.",
+      "created_note": "Tu nombre no aparece, los buscadores no lo encuentran, y puedes quitarlo cuando quieras desde Controles de datos.",
+      "errors": {
+        "create": "Argus no pudo crear ese enlace. Inténtalo de nuevo.",
+        "note_rejected": "Esa nota no puede ser pública. Quita cualquier clave o código largo.",
+        "rate_limited": "Has creado muchos enlaces hace poco. Inténtalo de nuevo en un rato."
+      }
+    },
+    "list": {
+      "menu": "Enlaces compartidos",
+      "title": "Enlaces compartidos",
+      "close": "Cerrar enlaces compartidos",
+      "intro": "Todo lo que has compartido. Cada enlace muestra números fijos y nada sobre ti.",
+      "loading": "Cargando tus enlaces...",
+      "load_error": "Tus enlaces compartidos no se cargaron.",
+      "load_more": "Ver enlaces más antiguos",
+      "retry": "Intentar de nuevo",
+      "empty": "Todavía no has compartido nada.",
+      "created_on": "Compartido el {{date}}",
+      "revoked_on": "Quitado el {{date}}",
+      "revoked_by_source": "Se quitó solo cuando borraste el chat que había detrás.",
+      "open": "Abrirlo",
+      "copy": "Copiar enlace",
+      "revoke": "Quitarlo",
+      "revoking": "Quitándolo...",
+      "confirm_revoke": "¿Seguro?",
+      "revoke_error": "Ese enlace no se quitó. Inténtalo de nuevo.",
+      "cache_note": "El enlace muere en Argus de inmediato. Las apps de chat a veces guardan una tarjeta de vista previa antigua en las conversaciones donde ya se pegó, y Argus no puede entrar ahí."
+    },
+    "strategy_facts": {
+      "strategy_type": "Estrategia",
+      "cadence": "Cada cuánto",
+      "indicator": "Indicador",
+      "indicator_period": "Periodo del indicador",
+      "fast_indicator": "Promedio rápido",
+      "fast_period": "Ventana rápida",
+      "slow_indicator": "Promedio lento",
+      "slow_period": "Ventana lenta",
+      "exit_fast_indicator": "Promedio rápido al salir",
+      "exit_fast_period": "Ventana rápida al salir",
+      "exit_slow_indicator": "Promedio lento al salir",
+      "exit_slow_period": "Ventana lenta al salir",
+      "signal_period": "Ventana de señal",
+      "entry_threshold": "Compra en",
+      "exit_threshold": "Vende en"
     }
   }
 }

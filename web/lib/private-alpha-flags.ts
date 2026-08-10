@@ -17,3 +17,8 @@ export function guestAccessEnabledFromEnv(value: string | undefined): boolean {
 export const guestAccessEnabled = guestAccessEnabledFromEnv(
   process.env.NEXT_PUBLIC_GUEST_ACCESS_ENABLED,
 );
+
+// Default off, and it stays off when this lane lands. Turning sharing on is a
+// separate founder decision from merging it.
+export const evidenceReceiptSharingEnabled =
+  process.env.NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED === "true";
