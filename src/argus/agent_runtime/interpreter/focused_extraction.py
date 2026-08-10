@@ -4,6 +4,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
@@ -14,14 +15,30 @@ from langchain_core.messages import (
     SystemMessage,
 )
 
+from argus.agent_runtime.interpreter import simplification_options as _options
+from argus.agent_runtime.interpreter.dca_audits import (
+    _capability_required_missing_fields_for_canonical_strategy,
+)
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
 from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
     LLMInterpretationResponse,
+    LLMStrategyDraft,
+    LLMUnsupportedConstraint,
+)
+from argus.agent_runtime.rule_specs import (
+    moving_average_crossover_text,
+    opposite_moving_average_crossover_rule,
 )
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
-from argus.agent_runtime.strategy_contract import canonical_strategy_type
+from argus.agent_runtime.strategy_contract import (
+    canonical_strategy_type,
+    executable_strategy_type_from_extracted_fields,
+)
+from argus.nlp.natural_time import resolve_date_range_intent
+
+ResolveAssetCandidate = Callable[..., Any]
 
 
 def _focused_strategy_extraction_messages(
@@ -300,6 +317,196 @@ def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str
             "task-specific instructions above as the contract for canonical values."
         )
     return wire_messages
+
+
+def canonical_asset_universe_from_llm_extraction(
+    values: list[str],
+    *,
+    resolve_asset_candidate: ResolveAssetCandidate,
+) -> tuple[list[str], str | None]:
+    symbols: list[str] = []
+    seen: set[str] = set()
+    asset_classes: set[str] = set()
+    for index, value in enumerate(values):
+        raw_text = str(value or "").strip()
+        if not raw_text:
+            continue
+        symbol = ""
+        try:
+            resolution = resolve_asset_candidate(
+                raw_text,
+                field=f"asset_universe[{index}]",
+                source="llm_extraction",
+            )
+        except Exception:
+            resolution = None
+        if (
+            resolution is not None
+            and resolution.status == "resolved"
+            and resolution.asset is not None
+        ):
+            symbol = str(resolution.asset.canonical_symbol or "").upper()
+            asset_class = str(resolution.asset.asset_class or "").strip()
+            if asset_class:
+                asset_classes.add(asset_class)
+        if not symbol:
+            symbol = raw_text.upper()
+        if symbol and symbol not in seen:
+            seen.add(symbol)
+            symbols.append(symbol)
+    resolved_asset_class = next(iter(asset_classes)) if len(asset_classes) == 1 else None
+    return symbols, resolved_asset_class
+
+
+def response_from_focused_strategy_extraction(
+    *,
+    extraction: FocusedStrategyExtraction,
+    request: InterpretationRequest,
+    base_response: LLMInterpretationResponse | None = None,
+    resolve_asset_candidate: ResolveAssetCandidate,
+) -> LLMInterpretationResponse:
+    strategy_type = executable_strategy_type_from_extracted_fields(
+        extraction.model_dump(mode="python")
+    )
+    entry_logic = extraction.entry_logic or moving_average_crossover_text(
+        extraction.entry_rule
+    )
+    exit_logic = (
+        extraction.exit_logic
+        or moving_average_crossover_text(extraction.exit_rule)
+        or moving_average_crossover_text(
+            opposite_moving_average_crossover_rule(extraction.entry_rule)
+        )
+    )
+    asset_universe, resolved_asset_class = canonical_asset_universe_from_llm_extraction(
+        extraction.asset_universe,
+        resolve_asset_candidate=resolve_asset_candidate,
+    )
+    extraction_date_range = extraction.date_range
+    if _llm_value_is_empty(extraction_date_range):
+        resolved_date_intent = resolve_date_range_intent(extraction.date_range_intent)
+        if resolved_date_intent is not None:
+            extraction_date_range = resolved_date_intent.payload
+    if strategy_type is None:
+        return LLMInterpretationResponse(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary=extraction.user_goal_summary,
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=request.current_user_message,
+                language=extraction.language,
+                strategy_thesis=extraction.strategy_thesis
+                or extraction.user_goal_summary,
+                asset_universe=asset_universe,
+                asset_class=extraction.asset_class or resolved_asset_class,
+                timeframe=extraction.timeframe,
+                date_range=extraction_date_range,
+                date_range_raw_text=extraction.date_range_raw_text,
+                date_range_intent=extraction.date_range_intent,
+                comparison_baseline=extraction.comparison_baseline,
+                capital_amount=extraction.capital_amount,
+                recurring_contribution=extraction.recurring_contribution,
+                cadence=extraction.cadence,
+                entry_logic=entry_logic,
+                exit_logic=exit_logic,
+                indicator=extraction.indicator,
+                indicator_period=extraction.indicator_period,
+                entry_threshold=extraction.entry_threshold,
+                exit_threshold=extraction.exit_threshold,
+                evidence_spans=dict(extraction.evidence_spans or {}),
+                field_provenance=_focused_extraction_field_provenance(
+                    extraction=extraction,
+                    current_message=request.current_user_message,
+                ),
+                extra_parameters={
+                    "raw_strategy_type": extraction.strategy_type,
+                }
+                if extraction.strategy_type
+                else {},
+            ),
+            unsupported_constraints=[
+                LLMUnsupportedConstraint(
+                    category="unsupported_strategy_logic",
+                    raw_value=(
+                        extraction.entry_logic
+                        or extraction.strategy_thesis
+                        or extraction.strategy_type
+                        or extraction.user_goal_summary
+                    ),
+                    explanation=(
+                        extraction.assistant_response
+                        or "This idea depends on strategy logic that is not executable yet."
+                    ),
+                    simplification_options=(
+                        _options.unsupported_strategy_logic_simplification_options()
+                    ),
+                )
+            ],
+            confidence=extraction.confidence,
+            reason_codes=["focused_strategy_extraction_unrecognized_contract"],
+            semantic_turn_act="unsupported_request",
+        )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting"
+        if extraction.requires_clarification
+        else "backtest_execution",
+        task_relation="new_task",
+        requires_clarification=extraction.requires_clarification,
+        user_goal_summary=extraction.user_goal_summary,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=request.current_user_message,
+            language=extraction.language,
+            strategy_type=strategy_type,
+            strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
+            asset_universe=asset_universe,
+            asset_class=extraction.asset_class or resolved_asset_class,
+            timeframe=extraction.timeframe,
+            date_range=extraction_date_range,
+            date_range_raw_text=extraction.date_range_raw_text,
+            date_range_intent=extraction.date_range_intent,
+            comparison_baseline=extraction.comparison_baseline,
+            capital_amount=extraction.capital_amount,
+            recurring_contribution=extraction.recurring_contribution,
+            cadence=extraction.cadence,
+            entry_logic=entry_logic,
+            exit_logic=exit_logic,
+            entry_rule=extraction.entry_rule,
+            exit_rule=extraction.exit_rule,
+            rule_spec=extraction.rule_spec,
+            indicator=extraction.indicator,
+            indicator_period=extraction.indicator_period,
+            entry_threshold=extraction.entry_threshold,
+            exit_threshold=extraction.exit_threshold,
+            evidence_spans=dict(extraction.evidence_spans or {}),
+            field_provenance=_focused_extraction_field_provenance(
+                extraction=extraction,
+                current_message=request.current_user_message,
+            ),
+        ),
+        missing_required_fields=list(extraction.missing_required_fields),
+        assistant_response=extraction.assistant_response,
+        confidence=extraction.confidence,
+        reason_codes=["focused_strategy_extraction_repair"],
+        semantic_turn_act="new_idea",
+    )
+    response = _merge_focused_repair_with_base(
+        response=response,
+        base_response=base_response,
+    )
+    # Missing fields derive from the merged draft so already-grounded context is
+    # not re-asked.
+    response.missing_required_fields = (
+        _capability_required_missing_fields_for_canonical_strategy(
+            response.missing_required_fields,
+            draft=response.candidate_strategy_draft,
+        )
+    )
+    if response.missing_required_fields or response.ambiguous_fields:
+        response.intent = "strategy_drafting"
+        response.requires_clarification = True
+        response.assistant_response = None
+    return response
 
 
 def strategy_extraction_repair_is_allowed(
