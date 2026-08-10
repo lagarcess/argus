@@ -70,6 +70,13 @@ beforeAll(async () => {
       get href() {
         return currentHref();
       },
+      assign(value: string) {
+        stack = [
+          ...stack.slice(0, cursor + 1),
+          new URL(value, currentHref()).href,
+        ];
+        cursor = stack.length - 1;
+      },
       replace(value: string) {
         stack[cursor] = new URL(value, currentHref()).href;
       },
@@ -122,6 +129,21 @@ function navigateTo(href: string): void {
 }
 
 describe("back after navigating out of nested overlays", () => {
+  test("navigation from a history-less popover preserves the source page", () => {
+    let closed = false;
+
+    subject.navigateFromOverlay(DEST, () => {
+      closed = true;
+    });
+
+    expect(closed).toBe(true);
+    expect(currentHref()).toBe(DEST);
+    expect(stack).toEqual([SOURCE, DEST]);
+
+    userBack();
+    expect(currentHref()).toBe(SOURCE);
+  });
+
   test("route navigation spends the overlay before its close callback", () => {
     openOverlay("settings");
     let closed = false;

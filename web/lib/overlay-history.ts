@@ -193,11 +193,17 @@ export function openOverlayEntries(): readonly string[] {
  * traversal, and a traversal cannot be awaited without leaving the destination
  * URL unwritten in the meantime, which is the failure this whole function
  * exists to prevent.
+ *
+ * Returns whether the current entry belonged to an overlay and is therefore
+ * safe for a destination to replace.
  */
-export function consumeOverlayEntriesForNavigation(): void {
+export function consumeOverlayEntriesForNavigation(): boolean {
+  const consumedOverlayEntry = unconsumedOverlays.length > 0;
   const duplicates = Math.max(0, unconsumedOverlays.length - 1);
   unconsumedOverlays = [];
-  if (duplicates === 0 || typeof window === "undefined") return;
+  if (duplicates === 0 || typeof window === "undefined") {
+    return consumedOverlayEntry;
+  }
   // Called before the destination is written, so this is still the URL the
   // overlays opened over, which is what those entries hold.
   const href = window.location.href;
@@ -205,6 +211,7 @@ export function consumeOverlayEntriesForNavigation(): void {
   for (let index = 0; index < duplicates; index += 1) {
     overlayDuplicateHrefs.push(href);
   }
+  return consumedOverlayEntry;
 }
 
 /**
@@ -214,15 +221,21 @@ export function consumeOverlayEntriesForNavigation(): void {
  * route change has to claim that entry first, then close the sheet, so the
  * deferred cleanup cannot send the user back to the page they just left.
  * Replacing that temporary entry also keeps the original page one Back away.
+ * A desktop popover has no temporary entry, so it must push the destination;
+ * replacing there would erase the conversation the user came from.
  */
 export function navigateFromOverlay(
   href: string,
   beforeNavigate?: () => void,
 ): void {
   if (typeof window === "undefined") return;
-  consumeOverlayEntriesForNavigation();
+  const consumedOverlayEntry = consumeOverlayEntriesForNavigation();
   beforeNavigate?.();
-  window.location.replace(href);
+  if (consumedOverlayEntry) {
+    window.location.replace(href);
+    return;
+  }
+  window.location.assign(href);
 }
 
 export function overlayHistoryState(

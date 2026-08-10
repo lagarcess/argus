@@ -506,7 +506,7 @@ test.describe("signed-in surfaces", () => {
 
     /* The visible Security row reaches the same account surface at every band. */
     test(`account security navigation at ${band}`, async ({ page }) => {
-      await open(page, band, "/chat", { emptyChat: true });
+      await open(page, band, "/chat?conversation=conversation-alpha", {});
       await openSettings(page, band);
       if (!(await clickByName(page, /^(data controls|controles de datos)$/i)))
         return;
@@ -528,6 +528,13 @@ test.describe("signed-in surfaces", () => {
         join(OUT_DIR, `findings/security-${band}-url.txt`),
         `${new URL(page.url()).pathname}\n`,
         "utf8",
+      );
+
+      // The sheet contributes a temporary entry below 1024; the rail popover
+      // does not. Either way, one Back must restore the exact conversation.
+      await page.goBack();
+      await expect(page).toHaveURL(
+        /\/chat\?conversation=conversation-alpha$/,
       );
     });
 
