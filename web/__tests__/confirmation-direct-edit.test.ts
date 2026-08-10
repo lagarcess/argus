@@ -25,9 +25,11 @@ describe("confirmation direct edit surface", () => {
     expect(editor).toContain("onDirectEdit(edit)");
     expect(editor).toContain("date_window");
 
+    const handlers = source("components/chat/confirmation-superseding.ts");
+    expect(handlers).toContain("directEditConfirmation(");
+    expect(handlers).toContain("appendSupersedingConfirmation(created)");
     const chat = source("components/chat/ChatInterface.tsx");
-    expect(chat).toContain("directEditConfirmation(");
-    expect(chat).toContain("appendSupersedingConfirmation(created)");
+    expect(chat).toContain("confirmationSupersedingHandlers(");
 
     const api = source("lib/argus-api.ts");
     expect(api).toContain("/direct-edit");
