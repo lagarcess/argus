@@ -833,6 +833,9 @@ def _merge_contextual_extra_parameters(
     incoming: dict[str, Any],
 ) -> dict[str, Any]:
     merged = dict(base or {})
+    # An edit disclosure describes one transition only; only the incoming
+    # turn's own record may ride into the merged strategy.
+    merged.pop("edit_disclosure", None)
     for key, value in incoming.items():
         if key == "asset_universe_operation":
             continue

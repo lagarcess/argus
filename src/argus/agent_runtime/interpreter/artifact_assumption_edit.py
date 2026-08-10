@@ -9,6 +9,7 @@ from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
+    EditOperation,
     ResolvedArtifactEdit,
     apply_edit_operations,
     resolved_asset_operation_symbols,
@@ -23,6 +24,7 @@ from argus.agent_runtime.asset_text_grounding import (
 )
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     ground_planned_execution_costs,
+    numeric_cost_anchor_in_message,
     supported_cost_rate_value,
 )
 from argus.agent_runtime.interpreter.shared import (
@@ -553,18 +555,71 @@ def _required_edit_targets_from_primary_draft(
             and provenance.get(field_name) == "explicit_user"
         ):
             targets.add(target)
-    for field_name, target in (("fee_rate", "fees"), ("slippage", "slippage")):
-        if (
-            field_name in draft.extra_parameters
-            and provenance.get(field_name) == "explicit_user"
-            and (
-                current_strategy is None
-                or draft.extra_parameters[field_name]
-                != current_strategy.extra_parameters.get(field_name)
-            )
-        ):
-            targets.add(target)
+    targets.update(
+        _STATED_COST_TARGETS[field_name]
+        for field_name in _stated_cost_changes(
+            draft, current_strategy=current_strategy, request=request
+        )
+    )
     return targets
+
+
+_STATED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def _stated_cost_changes(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest | None,
+) -> dict[str, float]:
+    """Current-turn cost values the user actually stated, keyed by draft field.
+
+    Explicit-user provenance is stamped by the cost-fidelity audit, which runs
+    after planner routing; at planner time the message's own numeric anchor is
+    the available grounding. Without it, a stated cost the plan omits passes
+    coverage and drops silently (§3.2).
+    """
+
+    provenance = draft.field_provenance or {}
+    current_message = request.current_user_message if request is not None else ""
+    changes: dict[str, float] = {}
+    for field_name in _STATED_COST_TARGETS:
+        value = draft.extra_parameters.get(field_name)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            continue
+        stated = provenance.get(field_name) == "explicit_user" or (
+            numeric_cost_anchor_in_message(value, current_message)
+        )
+        if stated and (
+            current_strategy is None
+            or value != current_strategy.extra_parameters.get(field_name)
+        ):
+            changes[field_name] = float(value)
+    return changes
+
+
+def stated_cost_edit_operations(
+    draft: LLMStrategyDraft | None,
+    *,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest | None,
+) -> list[EditOperation]:
+    """Typed cost operations for the planner to fall back on (§3.2).
+
+    Values come from the primary interpretation's typed extraction, so the
+    plan completion stays deterministic; the applier still validates each
+    value and the card discloses anything it refuses.
+    """
+
+    if draft is None:
+        return []
+    return [
+        EditOperation(op="set", target=_STATED_COST_TARGETS[field_name], number=value)
+        for field_name, value in _stated_cost_changes(
+            draft, current_strategy=current_strategy, request=request
+        ).items()
+    ]
 
 
 def asset_edit_symbol_resolver(
@@ -1018,6 +1073,14 @@ def materialized_artifact_edit_targets(
         for target in materialized_targets
     ):
         return None
+    # Coverage guards against silent drops, not against refusals: a target the
+    # materializer refused and recorded for card disclosure is covered (§3.2).
+    disclosure = draft.extra_parameters.get("edit_disclosure")
+    if isinstance(disclosure, dict):
+        for entry in disclosure.get("unapplied") or []:
+            unapplied_target = entry.get("target") if isinstance(entry, dict) else None
+            if isinstance(unapplied_target, str):
+                matching_targets.add(unapplied_target)
     return matching_targets
 
 

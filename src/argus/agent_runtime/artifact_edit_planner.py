@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, Literal, get_args
 
@@ -86,6 +86,7 @@ async def plan_artifact_assumption_edit(
     required_targets: set[str] | None = None,
     materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
     | None = None,
+    stated_cost_operations: Sequence[EditOperation] | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
@@ -116,6 +117,7 @@ async def plan_artifact_assumption_edit(
             continue
         if not isinstance(plan, ArtifactAssumptionEditPlan):
             continue
+        plan = _completed_with_stated_cost_operations(plan, stated_cost_operations or ())
         if plan.outcome == "ready_to_confirm" and not _has_supported_edit(
             plan,
             prior_strategy=prior_strategy,
@@ -196,7 +198,10 @@ def _artifact_assumption_edit_messages(
                 "- timeframe (use value, compact such as 1D or 1h): set the bar "
                 "size.\n"
                 "- fees (use number) and slippage (use number): set as decimal "
-                "fractions when explicitly supplied.\n"
+                "fractions when explicitly supplied. Always express a stated fee "
+                "or slippage change as its operation whatever the value; the "
+                "system validates it and discloses anything it cannot apply. "
+                "Never silently omit a requested cost change.\n"
                 "- indicator_entry_threshold and indicator_exit_threshold (use "
                 "number): set tunable RSI buy/entry and sell/exit thresholds on "
                 "an existing RSI confirmation. Use indicator_period for a tunable "
@@ -249,6 +254,40 @@ def _artifact_assumption_edit_messages(
         },
         {"role": "user", "content": current_user_message},
     ]
+
+
+_FLAT_PLAN_COST_FIELDS = {"fees": "fee_rate", "slippage": "slippage"}
+
+
+def _completed_with_stated_cost_operations(
+    plan: ArtifactAssumptionEditPlan,
+    stated_cost_operations: Sequence[EditOperation],
+) -> ArtifactAssumptionEditPlan:
+    """Carry a stated cost the plan left out into the operation list (§3.2).
+
+    The applier validates every value and the card discloses anything it
+    refuses, so completion decides only whether the request enters the
+    pipeline, never how it lands. Flat-only plans stay untouched because the
+    legacy application path would ignore their non-cost flat fields once an
+    operation list exists.
+    """
+
+    if plan.outcome != "ready_to_confirm" or not plan.operations:
+        return plan
+    present_targets = {operation.target for operation in plan.operations}
+    additions: list[EditOperation] = []
+    for stated in stated_cost_operations:
+        if stated.target in present_targets:
+            continue
+        flat_value = getattr(plan, _FLAT_PLAN_COST_FIELDS.get(stated.target, ""), None)
+        additions.append(
+            stated
+            if flat_value is None
+            else stated.model_copy(update={"number": float(flat_value)})
+        )
+    if not additions:
+        return plan
+    return plan.model_copy(update={"operations": [*plan.operations, *additions]})
 
 
 def _covers_required_targets(
@@ -440,9 +479,7 @@ def typed_unapplied_operations(
         op, _, target = str(entry).partition(".")
         if not target:
             op, target = "set", op
-        unapplied.append(
-            {"op": op, "target": target, "reason": "unsupported_operation"}
-        )
+        unapplied.append({"op": op, "target": target, "reason": "unsupported_operation"})
     for field_name in dropped_cost_fields:
         unapplied.append(
             {

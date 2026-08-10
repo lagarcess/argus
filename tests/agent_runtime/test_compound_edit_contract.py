@@ -8,9 +8,13 @@ narrow entry point and asked for more gets the whole request served.
 
 from __future__ import annotations
 
+import asyncio
+
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     EditOperation,
+    _completed_with_stated_cost_operations,
+    plan_artifact_assumption_edit,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (
@@ -127,9 +131,9 @@ class TestScopedEntryPointsWiden:
         # The planner layer carries capital as initial_capital; the turn-level
         # merge maps it onto the pending strategy's capital_amount.
         assert draft.initial_capital == 5000
-        assert "edit_disclosure" not in draft.extra_parameters, (
-            "a fully applied compound edit needs no disclosure"
-        )
+        assert (
+            "edit_disclosure" not in draft.extra_parameters
+        ), "a fully applied compound edit needs no disclosure"
 
 
 class TestUnappliedChangesAreDisclosed:
@@ -168,9 +172,7 @@ class TestUnappliedChangesAreDisclosed:
             plan=plan,
             request=_request("make it $5,000 and short it on the way down"),
         )
-        disclosure = response.candidate_strategy_draft.extra_parameters[
-            "edit_disclosure"
-        ]
+        disclosure = response.candidate_strategy_draft.extra_parameters["edit_disclosure"]
         assert disclosure["unapplied"] == []
         assert "short selling" in disclosure["note"]
 
@@ -202,8 +204,21 @@ class TestUnappliedChangesAreDisclosed:
             payload["strategy"].get("extra_parameters") or {}
         ), "the disclosure describes this transition only and must not persist"
 
+        # The runtime state channel validates the payload into a typed model;
+        # a field the model does not declare dies here, invisibly to tests
+        # that read the raw stage patch. Round-trip it like the server does.
+        from argus.agent_runtime.state.models import ConfirmationPayload
+
+        channel_payload = {
+            **payload,
+            **ConfirmationPayload.model_validate(payload).model_dump(mode="python"),
+        }
+        assert (
+            channel_payload["edit_disclosure"] == payload["edit_disclosure"]
+        ), "the state channel must carry the disclosure, not strip it"
+
         card = runtime_confirmation_card(
-            {"stage_outcome": "await_approval", "confirmation_payload": payload},
+            {"stage_outcome": "await_approval", "confirmation_payload": channel_payload},
             confirmation_id=str(payload.get("confirmation_id")),
             conversation_id="c1",
             language="en",
@@ -211,3 +226,244 @@ class TestUnappliedChangesAreDisclosed:
         assert card is not None
         assert card["edit_disclosure"]["unapplied"][0]["target"] == "asset"
         assert "nothing to remove" in card["edit_disclosure"]["note"]
+
+
+class TestStatedCostsCannotDropSilently:
+    """A stated cost the planner leaves out of its operation list must still
+    enter the pipeline: it becomes a required coverage target from the
+    message's own numeric anchor, the plan is completed from the primary
+    interpretation's typed value, and a refused value is disclosed rather
+    than silently missing (the live $9,000 + 90% slippage leak)."""
+
+    MESSAGE = "Make it $9,000 and set slippage to 90%"
+
+    def _primary(self):
+        from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+        return LLMStrategyDraft(
+            capital_amount=9000,
+            extra_parameters={"slippage": 0.9},
+            field_provenance={"capital_amount": "starting_capital"},
+        )
+
+    def test_message_anchored_cost_is_a_required_target(self) -> None:
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            _current_artifact_strategy,
+            _required_edit_targets_from_primary_draft,
+        )
+
+        request = _request(self.MESSAGE)
+        targets = _required_edit_targets_from_primary_draft(
+            self._primary(),
+            current_strategy=_current_artifact_strategy(request),
+            request=request,
+        )
+        assert "slippage" in targets, (
+            "audit-time provenance does not exist at planner time; the "
+            "message anchor must be enough"
+        )
+        assert "capital" in targets
+
+    def test_capital_only_plan_is_completed_and_discloses_the_refusal(self) -> None:
+        import argus.agent_runtime.artifact_edit_planner as planner_module
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            _current_artifact_strategy,
+            _required_edit_targets_from_primary_draft,
+            materialized_artifact_edit_targets,
+            stated_cost_edit_operations,
+        )
+
+        request = _request(self.MESSAGE)
+        primary = self._primary()
+        current = _current_artifact_strategy(request)
+        capital_only = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[EditOperation(op="set", target="capital", number=9000)],
+        )
+
+        async def fake_invoke(**kwargs):
+            return capital_only
+
+        original = planner_module.invoke_openrouter_json_schema
+        planner_module.invoke_openrouter_json_schema = fake_invoke
+        try:
+            plan = asyncio.run(
+                plan_artifact_assumption_edit(
+                    current_user_message=self.MESSAGE,
+                    prior_strategy=current.model_dump(mode="json"),
+                    active_confirmation=None,
+                    preferred_model="test-model",
+                    required_targets=_required_edit_targets_from_primary_draft(
+                        primary, current_strategy=current, request=request
+                    ),
+                    materialized_targets_for_plan=(
+                        lambda candidate: materialized_artifact_edit_targets(
+                            candidate, request=request, primary_draft=primary
+                        )
+                    ),
+                    stated_cost_operations=stated_cost_edit_operations(
+                        primary, current_strategy=current, request=request
+                    ),
+                )
+            )
+        finally:
+            planner_module.invoke_openrouter_json_schema = original
+
+        assert plan is not None, (
+            "a plan omitting a stated cost must be completed, not rejected "
+            "into a silent fallback"
+        )
+        assert {operation.target for operation in plan.operations} == {
+            "capital",
+            "slippage",
+        }
+        response = _response_from_artifact_assumption_edit_plan(
+            plan=plan, request=request, primary_draft=primary
+        )
+        draft = response.candidate_strategy_draft
+        assert draft.initial_capital == 9000
+        disclosure = draft.extra_parameters["edit_disclosure"]
+        assert [entry["target"] for entry in disclosure["unapplied"]] == ["slippage"]
+        assert "slippage" not in draft.extra_parameters
+
+    def test_completion_leaves_clarification_and_flat_plans_alone(self) -> None:
+        stated = [EditOperation(op="set", target="slippage", number=0.9)]
+        clarification = ArtifactAssumptionEditPlan(
+            outcome="needs_clarification",
+            operations=[EditOperation(op="set", target="capital", number=9000)],
+            assistant_response="Which slippage did you mean?",
+        )
+        assert _completed_with_stated_cost_operations(clarification, stated) is (
+            clarification
+        )
+        flat_only = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm", initial_capital=9000
+        )
+        assert _completed_with_stated_cost_operations(flat_only, stated) is flat_only
+
+    def test_over_cap_stated_cost_is_disclosed_not_stalled(self) -> None:
+        """The free-form route's cost audit refuses an unmodelable stated
+        value the same way the planner route does: disclose on the card and
+        let the rest of the edit land, instead of stalling the whole turn
+        behind a clarification the stage then swallows."""
+        from argus.agent_runtime.interpreter.audits import (
+            StatedRunFieldFidelityAudit,
+        )
+        from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+            apply_cost_fidelity,
+        )
+        from argus.agent_runtime.llm_interpreter_types import (
+            LLMInterpretationResponse,
+            LLMStrategyDraft,
+        )
+
+        response = LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="edit capital and slippage",
+            semantic_turn_act="refine_current_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=self.MESSAGE,
+                strategy_type="buy_and_hold",
+                asset_universe=["NFLX"],
+                capital_amount=9000,
+                extra_parameters={"slippage": 0.9},
+            ),
+        )
+        audit = StatedRunFieldFidelityAudit.model_validate(
+            {"slippage": {"rate": 0.9, "evidence_span": "set slippage to 90%"}}
+        )
+        changed = apply_cost_fidelity(response, audit, self.MESSAGE, None)
+        assert changed is True
+        assert response.requires_clarification is False, (
+            "a disclosed refusal owns the outcome; the stage would swallow a "
+            "clarification about a non-contract field anyway"
+        )
+        draft = response.candidate_strategy_draft
+        assert "slippage" not in draft.extra_parameters
+        disclosure = draft.extra_parameters["edit_disclosure"]
+        assert disclosure["unapplied"] == [
+            {"op": "set", "target": "slippage", "reason": "unsupported_value"}
+        ]
+        assert "execution_cost_refusal_disclosed" in response.reason_codes
+
+    def test_value_disagreement_still_asks_instead_of_refusing(self) -> None:
+        """A modelable value the draft transcribed differently is an
+        ambiguity, not a refusal: asking is honest, disclosing 'cannot' is
+        not."""
+        from argus.agent_runtime.interpreter.audits import (
+            StatedRunFieldFidelityAudit,
+        )
+        from argus.agent_runtime.interpreter.execution_cost_fidelity import (
+            apply_cost_fidelity,
+        )
+        from argus.agent_runtime.llm_interpreter_types import (
+            LLMInterpretationResponse,
+            LLMStrategyDraft,
+        )
+
+        message = "Use a 0.2% fee"
+        response = LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="edit fees",
+            semantic_turn_act="refine_current_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=message,
+                strategy_type="buy_and_hold",
+                asset_universe=["NFLX"],
+                extra_parameters={"fee_rate": 0.2},
+            ),
+        )
+        audit = StatedRunFieldFidelityAudit.model_validate(
+            {"fee": {"rate": 0.002, "evidence_span": "0.2% fee"}}
+        )
+        apply_cost_fidelity(response, audit, message, None)
+        assert response.requires_clarification is True
+        assert "edit_disclosure" not in (
+            response.candidate_strategy_draft.extra_parameters
+        )
+
+    def test_disclosure_describes_one_transition_only(self) -> None:
+        from argus.agent_runtime.stages.interpret_internal.contextual_merge import (
+            _merge_contextual_extra_parameters,
+        )
+
+        stale = {"unapplied": [{"op": "set", "target": "slippage"}]}
+        merged = _merge_contextual_extra_parameters(
+            base={"edit_disclosure": stale, "fee_rate": 0.001},
+            incoming={},
+        )
+        assert "edit_disclosure" not in merged
+        assert merged["fee_rate"] == 0.001
+
+        fresh = {"unapplied": [{"op": "set", "target": "fees"}]}
+        merged = _merge_contextual_extra_parameters(
+            base={"edit_disclosure": stale},
+            incoming={"edit_disclosure": fresh},
+        )
+        assert merged["edit_disclosure"] == fresh
+
+    def test_refused_cost_op_counts_as_covered(self) -> None:
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            materialized_artifact_edit_targets,
+        )
+
+        request = _request(self.MESSAGE)
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="set", target="capital", number=9000),
+                EditOperation(op="set", target="slippage", number=0.9),
+            ],
+        )
+        covered = materialized_artifact_edit_targets(
+            plan, request=request, primary_draft=self._primary()
+        )
+        assert covered is not None
+        assert "slippage" in covered, (
+            "coverage guards against silence; a refusal recorded for card "
+            "disclosure is not silence"
+        )

@@ -309,6 +309,9 @@ class ConfirmationPayload(BaseModel):
     optional_parameters: dict[str, Any] = Field(default_factory=dict)
     launch_payload: dict[str, Any] | None = None
     validation: dict[str, Any] = Field(default_factory=dict)
+    # §3.2: requested-but-unapplied changes for this transition. Without the
+    # field the state channel's validation silently drops the record.
+    edit_disclosure: dict[str, Any] | None = None
 
 
 class ToolCallRecord(BaseModel):

@@ -43,6 +43,7 @@ def apply_cost_fidelity(
     changed = False
     validated_fields: set[str] = set()
     grounded_conflicts: set[str] = set()
+    refused_fields: set[str] = set()
     for audit_field, draft_field in (
         ("fee", "fee_rate"),
         ("slippage", "slippage"),
@@ -52,7 +53,14 @@ def apply_cost_fidelity(
         if evidence_span is None:
             continue
         rate = _supported_cost_rate(cost, field_name=draft_field)
-        if rate is None or not _candidate_agrees_with_cost(
+        if rate is None:
+            # The user stated the value and it anchors in the message; the
+            # value itself cannot be modeled. That is a refusal, not an
+            # ambiguity.
+            refused_fields.add(draft_field)
+            grounded_conflicts.add(draft_field)
+            continue
+        if not _candidate_agrees_with_cost(
             draft.extra_parameters.get(draft_field),
             rate,
         ):
@@ -104,6 +112,24 @@ def apply_cost_fidelity(
 
     if not unresolved_fields:
         return changed
+    for field_name in unresolved_fields:
+        if field_name in refused_fields:
+            _record_cost_refusal_disclosure(draft, field_name=field_name)
+            changed = True
+    if all(field_name in refused_fields for field_name in unresolved_fields):
+        # Every unresolved cost is a disclosed refusal: the card names it with
+        # a reason, exactly as the planner route would, so the turn proceeds
+        # instead of stalling the rest of the user's edit (§3.2).
+        response.reason_codes = list(
+            dict.fromkeys(
+                [
+                    *response.reason_codes,
+                    "stated_run_field_fidelity_audit",
+                    "execution_cost_refusal_disclosed",
+                ]
+            )
+        )
+        return True
     response.requires_clarification = True
     response.assistant_response = None
     response.missing_required_fields = list(
@@ -119,6 +145,27 @@ def apply_cost_fidelity(
         )
     )
     return True
+
+
+_COST_FIELD_DISCLOSURE_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def _record_cost_refusal_disclosure(draft: LLMStrategyDraft, *, field_name: str) -> None:
+    """Card turns drop assistant prose, so a refused stated cost rides the
+    draft as a typed disclosure record instead of vanishing (§3.2)."""
+
+    target = _COST_FIELD_DISCLOSURE_TARGETS.get(field_name, field_name)
+    disclosure = draft.extra_parameters.get("edit_disclosure")
+    if not isinstance(disclosure, dict):
+        disclosure = {}
+    unapplied = [
+        entry for entry in (disclosure.get("unapplied") or []) if isinstance(entry, dict)
+    ]
+    if any(entry.get("target") == target for entry in unapplied):
+        return
+    unapplied.append({"op": "set", "target": target, "reason": "unsupported_value"})
+    disclosure["unapplied"] = unapplied
+    draft.extra_parameters["edit_disclosure"] = disclosure
 
 
 def _cost_retains_validated_evidence(

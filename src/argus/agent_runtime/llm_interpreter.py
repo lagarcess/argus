@@ -46,6 +46,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
     materialized_artifact_edit_targets,
+    stated_cost_edit_operations,
 )
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
@@ -476,7 +477,10 @@ class OpenRouterStructuredInterpreter:
                     return self._to_runtime_interpretation(response, request=request)
                 except Exception as exc:
                     recovered = await contract_recovery.handle_candidate_failure(
-                        interpreter=self, exc=exc, is_primary=index == 0, request=request,
+                        interpreter=self,
+                        exc=exc,
+                        is_primary=index == 0,
+                        request=request,
                         candidate_model=candidate_model,
                         wire_messages=_openrouter_wire_messages(messages),
                         invoke_schema=invoke_openrouter_json_schema,
@@ -2202,7 +2206,9 @@ async def _response_ready_for_runtime(
     if discovery_response is not None:
         return discovery_response
     return await _audited_response_ready_for_runtime(
-        response=response, preferred_model=preferred_model, request=request,
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
         asset_resolution_context=asset_resolution_context,
     )
 
@@ -3448,6 +3454,7 @@ async def _plan_pending_artifact_assumption_edit(
         language=request.user.language_preference,
         required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
         materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
+        stated_cost_operations=stated_cost_edit_operations(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
     )
     # fmt: on
     if plan is None:
@@ -5061,7 +5068,9 @@ def _validate_capability_boundaries(
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
         context_asset_classes = (
-            provider_context_assets.resolved_asset_classes_from_strategy_context(strategy, symbol)
+            provider_context_assets.resolved_asset_classes_from_strategy_context(
+                strategy, symbol
+            )
         )
         asset_classes.update(context_asset_classes or {resolution.asset.asset_class})
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
