@@ -27,7 +27,7 @@
     "viewport": "1280x900",
     "localTime": "2026-08-09T12:00:00",
     "preferredName": null,
-    "greeting": "¿Qué vale la pena revisar hoy?",
+    "greeting": "\u00bfQu\u00e9 vale la pena revisar hoy?",
     "hasToggle": false,
     "chipsVisible": true,
     "consoleErrors": []
@@ -38,7 +38,7 @@
     "viewport": "390x844",
     "localTime": "2026-08-09T12:00:00",
     "preferredName": null,
-    "greeting": "¿Qué vale la pena revisar hoy?",
+    "greeting": "\u00bfQu\u00e9 vale la pena revisar hoy?",
     "hasToggle": false,
     "chipsVisible": true,
     "consoleErrors": []
@@ -47,44 +47,28 @@
     "frame": "05-closed-market-en-desktop",
     "lang": "en",
     "viewport": "1280x900",
-    "localTime": "2026-08-09T19:00:00",
-    "preferredName": null,
-    "greeting": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test.",
-    "hasToggle": false,
-    "chipsVisible": true,
-    "consoleErrors": []
+    "consoleErrors": [],
+    "greeting": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test."
   },
   {
     "frame": "06-closed-market-es-mobile",
     "lang": "es-419",
     "viewport": "390x844",
-    "localTime": "2026-08-09T19:00:00",
-    "preferredName": null,
-    "greeting": "La bolsa está cerrada por el fin de semana. Las criptos no paran, así que hay mucho por probar.",
-    "hasToggle": false,
-    "chipsVisible": true,
-    "consoleErrors": []
+    "consoleErrors": [],
+    "greeting": "La bolsa est\u00e1 cerrada por el fin de semana. Las criptos no paran, as\u00ed que hay mucho por probar."
   },
   {
     "frame": "07-named-en-desktop",
     "lang": "en",
     "viewport": "1280x900",
-    "localTime": "2026-08-09T23:30:00",
-    "preferredName": "Lucas",
-    "greeting": "Still up, Lucas. What are you curious about?",
-    "hasToggle": false,
-    "chipsVisible": true,
-    "consoleErrors": []
+    "consoleErrors": [],
+    "greeting": "Still up, Lucas. What are you curious about?"
   },
   {
     "frame": "08-named-es-mobile",
     "lang": "es-419",
     "viewport": "390x844",
-    "localTime": "2026-08-09T23:30:00",
-    "preferredName": "Lucas",
-    "greeting": "Todavía por aquí, Lucas. ¿Qué te da curiosidad?",
-    "hasToggle": false,
-    "chipsVisible": true,
-    "consoleErrors": []
+    "consoleErrors": [],
+    "greeting": "Todav\u00eda por aqu\u00ed, Lucas. \u00bfQu\u00e9 te da curiosidad?"
   }
 ]

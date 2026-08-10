@@ -99,13 +99,24 @@ stopped claiming that currencies keep trading or that the market reopens on a
 Monday. **Frames 05, 06, 07, 08, 13 and 14 were re-run at `746185f2`** and the
 rendered text is unchanged.
 
+A seventh, eighth and ninth finding landed on `73a0d2d9` and `48fb2bc4` fixed
+them: profile reads and writes are serialized rather than reconciled, and the
+pre-market and after-hours lines stopped calling the market shut during windows
+it is trading in. **Frames 05 to 08, 13 and 14 were re-run at `48fb2bc4`** and
+the rendered text is unchanged.
+
 **What the frames do not prove, and what does.** Today's rotation selects
-`session_closed_weekend_a`, which was already true and did not change. The two
-strings the copy fix actually rewrote, `session_closed_weekend_b` and
-`session_closed_holiday_a`, are not the lines a capture on this date can show.
-They are covered by a test instead: no `session_*` string in either locale may
-match currency, divisa, forex, fx, Monday, or lunes. That guards every line
-rather than the two that were wrong.
+`session_closed_weekend_a`, which was already true and never changed. Every
+session string the copy fixes actually rewrote, `session_closed_weekend_b`,
+`session_closed_holiday_a`, `session_pre_market_a` and `session_after_hours_a`,
+fires in a phase a capture on this date cannot reach. Tests cover them instead,
+and they guard the class rather than the lines that were wrong:
+
+- No `session_*` string in either locale may match currency, divisa, forex, fx,
+  Monday, or lunes. The endpoint resolves the US equity calendar and nothing
+  else.
+- Neither `session_pre_market_a` nor `session_after_hours_a` may match closed,
+  shut, cerrad, or no opera. Both phases are trading windows.
 
 `13` and `14` are the propagation proof, and they are three frames each: the
 greeting before the save, the dialog with the name saved, and the greeting
