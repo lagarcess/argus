@@ -2,9 +2,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from typing import Sequence
 
-from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
-from argus.domain.supabase_gateway import SupabaseGateway
+if __package__:
+    from scripts.ops.destructive_database_target import (
+        DestructiveDatabaseTargetError,
+        announce_destructive_database_target,
+        pin_destructive_database_target,
+        resolve_destructive_database_target,
+    )
+else:
+    from destructive_database_target import (  # type: ignore[no-redef]
+        DestructiveDatabaseTargetError,
+        announce_destructive_database_target,
+        pin_destructive_database_target,
+        resolve_destructive_database_target,
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -16,8 +30,19 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = _parser().parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
+    args = parser.parse_args(argv)
+    try:
+        target = resolve_destructive_database_target()
+    except DestructiveDatabaseTargetError as exc:
+        parser.error(str(exc))
+    pin_destructive_database_target(target)
+    announce_destructive_database_target(target)
+
+    from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
+    from argus.domain.supabase_gateway import SupabaseGateway
+
     result = cleanup_expired_guest_workspaces(
         SupabaseGateway.from_env(),
         limit=args.limit,
@@ -30,4 +55,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
