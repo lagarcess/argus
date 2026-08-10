@@ -211,20 +211,20 @@ history with phantom versions from abandoned edits.
 Material change is defined once, here, and consumed by comparison. There is no
 second definition anywhere.
 
-## 4. Open decision for the founder
+## 4. Versioning: decided
 
-**Does a confirmation-card edit mint a new `IdeaVersion`?**
+**Does a confirmation-card edit mint a new `IdeaVersion`? No.** Founder
+confirmed 2026-08-10: edits to a pending confirmation card mint nothing;
+only run finalization mints an `IdeaVersion`.
 
-Decision memo section 16.2 states that one material experiment definition maps
-to one immutable `IdeaVersion`, that material changes include assets, date
-range, benchmark, rules, cadence, capital, and modeled costs, and that multiple
-edits before one confirmed run collapse into a single version.
-
-Read literally, that last clause resolves it: edits made while a card is still
-pending collapse, so no version is minted until the run is confirmed. This spec
-assumes that reading. It needs an explicit confirmation, because the alternative
-silently changes what product memory records for every edited experiment, and
-item 4 depends on that record being right.
+Decision memo section 16.2 supports the same reading: one material
+experiment definition maps to one immutable `IdeaVersion`, and multiple
+edits before one confirmed run collapse into a single version. This is one
+face of the contract's record-creation rule, whose dividing line is whether
+a turn was spent: non-turn changes update the pending card in place and
+mint nothing anywhere; turn-based edits supersede with a new card message
+because the conversation records the change; run finalization alone mints
+the version.
 
 ## 5. Non-goals
 
