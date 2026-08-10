@@ -46,12 +46,19 @@ class ResearchUnavailableError(Exception):
 class ResearchUsage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    invocations: int = 0
+    # Compatibility name: existing grounding checks use finance_search
+    # invocations specifically, not the sum of every provider tool.
+    invocations: int = Field(default=0, ge=0)
+    finance_search_invocations: int = Field(default=0, ge=0)
+    web_search_invocations: int = Field(default=0, ge=0)
+    fetch_url_invocations: int = Field(default=0, ge=0)
     model: str = ""
-    latency_ms: int = 0
-    cost_usd: float = 0.0
-    input_tokens: int | None = None
-    output_tokens: int | None = None
+    latency_ms: int = Field(default=0, ge=0)
+    cost_usd: float = Field(default=0.0, ge=0.0)
+    input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    cache_creation_input_tokens: int | None = Field(default=None, ge=0)
+    cache_read_input_tokens: int | None = Field(default=None, ge=0)
 
 
 class ResearchNamePair(BaseModel):

@@ -42,11 +42,284 @@ def test_run_research_builds_documented_request_and_parses_packet() -> None:
     assert body["max_steps"] == RESEARCH_CONFIG_SPECS["fast"].max_steps
     assert body["max_output_tokens"] == 1024
     assert packet.usage.invocations == 1
-    assert packet.usage.cost_usd == pytest.approx(0.005)
+    assert packet.usage.finance_search_invocations == 1
+    assert packet.usage.web_search_invocations == 0
+    assert packet.usage.fetch_url_invocations == 0
+    assert packet.usage.input_tokens == 1_000
+    assert packet.usage.output_tokens == 500
+    assert packet.usage.model == "openai/gpt-5.6-sol"
+    assert packet.usage.cost_usd == pytest.approx(0.025)
     # Provider hosts are scrubbed; public sources survive as typed citations.
     assert [source.url for source in packet.sources] == ["https://www.sec.gov/a"]
     # NOT_FOUND and header rows never become candidates.
     assert [pair.symbol for pair in packet.name_pairs] == ["DIS"]
+
+
+def test_usage_cost_uses_served_model_tokens_and_every_tool_count() -> None:
+    client, transport = _client(
+        [
+            agent_response(
+                model="anthropic/claude-opus-4-7",
+                input_tokens=20_000,
+                output_tokens=4_000,
+                invocations=2,
+                web_search_invocations=3,
+                fetch_url_invocations=4,
+            )
+        ]
+    )
+
+    packet = client.run_research("compare", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert request_body(transport.requests[0])["model"] == "openai/gpt-5.6-sol"
+    assert packet.usage.model == "anthropic/claude-opus-4-7"
+    assert packet.usage.input_tokens == 20_000
+    assert packet.usage.output_tokens == 4_000
+    assert packet.usage.finance_search_invocations == 2
+    assert packet.usage.web_search_invocations == 3
+    assert packet.usage.fetch_url_invocations == 4
+    assert packet.usage.invocations == 2
+    assert packet.usage.cost_usd == pytest.approx(0.2185)
+
+
+def test_usage_cost_matches_the_committed_live_cached_response() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=14_166,
+                output_tokens=191,
+                cache_creation_input_tokens=6_221,
+                cache_read_input_tokens=7_864,
+                invocations=1,
+            )
+        ]
+    )
+
+    packet = client.run_research("quote Apple", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(0.05395)
+    assert packet.usage.cache_creation_input_tokens == 6_221
+    assert packet.usage.cache_read_input_tokens == 7_864
+
+
+def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=300_000,
+                output_tokens=1_000,
+                invocations=0,
+                cost_overrides={
+                    "input_cost": 1.5,
+                    "output_cost": 0.03,
+                    "cache_creation_cost": 0.0,
+                    "cache_read_cost": 0.0,
+                    "total_cost": 1.53,
+                },
+            )
+        ]
+    )
+
+    packet = client.run_research("multi-step", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(1.53)
+
+
+@pytest.mark.parametrize(
+    ("cache_creation_input_tokens", "cache_read_input_tokens", "cost_overrides"),
+    [
+        pytest.param(
+            0,
+            0,
+            {
+                "input_cost": 1.63201,
+                "output_cost": 0.0,
+                "cache_creation_cost": 0.0,
+                "cache_read_cost": 0.0,
+                "total_cost": 1.63201,
+            },
+            id="uncached-input",
+        ),
+        pytest.param(
+            272_001,
+            0,
+            {
+                "input_cost": 0.0,
+                "output_cost": 0.0,
+                "cache_creation_cost": 2.04001,
+                "cache_read_cost": 0.0,
+                "total_cost": 2.04001,
+            },
+            id="cache-creation",
+        ),
+        pytest.param(
+            0,
+            272_001,
+            {
+                "input_cost": 0.0,
+                "output_cost": 0.0,
+                "cache_creation_cost": 0.0,
+                "cache_read_cost": 0.16320,
+                "total_cost": 0.16320,
+            },
+            id="cache-read",
+        ),
+    ],
+)
+def test_aggregated_multistep_tokens_reject_an_impossible_tier_blend(
+    cache_creation_input_tokens: int,
+    cache_read_input_tokens: int,
+    cost_overrides: dict[str, float],
+) -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=272_001,
+                output_tokens=0,
+                invocations=0,
+                cache_creation_input_tokens=cache_creation_input_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+                cost_overrides=cost_overrides,
+            )
+        ]
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("impossible blend", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_aggregated_multistep_tokens_accept_a_feasible_tier_blend() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=273_001,
+                output_tokens=100,
+                invocations=0,
+                cost_overrides={
+                    # One 272,001-token long-context call plus a 1,000-token
+                    # short-context call can produce this aggregate component.
+                    "input_cost": 2.72501,
+                    "output_cost": 0.0045,
+                    "cache_creation_cost": 0.0,
+                    "cache_read_cost": 0.0,
+                    "total_cost": 2.72951,
+                },
+            )
+        ]
+    )
+
+    packet = client.run_research("feasible blend", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(2.72951)
+
+
+@pytest.mark.parametrize(
+    ("input_cost", "output_cost", "total_cost"),
+    [
+        pytest.param(1.5, 0.045, 1.545, id="short-input-long-output"),
+        pytest.param(3.0, 0.03, 3.03, id="long-input-short-output"),
+    ],
+)
+def test_aggregated_multistep_tokens_reject_inconsistent_tiers(
+    input_cost: float, output_cost: float, total_cost: float
+) -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=300_000,
+                output_tokens=1_000,
+                invocations=0,
+                cost_overrides={
+                    "input_cost": input_cost,
+                    "output_cost": output_cost,
+                    "cache_creation_cost": 0.0,
+                    "cache_read_cost": 0.0,
+                    "total_cost": total_cost,
+                },
+            )
+        ]
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("inconsistent tiers", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_provider_total_must_match_its_cost_components() -> None:
+    client, _ = _client([agent_response(cost_overrides={"total_cost": 9.99})])
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_provider_tool_cost_must_match_actual_invocation_counts() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                cost_overrides={
+                    "tool_calls_cost": 0.0,
+                    "tool_calls_cost_details": {"finance_search": 0.0},
+                    "total_cost": 0.02,
+                }
+            )
+        ]
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_unknown_served_model_rate_fails_loudly() -> None:
+    client, _ = _client([agent_response(model="vendor/new-model")])
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "unknown_model_rate"
+    assert excinfo.value.detail == "vendor/new-model"
+
+
+def test_missing_required_token_usage_is_malformed() -> None:
+    response = agent_response()
+    del response["usage"]["input_tokens"]
+    client, _ = _client([response])
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+@pytest.mark.parametrize(
+    ("input_tokens", "expected_cost_usd"),
+    [
+        (272_000, 1.39),
+        (272_001, 2.76501),
+    ],
+)
+def test_gpt_5_6_sol_uses_the_documented_long_context_rate(
+    input_tokens: int, expected_cost_usd: float
+) -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=input_tokens,
+                output_tokens=1_000,
+                invocations=0,
+            )
+        ]
+    )
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(expected_cost_usd)
 
 
 def test_balanced_spec_sends_reasoning_and_all_three_tools() -> None:

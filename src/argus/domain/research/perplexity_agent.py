@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from decimal import Decimal
 from typing import Any
 from urllib.parse import urlparse
 
@@ -32,11 +33,9 @@ from argus.domain.research.contracts import (
     ResearchUnavailableError,
     ResearchUsage,
 )
+from argus.domain.research.pricing import validated_research_cost_usd
 
 PERPLEXITY_AGENT_URL = "https://api.perplexity.ai/v1/agent"
-# Published tool pricing: $5 per 1,000 finance_search invocations. Token costs
-# bill separately; the ledger records this floor as provider_reported.
-DOCUMENTED_FINANCE_SEARCH_COST_USD = 0.005
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
 
@@ -158,7 +157,6 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
     tickers: list[str] = []
     sources: list[ResearchSource] = []
     pairs: list[ResearchNamePair] = []
-    invocations = 0
     for item in output:
         if not isinstance(item, dict):
             continue
@@ -201,16 +199,7 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
                         _append_public_source(sources, annotation)
-    usage = document.get("usage")
-    if isinstance(usage, dict):
-        details = usage.get("tool_calls_details")
-        if isinstance(details, dict):
-            finance = details.get("finance_search")
-            if isinstance(finance, dict):
-                try:
-                    invocations = int(finance.get("invocation") or 0)
-                except (TypeError, ValueError):
-                    invocations = 0
+    usage = _usage_from_response(document, latency_ms=latency_ms)
     answer = _sanitize_answer("\n\n".join(text_blocks))
     seen: set[str] = set()
     unique_pairs = []
@@ -226,14 +215,200 @@ def _packet_from_response(document: dict[str, Any], *, latency_ms: int) -> Resea
         tickers=tuple(tickers[:MAX_PACKET_TICKERS]),
         sources=tuple(sources[:MAX_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
-        usage=ResearchUsage(
-            invocations=invocations,
-            model=str(document.get("model") or ""),
-            latency_ms=latency_ms,
-            cost_usd=round(invocations * DOCUMENTED_FINANCE_SEARCH_COST_USD, 6),
-        ),
+        usage=usage,
         background_id=str(document.get("id") or "") or None,
     )
+
+
+def _usage_from_response(document: dict[str, Any], *, latency_ms: int) -> ResearchUsage:
+    model = document.get("model")
+    if not isinstance(model, str) or not model.strip():
+        raise ResearchUnavailableError("malformed_response", "missing model")
+    usage = document.get("usage")
+    if not isinstance(usage, dict):
+        raise ResearchUnavailableError("malformed_response", "missing usage")
+    input_tokens = _required_nonnegative_int(
+        usage, "input_tokens", path="usage.input_tokens"
+    )
+    output_tokens = _required_nonnegative_int(
+        usage, "output_tokens", path="usage.output_tokens"
+    )
+    input_details = usage.get("input_tokens_details")
+    if not isinstance(input_details, dict):
+        raise ResearchUnavailableError(
+            "malformed_response", "invalid usage.input_tokens_details"
+        )
+    cache_creation_input_tokens = _required_nonnegative_int(
+        input_details,
+        "cache_creation_input_tokens",
+        path="usage.input_tokens_details.cache_creation_input_tokens",
+    )
+    cache_read_input_tokens = _required_nonnegative_int(
+        input_details,
+        "cache_read_input_tokens",
+        path="usage.input_tokens_details.cache_read_input_tokens",
+    )
+    cached_tokens = input_details.get("cached_tokens")
+    if cached_tokens is not None and (
+        isinstance(cached_tokens, bool)
+        or not isinstance(cached_tokens, int)
+        or cached_tokens != cache_read_input_tokens
+    ):
+        raise ResearchUnavailableError(
+            "malformed_response",
+            "invalid usage.input_tokens_details.cached_tokens",
+        )
+    details = usage.get("tool_calls_details")
+    if details is None:
+        details = {}
+    if not isinstance(details, dict):
+        raise ResearchUnavailableError(
+            "malformed_response", "invalid usage.tool_calls_details"
+        )
+    finance_search_invocations = _tool_invocation_count(details, "finance_search")
+    web_search_invocations = _tool_invocation_count(details, "web_search", "search_web")
+    fetch_url_invocations = _tool_invocation_count(details, "fetch_url")
+    cost = usage.get("cost")
+    if not isinstance(cost, dict) or cost.get("currency") != "USD":
+        raise ResearchUnavailableError(
+            "malformed_response", "invalid usage.cost currency"
+        )
+    provider_tool_costs_usd = _tool_cost_details(cost)
+    cost_usd = validated_research_cost_usd(
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
+        cache_read_input_tokens=cache_read_input_tokens,
+        finance_search_invocations=finance_search_invocations,
+        web_search_invocations=web_search_invocations,
+        fetch_url_invocations=fetch_url_invocations,
+        provider_input_cost_usd=_required_nonnegative_decimal(
+            cost, "input_cost", path="usage.cost.input_cost"
+        ),
+        provider_output_cost_usd=_required_nonnegative_decimal(
+            cost, "output_cost", path="usage.cost.output_cost"
+        ),
+        provider_cache_creation_cost_usd=_required_nonnegative_decimal(
+            cost, "cache_creation_cost", path="usage.cost.cache_creation_cost"
+        ),
+        provider_cache_read_cost_usd=_required_nonnegative_decimal(
+            cost, "cache_read_cost", path="usage.cost.cache_read_cost"
+        ),
+        provider_tool_calls_cost_usd=_optional_nonnegative_decimal(
+            cost, "tool_calls_cost", path="usage.cost.tool_calls_cost"
+        ),
+        provider_tool_costs_usd=provider_tool_costs_usd,
+        provider_total_cost_usd=_required_nonnegative_decimal(
+            cost, "total_cost", path="usage.cost.total_cost"
+        ),
+    )
+    return ResearchUsage(
+        invocations=finance_search_invocations,
+        finance_search_invocations=finance_search_invocations,
+        web_search_invocations=web_search_invocations,
+        fetch_url_invocations=fetch_url_invocations,
+        model=model,
+        latency_ms=latency_ms,
+        cost_usd=cost_usd,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
+        cache_read_input_tokens=cache_read_input_tokens,
+    )
+
+
+def _tool_invocation_count(details: dict[str, Any], *provider_keys: str) -> int:
+    counts: list[int] = []
+    for key in provider_keys:
+        if key not in details:
+            continue
+        entry = details[key]
+        if not isinstance(entry, dict):
+            raise ResearchUnavailableError(
+                "malformed_response", f"invalid usage.tool_calls_details.{key}"
+            )
+        counts.append(
+            _required_nonnegative_int(
+                entry,
+                "invocation",
+                path=f"usage.tool_calls_details.{key}.invocation",
+            )
+        )
+    if not counts:
+        return 0
+    if any(count != counts[0] for count in counts[1:]):
+        joined = ", ".join(provider_keys)
+        raise ResearchUnavailableError(
+            "malformed_response", f"conflicting tool counts: {joined}"
+        )
+    return counts[0]
+
+
+def _required_nonnegative_int(values: dict[str, Any], key: str, *, path: str) -> int:
+    value = values.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+    return value
+
+
+def _required_nonnegative_decimal(
+    values: dict[str, Any], key: str, *, path: str
+) -> Decimal:
+    if key not in values:
+        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+    return _nonnegative_decimal(values[key], path=path)
+
+
+def _optional_nonnegative_decimal(
+    values: dict[str, Any], key: str, *, path: str
+) -> Decimal:
+    if key not in values:
+        return Decimal(0)
+    return _nonnegative_decimal(values[key], path=path)
+
+
+def _nonnegative_decimal(value: Any, *, path: str) -> Decimal:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+    parsed = Decimal(str(value))
+    if not parsed.is_finite() or parsed < 0:
+        raise ResearchUnavailableError("malformed_response", f"invalid {path}")
+    return parsed
+
+
+def _tool_cost_details(cost: dict[str, Any]) -> dict[str, Decimal]:
+    details = cost.get("tool_calls_cost_details")
+    if details is None:
+        return {}
+    if not isinstance(details, dict):
+        raise ResearchUnavailableError(
+            "malformed_response", "invalid usage.cost.tool_calls_cost_details"
+        )
+    normalized: dict[str, Decimal] = {}
+    aliases = {
+        "finance_search": "finance_search",
+        "web_search": "web_search",
+        "search_web": "web_search",
+        "fetch_url": "fetch_url",
+    }
+    for provider_key, value in details.items():
+        tool = aliases.get(provider_key)
+        if tool is None:
+            raise ResearchUnavailableError(
+                "malformed_response",
+                f"unknown usage.cost.tool_calls_cost_details.{provider_key}",
+            )
+        parsed = _nonnegative_decimal(
+            value, path=f"usage.cost.tool_calls_cost_details.{provider_key}"
+        )
+        previous = normalized.get(tool)
+        if previous is not None and previous != parsed:
+            raise ResearchUnavailableError(
+                "malformed_response", f"conflicting tool costs: {tool}"
+            )
+        normalized[tool] = parsed
+    return normalized
 
 
 # Ticker-shaped cell: 1-5 uppercase letters, optionally a class suffix. Cells
