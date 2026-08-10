@@ -82,6 +82,77 @@ def test_usage_cost_uses_served_model_tokens_and_every_tool_count() -> None:
     assert packet.usage.cost_usd == pytest.approx(0.2185)
 
 
+def test_usage_cost_matches_the_committed_live_cached_response() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=14_166,
+                output_tokens=191,
+                cache_creation_input_tokens=6_221,
+                cache_read_input_tokens=7_864,
+                invocations=1,
+            )
+        ]
+    )
+
+    packet = client.run_research("quote Apple", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(0.05395)
+    assert packet.usage.cache_creation_input_tokens == 6_221
+    assert packet.usage.cache_read_input_tokens == 7_864
+
+
+def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                input_tokens=300_000,
+                output_tokens=1_000,
+                invocations=0,
+                cost_overrides={
+                    "input_cost": 1.5,
+                    "output_cost": 0.03,
+                    "cache_creation_cost": 0.0,
+                    "cache_read_cost": 0.0,
+                    "total_cost": 1.53,
+                },
+            )
+        ]
+    )
+
+    packet = client.run_research("multi-step", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.usage.cost_usd == pytest.approx(1.53)
+
+
+def test_provider_total_must_match_its_cost_components() -> None:
+    client, _ = _client([agent_response(cost_overrides={"total_cost": 9.99})])
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
+def test_provider_tool_cost_must_match_actual_invocation_counts() -> None:
+    client, _ = _client(
+        [
+            agent_response(
+                cost_overrides={
+                    "tool_calls_cost": 0.0,
+                    "tool_calls_cost_details": {"finance_search": 0.0},
+                    "total_cost": 0.02,
+                }
+            )
+        ]
+    )
+
+    with pytest.raises(ResearchUnavailableError) as excinfo:
+        client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert excinfo.value.reason == "malformed_response"
+
+
 def test_unknown_served_model_rate_fails_loudly() -> None:
     client, _ = _client([agent_response(model="vendor/new-model")])
 

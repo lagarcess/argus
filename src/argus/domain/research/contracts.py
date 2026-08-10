@@ -57,6 +57,8 @@ class ResearchUsage(BaseModel):
     cost_usd: float = Field(default=0.0, ge=0.0)
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
+    cache_creation_input_tokens: int | None = Field(default=None, ge=0)
+    cache_read_input_tokens: int | None = Field(default=None, ge=0)
 
 
 class ResearchNamePair(BaseModel):
