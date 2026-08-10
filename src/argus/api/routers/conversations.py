@@ -33,6 +33,8 @@ from argus.api.message_store import (
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
+    ConfirmationDirectEditRequest,
+    ConfirmationDirectEditResponse,
     ConfirmationPeerAssetsRequest,
     ConfirmationPeerAssetsResponse,
     Conversation,
@@ -1013,6 +1015,152 @@ def add_confirmation_peer_assets(
         request_id=getattr(request.state, "request_id", None),
     )
     return ConfirmationPeerAssetsResponse(message=created)
+
+
+@router.post(
+    "/conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit",
+    response_model=ConfirmationDirectEditResponse,
+)
+def direct_edit_confirmation(
+    conversation_id: str,
+    confirmation_id: str,
+    payload: ConfirmationDirectEditRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConfirmationDirectEditResponse:
+    """Edit the active confirmation's capital or dates without a turn.
+
+    Deterministic by construction: no LLM call, no message allowance, no
+    interpretation, and no backtest row. The typed values become the same edit
+    operations the conversational planner emits, applied by the same code and
+    assembled by the real confirm stage, so a direct edit and the equivalent
+    conversational edit produce one canonical artifact. The result is a new
+    superseding card; failures persist nothing.
+    """
+    from argus.agent_runtime.confirmation_direct_edit import (
+        direct_edit_confirmation_preparation,
+    )
+    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.api.chat.recovery import _recent_messages_for_conversation
+    from argus.api.message_store import create_message
+
+    invalid_state = problem(
+        request,
+        status_code=409,
+        code="artifact_action_invalid_state",
+        title="Conflict",
+        detail="The confirmation is no longer active.",
+    )
+    messages = _recent_messages_for_conversation(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    active_id = latest_active_confirmation_id(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        recent_messages=messages,
+    )
+    if active_id is None or active_id != confirmation_id:
+        raise invalid_state
+    source_payload: dict[str, Any] | None = None
+    source_next_experiments: dict[str, Any] | None = None
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        card = message.metadata.get("confirmation_card")
+        if (
+            not isinstance(card, dict)
+            or str(card.get("confirmation_id") or "") != confirmation_id
+        ):
+            continue
+        candidate_payload = message.metadata.get("confirmation_payload")
+        if isinstance(candidate_payload, dict):
+            source_payload = candidate_payload
+        rows_sidecar = message.metadata.get("next_experiments")
+        if isinstance(rows_sidecar, dict):
+            source_next_experiments = rows_sidecar
+        break
+    if source_payload is None:
+        raise invalid_state
+    language = str(getattr(user, "language", None) or "en")
+
+    preparation = direct_edit_confirmation_preparation(
+        source_payload,
+        capital=payload.capital,
+        date_window=(
+            payload.date_window.model_dump(mode="python")
+            if payload.date_window is not None
+            else None
+        ),
+        language=language,
+    )
+    if preparation.confirmation_payload is None:
+        error_code = preparation.error_code or "confirmation_not_executable"
+        if error_code == "market_data_unavailable":
+            raise problem(
+                request,
+                status_code=503,
+                code="market_data_unavailable",
+                title="Service Unavailable",
+                detail="Market data is unavailable for the requested test.",
+            )
+        if error_code in {
+            "no_common_data_window",
+            "insufficient_common_data",
+            "invalid_date_window",
+        }:
+            raise problem(
+                request,
+                status_code=422,
+                code=error_code,
+                title="Validation Error",
+                detail="The requested change cannot run as one test.",
+            )
+        raise invalid_state
+    new_payload = preparation.confirmation_payload
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": new_payload,
+        },
+        confirmation_id=str(new_payload.get("confirmation_id")),
+        conversation_id=conversation_id,
+        language=language,
+    )
+    if card is None:
+        raise invalid_state
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+
+    reference = confirmation_artifact_reference(
+        confirmation_id=str(card.get("confirmation_id")),
+        confirmation_payload=new_payload,
+        confirmation_card=card,
+    )
+    metadata: dict[str, Any] = {
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "await_approval",
+        "confirmation_card": card,
+        "confirmation_payload": new_payload,
+        "active_confirmation_reference": reference.model_dump(mode="python"),
+        "artifact_references": [reference.model_dump(mode="python")],
+    }
+    if source_next_experiments is not None:
+        # A capital or date edit does not change the basket, so the offered
+        # peer rows stay valid and ride the superseding card unchanged.
+        metadata["next_experiments"] = source_next_experiments
+    created = create_message(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        role="assistant",
+        content=str(card.get("summary") or ""),
+        metadata=metadata,
+        settle_usage=None,
+    )
+    return ConfirmationDirectEditResponse(message=created)
 
 
 def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:

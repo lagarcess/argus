@@ -251,10 +251,18 @@ def runtime_confirmation_card(
     }
     if display_facts:
         card["display_facts"] = display_facts
+    capabilities: dict[str, Any] = {}
     if _execution_realism_feature_enabled():
         # Backend capability truth: the engine can apply fee/slippage
         # assumptions, so the confirmation surface may offer editing them.
-        card["capabilities"] = {"execution_costs_editable": True}
+        capabilities["execution_costs_editable"] = True
+    # Direct no-turn edits the typed endpoint accepts for this card. Capital
+    # follows the launch sizing mode; dates are always directly editable.
+    direct_edits = ["dates"]
+    if str(launch_payload.get("sizing_mode") or "capital_amount") != "position_size":
+        direct_edits.insert(0, "capital")
+    capabilities["direct_edits"] = direct_edits
+    card["capabilities"] = capabilities
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
         card["asset_class"] = asset_class

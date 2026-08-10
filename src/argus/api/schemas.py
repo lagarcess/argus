@@ -923,6 +923,51 @@ class ConfirmationPeerAssetsResponse(BaseModel):
     message: Message
 
 
+class ConfirmationDirectEditWindow(BaseModel):
+    """Explicit calendar endpoints from the drawer's date inputs.
+
+    Direct edits are deterministic UI values, never prose: relative or
+    semantic windows stay on the conversational path where the interpreter
+    owns them.
+    """
+
+    start: str = Field(min_length=10, max_length=10)
+    end: str = Field(min_length=10, max_length=10)
+
+    @model_validator(mode="after")
+    def require_ordered_iso_dates(self) -> "ConfirmationDirectEditWindow":
+        try:
+            start = date.fromisoformat(self.start)
+            end = date.fromisoformat(self.end)
+        except ValueError as exc:
+            raise ValueError("invalid_date_window") from exc
+        if start > end:
+            raise ValueError("invalid_date_window")
+        return self
+
+
+class ConfirmationDirectEditRequest(BaseModel):
+    """Edit the pending confirmation's capital or dates without a turn.
+
+    At least one field is required. Capital is the starting capital, or the
+    recurring contribution when the pending strategy is a recurring-buy plan,
+    matching the money-role semantics of the conversational path.
+    """
+
+    capital: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    date_window: ConfirmationDirectEditWindow | None = None
+
+    @model_validator(mode="after")
+    def require_one_edit(self) -> "ConfirmationDirectEditRequest":
+        if self.capital is None and self.date_window is None:
+            raise ValueError("capital_or_date_window_required")
+        return self
+
+
+class ConfirmationDirectEditResponse(BaseModel):
+    message: Message
+
+
 def _validate_chat_action_payload_value(value: Any, *, depth: int) -> None:
     if isinstance(value, dict):
         if depth > CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH:
