@@ -879,11 +879,11 @@ paths:
 
         adjustment data, and every patched draft re-passes the same execution and
 
-        coverage validation every confirmation passes. The result is a new
+        coverage validation every confirmation passes. No turn is spent, so the
 
-        superseding card; motion, chips, and inline period disclosure carry the
+        card is updated in place; motion, chips, and inline period disclosure
 
-        change, never a narration banner.'
+        carry the change, never a narration banner.'
       parameters:
       - name: conversation_id
         in: path

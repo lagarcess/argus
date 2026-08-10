@@ -829,9 +829,9 @@ def add_confirmation_peer_assets(
     interpretation. Only symbols the active turn offered as peer rows are
     addable, restore undoes the latest add from the card's own typed
     adjustment data, and every patched draft re-passes the same execution and
-    coverage validation every confirmation passes. The result is a new
-    superseding card; motion, chips, and inline period disclosure carry the
-    change, never a narration banner.
+    coverage validation every confirmation passes. No turn is spent, so the
+    card is updated in place; motion, chips, and inline period disclosure
+    carry the change, never a narration banner.
     """
     from argus.agent_runtime.research_basket import (
         confirmation_symbols_restoration,
@@ -839,10 +839,9 @@ def add_confirmation_peer_assets(
         peer_added_confirmation_preparation,
     )
     from argus.api.chat.actions import latest_active_confirmation_id
-    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.api.chat.confirmation import apply_pending_card_update
     from argus.api.chat.recovery import _recent_messages_for_conversation
     from argus.api.chat.research_evidence import record_research_turn_evidence
-    from argus.api.message_store import create_message
     from argus.domain.research.config import research_rail_enabled
 
     if not research_rail_enabled():
@@ -873,6 +872,7 @@ def add_confirmation_peer_assets(
     if active_id is None or active_id != confirmation_id:
         raise invalid_state
     source_payload: dict[str, Any] | None = None
+    source_message: Message | None = None
     offered_symbols: list[str] = []
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):
@@ -886,6 +886,7 @@ def add_confirmation_peer_assets(
         candidate_payload = message.metadata.get("confirmation_payload")
         if isinstance(candidate_payload, dict):
             source_payload = candidate_payload
+            source_message = message
         rows_sidecar = message.metadata.get("next_experiments")
         rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
         for row in rows or []:
@@ -900,7 +901,7 @@ def add_confirmation_peer_assets(
                 if normalized and normalized not in offered_symbols:
                     offered_symbols.append(normalized)
         break
-    if source_payload is None:
+    if source_payload is None or source_message is None:
         raise invalid_state
     language = str(getattr(user, "language", None) or "en")
 
@@ -963,34 +964,6 @@ def add_confirmation_peer_assets(
             )
         raise invalid_state
     new_payload = preparation.confirmation_payload
-    card = runtime_confirmation_card(
-        {
-            "stage_outcome": "await_approval",
-            "confirmation_payload": new_payload,
-        },
-        confirmation_id=str(new_payload.get("confirmation_id")),
-        conversation_id=conversation_id,
-        language=language,
-    )
-    if card is None:
-        raise invalid_state
-    from argus.agent_runtime.confirmation_artifacts import (
-        confirmation_artifact_reference,
-    )
-
-    reference = confirmation_artifact_reference(
-        confirmation_id=str(card.get("confirmation_id")),
-        confirmation_payload=new_payload,
-        confirmation_card=card,
-    )
-    metadata: dict[str, Any] = {
-        "conversation_mode": "confirm",
-        "agent_runtime_stage_outcome": "await_approval",
-        "confirmation_card": card,
-        "confirmation_payload": new_payload,
-        "active_confirmation_reference": reference.model_dump(mode="python"),
-        "artifact_references": [reference.model_dump(mode="python")],
-    }
     remaining_peers = _resolved_peer_identities(remaining_symbols) or []
     basket = [
         str(symbol).strip().upper()
@@ -1004,16 +977,18 @@ def add_confirmation_peer_assets(
         ),
         language=language,
     )
-    if peer_rows is not None:
-        metadata["next_experiments"] = peer_rows
-    created = create_message(
+    # peer_rows=None removes a fully consumed offer set from the updated card.
+    updated = apply_pending_card_update(
         user_id=user.id,
         conversation_id=conversation_id,
-        role="assistant",
-        content=str(card.get("summary") or ""),
-        metadata=metadata,
-        settle_usage=None,
+        source_message=source_message,
+        confirmation_id=confirmation_id,
+        confirmation_payload=new_payload,
+        language=language,
+        metadata_extra={"next_experiments": peer_rows},
     )
+    if updated is None:
+        raise invalid_state
     record_research_turn_evidence(
         research={
             "capability_class": "peer_expansion",
@@ -1027,10 +1002,10 @@ def add_confirmation_peer_assets(
         },
         user_id=user.id,
         conversation_id=conversation_id,
-        message_id=created.id,
+        message_id=updated.id,
         request_id=getattr(request.state, "request_id", None),
     )
-    return ConfirmationPeerAssetsResponse(message=created)
+    return ConfirmationPeerAssetsResponse(message=updated)
 
 
 @router.post(
@@ -1059,9 +1034,8 @@ def direct_edit_confirmation(
         direct_edit_confirmation_preparation,
     )
     from argus.api.chat.actions import latest_active_confirmation_id
-    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.api.chat.confirmation import apply_pending_card_update
     from argus.api.chat.recovery import _recent_messages_for_conversation
-    from argus.api.message_store import update_message_artifact
 
     invalid_state = problem(
         request,
@@ -1138,48 +1112,16 @@ def direct_edit_confirmation(
                 detail="The requested change cannot run as one test.",
             )
         raise invalid_state
-    new_payload = preparation.confirmation_payload
-    # In place means in place: the edited card keeps its identity. The confirm
-    # stage minted a fresh id while assembling, and the id the user is looking
-    # at wins over it.
-    new_payload["confirmation_id"] = confirmation_id
-    new_payload["artifact_id"] = confirmation_id
-    card = runtime_confirmation_card(
-        {
-            "stage_outcome": "await_approval",
-            "confirmation_payload": new_payload,
-        },
-        confirmation_id=confirmation_id,
-        conversation_id=conversation_id,
-        language=language,
-    )
-    if card is None:
-        raise invalid_state
-    from argus.agent_runtime.confirmation_artifacts import (
-        confirmation_artifact_reference,
-    )
-
-    reference = confirmation_artifact_reference(
-        confirmation_id=confirmation_id,
-        confirmation_payload=new_payload,
-        confirmation_card=card,
-    )
-    metadata: dict[str, Any] = {
-        **source_message.metadata,
-        "conversation_mode": "confirm",
-        "agent_runtime_stage_outcome": "await_approval",
-        "confirmation_card": card,
-        "confirmation_payload": new_payload,
-        "active_confirmation_reference": reference.model_dump(mode="python"),
-        "artifact_references": [reference.model_dump(mode="python")],
-    }
-    updated = update_message_artifact(
+    updated = apply_pending_card_update(
         user_id=user.id,
         conversation_id=conversation_id,
-        message_id=source_message.id,
-        content=str(card.get("summary") or ""),
-        metadata=metadata,
+        source_message=source_message,
+        confirmation_id=confirmation_id,
+        confirmation_payload=preparation.confirmation_payload,
+        language=language,
     )
+    if updated is None:
+        raise invalid_state
     return ConfirmationDirectEditResponse(message=updated)
 
 

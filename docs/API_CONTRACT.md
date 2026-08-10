@@ -3132,11 +3132,12 @@ while `ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
 - Undo: `{"restore_previous": true}` re-materializes the exact previous
   asset set from the active card's own `assets_adjustment` data.
 
-**Response:** `{"message": Message}` where the message is a new assistant
-confirmation message carrying the superseding card (new `confirmation_id`,
-typed `assets_adjustment`, recomputed provider coverage) plus the remaining
-peer rows on its `next_experiments` metadata. The previous card supersedes by
-ordinary latest-active projection.
+**Response:** `{"message": Message}` where the message is the **same**
+assistant confirmation message, updated in place: same `id`, same
+`confirmation_id`, typed `assets_adjustment`, recomputed provider coverage,
+and the remaining peer rows replacing `next_experiments` (removed once the
+offer set is consumed). No turn was spent, so nothing new appears in the
+transcript; see the record-creation rule under the direct-edit endpoint.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
 non-active confirmation, non-offered symbols, and restore with nothing to
@@ -3159,10 +3160,13 @@ nothing becomes runnable that would not have been runnable through chat.
 **In place means in place.** This endpoint updates the card it edits: the
 same `confirmation_id`, the same assistant message rewritten where it
 stands, nothing new in the transcript. This is the record-creation rule of
-the edit contract stated explicitly: an in-place edit spends nothing and
-mints nothing; a turn-based edit supersedes with a new card message because
-the conversation records the change; only run finalization mints an
-`IdeaVersion`.
+the edit contract stated explicitly, and its dividing line is whether a turn
+was spent, not which affordance was used: a turn-based edit supersedes with
+a new card message because the conversation records the change; a non-turn
+change (this endpoint, and peer add/undo above) spent nothing, so nothing
+new appears; only run finalization mints an `IdeaVersion`. Every non-turn
+producer writes through one backend path (`apply_pending_card_update`), so a
+future producer cannot append by omission.
 
 **Request:** at least one field.
 - `capital`: positive number. Starting capital, or the recurring

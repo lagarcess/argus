@@ -308,7 +308,7 @@ def test_the_relevant_research_wins_over_the_latest() -> None:
     ), "unrelated baskets get no researched peers"
 
 
-def test_add_peer_supersedes_without_narration_and_without_turn_spend() -> None:
+def test_add_peer_updates_in_place_without_narration_and_without_turn_spend() -> None:
     client = _client()
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
@@ -319,7 +319,8 @@ def test_add_peer_supersedes_without_narration_and_without_turn_spend() -> None:
     message = response.json()["message"]
     assert message["role"] == "assistant"
     card = message["metadata"]["confirmation_card"]
-    assert card["confirmation_id"] != CONFIRMATION_ID, "a new identity supersedes"
+    # No turn was spent, so nothing new appears: the same card is the record.
+    assert card["confirmation_id"] == CONFIRMATION_ID
     adjustment = card["assets_adjustment"]
     # The resolver owns display names; the row label is never trusted.
     assert adjustment["added"] == [{"symbol": "AAPL", "name": "Apple Inc."}]
@@ -344,9 +345,10 @@ def test_restore_previous_undoes_the_latest_add() -> None:
 
     added = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert added.status_code == 200, added.text
-    new_id = added.json()["message"]["metadata"]["confirmation_card"]["confirmation_id"]
+    same_id = added.json()["message"]["metadata"]["confirmation_card"]["confirmation_id"]
+    assert same_id == CONFIRMATION_ID
 
-    restored = _add(client, conversation["id"], new_id, {"restore_previous": True})
+    restored = _add(client, conversation["id"], same_id, {"restore_previous": True})
     assert restored.status_code == 200, restored.text
     message = restored.json()["message"]
     card = message["metadata"]["confirmation_card"]

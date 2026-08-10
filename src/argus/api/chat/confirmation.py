@@ -289,6 +289,73 @@ def runtime_confirmation_card(
     return card
 
 
+def apply_pending_card_update(
+    *,
+    user_id: str,
+    conversation_id: str,
+    source_message: Any,
+    confirmation_id: str,
+    confirmation_payload: dict[str, Any],
+    language: str,
+    metadata_extra: dict[str, Any] | None = None,
+):
+    """The only write path for a non-turn change to a pending confirmation.
+
+    The edit contract's dividing line is whether a turn was spent, not which
+    affordance asked. A turn-based edit mints a new card because the
+    conversation records the change; a non-turn change spent nothing, so the
+    card it changed is the record, rewritten in place: same confirmation id,
+    same message, nothing appended. Every non-turn producer must write
+    through here; a key set to None in ``metadata_extra`` is removed so a
+    consumed sidecar cannot go stale on the updated card. Returns the updated
+    message, or None when the card cannot be assembled.
+    """
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+    from argus.api.message_store import update_message_artifact
+
+    confirmation_payload["confirmation_id"] = confirmation_id
+    confirmation_payload["artifact_id"] = confirmation_id
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": confirmation_payload,
+        },
+        confirmation_id=confirmation_id,
+        conversation_id=conversation_id,
+        language=language,
+    )
+    if card is None:
+        return None
+    reference = confirmation_artifact_reference(
+        confirmation_id=confirmation_id,
+        confirmation_payload=confirmation_payload,
+        confirmation_card=card,
+    )
+    metadata: dict[str, Any] = {
+        **source_message.metadata,
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "await_approval",
+        "confirmation_card": card,
+        "confirmation_payload": confirmation_payload,
+        "active_confirmation_reference": reference.model_dump(mode="python"),
+        "artifact_references": [reference.model_dump(mode="python")],
+    }
+    for key, value in (metadata_extra or {}).items():
+        if value is None:
+            metadata.pop(key, None)
+        else:
+            metadata[key] = value
+    return update_message_artifact(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=source_message.id,
+        content=str(card.get("summary") or ""),
+        metadata=metadata,
+    )
+
+
 def attach_research_peer_rows(
     runtime_result: dict[str, Any],
     metadata: dict[str, Any],
