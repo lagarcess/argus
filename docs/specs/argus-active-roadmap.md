@@ -250,6 +250,43 @@ but a receipt list so revocation is real. ChatGPT exposed roughly 100,000 shared
 conversations through a toggle users misread, and Claude shipped share links
 with no noindex at all.
 
+## Specced, not yet placed
+
+### Follow up on unfinished work
+
+**Spec is written and founder-locked:**
+[`2026-08-09-follow-up-on-unfinished-work.md`](../superpowers/specs/2026-08-09-follow-up-on-unfinished-work.md).
+Rank against the five is a founder call and is deliberately not claimed here.
+
+Argus brings a user back by finishing a turn they started and abandoned. "You
+compared Costco, Walmart and Target three weeks ago and never tested it. Costco
+reported earnings since. Want to run it now?"
+
+- **It amends the rail spec in three places, and the amendments are written
+  into that file.** "Pull on return, never push" is replaced by: Argus may
+  follow up only on something the user started and left open, and only when a
+  fact specific to that thing changed. The initiation is the user's own,
+  deferred, so an alerting product is structurally unreachable: Argus never
+  picks the subject. Rail section 11c retires the requirement that memory record
+  research subjects, open threads, and comparison sets, and rail section 12b
+  retires "autonomous monitoring" from the non-goal list.
+- **A reader over canonical records, working with memory off**, on the same
+  precedent as pillar 4. Memory is a ranking sharpener only, and
+  `MemoryCategory` does not grow.
+- **It cannot be built yet, and that is the headline.** The rail flag is false,
+  so zero open threads exist. The spec's section 0 carries four checkable
+  preconditions: rail on in production, #411 and #412 closed, real threads
+  accumulated to a stated floor, and the email decision made.
+- **Email is a hard dependency and is not approved.** Widening the
+  single-purpose Resend helper into a consented mail capability is its own lane
+  and its own founder decision.
+- **Shares one reader with the empty chat polish sidequest, Piece 2.** Ownership
+  is stated in the spec so two do not get built.
+- **Scheduler is solved and merged.** #414 landed `argus-maintenance`, a
+  `type: cron` service on `*/15 * * * *`. A Render cron service carries one
+  schedule, so this pillar rides that pass as a guarded daily branch rather than
+  a second schedule or a second surface.
+
 ## Continuous, not a lane
 
 **Conversational runtime robustness.** Keep exercising the real chat runtime and
