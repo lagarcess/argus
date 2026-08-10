@@ -831,15 +831,14 @@ def compose_completed_research(
     if not rows:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     capability_class = str(job_request.get("capability_class") or "thorough_research")
-    sidecar: dict[str, Any] = {
-        "schema_version": RESEARCH_SCHEMA_VERSION,
-        "capability_class": capability_class,
-        "shape": "thorough",
-        "sources": typed_sources(packet),
-        "retrieved_at": packet.retrieved_at.isoformat(),
-        "anchor_symbols": [s["symbol"] for s in subjects],
-        "peers": peers,
-        "usage": {
+    sidecar = build_research_sidecar(
+        capability_class=capability_class,
+        shape="thorough",
+        sources=typed_sources(packet),
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=subjects,
+        peers=peers,
+        usage={
             "invocations": packet.usage.invocations,
             "latency_ms": packet.usage.latency_ms,
             "cost_usd": packet.usage.cost_usd,
@@ -847,17 +846,12 @@ def compose_completed_research(
             # cache hits answer inline and never reach a job.
             "cache_status": "miss",
         },
-        "follow_up": research_follow_up_block(
-            subjects=subjects,
-            peers=peers,
-            shape="thorough",
-            period_of_interest=(
-                str(job_request.get("period_of_interest"))
-                if job_request.get("period_of_interest")
-                else None
-            ),
+        period_of_interest=(
+            str(job_request.get("period_of_interest"))
+            if job_request.get("period_of_interest")
+            else None
         ),
-    }
+    )
     return {
         "answer": answer,
         "research": sidecar,
@@ -987,6 +981,43 @@ def research_follow_up_block(
     }
 
 
+def build_research_sidecar(
+    *,
+    capability_class: str,
+    shape: str,
+    sources: list[dict[str, Any]],
+    retrieved_at: str,
+    subjects: list[dict[str, str]],
+    peers: list[dict[str, str]],
+    usage: dict[str, Any],
+    period_of_interest: str | None,
+    category: str | None = None,
+    degraded_code: str | None = None,
+) -> dict[str, Any]:
+    """Build the only supported research sidecar shape."""
+    sidecar: dict[str, Any] = {
+        "schema_version": RESEARCH_SCHEMA_VERSION,
+        "capability_class": capability_class,
+        "shape": shape,
+        "sources": sources,
+        "retrieved_at": retrieved_at,
+        "anchor_symbols": [subject["symbol"] for subject in subjects],
+        "peers": peers,
+        "usage": usage,
+        "follow_up": research_follow_up_block(
+            subjects=subjects,
+            peers=peers,
+            shape=shape,
+            period_of_interest=period_of_interest,
+            category=category,
+        ),
+    }
+    if degraded_code:
+        sidecar["degraded"] = {"code": degraded_code}
+    assert set(sidecar) <= RESEARCH_SIDECAR_KEYS, "undocumented research sidecar key"
+    return sidecar
+
+
 def research_stage_result(
     *,
     answer: str,
@@ -1005,30 +1036,22 @@ def research_stage_result(
     decision = research_decision(
         interpretation, user, f"research_answer_{capability_class}"
     )
-    sidecar: dict[str, Any] = {
-        "schema_version": RESEARCH_SCHEMA_VERSION,
-        "capability_class": capability_class,
-        "shape": shape,
-        "sources": typed_sources(packet),
-        "retrieved_at": packet.retrieved_at.isoformat(),
-        "anchor_symbols": [s["symbol"] for s in subjects],
-        "peers": peers,
-        "usage": {
+    sidecar = build_research_sidecar(
+        capability_class=capability_class,
+        shape=shape,
+        sources=typed_sources(packet),
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=subjects,
+        peers=peers,
+        usage={
             "invocations": packet.usage.invocations,
             "latency_ms": packet.usage.latency_ms,
             "cost_usd": packet.usage.cost_usd,
             "cache_status": cache_status,
         },
-        "follow_up": research_follow_up_block(
-            subjects=subjects,
-            peers=peers,
-            shape=shape,
-            period_of_interest=period_of_interest,
-        ),
-    }
-    if degraded_code:
-        sidecar["degraded"] = {"code": degraded_code}
-    assert set(sidecar) <= RESEARCH_SIDECAR_KEYS, "undocumented research sidecar key"
+        period_of_interest=period_of_interest,
+        degraded_code=degraded_code,
+    )
     stage_patch: dict[str, Any] = {
         "assistant_response": answer,
         "research": sidecar,
