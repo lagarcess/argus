@@ -77,6 +77,16 @@ def apply_cost_fidelity(
     for field_name in ("fee_rate", "slippage"):
         if field_name in validated_fields:
             continue
+        if field_name not in grounded_conflicts and _cost_retains_validated_evidence(
+            draft,
+            field_name=field_name,
+            current_message=current_message,
+        ):
+            # Deterministic validation already earned this turn survives an
+            # absent or empty audit; re-litigating it is how a repair pass
+            # silently drops a stated cost (#367). A conflicting audit above
+            # still wins, because it read the same message and disagreed.
+            continue
         if field_name in grounded_conflicts or _introduces_unowned_cost(
             draft, field_name=field_name, prior_strategy=prior_strategy
         ):
@@ -109,6 +119,32 @@ def apply_cost_fidelity(
         )
     )
     return True
+
+
+def _cost_retains_validated_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    field_name: str,
+    current_message: str,
+) -> bool:
+    """A cost the deterministic channel already validated for this value.
+
+    A str span must still anchor in the current message; a None span is typed
+    edit-plan provenance and needs no quote. A value that no longer matches
+    the validated marker is a new claim and gets no pass.
+    """
+    marker = draft._validated_execution_cost_evidence.get(field_name)
+    if marker is None:
+        return False
+    rate, span = marker
+    candidate = draft.extra_parameters.get(field_name)
+    if isinstance(candidate, bool) or not isinstance(candidate, (int, float)):
+        return False
+    if float(candidate) != float(rate):
+        return False
+    if span is None:
+        return True
+    return bool(span) and span in str(current_message or "")
 
 
 def _bounded_cost_evidence(

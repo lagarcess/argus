@@ -5,6 +5,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from datetime import date
 from typing import Any
 
@@ -190,33 +191,62 @@ def _focused_extraction_field_provenance(
     return provenance
 
 
+# The base response's classification metadata, not user-stated executable
+# context; carrying it would relabel the repaired strategy. Same exclusion the
+# turn-level contextual merge applies when preserving a strategy family.
+_REPAIR_MERGE_CLASSIFICATION_KEYS = frozenset({"raw_strategy_type", "template"})
+
+_REPAIR_MERGE_DICT_CHANNELS = ("extra_parameters", "field_provenance", "evidence_spans")
+
+
 def _merge_focused_repair_with_base(
     *,
     response: LLMInterpretationResponse,
     base_response: LLMInterpretationResponse | None,
 ) -> LLMInterpretationResponse:
+    """Carry every user-stated fact the focused schema could not restate.
+
+    One edit contract owns preservation (spec §3.5/#367): repair holds no
+    private list of what survives. Preservation is field-general over the
+    whole draft — a gap in the repaired draft is filled from the base, and the
+    repair's own statements always win — so a stated cost, contribution, or
+    rule parameter cannot be dropped just because the focused schema has no
+    field for it. Silent partial application is the defect this guards.
+    """
     if base_response is None:
         return response
     repaired = response.model_copy(deep=True)
     draft = repaired.candidate_strategy_draft
     base = base_response.candidate_strategy_draft
-    for field_name in (
-        "raw_user_phrasing",
-        "strategy_thesis",
-        "asset_universe",
-        "asset_class",
-        "date_range",
-        "date_range_intent",
-        "timeframe",
-        "cadence",
-        "capital_amount",
-        "position_size",
-        "comparison_baseline",
-    ):
+    for field_name in LLMStrategyDraft.model_fields:
+        if field_name in _REPAIR_MERGE_DICT_CHANNELS:
+            continue
         current_value = getattr(draft, field_name)
         base_value = getattr(base, field_name)
         if _llm_value_is_empty(current_value) and not _llm_value_is_empty(base_value):
-            setattr(draft, field_name, base_value)
+            setattr(draft, field_name, deepcopy(base_value))
+    for channel in _REPAIR_MERGE_DICT_CHANNELS:
+        merged = {
+            key: deepcopy(value)
+            for key, value in getattr(base, channel).items()
+            if not _llm_value_is_empty(value)
+            and not (
+                channel == "extra_parameters"
+                and key in _REPAIR_MERGE_CLASSIFICATION_KEYS
+            )
+        }
+        for key, value in getattr(draft, channel).items():
+            if not _llm_value_is_empty(value):
+                merged[key] = value
+        setattr(draft, channel, merged)
+    # The validated-cost channel is deterministic-only, so it re-attaches only
+    # where the merged value still equals the validated one.
+    for field_name, marker in base._validated_execution_cost_evidence.items():
+        if (
+            field_name not in draft._validated_execution_cost_evidence
+            and draft.extra_parameters.get(field_name) == marker[0]
+        ):
+            draft._validated_execution_cost_evidence[field_name] = marker
     if not repaired.user_goal_summary and base_response.user_goal_summary:
         repaired.user_goal_summary = base_response.user_goal_summary
     repaired.reason_codes = list(
