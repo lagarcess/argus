@@ -12,6 +12,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     ResolvedArtifactEdit,
     apply_edit_operations,
     resolved_asset_operation_symbols,
+    typed_unapplied_operations,
 )
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_symbols,
@@ -1387,34 +1388,6 @@ def _canonical_draft_date_request(
     return None
 
 
-_DROPPED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
-
-
-def _typed_unapplied_operations(
-    *,
-    resolved_unsupported: list[str],
-    dropped_cost_fields: list[str],
-) -> list[dict[str, str]]:
-    """Typed record of requested changes that did not land, with reasons."""
-    unapplied: list[dict[str, str]] = []
-    for entry in resolved_unsupported:
-        op, _, target = str(entry).partition(".")
-        if not target:
-            op, target = "set", op
-        unapplied.append(
-            {"op": op, "target": target, "reason": "unsupported_operation"}
-        )
-    for field_name in dropped_cost_fields:
-        unapplied.append(
-            {
-                "op": "set",
-                "target": _DROPPED_COST_TARGETS.get(field_name, field_name),
-                "reason": "cost_evidence_ungrounded",
-            }
-        )
-    return unapplied
-
-
 def _materialized_artifact_edit(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -1461,7 +1434,7 @@ def _materialized_artifact_edit(
         extra_parameters=extra_parameters,
         field_provenance=field_provenance,
     )
-    unapplied = _typed_unapplied_operations(
+    unapplied = typed_unapplied_operations(
         resolved_unsupported=resolved.unsupported if resolved is not None else [],
         dropped_cost_fields=dropped_costs,
     )

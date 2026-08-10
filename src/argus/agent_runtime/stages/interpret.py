@@ -238,6 +238,7 @@ from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
 )
 from argus.agent_runtime.stages.interpret_internal.pending_date_answer import (
     pending_date_answer_interpretation as _pending_date_answer_interpretation,
+    repair_pending_date_answer_route_when_pending_need_is_active as _route_repair_pending_date_answer,
 )
 from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noqa: F401
     _DATE_RANGE_EVIDENCE_KEYS,
@@ -1681,67 +1682,10 @@ def _date_range_from_strategy_bounded_evidence(
 
 
 def _repair_pending_date_answer_route_when_pending_need_is_active(
-    *,
-    interpretation: StructuredInterpretation,
-    current_user_message: str,
-    language: str | None,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
+    **kwargs: Any,
 ) -> StructuredInterpretation:
-    requested_field = _selected_requested_field(selected_thread_metadata)
-    if requested_field != "date_range":
-        return interpretation
-    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
-    if last_stage_outcome and last_stage_outcome != "await_user_reply":
-        return interpretation
-    candidate_endpoints = _date_range_endpoints(interpretation.candidate_strategy_draft.date_range)
-    if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
-        return interpretation
-    if candidate_endpoints is not None and any(candidate_endpoints):
-        return interpretation
-    if (
-        interpretation.semantic_turn_act != "answer_pending_need"
-        and "date_range_refinement" not in interpretation.reason_codes
-        and not interpretation.requires_clarification
-        and _candidate_strategy_has_backtest_shape(
-            interpretation.candidate_strategy_draft
-        )
-    ):
-        return interpretation
-    if _interpretation_carries_broader_edit_than_dates(interpretation):
-        # §3.3: a scoped date prompt answered with more than a date is a
-        # compound edit. Replacing it with a date-only reading would drop the
-        # rest of the request, so the broader turn keeps its interpretation.
-        return interpretation
-    repaired = _pending_date_answer_interpretation(
-        current_user_message=current_user_message,
-        language=language,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-        today=date.today(), allow_result_anchor=True,
-        require_explicit_range=(
-            "pending_date_answer_unowned_candidate_stripped"
-            in interpretation.reason_codes
-        ),
-        reason_code=(
-            "pending_date_answer_current_message_repaired"
-            if interpretation.semantic_turn_act == "answer_pending_need"
-            else "pending_date_answer_route_repaired"
-        ),
-    )
-    if repaired is None:
-        return interpretation
-    repaired.reason_codes = list(
-        dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
-    )
-    return repaired
-
-
-def _interpretation_carries_broader_edit_than_dates(
-    interpretation: StructuredInterpretation,
-) -> bool:
-    """The current turn states more than the date the scoped prompt asked for."""
-    return carries_broader_edit_than_dates(interpretation.candidate_strategy_draft)
+    # This module's date stays the clock seam tests patch.
+    return _route_repair_pending_date_answer(today=date.today(), **kwargs)
 
 
 def _repair_pending_date_answer_noop_from_current_message(

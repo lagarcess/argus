@@ -426,6 +426,34 @@ _INDICATOR_PARAMETER_TARGETS = {
 _TEXT_TARGETS = {"cadence", "timeframe"}
 
 
+_DROPPED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def typed_unapplied_operations(
+    *,
+    resolved_unsupported: list[str],
+    dropped_cost_fields: list[str],
+) -> list[dict[str, str]]:
+    """Typed record of requested changes that did not land, with reasons."""
+    unapplied: list[dict[str, str]] = []
+    for entry in resolved_unsupported:
+        op, _, target = str(entry).partition(".")
+        if not target:
+            op, target = "set", op
+        unapplied.append(
+            {"op": op, "target": target, "reason": "unsupported_operation"}
+        )
+    for field_name in dropped_cost_fields:
+        unapplied.append(
+            {
+                "op": "set",
+                "target": _DROPPED_COST_TARGETS.get(field_name, field_name),
+                "reason": "cost_evidence_ungrounded",
+            }
+        )
+    return unapplied
+
+
 class ResolvedArtifactEdit(BaseModel):
     """Deterministic result of applying an operation list to the current card.
 
