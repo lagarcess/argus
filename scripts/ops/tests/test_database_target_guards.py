@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
+import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +14,7 @@ from typing import Callable
 import pytest
 
 OPS_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = OPS_DIR.parents[1]
 
 CONNECTION_ENV = (
     "DATABASE_URL",
@@ -192,16 +196,17 @@ def test_stale_job_reconciliation_rejects_invalid_database_targets(
     assert "DATABASE_URL" in capsys.readouterr().err
 
 
-def test_stale_job_reconciliation_echoes_hosts_before_gateway_construction(
+def test_stale_job_json_keeps_target_on_stderr_before_gateway_construction(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _clear_connection_environment(monkeypatch)
     _set_fake_connection_environment(monkeypatch)
-    output_before_gateway: list[str] = []
+    output_before_gateway: list[tuple[str, str]] = []
 
     def gateway_factory() -> object:
-        output_before_gateway.append(capsys.readouterr().out)
+        captured = capsys.readouterr()
+        output_before_gateway.append((captured.out, captured.err))
         return object()
 
     def stale_scan(**_kwargs: object) -> dict[str, object]:
@@ -216,10 +221,16 @@ def test_stale_job_reconciliation_echoes_hosts_before_gateway_construction(
 
     assert entry_point.main(["--json"]) == 0
     assert output_before_gateway == [
-        "destructive database target: "
-        "database_host=db.issue413.test supabase_host=api.issue413.test\n"
+        (
+            "",
+            "destructive database target: "
+            "database_host=db.issue413.test supabase_host=api.issue413.test\n",
+        )
     ]
-    assert "do-not-print" not in output_before_gateway[0]
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {"status": "ready"}
+    assert captured.err == ""
+    assert "do-not-print" not in output_before_gateway[0][1]
 
 
 @dataclass(frozen=True)
@@ -234,16 +245,17 @@ class _CleanupResult:
         }
 
 
-def test_guest_cleanup_echoes_hosts_before_gateway_construction(
+def test_guest_cleanup_keeps_json_stdout_clean_and_announces_before_gateway(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _clear_connection_environment(monkeypatch)
     _set_fake_connection_environment(monkeypatch)
-    output_before_gateway: list[str] = []
+    output_before_gateway: list[tuple[str, str]] = []
 
     def gateway_factory() -> object:
-        output_before_gateway.append(capsys.readouterr().out)
+        captured = capsys.readouterr()
+        output_before_gateway.append((captured.out, captured.err))
         return object()
 
     def guest_cleanup_operation(*_args: object, **_kwargs: object) -> object:
@@ -259,10 +271,19 @@ def test_guest_cleanup_echoes_hosts_before_gateway_construction(
 
     assert entry_point.main() == 0
     assert output_before_gateway == [
-        "destructive database target: "
-        "database_host=db.issue413.test supabase_host=api.issue413.test\n"
+        (
+            "",
+            "destructive database target: "
+            "database_host=db.issue413.test supabase_host=api.issue413.test\n",
+        )
     ]
-    assert "do-not-print" not in output_before_gateway[0]
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {
+        "auth_delete_failed": 0,
+        "purge_failed": 0,
+    }
+    assert captured.err == ""
+    assert "do-not-print" not in output_before_gateway[0][1]
 
 
 def test_stale_job_reconciliation_maps_explicit_operator_aliases(
@@ -344,3 +365,47 @@ def test_project_url_is_pinned_as_the_announced_gateway_target(
 
     assert entry_point.main(["--json"]) == 0
     assert supabase_url_at_gateway == ["https://project-api.issue413.test"]
+
+
+def test_stale_job_wrapper_does_not_load_repository_dotenv(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "checkout"
+    github_dir = checkout / ".github"
+    bin_dir = checkout / "bin"
+    github_dir.mkdir(parents=True)
+    bin_dir.mkdir()
+    shutil.copy2(REPO_ROOT / ".github/stale-backtest-jobs.sh", github_dir)
+    shutil.copy2(REPO_ROOT / ".github/argus-env.sh", github_dir)
+    (checkout / ".env").write_text(
+        "DATABASE_URL=postgresql://dotenv.issue413.test/argus\n"
+        "ARGUS_STALE_JOBS_SUPABASE_URL=https://dotenv-api.issue413.test\n"
+        "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY=dotenv-service-role-key\n"
+    )
+    poetry_stub = bin_dir / "poetry"
+    poetry_stub.write_text(
+        "#!/bin/sh\n"
+        "printf 'database=%s\\n' \"${DATABASE_URL:-<unset>}\"\n"
+        "printf 'supabase=%s\\n' \"${SUPABASE_URL:-<unset>}\"\n"
+        "printf 'service_key=%s\\n' \"${SUPABASE_SERVICE_ROLE_KEY:-<unset>}\"\n"
+    )
+    poetry_stub.chmod(0o755)
+    environment = os.environ.copy()
+    for name in CONNECTION_ENV:
+        environment.pop(name, None)
+    environment["PATH"] = f"{bin_dir}{os.pathsep}{environment['PATH']}"
+
+    result = subprocess.run(
+        [str(github_dir / "stale-backtest-jobs.sh"), "--json"],
+        cwd=checkout,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == (
+        "database=<unset>\n" "supabase=<unset>\n" "service_key=<unset>\n"
+    )
+    assert result.stderr == ""

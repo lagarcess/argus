@@ -38,7 +38,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except DestructiveDatabaseTargetError as exc:
         parser.error(str(exc))
     pin_destructive_database_target(target)
-    announce_destructive_database_target(target)
+    announce_destructive_database_target(target, stream=sys.stderr)
 
     from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
     from argus.domain.supabase_gateway import SupabaseGateway

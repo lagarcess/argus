@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Mapping, TextIO
 from urllib.parse import urlsplit
 
 
@@ -70,13 +71,18 @@ def pin_destructive_database_target(target: DestructiveDatabaseTarget) -> None:
     os.environ["SUPABASE_URL"] = target.supabase_url
 
 
-def announce_destructive_database_target(target: DestructiveDatabaseTarget) -> None:
+def announce_destructive_database_target(
+    target: DestructiveDatabaseTarget,
+    *,
+    stream: TextIO | None = None,
+) -> None:
     """Print non-secret target evidence before gateway construction or queries."""
 
     print(
         "destructive database target: "
         f"database_host={target.database_host} "
         f"supabase_host={target.supabase_host}",
+        file=stream or sys.stdout,
         flush=True,
     )
 

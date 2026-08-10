@@ -79,7 +79,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     except DestructiveDatabaseTargetError as exc:
         parser.error(str(exc))
     pin_destructive_database_target(target)
-    announce_destructive_database_target(target)
+    announce_destructive_database_target(
+        target,
+        stream=sys.stderr if args.json else sys.stdout,
+    )
 
     from argus.api.chat.backtest_jobs import (
         DEFAULT_STALE_QUEUED_SECONDS,
