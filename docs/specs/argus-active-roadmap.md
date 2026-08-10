@@ -262,11 +262,14 @@ Argus brings a user back by finishing a turn they started and abandoned. "You
 compared Costco, Walmart and Target three weeks ago and never tested it. Costco
 reported earnings since. Want to run it now?"
 
-- **It amends rail spec section 11.** "Pull on return, never push" is replaced
-  by: Argus may follow up only on something the user started and left open, and
-  only when a fact specific to that thing changed. The initiation is the user's
-  own, deferred, so an alerting product is structurally unreachable: Argus never
-  picks the subject.
+- **It amends the rail spec in three places, and the amendments are written
+  into that file.** "Pull on return, never push" is replaced by: Argus may
+  follow up only on something the user started and left open, and only when a
+  fact specific to that thing changed. The initiation is the user's own,
+  deferred, so an alerting product is structurally unreachable: Argus never
+  picks the subject. Rail section 11c retires the requirement that memory record
+  research subjects, open threads, and comparison sets, and rail section 12b
+  retires "autonomous monitoring" from the non-goal list.
 - **A reader over canonical records, working with memory off**, on the same
   precedent as pillar 4. Memory is a ranking sharpener only, and
   `MemoryCategory` does not grow.
@@ -279,9 +282,10 @@ reported earnings since. Want to run it now?"
   and its own founder decision.
 - **Shares one reader with the empty chat polish sidequest, Piece 2.** Ownership
   is stated in the spec so two do not get built.
-- **Scheduler is solved and unmerged.** It rides `argus-maintenance` on branch
-  `claude/argus-render-cron-service-e18998` (`4930298a`), as a second job with
-  its own daily schedule, not a new Render surface.
+- **Scheduler is solved and merged.** #414 landed `argus-maintenance`, a
+  `type: cron` service on `*/15 * * * *`. A Render cron service carries one
+  schedule, so this pillar rides that pass as a guarded daily branch rather than
+  a second schedule or a second surface.
 
 ## Continuous, not a lane
 

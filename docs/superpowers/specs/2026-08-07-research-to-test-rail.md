@@ -362,6 +362,12 @@ assisted-not-automatic.
 Everything already locked still holds: user confirmation before anything
 durable, guest denial, the never-store classes, and S10.
 
+**Two parts of this section are superseded as of 2026-08-09.** The
+memory-must-record list is replaced by section 11c below. The hard boundary is
+replaced by `2026-08-09-follow-up-on-unfinished-work.md` section 2, and the
+matching non-goal by section 12b below. Read those before building against this
+section.
+
 ## 11b. Amendment 2026-08-07: one rail, not two
 
 **This amendment is binding and supersedes anything above that conflicts with
@@ -427,6 +433,8 @@ points with a taxonomy arbitrating between them, which is the failure.
   subjects, open threads, and comparison sets. The rail must **emit** those in a
   typed form the memory lane can consume, even though consumption ships
   separately. Without the producer the follow-up lane has to retrofit it.
+  *(Section 11c retires the memory-must-record requirement. The producer seam
+  itself is unchanged and still required; only the consumer changed.)*
 
 ### Acceptance for this amendment
 
@@ -438,11 +446,91 @@ points with a taxonomy arbitrating between them, which is the failure.
 - The rail fires at default configuration with no knob raised.
 - Research subjects and open threads are emitted in a typed, consumable shape.
 
+## 11c. Amendment 2026-08-09: the sidecar is canonical, not memory
+
+**This amendment is binding and supersedes section 11's requirement that memory
+record research subjects, open threads, and comparison sets.** It is written as
+its own numbered amendment because section 11 states that requirement as a
+locked list, and a spec that reverses it inside a paragraph in another file
+leaves two founder-locked instructions standing.
+
+Section 11 says:
+
+> New categories memory must record, beyond confirmed preferences and saved
+> decisions: **Research subjects** ... **Open threads** ... **Comparison sets**
+
+That requirement is retired. The replacement:
+
+> **Research subjects, open threads, and comparison sets are canonical records
+> the rail emits into its own sidecar. They are not memory records.** A reader
+> takes them from `messages.metadata["research"]["follow_up"]` directly, and
+> works with memory off.
+
+### Why the replacement holds
+
+Reading your own research is the same act as reading your own runs, and that
+precedent is already settled in `2026-08-07-compare-your-own-work.md` section 3:
+reading your own runs is the product, not a memory feature, and requiring
+consent for it would be absurd. A user who researched Costco and never tested it
+does not need to consent to Argus knowing that. It is in their own transcript.
+
+Routing these through memory would put a consent step in front of a retention
+feature and gate it behind memory's flag and its admin and developer role gate.
+
+**`MemoryCategory` does not grow.** Its four values in
+[`contracts.py:27`](../../../src/argus/memory/contracts.py:27) stay as they are.
+
+**Memory keeps a role, and it is smaller.** It is an optional sharpener for
+ranking, inert when disabled, never the mechanism and never a second data
+source: when several threads qualify at once, it answers which one this user
+cares about most. With memory off, ranking falls back to structured signals.
+
+Section 11b's producer seam is unchanged and still required. What changed is who
+consumes it. The consumer is the follow-up pillar,
+`2026-08-09-follow-up-on-unfinished-work.md`, section 3.
+
 ## 12. Non-goals
 
 No skill store, model picker, agent marketplace, autonomous monitoring,
 portfolio tracking, messaging channels, or trading workflow. No auth wall before
 a first test. Argus remains the pre-flight checklist.
+
+**"Autonomous monitoring" is superseded as of 2026-08-09 by section 12b below.**
+Everything else in this list stands.
+
+## 12b. Amendment 2026-08-09: initiation, not autonomous monitoring
+
+**This amendment is binding and supersedes "autonomous monitoring" in section
+12's non-goal list.** Section 11's hard boundary is amended separately, in
+`2026-08-09-follow-up-on-unfinished-work.md` section 2. This names the non-goal
+that amendment would otherwise have overridden implicitly, so no builder holds
+two founder-locked instructions at once.
+
+The replacement:
+
+> **Argus may follow up only on something the user started and left open, and
+> only when a fact specific to that thing changed. If Argus has nothing of yours
+> to point at, it sends nothing.**
+
+### Why the replacement holds
+
+The non-goal was protecting the rule that the user initiates and Argus responds.
+That rule is intact, because **the initiation is the user's own, deferred**.
+Argus finishing a turn the user opened is not Argus picking a subject.
+
+An alerting product requires Argus to choose the topic. Under this rule it
+structurally cannot, because the subject is always a record the user created.
+"PLTR is down 8 percent" is dead by construction rather than by policy: no PLTR
+thread exists in that user's history for it to attach to.
+
+### What stays a non-goal
+
+Portfolio tracking, price and threshold triggers, digests, watchlists, thesis
+warnings, and any user-authored subject or cadence. The moment a user can author
+either, this is the same product as everyone else's.
+
+**Argus never acts without you** is untouched. A follow-up ends at the ordinary
+confirmation card and is an invitation to a turn, never a turn.
 
 ## 13. Acceptance
 

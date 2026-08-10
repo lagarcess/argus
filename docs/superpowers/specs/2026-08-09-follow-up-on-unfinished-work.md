@@ -16,7 +16,7 @@ Related issues: #401, #411, #412, #409.
 
 The corpus is empty. Not small. Empty.
 
-`research_memory_block()` in
+`research_follow_up_block()` in
 [`research_grounded.py:953`](../../../src/argus/agent_runtime/research_grounded.py:953)
 only fires on a research turn. Research is gated by `research_rail_enabled()`
 ([`conversations.py:830`](../../../src/argus/api/routers/conversations.py:830)),
@@ -107,6 +107,19 @@ runs, confirms, or executes anything. Every follow-up ends at the ordinary
 confirmation card with the ordinary explicit confirmation. A follow-up is an
 invitation to a turn, never a turn.
 
+### Written into the rail spec, not only here
+
+Two founder-locked statements in the rail spec are displaced by this pillar, and
+both are amended in that file rather than left to be overridden implicitly from
+this one. Two specs giving opposite instructions is worse than either being
+wrong.
+
+- **Rail spec section 11c** retires section 11's requirement that memory record
+  research subjects, open threads, and comparison sets. Section 3 below is the
+  replacement.
+- **Rail spec section 12b** retires "autonomous monitoring" from section 12's
+  non-goal list, on the initiation rule stated above.
+
 ## 3. What it reads: canonical records, and it works with memory off
 
 **This is a reader over the user's own canonical records. It is not a memory
@@ -125,7 +138,7 @@ Sources, all owner-scoped and all already written:
 
 | Record | What it supplies |
 | --- | --- |
-| `messages.metadata["research"]["memory"]` | subjects, comparison set, peer suggestions, open thread |
+| `messages.metadata["research"]["follow_up"]` | subjects, comparison set, peer suggestions, open thread |
 | `backtest_runs` | whether a test happened, by owner and `symbols` |
 | `decision_notes` | `revisit_later` as an explicit open state |
 | `ideas`, `idea_versions` | lineage, so a follow-up points at the right version |
@@ -150,31 +163,26 @@ records and must not become them. Requiring a per-thread confirmation before
 Argus may follow up would put a consent step in front of a retention feature,
 which is backwards.
 
-### The naming defect that caused this confusion, and must not cause it again
+This reverses rail spec section 11, which lists those same three as categories
+memory must record. The reversal is written into that file as **section 11c** so
+the two specs do not stand in contradiction.
 
-`research_memory_block()` writes a sidecar field literally named `"memory"` into
-`messages.metadata["research"]`. It is not a memory record, it never passes
+### The naming defect that caused this confusion, and is now fixed
+
+`research_memory_block()` wrote a sidecar field literally named `"memory"` into
+`messages.metadata["research"]`. It was never a memory record: it does not pass
 through `MemoryService`, it carries no consent receipt, and it is written
-whether or not memory is enabled.
+whether or not memory is enabled. That name had already misled one reader into
+specifying this pillar as a memory consumer.
 
-That name has already misled one reader into specifying this pillar as a memory
-consumer. It will mislead the next one.
+**The rename shipped in #418.** The sidecar key is `follow_up`, the producer is
+[`research_follow_up_block()`](../../../src/argus/agent_runtime/research_grounded.py:953),
+the schema version is `argus_research_follow_up/v1`, and
+`RESEARCH_SIDECAR_KEYS`, `docs/API_CONTRACT.md`, and the OpenAPI artifact moved
+with it. No legacy `memory` key is tolerated anywhere, because production
+carried zero rows to migrate: the flag has never been on.
 
-**Decision: rename the sidecar key and the function while the corpus is empty.**
-`memory` becomes `follow_up`, `research_memory_block()` becomes
-`research_follow_up_block()`, and `RESEARCH_SIDECAR_KEYS` updates with it. This
-is a documented contract surface, so `docs/API_CONTRACT.md` and the OpenAPI
-artifact move with it.
-
-**This is dispatched, not owed by this pillar.** It is being built on
-`claude/research-memory-follow-up-rename-43ec89`.
-
-It will never be cheaper than now: production has zero rows carrying the key,
-because the flag has never been on. Readers should accept the legacy `memory`
-key for non-production rows written during development, and that tolerance
-should be removed rather than kept forever. If the rename does not happen before
-the flag flips, it does not happen at all, and the doc comment must then say in
-one line that this field is not a memory record.
+A reader of this spec should expect `follow_up` and nothing else.
 
 ## 4. Eligibility: what counts as unfinished work
 
@@ -251,8 +259,10 @@ Free or near-free signals that must be exhausted before any provider call:
   present in `src/argus/domain/market_data/capabilities.py`.
 - Known earnings dates for the thread's symbols.
 - Elapsed time since the thread opened.
-- Whether the user has since run anything at all, which closes the thread with
-  no provider call.
+- Whether a completed run owned by that user, whose `symbols` intersect the
+  thread's subjects, has landed since the thread opened. That closes the thread
+  under section 4's rule with no provider call. Any other run the user made does
+  not close it.
 
 **A hard spend ceiling on the qualification pass is required**, declared in the
 environment contract and default-off with the rest of the feature. A pass that
@@ -449,35 +459,42 @@ report rather than inline a mail subsystem into a follow-up lane.
 
 ## 14. Infrastructure
 
-Anything scheduled needs a scheduler, and Argus has one built and unmerged.
+Anything scheduled needs a scheduler, and Argus has one.
 
-`render.yaml` at head defines two `type: web` services and no cron. Branch
-`claude/argus-render-cron-service-e18998`, commit `4930298a`, adds
-`argus-maintenance` as a `type: cron` service on `*/15 * * * *`, running one
-entry point that invokes guest retention and stale-job reconciliation unchanged.
-It closes #401 and the scheduled half of #412. It is blocked on a denied `git
-push`, so it has no PR and no CI, not on an open decision.
+`render.yaml` defines `argus-maintenance`, a `type: cron` service on
+`*/15 * * * *` running `scripts/ops/scheduled_maintenance.py`, which invokes
+guest retention and stale-job reconciliation in one pass. It merged in #414,
+which answers #401 and the scheduled half of #412. Both issues are still open.
 
-**Render Cron is the answer, and this pillar is a second job on that service,
-not a new platform surface.** The reason #401 gives applies identically:
-production data work should not require production service-role credentials
-sitting in GitHub Actions.
+**This pillar rides that pass. It does not add a Render service.** The reason
+#401 gives applies identically: production data work should not require
+production service-role credentials sitting in GitHub Actions.
 
 Two things a builder needs to know:
 
-- Adding a Render service touches five files, not four. Beyond `render.yaml`,
-  `.github/argus-env.sh`, `.github/private-alpha-release-profile.json`, and
-  `.env.example`, the validator `.github/private-alpha-release-profile.py` has a
-  hard `SURFACES` tuple and an `expected_names` map that reject a profile whose
-  service set differs. Adding a **job** to an existing service avoids this;
-  adding a service does not.
-- This feature's cadence is not fifteen minutes. Daily evaluation, weekly sends.
-  That is a separate schedule on the same service, not a fourth call inside the
-  existing maintenance pass, so a slow qualification run cannot delay guest
-  retention or job reconciliation.
+- **A Render `type: cron` service carries one schedule and one start command.**
+  There is no second schedule to hang on an existing service. The follow-up
+  evaluation therefore runs as a **guarded daily branch inside the existing
+  `*/15` pass**: the pass checks whether it is the daily slot and, if so, also
+  runs qualification. Daily evaluation and weekly sends, on a fifteen-minute
+  heartbeat.
+- **Do not add a second cron service.** Adding a Render surface touches eleven
+  enumeration sites, which #414 paid over two review rounds: beyond
+  `render.yaml`, `.github/argus-env.sh`,
+  `.github/private-alpha-release-profile.json`, and `.env.example`, the
+  validator `.github/private-alpha-release-profile.py` carries a hard `SURFACES`
+  tuple and an `expected_names` map that reject a profile whose service set
+  differs. A job riding the existing pass pays none of that.
 
-If the cron branch is still unmerged when this pillar is dispatched, that is a
-blocker to report, not a reason to build a second scheduling mechanism.
+Isolation comes from the pass itself rather than from a separate schedule.
+`run_maintenance()` runs each job in its own child process and runs every job
+even after an earlier one fails, so qualification is appended after retention
+and reconciliation and cannot delay or take down work that already ran. A failed
+qualification leaves the pass `degraded` and its own report intact in the cron
+log.
+
+There is no second scheduling mechanism to build. A builder who thinks this
+feature needs one should stop and report instead.
 
 ## 15. The differentiation, and defend it
 
@@ -551,7 +568,10 @@ second scheduler, no public sharing, and no urgency in any copy in any language.
 ### Argus authority
 
 - `docs/superpowers/specs/2026-08-07-research-to-test-rail.md`, sections 4, 7,
-  9b, 11, 11b, and 13b. Section 11's hard boundary is amended by section 2 here.
+  9b, 11, 11b, 11c, 12b, and 13b. Section 11's hard boundary is amended by
+  section 2 here. Its memory-must-record list is amended by rail section 11c,
+  and section 12's autonomous-monitoring non-goal by rail section 12b, both
+  written into the rail spec itself.
 - `docs/superpowers/specs/2026-08-07-compare-your-own-work.md`, section 3, for
   the works-with-memory-off precedent this spec follows exactly.
 - `docs/superpowers/specs/2026-08-06-personalization-memory-recall-loop.md`, for
