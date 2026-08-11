@@ -3242,12 +3242,15 @@ publishes no result: it settles as a completed turn carrying the standard
 job state and the run id that was withheld. The just-computed finalized
 tuple is removed rather than left readable, because each part surfaces
 without a link check: the run row through History and latest-result
-reads, the evidence artifact and idea through the Omnisearch leaves. The
-minted idea version and its evidence go first (decisions cascade), an
-idea left versionless goes with them while one with earlier published
-versions is repointed to its latest remaining version, and the run row
-goes last; the refusal record on the job's execution metadata and the
-turn's message is the audit trail. The final frame carries no `run`, `result_card`, or result
+reads, the evidence artifact and idea through the Omnisearch leaves.
+One transactional database function
+(`public.delete_withheld_backtest_result`, service-role only) owns the
+removal for every gateway, so product reads can never observe a partial
+tuple: the minted idea version and its evidence go first (decisions
+cascade), an idea left versionless goes with them while one with earlier
+published versions is repointed to its latest remaining version, and the
+run row goes last. The refusal record on the job's execution metadata
+and the turn's message is the audit trail. The final frame carries no `run`, `result_card`, or result
 continuity ids, so clients render the localized recovery text instead of
 a result, and the simulation allowance stays settled at admission per the
 usage rules above.

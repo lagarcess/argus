@@ -1558,77 +1558,21 @@ class PostgresBacktestJobGateway:
         return _json_safe(row)
 
     def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
-        """Atomically remove the full finalized tuple of a withheld run:
-        evidence, minted idea version (decisions cascade), an idea left
-        versionless, then the run row. Every part is product-readable
-        without a link check (History, latest-result, the Omnisearch idea
-        and evidence leaves), and the children go first while their
-        source_run_id pointers still exist."""
-        params = {"run_id": run_id, "user_id": user_id}
+        """Remove the full finalized tuple of a withheld run atomically.
+
+        The database function is the one owner of the removal (children
+        first, run row last, ideas with earlier versions repointed), so
+        this gateway and the API gateway cannot drift apart and product
+        reads can never observe a partial tuple."""
         with self._connection() as conn:
-            with conn.transaction():
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        delete from public.evidence_artifacts
-                        where user_id = %(user_id)s
-                          and source_run_id = %(run_id)s
-                        """,
-                        params,
-                    )
-                    cur.execute(
-                        """
-                        delete from public.idea_versions
-                        where user_id = %(user_id)s
-                          and source_run_id = %(run_id)s
-                        returning idea_id
-                        """,
-                        params,
-                    )
-                    idea_ids = {
-                        str(row["idea_id"]) for row in cur.fetchall() if row["idea_id"]
-                    }
-                    for idea_id in idea_ids:
-                        idea_params = {"user_id": user_id, "idea_id": idea_id}
-                        cur.execute(
-                            """
-                            delete from public.ideas as idea
-                            where idea.user_id = %(user_id)s
-                              and idea.id = %(idea_id)s
-                              and not exists (
-                                select 1 from public.idea_versions as v
-                                where v.idea_id = idea.id
-                              )
-                            """,
-                            idea_params,
-                        )
-                        cur.execute(
-                            """
-                            update public.ideas as idea
-                            set active_version_id = (
-                                select v.id from public.idea_versions as v
-                                where v.user_id = %(user_id)s
-                                  and v.idea_id = idea.id
-                                order by v.created_at desc
-                                limit 1
-                            ),
-                                updated_at = now()
-                            where idea.user_id = %(user_id)s
-                              and idea.id = %(idea_id)s
-                              and idea.active_version_id is null
-                            """,
-                            idea_params,
-                        )
-                    cur.execute(
-                        """
-                        delete from public.backtest_runs
-                        where id = %(run_id)s
-                          and user_id = %(user_id)s
-                        returning id
-                        """,
-                        params,
-                    )
-                    return cur.fetchone() is not None
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select public.delete_withheld_backtest_result("
+                    "%(user_id)s, %(run_id)s) as deleted",
+                    {"run_id": run_id, "user_id": user_id},
+                )
+                row = cur.fetchone()
+        return bool(row and row.get("deleted"))
 
     def mark_backtest_job_failed(
         self,
