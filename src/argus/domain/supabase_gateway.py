@@ -1239,14 +1239,29 @@ class SupabaseGateway(
             payload["failure_detail"] = None
             payload["retryable"] = False
 
-        updated = (
+        update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .execute()
         )
-        return dict(_row_one(updated) or {})
+        if mark_succeeded:
+            from argus.domain.backtest_job_lifecycle import (
+                job_success_write_postgrest_filter,
+            )
+
+            # Success may only follow a state a worker legitimately holds;
+            # the filter is generated beside the card-restore
+            # classification so the two cannot drift. A refused write
+            # returns the standing row and the caller logs the refusal.
+            update_query = update_query.or_(job_success_write_postgrest_filter())
+        updated = update_query.execute()
+        row = _row_one(updated)
+        if row is None and mark_succeeded:
+            standing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+            if standing is not None:
+                return dict(standing)
+        return dict(row or {})
 
     def mark_backtest_job_running(
         self,

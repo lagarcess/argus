@@ -624,10 +624,21 @@ def restore_pending_card_for_failed_job(
     wrongly editable card; a missed restore leaves the card dead until the
     user starts over, and the loss is logged by the restorer.
     """
+    from argus.domain.backtest_job_lifecycle import (
+        JOB_DEAD,
+        classify_job_for_card,
+    )
+
     if not isinstance(job, dict):
         return
-    status = str(job.get("status") or "").strip().casefold()
-    if status not in {"failed", "canceled", "cancelled", "expired"}:
+    if (
+        classify_job_for_card(status=job.get("status"), retryable=job.get("retryable"))
+        != JOB_DEAD
+    ):
+        # Only a state no future write can turn into a result gives the
+        # card back; may-succeed, has-result, and unknown all fail toward
+        # consumed. The worker's success write derives its refusal from
+        # the same classification, so the two cannot drift apart.
         return
     if job.get("result_run_id"):
         # A run that produced a result consumed its card for good, whatever

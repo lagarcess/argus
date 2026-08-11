@@ -415,3 +415,250 @@ def test_newest_first_window_returns_the_tail_chronologically() -> None:
         assert contents == [
             f"message {index:02d}" for index in range(5, 25)
         ], "the window is the newest 20 in chronological order"
+
+
+def _seed_job(connection, owner, *, status, retryable, result_run_id=None):
+    import json as _json
+
+    job_id = str(uuid.uuid4())
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            insert into public.backtest_jobs
+              (id, user_id, operation_scope, idempotency_key, identity_hash,
+               payload_hash, launch_payload, status, retryable,
+               conversation_id, result_run_id)
+            values (%s, %s, 'chat.run_backtest', %s, 'identity', 'payload',
+                    %s::jsonb, %s, %s, %s, %s)
+            """,
+            (
+                job_id,
+                owner["user_id"],
+                f"key-{job_id[:8]}",
+                _json.dumps({"kind": "test"}),
+                status,
+                retryable,
+                owner["conversation_id"],
+                result_run_id,
+            ),
+        )
+    return job_id
+
+
+def _job_row(connection, job_id):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select status, result_run_id from public.backtest_jobs where id = %s",
+            (job_id,),
+        )
+        return cursor.fetchone()
+
+
+def _seed_run(connection, owner) -> str:
+    import json as _json
+
+    run_id = str(uuid.uuid4())
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            insert into public.backtest_runs
+              (id, user_id, conversation_id, status, asset_class, symbols,
+               benchmark_symbol, config_snapshot)
+            values (%s, %s, %s, 'completed', 'equity', %s, 'SPY', %s::jsonb)
+            """,
+            (
+                run_id,
+                owner["user_id"],
+                owner["conversation_id"],
+                ["NFLX"],
+                _json.dumps({"kind": "test"}),
+            ),
+        )
+    return run_id
+
+
+def _late_success_write(connection, owner, job_id, run_id):
+    """The worker's success write shape, with the generated predicate."""
+    from argus.domain.backtest_job_lifecycle import (
+        job_success_write_sql_predicate,
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            update public.backtest_jobs
+            set result_run_id = coalesce(result_run_id, %(run_id)s),
+                status = 'succeeded'
+            where id = %(job_id)s
+              and user_id = %(user_id)s
+              and (
+                'succeeded' is distinct from 'succeeded'
+                or {job_success_write_sql_predicate()}
+              )
+            returning id
+            """,
+            {
+                "job_id": job_id,
+                "user_id": owner["user_id"],
+                "run_id": run_id,
+            },
+        )
+        return cursor.fetchone() is not None
+
+
+def test_the_lifecycle_predicate_agrees_with_the_classifier_on_postgres() -> None:
+    """Walk every state the database allows and assert the generated SQL
+    fragment and the Python classification never disagree."""
+    import itertools
+
+    from argus.domain.backtest_job_lifecycle import (
+        JOB_MAY_SUCCEED,
+        classify_job_for_card,
+        job_success_write_sql_predicate,
+    )
+
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        for status, retryable in itertools.product(
+            ("queued", "running", "succeeded", "failed", "canceled", "expired"),
+            (True, False),
+        ):
+            job_id = _seed_job(connection, owner, status=status, retryable=retryable)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select "
+                    + job_success_write_sql_predicate()
+                    + " from public.backtest_jobs where id = %s",
+                    (job_id,),
+                )
+                sql_allows = bool(cursor.fetchone()[0])
+            python_allows = (
+                classify_job_for_card(status=status, retryable=retryable)
+                == JOB_MAY_SUCCEED
+            )
+            assert sql_allows == python_allows, (status, retryable)
+
+
+def test_restore_then_late_success_cannot_split_card_and_result() -> None:
+    """The round-6 interleaving, on real Postgres: the reconciler wins a
+    non-retryable failure and restores the card, then the worker's late
+    success write arrives. The write is refused, so the conversation can
+    never show an active card beside a successful result."""
+    from argus.api.chat.confirmation import (
+        consume_pending_card_for_run,
+        restore_pending_card_for_failed_job,
+    )
+
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        card = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={
+                "conversation_mode": "confirm",
+                "confirmation_card": {
+                    "confirmation_id": "conf-race",
+                    "confirmation_state": "active",
+                },
+                "confirmation_payload": {"strategy": {"capital_amount": 10000}},
+            },
+        )
+        assert (
+            consume_pending_card_for_run(
+                user_id=owner["user_id"],
+                conversation_id=owner["conversation_id"],
+                message_id=card.id,
+                gateway=gateway,
+            )
+            == "consumed"
+        )
+        job_id = _seed_job(connection, owner, status="failed", retryable=False)
+        restore_pending_card_for_failed_job(
+            gateway,
+            user_id=owner["user_id"],
+            job={
+                "status": "failed",
+                "retryable": False,
+                "confirmation_message_id": card.id,
+                "conversation_id": owner["conversation_id"],
+            },
+        )
+        restored = gateway.get_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+        )
+        assert restored is not None
+        assert restored.metadata["confirmation_card"]["confirmation_state"] == "active"
+
+        late_run_id = _seed_run(connection, owner)
+        assert not _late_success_write(
+            connection, owner, job_id, late_run_id
+        ), "success must be refused after a state the card was restored from"
+        status, result_run_id = _job_row(connection, job_id)
+        assert status == "failed" and result_run_id is None
+
+
+def test_retryable_failure_keeps_the_card_and_admits_the_late_success() -> None:
+    """The self-healing side: a retryable failure does not restore the
+    card, so the late success lands and the consumed card sits beside its
+    result, consistent."""
+    from argus.api.chat.confirmation import (
+        consume_pending_card_for_run,
+        restore_pending_card_for_failed_job,
+    )
+
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        card = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={
+                "conversation_mode": "confirm",
+                "confirmation_card": {
+                    "confirmation_id": "conf-heal",
+                    "confirmation_state": "active",
+                },
+                "confirmation_payload": {"strategy": {"capital_amount": 10000}},
+            },
+        )
+        assert (
+            consume_pending_card_for_run(
+                user_id=owner["user_id"],
+                conversation_id=owner["conversation_id"],
+                message_id=card.id,
+                gateway=gateway,
+            )
+            == "consumed"
+        )
+        job_id = _seed_job(connection, owner, status="failed", retryable=True)
+        restore_pending_card_for_failed_job(
+            gateway,
+            user_id=owner["user_id"],
+            job={
+                "status": "failed",
+                "retryable": True,
+                "confirmation_message_id": card.id,
+                "conversation_id": owner["conversation_id"],
+            },
+        )
+        stored = gateway.get_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+        )
+        assert stored is not None
+        assert (
+            stored.metadata["confirmation_card"]["confirmation_state"] == "consumed"
+        ), "a re-claimable failure must not give the card back"
+
+        late_run_id = _seed_run(connection, owner)
+        assert _late_success_write(connection, owner, job_id, late_run_id)
+        status, result_run_id = _job_row(connection, job_id)
+        assert status == "succeeded" and str(result_run_id) == late_run_id

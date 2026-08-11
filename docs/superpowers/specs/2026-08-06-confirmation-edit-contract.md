@@ -256,8 +256,13 @@ non-turn mutation, so a background run can never complete under a card
 claiming different values. Cancel-the-pending-card has nothing to act on
 once the card is consumed; cancelling the queued run keeps working, and a
 run that dies without a result restores the card to `"active"`, so the
-user who cancels edits and runs again, losing nothing. Founder directed
-2026-08-10 after three guard designs failed on split liveness truth.
+user who cancels edits and runs again, losing nothing. Restoration and
+the success write derive from one lifecycle statement
+(`argus.domain.backtest_job_lifecycle`), so a state the card was restored
+from can never convert into a result, and a re-claimable failure keeps
+the card consumed until its retries resolve. Founder directed 2026-08-10
+after three guard designs failed on split liveness truth; the one-way
+success rule followed 2026-08-11.
 
 ## 5. Non-goals
 

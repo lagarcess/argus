@@ -1055,13 +1055,21 @@ def link_shadow_backtest_job_result(
                 execution_metadata=metadata,
             )
             return
-        gateway.link_backtest_job_result(
+        linked = gateway.link_backtest_job_result(
             user_id=user_id,
             job_id=context.created_job_id,
             result_run_id=run_id,
             execution_metadata=metadata,
             mark_succeeded=mark_succeeded,
         )
+        if mark_succeeded and str(linked.get("status") or "") != "succeeded":
+            logger.warning(
+                "Success finalization refused; the job's terminal state "
+                "stands and its card consequence is owned by the writer "
+                "that won it",
+                job_id=context.created_job_id,
+                standing_status=str(linked.get("status") or ""),
+            )
     except Exception as exc:
         if not dev_memory_fallback_enabled:
             raise

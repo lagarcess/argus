@@ -1443,14 +1443,21 @@ class PostgresBacktestJobGateway:
         execution_metadata: dict[str, Any] | None = None,
         mark_succeeded: bool = False,
     ) -> dict[str, Any]:
+        from argus.domain.backtest_job_lifecycle import (
+            job_success_write_sql_predicate,
+        )
         from psycopg.types.json import Jsonb
 
         status = "succeeded" if mark_succeeded else None
         finished_at = utcnow_iso() if mark_succeeded else None
+        # Success may only follow a state a worker legitimately holds. The
+        # predicate is generated beside the card-restore classification so
+        # the two sides of the consumption design cannot drift: a state the
+        # card was restored from can never be converted into a result.
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     update public.backtest_jobs
                     set result_run_id = coalesce(result_run_id, %(result_run_id)s),
                         status = coalesce(%(status)s, status),
@@ -1471,6 +1478,10 @@ class PostgresBacktestJobGateway:
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
                       and user_id = %(user_id)s
+                      and (
+                        %(status)s is distinct from 'succeeded'
+                        or {job_success_write_sql_predicate()}
+                      )
                     returning *
                     """,
                     {
@@ -1485,7 +1496,31 @@ class PostgresBacktestJobGateway:
                 )
                 row = cur.fetchone()
                 if row is None:
-                    raise WorkflowBacktestJobError(f"Backtest job {job_id} not found.")
+                    cur.execute(
+                        """
+                        select * from public.backtest_jobs
+                        where id = %(job_id)s and user_id = %(user_id)s
+                        """,
+                        {"job_id": job_id, "user_id": user_id},
+                    )
+                    standing = cur.fetchone()
+                    if standing is None:
+                        raise WorkflowBacktestJobError(
+                            f"Backtest job {job_id} not found."
+                        )
+                    # The success write was refused: the job reached a state
+                    # no worker legitimately holds, its card may already be
+                    # restored, and that terminal state stands. The computed
+                    # run row remains for audit, unlinked.
+                    logger.warning(
+                        "Success finalization refused; the job's terminal "
+                        "state stands and its card consequence is owned by "
+                        "the writer that won it",
+                        job_id=job_id,
+                        standing_status=str(standing.get("status") or ""),
+                        mark_succeeded=mark_succeeded,
+                    )
+                    return _json_safe(standing)
         return _json_safe(row)
 
     def mark_backtest_job_failed(

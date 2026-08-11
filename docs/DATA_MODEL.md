@@ -382,6 +382,16 @@ Represents individual messages within a conversation.
   transcripts that predate the stamp and carry consumption only as later
   result messages. No reader may re-implement the predicate or infer
   liveness from job tables.
+- Job success is one-way against the card lifecycle: both success writers
+  (the worker's SQL update and the API gateway's PostgREST update) embed a
+  predicate generated beside the card-restore classification in
+  `argus.domain.backtest_job_lifecycle`, so success can only follow a state
+  a worker legitimately holds (queued, running, or a re-claimable failure).
+  A state the card was restored from can never convert into a result; a
+  refused success write leaves the terminal state standing and is logged by
+  its caller. This tightens a spine invariant so it can carry the
+  consumption feature; the unguarded write was correct self-healing before
+  cards were consumed at admission.
 - Recent-window reads use `list_messages(newest_first_window=True)`: the
   newest N messages of the conversation restored to chronological order.
   An ascending read with a limit returns the head of the conversation and
