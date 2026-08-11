@@ -92,3 +92,67 @@ Taken at 375 px on a 1500 px tall viewport. The action bar is fixed to the
 viewport, so a full-page shot floats it across the middle of the document and
 covers three assumption lines; a viewport tall enough to hold the whole receipt
 leaves the bar below the last line, where it covers nothing.
+
+## The shell reached the bottom, and the tombstone became readable
+
+Two defects on this route, both shipped with #397, both byte-identical at base
+, and both visible in that lane's own evidence
+() without having been noticed.
+
+**The white band.**  sized the dark shell with , a
+percentage min-height, which resolves against the containing block's height. Body
+sets  and never a height, so its own height stays content-based and
+the percentage resolved to nothing. On any page shorter than the screen the dark
+surface stopped at the last line and the white body showed underneath. Now
+, which is sized against the viewport and needs no cooperation from a
+parent.
+
+**The invisible tombstone.**  was the one component on this route
+written with  variants. The route runs no theme provider and the shell is
+one fixed colour on purpose, so those variants never applied and their light-mode
+values shipped: black text on the dark shell. Every sibling component was already
+unconditional light-on-dark; this one now matches.
+
+| Frame | Shows |
+| :--- | :--- |
+|  | 394 px of white body, and a title nobody can read |
+|  | dark to the bottom edge, text legible |
+|  | the same fix on a short real receipt |
+
+Captured at a real 375x812 viewport, never : a full-page shot stretches
+the viewport to the document and the gap it is meant to show disappears.
+ records what was measured in the page rather than read off an
+image. Both are pinned by test now: the layout must use , and no
+component on this route may carry a  variant.
+
+## The shell reached the bottom, and the tombstone became readable
+
+Two defects on this route, both shipped with #397, both byte-identical at base
+`d4ebaa96`, and both visible in that lane's own evidence
+(`../receipt-sharing/08a-phone-en-tombstone.png`) without having been noticed.
+
+**The white band.** `app/r/layout.tsx` sized the dark shell with `min-h-full`, a
+percentage min-height, which resolves against the containing block's height. Body
+sets `min-h-full` and never a height, so its own height stays content-based and
+the percentage resolved to nothing. On any page shorter than the screen the dark
+surface stopped at the last line and the white body showed underneath. Now
+`min-h-dvh`, which is sized against the viewport and needs no cooperation from a
+parent.
+
+**The invisible tombstone.** `ReceiptNotice` was the one component on this route
+written with `dark:` variants. The route runs no theme provider and the shell is
+one fixed colour on purpose, so those variants never applied and their light-mode
+values shipped: black text on the dark shell. Every sibling component was already
+unconditional light on dark; this one now matches.
+
+| Frame | Shows |
+| :--- | :--- |
+| `03-phone-en-tombstone-before.png` | 394 px of white body, and a title nobody can read |
+| `03-phone-en-tombstone-after.png` | dark to the bottom edge, text legible |
+| `02-phone-en-short-receipt-after.png` | the same fix on a short real receipt |
+
+Captured at a real 375x812 viewport, never `fullPage`: a full-page shot stretches
+the viewport to the document and the gap it is meant to show disappears.
+`shell-height.json` records what was measured in the page rather than read off an
+image. Both are pinned by test now: the layout must use `min-h-dvh`, and no
+component on this route may carry a `dark:` variant.

@@ -33,7 +33,13 @@ export default function PublicReceiptLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="flex min-h-full w-full flex-col bg-[#191c1f]">
+    // Sized against the viewport, not against the parent. A percentage min-height
+    // resolves against the containing block's height, and body sets min-height
+    // without ever setting a height, so its own height stays content-based and the
+    // percentage resolves to nothing. On any page shorter than the screen the dark
+    // surface stopped at the last line and the white body showed underneath, which
+    // on this route is a stranger's first sight of Argus.
+    <div className="flex min-h-dvh w-full flex-col bg-[#191c1f]">
       {children}
     </div>
   );
