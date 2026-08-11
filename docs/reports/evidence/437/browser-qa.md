@@ -7,8 +7,11 @@ interpretation, shadow jobs off), captured with the committed
 `qa-driver.mjs` at real viewports and read against rendered text before
 being trusted. Backend and frontend served from this lane's worktree.
 
-Captured at lane head `cb7dd3bc`; the commits after it are evidence and
-documentation only, so no exercised runtime path moved.
+Captured at lane head `cb7dd3bc`. The commits after it are evidence,
+documentation, the one-way integration reconciliation (docs and
+environment-script tests), and a budget-config rebaseline, so no
+exercised runtime path moved and the capture remains valid for the PR
+head.
 
 ## Matrix
 
