@@ -163,10 +163,11 @@ def apply_result_link_outcome(
 
     An accepted link stamps the result keys onto the turn's metadata and
     final payload. A refused link publishes nothing: every result key is
-    stripped, card restoration is re-attempted with the standing row (the
-    finalizer that won the terminal state may not have completed it), the
-    just-persisted finalized tuple is removed so it cannot surface through
-    durable result reads or the Omnisearch leaves, and the turn settles on
+    stripped, the just-persisted finalized tuple is removed so it cannot
+    surface through durable result reads or the Omnisearch leaves, card
+    restoration is re-attempted only after that removal succeeds (the
+    finalizer that won the terminal state may not have completed it, and
+    failing toward consumed is the guard's bias), and the turn settles on
     the ``run_result_withheld`` recovery, recording the refusal as
     ``result_link_refused``.
     """
@@ -219,12 +220,17 @@ def _withhold_refused_result_publication(
 ) -> str:
     from argus.api.chat.confirmation import restore_pending_card_for_failed_job
 
+    # Removal first, restoration second: if the cleanup fails, the raise
+    # skips the restore re-attempt, so this path never itself hands back
+    # an editable card while the tuple is still readable. Failing toward
+    # consumed is the guard's stated bias; the finalizer that won the
+    # terminal state ran its own restore either way.
+    _remove_withheld_result_tuple(gateway, user_id=user_id, run_id=run_id)
     restore_pending_card_for_failed_job(
         gateway,
         user_id=user_id,
         job=link_outcome.job,
     )
-    _remove_withheld_result_tuple(gateway, user_id=user_id, run_id=run_id)
     for stale_key in RESULT_PUBLICATION_KEYS:
         metadata.pop(stale_key, None)
         runtime_result.pop(stale_key, None)

@@ -115,6 +115,8 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     class _Run:
         id = "run-1"
 
+    order: list[str] = []
+
     class _RefusingGateway(_LinkGateway):
         def __init__(self) -> None:
             super().__init__(
@@ -127,6 +129,7 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
             self.deleted_runs: list[str] = []
 
         def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+            order.append("cleanup")
             self.deleted_runs.append(run_id)
             return True
 
@@ -134,8 +137,9 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     monkeypatch.setattr(
         chat_confirmation,
         "restore_pending_card_for_failed_job",
-        lambda gateway, *, user_id, job: restore_calls.append(
-            {"user_id": user_id, "job": job}
+        lambda gateway, *, user_id, job: (
+            order.append("restore"),
+            restore_calls.append({"user_id": user_id, "job": job}),
         ),
     )
 
@@ -160,6 +164,10 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     assert publication.publishable is False
     assert publication.assistant_text
     assert gateway.deleted_runs == ["run-1"]
+    assert order == ["cleanup", "restore"], (
+        "restoration may only follow a successful removal, so this path "
+        "can never hand back an editable card beside a readable tuple"
+    )
     assert restore_calls and restore_calls[0]["job"]["status"] == "canceled"
     assert "result_card" not in metadata and "latest_run_id" not in metadata
     assert "result_card" not in runtime_result and "run" not in runtime_result
@@ -173,7 +181,9 @@ def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
     """The withheld terminal may only be composed after the tuple left the
     result tables: a removal failure propagates so the turn fails as an
     ordinary runtime error, never persisting a claim that no result exists
-    while one remains readable."""
+    while one remains readable. The restore re-attempt is also skipped, so
+    this path cannot itself hand back an editable card beside the still
+    readable tuple."""
     from argus.api.chat import confirmation as chat_confirmation
     from argus.api.chat.result_link import apply_result_link_outcome
 
@@ -193,10 +203,11 @@ def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
         def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
             raise RuntimeError("cleanup unavailable")
 
+    restore_calls: list[str] = []
     monkeypatch.setattr(
         chat_confirmation,
         "restore_pending_card_for_failed_job",
-        lambda gateway, *, user_id, job: None,
+        lambda gateway, *, user_id, job: restore_calls.append(user_id),
     )
     context = _context()
     context.created_job_id = "job-1"
@@ -216,6 +227,7 @@ def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
                 dev_memory_fallback_enabled=True,
             )
 
+    assert restore_calls == []
     assert "recovery" not in metadata
     assert "result_link_refused" not in metadata
 
