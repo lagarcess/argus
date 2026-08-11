@@ -53,7 +53,9 @@ def _run(job, gateway, **overrides):
 def test_run_backtest_job_removes_the_run_row_when_the_link_is_refused() -> None:
     """A refused attach must not leave a completed run row behind: History
     and latest-result reads carry no link check, so the worker removes the
-    just-committed run and reports the refusal instead of the run id."""
+    just-committed run, reports the refusal instead of the run id, and
+    persists the contract's durable refusal record on the job without
+    erasing the metadata already there."""
     job, gateway = _refused_link_job()
     result = _run(job, gateway)
     assert result["status"] == "canceled"
@@ -62,6 +64,10 @@ def test_run_backtest_job_removes_the_run_row_when_the_link_is_refused() -> None
     assert "result_cleanup_reconciled" not in result
     assert gateway.deleted_runs == ["run-workflow"]
     assert gateway.row["result_run_id"] is None
+    audit = gateway.row["execution_metadata"]["result_link_refused"]
+    assert audit["run_id"] == "run-workflow"
+    assert audit["cleaned_at"]
+    assert gateway.row["execution_metadata"]["existing"] == "kept"
 
 
 def test_run_backtest_job_fails_the_task_when_cleanup_fails() -> None:
@@ -83,6 +89,10 @@ def test_run_backtest_job_fails_the_task_when_cleanup_fails() -> None:
     marker = gateway.row["execution_metadata"][RESULT_CLEANUP_PENDING_KEY]
     assert marker["run_id"] == "run-workflow"
     assert marker["failed_at"]
+    assert gateway.row["execution_metadata"]["existing"] == "kept", (
+        "the worker gateway's metadata write replaces the whole object, "
+        "so the marker must be merged onto the standing metadata"
+    )
     assert "failed" not in gateway.transitions
 
 
@@ -123,4 +133,8 @@ def test_run_backtest_job_reconciles_a_pending_cleanup_marker_at_entry() -> None
     assert gateway.deleted_runs == ["run-withheld"]
     marker = gateway.row["execution_metadata"][RESULT_CLEANUP_PENDING_KEY]
     assert marker["completed_at"]
+    assert gateway.row["execution_metadata"]["result_link_refused"]["run_id"] == (
+        "run-withheld"
+    )
+    assert gateway.row["execution_metadata"]["existing"] == "kept"
     assert gateway.transitions == []
