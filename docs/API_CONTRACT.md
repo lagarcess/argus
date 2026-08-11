@@ -3250,7 +3250,11 @@ tuple: the minted idea version and its evidence go first (decisions
 cascade), an idea left versionless goes with them while one with earlier
 published versions is repointed to its latest remaining version, and the
 run row goes last. The refusal record on the job's execution metadata
-and the turn's message is the audit trail. The final frame carries no `run`, `result_card`, or result
+and the turn's message is the audit trail. The withheld terminal is only
+composed after the removal succeeds: if the removal itself fails, the
+turn fails as an ordinary runtime error instead, so the transcript never
+claims there is no result to show while one remains readable. The final
+frame of a withheld turn carries no `run`, `result_card`, or result
 continuity ids, so clients render the localized recovery text instead of
 a result, and the simulation allowance stays settled at admission per the
 usage rules above.

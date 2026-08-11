@@ -418,13 +418,18 @@ def run_backtest_job(
         )
         timings.record_elapsed("link_result", phase_started)
         link_refused = str(succeeded.get("result_run_id") or "") != result_run_id
+        cleanup_failed = False
         if link_refused:
             # The lifecycle statement refused the attach: the job's terminal
             # state stands and its card may already be restored. Completed
             # run rows are product-readable regardless of link state, so
-            # the just-committed run leaves the result table; the refusal
-            # stays recorded on the job row and in this task's output.
-            _delete_withheld_run(gateway, user_id=user_id, run_id=result_run_id)
+            # the just-committed tuple leaves the result tables; a removal
+            # failure is reported in this task's output rather than routed
+            # through the generic failure handler, which would overwrite
+            # the job's standing terminal state.
+            cleanup_failed = not _delete_withheld_run(
+                gateway, user_id=user_id, run_id=result_run_id
+            )
         succeeded = _persist_final_workflow_timings(
             gateway,
             user_id=user_id,
@@ -437,6 +442,7 @@ def run_backtest_job(
             "status": succeeded.get("status") or "succeeded",
             "result_run_id": None if link_refused else result_run_id,
             **({"result_link_refused": True} if link_refused else {}),
+            **({"result_cleanup_failed": True} if cleanup_failed else {}),
             "workflow_run_id": workflow_run_id,
             **({"result_readout": result_readout.text} if result_readout.text else {}),
             "result_readout_source": result_readout.source,
@@ -480,21 +486,26 @@ def run_backtest_job(
         )
 
 
-def _delete_withheld_run(gateway: Any, *, user_id: str, run_id: str) -> None:
-    """Best-effort like card restoration: a miss leaks a row into History
-    until reconciled, never a wrong card."""
+def _delete_withheld_run(gateway: Any, *, user_id: str, run_id: str) -> bool:
+    """Returns whether the tuple is gone. A failure is surfaced in the
+    task's output as result_cleanup_failed instead of raising, because the
+    generic failure handler would overwrite the job's standing terminal
+    state; the workflow task run and its logs are the ops surface that
+    makes the leak visible."""
     delete_run = getattr(gateway, "delete_withheld_backtest_result", None)
     if delete_run is None:
-        return
+        return True
     try:
         delete_run(user_id=user_id, run_id=run_id)
+        return True
     except Exception:  # noqa: BLE001
         logger.opt(exception=True).warning(
-            "Withheld run row could not be removed; it remains readable "
-            "until reconciled",
+            "Withheld result tuple could not be removed; it remains "
+            "readable until an operator intervenes",
             user_id=user_id,
             run_id=run_id,
         )
+        return False
 
 
 def _already_succeeded_result(

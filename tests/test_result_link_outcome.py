@@ -167,6 +167,59 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     assert metadata["result_link_refused"]["unpublished_run_id"] == "run-1"
 
 
+def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
+    monkeypatch,
+) -> None:
+    """The withheld terminal may only be composed after the tuple left the
+    result tables: a removal failure propagates so the turn fails as an
+    ordinary runtime error, never persisting a claim that no result exists
+    while one remains readable."""
+    from argus.api.chat import confirmation as chat_confirmation
+    from argus.api.chat.result_link import apply_result_link_outcome
+
+    class _Run:
+        id = "run-1"
+
+    class _BrokenCleanupGateway(_LinkGateway):
+        def __init__(self) -> None:
+            super().__init__(
+                link_result={
+                    "id": "job-1",
+                    "status": "canceled",
+                    "result_run_id": None,
+                }
+            )
+
+        def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+            raise RuntimeError("cleanup unavailable")
+
+    monkeypatch.setattr(
+        chat_confirmation,
+        "restore_pending_card_for_failed_job",
+        lambda gateway, *, user_id, job: None,
+    )
+    context = _context()
+    context.created_job_id = "job-1"
+    context.workflow_dispatch_started = True
+    metadata: dict[str, object] = {"result_card": {"title": "x"}}
+    runtime_result: dict[str, object] = {"result_card": {"title": "x"}}
+
+    with backtest_job_shadow_context(context):
+        with pytest.raises(RuntimeError, match="cleanup unavailable"):
+            apply_result_link_outcome(
+                run=_Run(),
+                metadata=metadata,
+                runtime_result=runtime_result,
+                gateway=_BrokenCleanupGateway(),
+                user_id="user-1",
+                language="en",
+                dev_memory_fallback_enabled=True,
+            )
+
+    assert "recovery" not in metadata
+    assert "result_link_refused" not in metadata
+
+
 def test_link_outcome_tolerates_gateway_errors_only_in_dev_fallback() -> None:
     context = _context()
     context.created_job_id = "job-1"

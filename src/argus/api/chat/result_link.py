@@ -224,7 +224,7 @@ def _withhold_refused_result_publication(
         user_id=user_id,
         job=link_outcome.job,
     )
-    _remove_withheld_run_row(gateway, user_id=user_id, run_id=run_id)
+    _remove_withheld_result_tuple(gateway, user_id=user_id, run_id=run_id)
     for stale_key in RESULT_PUBLICATION_KEYS:
         metadata.pop(stale_key, None)
         runtime_result.pop(stale_key, None)
@@ -246,22 +246,29 @@ def _withhold_refused_result_publication(
     return assistant_text
 
 
-def _remove_withheld_run_row(gateway: Any | None, *, user_id: str, run_id: str) -> None:
+def _remove_withheld_result_tuple(
+    gateway: Any | None, *, user_id: str, run_id: str
+) -> None:
     """Every part of a finalized tuple is product-readable without a link
     check (History's run leaf, the latest-completed read, the Omnisearch
-    idea and evidence leaves), so a withheld run's tuple must leave those
-    tables; the refusal record on the job and message is the audit trail.
-    Removal is best-effort like restoration: a miss leaks readable rows
-    until reconciled, never a wrong card."""
+    idea and evidence leaves), so the withheld terminal may only be
+    composed after the tuple has left those tables. A removal failure
+    propagates and the turn fails as an ordinary runtime error instead:
+    the transcript must never claim there is no result to show while one
+    remains readable, and no reconciler exists to finish the job later. A
+    gateway without the remover holds no durable tuple to remove; a False
+    return means the row was already gone, which a replay of a refused
+    turn legitimately produces."""
     delete_run = getattr(gateway, "delete_withheld_backtest_result", None)
     if delete_run is None:
         return
     try:
         delete_run(user_id=user_id, run_id=run_id)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.opt(exception=True).warning(
-            "Withheld result tuple could not be removed; it remains "
-            "readable until reconciled",
+            "Withheld result tuple could not be removed; failing the turn "
+            "rather than claiming the result does not exist",
             user_id=user_id,
             run_id=run_id,
         )
+        raise
