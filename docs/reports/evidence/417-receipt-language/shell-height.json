@@ -1,0 +1,22 @@
+{
+  "what": "The dark receipt shell against a real phone viewport, before and after web/app/r/layout.tsx changed min-h-full to min-h-dvh. Measured in the page, not eyeballed from the image.",
+  "viewport": { "width": 375, "height": 812 },
+  "page": "tombstone, the shortest page this route serves",
+  "before": {
+    "shellMinHeightComputed": "100%",
+    "shellBottomPx": 348,
+    "whiteBodyVisiblePx": 394,
+    "paintedInTheGap": { "tag": "BODY", "backgroundColor": "rgb(255, 255, 255)" }
+  },
+  "after": {
+    "shellMinHeightComputed": "812px",
+    "shellBottomPx": 812,
+    "whiteBodyVisiblePx": 0
+  },
+  "alsoMeasuredAfter": [
+    { "case": "short receipt, 375x812", "shellHeightPx": 812, "viewportPx": 812 },
+    { "case": "short receipt, 375x932", "shellHeightPx": 932, "viewportPx": 932 },
+    { "case": "tombstone, 375x812", "shellHeightPx": 812, "viewportPx": 812 },
+    { "case": "tombstone, 375x932", "shellHeightPx": 932, "viewportPx": 932 }
+  ]
+}

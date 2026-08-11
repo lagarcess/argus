@@ -13,10 +13,13 @@ import json
 import re
 import secrets
 import unicodedata
-from typing import Any
+from datetime import date
+from typing import Any, get_args
 
 from argus.api.public_excerpt_schemas import (
     PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH,
+    MetricKey,
+    PublicExcerptAssumption,
     PublicExcerptDateRange,
     PublicExcerptListItem,
     PublicExcerptMetric,
@@ -60,6 +63,29 @@ _UNDESCRIBABLE_STRATEGY = (
     "Argus cannot describe this strategy on a shared page yet, so this result "
     "cannot be shared."
 )
+
+# Same rule, applied to what the run assumed. Understating a cost the run modeled is
+# a lie about the numbers beside it, so an assumption that will not project refuses
+# rather than falling back to the sentence the run happened to freeze.
+_UNDESCRIBABLE_ASSUMPTIONS = (
+    "Argus cannot describe what this run assumed on a shared page, so this result "
+    "cannot be shared."
+)
+
+# Same rule again, for the result numbers.
+_UNDESCRIBABLE_METRICS = (
+    "Argus cannot describe this result's numbers on a shared page, so this result "
+    "cannot be shared."
+)
+
+# The one card row whose value is a sentence rather than a number. It is skipped by
+# name, and the comparison it renders is carried typed from the run's own metrics
+# instead, so this is a redirection rather than a loss.
+PROSE_METRIC_KEYS = frozenset({"benchmark_delta"})
+
+BENCHMARK_METRIC_KEYS = frozenset({"benchmark_return_pct", "delta_vs_benchmark_pct"})
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # §3 of the sharing spec, from decision memo §15.7. Absolute.
 NEVER_EXPOSE_KEY_MARKERS = (
@@ -107,6 +133,11 @@ _UUID_RE = re.compile(
 )
 _SECRET_SHAPED_RE = re.compile(r"[A-Za-z0-9_\-]{24,}")
 _WHITESPACE_RE = re.compile(r"\s+")
+# Two never-expose markers carry a separator, and fields on the way into the payload
+# rewrite separators: a strategy fact turns underscores into spaces. Folding both the
+# value and the marker to one separator means the marker is matched on what the field
+# means rather than on how it happened to be punctuated.
+_SEPARATOR_RE = re.compile(r"[ _]+")
 _CONTROL_CHARS = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
@@ -120,6 +151,15 @@ class PublicExcerptOwnerNoteError(ValueError):
 
 class PublicExcerptSourceError(ValueError):
     """The artifact cannot back a receipt."""
+
+
+class PublicExcerptUnreadableError(RuntimeError):
+    """A stored receipt cannot be read by this build.
+
+    Separate from every other failure on this surface because it is temporary and
+    about Argus rather than about the receipt: the row is intact, the reader is
+    behind it. The viewer is told to try again, never that their link is dead.
+    """
 
 
 def new_public_excerpt_id() -> str:
@@ -196,22 +236,25 @@ def build_public_excerpt_payload(
     date_range = _date_range(result_card.get("date_range"))
     if date_range is None:
         raise PublicExcerptSourceError("The result has no tested date range.")
+    benchmark_symbol = _text(provenance.get("benchmark_symbol"))
     payload = PublicExcerptPayload(
         idea_title=_text(artifact.title) or _text(result_card.get("title")) or "Backtest",
         asset_class=_asset_class(
             provenance.get("asset_class") or result_card.get("asset_class")
         ),
         symbols=_symbols(provenance.get("symbols") or result_card.get("symbols")),
-        strategy_label=_text(result_card.get("strategy_label")),
         strategy_facts=_strategy_facts(run_config_snapshot),
-        assumptions=_text_list(
-            source.get("assumptions") or result_card.get("assumptions"),
-            limit=MAX_ASSUMPTIONS,
+        assumptions=_assumptions(
+            run_config_snapshot,
+            benchmark_symbol=benchmark_symbol,
         ),
         date_range=date_range,
-        metrics=_metrics(result_card.get("rows")),
-        benchmark_symbol=_text(provenance.get("benchmark_symbol")),
-        benchmark_note=_text(result_card.get("benchmark_note")),
+        metrics=_metrics(
+            result_card.get("rows"),
+            performance=_aggregate_performance(source),
+            benchmark_symbol=benchmark_symbol,
+        ),
+        benchmark_symbol=benchmark_symbol,
         visual=_visual(run_chart),
         owner_note=owner_note,
         content_language="es-419" if content_language == "es-419" else "en",
@@ -283,7 +326,7 @@ def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem
         path=public_excerpt_path(snapshot.public_id),
         title=snapshot.payload.idea_title,
         symbols=list(snapshot.payload.symbols),
-        date_range_display=snapshot.payload.date_range.display,
+        date_range=snapshot.payload.date_range,
         created_at=snapshot.created_at,
         revoked_at=snapshot.revoked_at,
         revocation_reason=snapshot.revocation_reason,
@@ -379,8 +422,9 @@ def _audit_value(
             )
     if path and path[-1] in skip_value_markers_for:
         return
+    folded = _SEPARATOR_RE.sub("_", lowered)
     for marker in NEVER_EXPOSE_VALUE_MARKERS:
-        if marker in lowered:
+        if marker in lowered or _SEPARATOR_RE.sub("_", marker) in folded:
             raise PublicExcerptSanitizationError(
                 f"Receipt payload field '{location}' carries provider metadata."
             )
@@ -437,32 +481,272 @@ def _asset_class(value: object) -> str | None:
 
 
 def _date_range(value: object) -> PublicExcerptDateRange | None:
+    """The tested window as two calendar dates, or nothing.
+
+    The run also freezes a rendered ``display`` string, and it is deliberately not
+    read: it is written in the author's language, which says nothing about who opens
+    the link. Two ISO dates are the same fact in a form the page can speak.
+    """
     mapping = _mapping(value)
-    start = _text(mapping.get("start"))
-    end = _text(mapping.get("end"))
-    display = _text(mapping.get("display")) or (
-        f"{start} to {end}" if start and end else None
-    )
-    if start is None or end is None or display is None:
+    start = _iso_date(mapping.get("start"))
+    end = _iso_date(mapping.get("end"))
+    if start is None or end is None:
         return None
-    return PublicExcerptDateRange(start=start, end=end, display=display)
+    return PublicExcerptDateRange(start=start, end=end)
 
 
-def _metrics(value: object) -> list[PublicExcerptMetric]:
-    if not isinstance(value, list):
-        return []
+def _iso_date(value: object) -> str | None:
+    """A real calendar date in ISO form, or nothing. The viewer's page parses this."""
+    text = _text(value)
+    if text is None or _ISO_DATE_RE.match(text) is None:
+        return None
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return None
+    return text
+
+
+def _metrics(
+    rows: object,
+    *,
+    performance: dict[str, Any],
+    benchmark_symbol: str | None,
+) -> list[PublicExcerptMetric]:
+    """The result numbers, under keys the page labels in the viewer's language.
+
+    The row's own label is not read. It is written in the author's language, and a
+    frozen "Peor caída" is unreadable to half the people a link reaches.
+
+    A key this projection does not know is refused, not dropped. Dropping is how the
+    benchmark comparison disappeared from every real receipt while the page went on
+    naming a benchmark: a silent skip turns a generator that grew a row into a
+    receipt that quietly says less than the run did.
+    """
+    known = set(get_args(MetricKey))
     metrics: list[PublicExcerptMetric] = []
-    for entry in value:
+    for entry in rows if isinstance(rows, list) else []:
         row = _mapping(entry)
         key = _text(row.get("key"))
-        label = _text(row.get("label"))
-        display = _text(row.get("value"))
-        if key is None or label is None or display is None:
+        if key in PROSE_METRIC_KEYS:
             continue
-        metrics.append(PublicExcerptMetric(key=key, label=label, value=display))
-        if len(metrics) >= MAX_METRICS:
-            break
+        display = _text(row.get("value"))
+        if key not in known or display is None:
+            raise PublicExcerptSourceError(_UNDESCRIBABLE_METRICS)
+        metrics.append(PublicExcerptMetric(key=key, value=display))
+    metrics.extend(_benchmark_metrics(performance))
+    if benchmark_symbol is not None and not any(
+        metric.key in BENCHMARK_METRIC_KEYS for metric in metrics
+    ):
+        # The payload would name a benchmark and then carry no number for it, which
+        # is the defect this projection exists to prevent rather than to commit.
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_METRICS)
+    if len(metrics) > MAX_METRICS:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_METRICS)
     return metrics
+
+
+def _benchmark_metrics(performance: dict[str, Any]) -> list[PublicExcerptMetric]:
+    """The comparison, read from the run's own metrics rather than from the card.
+
+    The card renders this one as a sentence, in English in both languages (see the
+    issue filed against ``benchmark_comparison_from_delta``), so the numbers behind
+    it are taken from where the engine put them. Both are frozen: the benchmark's
+    return so the page can show what it did, and the engine's own delta so the
+    comparison is not re-derived by subtracting two already rounded strings.
+    """
+    metrics: list[PublicExcerptMetric] = []
+    benchmark_return = _amount(performance.get("benchmark_return_pct"))
+    if benchmark_return is not None:
+        metrics.append(
+            PublicExcerptMetric(
+                key="benchmark_return_pct",
+                value=f"{benchmark_return:+.1f}%",
+            )
+        )
+    delta = _amount(performance.get("delta_vs_benchmark_pct"))
+    if delta is not None:
+        # Bare, because its unit is percentage points and that unit is a word.
+        metrics.append(
+            PublicExcerptMetric(key="delta_vs_benchmark_pct", value=_number(delta))
+        )
+    return metrics
+
+
+def _aggregate_performance(artifact_payload: dict[str, Any]) -> dict[str, Any]:
+    """Where the engine's own numbers live on the artifact."""
+    aggregate = _mapping(_mapping(artifact_payload.get("metrics")).get("aggregate"))
+    return _mapping(aggregate.get("performance"))
+
+
+def _assumptions(
+    config_snapshot: object,
+    *,
+    benchmark_symbol: str | None,
+) -> list[PublicExcerptAssumption]:
+    """Freeze what the run assumed, as keys and scalars rather than as prose.
+
+    The run writes these as prose into its result card, correctly translated into the
+    language the author was working in. That is the wrong shape for a public link:
+    the author's language is not the viewer's, and no generator can know who will
+    open it. So the same facts are read from the frozen run config here, and the
+    lines are composed at view time, in the register the surface reads in.
+
+    Long only and equal weight are stated unconditionally because they are true of
+    every Argus run by construction, not because the card happened to mention them.
+    """
+    engine = _engine_config(config_snapshot)
+    assumptions: list[PublicExcerptAssumption] = []
+    if _is_recurring_contribution_run(config_snapshot, engine):
+        assumptions.extend(_contribution_assumptions(engine))
+    assumptions.append(PublicExcerptAssumption(key="long_only"))
+    assumptions.append(PublicExcerptAssumption(key="equal_weight"))
+
+    costs = _modeled_cost_bps(engine)
+    if costs is None:
+        assumptions.append(PublicExcerptAssumption(key="no_costs"))
+    else:
+        fee_bps, slippage_bps = costs
+        assumptions.append(
+            PublicExcerptAssumption(key="modeled_fee_bps", value=_number(fee_bps))
+        )
+        assumptions.append(
+            PublicExcerptAssumption(
+                key="modeled_slippage_bps", value=_number(slippage_bps)
+            )
+        )
+    if benchmark_symbol is not None:
+        # The engine charges the benchmark the same modeled costs it charges the
+        # strategy, so which of the two keys applies is decided here, once, from the
+        # run rather than re-derived by every surface that renders it.
+        assumptions.append(
+            PublicExcerptAssumption(
+                key="benchmark" if costs is None else "benchmark_same_modeled_costs",
+                value=benchmark_symbol,
+            )
+        )
+    if len(assumptions) > MAX_ASSUMPTIONS:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
+    return assumptions
+
+
+def _engine_config(config_snapshot: object) -> dict[str, Any]:
+    """The engine config the run executed, whichever snapshot shape wraps it.
+
+    Same two shapes ``_strategy_facts`` handles. The direct engine path stores the
+    config itself; the agent path repeats part of it in ``resolved_parameters`` and
+    carries a whole copy under ``engine_config``. The run builder lifts that copy to
+    the top level and the launch envelope leaves it nested, so both places are read.
+    The copy is what the engine was actually handed, so it is merged last and wins.
+    """
+    snapshot = _mapping(config_snapshot)
+    merged = {**snapshot, **_mapping(snapshot.get("resolved_parameters"))}
+    return {**merged, **_mapping(merged.get("engine_config"))}
+
+
+def _is_recurring_contribution_run(
+    config_snapshot: object, engine: dict[str, Any]
+) -> bool:
+    snapshot = _mapping(config_snapshot)
+    resolved_strategy = _mapping(snapshot.get("resolved_strategy"))
+    identity = {
+        (_text(snapshot.get("template")) or "").lower(),
+        (_text(resolved_strategy.get("strategy_type")) or "").lower(),
+        (_text(engine.get("template")) or "").lower(),
+    }
+    return "dca_accumulation" in identity
+
+
+def _contribution_assumptions(
+    engine: dict[str, Any],
+) -> list[PublicExcerptAssumption]:
+    """The contribution facts, borrowing the engine's own reading of its config.
+
+    The engine reads ``starting_capital`` as the periodic contribution for this
+    template, and treats an absent principal as zero. Both are the engine's rules
+    rather than this module's guesses, so the receipt states what actually ran. A
+    contribution that is not there at all is refused: it is the number every other
+    number on the page was produced from.
+    """
+    amount = _amount(engine.get("recurring_contribution"))
+    if amount is None:
+        amount = _amount(engine.get("starting_capital"))
+    if amount is None:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
+    facts = [
+        PublicExcerptAssumption(key="recurring_contribution", value=_number(amount))
+    ]
+    cadence = _cadence(engine)
+    if cadence is not None:
+        facts.append(
+            PublicExcerptAssumption(key="contribution_cadence", value=cadence)
+        )
+    raw_principal = engine.get("starting_principal")
+    principal = 0.0 if raw_principal in (None, "") else _amount(raw_principal)
+    if principal is None:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
+    facts.append(
+        PublicExcerptAssumption(key="starting_principal", value=_number(principal))
+    )
+    return facts
+
+
+def _cadence(engine: dict[str, Any]) -> str | None:
+    """The contribution cadence as its frozen token, never as a localized word."""
+    candidates = (
+        _mapping(engine.get("parameters")).get("dca_cadence"),
+        engine.get("dca_cadence"),
+        engine.get("cadence"),
+    )
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip().lower()
+    return None
+
+
+def _modeled_cost_bps(engine: dict[str, Any]) -> tuple[float, float] | None:
+    """The execution costs the run modeled, or nothing when it modeled none.
+
+    Read from the frozen config rather than through
+    ``_execution_realism_settings``, which consults the live feature flag: a flag
+    flipped after the run would otherwise decide what the receipt says the run
+    assumed. The config carries the field only when the flag was on at run time,
+    which is the frozen truth this page is supposed to hold.
+
+    A run that states costs it cannot express is refused rather than reported as
+    costless, because understating them misdescribes every number beside it.
+    """
+    realism = _mapping(engine.get("_execution_realism"))
+    if not bool(realism.get("enabled")):
+        return None
+    fee_bps = _amount(realism.get("fee_bps"))
+    slippage_bps = _amount(realism.get("slippage_bps"))
+    if fee_bps is None or slippage_bps is None or fee_bps < 0.0 or slippage_bps < 0.0:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
+    if fee_bps <= 0.0 and slippage_bps <= 0.0:
+        return None
+    return fee_bps, slippage_bps
+
+
+def _amount(value: object) -> float | None:
+    """A finite number, whatever numeric shape the snapshot froze it in."""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int | float):
+        number = float(value)
+    elif isinstance(value, str):
+        try:
+            number = float(value.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    return number if number == number and abs(number) != float("inf") else None
+
+
+def _number(value: float) -> str:
+    """A bare number with no separators, so the viewer's locale supplies its own."""
+    return str(int(value)) if float(value).is_integer() else f"{value:g}"
 
 
 def _strategy_facts(config_snapshot: object) -> list[PublicExcerptStrategyFact]:
@@ -713,7 +997,7 @@ def _strategy_fact_value(value: object) -> str | None:
         return str(value)
     if isinstance(value, float):
         # Whole numbers read as periods and thresholds, not as decimals.
-        return str(int(value)) if value.is_integer() else f"{value:g}"
+        return _number(value)
     if isinstance(value, str):
         normalized = _text(value)
         if normalized is None:

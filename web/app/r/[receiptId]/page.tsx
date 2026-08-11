@@ -9,6 +9,7 @@ import {
   type PublicReceiptResult,
 } from "@/lib/public-receipt-contract";
 import {
+  formatReceiptDateRange,
   receiptCopy,
   receiptLanguageFromAcceptLanguage,
 } from "@/lib/receipt-copy";
@@ -76,11 +77,16 @@ export async function generateMetadata({
   }
   const headline = headlineReceiptMetric(result.payload);
   // Description is built from the frozen payload only, so the card shows the
-  // same closed set of facts the page does and nothing more.
+  // same closed set of facts the page does and nothing more. Its labels and dates
+  // come from the copy, not from the payload: a preview card is read by whoever the
+  // link was sent to, in their language.
+  const metricLabels = copy.metric_labels as Record<string, string>;
   const description = [
     result.payload.symbols.join(", "),
-    result.payload.date_range.display,
-    headline ? `${headline.label}: ${headline.value}` : null,
+    formatReceiptDateRange(result.payload.date_range, copy, language),
+    headline
+      ? `${metricLabels[headline.key] ?? headline.key}: ${headline.value}`
+      : null,
     copy.framing.short,
   ]
     .filter(Boolean)

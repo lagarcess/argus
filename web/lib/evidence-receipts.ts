@@ -1,5 +1,8 @@
 import { apiFetch } from "./argus-api-transport";
-import { publicReceiptPath } from "./public-receipt-contract";
+import {
+  publicReceiptPath,
+  type PublicReceiptDateRange,
+} from "./public-receipt-contract";
 
 /** Mirrors PublicExcerptListItem. Carries no source id, by design. */
 export type EvidenceReceipt = {
@@ -8,7 +11,9 @@ export type EvidenceReceipt = {
   path: string;
   title: string;
   symbols: string[];
-  date_range_display: string;
+  // Two dates, not a rendered string: the owner reads this row in whatever
+  // language the app is in, which need not be the one the run was made in.
+  date_range: PublicReceiptDateRange;
   created_at: string;
   revoked_at?: string | null;
   revocation_reason?: "owner_revoked" | "source_deleted" | null;

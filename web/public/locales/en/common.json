@@ -1538,13 +1538,35 @@
       "monthly": "every month",
       "quarterly": "every quarter"
     },
+    "assumptions": {
+      "long_only": "Long only",
+      "equal_weight": "Equal weight",
+      "no_costs": "No fees or slippage",
+      "modeled_costs": "{{fee}} bps fee + {{slippage}} bps slippage",
+      "modeled_fee_bps": "{{bps}} bps fee",
+      "modeled_slippage_bps": "{{bps}} bps slippage",
+      "benchmark": "Compared with {{symbol}}",
+      "benchmark_same_modeled_costs": "Compared with {{symbol}}, same costs",
+      "recurring_contribution": "${{amount}} each time",
+      "recurring_contribution_cadence": "${{amount}} {{cadence}}",
+      "starting_principal": "${{amount}} to start"
+    },
+    "strategy_type_values": {
+      "buy and hold": "Buy and hold",
+      "dca accumulation": "Recurring buys",
+      "buy the dip": "Buy the dip",
+      "rsi threshold": "RSI threshold",
+      "indicator threshold": "Indicator threshold",
+      "moving average crossover": "Moving average crossover",
+      "macd crossover": "MACD crossover"
+    },
     "metric_labels": {
+      "cash_value": "Ending value",
       "total_return_pct": "Total return",
-      "total_return": "Total return",
-      "benchmark_return_pct": "Benchmark",
       "max_drawdown_pct": "Worst dip",
-      "max_drawdown": "Worst dip",
-      "win_rate_pct": "Win rate"
+      "win_rate": "Win rate",
+      "benchmark_return_pct": "Benchmark",
+      "delta_vs_benchmark_pct": "Difference"
     },
     "hero": {
       "ahead": "{{value}} ahead of {{symbol}}",
@@ -1570,6 +1592,7 @@
       "crypto": "Crypto",
       "currency_pair": "Currency pair"
     },
+    "date_range": "{{start}} to {{end}}",
     "frozen_note": "Saved on {{date}}. These numbers are locked, so they will look the same whenever you come back.",
     "frozen_note_undated": "These numbers were locked when the link was made, so they will look the same whenever you come back.",
     "chart_unavailable": "No chart was saved with this one.",

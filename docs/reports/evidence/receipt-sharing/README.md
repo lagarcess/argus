@@ -87,15 +87,18 @@ because the form has to argue for the numbers on a page nobody reached through A
 
 ## Still English on a Spanish page
 
-Two frozen strings, and both are frozen prose rather than chrome:
+**Fixed by issue #417.** At the time these frames were captured, two things on a
+Spanish page were still English, and both were frozen prose rather than chrome:
+the assumptions, `Long only, no leverage.` and `Modeled commissions and slippage.`,
+and the tested window, `Jan 2, 2024 to Mar 1, 2024`. They were generated as prose
+by the result-card builder at run time and frozen into the payload, so unlike a
+metric label there was no key to render from.
 
-- The assumptions, `Long only, no leverage.` and `Modeled commissions and slippage.`
-  They are generated as English prose by the result-card builder at run time and
-  frozen into the payload, so unlike a metric label there is no key to render from.
-  Fixing it properly means freezing them as keyed facts the way `strategy_facts`
-  already are, which is a payload contract change and a change to a generator this
-  lane does not own.
-- The tested window, `Jan 2, 2024 to Mar 1, 2024`, frozen as the run formatted it.
+The payload now freezes keys and bare scalars for the assumptions, the metrics and
+the tested window, and every sentence, label and date format is composed in the
+reader's language at view time. The frames in this directory predate that change
+and are kept as the record of what the surface looked like when this lane shipped.
+See `docs/reports/evidence/417-receipt-language/` for the current behaviour.
 
 The idea title stays in whatever language it was written in, which is deliberate and
 marked with `lang` so a screen reader pronounces it correctly.

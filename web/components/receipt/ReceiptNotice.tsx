@@ -19,6 +19,11 @@ type ReceiptNoticeProps = {
  *
  * Both still offer Try Argus. Someone who followed a link has already shown
  * intent.
+ *
+ * Light on dark unconditionally, like every other component on this route. The
+ * shell is one fixed colour by design, so a `dark:` variant here never applies:
+ * this route runs no theme provider, and the tombstone rendered black on the dark
+ * shell for anyone who opened it.
  */
 export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
   const notice = kind === "revoked" ? copy.tombstone : copy.unavailable;
@@ -32,20 +37,20 @@ export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
           displayed nothing, so counting it would inflate the view stage. */}
       {kind === "revoked" ? <ReceiptViewBeacon /> : null}
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11.5px] font-medium uppercase tracking-[0.07em] text-black/40 dark:text-white/40">
+        <span className="text-[11.5px] font-medium uppercase tracking-[0.07em] text-white/40">
           {copy.eyebrow}
         </span>
         <ProvenanceMark label={copy.provenance} />
       </div>
-      <section className="rounded-2xl border border-black/[0.08] px-4 py-5 dark:border-white/[0.10]">
-        <h1 className="font-display text-[19px] font-semibold leading-tight text-black dark:text-white">
+      <section className="rounded-2xl border border-white/[0.10] px-4 py-5">
+        <h1 className="font-display text-[19px] font-semibold leading-tight text-white">
           {notice.title}
         </h1>
-        <p className="mt-2 text-[13.5px] leading-relaxed text-black/60 dark:text-white/60">
+        <p className="mt-2 text-[13.5px] leading-relaxed text-white/60">
           {notice.detail}
         </p>
         {kind === "revoked" && (
-          <p className="mt-2 text-[13.5px] leading-relaxed text-black/60 dark:text-white/60">
+          <p className="mt-2 text-[13.5px] leading-relaxed text-white/60">
             {copy.tombstone.cta_detail}
           </p>
         )}

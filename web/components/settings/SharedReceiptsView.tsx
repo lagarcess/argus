@@ -106,6 +106,29 @@ export default function SharedReceiptsView({
       month: "long",
       day: "numeric",
     }).format(new Date(value));
+  // The row carries the window as two frozen calendar days, so it is read in UTC
+  // and spoken here. A run made in one language is still legible in the other.
+  const formatWindow = (range: EvidenceReceipt["date_range"]) => {
+    const day = (value: string) => {
+      const parsed = new Date(`${value}T00:00:00Z`);
+      return Number.isNaN(parsed.getTime())
+        ? null
+        : new Intl.DateTimeFormat(locale, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            timeZone: "UTC",
+          }).format(parsed);
+    };
+    const start = day(range?.start ?? "");
+    const end = day(range?.end ?? "");
+    if (!start || !end) return null;
+    return t("receipt.date_range", {
+      start,
+      end,
+      defaultValue: "{{start}} to {{end}}",
+    });
+  };
 
   return (
     <AdaptivePanel
@@ -173,7 +196,7 @@ export default function SharedReceiptsView({
                       {receipt.title}
                     </p>
                     <p className="mt-0.5 truncate text-[12.5px] text-black/45 dark:text-white/45">
-                      {[receipt.symbols.join(", "), receipt.date_range_display]
+                      {[receipt.symbols.join(", "), formatWindow(receipt.date_range)]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>

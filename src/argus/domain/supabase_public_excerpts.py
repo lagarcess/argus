@@ -12,12 +12,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from loguru import logger
+from pydantic import ValidationError
+
 from argus.api.public_excerpt_schemas import (
     PublicExcerptPayload,
     PublicExcerptSnapshot,
     PublicExcerptView,
 )
-from argus.domain.public_excerpts import revoked_public_view
+from argus.domain.public_excerpts import (
+    PublicExcerptUnreadableError,
+    revoked_public_view,
+)
 
 TABLE = "public_excerpt_snapshots"
 
@@ -245,9 +251,27 @@ def _snapshot_from_row(row: dict[str, Any]) -> PublicExcerptSnapshot:
 def _public_view_from_row(public_id: str, row: dict[str, Any]) -> PublicExcerptView:
     if row.get("revoked_at") is not None:
         return revoked_public_view(public_id)
+    try:
+        payload = PublicExcerptPayload.model_validate(row.get("payload") or {})
+    except ValidationError as error:
+        # A stored payload this build cannot read is a deployment problem, not a
+        # statement about the receipt. Raising would answer a stranger's request
+        # with a 500 on the one Argus surface people arrive at from a message.
+        #
+        # Deliberately not the tombstone: that says gone for good, and it would be
+        # a permanent-sounding lie about a receipt that is perfectly alive and will
+        # read fine again once the reader can parse it.
+        logger.error(
+            "Stored receipt payload failed validation",
+            public_id=public_id,
+            error=str(error),
+        )
+        raise PublicExcerptUnreadableError(
+            "That receipt could not be read right now."
+        ) from error
     return PublicExcerptView(
         public_id=public_id,
         status="available",
         created_at=row.get("created_at"),
-        payload=PublicExcerptPayload.model_validate(row.get("payload") or {}),
+        payload=payload,
     )

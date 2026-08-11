@@ -1538,13 +1538,35 @@
       "monthly": "cada mes",
       "quarterly": "cada trimestre"
     },
+    "assumptions": {
+      "long_only": "Solo largo",
+      "equal_weight": "Peso igual",
+      "no_costs": "Sin comisiones ni deslizamiento",
+      "modeled_costs": "Comisión {{fee}} bps + deslizamiento {{slippage}} bps",
+      "modeled_fee_bps": "Comisión de {{bps}} bps",
+      "modeled_slippage_bps": "Deslizamiento de {{bps}} bps",
+      "benchmark": "Comparado con {{symbol}}",
+      "benchmark_same_modeled_costs": "Comparado con {{symbol}}, mismos costos",
+      "recurring_contribution": "${{amount}} cada vez",
+      "recurring_contribution_cadence": "${{amount}} {{cadence}}",
+      "starting_principal": "${{amount}} al inicio"
+    },
+    "strategy_type_values": {
+      "buy and hold": "Comprar y mantener",
+      "dca accumulation": "Compras recurrentes",
+      "buy the dip": "Comprar la caída",
+      "rsi threshold": "Umbral RSI",
+      "indicator threshold": "Umbral de indicador",
+      "moving average crossover": "Cruce de medias móviles",
+      "macd crossover": "Cruce MACD"
+    },
     "metric_labels": {
+      "cash_value": "Valor final",
       "total_return_pct": "Retorno total",
-      "total_return": "Retorno total",
-      "benchmark_return_pct": "Referencia",
       "max_drawdown_pct": "Peor caída",
-      "max_drawdown": "Peor caída",
-      "win_rate_pct": "Aciertos"
+      "win_rate": "Aciertos",
+      "benchmark_return_pct": "Referencia",
+      "delta_vs_benchmark_pct": "Diferencia"
     },
     "hero": {
       "ahead": "{{value}} por encima de {{symbol}}",
@@ -1570,6 +1592,7 @@
       "crypto": "Cripto",
       "currency_pair": "Par de divisas"
     },
+    "date_range": "{{start}} al {{end}}",
     "frozen_note": "Guardado el {{date}}. Estos números quedaron fijos, así que se verán igual cuando vuelvas.",
     "frozen_note_undated": "Estos números quedaron fijos cuando se creó el enlace, así que se verán igual cuando vuelvas.",
     "chart_unavailable": "No se guardó ningún gráfico con este.",

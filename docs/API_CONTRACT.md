@@ -626,10 +626,11 @@ when two concurrent requests race on the insert. Only a real insert emits the
 `receipt_created` funnel event, so a retry or a reload cannot inflate the
 acquisition funnel's creation stage.
 
-`PublicExcerptListItem` is `{id, public_id, path, title, symbols,
-date_range_display, created_at, revoked_at, revocation_reason}`. It carries no
-source conversation, run, or artifact id. Clients compose the shareable url as
-`origin + path`, so the backend owns no origin configuration.
+`PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range,
+created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
+as ISO dates. It carries no source conversation, run, or artifact id. Clients
+compose the shareable url as `origin + path`, so the backend owns no origin
+configuration.
 
 `GET /public-excerpts` is paginated, newest first, with `limit` (default 50, max
 200) and an opaque `cursor`, returning `{items, next_cursor}`. It is paginated
@@ -651,6 +652,12 @@ timestamps cannot drop or repeat a row across pages.
   one.
 - The request carries no credentials, and `payload` is the closed set documented in
   `docs/DATA_MODEL.md` section 12.1.3.
+- A stored payload this build cannot parse answers `503` with `Retry-After` and
+  code `receipt_unavailable`, which the viewer's page reads as temporarily
+  unavailable. It is not a tombstone: the row is intact, and telling a viewer their
+  live link is gone for good would be permanent-sounding and wrong. It is also not
+  an uncaught error, because this is the one Argus surface a stranger arrives at
+  from a message.
 
 `POST /public/receipt-funnel` takes `{"stage": "viewed" | "try_argus"}` and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
@@ -678,6 +685,21 @@ from its entry windows, which the rule compiler allows), and MACD crossovers. A
 generic `rule_spec` condition tree, or any shape added later without a projection,
 answers `receipt_source_unsupported` rather than publishing a page that names a
 strategy without describing it.
+
+The payload freezes no rendered prose. A link is opened by people whose language
+has nothing to do with the author's, so `assumptions`, `strategy_facts`, `metrics`,
+and `date_range` all carry closed keys and bare scalars, and every sentence, label,
+number format, and date format is composed by the reader's client in the reader's
+language. `content_language` names the language of the two author-written fields
+that remain, `idea_title` and `owner_note`. A run whose assumptions, numbers, or
+tested window will not project into that form answers
+`receipt_source_unsupported`; there is no passthrough string field, because one
+would reopen this defect under a new name.
+
+The same rule cuts the other way: a projection that cannot describe something
+refuses rather than dropping it silently. An unknown metric key is refused, and a
+payload that names a `benchmark_symbol` must carry a benchmark figure, so a receipt
+can never name a benchmark and then show nothing about it.
 
 ## Admin Bypass
 

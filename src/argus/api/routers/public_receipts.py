@@ -26,7 +26,10 @@ from argus.api.public_excerpts import (
     require_evidence_receipt_sharing_enabled,
 )
 from argus.api.rate_limits import SlidingWindowLimiter
-from argus.domain.public_excerpts import revoked_public_view
+from argus.domain.public_excerpts import (
+    PublicExcerptUnreadableError,
+    revoked_public_view,
+)
 from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1/public", tags=["public-receipts"])
@@ -56,7 +59,21 @@ def read_public_receipt(public_id: str, request: Request) -> PublicExcerptView:
         # Bounded before it reaches storage, and answered like any other stale
         # link so an oversized id is not its own signal.
         return revoked_public_view(public_id[:MAX_PUBLIC_ID_LENGTH])
-    return public_excerpt_reader().read_public_excerpt_view(public_id=public_id)
+    try:
+        return public_excerpt_reader().read_public_excerpt_view(public_id=public_id)
+    except PublicExcerptUnreadableError as error:
+        # A stored payload this build cannot parse answers as temporarily
+        # unavailable, which is what it is. An uncaught validation error would
+        # answer a stranger with a 500 on the first Argus page they ever see, and a
+        # tombstone would tell them a live receipt is gone for good.
+        raise problem(
+            request,
+            status_code=503,
+            code="receipt_unavailable",
+            title="Service Unavailable",
+            detail=str(error),
+            headers={"Retry-After": "120"},
+        ) from error
 
 
 @router.post("/receipt-funnel", status_code=204)

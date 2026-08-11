@@ -61,19 +61,20 @@ const PAYLOAD: PublicReceiptPayload = {
   idea_title: "AAPL buy and hold",
   asset_class: "equity",
   symbols: ["AAPL"],
-  strategy_label: "Buy and hold",
-  assumptions: ["Long only, no leverage."],
-  date_range: {
-    start: "2024-01-02",
-    end: "2024-03-01",
-    display: "Jan 2, 2024 to Mar 1, 2024",
-  },
+  assumptions: [
+    { key: "long_only" },
+    { key: "equal_weight" },
+    { key: "no_costs" },
+    { key: "benchmark", value: "SPY" },
+  ],
+  date_range: { start: "2024-01-02", end: "2024-03-01" },
   metrics: [
-    { key: "max_drawdown_pct", label: "Max drawdown", value: "-6.2%" },
-    { key: "total_return_pct", label: "Total return", value: "+18.4%" },
+    { key: "max_drawdown_pct", value: "-6.2%" },
+    { key: "total_return_pct", value: "+18.4%" },
+    { key: "benchmark_return_pct", value: "+9.1%" },
+    { key: "delta_vs_benchmark_pct", value: "9.3" },
   ],
   benchmark_symbol: "SPY",
-  benchmark_note: "Compared against SPY.",
   strategy_facts: [
     { key: "indicator", value: "RSI" },
     { key: "indicator_period", value: "14" },
@@ -490,17 +491,20 @@ describe("the public route escapes the client i18n gate", () => {
   });
 });
 
-describe("when the label and the frozen strategy name disagree", () => {
-  test("the description is composed from the executed facts, not the label", () => {
-    // The two are frozen from different records: the label from the result card,
-    // the name from the run's own config. The page no longer renders the label as
-    // the description of what ran at all, so a stale label cannot speak for a run
-    // it does not describe. It survives only as the fallback for a shape with no
-    // sentence of its own.
+describe("the strategy name a receipt renders", () => {
+  test("is composed from the executed facts, never from a frozen label", () => {
+    // The label and the name were frozen from different records: the label from the
+    // result card, the name from the run's own config. The label is gone from the
+    // payload entirely now, because it was also written in the author's language.
+    // Even the fallback for a shape with no sentence of its own reads the closed
+    // strategy_type token and translates it.
     const plan = source(join(WEB_ROOT, "lib/receipt-plan.ts"));
-    const labelUses = plan.match(/payload\.strategy_label/g) ?? [];
-    expect(labelUses).toHaveLength(1);
+    expect(plan).not.toContain("strategy_label");
     expect(plan).toContain("plan.unnamed");
+    expect(plan).toContain("strategy_type_values");
+    expect(source(join(WEB_ROOT, "lib/public-receipt-contract.ts"))).not.toContain(
+      "strategy_label",
+    );
   });
 });
 
@@ -616,31 +620,50 @@ describe("the plan sentence", () => {
     const ahead = {
       ...PAYLOAD,
       metrics: [
-        { key: "total_return_pct", label: "Total return", value: "+18.4%" },
-        { key: "benchmark_return_pct", label: "SPY", value: "+9.1%" },
+        { key: "total_return_pct", value: "+18.4%" },
+        { key: "benchmark_return_pct", value: "+9.1%" },
       ],
-    };
+    } satisfies PublicReceiptPayload;
     expect(benchmarkVerdict(ahead, copy)).toBe("9.3 pts ahead of SPY");
     const behind = {
       ...PAYLOAD,
       metrics: [
-        { key: "total_return_pct", label: "Total return", value: "+2.0%" },
-        { key: "benchmark_return_pct", label: "SPY", value: "+9.1%" },
+        { key: "total_return_pct", value: "+2.0%" },
+        { key: "benchmark_return_pct", value: "+9.1%" },
       ],
-    };
+    } satisfies PublicReceiptPayload;
     expect(benchmarkVerdict(behind, copy)).toBe("7.1 pts behind SPY");
   });
 
-  test("says nothing when the payload carries no benchmark to compare against", () => {
-    // PAYLOAD has a return and no benchmark row, which is a real shape.
-    expect(benchmarkVerdict(PAYLOAD, copy)).toBeNull();
+  test("prefers the engine's own delta over subtracting two rounded strings", () => {
+    // The displayed figures round to a 9.3 point gap; the run computed 9.4. The
+    // page is a record, so it states what the engine measured.
+    const frozen = {
+      ...PAYLOAD,
+      metrics: [
+        { key: "total_return_pct", value: "+18.4%" },
+        { key: "benchmark_return_pct", value: "+9.1%" },
+        { key: "delta_vs_benchmark_pct", value: "9.4" },
+      ],
+    } satisfies PublicReceiptPayload;
+    expect(benchmarkVerdict(frozen, copy)).toBe("9.4 pts ahead of SPY");
+  });
+
+  test("says nothing when the payload names no benchmark at all", () => {
+    // A payload that names one always carries its numbers: the projection refuses
+    // to freeze a benchmark symbol it has no figure for.
+    const unbenchmarked = {
+      ...PAYLOAD,
+      benchmark_symbol: null,
+    } satisfies PublicReceiptPayload;
+    expect(benchmarkVerdict(unbenchmarked, copy)).toBeNull();
   });
 
   test("says nothing rather than guessing when a figure will not parse", () => {
     const unparseable = {
       ...PAYLOAD,
       benchmark_symbol: null,
-      metrics: [{ key: "total_return_pct", label: "Total return", value: "n/a" }],
+      metrics: [{ key: "total_return_pct", value: "n/a" }],
     };
     expect(benchmarkVerdict(unparseable, copy)).toBeNull();
   });
