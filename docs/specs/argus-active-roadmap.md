@@ -150,10 +150,36 @@ remains, which is this item.
 Simplicity bar: someone who knows nothing about investing must understand the
 answer and the offered tests.
 
-### 2. Master editing (serial, after 1)
+### 2. Master editing — SHIPPED 2026-08-11, one half dark
 
-The confirmation card carries exactly three actions: **Run backtest**,
-**Change/edit assumptions**, **Cancel**.
+Merged as PR #431 at `522c6d9c`, 148 files, after seven review rounds and
+twelve findings. Also closes #433.
+
+**The conversational half is on and unflagged.** Compound multi-parameter
+edits in one turn, the disclosure chain, scoped widening, the accepted-value
+envelope, and the card cut from five actions to three. That is the largest
+known reliability gap in the loop and it is closed.
+
+**The in-place drawers ship dark.** `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is
+`false` in all four release-contract files and gates both non-turn routes plus
+the `direct_edits` advertisement, so the frontend goes dark with no web
+change. **The flag flips only when #437 closes**, and it is not a preference:
+turning it on today ships a reachable defect.
+
+Why, stated once so it is not relitigated. The drawers write to a card without
+spending a turn, which is a new write path, and protecting it turned out to
+depend on the run lifecycle being sound. It is not. A worker can flip a failed
+job to succeeded after the card was handed back, producing an editable card
+beside a finished result computed from different numbers. Three consecutive
+rounds found three different holes in that one leg. **Production runs
+`api-proof-shadow-on`**, which is the exact configuration the last hole lives
+in, so this is the configured mode rather than a corner case.
+
+#335 stays open and moves behind #437: its surface is built and merged but not
+reachable. Do not sweep it into a bulk close.
+
+The original scope, kept for the record. The confirmation card carries exactly
+three actions: **Run backtest**, **Change/edit assumptions**, **Cancel**.
 
 - Change/edit assumptions is the only entry point to editing anything.
 - Compound, multi-parameter edits must work in one turn. "Change this and add
@@ -185,15 +211,23 @@ The confirmation card carries exactly three actions: **Run backtest**,
 
 Absorbs #335, the #141 macro, and the #237 umbrella.
 
-### 3. Mobile PWA (parallel, behind flag)
+### 3. Mobile PWA — SHIPPED 2026-08-08
 
-The public exposure gate. Nothing ships publicly while phones are broken.
+Merged as PR #393 at `01044cda`, 158 files. The public exposure gate: nothing
+ships publicly while phones are broken.
+
+Not flagged. The responsive shell is unconditional, so there is nothing to turn
+on at promotion.
+
+The breakpoint audit lane that followed (PR #420) treated the shipped shell as
+the thing under test and found two defects it had shipped with: **#421**
+account security unreachable below 1024, since fixed, and **#422** seven
+lower-severity findings still open. Neither blocks promotion.
 
 **Spec is written and founder-locked:**
 [`2026-08-06-mobile-pwa-responsive-shell.md`](../superpowers/specs/2026-08-06-mobile-pwa-responsive-shell.md).
-No implementation authorized yet.
 
-Locked shape, in brief:
+Shape as built:
 
 - Responsive by screen width, not device sniffing, on custom breakpoints
   matching DESIGN.md section 8 rather than Tailwind defaults.
@@ -522,6 +556,34 @@ how someone types would be the creepiest thing in the product. Guests have no
 profile and fall back to the nameless pool.
 
 ## Landed this cycle
+
+- **Master editing** (PR #431, merged 2026-08-11 at `522c6d9c`) — pillar 2.
+  Recorded above. The transferable lesson is about where a guard belongs.
+  Round 1 guarded the message row, round 2 moved to the conversation, round 4
+  moved liveness into the card itself as one oracle every reader derives from,
+  and rounds 5 through 7 kept finding holes not in the guard but in the run
+  lifecycle underneath it. A guard cannot be finished while the truth it
+  checks is split across three stores. When the same leg produces a third
+  round, the answer is not a fourth patch, and the pre-stated exit is what
+  made stopping cheap rather than a defeat.
+
+- **Receipt payload freezes facts, not prose** (PR #436, merged 2026-08-11)
+  — closes #417. A receipt froze the author's language, and a public link is
+  opened by strangers, so no generator fix could reach it. Assumptions, the
+  tested window, and metric labels became typed keys rendered at view time,
+  the pattern `strategy_facts` already proved on the same payload.
+
+  Three lessons worth more than the fix. **Translation-invariance is a blind
+  guard on its own**: zero metrics is byte-identical to zero metrics, so an
+  equality test watched a closed enum silently drop the only benchmark number
+  a real card carries. It needs a content-preservation test beside it.
+  **Typed facts do not license new copy**: the first attempt wrote seven
+  past-tense sentences where the card had terse fragments, which rebuilt the
+  receipt look #397 was redesigned to kill. And **frames are proof only if
+  someone reads them**: two defects on this route, a white body showing under
+  the dark shell and unreadable dark-on-dark tombstone text, were both visible
+  in #397's own committed evidence frame and nobody had looked. A full-page
+  capture is the wrong instrument for anything about viewport height.
 
 - **Breakpoint audit and visual baselines** (PR #420, merged 2026-08-10 at
   `7989e62e`) — 74 committed Playwright baselines across legal, auth, and
