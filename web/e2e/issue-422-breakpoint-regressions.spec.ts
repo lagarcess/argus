@@ -386,7 +386,12 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureFinding({
       finding: 8,
       slug: "chart-leading-label",
-      screenshot: () => card.screenshot(),
+      screenshot: () =>
+        card.screenshot({
+          animations: "disabled",
+          caret: "hide",
+          scale: "css",
+        }),
       renderedText,
     });
   });
