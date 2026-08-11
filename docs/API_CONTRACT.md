@@ -3228,6 +3228,23 @@ the admitted run), the run refuses with failure code
 `confirmation_changed` instead of executing values the card no longer
 shows.
 
+**A state the card was restored from can never become a result.** This
+half of the lifecycle is unflagged correctness, independent of the
+in-place surface: every write that attaches `result_run_id` to a backtest
+job, in every finalizer configuration, passes the one lifecycle statement
+(`argus.domain.backtest_job_lifecycle`), so a dead or unknown job refuses
+the link and the proof machinery cannot revive one. Publication derives
+from what the link write actually did. When the link is refused, the turn
+publishes no result: it settles as a completed turn carrying the standard
+`recovery` object with code `run_result_withheld` (not retryable), plus a
+`result_link_refused` metadata record
+(`{"job_id", "job_status", "unpublished_run_id"}`) naming the standing
+job state and the computed run row that remains persisted for audit,
+unlinked. The final frame carries no `run`, `result_card`, or result
+continuity ids, so clients render the localized recovery text instead of
+a result, and the simulation allowance stays settled at admission per the
+usage rules above.
+
 **Request:** at least one field.
 - `capital`: positive number. Starting capital, or the recurring
   contribution when the pending strategy is a recurring-buy plan, matching
