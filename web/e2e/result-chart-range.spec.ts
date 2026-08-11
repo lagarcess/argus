@@ -381,6 +381,56 @@ test("responsive resize reapplies the semantic chart window and edge gutter", as
   await resizedPage.close();
 });
 
+test("immediate resize preserves a gesture-defined Custom window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openPlayground(page);
+  const card = adaptiveCard(page);
+  const chart = card.getByTestId("result-equity-chart");
+  await chart.scrollIntoViewIfNeeded();
+  await openRangeDetails(card);
+
+  const chartBox = await chart.boundingBox();
+  expect(chartBox).not.toBeNull();
+  if (chartBox) {
+    await page.mouse.move(
+      chartBox.x + chartBox.width / 2,
+      chartBox.y + chartBox.height / 2,
+    );
+    await page.mouse.wheel(0, -240);
+  }
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  const customPeriod = await card
+    .getByTestId("result-chart-visible-period")
+    .textContent();
+  const customEventCount = await card
+    .getByTestId("result-chart-event-count")
+    .textContent();
+
+  await card.evaluate((element) => {
+    element.style.width = "324px";
+    element.style.maxWidth = "324px";
+  });
+  await expect
+    .poll(() => chart.evaluate((element) => element.clientWidth))
+    .toBe(296);
+  await chart.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  await expect(card.getByTestId("result-chart-visible-period")).toHaveText(
+    customPeriod ?? "",
+  );
+  await expect(card.getByTestId("result-chart-event-count")).toHaveText(
+    customEventCount ?? "",
+  );
+});
+
 test("hover and resize never fabricate a Custom selection", async ({
   page,
 }) => {

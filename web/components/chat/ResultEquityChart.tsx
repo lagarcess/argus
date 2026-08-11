@@ -388,11 +388,18 @@ export default function ResultEquityChart({
       );
     };
     timeScale.subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+    let semanticWindowWidth = container.clientWidth;
     const notifyVisibleWindow = (visibleRange: LogicalRange | null) => {
       if (!visibleRange || data.length === 0) return;
       const manualGesture =
         performance.now() - lastChartGestureAtRef.current < 1500;
-      if (!manualGesture) return;
+      // Autosize can publish a contracted logical range before our resize
+      // observer reapplies the selected semantic window. A range notification
+      // only belongs to the gesture while the chart is still at the width that
+      // produced that semantic selection.
+      const semanticWidthStillApplies =
+        Math.abs(container.clientWidth - semanticWindowWidth) < 0.5;
+      if (!manualGesture || !semanticWidthStillApplies) return;
       const lastIndex = data.length - 1;
       const from = Math.min(lastIndex, Math.max(0, Math.floor(visibleRange.from)));
       const to = Math.min(lastIndex, Math.max(0, Math.ceil(visibleRange.to)));
@@ -443,23 +450,29 @@ export default function ResultEquityChart({
       // Visual padding is recalculated from the current width so autosize
       // cannot shrink the gutter or turn a passive resize into Custom.
       const restoredWindow = visibleWindowRef.current ?? allWindow;
+      const chartWidth = container.clientWidth;
+      if (chartWidth <= 0) return;
       lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
+      semanticWindowWidth = chartWidth;
       timeScale.setVisibleLogicalRange(
         paddedResultChartLogicalRange({
           from: restoredWindow.from,
           to: restoredWindow.to,
-          chartWidth: container.clientWidth,
+          chartWidth,
         }),
       );
     };
     applySemanticWindow();
     let resizeFrame: number | null = null;
-    let observedWidth = container.clientWidth;
     const semanticWindowResizeObserver = new ResizeObserver((entries) => {
       const latestEntry = entries[entries.length - 1];
       const nextWidth = latestEntry?.contentRect.width ?? container.clientWidth;
-      if (nextWidth <= 0 || Math.abs(nextWidth - observedWidth) < 0.5) return;
-      observedWidth = nextWidth;
+      if (
+        nextWidth <= 0 ||
+        Math.abs(nextWidth - semanticWindowWidth) < 0.5
+      ) {
+        return;
+      }
       if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       // Lightweight Charts autosizes synchronously in its ResizeObserver.
       // Reapply after that observer so the final frame owns the new gutter.
