@@ -127,7 +127,8 @@ def test_refused_result_link_withholds_publication(monkeypatch) -> None:
     recovery instead of a run, and card restoration is re-attempted with
     the standing job row."""
     from argus.api.chat import confirmation as chat_confirmation
-    from argus.api.chat.backtest_jobs import ResultLinkOutcome
+    from argus.api.chat import result_link
+    from argus.api.chat.result_link import ResultLinkOutcome
     from argus.api.routers import agent as agent_router
 
     async def _fake_stream_agent_turn_events(**kwargs: Any):
@@ -186,7 +187,7 @@ def test_refused_result_link_withholds_publication(monkeypatch) -> None:
         "stream_agent_turn_events",
         _fake_stream_agent_turn_events,
     )
-    monkeypatch.setattr(agent_router, "link_shadow_backtest_job_result", _refused_link)
+    monkeypatch.setattr(result_link, "link_shadow_backtest_job_result", _refused_link)
     monkeypatch.setattr(
         chat_confirmation,
         "restore_pending_card_for_failed_job",

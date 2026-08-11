@@ -9,9 +9,9 @@ from argus.api.chat.backtest_jobs import (
     RenderWorkflowDispatcher,
     ShadowBacktestJobTool,
     backtest_job_shadow_context,
-    link_shadow_backtest_job_result,
     payload_hash,
 )
+from argus.api.chat.result_link import link_shadow_backtest_job_result
 
 
 class _DelegateTool:

@@ -54,10 +54,10 @@ from argus.api.chat.artifacts import (
 )
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
-    link_shadow_backtest_job_result,
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
+from argus.api.chat.result_link import apply_result_link_outcome
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -1143,75 +1143,24 @@ async def chat_stream(
                 if isinstance(recovery, dict):
                     metadata["recovery"] = dict(recovery)
                 if run is not None:
-                    link_outcome = link_shadow_backtest_job_result(
-                        user_id=user.id,
-                        run_id=run.id,
+                    # Publication derives from what the link write did; a
+                    # refused link withholds the result and settles the
+                    # turn on the run_result_withheld recovery.
+                    publication = apply_result_link_outcome(
+                        run=run,
+                        metadata=metadata,
+                        runtime_result=runtime_result,
                         gateway=api_state.supabase_gateway,
+                        user_id=user.id,
+                        language=runtime_user.language_preference,
                         dev_memory_fallback_enabled=dev_memory_fallback_enabled(),
                     )
-                    if not link_outcome.publishable:
-                        # The lifecycle statement refused the link: the job
-                        # is dead and its card may already be restored, so
-                        # the computed result is withheld instead of being
-                        # published beside an editable card. The run row
-                        # remains for audit, unlinked; restoration is
-                        # re-attempted here in case the finalizer that won
-                        # the terminal state could not complete it.
-                        chat_confirmation.restore_pending_card_for_failed_job(
-                            api_state.supabase_gateway,
-                            user_id=user.id,
-                            job=link_outcome.job,
-                        )
-                        for stale_key in (
-                            "result_card",
-                            "latest_run_id",
-                            "result_run_id",
-                            "result_strategy_id",
-                            "result_conversation_id",
-                            "result_fact_bank",
-                            "context_packets",
-                            "next_experiments",
-                            "run",
-                            "final_response_payload",
-                        ):
-                            metadata.pop(stale_key, None)
-                            runtime_result.pop(stale_key, None)
-                        assistant_text = recovery_message(
-                            "run_result_withheld",
-                            language=runtime_user.language_preference,
-                        )
-                        withheld_recovery = recovery_state(
-                            "run_result_withheld",
-                            language=runtime_user.language_preference,
-                            retryable=False,
-                        )
-                        metadata["conversation_mode"] = "confirm"
-                        metadata["recovery"] = withheld_recovery
-                        metadata["result_link_refused"] = {
-                            "job_id": (link_outcome.job or {}).get("id"),
-                            "job_status": (link_outcome.job or {}).get("status"),
-                            "unpublished_run_id": run.id,
-                        }
-                        runtime_result["recovery"] = withheld_recovery
-                        runtime_result["assistant_response"] = assistant_text
+                    if publication.publishable:
+                        receipt_run_id = run.id
+                        result_card = publication.result_card
+                    else:
+                        assistant_text = publication.assistant_text
                         run = None
-                if run is not None:
-                    receipt_run_id = run.id
-                    result_card = run.conversation_result_card
-                    metadata["result_card"] = result_card
-                    runtime_result["result_card"] = result_card
-                    final_response_payload = runtime_result.get("final_response_payload")
-                    if isinstance(final_response_payload, dict):
-                        final_response_payload["result_card"] = result_card
-                    metadata["latest_run_id"] = run.id
-                    metadata["result_run_id"] = run.id
-                    metadata["result_strategy_id"] = run.strategy_id
-                    metadata["result_conversation_id"] = run.conversation_id
-                    metadata["result_fact_bank"] = result_fact_bank(run)
-                    context_packets = run.conversation_result_card.get("context_packets")
-                    if isinstance(context_packets, list):
-                        metadata["context_packets"] = context_packets
-                    runtime_result["run"] = run.model_dump(mode="json")
 
                 streamed_text = "".join(streamed_text_parts).strip()
                 if (
