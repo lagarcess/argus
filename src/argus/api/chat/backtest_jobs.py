@@ -411,13 +411,17 @@ def reconcile_terminal_render_task_run(
         expected_status=status,
         expected_updated_at=str(job.get("updated_at") or "").strip() or None,
     )
+    if reconciled:
+        # Restoration belongs to the writer that won the terminal
+        # transition; a lost CAS means another finalizer owns the card's
+        # consequence (a success must not see its card reactivated).
+        restore_pending_card_for_failed_job(
+            gateway, user_id=user_id, job={**job, **dict(reconciled)}
+        )
     reconciled = (
         reconciled
         or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or ""))
         or job
-    )
-    restore_pending_card_for_failed_job(
-        gateway, user_id=user_id, job={**job, **dict(reconciled)}
     )
     return dict(reconciled)
 

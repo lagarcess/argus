@@ -626,6 +626,13 @@ def restore_pending_card_for_failed_job(
     """
     if not isinstance(job, dict):
         return
+    status = str(job.get("status") or "").strip().casefold()
+    if status not in {"failed", "canceled", "cancelled", "expired"}:
+        return
+    if job.get("result_run_id"):
+        # A run that produced a result consumed its card for good, whatever
+        # its row's status claims; never reactivate it.
+        return
     message_id = str(job.get("confirmation_message_id") or "").strip()
     conversation_id = str(job.get("conversation_id") or "").strip()
     if not message_id or not conversation_id:

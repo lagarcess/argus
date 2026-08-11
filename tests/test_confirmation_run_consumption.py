@@ -186,6 +186,7 @@ def test_a_run_that_dies_without_a_result_gives_the_card_back() -> None:
         None,
         user_id=owner,
         job={
+            "status": "canceled",
             "confirmation_message_id": card.id,
             "conversation_id": conversation["id"],
         },
@@ -248,3 +249,35 @@ def test_a_legacy_transcript_still_reads_dead_after_its_result() -> None:
         latest_active_confirmation_id(user_id=owner, conversation_id=conversation["id"])
         is None
     )
+
+
+def test_restoration_requires_terminal_without_result() -> None:
+    """Only a run that died without a result gives the card back: a
+    succeeded job, or a failed-looking row that carries a result, must
+    never reactivate its consumed card, whichever reconciler lost the
+    race."""
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"])
+    owner = api_state.store.conversation_owners[conversation["id"]]
+    card = _card_message(conversation["id"])
+    assert _consume(conversation["id"], owner) == "consumed"
+
+    for job in (
+        {"status": "succeeded"},
+        {"status": "failed", "result_run_id": "run-1"},
+        {},
+    ):
+        restore_pending_card_for_failed_job(
+            None,
+            user_id=owner,
+            job={
+                **job,
+                "confirmation_message_id": card.id,
+                "conversation_id": conversation["id"],
+            },
+        )
+        stored = _card_message(conversation["id"])
+        assert stored.metadata["confirmation_card"]["confirmation_state"] == (
+            "consumed"
+        ), f"job shape {job} must not reactivate the card"
