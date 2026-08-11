@@ -9,12 +9,12 @@ from the runtime-equivalent docs-only head
 
 The `after` folder was regenerated and every rendered-text and geometry file
 was re-read at product-and-harness capture head
-`27bdca0ed15576127a4e8f3718d01f5dee23d1d6`. All nine focused browser checks
+`596f1183cab3e5907585a2fc53d7a9a25fa2548c`. All nine focused browser checks
 passed, including the 720px and 1024px no-regression checks, and the command
-left the worktree clean. The following manifest-only commit changes this
-README, not the rendered product or capture harness. The same capture command
-must be rerun on the published PR head and recorded in the PR terminal audit;
-a commit cannot contain its own final SHA.
+left every regenerated evidence artifact unchanged. The following
+manifest-only commit changes this README, not the rendered product or capture
+harness. The same capture command must be rerun on the published PR head and
+recorded in the PR terminal audit; a commit cannot contain its own final SHA.
 
 | Finding | Before | After | Acceptance proof |
 | --- | --- | --- | --- |
@@ -33,6 +33,10 @@ The deliberate visual baseline changes are:
 - `issue-422-chart-390-chromium-darwin.png` for the 24-pixel chart edge gutter.
   That baseline moves 930 pixels because the visible range and line scale both
   change. The suite budget remains `maxDiffPixels: 100`.
+- `result-chart-responsive-resize-chromium-darwin.png` for the review repair
+  that reapplies the semantic window and 24-pixel gutter after a wide chart
+  narrows. It is a new capture, not an update to an existing baseline, and uses
+  the same `maxDiffPixels: 100` ceiling.
 
 After the review repair separated visual padding from semantic chart facts,
 the durable finding 8 frame was recaptured with the same fixed screenshot
