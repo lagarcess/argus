@@ -34,7 +34,6 @@ def test_every_release_gate_enumerates_the_cron_alongside_the_other_three() -> N
     env_sync = _source(".github/render-env-sync.sh")
     canary = _source(".github/canary-render.sh")
     canary_workflow = _source(".github/workflows/private-alpha-canary.yml")
-    resolver = _source(".github/canary-deployed-sha.py")
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     integrity = _source("docs/specs/private-alpha-release-integrity-contract.md")
     manifest = _source("docs/release-manifests/TEMPLATE.md")
@@ -51,10 +50,9 @@ def test_every_release_gate_enumerates_the_cron_alongside_the_other_three() -> N
     assert 'fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"' in canary
     assert 'fail_canary "deploy_status" "cron_deploy_not_live"' in canary
     assert ".github/render-env-sync.sh cron-deploy-status" in canary_workflow
-    assert "--cron-status" in canary_workflow
-
-    assert "cron_commit_mismatch" in resolver
-    assert "cron_deploy_not_live" in resolver
+    assert "cron_status_unavailable" in canary_workflow
+    assert "cron_deploy_not_live" in canary_workflow
+    assert "cron_deploy_sha_mismatch" in canary_workflow
 
     assert ".github/render-env-sync.sh cron-deploy-status" in runbook
     assert "argus-maintenance" in runbook
@@ -94,7 +92,7 @@ def test_current_promotion_keeps_the_unapplied_cron_absent() -> None:
 def test_a_failed_cron_lookup_is_never_reported_as_absent() -> None:
     env_sync = _source(".github/render-env-sync.sh")
     canary = _source(".github/canary-render.sh")
-    resolver = _source(".github/canary-deployed-sha.py")
+    canary_workflow = _source(".github/workflows/private-alpha-canary.yml")
 
     # `|| true` here would turn any 401 or timeout into the absence exemption.
     assert "|| true" not in _cron_service_block(env_sync)
@@ -102,7 +100,7 @@ def test_a_failed_cron_lookup_is_never_reported_as_absent() -> None:
     assert "cron_env_status=lookup_failed" in env_sync
     assert "service_lookup_failed" in env_sync
     assert 'fail_canary "deploy_status" "cron_status_unavailable"' in canary
-    assert "cron_status_unavailable" in resolver
+    assert "cron_status_unavailable" in canary_workflow
 
 
 def test_the_cron_service_id_is_resolved_from_render_not_hardcoded() -> None:

@@ -40,6 +40,7 @@ if [ -z "$CANDIDATE_SHA" ]; then
 fi
 
 BROWSER_IDENTITY_HANDOFF="$(mktemp)"
+BROWSER_PHASE_OUTPUT="$(mktemp)"
 BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
 SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
@@ -56,7 +57,7 @@ DECISION_ROWS="$(mktemp)"
 IDEA_ROWS="$(mktemp)"
 IDEA_VERSION_ROWS="$(mktemp)"
 RECEIPT_ROWS="$(mktemp)"
-chmod 600 "$BROWSER_IDENTITY_HANDOFF"
+chmod 600 "$BROWSER_IDENTITY_HANDOFF" "$BROWSER_PHASE_OUTPUT"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
 chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
@@ -74,7 +75,9 @@ cleanup() {
   if [ "${SIGNUP_IDENTITY_SETUP_ATTEMPTED:-false}" = "true" ]; then
     cleanup_signup_identity || signup_cleanup_failed=1
   fi
+  redact_browser_artifacts || true
   rm -f "$BROWSER_IDENTITY_HANDOFF"
+  rm -f "$BROWSER_PHASE_OUTPUT"
   rm -f "$BROWSER_AUTH_CURL_CONFIG"
   rm -f \
     "$SERVICE_ROLE_CURL_CONFIG" \
@@ -119,7 +122,6 @@ WORKFLOW_TASK=""
 REAL_WORKFLOW_TASK=""
 API_DEPLOY_SHA=""
 WEB_DEPLOY_SHA=""
-DEPLOYED_SHA=""
 API_DEPLOY_STATUS=""
 WEB_DEPLOY_STATUS=""
 WORKFLOW_VERSION_COMMIT=""
@@ -240,7 +242,6 @@ build_release_evidence_json() {
   CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
   CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
   CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
-  CANARY_DEPLOYED_SHA="$DEPLOYED_SHA" \
   CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
   CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
   CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
@@ -291,7 +292,6 @@ payload = {
     "real_workflow_task": optional(os.environ["CANARY_REAL_WORKFLOW_TASK"]),
     "api_deploy_sha": optional(os.environ["CANARY_API_DEPLOY_SHA"]),
     "web_deploy_sha": optional(os.environ["CANARY_WEB_DEPLOY_SHA"]),
-    "deployed_sha": optional(os.environ["CANARY_DEPLOYED_SHA"]),
     "api_deploy_status": optional(os.environ["CANARY_API_DEPLOY_STATUS"]),
     "web_deploy_status": optional(os.environ["CANARY_WEB_DEPLOY_STATUS"]),
     "workflow_version_commit": optional(os.environ["CANARY_WORKFLOW_VERSION_COMMIT"]),
@@ -606,21 +606,24 @@ run_deploy_status_probe() {
   if [ "$WEB_DEPLOY_STATUS" != "live" ]; then
     fail_canary "deploy_status" "web_deploy_not_live"
   fi
+  if [ "$API_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
+    fail_canary "deploy_status" "api_deploy_sha_mismatch"
+  fi
+  if [ "$WEB_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
+    fail_canary "deploy_status" "web_deploy_sha_mismatch"
+  fi
   if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
     fail_canary "deploy_status" "workflow_version_not_ready"
+  fi
+  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
+    fail_canary "deploy_status" "workflow_version_commit_mismatch"
   fi
   if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
     fail_canary "deploy_status" "workflow_version_id_mismatch"
   fi
-  if [ -z "$API_DEPLOY_SHA" ] || [ "$API_DEPLOY_SHA" != "$WEB_DEPLOY_SHA" ]; then
-    fail_canary "deploy_status" "api_web_deploy_sha_mismatch"
-  fi
-  if [ "$API_DEPLOY_SHA" != "$WORKFLOW_VERSION_COMMIT" ]; then
-    fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"
-  fi
-  # A deployed janitor runs with the service-role key, so it may not lag the
-  # release this canary certifies. absent means Render has no such service; a
-  # failed lookup already exited nonzero above and never reaches this exemption.
+  # Integration owns the maintenance release surface. No service is a valid,
+  # explicit state for this promotion; a failed lookup or a deployed janitor
+  # on another commit is not.
   if [ -z "$CRON_DEPLOY_STATUS" ] || [ "$CRON_DEPLOY_STATUS" = "lookup_failed" ]; then
     fail_canary "deploy_status" "cron_status_unavailable"
   fi
@@ -633,16 +636,10 @@ run_deploy_status_probe() {
     fi
   fi
 
-  DEPLOYED_SHA="$API_DEPLOY_SHA"
-  if [ "$CANDIDATE_SHA" != "$DEPLOYED_SHA" ]; then
-    fail_canary "deploy_status" "candidate_sha_does_not_match_deployed_sha"
-  fi
-
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
-  echo "canary_deployed_sha=$DEPLOYED_SHA"
   echo "canary_cron_deploy_status=$CRON_DEPLOY_STATUS"
   echo "canary_cron_deploy_sha=$CRON_DEPLOY_SHA"
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
@@ -720,23 +717,87 @@ validate_release_evidence_contract() {
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
 }
 
-run_browser_canary() {
+run_browser_canary_phase() {
+  local phase="$1"
   if ! env -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
     ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+    ARGUS_CANARY_BROWSER_PHASE="$phase" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
-    "$SCRIPT_DIR/canary-browser.sh"; then
+    "$SCRIPT_DIR/canary-browser.sh" 2>&1 | tee "$BROWSER_PHASE_OUTPUT"; then
+    return 1
+  fi
+}
+
+browser_auth_challenge_timed_out() {
+  # The rendered client only calls the auth API after Turnstile returns a token,
+  # so a timeout waiting for that call means the challenge never completed.
+  [ -s "$BROWSER_PHASE_OUTPUT" ] &&
+    grep -qF "page.waitForResponse" "$BROWSER_PHASE_OUTPUT" &&
+    grep -qF "/auth/" "$BROWSER_PHASE_OUTPUT"
+}
+
+redact_browser_artifacts() {
+  local results_dir="web/temp/playwright-results"
+  [ -d "$results_dir" ] || return 0
+  CANARY_REDACT_DIR="$results_dir" \
+  CANARY_REDACT_PASSWORD="$PASSWORD" \
+  CANARY_REDACT_EMAIL="$EMAIL" \
+    python3 - <<'PY'
+import os
+import pathlib
+
+# Playwright's failure context embeds every rendered input value, including the
+# canary password, so no browser artifact leaves this job unmasked.
+directory = pathlib.Path(os.environ["CANARY_REDACT_DIR"])
+masked_values = sorted(
+    (
+        value
+        for value in (
+            os.environ.get("CANARY_REDACT_PASSWORD", "").strip(),
+            os.environ.get("CANARY_REDACT_EMAIL", "").strip(),
+        )
+        if value
+    ),
+    key=len,
+    reverse=True,
+)
+for path in sorted(directory.rglob("*")):
+    if not path.is_file():
+        continue
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        path.unlink(missing_ok=True)
+        print(f"canary_browser_artifact_dropped={path.name}")
+        continue
+    redacted = text
+    for value in masked_values:
+        redacted = redacted.replace(value, "<redacted>")
+    if redacted != text:
+        path.write_text(redacted, encoding="utf-8")
+    path.chmod(0o600)
+# The workflow uploads these files only when this marker exists, so a deployed
+# tree without this redaction pass publishes nothing.
+(directory / ".redacted").write_text("1\n", encoding="utf-8")
+PY
+}
+
+run_requested_signup_denial_canary() {
+  env -u SUPABASE_SERVICE_ROLE_KEY \
+    -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
+    CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
+}
+
+run_browser_canary() {
+  if ! run_browser_canary_phase "full"; then
     BROWSER_CANARY_STATUS="failed"
     return 1
   fi
   BROWSER_CANARY_STATUS="passed"
-}
-
-run_requested_signup_denial_canary() {
-  CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN="${ARGUS_OPS_TOKEN:-}" \
-    python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
 }
 
 verify_browser_identity_handoff() {
@@ -1510,10 +1571,10 @@ if ! prepare_signup_identity; then
   fail_canary "auth" "canary_signup_identity_setup_failed"
 fi
 if ! run_requested_signup_denial_canary; then
-  fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"
+  fail_canary "auth" "requested_signup_was_not_denied"
 fi
 if ! verify_no_signup_auth_identity; then
-  fail_canary "requested_signup_denial" "requested_signup_created_auth_identity"
+  fail_canary "auth" "requested_signup_created_auth_identity"
 fi
 if ! promote_requested_signup_allowlist; then
   fail_canary "auth" "requested_signup_promotion_failed"
@@ -1521,6 +1582,9 @@ fi
 
 if ! run_browser_canary; then
   recover_browser_failure_capture_inputs || true
+  if browser_auth_challenge_timed_out; then
+    fail_canary "browser_auth" "captcha_challenge_timeout"
+  fi
   fail_canary "browser" "rendered_golden_path_failed"
 fi
 if ! verify_browser_identity_handoff; then
