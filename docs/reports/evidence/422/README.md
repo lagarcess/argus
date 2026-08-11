@@ -8,8 +8,8 @@ from the runtime-equivalent docs-only head
 `397235006ec8cbc50f5a113170437917853e632e`.
 
 The `after` folder was regenerated and every rendered-text and geometry file
-was re-read at product-and-evidence head
-`1f449cc7469a7ede704472b087ec57a70301bdac`. All nine focused browser checks
+was re-read at product-and-harness capture head
+`27bdca0ed15576127a4e8f3718d01f5dee23d1d6`. All nine focused browser checks
 passed, including the 720px and 1024px no-regression checks, and the command
 left the worktree clean. The following manifest-only commit changes this
 README, not the rendered product or capture harness. The same capture command
@@ -41,10 +41,11 @@ superseded evidence frame differed at 42 pixels by one color-channel step; the
 visual baseline itself did not move and the tolerance was not changed.
 
 The Spanish auth evidence frame uses the same shared capture settings. Its
-recorded raw frame differs from `login-390-es-light.png` at 34 pixels, each by
-one color-channel step, with no changed text or geometry. The fixed-budget
-visual matcher passes, the frame was visually inspected, and neither the
-baseline nor the tolerance moved.
+recorded raw frame differs from `login-390-es-light.png` at 34 grayscale
+antialias pixels on the button edge. The RGB channels move together by at most
+33, with no changed text or geometry. The fixed-budget visual matcher passes,
+the frame was visually inspected, and neither the baseline nor the tolerance
+moved.
 
 The final-head capture command rewrites the `after` folder and must leave the
 worktree clean before the lane is reported ready.
