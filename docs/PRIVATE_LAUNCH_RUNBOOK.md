@@ -90,14 +90,14 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Manually deploy `argus-api`, then `argus-app`, then `argus-maintenance` from
-   the candidate commit. The cron has `autoDeployTrigger: off` like the other
-   two, so skipping it leaves destructive maintenance code on its last manual
-   deploy.
+8. Manually deploy `argus-api`, then `argus-app` from the candidate commit. Do
+   not create or deploy `argus-maintenance` in the current promotion. The cron
+   remains deliberately absent until a separate founder decision applies the
+   blueprint.
 
-9. Confirm the live `argus-api`, `argus-app`, and `argus-maintenance` deploy
-   commits match the candidate commit you intend to test and that the latest
-   deploys are `live`:
+9. Confirm the live `argus-api` and `argus-app` deploy commits match the
+   candidate commit you intend to test and that the latest deploys are `live`.
+   Also confirm the deliberately unapplied cron is still absent:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
@@ -106,12 +106,12 @@ ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh cron-deploy-status
 ```
 
-If any commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
-before running the strict canaries. The canary script enforces the same deployed
-SHA/status check with `ARGUS_CANARY_SHA`. `cron-deploy-status` reports
-`status=absent` only when the Render API has no `argus-maintenance` service,
-which means the blueprint has not been applied yet and no scheduled deletion is
-running.
+If either deployed commit is not `ARGUS_RELEASE_SHA`, stop and deploy that stale
+service before running the strict canaries. The canary script enforces the same
+deployed SHA/status check with `ARGUS_CANARY_SHA`. For the current promotion,
+`cron-deploy-status` must report `status=absent`. Any other cron status is a
+finding and a stop: do not deploy it as part of this promotion. A failed Render
+lookup is also a real failure, never proof of absence.
 
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -365,17 +365,18 @@ Secrets stay manual on this service, same as `argus-api`: `DATABASE_URL`,
 is what lets the reconciler read terminal task runs; without it the stale scan
 reports errors instead of reconciling.
 
-The cron is part of the release, not a side service. Promotion deploys it with
-`argus-api` and `argus-app`, and both the canary and `release-config-audit`
-verify it: `cron-deploy-status` must report the candidate SHA, and
-`cron_env_status` must be `ready`. Until the blueprint has been applied for the
-first time, Render has no such service and both report `absent`, which is read
-back from the Render API rather than assumed, so a forgotten deploy shows up as
-a mismatch instead of a skipped check.
+For the current promotion, the cron is deliberately absent and is not deployed.
+Both the canary and `release-config-audit` verify that absence:
+`cron-deploy-status` must report `status=absent`, and `cron_env_status` must be
+`absent`. Those values are read back from the Render API rather than assumed.
 
-To close a promotion, record one real scheduled run: the run timestamp, the
-summary line, and either nonzero selected/purged counts or documented zeros on
-an empty window.
+If a later founder decision applies the blueprint and creates the service, it
+becomes a deployed release surface. From that point onward, promotions must
+verify its candidate SHA, live deploy state, and ready environment contract. To
+close such a later promotion, record one real scheduled run: the run timestamp,
+the summary line, and either nonzero selected/purged counts or documented zeros
+on an empty window. While the service remains absent, record the two absent
+statuses and the manual operator-job evidence instead.
 
 ## Runtime Tuning Flags
 
@@ -560,15 +561,15 @@ Use an allowlisted account and verify:
 - Clicking a cold-start starter chip submits a natural-language prompt into the
   normal chat runtime.
 - A Spanish prompt reaches confirmation without coaching or manual translation.
-- Confirmation actions stay card-scoped and structured:
+- The confirmation card shows exactly three card-scoped, structured actions:
   - `Run backtest` starts the supported job path.
-  - `Change dates` updates the confirmation/result period before execution, for
-    example Jan 1, 2025 to Apr 1, 2025.
-  - `Change asset` preserves the explicit period, capital, and benchmark while
-    changing the symbol.
-  - `Adjust assumptions` preserves the explicit period, symbol, and benchmark
-    while changing the assumption being edited.
+  - `Change assumptions` is the single editing entry point. Single-field and
+    compound edits preserve every explicit assumption the user did not change.
   - `Cancel` marks the draft canceled and removes the executable action.
+- `Change dates` and `Change asset` do not render as separate actions.
+- With `ARGUS_IN_PLACE_CARD_EDITS_ENABLED=false`, the capital and dates drawers
+  do not render. Capital and date changes continue through the conversational
+  `Change assumptions` path.
 - A supported backtest completes and shows a result card.
 - The result includes a readable Quick take.
 - Explain result opens a deeper card-scoped explanation without replacing the

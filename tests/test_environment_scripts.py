@@ -1222,26 +1222,37 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
 
 
-def test_private_launch_runbook_smoke_covers_final_readiness_path() -> None:
+def test_private_launch_runbook_smoke_matches_three_action_card_and_dark_drawers() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     smoke_test = runbook.split("## Smoke Test", maxsplit=1)[1].split(
         "## Supabase Persistence Check",
         maxsplit=1,
     )[0]
+    normalized_smoke_test = " ".join(smoke_test.split())
 
     for expected in (
         "Cold-start starter chips are visible",
         "do not reference 2024",
         "Spanish prompt",
+        "exactly three card-scoped, structured actions",
         "Run backtest",
-        "Change dates",
-        "Change asset",
-        "Adjust assumptions",
+        "Change assumptions",
         "Cancel",
+        "`Change dates` and `Change asset` do not render as separate actions",
+        "ARGUS_IN_PLACE_CARD_EDITS_ENABLED=false",
+        "the capital and dates drawers do not render",
         "Quick take",
         "Explain result",
         "Retry",
         "Reloading the page preserves the conversation, job state, and result",
         "Feedback can be submitted",
     ):
-        assert expected in smoke_test
+        assert expected in normalized_smoke_test
+
+    assert (
+        "`Change dates` updates the confirmation/result period"
+        not in normalized_smoke_test
+    )
+    assert (
+        "`Change asset` preserves the explicit period" not in normalized_smoke_test
+    )
