@@ -6,6 +6,8 @@ from typing import Literal
 
 from babel.dates import format_date as format_locale_date
 
+from argus.domain.benchmark_comparison import BenchmarkComparisonClaim
+
 Language = Literal["en", "es-419"]
 TimeframeUnit = Literal["minute", "hour", "day", "week"]
 
@@ -99,6 +101,50 @@ def format_date_range_label(
     if separator is None:
         separator = " al " if _resolve_language(language) == "es-419" else " - "
     return f"{start_label}{separator}{end_label}"
+
+
+def format_benchmark_magnitude_points(
+    magnitude_points: str,
+    *,
+    language: str = "en",
+) -> str:
+    if _resolve_language(language) != "es-419":
+        return magnitude_points
+    value = magnitude_points.removesuffix(" percentage points")
+    return f"{value} puntos porcentuales"
+
+
+def format_benchmark_comparison_phrase(
+    claim: BenchmarkComparisonClaim,
+    magnitude_points: str,
+    *,
+    language: str = "en",
+) -> str:
+    resolved_language = _resolve_language(language)
+    if resolved_language == "es-419":
+        if claim == "unknown":
+            return "Comparado con referencia"
+        if claim == "matched_benchmark":
+            return "En línea con la referencia"
+        magnitude = format_benchmark_magnitude_points(
+            magnitude_points,
+            language=resolved_language,
+        )
+        if claim == "beat_benchmark":
+            return f"Superó por {magnitude}"
+        if claim == "lagged_benchmark":
+            return f"Quedó por debajo por {magnitude}"
+        raise ValueError(f"Unsupported benchmark comparison claim: {claim}")
+
+    if claim == "unknown":
+        return "Compared with benchmark"
+    if claim == "matched_benchmark":
+        return "In line with benchmark"
+    if claim == "beat_benchmark":
+        return f"Beat by {magnitude_points}"
+    if claim == "lagged_benchmark":
+        return f"Lagged by {magnitude_points}"
+    raise ValueError(f"Unsupported benchmark comparison claim: {claim}")
 
 
 def format_timeframe_data_caveat(

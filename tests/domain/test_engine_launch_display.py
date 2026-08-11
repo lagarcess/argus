@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
 from argus.domain.engine_launch.display import (
     describe_timeframe,
+    format_benchmark_comparison_phrase,
     format_recurring_entry_caveat,
     format_timeframe_data_caveat,
     format_timeframe_data_label,
@@ -47,3 +49,28 @@ def test_legacy_data_caveat_cleanup_is_centralized_compatibility() -> None:
         )
         == "Recurring entries use the first available daily price in each cadence window."
     )
+
+
+@pytest.mark.parametrize("delta", [None, 0.02, 9.3, -9.3])
+def test_benchmark_comparison_copy_is_exhaustive_and_language_aware(
+    delta: float | None,
+) -> None:
+    comparison = benchmark_comparison_from_delta(delta)
+
+    english = format_benchmark_comparison_phrase(
+        comparison.claim,
+        comparison.magnitude_points,
+        language="en",
+    )
+    spanish = format_benchmark_comparison_phrase(
+        comparison.claim,
+        comparison.magnitude_points,
+        language="es-419",
+    )
+
+    assert english != spanish
+    if comparison.claim in {"beat_benchmark", "lagged_benchmark"}:
+        assert delta is not None
+        expected_magnitude = f"{abs(float(delta)):.1f}"
+        assert expected_magnitude in english
+        assert expected_magnitude in spanish

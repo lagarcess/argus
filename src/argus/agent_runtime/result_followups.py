@@ -18,6 +18,10 @@ from argus.agent_runtime.result_fact_enrichment import (
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
+from argus.domain.engine_launch.display import (
+    format_benchmark_comparison_phrase,
+    format_benchmark_magnitude_points,
+)
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
@@ -151,7 +155,7 @@ async def compose_result_followup_response(
     invoke_json_schema_func=invoke_openrouter_json_schema,
     log_openrouter_failure_func=log_openrouter_failure,
 ) -> str | None:
-    fact_bank = result_followup_fact_bank(metadata)
+    fact_bank = result_followup_fact_bank(metadata, language=language)
     if not fact_bank:
         return None
     if extra_facts:
@@ -252,7 +256,7 @@ async def compose_private_alpha_save_response(
     invoke_json_schema_func=invoke_openrouter_json_schema,
     log_openrouter_failure_func=log_openrouter_failure,
 ) -> str | None:
-    fact_bank = result_followup_fact_bank(metadata)
+    fact_bank = result_followup_fact_bank(metadata, language=language)
     fact_bank["save_surface_status"] = (
         "The legacy Strategies library and Save action have been retired"
     )
@@ -788,7 +792,11 @@ def result_followup_fact_bank_for_focus(
     return filtered
 
 
-def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
+def result_followup_fact_bank(
+    metadata: dict[str, Any],
+    *,
+    language: str = "en",
+) -> dict[str, str]:
     config = config_snapshot(metadata)
     fact_bank: dict[str, str] = {}
     symbols = symbols_label(metadata)
@@ -827,12 +835,20 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
     if benchmark_delta is not None:
         comparison = benchmark_comparison_from_delta(benchmark_delta)
         fact_bank["benchmark_comparison_claim"] = comparison.claim
-        fact_bank["benchmark_comparison"] = comparison.user_phrase
-        fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
+        fact_bank["benchmark_comparison"] = format_benchmark_comparison_phrase(
+            comparison.claim,
+            comparison.magnitude_points,
+            language=language,
+        )
+        fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
+            comparison.magnitude_points,
+            language=language,
+        )
         relative = relative_performance_label(
             symbols=symbols,
             benchmark=benchmark,
             delta=benchmark_delta,
+            language=language,
         )
         if relative:
             fact_bank["relative_performance"] = relative
@@ -1027,20 +1043,34 @@ def relative_performance_label(
     symbols: str,
     benchmark: str,
     delta: float,
+    language: str = "en",
 ) -> str | None:
+    comparison = benchmark_comparison_from_delta(delta)
+    magnitude = format_benchmark_magnitude_points(
+        comparison.magnitude_points,
+        language=language,
+    )
+    if language.lower().startswith("es"):
+        subject = f"El resultado de {symbols}" if symbols else "La estrategia"
+        benchmark_label = benchmark or "la referencia"
+        if comparison.claim == "beat_benchmark":
+            return (
+                f"{subject} superó a {benchmark_label} por {magnitude} "
+                "en esta simulación"
+            )
+        if comparison.claim == "lagged_benchmark":
+            return (
+                f"{subject} quedó por debajo de {benchmark_label} por {magnitude} "
+                "en esta simulación"
+            )
+        return f"{subject} quedó en línea con {benchmark_label} en esta simulación"
+
     subject = symbols or "The strategy"
     benchmark_label = benchmark or "the benchmark"
-    comparison = benchmark_comparison_from_delta(delta)
     if comparison.claim == "beat_benchmark":
-        return (
-            f"{subject} beat {benchmark_label} by "
-            f"{comparison.magnitude_points} in this run"
-        )
+        return f"{subject} beat {benchmark_label} by {magnitude} in this run"
     if comparison.claim == "lagged_benchmark":
-        return (
-            f"{subject} lagged {benchmark_label} by "
-            f"{comparison.magnitude_points} in this run"
-        )
+        return f"{subject} lagged {benchmark_label} by {magnitude} in this run"
     return f"{subject} matched {benchmark_label} in this run"
 
 
