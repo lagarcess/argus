@@ -560,15 +560,15 @@ Use an allowlisted account and verify:
 - Clicking a cold-start starter chip submits a natural-language prompt into the
   normal chat runtime.
 - A Spanish prompt reaches confirmation without coaching or manual translation.
-- Confirmation actions stay card-scoped and structured:
+- The confirmation card shows exactly three card-scoped, structured actions:
   - `Run backtest` starts the supported job path.
-  - `Change dates` updates the confirmation/result period before execution, for
-    example Jan 1, 2025 to Apr 1, 2025.
-  - `Change asset` preserves the explicit period, capital, and benchmark while
-    changing the symbol.
-  - `Adjust assumptions` preserves the explicit period, symbol, and benchmark
-    while changing the assumption being edited.
+  - `Change assumptions` is the single editing entry point. Single-field and
+    compound edits preserve every explicit assumption the user did not change.
   - `Cancel` marks the draft canceled and removes the executable action.
+- `Change dates` and `Change asset` do not render as separate actions.
+- With `ARGUS_IN_PLACE_CARD_EDITS_ENABLED=false`, the capital and dates drawers
+  do not render. Capital and date changes continue through the conversational
+  `Change assumptions` path.
 - A supported backtest completes and shows a result card.
 - The result includes a readable Quick take.
 - Explain result opens a deeper card-scoped explanation without replacing the
