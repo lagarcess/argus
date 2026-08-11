@@ -151,12 +151,19 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     )
 
     from argus.api import state as api_state
+    from argus.api.chat import evidence as chat_evidence
     from argus.domain.store import AlphaStore
 
     store = AlphaStore()
     store.backtest_runs["run-1"] = object()
     store.backtest_run_owners["run-1"] = "user-1"
     monkeypatch.setattr(api_state, "store", store)
+    product_events: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        chat_evidence,
+        "capture_product_event",
+        lambda kind, **kwargs: product_events.append((kind, kwargs)),
+    )
 
     gateway = _RefusingGateway()
     context = _context()
@@ -192,6 +199,15 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     assert audit["result_link_refused"]["run_id"] == "run-1", (
         "the job row carries the contract's durable refusal record, or it "
         "cannot distinguish a cleaned withheld result from a cancellation"
+    )
+    withdrawal = [
+        payload
+        for kind, payload in product_events
+        if kind == "evidence_capture" and payload.get("status") == "withdrawn"
+    ]
+    assert withdrawal and withdrawal[0]["backtest_run_id"] == "run-1", (
+        "finalization already appended completion telemetry, so the "
+        "withdrawal must ride the same stream to keep funnel counts honest"
     )
     assert "result_card" not in metadata and "latest_run_id" not in metadata
     assert "result_card" not in runtime_result and "run" not in runtime_result
