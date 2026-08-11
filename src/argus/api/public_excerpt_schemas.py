@@ -24,22 +24,45 @@ PublicExcerptStatus = Literal["available", "revoked"]
 
 
 class PublicExcerptDateRange(BaseModel):
-    """The tested window, frozen as the run reported it."""
+    """The tested window, frozen as two dates and rendered in the viewer's locale.
+
+    No rendered ``display`` string: the run writes one in the author's language, and
+    a receipt is opened by strangers whose language has nothing to do with the
+    author's. Two ISO dates carry the same fact and can be spoken by anyone.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     start: str
     end: str
-    display: str
+
+
+MetricKey = Literal[
+    "cash_value",
+    "total_return_pct",
+    "total_return",
+    "benchmark_return_pct",
+    "benchmark_return",
+    "max_drawdown_pct",
+    "max_drawdown",
+    "win_rate",
+    "win_rate_pct",
+]
 
 
 class PublicExcerptMetric(BaseModel):
-    """One result metric, already formatted for reading."""
+    """One result number, frozen as the run reported it, under a closed key.
+
+    No frozen label, for the same reason the strategy facts and the assumptions have
+    none: the run writes it in the author's language. ``benchmark_delta`` is
+    deliberately absent from the key set because its value is itself a sentence
+    (``benchmark_comparison_from_delta``); the page composes its own comparison from
+    the numbers instead.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    key: str
-    label: str
+    key: MetricKey
     value: str
 
 
@@ -80,6 +103,42 @@ class PublicExcerptStrategyFact(BaseModel):
     value: str
 
 
+AssumptionKey = Literal[
+    # Structural, and true of every Argus run by construction.
+    "long_only",
+    "equal_weight",
+    # Execution costs. Either the run modeled none, or it modeled both numbers.
+    "no_costs",
+    "modeled_fee_bps",
+    "modeled_slippage_bps",
+    # What the result was measured against. The two forms are exclusive: the second
+    # says the benchmark carried the same modeled costs the strategy did.
+    "benchmark",
+    "benchmark_same_modeled_costs",
+    # Recurring contribution runs. The cadence is absent when the run stated none.
+    "recurring_contribution",
+    "contribution_cadence",
+    "starting_principal",
+]
+
+
+class PublicExcerptAssumption(BaseModel):
+    """One assumption the run was executed under, frozen as a key and a value.
+
+    Same discipline as :class:`PublicExcerptStrategyFact`, and for the same reason:
+    the sentence is composed at view time in the viewer's language while the value
+    stays frozen. ``value`` is the raw scalar the run reported, so a number is a
+    number here and gets its separators from the viewer's locale, not the author's.
+
+    Keys with nothing to measure carry no value: ``long_only`` is the whole fact.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    key: AssumptionKey
+    value: str | None = None
+
+
 class PublicExcerptVisualPoint(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -107,15 +166,14 @@ class PublicExcerptPayload(BaseModel):
     idea_title: str
     asset_class: AssetClass | None = None
     symbols: list[str] = Field(default_factory=list)
-    strategy_label: str | None = None
-    # The label alone names a category. For anything but buy and hold it does not
-    # identify what was executed, so the defining parameters are frozen beside it.
+    # No frozen strategy label: it named a category in the author's language while
+    # strategy_facts already carries the shape as a closed key. Two names for one
+    # thing, one of them untranslatable.
     strategy_facts: list[PublicExcerptStrategyFact] = Field(default_factory=list)
-    assumptions: list[str] = Field(default_factory=list)
+    assumptions: list[PublicExcerptAssumption] = Field(default_factory=list)
     date_range: PublicExcerptDateRange
     metrics: list[PublicExcerptMetric] = Field(default_factory=list)
     benchmark_symbol: str | None = None
-    benchmark_note: str | None = None
     visual: PublicExcerptVisual | None = None
     owner_note: str | None = None
     content_language: Language = "en"
@@ -154,7 +212,7 @@ class PublicExcerptListItem(BaseModel):
     path: str
     title: str
     symbols: list[str] = Field(default_factory=list)
-    date_range_display: str
+    date_range: PublicExcerptDateRange
     created_at: datetime
     revoked_at: datetime | None = None
     revocation_reason: RevocationReason | None = None

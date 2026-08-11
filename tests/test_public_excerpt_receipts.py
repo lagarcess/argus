@@ -15,6 +15,7 @@ from argus.api.public_excerpt_schemas import (
     PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH,
     PUBLIC_EXCERPT_ROBOTS_DIRECTIVE,
     PublicExcerptPayload,
+    PublicExcerptSnapshot,
     PublicExcerptView,
 )
 from argus.api.public_excerpts import (
@@ -75,15 +76,13 @@ CLOSED_PAYLOAD_FIELDS = {
     "idea_title",
     "asset_class",
     "symbols",
-    "strategy_label",
-    # Part of section 2's "strategy", not a new field: the label alone names a
-    # category, so the defining parameters sit beside it.
+    # Section 2's "strategy". There is no separate label: it named a category in
+    # the author's language, which a stranger opening the link may not read.
     "strategy_facts",
     "assumptions",
     "date_range",
     "metrics",
     "benchmark_symbol",
-    "benchmark_note",
     "visual",
     "owner_note",
     "content_language",
@@ -150,102 +149,160 @@ def test_payload_is_frozen_after_construction() -> None:
 # ── Section 3: the never-expose list, attacked ────────────────────────────────
 
 
+# Every carrier the payload still has for text it did not author: the title and its
+# card fallback, metric values, symbols, the benchmark symbol, a strategy fact, and
+# the visual's currency. The assumption sentences and metric labels the run froze
+# are deliberately absent, because the payload no longer has a channel for either.
 @pytest.mark.parametrize(
-    ("case", "artifact_payload"),
+    ("case", "overrides"),
     [
         (
-            "source_conversation_id_in_prose",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "benchmark_note": f"See conversation {CONVERSATION_ID}",
-                }
-            ),
-        ),
-        (
-            "source_run_id_in_metric_label",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "rows": [
-                        {
-                            "key": "total_return_pct",
-                            "label": f"Total return for run {RUN_ID}",
-                            "value": "+18.4%",
+            "source_conversation_id_in_card_title",
+            {
+                "artifact": build_artifact(
+                    title="   ",
+                    payload=build_artifact_payload(
+                        result_card={
+                            **build_result_card(),
+                            "title": f"See conversation {CONVERSATION_ID}",
                         }
-                    ],
-                }
-            ),
+                    ),
+                )
+            },
         ),
         (
-            "route_receipt_in_assumptions",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "assumptions": ["route_receipt stage=interpret outcome=ready"],
-                }
-            ),
+            "source_run_id_in_metric_value",
+            {
+                "artifact": build_artifact(
+                    payload=build_artifact_payload(
+                        result_card={
+                            **build_result_card(),
+                            "rows": [
+                                {
+                                    "key": "total_return_pct",
+                                    "label": "Total return",
+                                    "value": f"+18.4% on run {RUN_ID}",
+                                }
+                            ],
+                        }
+                    )
+                )
+            },
         ),
         (
-            "provider_metadata_in_strategy_label",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "strategy_label": "Buy and hold via openrouter",
-                }
-            ),
+            "route_receipt_in_metric_value",
+            {
+                "artifact": build_artifact(
+                    payload=build_artifact_payload(
+                        result_card={
+                            **build_result_card(),
+                            "rows": [
+                                {
+                                    "key": "total_return_pct",
+                                    "label": "Total return",
+                                    "value": "route_receipt stage=interpret outcome=ready",
+                                }
+                            ],
+                        }
+                    )
+                )
+            },
         ),
         (
-            "model_metadata_in_benchmark_note",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "benchmark_note": "Interpreted by langgraph then priced by alpaca",
-                }
-            ),
+            "provider_metadata_in_benchmark_symbol",
+            {
+                "artifact": build_artifact(
+                    payload=build_artifact_payload(
+                        extra={
+                            "provenance": {
+                                "asset_class": "equity",
+                                "symbols": ["AAPL"],
+                                "benchmark_symbol": "SPY priced by alpaca",
+                                "created_at": utc().isoformat(),
+                            }
+                        }
+                    )
+                )
+            },
         ),
         (
-            "raw_transcript_in_assumptions",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "assumptions": ["system_prompt: you are Argus"],
+            "model_metadata_in_a_strategy_fact",
+            {
+                "run_config_snapshot": {
+                    **INDICATOR_CONFIG_SNAPSHOT,
+                    "resolved_parameters": {
+                        **INDICATOR_CONFIG_SNAPSHOT["resolved_parameters"],
+                        "indicator": "RSI read by langgraph",
+                    },
                 }
-            ),
+            },
+        ),
+        (
+            "raw_transcript_in_a_strategy_fact",
+            {
+                "run_config_snapshot": {
+                    **INDICATOR_CONFIG_SNAPSHOT,
+                    "resolved_parameters": {
+                        **INDICATOR_CONFIG_SNAPSHOT["resolved_parameters"],
+                        "indicator": "system_prompt: you are Argus",
+                    },
+                }
+            },
         ),
         (
             "broker_token_in_metric_value",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "rows": [
-                        {
-                            "key": "total_return_pct",
-                            "label": "Total return",
-                            "value": "Bearer sk-live-abc",
+            {
+                "artifact": build_artifact(
+                    payload=build_artifact_payload(
+                        result_card={
+                            **build_result_card(),
+                            "rows": [
+                                {
+                                    "key": "total_return_pct",
+                                    "label": "Total return",
+                                    "value": "Bearer sk-live-abc",
+                                }
+                            ],
                         }
-                    ],
-                }
-            ),
+                    )
+                )
+            },
         ),
         (
-            "memory_record_id_in_note",
-            build_artifact_payload(
-                result_card={
-                    **build_result_card(),
-                    "benchmark_note": (
+            "strategy_id_in_symbols",
+            {
+                "artifact": build_artifact(
+                    payload=build_artifact_payload(
+                        extra={
+                            "provenance": {
+                                "asset_class": "equity",
+                                "symbols": [STRATEGY_ID],
+                                "benchmark_symbol": "SPY",
+                                "created_at": utc().isoformat(),
+                            }
+                        }
+                    )
+                )
+            },
+        ),
+        (
+            "memory_record_id_in_visual_currency",
+            {
+                "run_chart": {
+                    **build_chart(),
+                    "currency": (
                         "Recalled from memory 77777777-7777-4777-8777-777777777777"
                     ),
                 }
-            ),
+            },
         ),
     ],
 )
 def test_never_expose_content_prevents_the_receipt_entirely(
-    case: str, artifact_payload: dict[str, Any]
+    case: str, overrides: dict[str, Any]
 ) -> None:
     with pytest.raises(PublicExcerptSanitizationError):
-        _payload(artifact=build_artifact(payload=artifact_payload))
+        _payload(**overrides)
 
 
 def test_a_poisoned_artifact_title_prevents_the_receipt() -> None:
@@ -398,8 +455,6 @@ def test_visual_never_carries_chart_markers_or_attribution() -> None:
 
 
 def _snapshot(**overrides: Any):
-    from argus.api.public_excerpt_schemas import PublicExcerptSnapshot
-
     payload = overrides.pop("payload", None) or _payload()
     fields: dict[str, Any] = {
         "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -432,7 +487,9 @@ def test_public_view_carries_no_owner_and_no_source_reference() -> None:
 
 
 def test_revoked_view_keeps_nothing_from_the_payload() -> None:
-    view = snapshot_public_view(_snapshot(revoked_at=utc(5), revocation_reason="owner_revoked"))
+    view = snapshot_public_view(
+        _snapshot(revoked_at=utc(5), revocation_reason="owner_revoked")
+    )
     assert view.status == "revoked"
     assert view.payload is None
     assert view.created_at is None
@@ -562,7 +619,9 @@ def test_a_result_without_a_tested_window_is_not_shareable() -> None:
     card = build_result_card()
     card.pop("date_range")
     with pytest.raises(PublicExcerptSourceError):
-        _payload(artifact=build_artifact(payload=build_artifact_payload(result_card=card)))
+        _payload(
+            artifact=build_artifact(payload=build_artifact_payload(result_card=card))
+        )
 
 
 # ── Memory-mode repository parity ─────────────────────────────────────────────
@@ -612,9 +671,7 @@ def test_revocation_takes_effect_on_the_next_public_read() -> None:
         "available"
     )
 
-    repository.revoke_public_excerpt_snapshot(
-        owner_id=OWNER.id, snapshot_id=snapshot.id
-    )
+    repository.revoke_public_excerpt_snapshot(owner_id=OWNER.id, snapshot_id=snapshot.id)
 
     view = repository.read_public_excerpt_view(public_id=snapshot.public_id)
     assert view.status == "revoked"
@@ -877,9 +934,9 @@ def test_every_executable_strategy_shape_round_trips_completely() -> None:
         }
         assert facts, f"{template} produced a receipt describing no strategy"
         assert "strategy_type" in facts, f"{template} receipt names no strategy"
-        assert expected <= set(facts), (
-            f"{template} receipt is missing {sorted(expected - set(facts))}"
-        )
+        assert expected <= set(
+            facts
+        ), f"{template} receipt is missing {sorted(expected - set(facts))}"
         # Every parameter the registry declares tunable is disclosed, so a receipt
         # cannot omit one that changed the result.
         declared = set(STRATEGY_CAPABILITIES[template].parameters)
@@ -1122,3 +1179,20 @@ def test_the_mirror_is_the_engine_s_own_not_a_second_opinion() -> None:
         is _opposite_moving_average_crossover_rule
     )
 
+
+def test_a_marker_survives_the_separator_a_field_rewrites_it_with() -> None:
+    """Strategy facts turn underscores into spaces, which blinded two markers.
+
+    ``system_prompt`` and ``route_receipt`` both carry a separator, so a value that
+    reached the payload through a field that rewrites separators passed a check it
+    should have failed. The audit folds both sides now.
+    """
+    from argus.domain.public_excerpts import NEVER_EXPOSE_VALUE_MARKERS
+
+    separated = [marker for marker in NEVER_EXPOSE_VALUE_MARKERS if "_" in marker]
+    assert separated, "no separator-carrying marker left to guard"
+    for marker in separated:
+        document = _payload().model_dump(mode="json")
+        document["idea_title"] = marker.replace("_", " ")
+        with pytest.raises(PublicExcerptSanitizationError):
+            audit_public_excerpt_document(document)

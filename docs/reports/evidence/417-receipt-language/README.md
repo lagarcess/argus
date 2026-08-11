@@ -1,0 +1,67 @@
+# Issue #417: a receipt no longer freezes the author's language
+
+Captured at lane head against a **production build** with
+`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED=true`,
+`NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED=true` and
+`NEXT_PUBLIC_ENABLE_SPANISH=true`, on a local memory-mode backend with no provider
+keys. Enabling sharing stays a separate founder decision; both flags default to
+false and these captures only show what the surface does if it is ever turned on.
+
+## One receipt, two readers
+
+Both frames below are the **same stored snapshot**, seeded once and served from
+`/api/v1/public/receipts/argusreceiptevidence417abc`. Nothing about the payload
+differs between them. The only thing that changes is the `Accept-Language` the
+browser sent.
+
+| Frame | Reader |
+| :--- | :--- |
+| `01a-phone-en-same-frozen-receipt.png` | `en-US` |
+| `01b-phone-es-same-frozen-receipt.png` | `es-419` |
+
+The run behind them was **written up in Spanish**: a recurring-contribution
+strategy with modeled costs, produced by the real `build_result_card` at
+`language="es-419"`, whose card assumptions read `Aporte recurrente: $200 mensual`,
+`Capital inicial: $0`, `Solo largo`, `Peso igual`, `Neto de comisión de 10 bps +
+deslizamiento de 5 bps`, `Referencia: SPY (mismos costos modelados)`, and whose
+tested window read `2 de enero de 2024 al 1 de marzo de 2024`.
+
+None of that prose is in the payload. What the snapshot actually holds is:
+
+```json
+"assumptions": [
+  {"key": "recurring_contribution", "value": "200"},
+  {"key": "contribution_cadence", "value": "monthly"},
+  {"key": "starting_principal", "value": "0"},
+  {"key": "long_only", "value": null},
+  {"key": "equal_weight", "value": null},
+  {"key": "modeled_fee_bps", "value": "10"},
+  {"key": "modeled_slippage_bps", "value": "5"},
+  {"key": "benchmark_same_modeled_costs", "value": "SPY"}
+],
+"date_range": {"start": "2024-01-02", "end": "2024-03-01"}
+```
+
+So the English reader gets `It put in $200 every month.` and
+`Jan 2, 2024 to Mar 1, 2024`, and the Spanish reader gets `Aportó $200 cada mes.`
+and `2 ene 2024 al 1 mar 2024`, from one frozen object that contains neither
+sentence.
+
+`rendered-text.json` holds the full rendered body text of both pages. Every frame
+here was checked by reading that text before the image was trusted: an earlier
+capture attempt in this lane produced two plausible-looking frames that were both
+a browser error page, and the byte-identical file sizes were the only tell.
+
+## What still reads in the author's language, and why
+
+`AAPL cada mes` is the idea's title. It is the one field a person wrote about
+their own idea, so it stays as written and carries `lang="es-419"` for screen
+readers. `owner_note` is the same case. `content_language` exists to name the
+language of exactly those two fields, and nothing else.
+
+## Capture note
+
+Taken at 375 px on a 1500 px tall viewport. The action bar is fixed to the
+viewport, so a full-page shot floats it across the middle of the document and
+covers three assumption lines; a viewport tall enough to hold the whole receipt
+leaves the bar below the last line, where it covers nothing.

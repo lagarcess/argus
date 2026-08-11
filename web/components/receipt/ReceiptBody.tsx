@@ -3,10 +3,11 @@ import { type ReceiptCopy } from "@/lib/receipt-copy";
 import {
   benchmarkReturn,
   benchmarkVerdict,
+  receiptAssumptions,
   receiptPlan,
 } from "@/lib/receipt-plan";
 import type { ArgusLanguage } from "@/lib/language-features";
-import { formatReceiptDate } from "@/lib/receipt-copy";
+import { formatReceiptDate, formatReceiptDateRange } from "@/lib/receipt-copy";
 import { RECEIPT_ACTION_BAR_CLEARANCE } from "@/lib/receipt-layout";
 import ProvenanceMark from "./ProvenanceMark";
 import ReceiptActionBar from "./ReceiptActionBar";
@@ -52,15 +53,17 @@ export default function ReceiptBody({
   const stamped = formatReceiptDate(createdAt, language);
   const frozenLang = payload.content_language;
   const plan = receiptPlan(payload, copy);
+  const assumptions = receiptAssumptions(payload, copy, language);
+  const testedWindow = formatReceiptDateRange(payload.date_range, copy, language);
   const verdict = benchmarkVerdict(payload, copy);
   const benchmark = benchmarkReturn(payload);
 
   const metric = (...keys: string[]) =>
     payload.metrics.find((entry) => keys.includes(entry.key)) ?? null;
-  // Metric labels are frozen in English inside the payload. For the keys Argus owns
-  // the label renders in the viewer's language instead, as the strategy facts do.
-  const metricLabel = (entry: { key: string; label: string }) =>
-    (copy.metric_labels as Record<string, string>)[entry.key] ?? entry.label;
+  // The payload freezes a metric key and its number, never a label. The label is
+  // rendered from the key here, in the viewer's language, as the facts above are.
+  const metricLabel = (entry: { key: string }) =>
+    (copy.metric_labels as Record<string, string>)[entry.key] ?? entry.key;
   const headline = metric("total_return_pct", "total_return");
   const drawdown = metric("max_drawdown_pct", "max_drawdown");
   const isNegative = Boolean(headline?.value.trim().startsWith("-"));
@@ -115,7 +118,9 @@ export default function ReceiptBody({
               }
             />
           )}
-          <Row label={copy.fields.dates} value={payload.date_range.display} />
+          {testedWindow && (
+            <Row label={copy.fields.dates} value={testedWindow} />
+          )}
           {drawdown && (
             <Row label={metricLabel(drawdown)} value={drawdown.value} />
           )}
@@ -148,12 +153,9 @@ export default function ReceiptBody({
             </div>
           ))}
         </div>
-        {payload.assumptions.length > 0 && (
-          <ul
-            lang={frozenLang}
-            className="mt-3.5 flex flex-col gap-1 text-[11.5px] leading-[1.5] text-white/40"
-          >
-            {payload.assumptions.map((assumption) => (
+        {assumptions.length > 0 && (
+          <ul className="mt-3.5 flex flex-col gap-1 text-[11.5px] leading-[1.5] text-white/40">
+            {assumptions.map((assumption) => (
               <li key={assumption}>{assumption}</li>
             ))}
           </ul>

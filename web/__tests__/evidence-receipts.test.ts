@@ -29,7 +29,7 @@ const RECEIPT: EvidenceReceipt = {
   path: "/r/abcdefghijklmnopqrstuvwx",
   title: "AAPL buy and hold",
   symbols: ["AAPL"],
-  date_range_display: "Jan 2, 2024 to Mar 1, 2024",
+  date_range: { start: "2024-01-02", end: "2024-03-01" },
   created_at: "2026-08-07T12:00:00Z",
   revoked_at: null,
   revocation_reason: null,

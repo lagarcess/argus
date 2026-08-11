@@ -1502,13 +1502,37 @@
       "monthly": "cada mes",
       "quarterly": "cada trimestre"
     },
+    "assumptions": {
+      "long_only": "Solo compró y vendió. Nunca apostó en contra de nada.",
+      "equal_weight": "Repartió el dinero por partes iguales entre todo lo que tuvo.",
+      "no_costs": "No se cobraron comisiones ni deslizamiento.",
+      "modeled_fee_bps": "Se cobró una comisión de {{bps}} bps en cada operación.",
+      "modeled_slippage_bps": "Se cobró un deslizamiento de {{bps}} bps en cada operación.",
+      "benchmark": "Se comparó con {{symbol}}.",
+      "benchmark_same_modeled_costs": "Se comparó con {{symbol}}, con los mismos costos cobrados.",
+      "recurring_contribution": "Aportó ${{amount}} cada vez.",
+      "recurring_contribution_cadence": "Aportó ${{amount}} {{cadence}}.",
+      "starting_principal": "Empezó con ${{amount}} ya invertidos."
+    },
+    "strategy_type_values": {
+      "buy and hold": "Comprar y mantener",
+      "dca accumulation": "Compras recurrentes",
+      "buy the dip": "Comprar la caída",
+      "rsi threshold": "Umbral RSI",
+      "indicator threshold": "Umbral de indicador",
+      "moving average crossover": "Cruce de medias móviles",
+      "macd crossover": "Cruce MACD"
+    },
     "metric_labels": {
       "total_return_pct": "Retorno total",
       "total_return": "Retorno total",
       "benchmark_return_pct": "Referencia",
       "max_drawdown_pct": "Peor caída",
       "max_drawdown": "Peor caída",
-      "win_rate_pct": "Aciertos"
+      "win_rate_pct": "Aciertos",
+      "cash_value": "Valor final",
+      "benchmark_return": "Referencia",
+      "win_rate": "Aciertos"
     },
     "hero": {
       "ahead": "{{value}} por encima de {{symbol}}",
@@ -1534,6 +1558,7 @@
       "crypto": "Cripto",
       "currency_pair": "Par de divisas"
     },
+    "date_range": "{{start}} al {{end}}",
     "frozen_note": "Guardado el {{date}}. Estos números quedaron fijos, así que se verán igual cuando vuelvas.",
     "frozen_note_undated": "Estos números quedaron fijos cuando se creó el enlace, así que se verán igual cuando vuelvas.",
     "chart_unavailable": "No se guardó ningún gráfico con este.",

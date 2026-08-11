@@ -11,11 +11,17 @@ import {
 } from "../lib/public-receipt-contract";
 import {
   formatReceiptDate,
+  formatReceiptDateRange,
+  formatReceiptNumber,
   interpolate,
   receiptCopy,
   receiptLanguageFromAcceptLanguage,
 } from "../lib/receipt-copy";
-import { benchmarkVerdict, receiptPlan } from "../lib/receipt-plan";
+import {
+  benchmarkVerdict,
+  receiptAssumptions,
+  receiptPlan,
+} from "../lib/receipt-plan";
 import enCommon from "../public/locales/en/common.json";
 import esCommon from "../public/locales/es-419/common.json";
 
@@ -61,19 +67,18 @@ const PAYLOAD: PublicReceiptPayload = {
   idea_title: "AAPL buy and hold",
   asset_class: "equity",
   symbols: ["AAPL"],
-  strategy_label: "Buy and hold",
-  assumptions: ["Long only, no leverage."],
-  date_range: {
-    start: "2024-01-02",
-    end: "2024-03-01",
-    display: "Jan 2, 2024 to Mar 1, 2024",
-  },
+  assumptions: [
+    { key: "long_only" },
+    { key: "equal_weight" },
+    { key: "no_costs" },
+    { key: "benchmark", value: "SPY" },
+  ],
+  date_range: { start: "2024-01-02", end: "2024-03-01" },
   metrics: [
-    { key: "max_drawdown_pct", label: "Max drawdown", value: "-6.2%" },
-    { key: "total_return_pct", label: "Total return", value: "+18.4%" },
+    { key: "max_drawdown_pct", value: "-6.2%" },
+    { key: "total_return_pct", value: "+18.4%" },
   ],
   benchmark_symbol: "SPY",
-  benchmark_note: "Compared against SPY.",
   strategy_facts: [
     { key: "indicator", value: "RSI" },
     { key: "indicator_period", value: "14" },
@@ -490,17 +495,20 @@ describe("the public route escapes the client i18n gate", () => {
   });
 });
 
-describe("when the label and the frozen strategy name disagree", () => {
-  test("the description is composed from the executed facts, not the label", () => {
-    // The two are frozen from different records: the label from the result card,
-    // the name from the run's own config. The page no longer renders the label as
-    // the description of what ran at all, so a stale label cannot speak for a run
-    // it does not describe. It survives only as the fallback for a shape with no
-    // sentence of its own.
+describe("the strategy name a receipt renders", () => {
+  test("is composed from the executed facts, never from a frozen label", () => {
+    // The label and the name were frozen from different records: the label from the
+    // result card, the name from the run's own config. The label is gone from the
+    // payload entirely now, because it was also written in the author's language.
+    // Even the fallback for a shape with no sentence of its own reads the closed
+    // strategy_type token and translates it.
     const plan = source(join(WEB_ROOT, "lib/receipt-plan.ts"));
-    const labelUses = plan.match(/payload\.strategy_label/g) ?? [];
-    expect(labelUses).toHaveLength(1);
+    expect(plan).not.toContain("strategy_label");
     expect(plan).toContain("plan.unnamed");
+    expect(plan).toContain("strategy_type_values");
+    expect(source(join(WEB_ROOT, "lib/public-receipt-contract.ts"))).not.toContain(
+      "strategy_label",
+    );
   });
 });
 
@@ -743,5 +751,181 @@ describe("the action bar", () => {
     // And the in-flow block no longer repeats the headline the bar now carries.
     expect(source(RECEIPT_BODY)).not.toContain("copy.framing.headline}{\" \"}");
     expect(source(RECEIPT_BODY)).toContain("{copy.framing.detail}");
+  });
+});
+
+describe("what the run assumed, spoken to whoever opened the link", () => {
+  // One frozen payload, produced by one run, read by two people who share no
+  // language. Everything below reads this same object: that is the whole point.
+  const FROZEN: PublicReceiptPayload = {
+    ...PAYLOAD,
+    assumptions: [
+      { key: "recurring_contribution", value: "1200" },
+      { key: "contribution_cadence", value: "monthly" },
+      { key: "starting_principal", value: "0" },
+      { key: "long_only" },
+      { key: "equal_weight" },
+      { key: "modeled_fee_bps", value: "10" },
+      { key: "modeled_slippage_bps", value: "5" },
+      { key: "benchmark_same_modeled_costs", value: "SPY" },
+    ],
+  };
+
+  test("every frozen assumption becomes a sentence, in each language", () => {
+    for (const language of ["en", "es-419"] as const) {
+      const lines = receiptAssumptions(FROZEN, receiptCopy(language), language);
+      // The cadence is spoken inside the contribution sentence, so eight frozen
+      // facts read as seven lines.
+      expect(lines).toHaveLength(7);
+      expect(lines.every((line) => line.trim().length > 0)).toBe(true);
+      expect(lines.some((line) => line.includes("{{"))).toBe(false);
+    }
+  });
+
+  test("the two languages say different words about the same run", () => {
+    const english = receiptAssumptions(FROZEN, receiptCopy("en"), "en");
+    const spanish = receiptAssumptions(FROZEN, receiptCopy("es-419"), "es-419");
+    expect(english).not.toEqual(spanish);
+    // The numbers and the symbol are the frozen facts and survive both readings.
+    expect(english.join(" ")).toContain("SPY");
+    expect(spanish.join(" ")).toContain("SPY");
+    for (const lines of [english, spanish]) {
+      expect(lines.join(" ")).toContain("10");
+      expect(lines.join(" ")).toContain("5");
+    }
+  });
+
+  test("the contribution and its cadence read as one sentence", () => {
+    const [first] = receiptAssumptions(FROZEN, receiptCopy("en"), "en");
+    expect(first).toBe("It put in $1,200 every month.");
+    const [firstEs] = receiptAssumptions(FROZEN, receiptCopy("es-419"), "es-419");
+    expect(firstEs).toBe("Aportó $1,200 cada mes.");
+  });
+
+  test("a contribution with no frozen cadence still reads", () => {
+    const withoutCadence = {
+      ...FROZEN,
+      assumptions: FROZEN.assumptions.filter(
+        (assumption) => assumption.key !== "contribution_cadence",
+      ),
+    };
+    const lines = receiptAssumptions(withoutCadence, receiptCopy("en"), "en");
+    expect(lines[0]).toBe("It put in $1,200 each time.");
+  });
+
+  test("a key whose sentence needs a value it does not have is dropped", () => {
+    const broken: PublicReceiptPayload = {
+      ...PAYLOAD,
+      assumptions: [
+        { key: "benchmark", value: null },
+        { key: "modeled_fee_bps" },
+        { key: "long_only" },
+      ],
+    };
+    expect(receiptAssumptions(broken, receiptCopy("en"), "en")).toEqual([
+      receiptCopy("en").assumptions.long_only,
+    ]);
+  });
+
+  test("both locales carry a sentence for every key in the closed set", () => {
+    const contract = code(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
+    const start = contract.indexOf("PublicReceiptAssumptionKey =");
+    const union = contract.slice(start, contract.indexOf(";", start));
+    const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
+    expect(keys).toHaveLength(10);
+    for (const common of [enCommon, esCommon]) {
+      const said = common.receipt.assumptions as Record<string, string>;
+      for (const key of keys) {
+        // The cadence is spoken through the contribution sentence, not on its own.
+        if (key === "contribution_cadence") continue;
+        expect(said[key]).toBeTruthy();
+      }
+      expect(said.recurring_contribution_cadence).toBeTruthy();
+    }
+  });
+});
+
+describe("the tested window", () => {
+  test("is rendered from two dates, in the language of whoever opened it", () => {
+    const range = { start: "2024-01-02", end: "2024-03-01" };
+    expect(formatReceiptDateRange(range, receiptCopy("en"), "en")).toBe(
+      "Jan 2, 2024 to Mar 1, 2024",
+    );
+    const spanish = formatReceiptDateRange(range, receiptCopy("es-419"), "es-419");
+    expect(spanish).toContain(" al ");
+    expect(spanish).not.toBe(formatReceiptDateRange(range, receiptCopy("en"), "en"));
+  });
+
+  test("reads the frozen day in UTC, so the window cannot slide", () => {
+    // A calendar day parsed in the viewer's zone lands on the day before for
+    // anyone west of Greenwich, which would move the tested window.
+    const range = { start: "2024-01-01", end: "2024-12-31" };
+    expect(formatReceiptDateRange(range, receiptCopy("en"), "en")).toBe(
+      "Jan 1, 2024 to Dec 31, 2024",
+    );
+  });
+
+  test("says nothing when either end will not parse", () => {
+    expect(
+      formatReceiptDateRange(
+        { start: "not a date", end: "2024-03-01" },
+        receiptCopy("en"),
+        "en",
+      ),
+    ).toBeNull();
+  });
+
+  test("the page and its preview card render it rather than reading a string", () => {
+    const route = code(RECEIPT_ROUTE);
+    const body = code(RECEIPT_BODY);
+    expect(route).not.toContain("date_range.display");
+    expect(body).not.toContain("date_range.display");
+    expect(route).toContain("formatReceiptDateRange");
+    expect(body).toContain("formatReceiptDateRange");
+  });
+});
+
+describe("metric labels", () => {
+  test("are rendered from the key, never read off the payload", () => {
+    const body = code(RECEIPT_BODY);
+    const route = code(RECEIPT_ROUTE);
+    expect(body).not.toContain("entry.label");
+    expect(route).not.toContain("headline.label");
+    expect(body).toContain("copy.metric_labels");
+    expect(route).toContain("metric_labels");
+  });
+
+  test("both locales label every key the payload can carry", () => {
+    const contract = code(join(WEB_ROOT, "lib/public-receipt-contract.ts"));
+    const start = contract.indexOf("PublicReceiptMetricKey =");
+    const union = contract.slice(start, contract.indexOf(";", start));
+    const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
+    expect(keys).toHaveLength(9);
+    for (const common of [enCommon, esCommon]) {
+      const labels = common.receipt.metric_labels as Record<string, string>;
+      for (const key of keys) expect(labels[key]).toBeTruthy();
+    }
+  });
+});
+
+describe("numbers frozen bare", () => {
+  test("are grouped by the renderer, not by whoever ran the backtest", () => {
+    // The payload freezes "25000" with no separators at all, and each locale adds
+    // its own. CLDR gives es-419 the same grouping as en-US today, so the two read
+    // alike; the point is that the separator is a rendering decision rather than a
+    // frozen one, which is what makes the payload safe to hand any locale later.
+    expect(formatReceiptNumber("25000", "en")).toBe("25,000");
+    expect(formatReceiptNumber("25000", "es-419")).toBe(
+      new Intl.NumberFormat("es-419").format(25000),
+    );
+    expect(formatReceiptNumber("not a number", "en")).toBeNull();
+  });
+});
+
+describe("no user-facing copy on this surface uses an em dash", () => {
+  test("in either language", () => {
+    for (const common of [enCommon, esCommon]) {
+      expect(JSON.stringify(common.receipt)).not.toContain("—");
+    }
   });
 });

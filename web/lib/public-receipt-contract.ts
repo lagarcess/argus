@@ -9,7 +9,6 @@ import { ARGUS_API_BASE_URL } from "./argus-api-transport";
 export type PublicReceiptDateRange = {
   start: string;
   end: string;
-  display: string;
 };
 
 /** Closed key set; the label is rendered from the key in the viewer's language. */
@@ -40,9 +39,45 @@ export type PublicReceiptStrategyFact = {
   value: string;
 };
 
+/**
+ * Closed key set, same reason as the strategy facts: the run assumed these in the
+ * author's language and the page speaks them in the viewer's. Values are bare
+ * scalars, so numbers pick up the viewer's separators rather than the author's.
+ */
+export type PublicReceiptAssumptionKey =
+  | "long_only"
+  | "equal_weight"
+  | "no_costs"
+  | "modeled_fee_bps"
+  | "modeled_slippage_bps"
+  | "benchmark"
+  | "benchmark_same_modeled_costs"
+  | "recurring_contribution"
+  | "contribution_cadence"
+  | "starting_principal";
+
+export type PublicReceiptAssumption = {
+  key: PublicReceiptAssumptionKey;
+  value?: string | null;
+};
+
+/**
+ * Closed key set, and no frozen label. `benchmark_delta` is deliberately absent:
+ * its value is a sentence, so the page composes its own comparison from numbers.
+ */
+export type PublicReceiptMetricKey =
+  | "cash_value"
+  | "total_return_pct"
+  | "total_return"
+  | "benchmark_return_pct"
+  | "benchmark_return"
+  | "max_drawdown_pct"
+  | "max_drawdown"
+  | "win_rate"
+  | "win_rate_pct";
+
 export type PublicReceiptMetric = {
-  key: string;
-  label: string;
+  key: PublicReceiptMetricKey;
   value: string;
 };
 
@@ -63,13 +98,11 @@ export type PublicReceiptPayload = {
   idea_title: string;
   asset_class?: AssetClass | null;
   symbols: string[];
-  strategy_label?: string | null;
   strategy_facts: PublicReceiptStrategyFact[];
-  assumptions: string[];
+  assumptions: PublicReceiptAssumption[];
   date_range: PublicReceiptDateRange;
   metrics: PublicReceiptMetric[];
   benchmark_symbol?: string | null;
-  benchmark_note?: string | null;
   visual?: PublicReceiptVisual | null;
   owner_note?: string | null;
   content_language: "en" | "es-419";
@@ -161,7 +194,7 @@ export async function fetchPublicReceipt(
 export function headlineReceiptMetric(
   payload: PublicReceiptPayload,
 ): PublicReceiptMetric | null {
-  const preferred = ["total_return_pct", "delta_vs_benchmark_pct", "total_return"];
+  const preferred: PublicReceiptMetricKey[] = ["total_return_pct", "total_return"];
   for (const key of preferred) {
     const match = payload.metrics.find((metric) => metric.key === key);
     if (match) return match;

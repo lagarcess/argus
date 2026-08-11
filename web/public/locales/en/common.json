@@ -1502,13 +1502,37 @@
       "monthly": "every month",
       "quarterly": "every quarter"
     },
+    "assumptions": {
+      "long_only": "It only ever bought and sold. It never bet against anything.",
+      "equal_weight": "It split the money evenly across everything it held.",
+      "no_costs": "No trading fees or slippage were charged.",
+      "modeled_fee_bps": "A trading fee of {{bps}} bps was charged on every trade.",
+      "modeled_slippage_bps": "Slippage of {{bps}} bps was charged on every trade.",
+      "benchmark": "It was measured against {{symbol}}.",
+      "benchmark_same_modeled_costs": "It was measured against {{symbol}}, charged the same costs.",
+      "recurring_contribution": "It put in ${{amount}} each time.",
+      "recurring_contribution_cadence": "It put in ${{amount}} {{cadence}}.",
+      "starting_principal": "It started with ${{amount}} already invested."
+    },
+    "strategy_type_values": {
+      "buy and hold": "Buy and hold",
+      "dca accumulation": "Recurring buys",
+      "buy the dip": "Buy the dip",
+      "rsi threshold": "RSI threshold",
+      "indicator threshold": "Indicator threshold",
+      "moving average crossover": "Moving average crossover",
+      "macd crossover": "MACD crossover"
+    },
     "metric_labels": {
       "total_return_pct": "Total return",
       "total_return": "Total return",
       "benchmark_return_pct": "Benchmark",
       "max_drawdown_pct": "Worst dip",
       "max_drawdown": "Worst dip",
-      "win_rate_pct": "Win rate"
+      "win_rate_pct": "Win rate",
+      "cash_value": "Ending value",
+      "benchmark_return": "Benchmark",
+      "win_rate": "Win rate"
     },
     "hero": {
       "ahead": "{{value}} ahead of {{symbol}}",
@@ -1534,6 +1558,7 @@
       "crypto": "Crypto",
       "currency_pair": "Currency pair"
     },
+    "date_range": "{{start}} to {{end}}",
     "frozen_note": "Saved on {{date}}. These numbers are locked, so they will look the same whenever you come back.",
     "frozen_note_undated": "These numbers were locked when the link was made, so they will look the same whenever you come back.",
     "chart_unavailable": "No chart was saved with this one.",

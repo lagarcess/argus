@@ -626,10 +626,11 @@ when two concurrent requests race on the insert. Only a real insert emits the
 `receipt_created` funnel event, so a retry or a reload cannot inflate the
 acquisition funnel's creation stage.
 
-`PublicExcerptListItem` is `{id, public_id, path, title, symbols,
-date_range_display, created_at, revoked_at, revocation_reason}`. It carries no
-source conversation, run, or artifact id. Clients compose the shareable url as
-`origin + path`, so the backend owns no origin configuration.
+`PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range,
+created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
+as ISO dates. It carries no source conversation, run, or artifact id. Clients
+compose the shareable url as `origin + path`, so the backend owns no origin
+configuration.
 
 `GET /public-excerpts` is paginated, newest first, with `limit` (default 50, max
 200) and an opaque `cursor`, returning `{items, next_cursor}`. It is paginated
@@ -678,6 +679,15 @@ from its entry windows, which the rule compiler allows), and MACD crossovers. A
 generic `rule_spec` condition tree, or any shape added later without a projection,
 answers `receipt_source_unsupported` rather than publishing a page that names a
 strategy without describing it.
+
+The payload freezes no rendered prose. A link is opened by people whose language
+has nothing to do with the author's, so `assumptions`, `strategy_facts`, `metrics`,
+and `date_range` all carry closed keys and bare scalars, and every sentence, label,
+number format, and date format is composed by the reader's client in the reader's
+language. `content_language` names the language of the two author-written fields
+that remain, `idea_title` and `owner_note`. A run whose assumptions or tested window
+will not project into that form answers `receipt_source_unsupported`; there is no
+passthrough string field, because one would reopen this defect under a new name.
 
 ## Admin Bypass
 

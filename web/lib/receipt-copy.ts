@@ -60,6 +60,58 @@ export function formatReceiptDate(
   }).format(parsed);
 }
 
+const DATE_LOCALE: Record<ArgusLanguage, string> = {
+  en: "en-US",
+  "es-419": "es-419",
+};
+
+/**
+ * One frozen calendar date, spoken in the viewer's language.
+ *
+ * UTC on purpose: the payload froze a calendar day, not an instant, so reading it
+ * in the viewer's zone would slide the tested window by a day for anyone west of
+ * Greenwich.
+ */
+export function formatReceiptDay(
+  value: string | null | undefined,
+  language: ArgusLanguage,
+): string | null {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat(DATE_LOCALE[language] ?? DATE_LOCALE.en, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+/** The tested window. Nothing is rendered when either end will not parse. */
+export function formatReceiptDateRange(
+  range: { start: string; end: string } | null | undefined,
+  copy: ReceiptCopy,
+  language: ArgusLanguage,
+): string | null {
+  const start = formatReceiptDay(range?.start, language);
+  const end = formatReceiptDay(range?.end, language);
+  if (!start || !end) return null;
+  return interpolate(copy.date_range, { start, end });
+}
+
+/** A frozen bare number, given the viewer's own grouping and decimal marks. */
+export function formatReceiptNumber(
+  value: string | null | undefined,
+  language: ArgusLanguage,
+): string | null {
+  if (!value) return null;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return null;
+  return new Intl.NumberFormat(DATE_LOCALE[language] ?? DATE_LOCALE.en, {
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
+
 export function interpolate(
   template: string,
   values: Record<string, string | number>,

@@ -1,8 +1,14 @@
 import type {
+  PublicReceiptAssumptionKey,
   PublicReceiptPayload,
   PublicReceiptStrategyFactKey,
 } from "./public-receipt-contract";
-import { interpolate, type ReceiptCopy } from "./receipt-copy";
+import {
+  formatReceiptNumber,
+  interpolate,
+  type ReceiptCopy,
+} from "./receipt-copy";
+import type { ArgusLanguage } from "./language-features";
 
 /**
  * Turns the frozen strategy facts into the rules a person can read.
@@ -126,10 +132,11 @@ export function receiptPlan(
   } else if (shape.includes("buy and hold")) {
     rows.push({ text: plan.buy_and_hold, exact: null });
   } else {
-    rows.push({
-      text: interpolate(plan.unnamed, { label: payload.strategy_label ?? shape }),
-      exact: null,
-    });
+    // The shape name is a closed token frozen by the projection, not a label in the
+    // author's language, so it gets translated like every other key on this page.
+    const named =
+      (copy.strategy_type_values as Record<string, string>)[shape] ?? shape;
+    rows.push({ text: interpolate(plan.unnamed, { label: named }), exact: null });
   }
 
   return {
@@ -138,6 +145,83 @@ export function receiptPlan(
       .filter((fact) => fact.key !== "strategy_type")
       .map((fact) => ({ key: fact.key, value: fact.value })),
   };
+}
+
+/**
+ * Turns the frozen assumptions into sentences a person can read.
+ *
+ * Same job as `receiptPlan` and for the same reason: the payload freezes keys and
+ * bare scalars, and the language they are spoken in belongs to whoever opened the
+ * link. Numbers get their separators here too, from the viewer's locale.
+ *
+ * The contribution amount and its cadence are one sentence rather than two. They
+ * are separate frozen facts because the cadence can be absent, but read together
+ * they are one thing the run did.
+ *
+ * A key whose sentence needs a value it does not have is dropped. Half a sentence
+ * about money is worse on this page than one fewer line.
+ */
+export function receiptAssumptions(
+  payload: PublicReceiptPayload,
+  copy: ReceiptCopy,
+  language: ArgusLanguage,
+): string[] {
+  const values = new Map<PublicReceiptAssumptionKey, string>();
+  for (const assumption of payload.assumptions) {
+    if (assumption.value != null) values.set(assumption.key, assumption.value);
+  }
+  const said = copy.assumptions as Record<string, string>;
+  const lines: string[] = [];
+  const money = (key: PublicReceiptAssumptionKey) =>
+    formatReceiptNumber(values.get(key), language);
+
+  for (const assumption of payload.assumptions) {
+    switch (assumption.key) {
+      case "long_only":
+      case "equal_weight":
+      case "no_costs":
+        lines.push(said[assumption.key]);
+        break;
+      case "modeled_fee_bps":
+      case "modeled_slippage_bps": {
+        const bps = formatReceiptNumber(assumption.value, language);
+        if (bps) lines.push(interpolate(said[assumption.key], { bps }));
+        break;
+      }
+      case "benchmark":
+      case "benchmark_same_modeled_costs": {
+        if (assumption.value) {
+          lines.push(
+            interpolate(said[assumption.key], { symbol: assumption.value }),
+          );
+        }
+        break;
+      }
+      case "recurring_contribution": {
+        const amount = money("recurring_contribution");
+        if (!amount) break;
+        const token = values.get("contribution_cadence");
+        const cadence = token
+          ? ((copy.cadence_values as Record<string, string>)[token] ?? token)
+          : null;
+        lines.push(
+          cadence
+            ? interpolate(said.recurring_contribution_cadence, { amount, cadence })
+            : interpolate(said.recurring_contribution, { amount }),
+        );
+        break;
+      }
+      case "starting_principal": {
+        const amount = money("starting_principal");
+        if (amount) lines.push(interpolate(said.starting_principal, { amount }));
+        break;
+      }
+      // Spoken as part of the contribution sentence above, never on its own.
+      case "contribution_cadence":
+        break;
+    }
+  }
+  return lines;
 }
 
 /**

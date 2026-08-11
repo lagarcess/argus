@@ -175,7 +175,7 @@ def test_owner_list_shows_the_receipt_without_a_source_reference(
         "path",
         "title",
         "symbols",
-        "date_range_display",
+        "date_range",
         "created_at",
         "revoked_at",
         "revocation_reason",
@@ -840,13 +840,11 @@ def test_the_snapshot_captures_nothing_mutable_beyond_the_owner_note() -> None:
         "idea_title",
         "asset_class",
         "symbols",
-        "strategy_label",
         "strategy_facts",
         "assumptions",
         "date_range",
         "metrics",
         "benchmark_symbol",
-        "benchmark_note",
         "visual",
     }
     constants = {"schema_version", "framing", "provenance_mark"}

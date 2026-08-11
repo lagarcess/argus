@@ -1051,9 +1051,9 @@ audit list; the public read never selects them.
 
 `payload` carries exactly these keys and no others, enforced by `extra="forbid"`
 on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
-`idea_title`, `asset_class`, `symbols`, `strategy_label`, `assumptions`,
-`date_range`, `metrics`, `benchmark_symbol`, `benchmark_note`, `visual`,
-`owner_note`, `content_language`, `framing`, `provenance_mark`.
+`idea_title`, `asset_class`, `symbols`, `strategy_facts`, `assumptions`,
+`date_range`, `metrics`, `benchmark_symbol`, `visual`, `owner_note`,
+`content_language`, `framing`, `provenance_mark`.
 
 Source conversation ids, route receipts, provider or model metadata, retry
 payloads, raw transcripts, broker or account data, and user-private memory are
@@ -1061,9 +1061,32 @@ never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audit
 keys and values before any receipt is written and fails closed, so a payload that
 cannot be proven clean is never stored.
 
-`owner_note` is the only free-text field. It is bounded at 280 characters,
-stripped of control characters, and refused if it contains an identifier or a
-credential-shaped token.
+### Nothing rendered is frozen
+
+A receipt is read by strangers, so the payload freezes facts and never sentences.
+`strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
+under a closed key enum (`StrategyFactKey`, `AssumptionKey`, `MetricKey`), where
+`value` is the bare scalar the run reported, and `date_range` is `{start, end}` as
+ISO dates. Labels, sentences, thousands separators, and date formats are all
+composed by the client in the reader's language. There is deliberately no label
+field, no rendered `display` string, and no free-text passthrough anywhere in the
+list models.
+
+`assumptions` keys are `long_only`, `equal_weight`, `no_costs`, `modeled_fee_bps`,
+`modeled_slippage_bps`, `benchmark`, `benchmark_same_modeled_costs`,
+`recurring_contribution`, `contribution_cadence`, and `starting_principal`. Costs
+are read from the frozen run config rather than through the live execution-realism
+flag, so a flag flipped after the run cannot rewrite what the receipt says the run
+assumed. `MetricKey` deliberately excludes `benchmark_delta`, whose card value is
+itself a sentence; the page composes its own comparison from the numbers.
+
+A run whose assumptions or tested window will not project into this form is refused
+rather than published with the prose the run happened to freeze.
+
+`idea_title` and `owner_note` are the only author-written fields, and
+`content_language` names the language they are in. `owner_note` is also the only
+free-text field: bounded at 280 characters, stripped of control characters, and
+refused if it contains an identifier or a credential-shaped token.
 
 `visual` freezes the run's equity series, downsampled to at most 500 points with
 the endpoints preserved. The public view renders it client side; nothing is
