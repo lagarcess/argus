@@ -34,6 +34,11 @@ async function captureFinding({
   metadata?: unknown;
 }) {
   if (capturePhase !== "before" && capturePhase !== "after") return;
+  const normalizedRenderedText = renderedText
+    .split("\n")
+    .map((line) => (line.trim() ? line : ""))
+    .join("\n")
+    .trim();
   const base = join(
     EVIDENCE_ROOT,
     capturePhase,
@@ -41,7 +46,7 @@ async function captureFinding({
   );
   await mkdir(dirname(base), { recursive: true });
   await writeFile(`${base}.png`, await screenshot());
-  await writeFile(`${base}.txt`, `${renderedText.trim()}\n`, "utf8");
+  await writeFile(`${base}.txt`, `${normalizedRenderedText}\n`, "utf8");
   if (metadata !== undefined) {
     await writeFile(
       `${base}.json`,
