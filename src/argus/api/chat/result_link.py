@@ -239,6 +239,12 @@ def _withhold_refused_result_publication(
         )
         raise
     _evict_withheld_from_process_cache(user_id=user_id, run_id=run_id)
+    _persist_refusal_audit_record(
+        gateway,
+        user_id=user_id,
+        job_id=str((link_outcome.job or {}).get("id") or ""),
+        run_id=run_id,
+    )
     restore_pending_card_for_failed_job(
         gateway,
         user_id=user_id,
@@ -280,6 +286,42 @@ def _evict_withheld_from_process_cache(*, user_id: str, run_id: str) -> None:
         user_id=user_id,
         run_id=run_id,
     )
+
+
+def _persist_refusal_audit_record(
+    gateway: Any | None,
+    *,
+    user_id: str,
+    job_id: str,
+    run_id: str,
+) -> None:
+    """The contract's durable refusal record on the job row: without it,
+    the row cannot distinguish a successfully cleaned withheld result
+    from an ordinary cancellation once the turn is stored. Best effort,
+    matching the worker path: the message metadata and logs still carry
+    the refusal if this write fails. This gateway's merge
+    read-modify-writes internally, so the record is sent alone."""
+    merge = getattr(gateway, "merge_backtest_job_execution_metadata", None)
+    if merge is None or not job_id:
+        return
+    try:
+        merge(
+            user_id=user_id,
+            job_id=job_id,
+            execution_metadata={
+                "result_link_refused": {
+                    "run_id": run_id,
+                    "cleaned_at": _utcnow_iso(),
+                }
+            },
+        )
+    except Exception:  # noqa: BLE001
+        logger.opt(exception=True).warning(
+            "Refused-link audit record could not be persisted",
+            user_id=user_id,
+            job_id=job_id,
+            run_id=run_id,
+        )
 
 
 def _persist_cleanup_pending_marker(

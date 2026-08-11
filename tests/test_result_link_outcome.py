@@ -127,11 +127,18 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
                 }
             )
             self.deleted_runs: list[str] = []
+            self.metadata_merges: list[dict[str, object]] = []
 
         def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
             order.append("cleanup")
             self.deleted_runs.append(run_id)
             return True
+
+        def merge_backtest_job_execution_metadata(
+            self, **payload: object
+        ) -> dict[str, object]:
+            self.metadata_merges.append(payload)
+            return {"id": payload["job_id"]}
 
     restore_calls: list[dict[str, object]] = []
     monkeypatch.setattr(
@@ -180,6 +187,11 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
     assert "run-1" not in store.backtest_runs, (
         "the process cache must be evicted too, or fallback readers "
         "resurrect the withheld result after the authoritative empty read"
+    )
+    audit = gateway.metadata_merges[-1]["execution_metadata"]
+    assert audit["result_link_refused"]["run_id"] == "run-1", (
+        "the job row carries the contract's durable refusal record, or it "
+        "cannot distinguish a cleaned withheld result from a cancellation"
     )
     assert "result_card" not in metadata and "latest_run_id" not in metadata
     assert "result_card" not in runtime_result and "run" not in runtime_result
