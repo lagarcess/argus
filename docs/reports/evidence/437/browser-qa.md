@@ -13,7 +13,8 @@ result-link and withheld-cleanup runtime (`f3e51c53`, `69e20979`,
 were produced by one run of the committed driver with its default cell
 set. Later commits are re-validated against the exercised journeys
 rather than blanket-trusted: `eaa31ce2`, `a9e97268`, `b43b885b`,
-`1b63a305`, `0d3cc0f2`, and `4dace732` change only the refused-link and cleanup
+`1b63a305`, `0d3cc0f2`, `4dace732`, and `07a8e334` change only the
+refused-link and cleanup
 paths, which no frame exercises (the captured journeys run with shadow jobs off and never
 enter the worker) and the refusal unit and worker tests prove, and
 evidence-record edits carry no runtime. Any future commit that moves an
