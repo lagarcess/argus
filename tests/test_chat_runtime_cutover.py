@@ -121,6 +121,115 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
     ]
 
 
+def test_refused_result_link_withholds_publication(monkeypatch) -> None:
+    """When the lifecycle statement refuses the link, the turn publishes no
+    result: the final frame and the persisted message carry the withheld
+    recovery instead of a run, and card restoration is re-attempted with
+    the standing job row."""
+    from argus.api.chat import confirmation as chat_confirmation
+    from argus.api.chat.backtest_jobs import ResultLinkOutcome
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Here is your buy-and-hold result.",
+                "final_response_payload": {
+                    "result": {
+                        "execution_status": "succeeded",
+                        "resolved_strategy": {
+                            "strategy_type": "buy_and_hold",
+                            "symbol": "TSLA",
+                        },
+                        "resolved_parameters": {
+                            "timeframe": "1D",
+                            "date_range": {
+                                "start": "2025-01-01",
+                                "end": "2025-12-31",
+                            },
+                        },
+                        "metrics": {
+                            "aggregate": {"performance": {"total_return_pct": 12.5}}
+                        },
+                        "benchmark_metrics": {
+                            "benchmark_symbol": "SPY",
+                            "benchmark_return_pct": 9.2,
+                        },
+                        "assumptions": ["Starting capital: $10,000."],
+                        "caveats": [],
+                    },
+                    "result_card": {
+                        "title": "TSLA Buy and Hold",
+                        "status_label": "Completed",
+                        "rows": [
+                            {"label": "Total Return", "value": "+12.5%"},
+                        ],
+                    },
+                },
+            },
+        }
+
+    standing_job = {"id": "job-dead", "status": "canceled", "result_run_id": None}
+
+    def _refused_link(**kwargs: Any) -> ResultLinkOutcome:
+        return ResultLinkOutcome(publishable=False, reason="refused", job=standing_job)
+
+    restore_calls: list[dict[str, Any]] = []
+
+    def _capture_restore(gateway: Any, *, user_id: str, job: Any) -> None:
+        restore_calls.append({"user_id": user_id, "job": job})
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(agent_router, "link_shadow_backtest_job_result", _refused_link)
+    monkeypatch.setattr(
+        chat_confirmation,
+        "restore_pending_card_for_failed_job",
+        _capture_restore,
+    )
+
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold Tesla over the last year.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final_line = next(
+        line.removeprefix("data: ")
+        for line in response.text.splitlines()
+        if line.startswith("data: {") and '"type":"final"' in line.replace(" ", "")
+    )
+    final_payload = json.loads(final_line)["payload"]
+    assert "run" not in final_payload
+    assert "result_card" not in final_payload
+    assert final_payload["recovery"]["code"] == "run_result_withheld"
+    assert final_payload["recovery"]["retryable"] is False
+    assert restore_calls == [{"user_id": restore_calls[0]["user_id"], "job": standing_job}]
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assistant = messages.json()["items"][-1]
+    assert assistant["role"] == "assistant"
+    metadata = assistant["metadata"]
+    assert metadata["recovery"]["code"] == "run_result_withheld"
+    assert metadata["result_link_refused"]["job_id"] == "job-dead"
+    assert metadata["result_link_refused"]["job_status"] == "canceled"
+    assert metadata["result_link_refused"]["unpublished_run_id"]
+    for absent in ("result_card", "result_run_id", "latest_run_id", "result_fact_bank"):
+        assert absent not in metadata, absent
+    assert "no result to show" in assistant["content"]
+
+
 @pytest.mark.parametrize("account_kind", ["guest", "registered"])
 @pytest.mark.parametrize("threaded", [False, True])
 def test_inline_and_threaded_streams_use_one_scope(

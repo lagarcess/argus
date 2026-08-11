@@ -33,11 +33,13 @@ class _Gateway:
         should_raise: bool = False,
         create_result: dict[str, object] | None = None,
         backpressure_counts: dict[tuple[str, str | None], int] | None = None,
+        link_result: dict[str, object] | None = None,
     ) -> None:
         self.events = events
         self.should_raise = should_raise
         self.create_result = create_result
         self.backpressure_counts = backpressure_counts or {}
+        self.link_result = link_result
         self.jobs: list[dict[str, object]] = []
         self.metadata_updates: list[dict[str, object]] = []
         self.result_links: list[dict[str, object]] = []
@@ -78,7 +80,11 @@ class _Gateway:
 
     def link_backtest_job_result(self, **payload: object) -> dict[str, object]:
         self.events.append("link")
+        if self.should_raise:
+            raise RuntimeError("link failed")
         self.result_links.append(payload)
+        if self.link_result is not None:
+            return dict(self.link_result)
         return {"id": payload["job_id"], **payload}
 
     def count_backtest_jobs(
@@ -820,7 +826,7 @@ def test_link_shadow_backtest_job_result_marks_succeeded_without_dispatch() -> N
     context.created_job_id = "job-1"
 
     with backtest_job_shadow_context(context):
-        link_shadow_backtest_job_result(
+        outcome = link_shadow_backtest_job_result(
             user_id="user-1",
             run_id="run-1",
             gateway=gateway,
@@ -828,6 +834,8 @@ def test_link_shadow_backtest_job_result_marks_succeeded_without_dispatch() -> N
         )
 
     assert events == ["link"]
+    assert outcome.publishable is True
+    assert outcome.reason == "linked"
     assert gateway.result_links == [
         {
             "user_id": "user-1",
@@ -856,7 +864,7 @@ def test_link_shadow_backtest_job_result_leaves_lifecycle_to_dispatch() -> None:
     context.workflow_task_run_id = "task-run-1"
 
     with backtest_job_shadow_context(context):
-        link_shadow_backtest_job_result(
+        outcome = link_shadow_backtest_job_result(
             user_id="user-1",
             run_id="run-1",
             gateway=gateway,
@@ -865,6 +873,8 @@ def test_link_shadow_backtest_job_result_leaves_lifecycle_to_dispatch() -> None:
 
     link = gateway.result_links[0]
     assert events == ["link"]
+    assert outcome.publishable is True
+    assert outcome.reason == "linked"
     assert link["result_run_id"] == "run-1"
     assert link["mark_succeeded"] is False
     assert link["execution_metadata"]["workflow_dispatch"]["task_run_id"] == "task-run-1"
@@ -882,7 +892,7 @@ def test_link_shadow_backtest_job_result_leaves_result_link_to_real_workflow(
     context.workflow_task_run_id = "task-run-1"
 
     with backtest_job_shadow_context(context):
-        link_shadow_backtest_job_result(
+        outcome = link_shadow_backtest_job_result(
             user_id="user-1",
             run_id="run-1",
             gateway=gateway,
@@ -890,6 +900,8 @@ def test_link_shadow_backtest_job_result_leaves_result_link_to_real_workflow(
         )
 
     assert events == ["metadata"]
+    assert outcome.publishable is True
+    assert outcome.reason == "metadata_only"
     assert gateway.result_links == []
     metadata = gateway.metadata_updates[0]["execution_metadata"]
     assert metadata["api_in_process_result"]["result_run_id"] == "run-1"
@@ -899,6 +911,94 @@ def test_link_shadow_backtest_job_result_leaves_result_link_to_real_workflow(
         == "run_backtest_job"
     )
     assert metadata["workflow_dispatch"]["task_run_id"] == "task-run-1"
+
+
+def test_link_outcome_refused_when_the_lifecycle_statement_won() -> None:
+    """A standing row without the requested result means the attach was
+    refused; the publisher must withhold the result so a restored card can
+    never sit beside one."""
+    events: list[str] = []
+    gateway = _Gateway(
+        events,
+        link_result={"id": "job-1", "status": "canceled", "result_run_id": None},
+    )
+    context = _context()
+    context.created_job_id = "job-1"
+    context.workflow_dispatch_started = True
+
+    with backtest_job_shadow_context(context):
+        outcome = link_shadow_backtest_job_result(
+            user_id="user-1",
+            run_id="run-1",
+            gateway=gateway,
+            dev_memory_fallback_enabled=True,
+        )
+
+    assert events == ["link"]
+    assert outcome.publishable is False
+    assert outcome.reason == "refused"
+    assert outcome.job == {"id": "job-1", "status": "canceled", "result_run_id": None}
+
+
+def test_link_outcome_refused_when_the_job_owns_a_different_result() -> None:
+    """A job already linked to another run must not publish this one; the
+    first link owns the card's consequence."""
+    events: list[str] = []
+    gateway = _Gateway(
+        events,
+        link_result={"id": "job-1", "status": "succeeded", "result_run_id": "run-0"},
+    )
+    context = _context()
+    context.created_job_id = "job-1"
+    context.workflow_dispatch_started = True
+
+    with backtest_job_shadow_context(context):
+        outcome = link_shadow_backtest_job_result(
+            user_id="user-1",
+            run_id="run-1",
+            gateway=gateway,
+            dev_memory_fallback_enabled=True,
+        )
+
+    assert outcome.publishable is False
+    assert outcome.reason == "refused"
+
+
+def test_link_outcome_publishable_without_a_job_context() -> None:
+    with backtest_job_shadow_context(None):
+        outcome = link_shadow_backtest_job_result(
+            user_id="user-1",
+            run_id="run-1",
+            gateway=None,
+            dev_memory_fallback_enabled=False,
+        )
+    assert outcome.publishable is True
+    assert outcome.reason == "no_job"
+
+
+def test_link_outcome_tolerates_gateway_errors_only_in_dev_fallback() -> None:
+    events: list[str] = []
+    context = _context()
+    context.created_job_id = "job-1"
+
+    with backtest_job_shadow_context(context):
+        outcome = link_shadow_backtest_job_result(
+            user_id="user-1",
+            run_id="run-1",
+            gateway=_Gateway(events, should_raise=True),
+            dev_memory_fallback_enabled=True,
+        )
+    assert outcome.publishable is True
+    assert outcome.reason == "link_error"
+
+    with backtest_job_shadow_context(context):
+        with pytest.raises(RuntimeError):
+            link_shadow_backtest_job_result(
+                user_id="user-1",
+                run_id="run-1",
+                gateway=_Gateway(events, should_raise=True),
+                dev_memory_fallback_enabled=False,
+            )
 
 
 def test_render_workflow_dispatcher_posts_to_render_task_api(

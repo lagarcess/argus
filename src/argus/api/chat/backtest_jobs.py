@@ -1012,19 +1012,34 @@ class ShadowBacktestJobTool:
         return True
 
 
+@dataclass(frozen=True)
+class ResultLinkOutcome:
+    """What the result-link write actually did, for the publisher to obey.
+
+    Publication of an in-process run derives from this outcome: a link the
+    lifecycle statement refused must not become a visible result, because
+    the job it belongs to is dead and its card may already be restored.
+    ``job`` carries the standing row when the gateway returned one.
+    """
+
+    publishable: bool
+    reason: str
+    job: dict[str, Any] | None = None
+
+
 def link_shadow_backtest_job_result(
     *,
     user_id: str,
     run_id: str,
     gateway: Any | None,
     dev_memory_fallback_enabled: bool,
-) -> None:
+) -> ResultLinkOutcome:
     context = current_backtest_job_shadow_context()
     if context is None or context.created_job_id is None:
-        return
+        return ResultLinkOutcome(publishable=True, reason="no_job")
     if gateway is None:
         if dev_memory_fallback_enabled:
-            return
+            return ResultLinkOutcome(publishable=True, reason="no_gateway")
         raise RuntimeError("Supabase persistence is required to link backtest jobs.")
 
     mark_succeeded = not context.workflow_dispatch_started
@@ -1054,7 +1069,7 @@ def link_shadow_backtest_job_result(
                 job_id=context.created_job_id,
                 execution_metadata=metadata,
             )
-            return
+            return ResultLinkOutcome(publishable=True, reason="metadata_only")
         linked = gateway.link_backtest_job_result(
             user_id=user_id,
             job_id=context.created_job_id,
@@ -1062,14 +1077,31 @@ def link_shadow_backtest_job_result(
             execution_metadata=metadata,
             mark_succeeded=mark_succeeded,
         )
-        if mark_succeeded and str(linked.get("status") or "") != "succeeded":
-            logger.warning(
-                "Success finalization refused; the job's terminal state "
-                "stands and its card consequence is owned by the writer "
-                "that won it",
-                job_id=context.created_job_id,
-                standing_status=str(linked.get("status") or ""),
+        attached = str(linked.get("result_run_id") or "").strip() == str(run_id)
+        if attached:
+            if mark_succeeded and str(linked.get("status") or "") != "succeeded":
+                logger.warning(
+                    "Success finalization refused; the job's terminal state "
+                    "stands and its card consequence is owned by the writer "
+                    "that won it",
+                    job_id=context.created_job_id,
+                    standing_status=str(linked.get("status") or ""),
+                )
+            return ResultLinkOutcome(
+                publishable=True, reason="linked", job=dict(linked)
             )
+        logger.warning(
+            "Result link refused; publication is withheld so a restored "
+            "card can never sit beside a result",
+            job_id=context.created_job_id,
+            standing_status=str(linked.get("status") or ""),
+            run_id=run_id,
+        )
+        return ResultLinkOutcome(
+            publishable=False,
+            reason="refused",
+            job=dict(linked) if linked else None,
+        )
     except Exception as exc:
         if not dev_memory_fallback_enabled:
             raise
@@ -1080,3 +1112,4 @@ def link_shadow_backtest_job_result(
             job_id=context.created_job_id,
             run_id=run_id,
         )
+        return ResultLinkOutcome(publishable=True, reason="link_error")

@@ -1143,12 +1143,59 @@ async def chat_stream(
                 if isinstance(recovery, dict):
                     metadata["recovery"] = dict(recovery)
                 if run is not None:
-                    link_shadow_backtest_job_result(
+                    link_outcome = link_shadow_backtest_job_result(
                         user_id=user.id,
                         run_id=run.id,
                         gateway=api_state.supabase_gateway,
                         dev_memory_fallback_enabled=dev_memory_fallback_enabled(),
                     )
+                    if not link_outcome.publishable:
+                        # The lifecycle statement refused the link: the job
+                        # is dead and its card may already be restored, so
+                        # the computed result is withheld instead of being
+                        # published beside an editable card. The run row
+                        # remains for audit, unlinked; restoration is
+                        # re-attempted here in case the finalizer that won
+                        # the terminal state could not complete it.
+                        chat_confirmation.restore_pending_card_for_failed_job(
+                            api_state.supabase_gateway,
+                            user_id=user.id,
+                            job=link_outcome.job,
+                        )
+                        for stale_key in (
+                            "result_card",
+                            "latest_run_id",
+                            "result_run_id",
+                            "result_strategy_id",
+                            "result_conversation_id",
+                            "result_fact_bank",
+                            "context_packets",
+                            "next_experiments",
+                            "run",
+                            "final_response_payload",
+                        ):
+                            metadata.pop(stale_key, None)
+                            runtime_result.pop(stale_key, None)
+                        assistant_text = recovery_message(
+                            "run_result_withheld",
+                            language=runtime_user.language_preference,
+                        )
+                        withheld_recovery = recovery_state(
+                            "run_result_withheld",
+                            language=runtime_user.language_preference,
+                            retryable=False,
+                        )
+                        metadata["conversation_mode"] = "confirm"
+                        metadata["recovery"] = withheld_recovery
+                        metadata["result_link_refused"] = {
+                            "job_id": (link_outcome.job or {}).get("id"),
+                            "job_status": (link_outcome.job or {}).get("status"),
+                            "unpublished_run_id": run.id,
+                        }
+                        runtime_result["recovery"] = withheld_recovery
+                        runtime_result["assistant_response"] = assistant_text
+                        run = None
+                if run is not None:
                     receipt_run_id = run.id
                     result_card = run.conversation_result_card
                     metadata["result_card"] = result_card

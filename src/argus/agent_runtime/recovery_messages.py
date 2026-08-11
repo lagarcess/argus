@@ -33,6 +33,7 @@ RecoveryMessageCode = Literal[
     "artifact_action_retry_rebuilt_confirmation",
     "artifact_action_retry_inactive",
     "execution_data_unavailable",
+    "run_result_withheld",
     "discovery_unavailable",
     "discovery_search_failed",
     "discovery_no_verified_candidates",
@@ -165,6 +166,11 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "The setup is still here, but I could not get {data_label} for that run "
         "right now. Try again, change the dates, or choose a different supported "
         "asset."
+    ),
+    "run_result_withheld": (
+        "This run stopped before its result could be saved, so there is no "
+        "result to show. You can run the idea again from the confirmation "
+        "card, or describe it again and I will prepare a fresh one."
     ),
     "discovery_unavailable": (
         "Current source-backed discovery is not available for this request, and I "
