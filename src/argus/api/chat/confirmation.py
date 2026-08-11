@@ -325,6 +325,319 @@ def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+class DeadConfirmationCardError(ValueError):
+    """The card is no longer a live pending confirmation; nothing was written."""
+
+
+def _card_message_for_state(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+    gateway: Any | None,
+) -> Any | None:
+    if gateway is not None:
+        try:
+            return gateway.get_message(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=message_id,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+    return _persisted_card_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
+
+
+def _stamped_card_metadata(metadata: dict[str, Any], state: str) -> dict[str, Any]:
+    """A copy of the card message metadata carrying the liveness state."""
+    import copy as _copy
+
+    stamped = _copy.deepcopy(metadata)
+    card = stamped.get("confirmation_card")
+    if isinstance(card, dict):
+        card["confirmation_state"] = state
+    reference = stamped.get("active_confirmation_reference")
+    if isinstance(reference, dict):
+        reference["artifact_status"] = state
+    references = stamped.get("artifact_references")
+    if isinstance(references, list):
+        for item in references:
+            if isinstance(item, dict) and item.get("artifact_type") == "confirmation":
+                item["artifact_status"] = state
+    return stamped
+
+
+def _write_card_state(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message: Any,
+    state: str,
+    gateway: Any | None,
+) -> None:
+    from argus.api.message_store import update_message_artifact
+
+    stamped = _stamped_card_metadata(message.metadata, state)
+    if gateway is not None:
+        gateway.update_message_artifact(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message.id,
+            content=message.content,
+            metadata=stamped,
+            expected_source_metadata=message.metadata,
+            expected_latest_message_id=None,
+        )
+        return
+    update_message_artifact(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message.id,
+        content=message.content,
+        metadata=stamped,
+        expected_source_metadata=message.metadata,
+        expected_latest_message_id=None,
+    )
+
+
+def consume_pending_card_for_run(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+    expected_launch_payload_hash: str | None = None,
+    gateway: Any | None = None,
+) -> str:
+    """Stamp the card consumed at run admission; the card row is the truth.
+
+    Pressing Run is a commitment: once a run is admitted for a card, the
+    card is no longer pending, whatever the job later does. Returns
+    ``consumed`` when this call stamped the card, ``already_consumed`` on a
+    replay of an admitted run, ``stale_card`` when the card changed between
+    the click and admission (its launch payload hash no longer matches the
+    admitted run, or an edit keeps winning the row), in which case the run
+    must not dispatch, and ``unstamped`` when the card row cannot be read
+    at all, in which case the run proceeds without a stamp and the legacy
+    newer-message clause covers liveness once its result lands. The write
+    is guarded; a lost race re-reads once and re-decides, so a concurrent
+    edit and a consumption can never both win the row.
+    """
+    from argus.agent_runtime.stages.artifact_context import (
+        CONSUMED_CONFIRMATION_STATE,
+        confirmation_card_is_dead,
+    )
+    from argus.domain.supabase_conversation_messages import (
+        StaleMessageArtifactError,
+    )
+
+    for _ in range(2):
+        message = _card_message_for_state(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            gateway=gateway,
+        )
+        if message is None or not isinstance(message.metadata, dict):
+            return "unstamped"
+        if confirmation_card_is_dead(message.metadata):
+            return "already_consumed"
+        if expected_launch_payload_hash:
+            reference = message.metadata.get("active_confirmation_reference")
+            reference_metadata = (
+                reference.get("metadata") if isinstance(reference, dict) else None
+            )
+            current_hash = str(
+                (reference_metadata or {}).get("launch_payload_hash") or ""
+            ).strip()
+            if current_hash and current_hash != expected_launch_payload_hash:
+                # The click's basis is gone: an edit rewrote the card after
+                # the run was requested, so the run refuses as stale rather
+                # than executing values the card no longer shows.
+                return "stale_card"
+        try:
+            _write_card_state(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message=message,
+                state=CONSUMED_CONFIRMATION_STATE,
+                gateway=gateway,
+            )
+            return "consumed"
+        except StaleMessageArtifactError:
+            continue
+        except Exception:  # noqa: BLE001
+            # The stamp is protective; a store that cannot write it must
+            # degrade to the legacy behaviour, never fail the run.
+            logger.opt(exception=True).warning(
+                "Run consumption stamp could not be written; proceeding "
+                "unstamped with legacy liveness",
+                conversation_id=conversation_id,
+                message_id=message_id,
+            )
+            return "unstamped"
+    return "stale_card"
+
+
+def restore_pending_card_after_run(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+    gateway: Any | None = None,
+) -> bool:
+    """Restore a consumed card to active when its run died without a result.
+
+    Only a consumed card is restored; a cancelled or superseded card stays
+    dead, so a failed run can never resurrect a card the user closed. The
+    checkpoint is not written here: recovery derives liveness from the card
+    row, and the next turn's metadata fallback carries the restored card.
+    """
+    from argus.agent_runtime.stages.artifact_context import (
+        ACTIVE_CONFIRMATION_STATE,
+        CONSUMED_CONFIRMATION_STATE,
+    )
+    from argus.domain.supabase_conversation_messages import (
+        StaleMessageArtifactError,
+    )
+
+    for _ in range(2):
+        message = _card_message_for_state(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            gateway=gateway,
+        )
+        if message is None or not isinstance(message.metadata, dict):
+            return False
+        card = message.metadata.get("confirmation_card")
+        state = str((card or {}).get("confirmation_state") or "").strip().casefold()
+        if state == ACTIVE_CONFIRMATION_STATE:
+            return True
+        if state != CONSUMED_CONFIRMATION_STATE:
+            return False
+        try:
+            _write_card_state(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message=message,
+                state=ACTIVE_CONFIRMATION_STATE,
+                gateway=gateway,
+            )
+            return True
+        except StaleMessageArtifactError:
+            continue
+        except Exception:  # noqa: BLE001
+            break
+    logger.warning(
+        "A failed run could not restore its consumed card to active",
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
+    return False
+
+
+def consume_confirmation_for_admitted_run(
+    *,
+    gateway: Any,
+    user_id: str,
+    conversation_id: str,
+    confirmation_message_id: str | None,
+    chat_action: dict[str, Any] | None,
+    job_id: str,
+    utcnow_iso: Any,
+) -> dict[str, Any] | None:
+    """Stamp the card consumed the moment its run is admitted.
+
+    Pressing Run is a commitment: the card row is the single source of
+    consumption truth, so the stamp lands before dispatch for admitted runs
+    and idempotently on replays. When the card changed after the click (a
+    guarded edit won the row first), the freshly admitted job is marked
+    failed and the run refuses as stale instead of executing values the
+    card no longer shows.
+    """
+    from argus.api.chat.backtest_job_envelopes import admission_rejection_envelope
+
+    message_id = str(confirmation_message_id or "").strip()
+    if not message_id:
+        return None
+    clicked_hash = None
+    if isinstance(chat_action, dict):
+        raw_hash = chat_action.get("launch_payload_hash") or (
+            chat_action.get("payload") or {}
+        ).get("launch_payload_hash")
+        if isinstance(raw_hash, str) and raw_hash.strip():
+            clicked_hash = raw_hash.strip()
+    consumption = consume_pending_card_for_run(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        expected_launch_payload_hash=clicked_hash,
+        gateway=gateway,
+    )
+    if consumption == "unstamped":
+        logger.warning(
+            "Run admitted without a consumption stamp; the card row could "
+            "not be read, so liveness falls back to the legacy clause",
+            conversation_id=conversation_id,
+            job_id=job_id,
+        )
+        return None
+    if consumption == "stale_card" and job_id:
+        try:
+            gateway.mark_backtest_job_failed(
+                user_id=user_id,
+                job_id=job_id,
+                failure_code="confirmation_changed",
+                failure_detail=(
+                    "The confirmation changed before this run could "
+                    "start. Nothing ran."
+                ),
+                retryable=False,
+                finished_at=utcnow_iso(),
+                execution_metadata={"refused_before_dispatch": True},
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Stale-card run refusal could not mark its job failed",
+                job_id=job_id,
+                conversation_id=conversation_id,
+            )
+    if consumption == "stale_card":
+        return admission_rejection_envelope("confirmation_changed")
+    return None
+
+
+def restore_pending_card_for_failed_job(
+    gateway: Any,
+    *,
+    user_id: str,
+    job: dict[str, Any] | None,
+) -> None:
+    """A chat run that died without a result gives its card back.
+
+    Research and non-chat jobs carry no confirmation card and fall through.
+    Restoration is best-effort and fails toward consumed, never toward a
+    wrongly editable card; a missed restore leaves the card dead until the
+    user starts over, and the loss is logged by the restorer.
+    """
+    if not isinstance(job, dict):
+        return
+    message_id = str(job.get("confirmation_message_id") or "").strip()
+    conversation_id = str(job.get("conversation_id") or "").strip()
+    if not message_id or not conversation_id:
+        return
+    restore_pending_card_after_run(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        gateway=gateway,
+    )
+
+
 def apply_pending_card_update(
     *,
     user_id: str,
@@ -369,7 +682,20 @@ def apply_pending_card_update(
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
     )
+    from argus.agent_runtime.stages.artifact_context import confirmation_card_is_dead
     from argus.api.message_store import message_preview, update_message_artifact
+
+    # The write-path invariant: no confirmation card is mutated after its
+    # run has been admitted (or it was cancelled or superseded). Enforced
+    # here so every producer, present or future, inherits it; the guarded
+    # write's metadata compare keeps this check honest against races.
+    if confirmation_card_is_dead(source_message.metadata) or (
+        expected_source_metadata is not None
+        and confirmation_card_is_dead(expected_source_metadata)
+    ):
+        raise DeadConfirmationCardError(
+            "The confirmation is no longer pending; nothing was written."
+        )
 
     confirmation_payload["confirmation_id"] = confirmation_id
     confirmation_payload["artifact_id"] = confirmation_id

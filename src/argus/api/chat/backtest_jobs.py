@@ -19,6 +19,15 @@ from argus.api.chat.backtest_job_envelopes import (
     admission_rejection_envelope,
     async_backtest_job_envelope,
 )
+from argus.api.chat.backtest_task_runs import (
+    _task_run_completed_at,
+    _task_run_error,
+    _workflow_task_failure,
+)
+from argus.api.chat.confirmation import (
+    consume_confirmation_for_admitted_run,
+    restore_pending_card_for_failed_job,
+)
 from argus.api.chat.research_job_reconciliation import (
     fail_stranded_research_job,
     is_stranded_research_job,
@@ -407,6 +416,9 @@ def reconcile_terminal_render_task_run(
         or gateway.get_backtest_job(user_id=user_id, job_id=str(job.get("id") or ""))
         or job
     )
+    restore_pending_card_for_failed_job(
+        gateway, user_id=user_id, job={**job, **dict(reconciled)}
+    )
     return dict(reconciled)
 
 
@@ -607,6 +619,9 @@ def fail_job_without_task_run(
         expected_updated_at=str(job.get("updated_at") or "").strip() or None,
     )
     if failed:
+        restore_pending_card_for_failed_job(
+            gateway, user_id=user_id, job={**job, **dict(failed)}
+        )
         return dict(failed)
     get_job = getattr(gateway, "get_backtest_job", None)
     current = get_job(user_id=user_id, job_id=job_id) if get_job else None
@@ -691,66 +706,6 @@ def _task_run_id_from_job(job: dict[str, Any]) -> str | None:
         if isinstance(raw, str) and raw.strip():
             return raw.strip()
     return None
-
-
-def _task_run_error(task_run: dict[str, Any]) -> str:
-    raw = task_run.get("error")
-    if isinstance(raw, str) and raw.strip():
-        return raw.strip()
-    attempts = task_run.get("attempts")
-    if isinstance(attempts, list):
-        for attempt in reversed(attempts):
-            if not isinstance(attempt, dict):
-                continue
-            error = attempt.get("error")
-            if isinstance(error, str) and error.strip():
-                return error.strip()
-    return ""
-
-
-def _task_run_completed_at(task_run: dict[str, Any]) -> str | None:
-    for key in ("completedAt", "completed_at", "finishedAt", "finished_at"):
-        raw = task_run.get(key)
-        if isinstance(raw, str) and raw.strip():
-            return raw.strip()
-    attempts = task_run.get("attempts")
-    if isinstance(attempts, list):
-        for attempt in reversed(attempts):
-            if not isinstance(attempt, dict):
-                continue
-            for key in ("completedAt", "completed_at", "finishedAt", "finished_at"):
-                raw = attempt.get(key)
-                if isinstance(raw, str) and raw.strip():
-                    return raw.strip()
-    return None
-
-
-def _workflow_task_failure(task_run: dict[str, Any]) -> tuple[str, str, bool]:
-    status = str(task_run.get("status") or "").strip().lower()
-    error = _task_run_error(task_run).lower()
-    if "timed out" in error or "timeout" in error:
-        return (
-            "workflow_task_timeout",
-            "Backtest execution timed out before finishing.",
-            True,
-        )
-    if status in {"canceled", "cancelled"}:
-        return (
-            "workflow_task_canceled",
-            "Backtest execution was canceled before finishing.",
-            False,
-        )
-    if status == "expired":
-        return (
-            "workflow_task_expired",
-            "Backtest execution expired before finishing.",
-            True,
-        )
-    return (
-        "workflow_task_failed",
-        "Backtest execution failed before finishing.",
-        True,
-    )
 
 
 def _terminal_task_run_metadata(
@@ -884,6 +839,17 @@ class ShadowBacktestJobTool:
                 return None, admission_rejection_envelope("missing_job")
             context.admission_decision = admission.decision
             job_id = str(job.get("id") or "").strip()
+            consumption_refusal = consume_confirmation_for_admitted_run(
+                gateway=gateway,
+                user_id=context.user_id,
+                conversation_id=context.conversation_id,
+                confirmation_message_id=context.confirmation_message_id,
+                chat_action=context.chat_action,
+                job_id=job_id,
+                utcnow_iso=_utcnow_iso,
+            )
+            if consumption_refusal is not None:
+                return None, consumption_refusal
             if job_id:
                 context.created_job_id = job_id
                 if admission.decision == "replay":

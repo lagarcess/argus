@@ -326,3 +326,92 @@ def test_update_message_artifact_conflicts_when_an_append_intervened() -> None:
             message_id=card.id,
         )
         assert stored is not None and stored.content == "Buy and hold NFLX"
+
+
+def test_consume_and_restore_round_trip_on_real_postgres() -> None:
+    """Run consumption is stamped and restored through the guarded writer
+    on the real database, and only a consumed card is restorable."""
+    from argus.api.chat.confirmation import (
+        consume_pending_card_for_run,
+        restore_pending_card_after_run,
+    )
+
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        card = gateway.create_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            role="assistant",
+            content="Buy and hold NFLX",
+            metadata={
+                "conversation_mode": "confirm",
+                "confirmation_card": {
+                    "confirmation_id": "conf-1",
+                    "confirmation_state": "active",
+                },
+                "confirmation_payload": {"strategy": {"capital_amount": 10000}},
+            },
+        )
+        outcome = consume_pending_card_for_run(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+            gateway=gateway,
+        )
+        assert outcome == "consumed"
+        stored = gateway.get_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+        )
+        assert stored is not None
+        assert stored.metadata["confirmation_card"]["confirmation_state"] == "consumed"
+        assert (
+            consume_pending_card_for_run(
+                user_id=owner["user_id"],
+                conversation_id=owner["conversation_id"],
+                message_id=card.id,
+                gateway=gateway,
+            )
+            == "already_consumed"
+        )
+        assert restore_pending_card_after_run(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+            gateway=gateway,
+        )
+        restored = gateway.get_message(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            message_id=card.id,
+        )
+        assert restored is not None
+        assert restored.metadata["confirmation_card"]["confirmation_state"] == "active"
+
+
+def test_newest_first_window_returns_the_tail_chronologically() -> None:
+    """#433: a recent window must come from the conversation's tail. The
+    ascending read with a limit returned the head and starved every
+    recent-state reader on long hosted conversations."""
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        gateway = _gateway()
+        for index in range(25):
+            gateway.create_message(
+                user_id=owner["user_id"],
+                conversation_id=owner["conversation_id"],
+                role="user" if index % 2 else "assistant",
+                content=f"message {index:02d}",
+            )
+        window = gateway.list_messages(
+            user_id=owner["user_id"],
+            conversation_id=owner["conversation_id"],
+            limit=20,
+            newest_first_window=True,
+        )
+        contents = [message.content for message in window]
+        assert contents == [
+            f"message {index:02d}" for index in range(5, 25)
+        ], "the window is the newest 20 in chronological order"

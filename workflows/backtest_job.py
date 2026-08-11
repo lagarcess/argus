@@ -312,13 +312,11 @@ def run_backtest_job(
         )
         phase_started = time.perf_counter()
         with openrouter_traffic_class(traffic_class):
-            result_readout, result_readout_receipts = (
-                _safe_result_readout_with_receipts(
-                    request=request,
-                    envelope=envelope,
-                    result_card=result_card,
-                    explanation_context=explanation_context_dict,
-                )
+            result_readout, result_readout_receipts = _safe_result_readout_with_receipts(
+                request=request,
+                envelope=envelope,
+                result_card=result_card,
+                explanation_context=explanation_context_dict,
             )
         timings.record_elapsed("result_readout_total", phase_started)
 
@@ -928,6 +926,14 @@ def _mark_failed(
             finished_at=finished_at,
             expected_status=expected_status,
         )
+    if failed:
+        from argus.api.chat.confirmation import restore_pending_card_for_failed_job
+
+        restore_pending_card_for_failed_job(
+            gateway,
+            user_id=user_id,
+            job={**(row if isinstance(row, dict) else {}), **dict(failed)},
+        )
     if timings is not None:
         failed = _persist_final_workflow_timings(
             gateway,
@@ -1130,8 +1136,7 @@ class PostgresBacktestJobGateway:
                     counts = cur.fetchone() or {}
                     if (
                         int(counts.get("user_running") or 0) >= limits.user_running
-                        or int(counts.get("global_running") or 0)
-                        >= limits.global_running
+                        or int(counts.get("global_running") or 0) >= limits.global_running
                     ):
                         return None
                     claim_started_at = started_at or utcnow_iso()

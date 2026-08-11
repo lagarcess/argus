@@ -205,9 +205,7 @@ class SupabasePublicExcerptMixin:
     ) -> int:
         result = (
             self.client.table(TABLE)
-            .update(
-                {"revoked_at": _now_iso(), "revocation_reason": "source_deleted"}
-            )
+            .update({"revoked_at": _now_iso(), "revocation_reason": "source_deleted"})
             .eq("owner_id", owner_id)
             .eq("source_conversation_id", conversation_id)
             .is_("revoked_at", "null")
@@ -218,9 +216,7 @@ class SupabasePublicExcerptMixin:
     def revoke_all_public_excerpts(self, *, owner_id: str) -> int:
         result = (
             self.client.table(TABLE)
-            .update(
-                {"revoked_at": _now_iso(), "revocation_reason": "source_deleted"}
-            )
+            .update({"revoked_at": _now_iso(), "revocation_reason": "source_deleted"})
             .eq("owner_id", owner_id)
             .is_("revoked_at", "null")
             .execute()

@@ -277,10 +277,7 @@ async def chat_stream(
         request,
         idempotency_key,
     )
-    headers = {
-        "X-Request-Id": request.state.request_id,
-        "X-Accel-Buffering": "no",
-    }
+    headers = {"X-Request-Id": request.state.request_id, "X-Accel-Buffering": "no"}
     is_run_backtest_turn = (
         payload.action is not None and payload.action.type == "run_backtest"
     )
@@ -566,6 +563,7 @@ async def chat_stream(
             conversation_id=conversation.id,
             recent_messages=confirmation_action_messages,
             language=language,
+            admit_consumed_run_replay=is_run_backtest_turn,
         )
         missing_run_confirmation_action_id = (
             payload.action is not None

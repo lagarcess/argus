@@ -26,6 +26,7 @@ def fetch_price_series(*args, **kwargs):
 
     return _fetch_price_series(*args, **kwargs)
 
+
 __all__ = [
     "ResolvedAsset",
     "AssetUniverseWarmupResult",

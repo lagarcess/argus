@@ -242,6 +242,23 @@ mint nothing anywhere; turn-based edits supersede with a new card message
 because the conversation records the change; run finalization alone mints
 the version.
 
+### 4b Amendment 2026-08-10: run admission consumes the card
+
+**Binding.** Pressing Run is a commitment: at run admission the card's own
+row is stamped `confirmation_state: "consumed"` through the guarded
+writer, before dispatch and idempotently on replays. The card row is the
+single source of liveness truth, and every reader (action admission, the
+non-turn routes, recovery fallback, the runtime) derives from one oracle
+over it; no reader infers liveness from job tables, and durable
+pre-amendment transcripts are honored by a compatibility clause that reads
+consumption from later result messages. A consumed card refuses every
+non-turn mutation, so a background run can never complete under a card
+claiming different values. Cancel-the-pending-card has nothing to act on
+once the card is consumed; cancelling the queued run keeps working, and a
+run that dies without a result restores the card to `"active"`, so the
+user who cancels edits and runs again, losing nothing. Founder directed
+2026-08-10 after three guard designs failed on split liveness truth.
+
 ## 5. Non-goals
 
 - No new modal, toast, wizard, or parallel edit surface.

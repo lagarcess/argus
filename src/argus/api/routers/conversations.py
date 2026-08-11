@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import copy
 from datetime import datetime, timezone
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.chat.confirmation import public_confirmation_projection
+from argus.api.chat.confirmation import (
+    DeadConfirmationCardError,
+    public_confirmation_projection,
+)
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
@@ -28,7 +29,6 @@ from argus.api.dependencies import (
 from argus.api.guest_access import account_context
 from argus.api.memory_run_dossiers import list_memory_run_dossier_source_rows
 from argus.api.message_store import (
-    latest_message,
     memory_conversation,
     reconcile_reload_message_metadata,
 )
@@ -841,9 +841,8 @@ def add_confirmation_peer_assets(
         peer_add_rows,
         peer_added_confirmation_preparation,
     )
-    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.actions import active_confirmation_read
     from argus.api.chat.confirmation import apply_pending_card_update
-    from argus.api.chat.recovery import _recent_messages_for_conversation
     from argus.api.chat.research_evidence import record_research_turn_evidence
     from argus.domain.research.config import research_rail_enabled
 
@@ -862,58 +861,34 @@ def add_confirmation_peer_assets(
         title="Conflict",
         detail="The confirmation is no longer active.",
     )
-    messages = _recent_messages_for_conversation(
+    # One consistent read: the active check, the source snapshot the
+    # guarded write compares against, and the latest-message witness all
+    # come from the same window, so no append can slip between them.
+    read = active_confirmation_read(
         user_id=user.id,
         conversation_id=conversation_id,
-        limit=20,
+        confirmation_id=confirmation_id,
     )
-    active_id = latest_active_confirmation_id(
-        user_id=user.id,
-        conversation_id=conversation_id,
-        recent_messages=messages,
-    )
-    if active_id is None or active_id != confirmation_id:
+    if read is None:
         raise invalid_state
-    source_payload: dict[str, Any] | None = None
-    source_message: Message | None = None
+    source_message = read.source_message
+    source_payload = read.source_payload
+    expected_source_metadata = read.expected_source_metadata
+    expected_latest_message_id = read.expected_latest_message_id
     offered_symbols: list[str] = []
-    for message in reversed(messages):
-        if message.role != "assistant" or not isinstance(message.metadata, dict):
-            continue
-        card = message.metadata.get("confirmation_card")
-        if (
-            not isinstance(card, dict)
-            or str(card.get("confirmation_id") or "") != confirmation_id
+    rows_sidecar = source_message.metadata.get("next_experiments")
+    rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
+    for row in rows or []:
+        if not isinstance(row, dict) or not str(row.get("kind") or "").startswith(
+            "research_add_peer"
         ):
             continue
-        candidate_payload = message.metadata.get("confirmation_payload")
-        if isinstance(candidate_payload, dict):
-            source_payload = candidate_payload
-            source_message = message
-        rows_sidecar = message.metadata.get("next_experiments")
-        rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
-        for row in rows or []:
-            if not isinstance(row, dict) or not str(row.get("kind") or "").startswith(
-                "research_add_peer"
-            ):
-                continue
-            why = row.get("why")
-            params = why.get("params") if isinstance(why, dict) else None
-            for symbol in (params or {}).get("symbols") or []:
-                normalized = str(symbol).strip().upper()
-                if normalized and normalized not in offered_symbols:
-                    offered_symbols.append(normalized)
-        break
-    if source_payload is None or source_message is None:
-        raise invalid_state
-    # Snapshot what this request read; the in-place write is conditional on
-    # it, so a concurrent writer surfaces as a conflict, never a rollback.
-    # The activity guard uses the conversation's true latest message: any
-    # append between this read and the write (a superseding turn, a run
-    # result, a cancellation) invalidates the active-state check above.
-    expected_source_metadata = copy.deepcopy(source_message.metadata)
-    latest = latest_message(user_id=user.id, conversation_id=conversation_id)
-    expected_latest_message_id = latest.id if latest is not None else None
+        why = row.get("why")
+        params = why.get("params") if isinstance(why, dict) else None
+        for symbol in (params or {}).get("symbols") or []:
+            normalized = str(symbol).strip().upper()
+            if normalized and normalized not in offered_symbols:
+                offered_symbols.append(normalized)
     language = str(getattr(user, "language", None) or "en")
 
     if payload.restore_previous:
@@ -1003,6 +978,8 @@ def add_confirmation_peer_assets(
             metadata_extra={"next_experiments": peer_rows},
             runtime_workflow=api_state.get_agent_runtime_workflow(request),
         )
+    except DeadConfirmationCardError as exc:
+        raise invalid_state from exc
     except StaleMessageArtifactError as exc:
         raise _confirmation_changed_conflict(request) from exc
     if updated is None:
@@ -1051,9 +1028,8 @@ def direct_edit_confirmation(
     from argus.agent_runtime.confirmation_direct_edit import (
         direct_edit_confirmation_preparation,
     )
-    from argus.api.chat.actions import latest_active_confirmation_id
+    from argus.api.chat.actions import active_confirmation_read
     from argus.api.chat.confirmation import apply_pending_card_update
-    from argus.api.chat.recovery import _recent_messages_for_conversation
 
     invalid_state = problem(
         request,
@@ -1062,44 +1038,20 @@ def direct_edit_confirmation(
         title="Conflict",
         detail="The confirmation is no longer active.",
     )
-    messages = _recent_messages_for_conversation(
+    # One consistent read: the active check, the source snapshot the
+    # guarded write compares against, and the latest-message witness all
+    # come from the same window, so no append can slip between them.
+    read = active_confirmation_read(
         user_id=user.id,
         conversation_id=conversation_id,
-        limit=20,
+        confirmation_id=confirmation_id,
     )
-    active_id = latest_active_confirmation_id(
-        user_id=user.id,
-        conversation_id=conversation_id,
-        recent_messages=messages,
-    )
-    if active_id is None or active_id != confirmation_id:
+    if read is None:
         raise invalid_state
-    source_payload: dict[str, Any] | None = None
-    source_message: Message | None = None
-    for message in reversed(messages):
-        if message.role != "assistant" or not isinstance(message.metadata, dict):
-            continue
-        card = message.metadata.get("confirmation_card")
-        if (
-            not isinstance(card, dict)
-            or str(card.get("confirmation_id") or "") != confirmation_id
-        ):
-            continue
-        candidate_payload = message.metadata.get("confirmation_payload")
-        if isinstance(candidate_payload, dict):
-            source_payload = candidate_payload
-            source_message = message
-        break
-    if source_payload is None or source_message is None:
-        raise invalid_state
-    # Snapshot what this request read; the in-place write is conditional on
-    # it, so a concurrent writer surfaces as a conflict, never a rollback.
-    # The activity guard uses the conversation's true latest message: any
-    # append between this read and the write (a superseding turn, a run
-    # result, a cancellation) invalidates the active-state check above.
-    expected_source_metadata = copy.deepcopy(source_message.metadata)
-    latest = latest_message(user_id=user.id, conversation_id=conversation_id)
-    expected_latest_message_id = latest.id if latest is not None else None
+    source_message = read.source_message
+    source_payload = read.source_payload
+    expected_source_metadata = read.expected_source_metadata
+    expected_latest_message_id = read.expected_latest_message_id
     language = str(getattr(user, "language", None) or "en")
 
     preparation = direct_edit_confirmation_preparation(
@@ -1149,6 +1101,8 @@ def direct_edit_confirmation(
             language=language,
             runtime_workflow=api_state.get_agent_runtime_workflow(request),
         )
+    except DeadConfirmationCardError as exc:
+        raise invalid_state from exc
     except StaleMessageArtifactError as exc:
         raise _confirmation_changed_conflict(request) from exc
     if updated is None:

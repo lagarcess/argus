@@ -81,7 +81,85 @@ def stale_confirmation_action_response(
     return None
 
 
-_DEAD_CONFIRMATION_STATES = frozenset({"cancelled", "canceled", "superseded"})
+# The one liveness vocabulary. "consumed" is stamped on the card row at run
+# admission: pressing Run is a commitment, so a card whose run was admitted
+# is no longer pending, whatever the job later does; a run that dies without
+# a result restores the card to "active" through the same guarded writer.
+_DEAD_CONFIRMATION_STATES = frozenset({"cancelled", "canceled", "superseded", "consumed"})
+CONSUMED_CONFIRMATION_STATE = "consumed"
+ACTIVE_CONFIRMATION_STATE = "active"
+
+
+def _confirmation_state_is_dead(value: Any) -> bool:
+    return str(value or "").strip().casefold() in _DEAD_CONFIRMATION_STATES
+
+
+def confirmation_card_is_dead(metadata: dict[str, Any] | None) -> bool:
+    """The liveness oracle, read from the card message's own row.
+
+    Every reader that judges whether a pending confirmation is live derives
+    from this function; no code path may re-implement the predicate. The
+    card row is the single source of consumption truth: run admission
+    stamps it, terminal-without-result restores it, and cancellation or
+    supersession stamp their own states through the same guarded writer.
+    """
+    if not isinstance(metadata, dict):
+        return False
+    card = metadata.get("confirmation_card")
+    if isinstance(card, dict) and _confirmation_state_is_dead(
+        card.get("confirmation_state")
+    ):
+        return True
+    reference = metadata.get("active_confirmation_reference")
+    if isinstance(reference, dict) and _confirmation_state_is_dead(
+        reference.get("artifact_status")
+    ):
+        return True
+    return False
+
+
+def _metadata_is_latest_result_fact_reply_marker(metadata: dict[str, Any]) -> bool:
+    """Typed latest-result fact replies carry run continuity ids without
+    superseding an active confirmation."""
+    response_intent = metadata.get("response_intent")
+    if not isinstance(response_intent, dict):
+        return False
+    if response_intent.get("kind") not in {"beginner_guidance", "unsupported_recovery"}:
+        return False
+    facts = response_intent.get("facts")
+    return isinstance(facts, dict) and bool(
+        facts.get("fact_key") or facts.get("requested_metric")
+    )
+
+
+def newer_message_supersedes_confirmation(metadata: dict[str, Any]) -> bool:
+    """Whether a message NEWER than a card closes the confirmation surface.
+
+    The compatibility half of the oracle: durable transcripts written before
+    run admission stamped the card row carry consumption only as later
+    result messages, and cancellations and clarifications append their own
+    markers. New writers must stamp the card row; this clause exists so old
+    transcripts and turn-based supersession read identically everywhere.
+    """
+    if metadata.get("result_card"):
+        return True
+    if metadata.get("result_run_id") and not _metadata_is_latest_result_fact_reply_marker(
+        metadata
+    ):
+        return True
+    action = metadata.get("chat_action")
+    if isinstance(action, dict) and action.get("type") == "cancel_confirmation":
+        return True
+    pending_strategy = metadata.get("pending_strategy")
+    if not isinstance(pending_strategy, dict):
+        return False
+    requested_field = pending_strategy.get("requested_field")
+    stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "")
+    return (
+        isinstance(requested_field, str)
+        and bool(requested_field.strip())
+        and stage_outcome in {"await_user_reply", "needs_clarification"}
+    )
 
 
 class LivePendingConfirmation:
@@ -118,14 +196,13 @@ def live_pending_confirmation(
 
 
 def _reference_confirmation_is_dead(reference: ArtifactReference) -> bool:
-    status = str(reference.artifact_status or "").strip().casefold()
-    if status in _DEAD_CONFIRMATION_STATES:
+    if _confirmation_state_is_dead(reference.artifact_status):
         return True
     card = reference.metadata.get("confirmation_card")
-    if isinstance(card, dict):
-        card_state = str(card.get("confirmation_state") or "").strip().casefold()
-        if card_state in _DEAD_CONFIRMATION_STATES:
-            return True
+    if isinstance(card, dict) and _confirmation_state_is_dead(
+        card.get("confirmation_state")
+    ):
+        return True
     return False
 
 

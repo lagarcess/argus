@@ -36,7 +36,10 @@ MAX_STARTING_CAPITAL = 100_000_000.0
 MAX_FEE_RATE = 0.05
 MAX_SLIPPAGE_RATE = 0.05
 
-_COST_RATE_CAPS = {"fee_bps": MAX_FEE_RATE * 10000, "slippage_bps": MAX_SLIPPAGE_RATE * 10000}
+_COST_RATE_CAPS = {
+    "fee_bps": MAX_FEE_RATE * 10000,
+    "slippage_bps": MAX_SLIPPAGE_RATE * 10000,
+}
 
 
 @dataclass(frozen=True)

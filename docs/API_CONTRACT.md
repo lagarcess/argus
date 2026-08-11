@@ -3173,14 +3173,29 @@ future producer cannot append by omission. That path is serialized and
 guarded: the write locks the owned conversation row and applies only while
 what the request read still holds, in two parts. The row guard compares the
 card's metadata; the activity guard compares the conversation's latest
-message id, because every superseding event (a turn, a run result, a
-cancellation) appends a message while a non-turn edit appends nothing, so
-an interleaved append means the request's active-confirmation check may no
-longer hold. Either mismatch is `409 confirmation_changed`, so concurrent
-writers conflict instead of silently rolling each other back, and a retry
-re-reads and re-checks. When the card is the conversation's latest message
-the denormalized `last_message_preview` follows the rewrite, without
-touching `updated_at` or reordering recents.
+message id, so an interleaved append invalidates the request's
+active-confirmation check. Either mismatch is `409 confirmation_changed`,
+so concurrent writers conflict instead of silently rolling each other
+back, and a retry re-reads and re-checks. When the card is the
+conversation's latest message the denormalized `last_message_preview`
+follows the rewrite, without touching `updated_at` or reordering recents.
+
+**Pressing Run is a commitment.** At run admission the card's own row is
+stamped `confirmation_state: "consumed"` through the same guarded writer,
+before dispatch and idempotently on replays, and that row is the single
+source of liveness truth: every reader (action admission, the non-turn
+routes, recovery fallback, the runtime's live-confirmation check) derives
+from one oracle over it. A consumed card refuses every non-turn mutation
+as `409 artifact_action_invalid_state`, with no race required, so a
+background run can never complete under a card claiming different values.
+A run that dies without a result (canceled, expired, failed before
+finishing) restores the card to `"active"` through the same writer: the
+user who cancels a queued run edits and runs again, losing nothing. A
+cancelled or superseded card is never restored. When the card changed
+between the click and admission (its launch payload hash no longer matches
+the admitted run), the run refuses with failure code
+`confirmation_changed` instead of executing values the card no longer
+shows.
 
 **Request:** at least one field.
 - `capital`: positive number. Starting capital, or the recurring

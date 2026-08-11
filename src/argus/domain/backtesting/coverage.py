@@ -368,8 +368,8 @@ def _equity_market_sessions_for_window(
     if asset_class != "equity":
         return None
     provider_mode = (
-        os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider"
-    ).strip().lower()
+        (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip().lower()
+    )
     if provider_mode == "synthetic_unit_fixture":
         return None
     fetch_calendar = fetch_market_calendar_func
@@ -380,9 +380,7 @@ def _equity_market_sessions_for_window(
     if fetch_calendar is None:
         return None
     try:
-        sessions = tuple(
-            fetch_calendar(start_date=start_date, end_date=end_date)
-        )
+        sessions = tuple(fetch_calendar(start_date=start_date, end_date=end_date))
         session_dates = [session.session_date for session in sessions]
         if (
             not sessions

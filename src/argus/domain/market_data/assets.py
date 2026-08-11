@@ -731,7 +731,9 @@ def _high_confidence_name_matches(query: str) -> list[ResolvedAsset]:
         score = _name_match_score(lowered_query, record)
         if score <= 1:
             matches.append((score, record))
-    matches.sort(key=lambda item: (item[0], item[1].asset_class, item[1].canonical_symbol))
+    matches.sort(
+        key=lambda item: (item[0], item[1].asset_class, item[1].canonical_symbol)
+    )
     return [record for _, record in matches]
 
 
