@@ -57,13 +57,28 @@ async function captureFinding({
   }
 }
 
+async function captureVerifiedFinding(
+  input: Parameters<typeof captureFinding>[0] & {
+    verify: () => void | Promise<void>;
+  },
+) {
+  const { verify, ...capture } = input;
+  if (capturePhase === "after") await verify();
+  await captureFinding(capture);
+  if (capturePhase !== "after") await verify();
+}
+
 async function openFixture(
   page: Page,
   url: string,
-  options: { language?: Language; theme?: Theme } = {},
+  options: {
+    language?: Language;
+    theme?: Theme;
+    viewport?: { width: number; height: number };
+  } = {},
 ) {
   const theme = options.theme ?? "dark";
-  await page.setViewportSize(VIEWPORT);
+  await page.setViewportSize(options.viewport ?? VIEWPORT);
   await page.emulateMedia({ colorScheme: theme });
   await installBreakpointFixture(page, options);
   await page.goto(url, { waitUntil: "networkidle" });
@@ -72,7 +87,8 @@ async function openFixture(
 }
 
 async function openSearch(page: Page, language: Language = "en") {
-  await page.getByTestId("chat-shell-menu-trigger").click();
+  const shellMenu = page.getByTestId("chat-shell-menu-trigger");
+  if (await shellMenu.count()) await shellMenu.click();
   await page
     .getByRole("button", { name: language === "es-419" ? /^buscar$/i : /^search$/i })
     .first()
@@ -173,19 +189,45 @@ test.describe("issue #422 breakpoint regressions", () => {
     const row = page.locator("[data-palette-row-index]").first();
     const geometry = await searchRowGeometry(row);
 
-    await captureFinding({
+    await captureVerifiedFinding({
       finding: 2,
       slug: "omnisearch-title",
       screenshot: () => row.screenshot(),
       renderedText: await row.innerText(),
       metadata: geometry,
+      verify: () => {
+        expect(geometry.title.text).toBe("Apple vs SPY, twelve months");
+        expect(geometry.title.scrollWidth).toBeLessThanOrEqual(
+          geometry.title.clientWidth,
+        );
+      },
     });
-
-    expect(geometry.title.text).toBe("Apple vs SPY, twelve months");
-    expect(geometry.title.scrollWidth).toBeLessThanOrEqual(
-      geometry.title.clientWidth,
-    );
   });
+
+  for (const viewport of [
+    { width: 720, height: 1024 },
+    { width: 1024, height: 768 },
+  ]) {
+    test(`finding 2 preserves the readable title at ${viewport.width}`, async ({
+      page,
+    }) => {
+      await openFixture(page, "/chat?conversation=conversation-alpha", {
+        viewport,
+      });
+      await openSearch(page);
+      const title = page
+        .locator("[data-palette-row-index]")
+        .first()
+        .locator("span.truncate")
+        .first();
+      const geometry = await title.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
+
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+    });
+  }
 
   test("finding 3 keeps the date clear of the row menu at 390", async ({ page }) => {
     await openFixture(page, "/chat?conversation=conversation-alpha");
@@ -194,15 +236,14 @@ test.describe("issue #422 breakpoint regressions", () => {
     const geometry = await searchRowGeometry(row);
     const gap = geometry.menu.left - geometry.date.right;
 
-    await captureFinding({
+    await captureVerifiedFinding({
       finding: 3,
       slug: "omnisearch-date-menu-gap",
       screenshot: () => row.screenshot(),
       renderedText: await row.innerText(),
       metadata: { ...geometry, gap },
+      verify: () => expect(gap).toBeGreaterThanOrEqual(8),
     });
-
-    expect(gap).toBeGreaterThanOrEqual(8);
   });
 
   test("finding 4 renders a single asset symbol once", async ({ page }) => {
@@ -213,15 +254,14 @@ test.describe("issue #422 breakpoint regressions", () => {
     const renderedText = await card.innerText();
     const symbolCount = renderedText.match(/\bAAPL\b/g)?.length ?? 0;
 
-    await captureFinding({
+    await captureVerifiedFinding({
       finding: 4,
       slug: "confirmation-symbol",
       screenshot: () => card.screenshot(),
       renderedText,
       metadata: { symbolCount },
+      verify: () => expect(symbolCount).toBe(1),
     });
-
-    expect(symbolCount).toBe(1);
   });
 
   test("finding 5 uses singular Spanish usage agreement at count one", async ({
@@ -231,17 +271,18 @@ test.describe("issue #422 breakpoint regressions", () => {
     const sheet = page.locator('[role="dialog"]').last();
     const renderedText = await sheet.innerText();
 
-    await captureFinding({
+    await captureVerifiedFinding({
       finding: 5,
       slug: "spanish-usage-singular",
       screenshot: () => sheet.screenshot(),
       renderedText,
+      verify: () => {
+        expect(renderedText).toContain("Queda 1 hoy");
+        expect(renderedText).toContain("1 disponible esta hora");
+        expect(renderedText).not.toContain("Quedan 1 hoy");
+        expect(renderedText).not.toContain("1 disponibles esta hora");
+      },
     });
-
-    expect(renderedText).toContain("Queda 1 hoy");
-    expect(renderedText).toContain("1 disponible esta hora");
-    expect(renderedText).not.toContain("Quedan 1 hoy");
-    expect(renderedText).not.toContain("1 disponibles esta hora");
   });
 
   test("finding 6 renders Spanish auth diacritics and accessible labels", async ({
@@ -257,7 +298,7 @@ test.describe("issue #422 breakpoint regressions", () => {
       .getByRole("button", { name: /mostrar contrase/i })
       .first();
 
-    await captureFinding({
+    await captureVerifiedFinding({
       finding: 6,
       slug: "spanish-auth-diacritics",
       screenshot: () => page.screenshot({ fullPage: false }),
@@ -267,11 +308,16 @@ test.describe("issue #422 breakpoint regressions", () => {
         passwordPlaceholder: await password.getAttribute("placeholder"),
         showPassword: await showPassword.getAttribute("aria-label"),
       },
+      verify: async () => {
+        await expect
+          .soft(email)
+          .toHaveAttribute("placeholder", "Correo electrónico");
+        await expect.soft(password).toHaveAttribute("placeholder", "Contraseña");
+        await expect
+          .soft(showPassword)
+          .toHaveAccessibleName("Mostrar contraseña");
+      },
     });
-
-    await expect.soft(email).toHaveAttribute("placeholder", "Correo electrónico");
-    await expect.soft(password).toHaveAttribute("placeholder", "Contraseña");
-    await expect.soft(showPassword).toHaveAccessibleName("Mostrar contraseña");
     await showPassword.click();
     await expect
       .soft(page.getByRole("button", { name: /ocultar contrase/i }).first())
@@ -301,16 +347,17 @@ test.describe("issue #422 breakpoint regressions", () => {
     );
     const renderedText = await sheet.innerText();
 
-    await captureFinding({
+    await captureVerifiedFinding({
       finding: 7,
       slug: "dossier-title",
       screenshot: () => sheet.screenshot(),
       renderedText,
       metadata: { visibleTitleCount },
+      verify: async () => {
+        await expect(sheet).toHaveAccessibleName(title);
+        expect(visibleTitleCount).toBe(1);
+      },
     });
-
-    await expect(sheet).toHaveAccessibleName(title);
-    expect(visibleTitleCount).toBe(1);
   });
 
   test("finding 8 keeps the leading chart label inside the 390px card", async ({
@@ -329,19 +376,18 @@ test.describe("issue #422 breakpoint regressions", () => {
     await expect(chart).toBeVisible();
     expect(await chart.evaluate((element) => element.clientWidth)).toBeGreaterThan(250);
     expect(renderedText).toContain("January 3, 2023");
-    await captureFinding({
-      finding: 8,
-      slug: "chart-leading-label",
-      screenshot: () => card.screenshot(),
-      renderedText,
-    });
-
     await expect(card).toHaveScreenshot("issue-422-chart-390.png", {
       animations: "disabled",
       caret: "hide",
       maxDiffPixels: 100,
       scale: "css",
       threshold: 0.2,
+    });
+    await captureFinding({
+      finding: 8,
+      slug: "chart-leading-label",
+      screenshot: () => card.screenshot(),
+      renderedText,
     });
   });
 });

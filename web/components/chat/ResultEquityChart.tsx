@@ -214,6 +214,7 @@ export default function ResultEquityChart({
     const timeScale = timeScaleRef.current;
     const chartWidth = containerRef.current?.clientWidth ?? 0;
     if (!timeScale || chartWidth <= 0) return;
+    lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
     timeScale.setVisibleLogicalRange(
       paddedResultChartLogicalRange({ from, to, chartWidth }),
     );
@@ -389,21 +390,15 @@ export default function ResultEquityChart({
     timeScale.subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
     const notifyVisibleWindow = (visibleRange: LogicalRange | null) => {
       if (!visibleRange || data.length === 0) return;
+      const manualGesture =
+        performance.now() - lastChartGestureAtRef.current < 1500;
+      if (!manualGesture) return;
       const lastIndex = data.length - 1;
       const from = Math.min(lastIndex, Math.max(0, Math.floor(visibleRange.from)));
       const to = Math.min(lastIndex, Math.max(0, Math.ceil(visibleRange.to)));
       visibleWindowRef.current = { from, to };
       setVisibleWindow({ from, to });
-      setSelection((previous) => {
-        if (previous === "CUSTOM" || rangeOptions.length === 0) return previous;
-        const expected = rangeOptions.find((option) => option.key === previous);
-        if (expected && expected.startIndex === from && expected.endIndex === to) {
-          return previous;
-        }
-        const manualGesture =
-          performance.now() - lastChartGestureAtRef.current < 1500;
-        return manualGesture ? "CUSTOM" : previous;
-      });
+      setSelection("CUSTOM");
     };
     timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
     const armChartGesture = () => {
@@ -446,6 +441,7 @@ export default function ResultEquityChart({
     // Recreations for theme/locale/size keep the explored viewport; only a new
     // immutable chart payload resets it (see the chart-change effect above).
     const restoredWindow = visibleWindowRef.current ?? allWindow;
+    lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
     timeScale.setVisibleLogicalRange(
       paddedResultChartLogicalRange({
         from: restoredWindow.from,

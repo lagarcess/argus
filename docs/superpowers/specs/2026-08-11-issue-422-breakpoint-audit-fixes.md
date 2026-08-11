@@ -56,7 +56,7 @@ the deterministic breakpoint fixture.
 
 ### 3.1 Omnisearch row at 390
 
-Below the desktop breakpoint, the conversation title gets its own line. Status
+Below the 720px tablet breakpoint, the conversation title gets its own line. Status
 and type badges plus the relative date move to a compact metadata line. The
 date must remain outside the row-menu hit target with at least 8px of visible
 separation. The full fixture title must fit at 390 without horizontal clipping.
@@ -172,4 +172,3 @@ Record each changed baseline and why. Run the visual suite with
 - `docs/API_CONTRACT.md`
 - `docs/DATA_MODEL.md`
 - `docs/specs/argus-active-roadmap.md`
-
