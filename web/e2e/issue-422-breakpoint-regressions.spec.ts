@@ -9,6 +9,11 @@ import {
 } from "./support/breakpoint-fixture";
 
 const VIEWPORT = { width: 390, height: 844 } as const;
+const CAPTURE_SCREENSHOT_OPTIONS = {
+  animations: "disabled",
+  caret: "hide",
+  scale: "css",
+} as const;
 const EVIDENCE_ROOT = join(
   __dirname,
   "..",
@@ -192,7 +197,7 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureVerifiedFinding({
       finding: 2,
       slug: "omnisearch-title",
-      screenshot: () => row.screenshot(),
+      screenshot: () => row.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       renderedText: await row.innerText(),
       metadata: geometry,
       verify: () => {
@@ -239,7 +244,7 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureVerifiedFinding({
       finding: 3,
       slug: "omnisearch-date-menu-gap",
-      screenshot: () => row.screenshot(),
+      screenshot: () => row.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       renderedText: await row.innerText(),
       metadata: { ...geometry, gap },
       verify: () => expect(gap).toBeGreaterThanOrEqual(8),
@@ -257,7 +262,7 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureVerifiedFinding({
       finding: 4,
       slug: "confirmation-symbol",
-      screenshot: () => card.screenshot(),
+      screenshot: () => card.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       renderedText,
       metadata: { symbolCount },
       verify: () => expect(symbolCount).toBe(1),
@@ -274,7 +279,7 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureVerifiedFinding({
       finding: 5,
       slug: "spanish-usage-singular",
-      screenshot: () => sheet.screenshot(),
+      screenshot: () => sheet.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       renderedText,
       verify: () => {
         expect(renderedText).toContain("Queda 1 hoy");
@@ -301,7 +306,11 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureVerifiedFinding({
       finding: 6,
       slug: "spanish-auth-diacritics",
-      screenshot: () => page.screenshot({ fullPage: false }),
+      screenshot: () =>
+        page.screenshot({
+          ...CAPTURE_SCREENSHOT_OPTIONS,
+          fullPage: false,
+        }),
       renderedText: await page.locator("body").innerText(),
       metadata: {
         emailPlaceholder: await email.getAttribute("placeholder"),
@@ -350,7 +359,7 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureVerifiedFinding({
       finding: 7,
       slug: "dossier-title",
-      screenshot: () => sheet.screenshot(),
+      screenshot: () => sheet.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       renderedText,
       metadata: { visibleTitleCount },
       verify: async () => {
@@ -386,12 +395,7 @@ test.describe("issue #422 breakpoint regressions", () => {
     await captureFinding({
       finding: 8,
       slug: "chart-leading-label",
-      screenshot: () =>
-        card.screenshot({
-          animations: "disabled",
-          caret: "hide",
-          scale: "css",
-        }),
+      screenshot: () => card.screenshot(CAPTURE_SCREENSHOT_OPTIONS),
       renderedText,
     });
   });
