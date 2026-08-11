@@ -142,9 +142,11 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
                 animatedSymbols={addedSymbols}
               />
             )}
-            <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
-              {viewModel.strategyLabel}
-            </h3>
+            {viewModel.strategyLabel && (
+              <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
+                {viewModel.strategyLabel}
+              </h3>
+            )}
           </div>
         </div>
         <span
@@ -448,11 +450,8 @@ function confirmationAssetTitle(
   t: TFunction,
 ) {
   const symbols = splitSymbolList(assetRow?.value ?? "");
-  if (symbols.length === 1) {
-    return symbols[0];
-  }
-  if (symbols.length === 2) {
-    return symbols.join(" + ");
+  if (symbols.length === 1 || symbols.length === 2) {
+    return null;
   }
   if (symbols.length > 2) {
     return t("chat.confirmation.asset_count", "{{count}} assets", {
@@ -519,4 +518,3 @@ function ConfirmationActionIcon({ action }: { action: ChatActionOption }) {
   }
   return <PencilLine className="h-3.5 w-3.5" />;
 }
-

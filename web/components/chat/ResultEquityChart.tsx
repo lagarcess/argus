@@ -10,6 +10,7 @@ import {
   createChart,
   createSeriesMarkers,
   type BaselineData,
+  type IRange,
   type ISeriesApi,
   type ITimeScaleApi,
   type LogicalRange,
@@ -78,6 +79,31 @@ export const RESULT_CHART_ATTRIBUTION_FOOTER_CLASS =
   "border-t border-black/[0.04] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.06] dark:text-white/45";
 const RESULT_CHART_ATTRIBUTION_HERO_FOOTER_CLASS =
   "border-t border-black/[0.035] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.055] dark:text-white/45";
+const RESULT_CHART_EDGE_GUTTER_PX = 24;
+
+export function paddedResultChartLogicalRange({
+  from,
+  to,
+  chartWidth,
+}: {
+  from: number;
+  to: number;
+  chartWidth: number;
+}): IRange<number> {
+  const orderedFrom = Math.min(from, to);
+  const orderedTo = Math.max(from, to);
+  const span = Math.max(1, orderedTo - orderedFrom);
+  const pixelDerivedPadding =
+    chartWidth > RESULT_CHART_EDGE_GUTTER_PX * 2
+      ? (span * RESULT_CHART_EDGE_GUTTER_PX) /
+        (chartWidth - RESULT_CHART_EDGE_GUTTER_PX * 2)
+      : 0.5;
+  const logicalPadding = Math.max(0.5, pixelDerivedPadding);
+  return {
+    from: orderedFrom - logicalPadding,
+    to: orderedTo + logicalPadding,
+  };
+}
 
 export default function ResultEquityChart({
   chart,
@@ -184,16 +210,22 @@ export default function ResultEquityChart({
     setCustomError(null);
   }, [chart]);
 
+  const setVisualLogicalRange = (from: number, to: number) => {
+    const timeScale = timeScaleRef.current;
+    const chartWidth = containerRef.current?.clientWidth ?? 0;
+    if (!timeScale || chartWidth <= 0) return;
+    timeScale.setVisibleLogicalRange(
+      paddedResultChartLogicalRange({ from, to, chartWidth }),
+    );
+  };
+
   const selectRange = (option: ResultChartRangeOption) => {
     setCustomError(null);
     if (option.key === "ALL") {
       resetToAll();
       return;
     }
-    timeScaleRef.current?.setVisibleLogicalRange({
-      from: option.startIndex,
-      to: option.endIndex,
-    });
+    setVisualLogicalRange(option.startIndex, option.endIndex);
     setSelection(option.key);
     const window = { from: option.startIndex, to: option.endIndex };
     visibleWindowRef.current = window;
@@ -202,7 +234,7 @@ export default function ResultEquityChart({
 
   const resetToAll = () => {
     setCustomError(null);
-    timeScaleRef.current?.fitContent();
+    setVisualLogicalRange(allWindow.from, allWindow.to);
     setSelection("ALL");
     visibleWindowRef.current = allWindow;
     setVisibleWindow(allWindow);
@@ -230,10 +262,7 @@ export default function ResultEquityChart({
     }
     setCustomError(null);
     setDetailsOpen(false);
-    timeScaleRef.current?.setVisibleLogicalRange({
-      from: result.range.startIndex,
-      to: result.range.endIndex,
-    });
+    setVisualLogicalRange(result.range.startIndex, result.range.endIndex);
     setSelection("CUSTOM");
     const window = { from: result.range.startIndex, to: result.range.endIndex };
     visibleWindowRef.current = window;
@@ -416,15 +445,14 @@ export default function ResultEquityChart({
     );
     // Recreations for theme/locale/size keep the explored viewport; only a new
     // immutable chart payload resets it (see the chart-change effect above).
-    const restoredWindow = visibleWindowRef.current;
-    if (restoredWindow) {
-      timeScale.setVisibleLogicalRange({
+    const restoredWindow = visibleWindowRef.current ?? allWindow;
+    timeScale.setVisibleLogicalRange(
+      paddedResultChartLogicalRange({
         from: restoredWindow.from,
         to: restoredWindow.to,
-      });
-    } else {
-      timeScale.fitContent();
-    }
+        chartWidth: container.clientWidth,
+      }),
+    );
 
     chartApi.subscribeCrosshairMove((param) => {
       if (!param.point || param.time == null) {
@@ -484,6 +512,7 @@ export default function ResultEquityChart({
     };
   }, [
     chart,
+    allWindow,
     chartHeight,
     chartLocale,
     currencyFormatter,

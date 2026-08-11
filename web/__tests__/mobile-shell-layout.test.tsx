@@ -800,11 +800,14 @@ describe("omnisearch below threshold", () => {
     expect(globalsCss).not.toContain("@media (any-pointer: coarse)");
   });
 
-  test("the row date is a column rather than an overlay", () => {
-    // Absolute positioning let a wide chip run underneath the date.
+  test("the touch-layout date shares metadata space rather than the menu overlay", () => {
+    // The mobile date stays in flow and leaves a deliberate gutter before the
+    // 44px action target. Only the desktop hover layout keeps its date absolute.
+    expect(commandPalette).toContain('rowActionVariant === "menu" && (');
     expect(commandPalette).toContain(
-      '? "shrink-0 self-center whitespace-nowrap text-[11px] text-black/30 dark:text-white/30"',
+      "ml-auto me-2 shrink-0 whitespace-nowrap",
     );
+    expect(commandPalette).toContain('rowActionVariant !== "menu" && (');
     expect(commandPalette).toContain("max-desktop:min-h-11 max-desktop:pe-12");
   });
 });
