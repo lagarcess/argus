@@ -70,6 +70,27 @@ def test_every_release_gate_enumerates_the_cron_alongside_the_other_three() -> N
     assert "Argus does not need more services at this stage." not in topology
 
 
+def test_current_promotion_keeps_the_unapplied_cron_absent() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    promotion = runbook.split("## Before Tester Sessions", maxsplit=1)[1].split(
+        "## Signup And Login Verification", maxsplit=1
+    )[0]
+    maintenance = runbook.split("## Scheduled Maintenance", maxsplit=1)[1].split(
+        "## Runtime Tuning Flags", maxsplit=1
+    )[0]
+    promotion = " ".join(promotion.split())
+    maintenance = " ".join(maintenance.split())
+
+    assert "deploy `argus-api`, then `argus-app`" in promotion
+    assert "Do not create or deploy `argus-maintenance`" in promotion
+    assert "`cron-deploy-status` must report `status=absent`" in promotion
+    assert "then `argus-maintenance`" not in promotion
+
+    assert "deliberately absent and is not deployed" in maintenance
+    assert "`cron_env_status` must be `absent`" in maintenance
+    assert "Promotion deploys it with" not in maintenance
+
+
 def test_a_failed_cron_lookup_is_never_reported_as_absent() -> None:
     env_sync = _source(".github/render-env-sync.sh")
     canary = _source(".github/canary-render.sh")

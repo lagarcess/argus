@@ -90,14 +90,14 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Manually deploy `argus-api`, then `argus-app`, then `argus-maintenance` from
-   the candidate commit. The cron has `autoDeployTrigger: off` like the other
-   two, so skipping it leaves destructive maintenance code on its last manual
-   deploy.
+8. Manually deploy `argus-api`, then `argus-app` from the candidate commit. Do
+   not create or deploy `argus-maintenance` in the current promotion. The cron
+   remains deliberately absent until a separate founder decision applies the
+   blueprint.
 
-9. Confirm the live `argus-api`, `argus-app`, and `argus-maintenance` deploy
-   commits match the candidate commit you intend to test and that the latest
-   deploys are `live`:
+9. Confirm the live `argus-api` and `argus-app` deploy commits match the
+   candidate commit you intend to test and that the latest deploys are `live`.
+   Also confirm the deliberately unapplied cron is still absent:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
@@ -106,12 +106,12 @@ ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh cron-deploy-status
 ```
 
-If any commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
-before running the strict canaries. The canary script enforces the same deployed
-SHA/status check with `ARGUS_CANARY_SHA`. `cron-deploy-status` reports
-`status=absent` only when the Render API has no `argus-maintenance` service,
-which means the blueprint has not been applied yet and no scheduled deletion is
-running.
+If either deployed commit is not `ARGUS_RELEASE_SHA`, stop and deploy that stale
+service before running the strict canaries. The canary script enforces the same
+deployed SHA/status check with `ARGUS_CANARY_SHA`. For the current promotion,
+`cron-deploy-status` must report `status=absent`. Any other cron status is a
+finding and a stop: do not deploy it as part of this promotion. A failed Render
+lookup is also a real failure, never proof of absence.
 
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -365,17 +365,18 @@ Secrets stay manual on this service, same as `argus-api`: `DATABASE_URL`,
 is what lets the reconciler read terminal task runs; without it the stale scan
 reports errors instead of reconciling.
 
-The cron is part of the release, not a side service. Promotion deploys it with
-`argus-api` and `argus-app`, and both the canary and `release-config-audit`
-verify it: `cron-deploy-status` must report the candidate SHA, and
-`cron_env_status` must be `ready`. Until the blueprint has been applied for the
-first time, Render has no such service and both report `absent`, which is read
-back from the Render API rather than assumed, so a forgotten deploy shows up as
-a mismatch instead of a skipped check.
+For the current promotion, the cron is deliberately absent and is not deployed.
+Both the canary and `release-config-audit` verify that absence:
+`cron-deploy-status` must report `status=absent`, and `cron_env_status` must be
+`absent`. Those values are read back from the Render API rather than assumed.
 
-To close a promotion, record one real scheduled run: the run timestamp, the
-summary line, and either nonzero selected/purged counts or documented zeros on
-an empty window.
+If a later founder decision applies the blueprint and creates the service, it
+becomes a deployed release surface. From that point onward, promotions must
+verify its candidate SHA, live deploy state, and ready environment contract. To
+close such a later promotion, record one real scheduled run: the run timestamp,
+the summary line, and either nonzero selected/purged counts or documented zeros
+on an empty window. While the service remains absent, record the two absent
+statuses and the manual operator-job evidence instead.
 
 ## Runtime Tuning Flags
 
