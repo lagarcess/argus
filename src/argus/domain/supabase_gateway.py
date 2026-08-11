@@ -1597,6 +1597,25 @@ class SupabaseGateway(
             )
         return runs_by_id
 
+    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+        """Remove a run row whose publication was refused.
+
+        Completed run rows are product-readable (History's run leaf and the
+        latest-completed read carry no link check), so a run the lifecycle
+        statement refused to attach must not stay in the result table. The
+        refusal itself stays recorded on the job's execution metadata and
+        the turn's message. Dependent audit rows survive by FK action:
+        context packets cascade, receipts and evidence references null out.
+        """
+        deleted = (
+            self.client.table("backtest_runs")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("id", run_id)
+            .execute()
+        )
+        return bool(deleted.data)
+
     def get_latest_completed_run_for_conversation(
         self, *, user_id: str, conversation_id: str
     ) -> BacktestRun | None:

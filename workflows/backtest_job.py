@@ -92,6 +92,9 @@ class BacktestJobGateway(Protocol):
     ) -> dict[str, Any]:
         """Link a successful job to its canonical run."""
 
+    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+        """Remove a run row whose publication the link write refused."""
+
     def mark_backtest_job_failed(
         self,
         *,
@@ -414,6 +417,14 @@ def run_backtest_job(
             mark_succeeded=True,
         )
         timings.record_elapsed("link_result", phase_started)
+        link_refused = str(succeeded.get("result_run_id") or "") != result_run_id
+        if link_refused:
+            # The lifecycle statement refused the attach: the job's terminal
+            # state stands and its card may already be restored. Completed
+            # run rows are product-readable regardless of link state, so
+            # the just-committed run leaves the result table; the refusal
+            # stays recorded on the job row and in this task's output.
+            _delete_withheld_run(gateway, user_id=user_id, run_id=result_run_id)
         succeeded = _persist_final_workflow_timings(
             gateway,
             user_id=user_id,
@@ -424,7 +435,8 @@ def run_backtest_job(
         return {
             "job_id": str(succeeded.get("id") or job_id),
             "status": succeeded.get("status") or "succeeded",
-            "result_run_id": result_run_id,
+            "result_run_id": None if link_refused else result_run_id,
+            **({"result_link_refused": True} if link_refused else {}),
             "workflow_run_id": workflow_run_id,
             **({"result_readout": result_readout.text} if result_readout.text else {}),
             "result_readout_source": result_readout.source,
@@ -465,6 +477,23 @@ def run_backtest_job(
             workflow_run_id=workflow_run_id,
             source_error=exc,
             timings=timings,
+        )
+
+
+def _delete_withheld_run(gateway: Any, *, user_id: str, run_id: str) -> None:
+    """Best-effort like card restoration: a miss leaks a row into History
+    until reconciled, never a wrong card."""
+    delete_run = getattr(gateway, "delete_backtest_run", None)
+    if delete_run is None:
+        return
+    try:
+        delete_run(user_id=user_id, run_id=run_id)
+    except Exception:  # noqa: BLE001
+        logger.opt(exception=True).warning(
+            "Withheld run row could not be removed; it remains readable "
+            "until reconciled",
+            user_id=user_id,
+            run_id=run_id,
         )
 
 
@@ -1515,7 +1544,8 @@ class PostgresBacktestJobGateway:
                     # The attach was refused: the job reached a state no
                     # future write may turn into a result, its card may
                     # already be restored, and that terminal state stands.
-                    # The computed run row remains for audit, unlinked.
+                    # The caller removes the computed run row, because
+                    # completed run rows are product-readable.
                     logger.warning(
                         "Result link refused; the job's terminal state "
                         "stands and its card consequence is owned by the "
@@ -1526,6 +1556,23 @@ class PostgresBacktestJobGateway:
                     )
                     return _json_safe(standing)
         return _json_safe(row)
+
+    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+        """Remove a run row whose publication the link write refused;
+        completed run rows are product-readable regardless of link state,
+        and the refusal record on the job row is the audit trail."""
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    delete from public.backtest_runs
+                    where id = %(run_id)s
+                      and user_id = %(user_id)s
+                    returning id
+                    """,
+                    {"run_id": run_id, "user_id": user_id},
+                )
+                return cur.fetchone() is not None
 
     def mark_backtest_job_failed(
         self,

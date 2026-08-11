@@ -375,6 +375,37 @@ def test_proof_shadow_success_path_still_links_the_result() -> None:
         assert _card_state(gateway, owner, card_id) == "consumed"
 
 
+def test_withheld_run_rows_leave_the_result_table_on_both_gateways() -> None:
+    """After a refused link, the caller removes the run row; the deletion
+    is owner-scoped, so another owner's id removes nothing."""
+    with _connect() as connection:
+        owner = _seed_owner(connection)
+        other = _seed_owner(connection)
+
+        api_run = _seed_run(connection, owner)
+        assert not _supabase_gateway().delete_backtest_run(
+            user_id=other["user_id"], run_id=api_run
+        )
+        assert _supabase_gateway().delete_backtest_run(
+            user_id=owner["user_id"], run_id=api_run
+        )
+
+        worker_run = _seed_run(connection, owner)
+        assert not _worker_gateway().delete_backtest_run(
+            user_id=other["user_id"], run_id=worker_run
+        )
+        assert _worker_gateway().delete_backtest_run(
+            user_id=owner["user_id"], run_id=worker_run
+        )
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select count(*) from public.backtest_runs where id in (%s, %s)",
+                (api_run, worker_run),
+            )
+            assert cursor.fetchone()[0] == 0
+
+
 def test_worker_success_link_still_lands_from_running() -> None:
     """The real-workflow success write is unchanged by the attach guard:
     a running job converts to succeeded with its result in one write."""

@@ -74,7 +74,15 @@ const ALL_CELLS = [
   },
 ];
 
-const CELLS = ALL_CELLS.filter((cell) => cell.name !== "desktop-en");
+// Run every declared cell by default; QA_CELLS="phone-en,phone-es" reruns a
+// subset when a single cell needs a recapture.
+const only = (process.env.QA_CELLS || "")
+  .split(",")
+  .map((name) => name.trim())
+  .filter(Boolean);
+const CELLS = only.length
+  ? ALL_CELLS.filter((cell) => only.includes(cell.name))
+  : ALL_CELLS;
 
 const shot = (page, cell, tag) =>
   page.screenshot({ path: `${OUT}/${cell.name}-${tag}.png`, fullPage: false });
@@ -107,7 +115,6 @@ async function run() {
     page.setDefaultTimeout(120_000);
     await page.goto(`${BASE}/chat`, { waitUntil: "networkidle" });
 
-    await shot(page, cell, "0-loaded");
     await sendMessage(page, cell, cell.idea);
     await waitForPill(page, cell);
     await page.waitForTimeout(600);

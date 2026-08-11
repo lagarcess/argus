@@ -30,6 +30,8 @@ class FakeBacktestJobGateway:
         self.fail_finalization_after_commit_once = False
         self.fail_result_link_once = False
         self.fail_result_link_after_commit_once = False
+        self.refuse_result_link_once = False
+        self.deleted_runs: list[str] = []
         self.running_started_at_arguments: list[str | None] = []
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
@@ -102,6 +104,14 @@ class FakeBacktestJobGateway:
         if self.fail_result_link_once:
             self.fail_result_link_once = False
             raise RuntimeError("job result link unavailable")
+        if self.refuse_result_link_once:
+            # The lifecycle statement refused the attach: the standing
+            # terminal row comes back without the requested result.
+            self.refuse_result_link_once = False
+            self.row["status"] = "canceled"
+            self.row["retryable"] = False
+            self.row["result_run_id"] = None
+            return dict(self.row)
         self.transitions.append("succeeded")
         metadata = dict(self.row.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
@@ -116,6 +126,11 @@ class FakeBacktestJobGateway:
             self.fail_result_link_after_commit_once = False
             raise RuntimeError("job result link response lost")
         return dict(self.row)
+
+    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+        assert self.row["user_id"] == user_id
+        self.deleted_runs.append(run_id)
+        return True
 
     def mark_backtest_job_failed(
         self,
@@ -892,6 +907,39 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
         gateway.row["execution_metadata"]["workflow_backtest"]["workflow_run_id"]
         == "local-run"
     )
+
+
+def test_run_backtest_job_removes_the_run_row_when_the_link_is_refused() -> None:
+    """A refused attach must not leave a completed run row behind: History
+    and latest-result reads carry no link check, so the worker removes the
+    just-committed run and reports the refusal instead of the run id."""
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    request = _request_payload()
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": request,
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    gateway.refuse_result_link_once = True
+    tool = FakeBacktestTool(_successful_tool_result())
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["status"] == "canceled"
+    assert result["result_run_id"] is None
+    assert result["result_link_refused"] is True
+    assert gateway.deleted_runs == ["run-workflow"]
+    assert gateway.row["result_run_id"] is None
 
 
 def test_run_backtest_job_persists_terminal_capacity_wait_timeout() -> None:

@@ -164,9 +164,10 @@ def apply_result_link_outcome(
     An accepted link stamps the result keys onto the turn's metadata and
     final payload. A refused link publishes nothing: every result key is
     stripped, card restoration is re-attempted with the standing row (the
-    finalizer that won the terminal state may not have completed it), and
-    the turn settles on the ``run_result_withheld`` recovery. The unlinked
-    run row remains for audit, recorded as ``result_link_refused``.
+    finalizer that won the terminal state may not have completed it), the
+    just-persisted run row is removed so it cannot surface through durable
+    result reads, and the turn settles on the ``run_result_withheld``
+    recovery, recording the refusal as ``result_link_refused``.
     """
     link_outcome = link_shadow_backtest_job_result(
         user_id=user_id,
@@ -222,6 +223,7 @@ def _withhold_refused_result_publication(
         user_id=user_id,
         job=link_outcome.job,
     )
+    _remove_withheld_run_row(gateway, user_id=user_id, run_id=run_id)
     for stale_key in RESULT_PUBLICATION_KEYS:
         metadata.pop(stale_key, None)
         runtime_result.pop(stale_key, None)
@@ -241,3 +243,23 @@ def _withhold_refused_result_publication(
     runtime_result["recovery"] = withheld_recovery
     runtime_result["assistant_response"] = assistant_text
     return assistant_text
+
+
+def _remove_withheld_run_row(gateway: Any | None, *, user_id: str, run_id: str) -> None:
+    """Completed run rows are product-readable regardless of link state
+    (History's run leaf, the latest-completed read), so a withheld run must
+    leave the result table; the refusal record on the job and message is
+    the audit trail. Removal is best-effort like restoration: a miss leaks
+    a row into History until reconciliation, never a wrong card."""
+    delete_run = getattr(gateway, "delete_backtest_run", None)
+    if delete_run is None:
+        return
+    try:
+        delete_run(user_id=user_id, run_id=run_id)
+    except Exception:  # noqa: BLE001
+        logger.opt(exception=True).warning(
+            "Withheld run row could not be removed; it remains readable "
+            "until reconciled",
+            user_id=user_id,
+            run_id=run_id,
+        )

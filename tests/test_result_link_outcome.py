@@ -103,6 +103,70 @@ def test_link_outcome_publishable_without_a_job_context() -> None:
     assert outcome.reason == "no_job"
 
 
+def test_refused_publication_removes_the_run_row_and_strips_the_turn(
+    monkeypatch,
+) -> None:
+    """The withheld terminal leaves nothing readable: result keys leave the
+    turn, the just-persisted run row is deleted (History and latest-result
+    reads carry no link check), and restoration is re-attempted."""
+    from argus.api.chat import confirmation as chat_confirmation
+    from argus.api.chat.result_link import apply_result_link_outcome
+
+    class _Run:
+        id = "run-1"
+
+    class _RefusingGateway(_LinkGateway):
+        def __init__(self) -> None:
+            super().__init__(
+                link_result={
+                    "id": "job-1",
+                    "status": "canceled",
+                    "result_run_id": None,
+                }
+            )
+            self.deleted_runs: list[str] = []
+
+        def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+            self.deleted_runs.append(run_id)
+            return True
+
+    restore_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        chat_confirmation,
+        "restore_pending_card_for_failed_job",
+        lambda gateway, *, user_id, job: restore_calls.append(
+            {"user_id": user_id, "job": job}
+        ),
+    )
+
+    gateway = _RefusingGateway()
+    context = _context()
+    context.created_job_id = "job-1"
+    context.workflow_dispatch_started = True
+    metadata = {"result_card": {"title": "x"}, "latest_run_id": "run-1"}
+    runtime_result = {"result_card": {"title": "x"}, "run": {"id": "run-1"}}
+
+    with backtest_job_shadow_context(context):
+        publication = apply_result_link_outcome(
+            run=_Run(),
+            metadata=metadata,
+            runtime_result=runtime_result,
+            gateway=gateway,
+            user_id="user-1",
+            language="en",
+            dev_memory_fallback_enabled=True,
+        )
+
+    assert publication.publishable is False
+    assert publication.assistant_text
+    assert gateway.deleted_runs == ["run-1"]
+    assert restore_calls and restore_calls[0]["job"]["status"] == "canceled"
+    assert "result_card" not in metadata and "latest_run_id" not in metadata
+    assert "result_card" not in runtime_result and "run" not in runtime_result
+    assert metadata["recovery"]["code"] == "run_result_withheld"
+    assert metadata["result_link_refused"]["unpublished_run_id"] == "run-1"
+
+
 def test_link_outcome_tolerates_gateway_errors_only_in_dev_fallback() -> None:
     context = _context()
     context.created_job_id = "job-1"
