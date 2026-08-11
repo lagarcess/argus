@@ -16,6 +16,7 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.state.models import (
     RunState,
@@ -33,6 +34,14 @@ from tests.test_confirmation_direct_edit import (
     _direct_edit,
     _plant_confirmation,
 )
+
+
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
 
 
 def _client() -> TestClient:

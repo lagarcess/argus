@@ -37,6 +37,14 @@ from tests.test_confirmation_direct_edit import (
 from tests.test_pending_card_conflict import _card_message, _client
 
 
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+
 def _consume(conversation_id: str, owner: str, **kwargs) -> str:
     card = _card_message(conversation_id)
     return consume_pending_card_for_run(

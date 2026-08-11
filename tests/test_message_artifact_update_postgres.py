@@ -19,6 +19,15 @@ import uuid
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
 LOCAL_SERVICE_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", "").strip()

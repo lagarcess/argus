@@ -256,14 +256,19 @@ def runtime_confirmation_card(
     # Direct no-turn edits the typed endpoint accepts for this card. Capital
     # follows the launch sizing mode; dates are always directly editable;
     # costs join whenever the engine can model them, so all three edit
-    # affordances share one in-place behaviour.
-    direct_edits = ["dates"]
-    if str(launch_payload.get("sizing_mode") or "capital_amount") != "position_size":
-        direct_edits.insert(0, "capital")
-    if capabilities.get("execution_costs_editable"):
-        direct_edits.append("costs")
-    capabilities["direct_edits"] = direct_edits
-    capabilities["edit_constraints"] = _edit_constraints(strategy)
+    # affordances share one in-place behaviour. While the in-place surface
+    # is dark the card advertises none, and the frontend, which renders
+    # backend truth, shows no pills.
+    from argus.domain.edit_contract_config import in_place_card_edits_enabled
+
+    if in_place_card_edits_enabled():
+        direct_edits = ["dates"]
+        if str(launch_payload.get("sizing_mode") or "capital_amount") != "position_size":
+            direct_edits.insert(0, "capital")
+        if capabilities.get("execution_costs_editable"):
+            direct_edits.append("costs")
+        capabilities["direct_edits"] = direct_edits
+        capabilities["edit_constraints"] = _edit_constraints(strategy)
     card["capabilities"] = capabilities
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
@@ -560,7 +565,12 @@ def consume_confirmation_for_admitted_run(
     card no longer shows.
     """
     from argus.api.chat.backtest_job_envelopes import admission_rejection_envelope
+    from argus.domain.edit_contract_config import in_place_card_edits_enabled
 
+    if not in_place_card_edits_enabled():
+        # The in-place surface is dark: no non-turn writer exists, so no
+        # stamp is needed and the legacy newer-message clause owns liveness.
+        return None
     message_id = str(confirmation_message_id or "").strip()
     if not message_id:
         return None

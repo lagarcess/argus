@@ -140,6 +140,17 @@ Direct edits are ordinary edits: they obey the same validation, the same
 coverage and resolver gates, and the same disclosure rules as a conversational
 edit. Nothing becomes runnable that would not have been runnable through chat.
 
+### 3.4c Amendment 2026-08-11: the in-place surface ships default off
+
+**Binding.** Three review rounds found real defects in the run-consumption
+guard that protects non-turn card writes, each in a different place, and
+the founder's pre-stated exit fired: the whole in-place surface (both
+non-turn endpoints, the advertised `direct_edits`, and the consumption
+stamp) sits behind `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`, default off, and
+the guard finishes as its own lane. The flag flips at promotion only once
+that lane closes. Compound conversational editing, the pillar, is
+turn-based and unaffected.
+
 ### 3.5 Repair must not drop what the user already stated (#367)
 
 `FocusedStrategyExtraction` intermittently loses an explicit 10 bps fee and 5

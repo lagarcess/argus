@@ -3123,7 +3123,9 @@ Contract rules:
 
 Grows or restores the active confirmation's basket **without spending a
 turn**: no message allowance, no interpretation, no LLM call. Available only
-while `ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
+while `ARGUS_RESEARCH_RAIL_ENABLED` and `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`
+are both on (404 otherwise; the in-place surface ships default off until
+the run-consumption guard lane closes).
 
 **Request:** exactly one mode.
 - Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
@@ -3153,7 +3155,10 @@ nothing.
 
 Edits the active confirmation's capital, dates, or costs **without spending a
 turn**: no message allowance, no interpretation, no LLM call, no backtest
-row. The typed values become the same edit operations the conversational
+row. Available only while `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is on (404
+otherwise); the surface ships default off until the run-consumption guard
+lane closes, and while dark, cards advertise no `direct_edits` so the
+frontend renders no edit affordances. The typed values become the same edit operations the conversational
 planner emits, applied by the same application code, and the real confirm
 stage assembles the result, so a direct edit and the equivalent
 conversational edit produce one canonical artifact. Direct edits obey the
@@ -3180,7 +3185,11 @@ back, and a retry re-reads and re-checks. When the card is the
 conversation's latest message the denormalized `last_message_preview`
 follows the rewrite, without touching `updated_at` or reordering recents.
 
-**Pressing Run is a commitment.** At run admission the card's own row is
+**Pressing Run is a commitment.** The consumption lifecycle below is part
+of the flagged in-place surface: while `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`
+is off nothing stamps, no non-turn writer exists, and the legacy
+newer-message clause owns liveness exactly as before the contract. While
+on: at run admission the card's own row is
 stamped `confirmation_state: "consumed"` through the same guarded writer,
 before dispatch and idempotently on replays, and that row is the single
 source of liveness truth: every reader (action admission, the non-turn

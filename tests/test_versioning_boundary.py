@@ -10,11 +10,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from argus.api import state as api_state
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
 from argus.api.message_store import create_message
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
 
 CONFIRMATION_ID = "44444444-4444-4444-8444-444444444444"
 
@@ -99,9 +109,9 @@ def test_direct_edits_mint_no_idea_versions() -> None:
             "confirmation_id"
         ]
 
-    assert api_state.store.idea_versions == {}, (
-        "edits to a pending card mint nothing, however many there are"
-    )
+    assert (
+        api_state.store.idea_versions == {}
+    ), "edits to a pending card mint nothing, however many there are"
     assert api_state.store.ideas == {}
 
 

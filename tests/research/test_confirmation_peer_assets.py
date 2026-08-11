@@ -13,6 +13,15 @@ from argus.api.main import app
 from argus.api.message_store import create_message
 from fastapi.testclient import TestClient
 
+
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+
 CONFIRMATION_ID = "11111111-1111-4111-8111-111111111111"
 
 

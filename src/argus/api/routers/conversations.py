@@ -854,6 +854,16 @@ def add_confirmation_peer_assets(
             title="Not Found",
             detail="This capability is not available.",
         )
+    from argus.domain.edit_contract_config import in_place_card_edits_enabled
+
+    if not in_place_card_edits_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
     invalid_state = problem(
         request,
         status_code=409,
@@ -1030,7 +1040,16 @@ def direct_edit_confirmation(
     )
     from argus.api.chat.actions import active_confirmation_read
     from argus.api.chat.confirmation import apply_pending_card_update
+    from argus.domain.edit_contract_config import in_place_card_edits_enabled
 
+    if not in_place_card_edits_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
     invalid_state = problem(
         request,
         status_code=409,

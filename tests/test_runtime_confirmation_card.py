@@ -5,6 +5,14 @@ from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.domain.engine_launch.display import format_timeframe_data_label
 
 
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+
 def _confirmation_result_with_draft_costs() -> dict[str, object]:
     return {
         "stage_outcome": "await_approval",

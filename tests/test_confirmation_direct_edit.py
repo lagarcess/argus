@@ -9,10 +9,20 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
 from argus.api.message_store import create_message
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
 
 CONFIRMATION_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -249,9 +259,9 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
     contribution_rows = [row for row in card["rows"] if row["key"] == "contribution"]
     assert contribution_rows and contribution_rows[0]["value"] == "$250"
     constraints = card["capabilities"]["edit_constraints"]
-    assert "min" not in constraints["capital"], (
-        "a recurring card must not advertise the bankroll floor"
-    )
+    assert (
+        "min" not in constraints["capital"]
+    ), "a recurring card must not advertise the bankroll floor"
 
 
 def test_direct_edit_matches_the_conversational_edit_artifact() -> None:
@@ -593,9 +603,9 @@ def test_out_of_envelope_values_refuse_with_their_exact_codes() -> None:
     stored = _conversation_messages(client, conversation["id"])
     assert len(stored) == 1
     payload = stored[0]["metadata"]["confirmation_payload"]
-    assert payload["strategy"]["capital_amount"] == 10000, (
-        "a refused value must leave the card untouched"
-    )
+    assert (
+        payload["strategy"]["capital_amount"] == 10000
+    ), "a refused value must leave the card untouched"
     boundary = _direct_edit(
         client, conversation["id"], CONFIRMATION_ID, {"capital": MIN_STARTING_CAPITAL}
     )
@@ -634,6 +644,5 @@ def test_card_advertises_the_engine_envelope() -> None:
     assert constraints["slippage"] == {"min": 0.0, "max": MAX_SLIPPAGE_RATE}
     assert constraints["date_window"]["max_end"] == date.today().isoformat()
     assert (
-        constraints["date_window"]["min_start"]
-        == ALPACA_EQUITY_HISTORY_START.isoformat()
+        constraints["date_window"]["min_start"] == ALPACA_EQUITY_HISTORY_START.isoformat()
     )
