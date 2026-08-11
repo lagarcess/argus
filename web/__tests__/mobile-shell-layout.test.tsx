@@ -445,6 +445,7 @@ describe("omnisearch below threshold", () => {
       "utf-8",
     );
     expect(sheet).toContain('data-testid="dossier-sheet-open-conversation"');
+    expect(sheet).toContain("titleHidden");
     expect(sheet).toContain("commandPaletteOpenLabelKey(preview)");
     expect(sheet).toContain("min-h-11");
   });
