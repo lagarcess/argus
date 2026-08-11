@@ -150,6 +150,19 @@ with the service-role key, so it is promoted and verified with the other three,
 never treated as a side service. See Scheduled Maintenance in
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`.
 
+**It is declared in `render.yaml` and deliberately not created, so today
+nothing runs on a schedule.** At current scale there is no guest data to
+delete and no stranded job to rescue, so guest retention and stale-job
+reconciliation are run by hand with `scripts/ops/scheduled_maintenance.py`,
+and #412's stranded-job condition is settled by an operator rather than by a
+schedule.
+
+It stays in this list precisely because it is absent: every gate above checks
+it, `cron-deploy-status` must report `status=absent` for the current
+promotion, any other status is a finding, and a failed Render lookup is a real
+failure rather than proof of absence. Dropping it to three surfaces would
+delete that check.
+
 The workflow surface has two explicit tasks, not two separate services:
 
 - `argus-backtests/workflow_proof`

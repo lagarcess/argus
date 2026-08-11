@@ -336,10 +336,12 @@ reported earnings since. Want to run it now?"
   and its own founder decision.
 - **Shares one reader with the empty chat polish sidequest, Piece 2.** Ownership
   is stated in the spec so two do not get built.
-- **Scheduler is solved and merged.** #414 landed `argus-maintenance`, a
-  `type: cron` service on `*/15 * * * *`. A Render cron service carries one
-  schedule, so this pillar rides that pass as a guarded daily branch rather than
-  a second schedule or a second surface.
+- **Scheduler is designed and merged, but nothing is scheduled.** #414 defined
+  `argus-maintenance`, a `type: cron` service on `*/15 * * * *`, and the
+  service was deliberately never created, so no schedule runs today. A Render
+  cron service carries one schedule, so when it is created this pillar rides
+  that pass as a guarded daily branch rather than a second schedule or a second
+  surface. Creating it is a precondition for this pillar, not a given.
 
 ## Continuous, not a lane
 
