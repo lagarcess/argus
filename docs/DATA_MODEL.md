@@ -363,6 +363,39 @@ Represents individual messages within a conversation.
   row, inserts the message, and updates `last_message_preview` in one
   transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
   function or mutate `messages` directly.
+- The one sanctioned in-place rewrite, a non-turn edit of a pending
+  confirmation card, uses the service-role-only
+  `update_conversation_message_artifact` RPC on the same serialized spine: it
+  locks the owned conversation row and applies only while the caller's read
+  still holds, comparing both the row's `metadata` and the conversation's
+  latest message id (an empty result is the conflict signal, never a silent
+  last-writer win). When the rewritten row is the conversation's latest
+  message it carries `last_message_preview` with it while leaving
+  `updated_at` untouched, so a non-turn change never reorders recents.
+- A confirmation card's liveness truth lives on its own row:
+  `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
+  `cancelled`, `superseded`). Run admission stamps `consumed` through the
+  guarded writer before dispatch; a run that dies without a result restores
+  `active`; a cancelled or superseded card is never restored. Every
+  liveness reader derives from one oracle over this field
+  (`confirmation_card_is_dead`), with a compatibility clause for durable
+  transcripts that predate the stamp and carry consumption only as later
+  result messages. No reader may re-implement the predicate or infer
+  liveness from job tables.
+- Job success is one-way against the card lifecycle: both success writers
+  (the worker's SQL update and the API gateway's PostgREST update) embed a
+  predicate generated beside the card-restore classification in
+  `argus.domain.backtest_job_lifecycle`, so success can only follow a state
+  a worker legitimately holds (queued, running, or a re-claimable failure).
+  A state the card was restored from can never convert into a result; a
+  refused success write leaves the terminal state standing and is logged by
+  its caller. This tightens a spine invariant so it can carry the
+  consumption feature; the unguarded write was correct self-healing before
+  cards were consumed at admission.
+- Recent-window reads use `list_messages(newest_first_window=True)`: the
+  newest N messages of the conversation restored to chronological order.
+  An ascending read with a limit returns the head of the conversation and
+  starves every recent-state reader on long conversations (#433).
 - Conversation message order is deterministic by `(created_at DESC, id DESC)`.
   Under the conversation lock, a new append receives `created_at` at least one
   microsecond newer than the current maximum. Metadata-only updates do not

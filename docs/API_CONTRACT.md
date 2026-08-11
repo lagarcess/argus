@@ -2458,7 +2458,8 @@ stores nothing and makes no LLM, provider, or market-data call.
   rejects a missing id with `422 validation_error` and rejects a stale or
   header-mismatched id with `409 idempotency_conflict` instead of executing an
   older draft, as defined by `contract-run-action-reconciliation`.
-- `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields.
+- `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields. New cards emit only `adjust_assumptions` (the one editing entry point); the two scoped types remain valid for durable transcripts.
+- A scoped entry point accepts a broader edit: a reply that states more than the requested field routes through the edit planner and the whole request is served, never held to the field the button asked for.
 - Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
 - Confirmation eligibility requires semantic conservation: explicit date, asset, cadence, and money-role constraints from the user must survive interpretation, normalization, and default application.
 - Defaults fill absent fields only. They do not override explicit user constraints.
@@ -3144,7 +3145,9 @@ Contract rules:
 
 Grows or restores the active confirmation's basket **without spending a
 turn**: no message allowance, no interpretation, no LLM call. Available only
-while `ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
+while `ARGUS_RESEARCH_RAIL_ENABLED` and `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`
+are both on (404 otherwise; the in-place surface ships default off until
+the run-consumption guard lane closes).
 
 **Request:** exactly one mode.
 - Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
@@ -3153,18 +3156,142 @@ while `ARGUS_RESEARCH_RAIL_ENABLED` is on (404 otherwise).
 - Undo: `{"restore_previous": true}` re-materializes the exact previous
   asset set from the active card's own `assets_adjustment` data.
 
-**Response:** `{"message": Message}` where the message is a new assistant
-confirmation message carrying the superseding card (new `confirmation_id`,
-typed `assets_adjustment`, recomputed provider coverage) plus the remaining
-peer rows on its `next_experiments` metadata. The previous card supersedes by
-ordinary latest-active projection.
+**Response:** `{"message": Message}` where the message is the **same**
+assistant confirmation message, updated in place: same `id`, same
+`confirmation_id`, typed `assets_adjustment`, recomputed provider coverage,
+and the remaining peer rows replacing `next_experiments` (removed once the
+offer set is consumed). No turn was spent, so nothing new appears in the
+transcript; see the record-creation rule under the direct-edit endpoint.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
 non-active confirmation, non-offered symbols, and restore with nothing to
-restore; `422 asset_maximum_reached | asset_class_mismatch |
-no_common_data_window | insufficient_common_data` for baskets that cannot run
-as one test; `503 market_data_unavailable` when the coverage preflight cannot
-reach provider data. Failures persist nothing.
+restore; `409 confirmation_changed` when a concurrent writer changed the
+card between this request's read and its write (nothing was applied; a
+retry re-reads the current card); `422 asset_maximum_reached |
+asset_class_mismatch | no_common_data_window | insufficient_common_data`
+for baskets that cannot run as one test; `503 market_data_unavailable` when
+the coverage preflight cannot reach provider data. Failures persist
+nothing.
+
+## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit`
+
+Edits the active confirmation's capital, dates, or costs **without spending a
+turn**: no message allowance, no interpretation, no LLM call, no backtest
+row. Available only while `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is on (404
+otherwise); the surface ships default off until the run-consumption guard
+lane closes, and while dark, cards advertise no `direct_edits` so the
+frontend renders no edit affordances. The typed values become the same edit operations the conversational
+planner emits, applied by the same application code, and the real confirm
+stage assembles the result, so a direct edit and the equivalent
+conversational edit produce one canonical artifact. Direct edits obey the
+same validation, coverage, and disclosure gates as a conversational edit;
+nothing becomes runnable that would not have been runnable through chat.
+
+**In place means in place.** This endpoint updates the card it edits: the
+same `confirmation_id`, the same assistant message rewritten where it
+stands, nothing new in the transcript. This is the record-creation rule of
+the edit contract stated explicitly, and its dividing line is whether a turn
+was spent, not which affordance was used: a turn-based edit supersedes with
+a new card message because the conversation records the change; a non-turn
+change (this endpoint, and peer add/undo above) spent nothing, so nothing
+new appears; only run finalization mints an `IdeaVersion`. Every non-turn
+producer writes through one backend path (`apply_pending_card_update`), so a
+future producer cannot append by omission. That path is serialized and
+guarded: the write locks the owned conversation row and applies only while
+what the request read still holds, in two parts. The row guard compares the
+card's metadata; the activity guard compares the conversation's latest
+message id, so an interleaved append invalidates the request's
+active-confirmation check. Either mismatch is `409 confirmation_changed`,
+so concurrent writers conflict instead of silently rolling each other
+back, and a retry re-reads and re-checks. When the card is the
+conversation's latest message the denormalized `last_message_preview`
+follows the rewrite, without touching `updated_at` or reordering recents.
+
+**Pressing Run is a commitment.** The consumption lifecycle below is part
+of the flagged in-place surface: while `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`
+is off nothing stamps, no non-turn writer exists, and the legacy
+newer-message clause owns liveness exactly as before the contract. While
+on: at run admission the card's own row is
+stamped `confirmation_state: "consumed"` through the same guarded writer,
+before dispatch and idempotently on replays, and that row is the single
+source of liveness truth: every reader (action admission, the non-turn
+routes, recovery fallback, the runtime's live-confirmation check) derives
+from one oracle over it. A consumed card refuses every non-turn mutation
+as `409 artifact_action_invalid_state`, with no race required, so a
+background run can never complete under a card claiming different values.
+A run that dies without a result (canceled, expired, failed before
+finishing) restores the card to `"active"` through the same writer: the
+user who cancels a queued run edits and runs again, losing nothing. A
+cancelled or superseded card is never restored. When the card changed
+between the click and admission (its launch payload hash no longer matches
+the admitted run), the run refuses with failure code
+`confirmation_changed` instead of executing values the card no longer
+shows.
+
+**Request:** at least one field.
+- `capital`: positive number. Starting capital, or the recurring
+  contribution when the pending strategy is a recurring-buy plan, matching
+  the money-role semantics of the conversational path. Rejected with `409`
+  when the confirmation sizes by `position_size`.
+- `date_window`: `{"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}`, ordered
+  ISO dates. Explicit calendar endpoints only; relative or semantic windows
+  stay on the conversational path where the interpreter owns them.
+- `fee_rate`, `slippage`: decimal rates at or above zero (`0.002` is
+  0.2 percent); zero explicitly clears a cost. The shared edit resolver is
+  the one cost gate, so a rate above the engine cap (five percent for either
+  cost) is refused as `422 unsupported_cost_value` and the card is
+  untouched.
+
+**Response:** `{"message": Message}` where the message is the **same**
+assistant confirmation message, updated in place: same `id`, same
+`confirmation_id`, edited payload and card (recomputed provider coverage,
+`period_adjustment` when the requested window clamps). All other metadata
+the message carried, peer rows included, is preserved. The card stays the
+latest active confirmation, and its `run_backtest` action runs the edited
+values.
+
+**Errors:** `409 artifact_action_invalid_state` for a stale or non-active
+confirmation and for capital on a position-sized confirmation;
+`409 confirmation_changed` when a concurrent writer changed the card
+between this request's read and its write (nothing was applied; a retry
+re-reads the current card and composes cleanly);
+`503 market_data_unavailable`; every other refusal is a typed `422` carrying
+the exact code, including `invalid_starting_capital`, `future_end_date`,
+`invalid_chronological_date_range`, `invalid_date_window`,
+`provider_history_start_unavailable`, `no_common_data_window`,
+`insufficient_common_data`, and `unsupported_cost_value`. Failures persist
+nothing.
+
+### Confirmation card editing surface
+
+- The active card advertises `capabilities.direct_edits` (`"capital"` when
+  the launch sizes by capital, `"dates"` always, and `"costs"` when the
+  engine can model execution costs). The frontend renders the edit
+  affordances only from this backend truth; all three share one in-place
+  behaviour.
+- The card also advertises `capabilities.edit_constraints`, the engine's own
+  accepted-value envelope: `capital.min`/`capital.max` (the run-time
+  starting-capital band; `min` is absent on recurring cards because a
+  contribution is exempt from the bankroll floor), `fees.max` and
+  `slippage.max` (decimal rate caps), and `date_window.max_end` plus a
+  per-asset-class `date_window.min_start` provider history floor. The
+  client renders and pre-checks against these values and never restates
+  them; the confirm preflight enforces the same imported constants, so a
+  card whose `validation.status` is `ready_to_run` can never violate
+  run-time validation.
+- `display_facts.capital` carries the typed number seeding the capital
+  editor; card rows remain display strings and are never parsed back.
+- The card carries exactly three actions: `run_backtest` (when ready),
+  `adjust_assumptions` (labelled "Change assumptions"), and
+  `cancel_confirmation`. The `change_dates` and `change_asset` action types
+  remain valid inputs for durable transcripts and still patch the pending
+  strategy as before, but no new card emits them.
+- A compound edit turn applies every requested change or surfaces each
+  unapplied one with a reason; there is no third outcome. When part of an
+  edit could not be applied, the superseding card carries typed
+  `edit_disclosure` (`{"unapplied": [{"op", "target", "reason"}], "note"?}`)
+  and clients render it as a lead-in above the card. The disclosure
+  describes one transition and never persists onto later cards.
 
 ---
 

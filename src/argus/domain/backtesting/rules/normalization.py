@@ -35,9 +35,7 @@ def _canonicalize_condition(condition: Condition) -> Condition:
     swapped = dict(condition)
     swapped["left"] = right
     swapped["right"] = left
-    swapped["operator"] = (
-        "cross_below" if operator == "cross_above" else "cross_above"
-    )
+    swapped["operator"] = "cross_below" if operator == "cross_above" else "cross_above"
     return swapped
 
 

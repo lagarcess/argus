@@ -15,15 +15,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from argus.agent_runtime.confirmation_artifacts import (
-    new_confirmation_id,
-    validate_confirmation_execution_payload,
-)
-from argus.agent_runtime.state.models import StrategySummary
-from argus.agent_runtime.strategy_contract import strategy_can_be_approved
-from argus.domain.backtesting.confirmation_preflight import (
-    materialize_confirmation_strategy,
-    prepare_confirmation_launch,
+from argus.agent_runtime.confirmation_revalidation import (
+    launch_date_range_of,
+    revalidated_confirmation_candidate,
 )
 
 MAX_BASKET_SYMBOLS = 5
@@ -80,41 +74,13 @@ def peer_added_confirmation_preparation(
     patched_launch["symbol"] = merged[0]
     patched_launch["language"] = language
 
-    preflight = prepare_confirmation_launch(dict(patched_launch))
-    if preflight.outcome == "coverage_failure":
-        return BasketGrowthPreparation(
-            error_code=preflight.error_code or "market_data_unavailable"
-        )
-    if preflight.outcome != "ready_to_confirm" or preflight.launch_payload is None:
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-    materialized_strategy = materialize_confirmation_strategy(
-        patched_strategy,
-        launch_payload=preflight.launch_payload,
+    candidate, error_code = revalidated_confirmation_candidate(
+        patched_strategy=patched_strategy,
+        patched_launch=patched_launch,
+        source_payload=source_payload,
     )
-    candidate: dict[str, Any] = {
-        "strategy": materialized_strategy,
-        "optional_parameters": source_payload.get("optional_parameters") or {},
-        "launch_payload": preflight.launch_payload,
-    }
-    validation = validate_confirmation_execution_payload(candidate)
-    if not validation.executable or validation.launch_payload is None:
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-    try:
-        pending_strategy = StrategySummary.model_validate(materialized_strategy)
-    except ValueError:
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-    if not strategy_can_be_approved(pending_strategy):
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-
-    active_id = new_confirmation_id()
-    candidate["launch_payload"] = validation.launch_payload
-    candidate["confirmation_id"] = active_id
-    candidate["artifact_id"] = active_id
-    candidate["validation"] = {
-        "status": "ready_to_run",
-        "executable": True,
-        "date_adjusted": False,
-    }
+    if candidate is None:
+        return BasketGrowthPreparation(error_code=error_code)
     adjustment: dict[str, Any] = {
         "code": "assets_added",
         "added": additions,
@@ -122,7 +88,7 @@ def peer_added_confirmation_preparation(
         "symbols": merged,
     }
     source_range = _date_range_of(launch)
-    effective_range = _date_range_of(validation.launch_payload)
+    effective_range = _date_range_of(candidate["launch_payload"])
     if (
         source_range is not None
         and effective_range is not None
@@ -181,41 +147,13 @@ def confirmation_symbols_restoration(
     patched_launch["symbol"] = previous[0]
     patched_launch["language"] = language
 
-    preflight = prepare_confirmation_launch(dict(patched_launch))
-    if preflight.outcome == "coverage_failure":
-        return BasketGrowthPreparation(
-            error_code=preflight.error_code or "market_data_unavailable"
-        )
-    if preflight.outcome != "ready_to_confirm" or preflight.launch_payload is None:
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-    materialized_strategy = materialize_confirmation_strategy(
-        patched_strategy,
-        launch_payload=preflight.launch_payload,
+    candidate, error_code = revalidated_confirmation_candidate(
+        patched_strategy=patched_strategy,
+        patched_launch=patched_launch,
+        source_payload=source_payload,
     )
-    candidate: dict[str, Any] = {
-        "strategy": materialized_strategy,
-        "optional_parameters": source_payload.get("optional_parameters") or {},
-        "launch_payload": preflight.launch_payload,
-    }
-    validation = validate_confirmation_execution_payload(candidate)
-    if not validation.executable or validation.launch_payload is None:
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-    try:
-        pending_strategy = StrategySummary.model_validate(materialized_strategy)
-    except ValueError:
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-    if not strategy_can_be_approved(pending_strategy):
-        return BasketGrowthPreparation(error_code="confirmation_not_executable")
-
-    active_id = new_confirmation_id()
-    candidate["launch_payload"] = validation.launch_payload
-    candidate["confirmation_id"] = active_id
-    candidate["artifact_id"] = active_id
-    candidate["validation"] = {
-        "status": "ready_to_run",
-        "executable": True,
-        "date_adjusted": False,
-    }
+    if candidate is None:
+        return BasketGrowthPreparation(error_code=error_code)
     restoration: dict[str, Any] = {
         "code": "assets_restored",
         "added": [],
@@ -223,7 +161,7 @@ def confirmation_symbols_restoration(
         "symbols": previous,
     }
     source_range = _date_range_of(launch)
-    effective_range = _date_range_of(validation.launch_payload)
+    effective_range = _date_range_of(candidate["launch_payload"])
     if (
         source_range is not None
         and effective_range is not None
@@ -238,14 +176,7 @@ def confirmation_symbols_restoration(
 
 
 def _date_range_of(payload: dict[str, Any]) -> dict[str, str] | None:
-    date_range = payload.get("date_range")
-    if not isinstance(date_range, dict):
-        return None
-    start = str(date_range.get("start") or "")
-    end = str(date_range.get("end") or "")
-    if not start or not end:
-        return None
-    return {"start": start, "end": end}
+    return launch_date_range_of(payload)
 
 
 def remaining_peer_offers(

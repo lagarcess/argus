@@ -791,7 +791,7 @@
         "run_backtest": "Ejecutar backtest",
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",
-        "adjust_assumptions": "Ajustar supuestos",
+        "adjust_assumptions": "Cambiar supuestos",
         "cancel": "Cancelar"
       },
       "assumptions": {
@@ -802,13 +802,49 @@
         "modeled_costs": "Costos modelados: comisión de {{fee}} bps + deslizamiento de {{slippage}} bps"
       },
       "cost_editor": {
-        "edit_chip": "Editar costos",
         "fee_label": "Comisión % por operación",
         "slippage_label": "Deslizamiento % por operación",
+        "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%)."
+      },
+      "direct_edit": {
+        "edit_capital": "Editar capital",
+        "edit_contribution": "Editar aporte",
+        "edit_dates": "Editar fechas",
+        "capital_label": "Capital inicial",
+        "contribution_label": "Aporte por compra",
+        "start_label": "Fecha de inicio",
+        "end_label": "Fecha de fin",
         "apply": "Aplicar",
         "cancel": "Cancelar",
-        "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
-        "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
+        "invalid_capital": "Ingresa un monto mayor que cero.",
+        "invalid_dates": "Elige una fecha de inicio igual o anterior a la fecha de fin.",
+        "failed": "Ese cambio no se aplicó. La tarjeta quedó igual.",
+        "edit_costs": "Editar costos",
+        "errors": {
+          "invalid_starting_capital": "El capital inicial debe estar entre {{min}} y {{max}}.",
+          "future_end_date": "Elige una fecha de fin igual o anterior a hoy.",
+          "invalid_chronological_date_range": "Elige una fecha de inicio anterior a la fecha de fin.",
+          "provider_history_start": "Los datos de esta prueba comienzan después; elige una fecha de inicio igual o posterior a {{min}}.",
+          "no_common_data": "Estos activos no comparten datos suficientes para ese periodo.",
+          "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}.",
+          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo."
+        }
+      },
+      "edit_disclosure": {
+        "unapplied": "No pude cambiar {{targets}}; el resto quedó aplicado abajo.",
+        "targets": {
+          "asset": "los activos",
+          "benchmark": "el benchmark",
+          "cadence": "la frecuencia",
+          "capital": "el capital inicial",
+          "date_window": "las fechas",
+          "fees": "las comisiones",
+          "recurring_contribution": "el aporte",
+          "slippage": "el deslizamiento",
+          "strategy_family": "la estrategia",
+          "timeframe": "el intervalo",
+          "generic": "esa parte"
+        }
       },
       "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
     },

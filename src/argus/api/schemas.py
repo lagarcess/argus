@@ -900,26 +900,18 @@ class ChatStreamRequest(BaseModel):
         raise ValueError("message_or_action_required")
 
 
-class ConfirmationPeerAssetsRequest(BaseModel):
-    """Grow or restore the pending confirmation's basket without a turn.
-
-    Add mode: only symbols the active turn offered as research peer rows are
-    addable; the backend re-verifies each against the resolver and coverage
-    gates. Restore mode undoes the latest add by re-materializing the exact
-    previous asset set from the card's own typed adjustment data.
-    """
-
-    symbols: list[str] | None = Field(default=None, min_length=1, max_length=4)
-    restore_previous: bool = False
-
-    @model_validator(mode="after")
-    def require_one_mode(self) -> "ConfirmationPeerAssetsRequest":
-        if self.restore_previous == bool(self.symbols):
-            raise ValueError("symbols_or_restore_required")
-        return self
+from argus.api.confirmation_schemas import (  # noqa: E402, F401 — re-exported API surface
+    ConfirmationDirectEditRequest,
+    ConfirmationDirectEditWindow,
+    ConfirmationPeerAssetsRequest,
+)
 
 
 class ConfirmationPeerAssetsResponse(BaseModel):
+    message: Message
+
+
+class ConfirmationDirectEditResponse(BaseModel):
     message: Message
 
 

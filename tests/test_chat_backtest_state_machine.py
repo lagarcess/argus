@@ -746,10 +746,9 @@ def test_chat_stream_emits_structured_confirmation_actions(
     confirmation = _stream_payloads(response.text, "confirmation")[0]["confirmation"]
     confirmation_id = confirmation["confirmation_id"]
     assert confirmation["confirmation_state"] == "active"
+    # §3.1 end state: Run backtest, Change assumptions, Cancel.
     assert [action["type"] for action in confirmation["actions"]] == [
         "run_backtest",
-        "change_dates",
-        "change_asset",
         "adjust_assumptions",
         "cancel_confirmation",
     ]
@@ -1059,10 +1058,22 @@ def test_confirmation_edit_actions_reenter_runtime_with_structured_context(
     confirmation = _stream_payloads(create_confirmation.text, "confirmation")[0][
         "confirmation"
     ]
-    action = next(
-        item for item in confirmation["actions"] if item["type"] == action_type
+    # §3.1 retired change_dates/change_asset from emission, but durable
+    # transcripts still carry the buttons, so a historical card's action must
+    # keep routing with structured context. Rebuild it exactly as an old card
+    # carried it: same payload identity, retired type.
+    base_action = next(
+        item
+        for item in confirmation["actions"]
+        if item["type"] == "adjust_assumptions"
     )
-    action["label"] = localized_label
+    action = {
+        **base_action,
+        "id": action_type.replace("_", "-"),
+        "type": action_type,
+        "labelKey": f"chat.confirmation.actions.{action_type}",
+        "label": localized_label,
+    }
 
     response = client.post(
         "/api/v1/chat/stream",

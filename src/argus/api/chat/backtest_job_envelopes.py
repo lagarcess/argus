@@ -18,6 +18,11 @@ def admission_rejection_envelope(decision: str) -> dict[str, Any]:
     elif decision == "conflict":
         error_type = "tool_execution_error"
         failure_code = "idempotency_conflict"
+    elif decision == "confirmation_changed":
+        # The card changed between the click and admission; the run refuses
+        # rather than executing values the card no longer shows.
+        error_type = "tool_execution_error"
+        failure_code = "confirmation_changed"
     else:
         error_type = "tool_execution_error"
         failure_code = "backtest_admission_unavailable"

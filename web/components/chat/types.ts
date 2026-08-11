@@ -208,6 +208,12 @@ export type StrategyConfirmationBenchmarkAdjustment = {
   effective_benchmark: string;
 };
 
+/** §3.2: requested changes the edit turn could not apply, with reasons. */
+export type StrategyConfirmationEditDisclosure = {
+  unapplied: { op: string; target: string; reason: string }[];
+  note?: string | null;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -229,6 +235,7 @@ export type StrategyConfirmationPayload = {
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
   assets_adjustment?: StrategyConfirmationAssetsAdjustment;
+  edit_disclosure?: StrategyConfirmationEditDisclosure;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
@@ -249,6 +256,26 @@ export type StrategyConfirmationAssetsAdjustment = {
 
 export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
+  /** Direct no-turn edits the typed endpoint accepts for this card. */
+  direct_edits?: ("capital" | "dates" | "costs")[];
+  /** The accepted-value envelope for this card's edits: the engine's own
+   * bounds, advertised so the client renders backend truth without owning
+   * it. Rates are decimals; dates are ISO. */
+  edit_constraints?: {
+    capital?: { min?: number; max?: number };
+    fees?: { min?: number; max?: number };
+    slippage?: { min?: number; max?: number };
+    date_window?: { min_start?: string; max_end?: string };
+  };
+};
+
+/** Typed values the direct-edit endpoint accepts; at least one is present.
+ * Costs are decimal rates, converted from the editor's percent inputs. */
+export type ConfirmationDirectEditPayload = {
+  capital?: number;
+  date_window?: { start: string; end: string };
+  fee_rate?: number;
+  slippage?: number;
 };
 
 export type StrategyPathContext = {

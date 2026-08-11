@@ -39,8 +39,6 @@ import {
   type GuestResumeSend,
 } from "@/components/guest/useGuestExperience";
 import {
-  addConfirmationPeerAssets,
-  restoreConfirmationAssets,
   createConversation,
   deleteConversation,
   getBacktestRun,
@@ -170,6 +168,7 @@ import {
   type Message,
   type StrategyConfirmationPayload,
 } from "./types";
+import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
   chatActionRequestFromAction, chatHttpErrorDisplay,
   chatStreamErrorText,
@@ -1882,102 +1881,19 @@ export default function ChatInterface() {
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 
-  function activeConfirmationIdFromMessages(): string | null {
+  const {
+    handleAddConfirmationPeer,
+    handleDirectEditConfirmation,
+  } = confirmationSupersedingHandlers(() => ({
+    activeConversationId: () => activeConversationIdRef.current,
     // Through the ref: the undo toast outlives its render.
-    return activeConfirmationIdFrom(latestMessagesRef.current);
-  }
-
-  function appendSupersedingConfirmation(
-    created: Parameters<typeof hydrateMessagesFromApi>[0][number],
-  ): boolean {
-    const hydrated = hydrateMessagesFromApi([created]).messages;
-    if (hydrated.length === 0) {
-      return false;
-    }
-    setMessages((prev) => [
-      // The new card supersedes the old one; mirror the reload projection
-      // instead of leaving two active cards on screen.
-      ...prev.map((message) =>
-        message.confirmation &&
-        message.confirmation.confirmation_state !== "cancelled" &&
-        message.confirmation.confirmation_id !==
-          hydrated[0].confirmation?.confirmation_id
-          ? {
-              ...message,
-              confirmation: {
-                ...message.confirmation,
-                confirmation_state: "superseded" as const,
-              },
-            }
-          : message,
-      ),
-      ...hydrated,
-    ]);
-    return true;
-  }
-
-  async function handleUndoConfirmationPeer(): Promise<void> {
-    const targetConversationId = activeConversationIdRef.current;
-    const activeId = activeConfirmationIdFromMessages();
-    if (!targetConversationId || !activeId) return;
-    hideToast();
-    try {
-      const restored = await restoreConfirmationAssets(
-        targetConversationId,
-        activeId,
-      );
-      appendSupersedingConfirmation(restored);
-    } catch {
-      showToast(
-        t(
-          "chat.confirmation.peer_add_failed",
-          "Couldn't change that test. The card is unchanged.",
-        ),
-        "error",
-      );
-    }
-  }
-
-  async function handleAddConfirmationPeer(action: ChatActionOption): Promise<void> {
-    const payload = action.payload ?? {};
-    const symbols = Array.isArray(payload.symbols)
-      ? payload.symbols.map((symbol) => String(symbol)).filter(Boolean)
-      : [];
-    const targetConversationId = activeConversationIdRef.current;
-    const confirmationId =
-      String(payload.confirmation_id ?? "") || activeConfirmationIdFromMessages();
-    if (!targetConversationId || !confirmationId || symbols.length === 0) {
-      return;
-    }
-    try {
-      const created = await addConfirmationPeerAssets(
-        targetConversationId,
-        confirmationId,
-        symbols,
-      );
-      if (!appendSupersedingConfirmation(created)) {
-        return;
-      }
-      // Motion is the feedback; the toast carries Undo, not information.
-      // Quick successive adds replace the single toast, and each Undo steps
-      // back exactly one add.
-      showToast("", "neutral", {
-        action: {
-          label: t("chat.confirmation.undo", "Undo"),
-          onPress: () => void handleUndoConfirmationPeer(),
-        },
-        durationMs: 6000,
-      });
-    } catch {
-      showToast(
-        t(
-          "chat.confirmation.peer_add_failed",
-          "Couldn't add that asset to this test. The rest of the card is unchanged.",
-        ),
-        "error",
-      );
-    }
-  }
+    activeConfirmationId: () => activeConfirmationIdFrom(latestMessagesRef.current),
+    hydrate: (created) => hydrateMessagesFromApi(created),
+    setMessages,
+    showToast,
+    hideToast,
+    t,
+  }));
 
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
@@ -2464,6 +2380,7 @@ export default function ChatInterface() {
                           <ChatMessage
                             message={msg}
                             onAction={handleAction}
+                            onDirectEdit={handleDirectEditConfirmation}
                             onFeedback={(type, context, rating) => {
                               setFeedbackState(
                                 openFeedbackDialogState(type, context, rating, conversationId),

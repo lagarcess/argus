@@ -19,7 +19,12 @@ import NextMoveRow, {
   NextMoveTitle,
 } from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
-import { type ChatActionOption, type ChatMention, Message } from "./types";
+import {
+  type ChatActionOption,
+  type ChatMention,
+  type ConfirmationDirectEditPayload,
+  Message,
+} from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -42,6 +47,7 @@ import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
+import { confirmationEditDisclosureText } from "@/lib/confirmation-edit-disclosure";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 import { EntityToken } from "./entity-token";
 import { messageMentionPieces } from "./mention-rendering";
@@ -50,6 +56,10 @@ import { messageMentionPieces } from "./mention-rendering";
 type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
+  onDirectEdit?: (
+    confirmationId: string,
+    edit: ConfirmationDirectEditPayload,
+  ) => Promise<void>;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
@@ -73,6 +83,7 @@ const retryIconButtonClass =
 export default function ChatMessage({
   message,
   onAction,
+  onDirectEdit,
   onFeedback,
   onToast,
   isLatest,
@@ -286,6 +297,10 @@ export default function ChatMessage({
     message.confirmation?.benchmark_adjustment,
     (key, options) => t(key, options),
   );
+  const confirmationEditDisclosureLeadIn = confirmationEditDisclosureText(
+    message.confirmation?.edit_disclosure,
+    t,
+  );
 
   if (isUser && message.kind === "action") {
     const actionText =
@@ -390,7 +405,24 @@ export default function ChatMessage({
                   {confirmationBenchmarkLeadIn}
                 </p>
               ) : null}
-              <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
+              {confirmationEditDisclosureLeadIn ? (
+                <p
+                  data-testid="confirmation-edit-disclosure"
+                  className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75"
+                >
+                  {confirmationEditDisclosureLeadIn}
+                </p>
+              ) : null}
+              <StrategyConfirmationCard
+                confirmation={message.confirmation}
+                onAction={onAction}
+                onDirectEdit={
+                  onDirectEdit && message.confirmation.confirmation_id
+                    ? (edit) =>
+                        onDirectEdit(message.confirmation!.confirmation_id!, edit)
+                    : undefined
+                }
+              />
               {isGuest ? <GuestArtifactHint kind="confirmation" /> : null}
             </div>
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (

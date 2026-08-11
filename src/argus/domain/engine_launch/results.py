@@ -251,9 +251,11 @@ def build_explanation_context(
     result_card: dict[str, Any],
 ) -> dict[str, Any]:
     resolved_parameters = dict(envelope.resolved_parameters or {})
-    benchmark_symbol = str(
-        resolved_parameters.get("benchmark_symbol") or request.benchmark_symbol
-    ).strip().upper()
+    benchmark_symbol = (
+        str(resolved_parameters.get("benchmark_symbol") or request.benchmark_symbol)
+        .strip()
+        .upper()
+    )
     return {
         "strategy_type": request.strategy_type,
         "symbol": request.symbol,

@@ -15,4 +15,3 @@ def validate_backtest_date_window(
         raise ValueError("invalid_chronological_date_range")
     if end > (today or date.today()):
         raise ValueError("future_end_date")
-
