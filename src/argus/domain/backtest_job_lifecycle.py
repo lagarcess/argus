@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 WORKER_HELD_STATUSES = ("queued", "running")
+_SUCCEEDED_STATUS = "succeeded"
 _KNOWN_DEAD_STATUSES = ("canceled", "cancelled", "expired")
 
 JOB_MAY_SUCCEED = "may_succeed"
@@ -38,7 +39,7 @@ def classify_job_for_card(*, status: Any, retryable: Any) -> str:
         return JOB_MAY_SUCCEED
     if normalized == "failed":
         return JOB_MAY_SUCCEED if bool(retryable) else JOB_DEAD
-    if normalized == "succeeded":
+    if normalized == _SUCCEEDED_STATUS:
         return JOB_HAS_RESULT
     if normalized in _KNOWN_DEAD_STATUSES:
         return JOB_DEAD
@@ -68,3 +69,33 @@ def job_success_write_postgrest_filter() -> str:
     """
     held = ",".join(WORKER_HELD_STATUSES)
     return f"status.in.({held}),and(status.eq.failed,retryable.is.true)"
+
+
+def job_result_attach_sql_predicate() -> str:
+    """The SQL clause for attaching a result: ``may_succeed or has_result``.
+
+    Every write that sets ``result_run_id`` embeds one of the attach
+    encodings, with no caller able to opt out; a dead or unknown job can
+    never gain a result, because the card restore fires exactly on dead
+    states and fails closed on unknown ones. ``succeeded`` stays
+    attachable because the proof-shadow finalizer owns status while the
+    in-process run owns the link, and a succeeded job's card is consumed
+    for good, so the attach cannot split card and result.
+    """
+    held = ", ".join(f"'{status}'" for status in WORKER_HELD_STATUSES)
+    return (
+        f"(status in ({held}, '{_SUCCEEDED_STATUS}')"
+        " or (status = 'failed' and retryable))"
+    )
+
+
+def job_result_attach_postgrest_filter() -> str:
+    """The PostgREST or-filter equivalent of ``may_succeed or has_result``.
+
+    Same statement as :func:`job_result_attach_sql_predicate`, generated
+    beside it so the API gateway's attach write cannot drift from the
+    worker's, and the walk-every-state Postgres test covers both
+    encodings.
+    """
+    attachable = ",".join((*WORKER_HELD_STATUSES, _SUCCEEDED_STATUS))
+    return f"status.in.({attachable}),and(status.eq.failed,retryable.is.true)"

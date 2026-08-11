@@ -1444,16 +1444,19 @@ class PostgresBacktestJobGateway:
         mark_succeeded: bool = False,
     ) -> dict[str, Any]:
         from argus.domain.backtest_job_lifecycle import (
+            job_result_attach_sql_predicate,
             job_success_write_sql_predicate,
         )
         from psycopg.types.json import Jsonb
 
         status = "succeeded" if mark_succeeded else None
         finished_at = utcnow_iso() if mark_succeeded else None
-        # Success may only follow a state a worker legitimately holds. The
-        # predicate is generated beside the card-restore classification so
-        # the two sides of the consumption design cannot drift: a state the
-        # card was restored from can never be converted into a result.
+        # Every result attach passes the lifecycle statement, and success
+        # may only follow a state a worker legitimately holds. Both
+        # predicates are generated beside the card-restore classification
+        # so the sides of the consumption design cannot drift: a state the
+        # card was restored from can never gain a result, whether or not
+        # the write also converts status.
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -1478,6 +1481,7 @@ class PostgresBacktestJobGateway:
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
                       and user_id = %(user_id)s
+                      and {job_result_attach_sql_predicate()}
                       and (
                         %(status)s is distinct from 'succeeded'
                         or {job_success_write_sql_predicate()}
@@ -1508,14 +1512,14 @@ class PostgresBacktestJobGateway:
                         raise WorkflowBacktestJobError(
                             f"Backtest job {job_id} not found."
                         )
-                    # The success write was refused: the job reached a state
-                    # no worker legitimately holds, its card may already be
-                    # restored, and that terminal state stands. The computed
-                    # run row remains for audit, unlinked.
+                    # The attach was refused: the job reached a state no
+                    # future write may turn into a result, its card may
+                    # already be restored, and that terminal state stands.
+                    # The computed run row remains for audit, unlinked.
                     logger.warning(
-                        "Success finalization refused; the job's terminal "
-                        "state stands and its card consequence is owned by "
-                        "the writer that won it",
+                        "Result link refused; the job's terminal state "
+                        "stands and its card consequence is owned by the "
+                        "writer that won it",
                         job_id=job_id,
                         standing_status=str(standing.get("status") or ""),
                         mark_succeeded=mark_succeeded,
