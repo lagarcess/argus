@@ -38,6 +38,7 @@ async function captureFinding({
     .split("\n")
     .map((line) => (line.trim() ? line : ""))
     .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
   const base = join(
     EVIDENCE_ROOT,
@@ -344,4 +345,3 @@ test.describe("issue #422 breakpoint regressions", () => {
     });
   });
 });
-
