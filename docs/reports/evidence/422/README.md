@@ -9,12 +9,13 @@ from the runtime-equivalent docs-only head
 
 The `after` folder was regenerated and every rendered-text and geometry file
 was re-read at product-and-harness capture head
-`596f1183cab3e5907585a2fc53d7a9a25fa2548c`. All nine focused browser checks
+`88a1d9882775197c61983824df990590018611cb`. All nine focused browser checks
 passed, including the 720px and 1024px no-regression checks, and the command
-left every regenerated evidence artifact unchanged. The following
-manifest-only commit changes this README, not the rendered product or capture
-harness. The same capture command must be rerun on the published PR head and
-recorded in the PR terminal audit; a commit cannot contain its own final SHA.
+changed only the known auth antialias frame described below. The following
+evidence-manifest commit changes this README and that recaptured PNG, not the
+rendered product or capture harness. The same capture command must be rerun on
+the published PR head and recorded in the PR terminal audit; a commit cannot
+contain its own final SHA.
 
 | Finding | Before | After | Acceptance proof |
 | --- | --- | --- | --- |
@@ -44,12 +45,12 @@ settings as its baseline. It now matches that baseline byte-for-byte. The
 superseded evidence frame differed at 42 pixels by one color-channel step; the
 visual baseline itself did not move and the tolerance was not changed.
 
-The Spanish auth evidence frame uses the same shared capture settings. Its
-recorded raw frame differs from `login-390-es-light.png` at 34 grayscale
-antialias pixels on the button edge. The RGB channels move together by at most
-33, with no changed text or geometry. The fixed-budget visual matcher passes,
-the frame was visually inspected, and neither the baseline nor the tolerance
-moved.
+The Spanish auth evidence frame uses the same shared capture settings and now
+matches `login-390-es-light.png` byte-for-byte. A prior exact-head recapture
+differed at 34 grayscale antialias pixels on the button edge; its RGB channels
+moved together by at most 33, with no changed text or geometry. Both raw frames
+pass the fixed-budget visual matcher, the final frame was visually inspected,
+and neither the baseline nor the tolerance moved.
 
 The final-head capture command rewrites the `after` folder and must leave the
 worktree clean before the lane is reported ready.
