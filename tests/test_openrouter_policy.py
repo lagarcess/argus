@@ -722,7 +722,7 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
     assert text is None
 
 
-def test_spanish_result_breakdown_fallback_is_grounded_without_language_branch() -> None:
+def test_spanish_result_breakdown_fallback_uses_reader_language() -> None:
     from argus.api.chat import breakdown as chat_service
 
     text = chat_service.fallback_result_breakdown_message(
@@ -756,10 +756,9 @@ def test_spanish_result_breakdown_fallback_is_grounded_without_language_branch()
     assert "**Risk and assumptions.**" in text
     assert "**Useful next check.**" not in text
     assert "Entry rule: buy at the start of the period" in text
-    assert "Beat by 23.6 percentage points" in text
+    assert "Superó por 23.6 puntos porcentuales" in text
     assert "Prueba siguiente: Prueba siguiente" not in text
     assert "lectura más detallada" not in text
-    assert "Superó por" not in text
 
 
 def test_result_breakdown_llm_has_hard_action_budget() -> None:

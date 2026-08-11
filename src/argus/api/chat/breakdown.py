@@ -15,6 +15,10 @@ from argus.context.rendering import context_packet_fact_summary
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
+from argus.domain.engine_launch.display import (
+    format_benchmark_comparison_phrase,
+    format_benchmark_magnitude_points,
+)
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
@@ -320,7 +324,10 @@ def result_breakdown_fact_bank(
     )
     if delta_vs_benchmark is not None:
         comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
-        fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
+        fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
+            comparison.magnitude_points,
+            language=resolved_language,
+        )
         fact_bank["benchmark_comparison"] = _benchmark_comparison_phrase(
             delta_vs_benchmark,
             language=resolved_language,
@@ -406,7 +413,11 @@ def _benchmark_comparison_phrase(
     language: str,
 ) -> str:
     comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
-    return comparison.user_phrase
+    return format_benchmark_comparison_phrase(
+        comparison.claim,
+        comparison.magnitude_points,
+        language=language,
+    )
 
 
 def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:

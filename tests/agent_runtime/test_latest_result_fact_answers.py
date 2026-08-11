@@ -228,9 +228,7 @@ class _SequencedComposer:
 
 
 def test_fact_bank_is_enriched_with_curve_and_supplemental_facts() -> None:
-    fact_bank = result_followup_fact_bank(
-        dict(_latest_result_reference().metadata)
-    )
+    fact_bank = result_followup_fact_bank(dict(_latest_result_reference().metadata))
 
     assert fact_bank["peak_value"] == "$14,500.25"
     assert fact_bank["peak_date"] == "2021-11-09"
@@ -305,11 +303,7 @@ async def test_latest_result_peak_date_answer_composes_from_typed_facts() -> Non
         ),
         (
             "benchmark_cost_treatment",
-            {
-                "benchmark_cost_treatment": (
-                    "Benchmark used the same modeled costs"
-                )
-            },
+            {"benchmark_cost_treatment": ("Benchmark used the same modeled costs")},
         ),
     ],
 )
@@ -339,6 +333,40 @@ async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
         assert facts[key] == value
     assert facts["source"] == "result_followup_fact_bank"
     assert "latest_result_fact_answer" in result.decision.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_benchmark_delta_answer_replaces_stored_prose() -> None:
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    performance = reference.metadata["metrics"]["aggregate"]["performance"]
+    performance["benchmark_return_pct"] = 33.7
+    performance["delta_vs_benchmark_pct"] = -5.3
+    reference.metadata["result_card"]["rows"] = [
+        {
+            "key": "benchmark_delta",
+            "value": "Lagged by 5.3 percentage points",
+        }
+    ]
+    composer = _RecordingComposer()
+    decision = _decision("result_card_fact").model_copy(
+        update={"result_followup_fact_key": "benchmark_delta"}
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+        current_user_message="what was the benchmark delta?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    assert composer.calls[0]["fact_key"] == "benchmark_delta"
+    facts = result.patch["response_intent"]["facts"]
+    assert facts["benchmark_delta"] == "-5.3 percentage points"
+    assert facts["source"] == "result_followup_fact_bank"
 
 
 @pytest.mark.asyncio
@@ -411,9 +439,7 @@ async def test_fact_answer_passes_detected_turn_language_through() -> None:
 async def test_fact_answer_is_language_agnostic_for_any_detected_language() -> None:
     # A French turn reaches the composer as fr — not collapsed to en or es.
     composer = _RecordingComposer()
-    decision = _decision("peak_date").model_copy(
-        update={"detected_user_language": "fr"}
-    )
+    decision = _decision("peak_date").model_copy(update={"detected_user_language": "fr"})
 
     result = await latest_result_answer_stage_result_if_applicable(
         decision=decision,
@@ -566,7 +592,9 @@ async def test_stage_signals_typed_decline_when_composition_fails() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pending_refine_result_question_answers_without_clearing_pending_state() -> None:
+async def test_pending_refine_result_question_answers_without_clearing_pending_state() -> (
+    None
+):
     composer = _RecordingComposer()
     snapshot = _snapshot(pending=True)
 
@@ -1221,9 +1249,10 @@ async def test_workflow_refine_result_question_with_strategy_baggage_does_not_co
     )
 
     assert result["stage_outcome"] == "ready_to_respond"
-    assert "The peak portfolio value was $14,500.25 on 2021-11-09." in result[
-        "assistant_response"
-    ]
+    assert (
+        "The peak portfolio value was $14,500.25 on 2021-11-09."
+        in result["assistant_response"]
+    )
     assert composer.calls[0]["focus"] == "peak_date"
     assert composer.calls[0]["fact_key"] == "peak_date"
 

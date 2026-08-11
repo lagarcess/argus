@@ -16,7 +16,6 @@ class BenchmarkComparison:
     claim: BenchmarkComparisonClaim
     signed_delta_percent: str
     magnitude_points: str
-    user_phrase: str
 
 
 def benchmark_comparison_from_delta(
@@ -29,7 +28,6 @@ def benchmark_comparison_from_delta(
             claim="unknown",
             signed_delta_percent="unknown",
             magnitude_points="unknown",
-            user_phrase="Compared with benchmark",
         )
 
     delta = float(delta_percent)
@@ -40,20 +38,17 @@ def benchmark_comparison_from_delta(
             claim="matched_benchmark",
             signed_delta_percent=signed_delta,
             magnitude_points=magnitude,
-            user_phrase="In line with benchmark",
         )
     if delta > 0:
         return BenchmarkComparison(
             claim="beat_benchmark",
             signed_delta_percent=signed_delta,
             magnitude_points=magnitude,
-            user_phrase=f"Beat by {magnitude}",
         )
     return BenchmarkComparison(
         claim="lagged_benchmark",
         signed_delta_percent=signed_delta,
         magnitude_points=magnitude,
-        user_phrase=f"Lagged by {magnitude}",
     )
 
 

@@ -139,9 +139,9 @@ async def latest_result_answer_stage_result_if_applicable(
 
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
-    fact_bank = result_followup_fact_bank(metadata)
-    focus = _focus_for_answer(decision.result_followup_focus, requested_fact_key)
     answer_language = _answer_language(decision=decision, fallback=language)
+    fact_bank = result_followup_fact_bank(metadata, language=answer_language)
+    focus = _focus_for_answer(decision.result_followup_focus, requested_fact_key)
     run_patch = _run_reference_patch(
         metadata=metadata,
         artifact_id=reference.artifact_id,

@@ -104,9 +104,7 @@ async def test_private_alpha_save_response_uses_llm_fact_contract() -> None:
         metadata={
             "symbols": ["AAPL"],
             "benchmark_symbol": "SPY",
-            "metrics": {
-                "aggregate": {"performance": {"total_return_pct": 12.4}}
-            },
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
         },
         user_message="save this",
         language="es-419",
@@ -199,8 +197,7 @@ def test_result_followup_fact_bank_includes_execution_cost_evidence() -> None:
     assert fact_bank["net_total_return"] == "+11.8%"
     assert fact_bank["return_drag"] == "0.2 percentage points"
     assert (
-        fact_bank["benchmark_cost_treatment"]
-        == "Benchmark used the same modeled costs"
+        fact_bank["benchmark_cost_treatment"] == "Benchmark used the same modeled costs"
     )
 
 
@@ -253,7 +250,10 @@ async def test_result_followup_prefers_structured_answer_blocks() -> None:
 
     assert response is not None
     assert "compatibility answer" not in response
-    assert "AAPL beat SPY by 12.4 percentage points in this run.\n\nThat is useful" in response
+    assert (
+        "AAPL beat SPY by 12.4 percentage points in this run.\n\nThat is useful"
+        in response
+    )
 
 
 def test_result_followup_rejects_dense_unstructured_answer() -> None:
@@ -402,7 +402,7 @@ def test_result_followup_fact_bank_uses_user_safe_benchmark_comparison() -> None
     assert fact_bank["relative_performance"] == (
         "AAPL lagged QQQ by 5.3 percentage points in this run"
     )
-    assert "benchmark_delta" not in fact_bank
+    assert fact_bank["benchmark_delta"] == "-5.3 percentage points"
 
     messages = result_followup_llm_messages(
         fact_bank=fact_bank,
@@ -416,7 +416,7 @@ def test_result_followup_fact_bank_uses_user_safe_benchmark_comparison() -> None
         "Lagged by 5.3 percentage points"
     )
     assert "benchmark_comparison_claim" not in payload["fact_bank"]
-    assert "benchmark_delta" not in payload["fact_bank"]
+    assert payload["fact_bank"]["benchmark_delta"] == "-5.3 percentage points"
 
 
 def test_result_followup_rejects_user_visible_internal_fact_names() -> None:
@@ -756,9 +756,9 @@ def test_result_followup_fact_bank_includes_context_packet_limitations() -> None
     )
 
     assert fact_bank["context_packet_ids"] == "packet-1"
-    assert "Fed funds rate latest observation was 5.25" in fact_bank[
-        "context_packet_facts"
-    ]
+    assert (
+        "Fed funds rate latest observation was 5.25" in fact_bank["context_packet_facts"]
+    )
     assert "causal proof" in fact_bank["context_packet_limitations"]
     assert "fred" not in fact_bank["context_packet_facts"].lower()
     assert "FRED" not in fact_bank["context_packet_limitations"]
@@ -772,9 +772,10 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
         payload = json.loads(kwargs["messages"][1]["content"])
         assert payload["focus"] == "general"
         assert "context_packet_facts" in payload["required_fact_ids"]
-        assert "Fed funds rate latest observation was 5.33" in payload["fact_bank"][
-            "context_packet_facts"
-        ]
+        assert (
+            "Fed funds rate latest observation was 5.33"
+            in payload["fact_bank"]["context_packet_facts"]
+        )
         return schema(
             relative_performance_claim="beat_benchmark",
             answer=(
@@ -944,9 +945,7 @@ async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> N
 
 
 @pytest.mark.asyncio
-async def test_next_experiment_followup_is_retired_for_rows_sidecar() -> (
-    None
-):
+async def test_next_experiment_followup_is_retired_for_rows_sidecar() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(

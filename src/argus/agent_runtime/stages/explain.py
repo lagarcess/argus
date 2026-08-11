@@ -20,6 +20,8 @@ from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
 from argus.domain.engine_launch.display import (
+    format_benchmark_comparison_phrase,
+    format_benchmark_magnitude_points,
     format_date_range_label,
     normalize_legacy_data_caveat,
 )
@@ -556,8 +558,15 @@ def _quick_take_fact_bank(
         fact_bank["benchmark_return"] = _format_percent_points(benchmark_return)
     if total_return is not None and benchmark_return is not None:
         comparison = benchmark_comparison_from_delta(total_return - benchmark_return)
-        fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
-        fact_bank["benchmark_comparison"] = comparison.user_phrase
+        fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
+            comparison.magnitude_points,
+            language=language,
+        )
+        fact_bank["benchmark_comparison"] = format_benchmark_comparison_phrase(
+            comparison.claim,
+            comparison.magnitude_points,
+            language=language,
+        )
     fact_bank["caveat"] = fact_bank.get("caveat") or _caveat_summary(
         explanation_context,
         language=language,
