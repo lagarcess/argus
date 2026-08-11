@@ -438,17 +438,37 @@ export default function ResultEquityChart({
       releaseChartPress,
       gestureListenerOptions,
     );
-    // Recreations for theme/locale/size keep the explored viewport; only a new
-    // immutable chart payload resets it (see the chart-change effect above).
-    const restoredWindow = visibleWindowRef.current ?? allWindow;
-    lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
-    timeScale.setVisibleLogicalRange(
-      paddedResultChartLogicalRange({
-        from: restoredWindow.from,
-        to: restoredWindow.to,
-        chartWidth: container.clientWidth,
-      }),
-    );
+    const applySemanticWindow = () => {
+      // Recreations and responsive resizes keep the selected semantic window.
+      // Visual padding is recalculated from the current width so autosize
+      // cannot shrink the gutter or turn a passive resize into Custom.
+      const restoredWindow = visibleWindowRef.current ?? allWindow;
+      lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
+      timeScale.setVisibleLogicalRange(
+        paddedResultChartLogicalRange({
+          from: restoredWindow.from,
+          to: restoredWindow.to,
+          chartWidth: container.clientWidth,
+        }),
+      );
+    };
+    applySemanticWindow();
+    let resizeFrame: number | null = null;
+    let observedWidth = container.clientWidth;
+    const semanticWindowResizeObserver = new ResizeObserver((entries) => {
+      const latestEntry = entries[entries.length - 1];
+      const nextWidth = latestEntry?.contentRect.width ?? container.clientWidth;
+      if (nextWidth <= 0 || Math.abs(nextWidth - observedWidth) < 0.5) return;
+      observedWidth = nextWidth;
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      // Lightweight Charts autosizes synchronously in its ResizeObserver.
+      // Reapply after that observer so the final frame owns the new gutter.
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        applySemanticWindow();
+      });
+    });
+    semanticWindowResizeObserver.observe(container);
 
     chartApi.subscribeCrosshairMove((param) => {
       if (!param.point || param.time == null) {
@@ -476,6 +496,8 @@ export default function ResultEquityChart({
 
     return () => {
       setTooltip(null);
+      semanticWindowResizeObserver.disconnect();
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       container.removeEventListener(
         "pointerdown",
         beginChartPress,

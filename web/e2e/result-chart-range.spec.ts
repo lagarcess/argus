@@ -330,6 +330,57 @@ test("visible evidence tracks the viewport with separate sampling disclosures", 
   expect(watch.pageErrors).toEqual([]);
 });
 
+test("responsive resize reapplies the semantic chart window and edge gutter", async ({
+  context,
+}) => {
+  const referencePage = await context.newPage();
+  await referencePage.setViewportSize({ width: 390, height: 844 });
+  await openPlayground(referencePage);
+  const referenceChart = adaptiveCard(referencePage).getByTestId(
+    "result-equity-chart",
+  );
+  await referenceChart.scrollIntoViewIfNeeded();
+  const referenceWidth = await referenceChart.evaluate(
+    (element) => element.clientWidth,
+  );
+
+  const resizedPage = await context.newPage();
+  await resizedPage.setViewportSize({ width: 1280, height: 900 });
+  await openPlayground(resizedPage);
+  const resizedCard = adaptiveCard(resizedPage);
+  const resizedChart = resizedCard.getByTestId("result-equity-chart");
+  await resizedChart.scrollIntoViewIfNeeded();
+  await resizedCard.evaluate((element) => {
+    element.style.width = "324px";
+    element.style.maxWidth = "324px";
+  });
+  await expect
+    .poll(() => resizedChart.evaluate((element) => element.clientWidth))
+    .toBe(referenceWidth);
+  await resizedChart.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  await expect(
+    resizedCard.getByTestId("result-chart-range-ALL"),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    resizedCard.getByTestId("result-chart-custom-indicator"),
+  ).toHaveCount(0);
+  const resizedFrame = await resizedChart.screenshot({
+    animations: "disabled",
+  });
+
+  expect(resizedFrame).toMatchSnapshot("result-chart-responsive-resize.png", {
+    threshold: 0.2,
+    maxDiffPixels: 100,
+  });
+  await referencePage.close();
+  await resizedPage.close();
+});
+
 test("hover and resize never fabricate a Custom selection", async ({
   page,
 }) => {
