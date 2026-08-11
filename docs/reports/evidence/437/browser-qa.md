@@ -11,7 +11,12 @@ Recaptured in full at `d5294518` after the review rounds changed the
 result-link and withheld-cleanup runtime (`f3e51c53`, `69e20979`,
 `d5294518`), replacing the original `cb7dd3bc` capture. All four cells
 were produced by one run of the committed driver with its default cell
-set. The only commit after the capture is this evidence record itself.
+set. Later commits are re-validated against the exercised journeys
+rather than blanket-trusted: `eaa31ce2` changes only the
+refusal-failure semantics (a path no frame exercises; it is proven by
+the refusal unit and worker tests), and evidence-record edits like this
+one carry no runtime. Any future commit that moves an exercised path
+requires a fresh capture.
 
 ## Matrix
 
