@@ -19,8 +19,10 @@ from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
 from argus.domain.engine_launch.display import (
+    benchmark_comparison_from_legacy_phrase,
     format_benchmark_comparison_phrase,
     format_benchmark_magnitude_points,
+    format_benchmark_signed_delta_points,
 )
 from argus.domain.engine_launch.result_facts import (
     execution_note,
@@ -828,31 +830,46 @@ def result_followup_fact_bank(
     )
     if benchmark_return is not None:
         fact_bank["benchmark_return"] = format_percent(benchmark_return)
+    enriched_facts = enriched_result_fact_entries(metadata)
     benchmark_delta = metric_number(
         metadata,
         paths=(("metrics", "aggregate", "performance", "delta_vs_benchmark_pct"),),
     )
-    if benchmark_delta is not None:
-        comparison = benchmark_comparison_from_delta(benchmark_delta)
+    comparison = (
+        benchmark_comparison_from_delta(benchmark_delta)
+        if benchmark_delta is not None
+        else benchmark_comparison_from_legacy_phrase(
+            enriched_facts.get("benchmark_delta")
+        )
+    )
+    if benchmark_delta is None and comparison is not None:
+        benchmark_delta = as_float(comparison.signed_delta_percent)
+    if comparison is not None:
         fact_bank["benchmark_comparison_claim"] = comparison.claim
-        fact_bank["benchmark_delta"] = comparison.signed_delta_percent
         fact_bank["benchmark_comparison"] = format_benchmark_comparison_phrase(
             comparison.claim,
             comparison.magnitude_points,
             language=language,
         )
-        fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
-            comparison.magnitude_points,
-            language=language,
-        )
-        relative = relative_performance_label(
-            symbols=symbols,
-            benchmark=benchmark,
-            delta=benchmark_delta,
-            language=language,
-        )
-        if relative:
-            fact_bank["relative_performance"] = relative
+        if comparison.signed_delta_percent != "unknown":
+            fact_bank["benchmark_delta"] = format_benchmark_signed_delta_points(
+                comparison.signed_delta_percent,
+                language=language,
+            )
+        if comparison.magnitude_points != "unknown":
+            fact_bank["benchmark_delta_magnitude"] = format_benchmark_magnitude_points(
+                comparison.magnitude_points,
+                language=language,
+            )
+        if benchmark_delta is not None:
+            relative = relative_performance_label(
+                symbols=symbols,
+                benchmark=benchmark,
+                delta=benchmark_delta,
+                language=language,
+            )
+            if relative:
+                fact_bank["relative_performance"] = relative
     drawdown = metric_number(
         metadata,
         paths=(
@@ -871,9 +888,9 @@ def result_followup_fact_bank(
     fact_bank.update(_execution_cost_fact_entries(metadata))
     # Deterministic enrichment (equity-curve extrema, supplemental metrics,
     # result-card rows). Canonical entries above win on key collisions.
-    for fact_id, value in enriched_result_fact_entries(metadata).items():
+    for fact_id, value in enriched_facts.items():
         # Stored cards may predate typed benchmark facts and contain English prose.
-        # The canonical typed delta and comparison above are the only allowed source.
+        # Normalize that compatibility value above before rendering it for the reader.
         if fact_id == "benchmark_delta":
             continue
         fact_bank.setdefault(fact_id, value)

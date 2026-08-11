@@ -64,9 +64,33 @@ def _result_followup_comparison(language: str) -> tuple[str, ...]:
         },
         language=language,
     )
-    assert facts["benchmark_delta"] == f"+{BENCHMARK_DELTA_POINTS:.1f}%"
     return (
         facts["benchmark_comparison"],
+        facts["benchmark_delta"],
+        facts["benchmark_delta_magnitude"],
+        facts["relative_performance"],
+    )
+
+
+def _legacy_result_followup_comparison(language: str) -> tuple[str, ...]:
+    facts = result_followup_fact_bank(
+        {
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "result_card": {
+                "rows": [
+                    {
+                        "key": "benchmark_delta",
+                        "value": "Beat by 9.3 percentage points",
+                    }
+                ]
+            },
+        },
+        language=language,
+    )
+    return (
+        facts["benchmark_comparison"],
+        facts["benchmark_delta"],
         facts["benchmark_delta_magnitude"],
         facts["relative_performance"],
     )
@@ -108,6 +132,7 @@ def _breakdown_comparison(language: str) -> tuple[str, ...]:
     [
         pytest.param(_result_card_comparison, id="result-card"),
         pytest.param(_result_followup_comparison, id="result-followup"),
+        pytest.param(_legacy_result_followup_comparison, id="legacy-result-followup"),
         pytest.param(_quick_take_comparison, id="quick-take"),
         pytest.param(_breakdown_comparison, id="breakdown"),
     ],

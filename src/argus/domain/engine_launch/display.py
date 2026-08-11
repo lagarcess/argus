@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
 from babel.dates import format_date as format_locale_date
 
-from argus.domain.benchmark_comparison import BenchmarkComparisonClaim
+from argus.domain.benchmark_comparison import (
+    BenchmarkComparison,
+    BenchmarkComparisonClaim,
+    benchmark_comparison_from_delta,
+)
 
 Language = Literal["en", "es-419"]
 TimeframeUnit = Literal["minute", "hour", "day", "week"]
@@ -114,6 +119,20 @@ def format_benchmark_magnitude_points(
     return f"{value} puntos porcentuales"
 
 
+def format_benchmark_signed_delta_points(
+    signed_delta_percent: str,
+    *,
+    language: str = "en",
+) -> str:
+    value = signed_delta_percent.removesuffix("%").strip()
+    unit = (
+        "puntos porcentuales"
+        if _resolve_language(language) == "es-419"
+        else "percentage points"
+    )
+    return f"{value} {unit}"
+
+
 def format_benchmark_comparison_phrase(
     claim: BenchmarkComparisonClaim,
     magnitude_points: str,
@@ -145,6 +164,36 @@ def format_benchmark_comparison_phrase(
     if claim == "lagged_benchmark":
         return f"Lagged by {magnitude_points}"
     raise ValueError(f"Unsupported benchmark comparison claim: {claim}")
+
+
+_LEGACY_BENCHMARK_NUMBER_RE = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?")
+
+
+def benchmark_comparison_from_legacy_phrase(
+    value: object,
+) -> BenchmarkComparison | None:
+    """Recover typed comparison facts from persisted pre-localization card copy."""
+
+    text = " ".join(str(value or "").strip().split())
+    if not text:
+        return None
+    normalized = text.casefold().rstrip(".")
+    if normalized in {"in line with benchmark", "en línea con la referencia"}:
+        return benchmark_comparison_from_delta(0.0)
+    if normalized in {"compared with benchmark", "comparado con referencia"}:
+        return benchmark_comparison_from_delta(None)
+
+    match = _LEGACY_BENCHMARK_NUMBER_RE.search(text.replace("−", "-"))
+    if match is None:
+        return benchmark_comparison_from_delta(None)
+    delta = float(match.group().replace(",", ""))
+    if normalized.startswith(("beat by ", "superó por ")):
+        return benchmark_comparison_from_delta(abs(delta))
+    if normalized.startswith(("lagged by ", "quedó por debajo por ")):
+        return benchmark_comparison_from_delta(-abs(delta))
+    if match.group().startswith(("+", "-")):
+        return benchmark_comparison_from_delta(delta)
+    return benchmark_comparison_from_delta(None)
 
 
 def format_timeframe_data_caveat(
