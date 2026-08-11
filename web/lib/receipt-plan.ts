@@ -149,17 +149,23 @@ export function receiptPlan(
 }
 
 /**
- * Turns the frozen assumptions into sentences a person can read.
+ * Turns the frozen assumptions into the fine print under the rules block.
  *
  * Same job as `receiptPlan` and for the same reason: the payload freezes keys and
- * bare scalars, and the language they are spoken in belongs to whoever opened the
+ * bare scalars, and the language they are read in belongs to whoever opened the
  * link. Numbers get their separators here too, from the viewer's locale.
  *
- * The contribution amount and its cadence are one sentence rather than two. They
- * are separate frozen facts because the cadence can be absent, but read together
- * they are one thing the run did.
+ * Terse fragments, not sentences. This block sits below the rules as muted
+ * one-liners, and the result card it replaced froze fragments of the same weight
+ * ("Long-only", "Equal weight", "Benchmark: SPY"). Past-tense sentences with
+ * terminal periods turn it into a second narration beside the one above it, which
+ * is the shape this surface was redesigned out of.
  *
- * A key whose sentence needs a value it does not have is dropped. Half a sentence
+ * Two pairs read as one line each, the contribution with its cadence and the fee
+ * with its slippage. They are separate frozen facts because either half can be
+ * absent, but each pair is one thing to a reader and the app states it on one line.
+ *
+ * A key whose line needs a value it does not have is dropped. Half a fragment
  * about money is worse on this page than one fewer line.
  */
 export function receiptAssumptions(
@@ -183,10 +189,26 @@ export function receiptAssumptions(
       case "no_costs":
         lines.push(said[assumption.key]);
         break;
-      case "modeled_fee_bps":
+      case "modeled_fee_bps": {
+        // What a run cost is one thing to a reader, and the app states it on one
+        // line, so the pair is composed here the way the contribution pair is. The
+        // single-sided lines below only run when a payload carries just one.
+        const fee = formatReceiptNumber(assumption.value, language);
+        const slippage = formatReceiptNumber(
+          values.get("modeled_slippage_bps"),
+          language,
+        );
+        if (fee && slippage) {
+          lines.push(interpolate(said.modeled_costs, { fee, slippage }));
+        } else if (fee) {
+          lines.push(interpolate(said.modeled_fee_bps, { bps: fee }));
+        }
+        break;
+      }
       case "modeled_slippage_bps": {
+        if (values.has("modeled_fee_bps")) break;
         const bps = formatReceiptNumber(assumption.value, language);
-        if (bps) lines.push(interpolate(said[assumption.key], { bps }));
+        if (bps) lines.push(interpolate(said.modeled_slippage_bps, { bps }));
         break;
       }
       case "benchmark":

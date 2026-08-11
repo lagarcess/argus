@@ -1503,16 +1503,17 @@
       "quarterly": "every quarter"
     },
     "assumptions": {
-      "long_only": "It only ever bought and sold. It never bet against anything.",
-      "equal_weight": "It split the money evenly across everything it held.",
-      "no_costs": "No trading fees or slippage were charged.",
-      "modeled_fee_bps": "A trading fee of {{bps}} bps was charged on every trade.",
-      "modeled_slippage_bps": "Slippage of {{bps}} bps was charged on every trade.",
-      "benchmark": "It was measured against {{symbol}}.",
-      "benchmark_same_modeled_costs": "It was measured against {{symbol}}, charged the same costs.",
-      "recurring_contribution": "It put in ${{amount}} each time.",
-      "recurring_contribution_cadence": "It put in ${{amount}} {{cadence}}.",
-      "starting_principal": "It started with ${{amount}} already invested."
+      "long_only": "Long only",
+      "equal_weight": "Equal weight",
+      "no_costs": "No fees or slippage",
+      "modeled_costs": "{{fee}} bps fee + {{slippage}} bps slippage",
+      "modeled_fee_bps": "{{bps}} bps fee",
+      "modeled_slippage_bps": "{{bps}} bps slippage",
+      "benchmark": "Compared with {{symbol}}",
+      "benchmark_same_modeled_costs": "Compared with {{symbol}}, same costs",
+      "recurring_contribution": "${{amount}} each time",
+      "recurring_contribution_cadence": "${{amount}} {{cadence}}",
+      "starting_principal": "${{amount}} to start"
     },
     "strategy_type_values": {
       "buy and hold": "Buy and hold",
@@ -1529,7 +1530,7 @@
       "max_drawdown_pct": "Worst dip",
       "win_rate": "Win rate",
       "benchmark_return_pct": "Benchmark",
-      "delta_vs_benchmark_pct": "Against the benchmark"
+      "delta_vs_benchmark_pct": "Difference"
     },
     "hero": {
       "ahead": "{{value}} ahead of {{symbol}}",

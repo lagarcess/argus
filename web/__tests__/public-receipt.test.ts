@@ -795,9 +795,9 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
   test("every frozen assumption becomes a sentence, in each language", () => {
     for (const language of ["en", "es-419"] as const) {
       const lines = receiptAssumptions(FROZEN, receiptCopy(language), language);
-      // The cadence is spoken inside the contribution sentence, so eight frozen
-      // facts read as seven lines.
-      expect(lines).toHaveLength(7);
+      // Two pairs each read as one line, the contribution with its cadence and the
+      // fee with its slippage, so eight frozen facts read as six.
+      expect(lines).toHaveLength(6);
       expect(lines.every((line) => line.trim().length > 0)).toBe(true);
       expect(lines.some((line) => line.includes("{{"))).toBe(false);
     }
@@ -816,11 +816,11 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
     }
   });
 
-  test("the contribution and its cadence read as one sentence", () => {
+  test("the contribution and its cadence read as one line", () => {
     const [first] = receiptAssumptions(FROZEN, receiptCopy("en"), "en");
-    expect(first).toBe("It put in $1,200 every month.");
+    expect(first).toBe("$1,200 every month");
     const [firstEs] = receiptAssumptions(FROZEN, receiptCopy("es-419"), "es-419");
-    expect(firstEs).toBe("Aportó $1,200 cada mes.");
+    expect(firstEs).toBe("$1,200 cada mes");
   });
 
   test("a contribution with no frozen cadence still reads", () => {
@@ -831,7 +831,23 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
       ),
     };
     const lines = receiptAssumptions(withoutCadence, receiptCopy("en"), "en");
-    expect(lines[0]).toBe("It put in $1,200 each time.");
+    expect(lines[0]).toBe("$1,200 each time");
+  });
+
+  test("the fine print stays fine print, in both languages", () => {
+    // These sit under the rules block as muted one-liners, where the result card
+    // froze terse fragments before this lane existed. Full past-tense sentences
+    // with terminal periods turn that block into a narration and undo the shape
+    // the surface was redesigned into.
+    // The longest fragment the result card itself froze is "Neto de comisión de 10
+    // bps + deslizamiento de 5 bps", at 50 characters. Nothing composed here should
+    // run longer than what it replaced.
+    for (const language of ["en", "es-419"] as const) {
+      for (const line of receiptAssumptions(FROZEN, receiptCopy(language), language)) {
+        expect(line.endsWith(".")).toBe(false);
+        expect(line.length).toBeLessThanOrEqual(50);
+      }
+    }
   });
 
   test("a key whose sentence needs a value it does not have is dropped", () => {
@@ -857,11 +873,13 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
     for (const common of [enCommon, esCommon]) {
       const said = common.receipt.assumptions as Record<string, string>;
       for (const key of keys) {
-        // The cadence is spoken through the contribution sentence, not on its own.
+        // The cadence is spoken through the contribution line, not on its own.
         if (key === "contribution_cadence") continue;
         expect(said[key]).toBeTruthy();
       }
+      // The two composed lines, each covering a pair of frozen facts.
       expect(said.recurring_contribution_cadence).toBeTruthy();
+      expect(said.modeled_costs).toBeTruthy();
     }
   });
 });

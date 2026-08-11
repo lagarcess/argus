@@ -49,10 +49,24 @@ None of that prose is in the payload. What the snapshot actually holds is:
 "date_range": {"start": "2024-01-02", "end": "2024-03-01"}
 ```
 
-So the English reader gets `It put in $200 every month.` and
-`Jan 2, 2024 to Mar 1, 2024`, and the Spanish reader gets `Aportó $200 cada mes.`
-and `2 ene 2024 al 1 mar 2024`, from one frozen object that contains neither
-sentence.
+So the English reader gets `$200 every month` and
+`Jan 2, 2024 to Mar 1, 2024`, and the Spanish reader gets `$200 cada mes` and
+`2 ene 2024 al 1 mar 2024`, from one frozen object that contains neither line.
+
+## Register, checked against the lane that set it
+
+The fine print stays fine print. Compare the block under the rules here with
+`../receipt-sharing/02b-phone-es-recurring-buys.png`: terse muted one-liners of the
+same weight, no terminal periods, no second narration beside the sentence above
+them. That is the register the result card already froze (`Solo largo`,
+`Peso igual`, `Sin comisiones/deslizamiento`, `Referencia: SPY`), and the reason
+these are keys rather than prose is to render it in either language, not to make
+it longer.
+
+Six lines, the same count the app shows for this run: two pairs each read as one
+line, the contribution with its cadence and the fee with its slippage.
+`web/__tests__/public-receipt.test.ts` holds the bound, at the length of the
+longest fragment the card itself froze.
 
 The comparison line under the headline reads `9.3 pts ahead of SPY · SPY +9.1%`
 and `9.3 pts por encima de SPY · SPY +9.1%` from the same two numbers. The card

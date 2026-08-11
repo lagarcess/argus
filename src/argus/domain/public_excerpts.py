@@ -585,13 +585,13 @@ def _assumptions(
     *,
     benchmark_symbol: str | None,
 ) -> list[PublicExcerptAssumption]:
-    """Freeze what the run assumed, as keys and scalars rather than sentences.
+    """Freeze what the run assumed, as keys and scalars rather than as prose.
 
     The run writes these as prose into its result card, correctly translated into the
     language the author was working in. That is the wrong shape for a public link:
     the author's language is not the viewer's, and no generator can know who will
     open it. So the same facts are read from the frozen run config here, and the
-    sentences are composed at view time.
+    lines are composed at view time, in the register the surface reads in.
 
     Long only and equal weight are stated unconditionally because they are true of
     every Argus run by construction, not because the card happened to mention them.

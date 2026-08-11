@@ -1503,16 +1503,17 @@
       "quarterly": "cada trimestre"
     },
     "assumptions": {
-      "long_only": "Solo compró y vendió. Nunca apostó en contra de nada.",
-      "equal_weight": "Repartió el dinero por partes iguales entre todo lo que tuvo.",
-      "no_costs": "No se cobraron comisiones ni deslizamiento.",
-      "modeled_fee_bps": "Se cobró una comisión de {{bps}} bps en cada operación.",
-      "modeled_slippage_bps": "Se cobró un deslizamiento de {{bps}} bps en cada operación.",
-      "benchmark": "Se comparó con {{symbol}}.",
-      "benchmark_same_modeled_costs": "Se comparó con {{symbol}}, con los mismos costos cobrados.",
-      "recurring_contribution": "Aportó ${{amount}} cada vez.",
-      "recurring_contribution_cadence": "Aportó ${{amount}} {{cadence}}.",
-      "starting_principal": "Empezó con ${{amount}} ya invertidos."
+      "long_only": "Solo largo",
+      "equal_weight": "Peso igual",
+      "no_costs": "Sin comisiones ni deslizamiento",
+      "modeled_costs": "Comisión {{fee}} bps + deslizamiento {{slippage}} bps",
+      "modeled_fee_bps": "Comisión de {{bps}} bps",
+      "modeled_slippage_bps": "Deslizamiento de {{bps}} bps",
+      "benchmark": "Comparado con {{symbol}}",
+      "benchmark_same_modeled_costs": "Comparado con {{symbol}}, mismos costos",
+      "recurring_contribution": "${{amount}} cada vez",
+      "recurring_contribution_cadence": "${{amount}} {{cadence}}",
+      "starting_principal": "${{amount}} al inicio"
     },
     "strategy_type_values": {
       "buy and hold": "Comprar y mantener",
@@ -1529,7 +1530,7 @@
       "max_drawdown_pct": "Peor caída",
       "win_rate": "Aciertos",
       "benchmark_return_pct": "Referencia",
-      "delta_vs_benchmark_pct": "Frente a la referencia"
+      "delta_vs_benchmark_pct": "Diferencia"
     },
     "hero": {
       "ahead": "{{value}} por encima de {{symbol}}",
