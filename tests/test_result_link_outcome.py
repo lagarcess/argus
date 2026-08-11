@@ -143,6 +143,14 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
         ),
     )
 
+    from argus.api import state as api_state
+    from argus.domain.store import AlphaStore
+
+    store = AlphaStore()
+    store.backtest_runs["run-1"] = object()
+    store.backtest_run_owners["run-1"] = "user-1"
+    monkeypatch.setattr(api_state, "store", store)
+
     gateway = _RefusingGateway()
     context = _context()
     context.created_job_id = "job-1"
@@ -169,6 +177,10 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
         "can never hand back an editable card beside a readable tuple"
     )
     assert restore_calls and restore_calls[0]["job"]["status"] == "canceled"
+    assert "run-1" not in store.backtest_runs, (
+        "the process cache must be evicted too, or fallback readers "
+        "resurrect the withheld result after the authoritative empty read"
+    )
     assert "result_card" not in metadata and "latest_run_id" not in metadata
     assert "result_card" not in runtime_result and "run" not in runtime_result
     assert metadata["recovery"]["code"] == "run_result_withheld"

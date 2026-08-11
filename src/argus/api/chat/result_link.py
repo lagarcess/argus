@@ -238,6 +238,7 @@ def _withhold_refused_result_publication(
             run_id=run_id,
         )
         raise
+    _evict_withheld_from_process_cache(user_id=user_id, run_id=run_id)
     restore_pending_card_for_failed_job(
         gateway,
         user_id=user_id,
@@ -262,6 +263,23 @@ def _withhold_refused_result_publication(
     runtime_result["recovery"] = withheld_recovery
     runtime_result["assistant_response"] = assistant_text
     return assistant_text
+
+
+def _evict_withheld_from_process_cache(*, user_id: str, run_id: str) -> None:
+    """The finalization also cached the tuple in this process's memory
+    store, and fallback readers scan that cache after an authoritative
+    empty read, so the withheld claim requires the cache eviction too. A
+    failure here propagates like the authoritative removal: the turn must
+    not claim there is no result while this process would still serve
+    one."""
+    from argus.api import state as api_state
+    from argus.domain.backtest_finalization import evict_cached_backtest_result
+
+    evict_cached_backtest_result(
+        api_state.store,
+        user_id=user_id,
+        run_id=run_id,
+    )
 
 
 def _persist_cleanup_pending_marker(

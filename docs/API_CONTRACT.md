@@ -3249,7 +3249,9 @@ removal for every gateway, so product reads can never observe a partial
 tuple: the minted idea version and its evidence go first (decisions
 cascade), an idea left versionless goes with them while one with earlier
 published versions is repointed to its latest remaining version, and the
-run row goes last. The refusal record on the job's execution metadata
+run row goes last. The API process evicts the same tuple from its
+in-memory finalization cache, because fallback readers scan that cache
+after an authoritative empty read. The refusal record on the job's execution metadata
 and the turn's message is the audit trail. The withheld terminal is only
 composed after the removal succeeds: if the removal itself fails, the
 turn fails as an ordinary runtime error instead, so the transcript never
