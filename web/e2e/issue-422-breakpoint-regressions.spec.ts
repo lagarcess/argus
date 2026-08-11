@@ -318,18 +318,16 @@ test.describe("issue #422 breakpoint regressions", () => {
         showPassword: await showPassword.getAttribute("aria-label"),
       },
       verify: async () => {
-        await expect
-          .soft(email)
-          .toHaveAttribute("placeholder", "Correo electrónico");
-        await expect.soft(password).toHaveAttribute("placeholder", "Contraseña");
-        await expect
-          .soft(showPassword)
-          .toHaveAccessibleName("Mostrar contraseña");
+        await expect(email).toHaveAttribute(
+          "placeholder",
+          "Correo electrónico",
+        );
+        await expect(password).toHaveAttribute("placeholder", "Contraseña");
+        await expect(showPassword).toHaveAccessibleName("Mostrar contraseña");
       },
     });
     await showPassword.click();
-    await expect
-      .soft(page.getByRole("button", { name: /ocultar contrase/i }).first())
+    await expect(page.getByRole("button", { name: /ocultar contrase/i }).first())
       .toHaveAccessibleName("Ocultar contraseña");
   });
 
