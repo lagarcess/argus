@@ -3239,11 +3239,15 @@ publishes no result: it settles as a completed turn carrying the standard
 `recovery` object with code `run_result_withheld` (not retryable), plus a
 `result_link_refused` metadata record
 (`{"job_id", "job_status", "unpublished_run_id"}`) naming the standing
-job state and the run id that was withheld. The just-computed run row is
-removed rather than left readable, because completed run rows surface
-through History and latest-result reads without a link check; the refusal
-record on the job's execution metadata and the turn's message is the
-audit trail. The final frame carries no `run`, `result_card`, or result
+job state and the run id that was withheld. The just-computed finalized
+tuple is removed rather than left readable, because each part surfaces
+without a link check: the run row through History and latest-result
+reads, the evidence artifact and idea through the Omnisearch leaves. The
+minted idea version and its evidence go first (decisions cascade), an
+idea left versionless goes with them while one with earlier published
+versions is repointed to its latest remaining version, and the run row
+goes last; the refusal record on the job's execution metadata and the
+turn's message is the audit trail. The final frame carries no `run`, `result_card`, or result
 continuity ids, so clients render the localized recovery text instead of
 a result, and the simulation allowance stays settled at admission per the
 usage rules above.

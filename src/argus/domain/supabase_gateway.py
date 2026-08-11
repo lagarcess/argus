@@ -1597,16 +1597,60 @@ class SupabaseGateway(
             )
         return runs_by_id
 
-    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
-        """Remove a run row whose publication was refused.
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+        """Remove the full finalized tuple of a run whose publication was
+        refused: its evidence, its minted idea version, an idea the
+        removal leaves versionless, then the run row itself.
 
-        Completed run rows are product-readable (History's run leaf and the
-        latest-completed read carry no link check), so a run the lifecycle
-        statement refused to attach must not stay in the result table. The
-        refusal itself stays recorded on the job's execution metadata and
-        the turn's message. Dependent audit rows survive by FK action:
-        context packets cascade, receipts and evidence references null out.
+        Every part of the tuple is product-readable without a link check
+        (History's run leaf, the latest-completed read, the Omnisearch
+        idea and evidence leaves), so a withheld result must leave them
+        all. Children go first, while their source_run_id pointers still
+        exist; an idea that keeps earlier versions is repointed to its
+        latest remaining one. The refusal record on the job's execution
+        metadata and the turn's message is the audit trail.
         """
+        self.client.table("evidence_artifacts").delete().eq("user_id", user_id).eq(
+            "source_run_id", run_id
+        ).execute()
+        removed_versions = (
+            self.client.table("idea_versions")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("source_run_id", run_id)
+            .execute()
+            .data
+            or []
+        )
+        for idea_id in {
+            str(version["idea_id"])
+            for version in removed_versions
+            if version.get("idea_id")
+        }:
+            remaining = (
+                self.client.table("idea_versions")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("idea_id", idea_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            if not remaining:
+                self.client.table("ideas").delete().eq("user_id", user_id).eq(
+                    "id", idea_id
+                ).execute()
+            else:
+                self.client.table("ideas").update(
+                    {
+                        "active_version_id": remaining[0]["id"],
+                        "updated_at": _now_iso(),
+                    }
+                ).eq("user_id", user_id).eq("id", idea_id).is_(
+                    "active_version_id", "null"
+                ).execute()
         deleted = (
             self.client.table("backtest_runs")
             .delete()

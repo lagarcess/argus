@@ -375,35 +375,130 @@ def test_proof_shadow_success_path_still_links_the_result() -> None:
         assert _card_state(gateway, owner, card_id) == "consumed"
 
 
-def test_withheld_run_rows_leave_the_result_table_on_both_gateways() -> None:
-    """After a refused link, the caller removes the run row; the deletion
-    is owner-scoped, so another owner's id removes nothing."""
+def _seed_finalized_tuple(connection, owner, run_id: str, *, idea_id: str | None = None):
+    """The finalization tuple a withheld run must take with it: idea (or a
+    version added to an existing idea), version, evidence artifact."""
+    version_id = str(uuid.uuid4())
+    evidence_id = str(uuid.uuid4())
+    created_idea = idea_id is None
+    idea_id = idea_id or str(uuid.uuid4())
+    with connection.cursor() as cursor:
+        if created_idea:
+            cursor.execute(
+                """
+                insert into public.ideas (id, user_id, title)
+                values (%s, %s, 'NFLX buy and hold')
+                """,
+                (idea_id, owner["user_id"]),
+            )
+        cursor.execute(
+            """
+            insert into public.idea_versions
+              (id, user_id, idea_id, source_run_id, version_number, title)
+            values (%s, %s, %s, %s,
+                    (select coalesce(max(version_number), 0) + 1
+                     from public.idea_versions where idea_id = %s),
+                    'NFLX buy and hold')
+            """,
+            (version_id, owner["user_id"], idea_id, run_id, idea_id),
+        )
+        cursor.execute(
+            "update public.ideas set active_version_id = %s where id = %s",
+            (version_id, idea_id),
+        )
+        cursor.execute(
+            """
+            insert into public.evidence_artifacts
+              (id, user_id, idea_id, idea_version_id, source_run_id,
+               title, digest)
+            values (%s, %s, %s, %s, %s, 'NFLX evidence', 'Total return +12.5%%')
+            """,
+            (evidence_id, owner["user_id"], idea_id, version_id, run_id),
+        )
+    return {"idea_id": idea_id, "version_id": version_id, "evidence_id": evidence_id}
+
+
+def _count(connection, sql: str, *params) -> int:
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return int(cursor.fetchone()[0])
+
+
+def test_withheld_results_leave_every_product_readable_table() -> None:
+    """After a refused link, the caller removes the full finalized tuple:
+    run, minted version, evidence (Omnisearch indexes it with no link
+    check), and an idea left versionless. Deletion is owner-scoped, and an
+    idea with earlier published versions survives, repointed to its
+    latest remaining version."""
     with _connect() as connection:
         owner = _seed_owner(connection)
         other = _seed_owner(connection)
 
+        # API gateway: a fresh idea minted by the withheld run disappears.
         api_run = _seed_run(connection, owner)
-        assert not _supabase_gateway().delete_backtest_run(
+        api_tuple = _seed_finalized_tuple(connection, owner, api_run)
+        assert not _supabase_gateway().delete_withheld_backtest_result(
             user_id=other["user_id"], run_id=api_run
         )
-        assert _supabase_gateway().delete_backtest_run(
+        assert _supabase_gateway().delete_withheld_backtest_result(
             user_id=owner["user_id"], run_id=api_run
         )
+        for table, row_id in (
+            ("backtest_runs", api_run),
+            ("idea_versions", api_tuple["version_id"]),
+            ("evidence_artifacts", api_tuple["evidence_id"]),
+            ("ideas", api_tuple["idea_id"]),
+        ):
+            assert (
+                _count(
+                    connection,
+                    f"select count(*) from public.{table} where id = %s",  # noqa: S608
+                    row_id,
+                )
+                == 0
+            ), table
 
+        # Worker gateway: an idea with an earlier published version keeps
+        # it and repoints its active version.
+        published_run = _seed_run(connection, owner)
+        published = _seed_finalized_tuple(connection, owner, published_run)
         worker_run = _seed_run(connection, owner)
-        assert not _worker_gateway().delete_backtest_run(
-            user_id=other["user_id"], run_id=worker_run
+        withheld = _seed_finalized_tuple(
+            connection, owner, worker_run, idea_id=published["idea_id"]
         )
-        assert _worker_gateway().delete_backtest_run(
+        assert _worker_gateway().delete_withheld_backtest_result(
             user_id=owner["user_id"], run_id=worker_run
         )
-
+        assert (
+            _count(
+                connection,
+                "select count(*) from public.idea_versions where id = %s",
+                withheld["version_id"],
+            )
+            == 0
+        )
+        assert (
+            _count(
+                connection,
+                "select count(*) from public.evidence_artifacts where id = %s",
+                withheld["evidence_id"],
+            )
+            == 0
+        )
         with connection.cursor() as cursor:
             cursor.execute(
-                "select count(*) from public.backtest_runs where id in (%s, %s)",
-                (api_run, worker_run),
+                "select active_version_id from public.ideas where id = %s",
+                (published["idea_id"],),
             )
-            assert cursor.fetchone()[0] == 0
+            assert str(cursor.fetchone()[0]) == published["version_id"]
+        assert (
+            _count(
+                connection,
+                "select count(*) from public.backtest_runs where id = %s",
+                worker_run,
+            )
+            == 0
+        )
 
 
 def test_worker_success_link_still_lands_from_running() -> None:

@@ -126,7 +126,7 @@ def test_refused_publication_removes_the_run_row_and_strips_the_turn(
             )
             self.deleted_runs: list[str] = []
 
-        def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+        def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
             self.deleted_runs.append(run_id)
             return True
 

@@ -165,9 +165,10 @@ def apply_result_link_outcome(
     final payload. A refused link publishes nothing: every result key is
     stripped, card restoration is re-attempted with the standing row (the
     finalizer that won the terminal state may not have completed it), the
-    just-persisted run row is removed so it cannot surface through durable
-    result reads, and the turn settles on the ``run_result_withheld``
-    recovery, recording the refusal as ``result_link_refused``.
+    just-persisted finalized tuple is removed so it cannot surface through
+    durable result reads or the Omnisearch leaves, and the turn settles on
+    the ``run_result_withheld`` recovery, recording the refusal as
+    ``result_link_refused``.
     """
     link_outcome = link_shadow_backtest_job_result(
         user_id=user_id,
@@ -246,20 +247,21 @@ def _withhold_refused_result_publication(
 
 
 def _remove_withheld_run_row(gateway: Any | None, *, user_id: str, run_id: str) -> None:
-    """Completed run rows are product-readable regardless of link state
-    (History's run leaf, the latest-completed read), so a withheld run must
-    leave the result table; the refusal record on the job and message is
-    the audit trail. Removal is best-effort like restoration: a miss leaks
-    a row into History until reconciliation, never a wrong card."""
-    delete_run = getattr(gateway, "delete_backtest_run", None)
+    """Every part of a finalized tuple is product-readable without a link
+    check (History's run leaf, the latest-completed read, the Omnisearch
+    idea and evidence leaves), so a withheld run's tuple must leave those
+    tables; the refusal record on the job and message is the audit trail.
+    Removal is best-effort like restoration: a miss leaks readable rows
+    until reconciled, never a wrong card."""
+    delete_run = getattr(gateway, "delete_withheld_backtest_result", None)
     if delete_run is None:
         return
     try:
         delete_run(user_id=user_id, run_id=run_id)
     except Exception:  # noqa: BLE001
         logger.opt(exception=True).warning(
-            "Withheld run row could not be removed; it remains readable "
-            "until reconciled",
+            "Withheld result tuple could not be removed; it remains "
+            "readable until reconciled",
             user_id=user_id,
             run_id=run_id,
         )

@@ -92,7 +92,7 @@ class BacktestJobGateway(Protocol):
     ) -> dict[str, Any]:
         """Link a successful job to its canonical run."""
 
-    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
         """Remove a run row whose publication the link write refused."""
 
     def mark_backtest_job_failed(
@@ -483,7 +483,7 @@ def run_backtest_job(
 def _delete_withheld_run(gateway: Any, *, user_id: str, run_id: str) -> None:
     """Best-effort like card restoration: a miss leaks a row into History
     until reconciled, never a wrong card."""
-    delete_run = getattr(gateway, "delete_backtest_run", None)
+    delete_run = getattr(gateway, "delete_withheld_backtest_result", None)
     if delete_run is None:
         return
     try:
@@ -1544,8 +1544,8 @@ class PostgresBacktestJobGateway:
                     # The attach was refused: the job reached a state no
                     # future write may turn into a result, its card may
                     # already be restored, and that terminal state stands.
-                    # The caller removes the computed run row, because
-                    # completed run rows are product-readable.
+                    # The caller removes the computed finalized tuple,
+                    # because every part of it is product-readable.
                     logger.warning(
                         "Result link refused; the job's terminal state "
                         "stands and its card consequence is owned by the "
@@ -1557,22 +1557,78 @@ class PostgresBacktestJobGateway:
                     return _json_safe(standing)
         return _json_safe(row)
 
-    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
-        """Remove a run row whose publication the link write refused;
-        completed run rows are product-readable regardless of link state,
-        and the refusal record on the job row is the audit trail."""
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+        """Atomically remove the full finalized tuple of a withheld run:
+        evidence, minted idea version (decisions cascade), an idea left
+        versionless, then the run row. Every part is product-readable
+        without a link check (History, latest-result, the Omnisearch idea
+        and evidence leaves), and the children go first while their
+        source_run_id pointers still exist."""
+        params = {"run_id": run_id, "user_id": user_id}
         with self._connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    delete from public.backtest_runs
-                    where id = %(run_id)s
-                      and user_id = %(user_id)s
-                    returning id
-                    """,
-                    {"run_id": run_id, "user_id": user_id},
-                )
-                return cur.fetchone() is not None
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        delete from public.evidence_artifacts
+                        where user_id = %(user_id)s
+                          and source_run_id = %(run_id)s
+                        """,
+                        params,
+                    )
+                    cur.execute(
+                        """
+                        delete from public.idea_versions
+                        where user_id = %(user_id)s
+                          and source_run_id = %(run_id)s
+                        returning idea_id
+                        """,
+                        params,
+                    )
+                    idea_ids = {
+                        str(row["idea_id"]) for row in cur.fetchall() if row["idea_id"]
+                    }
+                    for idea_id in idea_ids:
+                        idea_params = {"user_id": user_id, "idea_id": idea_id}
+                        cur.execute(
+                            """
+                            delete from public.ideas as idea
+                            where idea.user_id = %(user_id)s
+                              and idea.id = %(idea_id)s
+                              and not exists (
+                                select 1 from public.idea_versions as v
+                                where v.idea_id = idea.id
+                              )
+                            """,
+                            idea_params,
+                        )
+                        cur.execute(
+                            """
+                            update public.ideas as idea
+                            set active_version_id = (
+                                select v.id from public.idea_versions as v
+                                where v.user_id = %(user_id)s
+                                  and v.idea_id = idea.id
+                                order by v.created_at desc
+                                limit 1
+                            ),
+                                updated_at = now()
+                            where idea.user_id = %(user_id)s
+                              and idea.id = %(idea_id)s
+                              and idea.active_version_id is null
+                            """,
+                            idea_params,
+                        )
+                    cur.execute(
+                        """
+                        delete from public.backtest_runs
+                        where id = %(run_id)s
+                          and user_id = %(user_id)s
+                        returning id
+                        """,
+                        params,
+                    )
+                    return cur.fetchone() is not None
 
     def mark_backtest_job_failed(
         self,

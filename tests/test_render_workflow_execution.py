@@ -127,7 +127,7 @@ class FakeBacktestJobGateway:
             raise RuntimeError("job result link response lost")
         return dict(self.row)
 
-    def delete_backtest_run(self, *, user_id: str, run_id: str) -> bool:
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
         assert self.row["user_id"] == user_id
         self.deleted_runs.append(run_id)
         return True
