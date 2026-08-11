@@ -7,11 +7,11 @@ interpretation, shadow jobs off), captured with the committed
 `qa-driver.mjs` at real viewports and read against rendered text before
 being trusted. Backend and frontend served from this lane's worktree.
 
-Captured at lane head `cb7dd3bc`. The commits after it are evidence,
-documentation, the one-way integration reconciliation (docs and
-environment-script tests), and a budget-config rebaseline, so no
-exercised runtime path moved and the capture remains valid for the PR
-head.
+Recaptured in full at `d5294518` after the review rounds changed the
+result-link and withheld-cleanup runtime (`f3e51c53`, `69e20979`,
+`d5294518`), replacing the original `cb7dd3bc` capture. All four cells
+were produced by one run of the committed driver with its default cell
+set. The only commit after the capture is this evidence record itself.
 
 ## Matrix
 
