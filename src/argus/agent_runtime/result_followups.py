@@ -871,6 +871,10 @@ def result_followup_fact_bank(
     # Deterministic enrichment (equity-curve extrema, supplemental metrics,
     # result-card rows). Canonical entries above win on key collisions.
     for fact_id, value in enriched_result_fact_entries(metadata).items():
+        # Stored cards may predate typed benchmark facts and contain English prose.
+        # The canonical typed comparison above is the only allowed source.
+        if fact_id == "benchmark_delta":
+            continue
         fact_bank.setdefault(fact_id, value)
     rule_summary = str(resolved_rule_summary(metadata) or "").strip()
     if rule_summary:

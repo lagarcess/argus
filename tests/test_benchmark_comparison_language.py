@@ -53,9 +53,18 @@ def _result_followup_comparison(language: str) -> tuple[str, ...]:
             "symbols": ["AAPL"],
             "benchmark_symbol": "SPY",
             "metrics": {"aggregate": {"performance": _run_performance()}},
+            "result_card": {
+                "rows": [
+                    {
+                        "key": "benchmark_delta",
+                        "value": "Beat by 9.3 percentage points",
+                    }
+                ]
+            },
         },
         language=language,
     )
+    assert "benchmark_delta" not in facts
     return (
         facts["benchmark_comparison"],
         facts["benchmark_delta_magnitude"],
