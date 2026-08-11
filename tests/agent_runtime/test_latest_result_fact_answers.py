@@ -342,6 +342,40 @@ async def test_latest_result_execution_cost_answer_composes_from_typed_facts(
 
 
 @pytest.mark.asyncio
+async def test_latest_result_benchmark_delta_answer_replaces_stored_prose() -> None:
+    snapshot = _snapshot()
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    performance = reference.metadata["metrics"]["aggregate"]["performance"]
+    performance["benchmark_return_pct"] = 33.7
+    performance["delta_vs_benchmark_pct"] = -5.3
+    reference.metadata["result_card"]["rows"] = [
+        {
+            "key": "benchmark_delta",
+            "value": "Lagged by 5.3 percentage points",
+        }
+    ]
+    composer = _RecordingComposer()
+    decision = _decision("result_card_fact").model_copy(
+        update={"result_followup_fact_key": "benchmark_delta"}
+    )
+
+    result = await latest_result_answer_stage_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+        current_user_message="what was the benchmark delta?",
+        language="en",
+        compose_response_func=composer,
+    )
+
+    assert result is not None
+    assert composer.calls[0]["fact_key"] == "benchmark_delta"
+    facts = result.patch["response_intent"]["facts"]
+    assert facts["benchmark_delta"] == "-5.3%"
+    assert facts["source"] == "result_followup_fact_bank"
+
+
+@pytest.mark.asyncio
 async def test_stage_declines_untyped_focus_without_fact_key() -> None:
     # Untyped focus stays out of the fact stage; the composer chain owns it.
     composer = _RecordingComposer()

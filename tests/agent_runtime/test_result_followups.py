@@ -402,7 +402,7 @@ def test_result_followup_fact_bank_uses_user_safe_benchmark_comparison() -> None
     assert fact_bank["relative_performance"] == (
         "AAPL lagged QQQ by 5.3 percentage points in this run"
     )
-    assert "benchmark_delta" not in fact_bank
+    assert fact_bank["benchmark_delta"] == "-5.3%"
 
     messages = result_followup_llm_messages(
         fact_bank=fact_bank,
@@ -416,7 +416,7 @@ def test_result_followup_fact_bank_uses_user_safe_benchmark_comparison() -> None
         "Lagged by 5.3 percentage points"
     )
     assert "benchmark_comparison_claim" not in payload["fact_bank"]
-    assert "benchmark_delta" not in payload["fact_bank"]
+    assert payload["fact_bank"]["benchmark_delta"] == "-5.3%"
 
 
 def test_result_followup_rejects_user_visible_internal_fact_names() -> None:

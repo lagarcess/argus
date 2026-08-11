@@ -64,7 +64,7 @@ def _result_followup_comparison(language: str) -> tuple[str, ...]:
         },
         language=language,
     )
-    assert "benchmark_delta" not in facts
+    assert facts["benchmark_delta"] == f"+{BENCHMARK_DELTA_POINTS:.1f}%"
     return (
         facts["benchmark_comparison"],
         facts["benchmark_delta_magnitude"],

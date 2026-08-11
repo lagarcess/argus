@@ -835,6 +835,7 @@ def result_followup_fact_bank(
     if benchmark_delta is not None:
         comparison = benchmark_comparison_from_delta(benchmark_delta)
         fact_bank["benchmark_comparison_claim"] = comparison.claim
+        fact_bank["benchmark_delta"] = comparison.signed_delta_percent
         fact_bank["benchmark_comparison"] = format_benchmark_comparison_phrase(
             comparison.claim,
             comparison.magnitude_points,
@@ -872,7 +873,7 @@ def result_followup_fact_bank(
     # result-card rows). Canonical entries above win on key collisions.
     for fact_id, value in enriched_result_fact_entries(metadata).items():
         # Stored cards may predate typed benchmark facts and contain English prose.
-        # The canonical typed comparison above is the only allowed source.
+        # The canonical typed delta and comparison above are the only allowed source.
         if fact_id == "benchmark_delta":
             continue
         fact_bank.setdefault(fact_id, value)
