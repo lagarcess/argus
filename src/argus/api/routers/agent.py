@@ -57,7 +57,6 @@ from argus.api.chat.backtest_jobs import (
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
-from argus.api.chat.result_link import apply_result_link_outcome
 from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
@@ -86,6 +85,7 @@ from argus.api.chat.research_evidence import (
     research_allowance_for_turn,
 )
 from argus.api.chat.result_actions import result_action_request_type
+from argus.api.chat.result_link import apply_result_link_outcome
 from argus.api.chat.retest import (
     complete_retest_turn,
     failed_retest_turn,
