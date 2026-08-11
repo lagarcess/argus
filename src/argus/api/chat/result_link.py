@@ -9,6 +9,7 @@ editable card can never sit beside a published one.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -278,24 +279,31 @@ def _persist_cleanup_pending_marker(
     merge = getattr(gateway, "merge_backtest_job_execution_metadata", None)
     if merge is None or not job_id:
         return
-    try:
-        merge(
-            user_id=user_id,
-            job_id=job_id,
-            execution_metadata={
-                RESULT_CLEANUP_PENDING_KEY: {
-                    "run_id": run_id,
-                    "failed_at": _utcnow_iso(),
-                }
-            },
-        )
-    except Exception:  # noqa: BLE001
-        logger.opt(exception=True).warning(
-            "Withheld-cleanup pending marker could not be persisted",
-            user_id=user_id,
-            job_id=job_id,
-            run_id=run_id,
-        )
+    for attempt in (1, 2, 3):
+        try:
+            merge(
+                user_id=user_id,
+                job_id=job_id,
+                execution_metadata={
+                    RESULT_CLEANUP_PENDING_KEY: {
+                        "run_id": run_id,
+                        "failed_at": _utcnow_iso(),
+                    }
+                },
+            )
+            return
+        except Exception:  # noqa: BLE001
+            if attempt == 3:
+                logger.opt(exception=True).warning(
+                    "Withheld-cleanup pending marker could not be persisted "
+                    "after retries; the leak is visible only in logs until "
+                    "an operator intervenes",
+                    user_id=user_id,
+                    job_id=job_id,
+                    run_id=run_id,
+                )
+                return
+            time.sleep(0.2 * attempt)
 
 
 def _remove_withheld_result_tuple(

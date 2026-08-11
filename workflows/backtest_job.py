@@ -549,27 +549,35 @@ def _persist_cleanup_pending_marker(
     job_id: str,
     run_id: str,
 ) -> None:
-    """Best-effort durable record of the leak: even if the task retry
-    never lands, the marker is queryable on the job row and names the
-    exact tuple an operator must remove."""
-    try:
-        gateway.merge_backtest_job_execution_metadata(
-            user_id=user_id,
-            job_id=job_id,
-            execution_metadata={
-                RESULT_CLEANUP_PENDING_KEY: {
-                    "run_id": run_id,
-                    "failed_at": utcnow_iso(),
-                }
-            },
-        )
-    except Exception:  # noqa: BLE001
-        logger.opt(exception=True).warning(
-            "Withheld-cleanup pending marker could not be persisted",
-            user_id=user_id,
-            job_id=job_id,
-            run_id=run_id,
-        )
+    """Durable record of the leak, written with bounded retries because
+    the entry reconciler keys on it: even if the task retry never lands,
+    the marker is queryable on the job row and names the exact tuple an
+    operator must remove."""
+    for attempt in (1, 2, 3):
+        try:
+            gateway.merge_backtest_job_execution_metadata(
+                user_id=user_id,
+                job_id=job_id,
+                execution_metadata={
+                    RESULT_CLEANUP_PENDING_KEY: {
+                        "run_id": run_id,
+                        "failed_at": utcnow_iso(),
+                    }
+                },
+            )
+            return
+        except Exception:  # noqa: BLE001
+            if attempt == 3:
+                logger.opt(exception=True).warning(
+                    "Withheld-cleanup pending marker could not be persisted "
+                    "after retries; the leak is visible only in logs until "
+                    "an operator intervenes",
+                    user_id=user_id,
+                    job_id=job_id,
+                    run_id=run_id,
+                )
+                return
+            time.sleep(0.2 * attempt)
 
 
 def _reconcile_withheld_cleanup(
