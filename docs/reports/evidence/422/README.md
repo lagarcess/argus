@@ -9,7 +9,7 @@ from the runtime-equivalent docs-only head
 
 The `after` folder was regenerated and every rendered-text and geometry file
 was re-read at product-and-evidence head
-`8e15575dbe3e8b3ee6c51a355344c88e6cad9027`. All nine focused browser checks
+`52410163840179715e230b826dae1ec031e2afa6`. All nine focused browser checks
 passed, including the 720px and 1024px no-regression checks, and the command
 left the worktree clean. The following manifest-only commit changes this
 README, not the rendered product or capture harness. The same capture command
@@ -39,6 +39,11 @@ the durable finding 8 frame was recaptured with the same fixed screenshot
 settings as its baseline. It now matches that baseline byte-for-byte. The
 superseded evidence frame differed at 42 pixels by one color-channel step; the
 visual baseline itself did not move and the tolerance was not changed.
+
+The Spanish auth evidence frame was normalized through the same shared capture
+settings and now matches `login-390-es-light.png` byte-for-byte. Its superseded
+frame differed at 34 pixels by one color-channel step. This also required no
+baseline or tolerance change.
 
 The final-head capture command rewrites the `after` folder and must leave the
 worktree clean before the lane is reported ready.
