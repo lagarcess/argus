@@ -7,6 +7,15 @@ image alone is ambiguous. The branch-point runtime was
 from the runtime-equivalent docs-only head
 `397235006ec8cbc50f5a113170437917853e632e`.
 
+The `after` folder was regenerated and every rendered-text and geometry file
+was re-read at product-and-evidence head
+`8e15575dbe3e8b3ee6c51a355344c88e6cad9027`. All nine focused browser checks
+passed, including the 720px and 1024px no-regression checks, and the command
+left the worktree clean. The following manifest-only commit changes this
+README, not the rendered product or capture harness. The same capture command
+must be rerun on the published PR head and recorded in the PR terminal audit;
+a commit cannot contain its own final SHA.
+
 | Finding | Before | After | Acceptance proof |
 | --- | --- | --- | --- |
 | 2 | [`finding-2-omnisearch-title.png`](before/finding-2-omnisearch-title.png) | [`finding-2-omnisearch-title.png`](after/finding-2-omnisearch-title.png) | The title grows from 92 of 191 pixels to 280 of 280 pixels, so the full title renders. |
@@ -24,6 +33,12 @@ The deliberate visual baseline changes are:
 - `issue-422-chart-390-chromium-darwin.png` for the 24-pixel chart edge gutter.
   That baseline moves 930 pixels because the visible range and line scale both
   change. The suite budget remains `maxDiffPixels: 100`.
+
+After the review repair separated visual padding from semantic chart facts,
+the durable finding 8 frame was recaptured with the same fixed screenshot
+settings as its baseline. It now matches that baseline byte-for-byte. The
+superseded evidence frame differed at 42 pixels by one color-channel step; the
+visual baseline itself did not move and the tolerance was not changed.
 
 The final-head capture command rewrites the `after` folder and must leave the
 worktree clean before the lane is reported ready.
