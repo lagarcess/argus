@@ -51,7 +51,9 @@ def decision_is_pure_approval(
         else decision.semantic_turn_act
     )
     task_relation = (
-        interpretation.task_relation if interpretation is not None else decision.task_relation
+        interpretation.task_relation
+        if interpretation is not None
+        else decision.task_relation
     )
     requires_clarification = (
         interpretation.requires_clarification
@@ -104,7 +106,9 @@ def decision_requests_confirmation_card_action(
         else decision.semantic_turn_act
     )
     task_relation = (
-        interpretation.task_relation if interpretation is not None else decision.task_relation
+        interpretation.task_relation
+        if interpretation is not None
+        else decision.task_relation
     )
     requires_clarification = (
         interpretation.requires_clarification
@@ -170,7 +174,9 @@ def decision_replays_visible_confirmation_without_material_change(
         else decision.semantic_turn_act
     )
     task_relation = (
-        interpretation.task_relation if interpretation is not None else decision.task_relation
+        interpretation.task_relation
+        if interpretation is not None
+        else decision.task_relation
     )
     requires_clarification = (
         interpretation.requires_clarification

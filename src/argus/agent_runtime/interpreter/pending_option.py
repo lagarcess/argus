@@ -99,9 +99,7 @@ def _pending_response_option_selection_audit_messages(
         and request.latest_task_snapshot.pending_strategy_summary
     ):
         pending_strategy = (
-            request.latest_task_snapshot.pending_strategy_summary.model_dump(
-                mode="json"
-            )
+            request.latest_task_snapshot.pending_strategy_summary.model_dump(mode="json")
         )
     return [
         {
@@ -173,9 +171,7 @@ def _response_from_pending_response_option_selection_audit(
     missing_fields = replacement_result["missing_fields"]
     return response.model_copy(
         update={
-            "intent": "strategy_drafting"
-            if missing_fields
-            else "backtest_execution",
+            "intent": "strategy_drafting" if missing_fields else "backtest_execution",
             "task_relation": "continue",
             "requires_clarification": bool(missing_fields),
             "candidate_strategy_draft": replacement_result["draft"],
@@ -291,9 +287,7 @@ def _apply_pending_response_option_replacement(
     if "date_range" in replacement_values:
         repaired.date_range = replacement_values["date_range"]
     if "cadence" in replacement_values:
-        repaired.cadence = _supported_dca_cadence_value(
-            replacement_values.get("cadence")
-        )
+        repaired.cadence = _supported_dca_cadence_value(replacement_values.get("cadence"))
     if "timeframe" in replacement_values:
         repaired.timeframe = str(replacement_values["timeframe"])
     if "comparison_baseline" in replacement_values:

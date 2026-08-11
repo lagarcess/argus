@@ -99,10 +99,7 @@ def _canonical_payload(
         ):
             return None
     elif to_status == "reconciled":
-        if (
-            assistant_message_id is None
-            or reconciled_outcome not in _EVIDENCE_STATUSES
-        ):
+        if assistant_message_id is None or reconciled_outcome not in _EVIDENCE_STATUSES:
             return None
         if reconciled_outcome == "completed" and (
             failure_code is not None or normalized_retryable
@@ -134,8 +131,7 @@ def _qualifies_as_terminal_evidence(metadata: dict[str, Any]) -> bool:
         status == "recoverable_failed"
         and "failure_code" in metadata
         and (
-            metadata["failure_code"] is None
-            or isinstance(metadata["failure_code"], str)
+            metadata["failure_code"] is None or isinstance(metadata["failure_code"], str)
         )
         and "retryable" in metadata
         and isinstance(metadata["retryable"], bool)
@@ -252,8 +248,7 @@ class MemoryChatTurnLifecycleGateway:
                 preceding = [
                     item
                     for item in messages
-                    if (item.created_at, item.id)
-                    < (existing.created_at, existing.id)
+                    if (item.created_at, item.id) < (existing.created_at, existing.id)
                 ]
                 source = preceding[-1] if preceding else None
             if (
@@ -310,8 +305,7 @@ class MemoryChatTurnLifecycleGateway:
             (
                 item
                 for item in reversed(messages)
-                if (item.created_at, item.id)
-                < (original.created_at, original.id)
+                if (item.created_at, item.id) < (original.created_at, original.id)
                 and item.role == "assistant"
                 and self._source_has_response_option(
                     item,
@@ -525,9 +519,7 @@ class MemoryChatTurnLifecycleGateway:
                 "reconciled_outcome": canonical_reconciled_outcome,
                 "failure_code": canonical_failure_code,
                 "retryable": canonical_retryable,
-                "running_at": (
-                    now if to_status == "running" else row.get("running_at")
-                ),
+                "running_at": (now if to_status == "running" else row.get("running_at")),
                 "terminal_at": now if to_status in TERMINAL else None,
                 "reconciled_at": now if to_status == "reconciled" else None,
                 "updated_at": now,
@@ -618,10 +610,7 @@ class MemoryChatTurnLifecycleGateway:
                 for row in self.store.chat_turn_lifecycles.values()
                 if row["user_id"] == user_id
                 and row["conversation_id"] == conversation_id
-                and (
-                    row.get("assistant_message_id") in ids
-                    or row["turn_id"] in ids
-                )
+                and (row.get("assistant_message_id") in ids or row["turn_id"] in ids)
             ]
         return sorted(rows, key=lambda row: row["turn_id"])
 
@@ -632,9 +621,7 @@ class MemoryChatTurnLifecycleGateway:
             latest_created_at = max(item.created_at for item in messages)
             if appended.created_at <= latest_created_at:
                 appended = appended.model_copy(
-                    update={
-                        "created_at": latest_created_at + timedelta(microseconds=1)
-                    }
+                    update={"created_at": latest_created_at + timedelta(microseconds=1)}
                 )
         messages.append(appended)
         self.store.bump_search_revision()
@@ -645,13 +632,11 @@ class MemoryChatTurnLifecycleGateway:
             else plain_text_preview(message.content, max_length=180)
         )
         if conversation is not None and preview:
-            self.store.conversations[message.conversation_id] = (
-                conversation.model_copy(
-                    update={
-                        "last_message_preview": preview,
-                        "updated_at": utcnow(),
-                    }
-                )
+            self.store.conversations[message.conversation_id] = conversation.model_copy(
+                update={
+                    "last_message_preview": preview,
+                    "updated_at": utcnow(),
+                }
             )
         return appended
 
@@ -674,9 +659,7 @@ class MemoryChatTurnLifecycleGateway:
             metadata.get("clarification") if isinstance(metadata, dict) else None
         )
         options = (
-            clarification.get("options")
-            if isinstance(clarification, dict)
-            else None
+            clarification.get("options") if isinstance(clarification, dict) else None
         )
         if not isinstance(options, list):
             return False
@@ -690,20 +673,13 @@ class MemoryChatTurnLifecycleGateway:
     @staticmethod
     def _response_option_action(message: Message) -> dict[str, Any] | None:
         metadata = message.metadata
-        action = (
-            metadata.get("chat_action") if isinstance(metadata, dict) else None
-        )
-        if (
-            not isinstance(action, dict)
-            or action.get("type") != "select_response_option"
-        ):
+        action = metadata.get("chat_action") if isinstance(metadata, dict) else None
+        if not isinstance(action, dict) or action.get("type") != "select_response_option":
             return None
         payload = action.get("payload")
         option_id = payload.get("option_id") if isinstance(payload, dict) else None
         replacement_values = (
-            payload.get("replacement_values")
-            if isinstance(payload, dict)
-            else None
+            payload.get("replacement_values") if isinstance(payload, dict) else None
         )
         if (
             not isinstance(option_id, str)
@@ -769,9 +745,7 @@ class MemoryChatTurnLifecycleGateway:
         if message is None or message.conversation_id != row["conversation_id"]:
             return False
         metadata = _terminal_metadata(message)
-        expected_status = (
-            reconciled_outcome if to_status == "reconciled" else to_status
-        )
+        expected_status = reconciled_outcome if to_status == "reconciled" else to_status
         identity_matches = (
             message.role == "assistant"
             and metadata is not None
@@ -811,10 +785,6 @@ class MemoryChatTurnLifecycleGateway:
                 or not _qualifies_as_terminal_evidence(metadata)
             ):
                 continue
-            precedence = (
-                0 if metadata["status"] == "recoverable_failed" else 1
-            )
-            candidates.append(
-                (message.created_at, precedence, message.id, message)
-            )
+            precedence = 0 if metadata["status"] == "recoverable_failed" else 1
+            candidates.append((message.created_at, precedence, message.id, message))
         return min(candidates)[-1] if candidates else None

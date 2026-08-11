@@ -189,8 +189,7 @@ def _strategy_with_contextual_merge(
         incoming_position_size_shape
         and effective_strategy_family in SUPPORTED_STRATEGY_TYPES
         and effective_strategy_family != "dca_accumulation"
-        and _strategy_field_provenance_value(strategy, "position_size")
-        == "explicit_user"
+        and _strategy_field_provenance_value(strategy, "position_size") == "explicit_user"
     )
     if position_size_owns_edit:
         merged.capital_amount = None
@@ -206,20 +205,24 @@ def _strategy_with_contextual_merge(
         if key == "strategy_type" and preserve_prior_family:
             continue
         if (
-            preserve_prior_asset_context
-            or preserve_prior_asset_for_field_owned_indicator
+            preserve_prior_asset_context or preserve_prior_asset_for_field_owned_indicator
         ) and key in {
             "asset_universe",
             "asset_class",
             "resolution_provenance",
         }:
             continue
-        if preserve_prior_money_context and not position_size_owns_edit and key in {
-            "capital_amount",
-            "initial_capital",
-            "total_capital",
-            "position_size",
-        }:
+        if (
+            preserve_prior_money_context
+            and not position_size_owns_edit
+            and key
+            in {
+                "capital_amount",
+                "initial_capital",
+                "total_capital",
+                "position_size",
+            }
+        ):
             continue
         if position_size_owns_edit and key == "capital_amount":
             continue
@@ -781,9 +784,7 @@ def _message_has_uppercase_asset_token(message: str | None, *, target: str) -> b
 
 def _compact_asset_evidence_token(value: Any) -> str:
     return "".join(
-        character.casefold()
-        for character in str(value or "")
-        if character.isalnum()
+        character.casefold() for character in str(value or "") if character.isalnum()
     )
 
 
@@ -807,15 +808,12 @@ def _strategy_fills_pending_execution_context(
     }
     if requested_field in context_fields:
         return _strategy_supplies_execution_context(strategy)
-    return (
-        selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
-        and (
-            (not prior.asset_universe and bool(strategy.asset_universe))
-            or (prior.date_range in (None, "") and bool(strategy.date_range))
-            or (prior.timeframe in (None, "") and bool(strategy.timeframe))
-            or (prior.capital_amount is None and strategy.capital_amount is not None)
-            or (prior.position_size is None and strategy.position_size is not None)
-        )
+    return selected_thread_metadata.get("last_stage_outcome") == "await_user_reply" and (
+        (not prior.asset_universe and bool(strategy.asset_universe))
+        or (prior.date_range in (None, "") and bool(strategy.date_range))
+        or (prior.timeframe in (None, "") and bool(strategy.timeframe))
+        or (prior.capital_amount is None and strategy.capital_amount is not None)
+        or (prior.position_size is None and strategy.position_size is not None)
     )
 
 
@@ -835,6 +833,9 @@ def _merge_contextual_extra_parameters(
     incoming: dict[str, Any],
 ) -> dict[str, Any]:
     merged = dict(base or {})
+    # An edit disclosure describes one transition only; only the incoming
+    # turn's own record may ride into the merged strategy.
+    merged.pop("edit_disclosure", None)
     for key, value in incoming.items():
         if key == "asset_universe_operation":
             continue

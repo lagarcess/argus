@@ -82,9 +82,7 @@ def apply_artifact_patch(
     if "asset_universe" in changed_fields:
         operation = normalized_asset_universe_operation(patch.asset_universe_operation)
         if operation is None:
-            raise ValueError(
-                "asset_universe patches require asset_universe_operation"
-            )
+            raise ValueError("asset_universe patches require asset_universe_operation")
         metadata["artifact_patch"]["asset_universe_operation"] = operation
     updated.extra_parameters = metadata
     return updated
@@ -111,11 +109,7 @@ def _validated_clear_fields(values: list[str]) -> list[str]:
         "asset_class",
         "asset_universe",
     }
-    return [
-        field_name
-        for field_name in values
-        if field_name in allowed
-    ]
+    return [field_name for field_name in values if field_name in allowed]
 
 
 def _normalize_value(field_name: str, value: Any) -> Any:

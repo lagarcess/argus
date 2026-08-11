@@ -6,7 +6,6 @@ from argus.agent_runtime.state.models import RunState
 RESULT_NEXT_ACTIONS = [
     "show_breakdown",
     "refine_strategy",
-    "save_strategy",
 ]
 
 

@@ -9,9 +9,12 @@ from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
+    EditOperation,
     ResolvedArtifactEdit,
+    _apply_legacy_flat_edit_fields,
     apply_edit_operations,
     resolved_asset_operation_symbols,
+    typed_unapplied_operations,
 )
 from argus.agent_runtime.artifacts.asset_edits import (
     normalized_asset_symbols,
@@ -22,7 +25,7 @@ from argus.agent_runtime.asset_text_grounding import (
 )
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     ground_planned_execution_costs,
-    supported_cost_rate_value,
+    numeric_cost_anchor_in_message,
 )
 from argus.agent_runtime.interpreter.shared import (
     _RECURRING_CAPITAL_SOURCES,
@@ -31,6 +34,7 @@ from argus.agent_runtime.interpreter.shared import (
     _field_path_base,
     _latest_result_date_window,
     _supported_dca_cadence_value,
+    carries_broader_edit_than_dates,
 )
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
@@ -55,7 +59,10 @@ ResolveAssetCandidate = Callable[..., AssetResolution | None]
 # Pending requested_field values whose next user reply edits the pending
 # artifact. The result-card "Refine idea" action ("refinement",
 # api/chat/result_actions.py) and the confirmation-card assumption prompts are
-# two entry points into the same typed edit contract.
+# two entry points into the same typed edit contract. date_range is
+# deliberately absent: a pure date answer keeps its specialized paths, and a
+# broadened reply on the change-dates prompt reaches the planner through the
+# response-conditioned §3.3 clause in the routing layer instead.
 ARTIFACT_EDIT_PENDING_FIELDS = frozenset(
     {
         "assumption",
@@ -71,6 +78,37 @@ def _normalized_ticker_symbol(value: Any) -> str | None:
         return None
     symbol = value.strip().upper()
     return symbol or None
+
+
+def _scoped_date_reply_carries_broader_edit(
+    request: InterpretationRequest,
+    draft: LLMStrategyDraft | None,
+) -> bool:
+    """§3.3: a change-dates prompt answered with more than a date widens.
+
+    The planner serves the whole request instead of holding the user to the
+    button they pressed; a pure date answer keeps its specialized paths.
+    """
+    if draft is None:
+        return False
+    requested_field = _field_path_base(
+        request.selected_thread_metadata.get("requested_field")
+    )
+    if requested_field != "date_range":
+        return False
+    last_stage_outcome = str(
+        request.selected_thread_metadata.get("last_stage_outcome") or ""
+    )
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return False
+    snapshot = request.latest_task_snapshot
+    if snapshot is None or not (
+        snapshot.pending_strategy_summary
+        or snapshot.confirmed_strategy_summary
+        or snapshot.active_confirmation_reference
+    ):
+        return False
+    return carries_broader_edit_than_dates(draft)
 
 
 def _request_targets_pending_artifact_assumption_edit(
@@ -517,18 +555,80 @@ def _required_edit_targets_from_primary_draft(
             and provenance.get(field_name) == "explicit_user"
         ):
             targets.add(target)
-    for field_name, target in (("fee_rate", "fees"), ("slippage", "slippage")):
-        if (
-            field_name in draft.extra_parameters
-            and provenance.get(field_name) == "explicit_user"
-            and (
-                current_strategy is None
-                or draft.extra_parameters[field_name]
-                != current_strategy.extra_parameters.get(field_name)
-            )
-        ):
-            targets.add(target)
+    targets.update(
+        _STATED_COST_TARGETS[field_name]
+        for field_name in _stated_cost_changes(
+            draft, current_strategy=current_strategy, request=request
+        )
+    )
     return targets
+
+
+_STATED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def _stated_cost_changes(
+    draft: LLMStrategyDraft,
+    *,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest | None,
+) -> dict[str, float]:
+    """Current-turn cost values the user actually stated, keyed by draft field.
+
+    Explicit-user provenance is stamped by the cost-fidelity audit, which runs
+    after planner routing; at planner time the message's own numeric anchor is
+    the available grounding. Without it, a stated cost the plan omits passes
+    coverage and drops silently (§3.2).
+
+    KNOWN LIMIT of the §3.2 guarantee: it holds when at least one layer, the
+    primary interpretation, the planner, or the audit, extracted the stated
+    change as a typed value. When every layer fails to extract it, this
+    function sees nothing, coverage requires nothing, and the change vanishes
+    with no disclosure. Observed once in six es-419 live capture attempts of
+    the compound slippage scenario. There is no deterministic backstop inside
+    LLM-first interpretation; see CONVERSATIONAL_RUNTIME.md, Edit Disclosure
+    Boundary.
+    """
+
+    provenance = draft.field_provenance or {}
+    current_message = request.current_user_message if request is not None else ""
+    changes: dict[str, float] = {}
+    for field_name in _STATED_COST_TARGETS:
+        value = draft.extra_parameters.get(field_name)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            continue
+        stated = provenance.get(field_name) == "explicit_user" or (
+            numeric_cost_anchor_in_message(value, current_message)
+        )
+        if stated and (
+            current_strategy is None
+            or value != current_strategy.extra_parameters.get(field_name)
+        ):
+            changes[field_name] = float(value)
+    return changes
+
+
+def stated_cost_edit_operations(
+    draft: LLMStrategyDraft | None,
+    *,
+    current_strategy: StrategySummary | None,
+    request: InterpretationRequest | None,
+) -> list[EditOperation]:
+    """Typed cost operations for the planner to fall back on (§3.2).
+
+    Values come from the primary interpretation's typed extraction, so the
+    plan completion stays deterministic; the applier still validates each
+    value and the card discloses anything it refuses.
+    """
+
+    if draft is None:
+        return []
+    return [
+        EditOperation(op="set", target=_STATED_COST_TARGETS[field_name], number=value)
+        for field_name, value in _stated_cost_changes(
+            draft, current_strategy=current_strategy, request=request
+        ).items()
+    ]
 
 
 def asset_edit_symbol_resolver(
@@ -651,82 +751,6 @@ def _apply_resolved_edit_to_draft(
         extra_parameters["indicator"] = "rsi"
         extra_parameters["indicator_parameters"] = indicator_parameters
         field_provenance["indicator_parameters"] = "explicit_user"
-
-
-def _apply_legacy_flat_edit_fields(
-    plan: ArtifactAssumptionEditPlan,
-    *,
-    draft: LLMStrategyDraft,
-    field_provenance: dict[str, str],
-    extra_parameters: dict[str, Any],
-) -> None:
-    if plan.asset_universe:
-        operation = normalized_asset_universe_operation(plan.asset_universe_operation)
-        draft.asset_universe = list(plan.asset_universe)
-        if operation is not None:
-            draft.asset_universe_operation = operation
-            extra_parameters["asset_universe_operation"] = operation
-        field_provenance["asset_universe"] = "explicit_user"
-    if plan.comparison_baseline is not None:
-        benchmark = str(plan.comparison_baseline or "").strip().upper()
-        if benchmark:
-            draft.comparison_baseline = benchmark
-            field_provenance["comparison_baseline"] = "explicit_user"
-    if plan.initial_capital is not None:
-        draft.initial_capital = plan.initial_capital
-        field_provenance["initial_capital"] = "starting_capital"
-    if plan.recurring_contribution_amount is not None:
-        recurring_amount = float(plan.recurring_contribution_amount)
-        draft.capital_amount = recurring_amount
-        draft.recurring_contribution = recurring_amount
-        field_provenance["capital_amount"] = "recurring_contribution"
-        field_provenance["recurring_contribution"] = "recurring_contribution"
-        extra_parameters["recurring_contribution"] = recurring_amount
-    if plan.cadence is not None:
-        cadence = _supported_dca_cadence_value(plan.cadence)
-        if cadence is not None:
-            draft.cadence = cadence
-            field_provenance["cadence"] = "explicit_user"
-            extra_parameters["recurring_cadence"] = cadence
-    if plan.timeframe is not None:
-        draft.timeframe = plan.timeframe
-        field_provenance["timeframe"] = "explicit_user"
-    if plan.fee_rate is not None:
-        fee_rate = supported_cost_rate_value(plan.fee_rate, field_name="fee_rate")
-        if fee_rate is not None:
-            extra_parameters["fee_rate"] = fee_rate
-            field_provenance["fee_rate"] = "explicit_user"
-    if plan.slippage is not None:
-        slippage = supported_cost_rate_value(plan.slippage, field_name="slippage")
-        if slippage is not None:
-            extra_parameters["slippage"] = slippage
-            field_provenance["slippage"] = "explicit_user"
-
-
-def _edit_plan_reshapes_non_recurring_strategy(
-    plan: ArtifactAssumptionEditPlan,
-    *,
-    prior_strategy_type: Any,
-) -> bool:
-    """Recurring-buy plan fields aimed at a non-recurring strategy are a
-    reshape ("make it recurring buys instead"), not an assumption edit.
-
-    The edit-operation set cannot change strategy_type, so applying such a
-    plan would silently keep the old strategy; callers must step aside and
-    let a reshape-capable interpretation path handle the turn.
-    """
-
-    proposes_recurring_fields = (
-        plan.cadence is not None
-        or plan.recurring_contribution_amount is not None
-        or any(
-            operation.target in {"cadence", "recurring_contribution"}
-            for operation in plan.operations
-        )
-    )
-    if not proposes_recurring_fields:
-        return False
-    return canonical_strategy_type(prior_strategy_type) != "dca_accumulation"
 
 
 def _current_artifact_uses_rsi(request: InterpretationRequest) -> bool:
@@ -982,6 +1006,14 @@ def materialized_artifact_edit_targets(
         for target in materialized_targets
     ):
         return None
+    # Coverage guards against silent drops, not against refusals: a target the
+    # materializer refused and recorded for card disclosure is covered (§3.2).
+    disclosure = draft.extra_parameters.get("edit_disclosure")
+    if isinstance(disclosure, dict):
+        for entry in disclosure.get("unapplied") or []:
+            unapplied_target = entry.get("target") if isinstance(entry, dict) else None
+            if isinstance(unapplied_target, str):
+                matching_targets.add(unapplied_target)
     return matching_targets
 
 
@@ -1365,6 +1397,7 @@ def _materialized_artifact_edit(
         draft.strategy_type = current_strategy.strategy_type
     field_provenance: dict[str, str] = {}
     extra_parameters: dict[str, Any] = {}
+    resolved: ResolvedArtifactEdit | None = None
     if plan.operations:
         resolved = apply_edit_operations(
             plan.operations,
@@ -1390,13 +1423,22 @@ def _materialized_artifact_edit(
         draft.extra_parameters.update(extra_parameters)
     if field_provenance:
         draft.field_provenance = field_provenance
-    ground_planned_execution_costs(
+    dropped_costs = ground_planned_execution_costs(
         draft,
         current_message=request.current_user_message,
         primary_draft=primary_draft,
         extra_parameters=extra_parameters,
         field_provenance=field_provenance,
     )
+    unapplied = typed_unapplied_operations(
+        resolved_unsupported=resolved.unsupported if resolved is not None else [],
+        dropped_cost_fields=dropped_costs,
+    )
+    if unapplied:
+        # §3.2: every requested change is applied or surfaced with a reason.
+        # The typed record rides the draft so the card can disclose it even
+        # though card turns drop assistant prose.
+        draft.extra_parameters["edit_disclosure"] = {"unapplied": unapplied}
     return draft, field_provenance, extra_parameters
 
 
@@ -1426,24 +1468,55 @@ def _response_from_artifact_assumption_edit_plan(
 
     if plan.outcome == "ready_to_confirm":
         if plan.operations and not field_provenance and not extra_parameters:
-            return LLMInterpretationResponse(
-                intent="conversation_followup",
-                task_relation="continue",
-                requires_clarification=True,
-                user_goal_summary=(
-                    plan.user_goal_summary
-                    or "The requested assumption change cannot be applied here."
-                ),
-                candidate_strategy_draft=draft,
-                assistant_response=(
-                    plan.assistant_response
-                    or "I can change RSI thresholds only on an active RSI confirmation card."
-                ),
-                confidence=plan.confidence,
-                reason_codes=["artifact_assumption_edit_planned"],
-                semantic_turn_act="unsupported_request",
-                artifact_target=artifact_target,
+            # Every operation was refused. When a refusal is impossible
+            # against the card state ("Quita TSLA" with no TSLA in the
+            # basket), no restatement can fix it, so the honest §3.2 shape is
+            # the same card re-issued with the typed disclosure; a
+            # clarification here gets swallowed by the stage because
+            # 'assumption' is not a contract field, and the card would
+            # re-issue clean. A refused cost is different: the value is
+            # correctable, so asking helps and the clarification reply stays
+            # (the #271 contract), as it does for refusals without a typed
+            # record (an indicator op dropped after the resolver).
+            disclosure_record = draft.extra_parameters.get("edit_disclosure")
+            discloses_impossible_change = isinstance(
+                disclosure_record, dict
+            ) and any(
+                isinstance(entry, dict)
+                and entry.get("target") not in ("fees", "slippage")
+                for entry in disclosure_record.get("unapplied") or []
             )
+            if not discloses_impossible_change:
+                return LLMInterpretationResponse(
+                    intent="conversation_followup",
+                    task_relation="continue",
+                    requires_clarification=True,
+                    user_goal_summary=(
+                        plan.user_goal_summary
+                        or "The requested assumption change cannot be applied here."
+                    ),
+                    candidate_strategy_draft=draft,
+                    assistant_response=(
+                        plan.assistant_response
+                        or "I can change RSI thresholds only on an active RSI confirmation card."
+                    ),
+                    confidence=plan.confidence,
+                    reason_codes=["artifact_assumption_edit_planned"],
+                    semantic_turn_act="unsupported_request",
+                    artifact_target=artifact_target,
+                )
+        # A mixed edit's unapplied part must reach the user through the card:
+        # card turns drop assistant prose, so the typed record carries the
+        # disclosure and the planner's note rides beside it as the voice. On a
+        # ready outcome the planner only writes a note for what it could not
+        # change, so a note without a rejected operation still discloses.
+        note = str(plan.assistant_response or "").strip()
+        disclosure = draft.extra_parameters.get("edit_disclosure")
+        if note:
+            if not isinstance(disclosure, dict):
+                disclosure = {"unapplied": []}
+                draft.extra_parameters["edit_disclosure"] = disclosure
+            disclosure["note"] = note
         return LLMInterpretationResponse(
             intent="backtest_execution",
             task_relation="continue",
@@ -1453,9 +1526,6 @@ def _response_from_artifact_assumption_edit_plan(
                 or "User changed a visible confirmation assumption."
             ),
             candidate_strategy_draft=draft,
-            # Surface the model's note when an applied edit also had a part it could
-            # not change (mixed supported/unsupported), so the reply never silently
-            # drops the unsupported part. None for a clean edit.
             assistant_response=plan.assistant_response,
             confidence=plan.confidence,
             reason_codes=["artifact_assumption_edit_planned"],

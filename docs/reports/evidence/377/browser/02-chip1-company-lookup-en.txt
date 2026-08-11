@@ -1,0 +1,52 @@
+argus
+New chat
+Search
+Recents
+Settings
+Netflix Revenue Streams Explained
+How does Netflix make money?
+Netflix mainly makes money by charging people for access to its streaming service. It also sells advertising on its lower-priced ad-supported plans.
+The revenue model
+SOURCE	HOW NETFLIX EARNS MONEY
+Subscriptions	Members pay a recurring monthly fee. Revenue grows when Netflix adds memberships, raises prices, or customers choose more expensive plans. Fees for “extra members” outside a household are also subscription revenue.
+Advertising	Advertisers pay to place commercials in programming watched by members on the ad-supported plan. Netflix benefits from both the member’s subscription fee and the advertising shown to that member.
+Other initiatives	Live events and games primarily make the subscription more attractive, improve retention, generate sign-ups, and, where applicable, create more advertising inventory. They are not currently described as major standalone revenue sources.
+
+Netflix’s core economic loop is straightforward:
+
+Spend money producing and licensing films, series, live programming, and games.
+Use that content to attract and retain members.
+Monetize the audience through subscription fees and advertising.
+Keep the difference after content, technology, marketing, staffing, and other expenses.
+How large is the business?
+
+For the year ended December 31, 2025, Netflix reported:
+
+Revenue: $45,183,036,000
+Operating profit: $13,326,603,000
+Net income attributable to common shareholders: $10,981,201,000
+Operating cash flow: $10,149,273,000
+
+Netflix operates globally. Its 2025 revenue by region was:
+
+REGION	2025 REVENUE
+United States and Canada	$19,957,152,000
+Europe, Middle East and Africa	$14,514,646,000
+Latin America	$5,357,521,000
+Asia-Pacific	$5,353,717,000
+Advertising is becoming more important
+
+Subscriptions remain the main business, but advertising is growing quickly. As of Netflix’s April 16, 2026 earnings call, management expected 2026 advertising revenue to reach $3 billion. That was a company target, not a completed full-year result.
+
+Live sports and entertainment events can support both sides of the model: they attract new members and provide valuable advertising opportunities. Games are still a small investment relative to Netflix’s overall content spending and are currently intended mainly to increase the value and use of the membership rather than generate substantial direct sales.
+
+Bottom line: Netflix sells recurring entertainment access. Subscriptions provide the bulk of its money, while advertising is its increasingly significant second revenue engine.
+
+Sources: Netflix financials, Netflix segments, Netflix earnings transcripts. No investment advice.
+
+TRY NEXT
+↳
+Test Netflix, Inc. Common Stock [NFLX] against history
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

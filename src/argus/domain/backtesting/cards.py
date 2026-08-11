@@ -129,14 +129,6 @@ def build_result_card(
             "payload": {},
         },
         {
-            "id": "save-strategy",
-            "type": "save_strategy",
-            "label": "Guardar" if is_es else "Save",
-            "labelKey": "chat.result_card.save",
-            "presentation": "result",
-            "payload": {},
-        },
-        {
             "id": "refine-strategy",
             "type": "refine_strategy",
             "label": "Refinar idea" if is_es else "Refine idea",

@@ -8,8 +8,10 @@ from typing import Any
 import httpx
 
 from argus.api.schemas import Conversation, Language
+from argus.domain.guest_funnel_milestones import purge_expired_milestones
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.usage_limits import QuotaExceededError
+from argus.domain.visitor_usage import purge_expired_visitor_usage
 
 
 def _row_one(result: Any) -> dict[str, Any] | None:
@@ -387,6 +389,16 @@ class GuestAccountPersistenceMixin:
         if isinstance(data, dict):
             return [dict(data)]
         return [dict(row) for row in data]
+
+    def purge_expired_visitor_usage(self, *, before: datetime | None = None) -> int:
+        return purge_expired_visitor_usage(self.client, before=before)
+
+    def purge_expired_guest_funnel_milestones(
+        self,
+        *,
+        before: datetime | None = None,
+    ) -> int:
+        return purge_expired_milestones(self.client, before=before)
 
     def check_allowance_windows(
         self,

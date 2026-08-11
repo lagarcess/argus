@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 RecoveryMessageCode = Literal[
     "interpreter_unavailable",
+    "interpreter_unavailable_not_retryable",
     "assumption_edit_unapplied",
     "setup_change_unapplied",
     "confirmation_change_unapplied",
@@ -46,6 +47,11 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "I saved your message, but I could not turn it into a reliable test setup. "
         "Please retry in a moment."
     ),
+    "interpreter_unavailable_not_retryable": (
+        "I saved your message, but I could not turn it into a reliable test setup. "
+        "Sending it again as written will hit the same problem, so try rewording "
+        "it, or tell me the asset and the period you want."
+    ),
     "assumption_edit_unapplied": (
         "I saved your reply, but I could not safely apply that assumption change, "
         "so I left the current idea unchanged. Please retry the change in a moment."
@@ -62,9 +68,9 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "I couldn’t answer that follow-up. Your result is still here."
     ),
     "private_alpha_save_unavailable": (
-        "I cannot move this into Strategies while that surface is off for private "
-        "alpha, but the completed run is still part of this chat and can be reopened "
-        "from the conversation or Recents."
+        "The legacy Strategies library and Save action have been retired. This "
+        "completed run remains available in this chat and Recents, and you can use "
+        "Refine idea to continue testing it."
     ),
     "confirmation_action_guidance": (
         "The visible confirmation is still ready. Use the card to start the "

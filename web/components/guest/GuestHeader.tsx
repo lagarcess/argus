@@ -8,11 +8,14 @@ export default function GuestHeader({
   feedbackEnabled,
   onFeedback,
   onSignIn,
+  showSettings = true,
 }: {
   expiresAt: string | null | undefined;
   feedbackEnabled: boolean;
   onFeedback: () => void;
   onSignIn: () => void;
+  /** Below the mobile threshold the gear moves to the drawer bottom. */
+  showSettings?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -21,10 +24,12 @@ export default function GuestHeader({
       className="flex items-center gap-1.5"
       data-guest-expires-at={expiresAt ?? undefined}
     >
-      <GuestSettingsMenu
-        feedbackEnabled={feedbackEnabled}
-        onFeedback={onFeedback}
-      />
+      {showSettings ? (
+        <GuestSettingsMenu
+          feedbackEnabled={feedbackEnabled}
+          onFeedback={onFeedback}
+        />
+      ) : null}
       <button
         type="button"
         onClick={onSignIn}

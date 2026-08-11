@@ -45,12 +45,22 @@ GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
 
 # Guest allowances follow the visitor per day; a fresh session grants
 # nothing new. Decision record: docs/PRODUCT.md (guest access).
-GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [
-    ("day", GUEST_MESSAGE_ALLOWANCE)
-]
+GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [("day", GUEST_MESSAGE_ALLOWANCE)]
 GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_SIMULATION_ALLOWANCE)
 ]
+
+# One ceiling for every research shape, not one per tier. A stranger cannot
+# tell a fast lookup from a thorough comparison, and a meter they cannot
+# predict is a meter that feels arbitrary; the rail decides the tier, so the
+# rail owns that cost, not the guest.
+#
+# Three is deliberately conservative because the recorded cost is wrong: the
+# ledger's per-call figure is not yet trustworthy (issue #409). Raising this
+# is cheap once the real number is known; refunding a month of underpriced
+# strangers is not.
+GUEST_RESEARCH_ALLOWANCE = 3
+GUEST_RESEARCH_VISITOR_LIMITS: list[tuple[str, int]] = [("day", GUEST_RESEARCH_ALLOWANCE)]
 
 # Circuit breaker, not a budget: the only bound that holds when someone rotates
 # identity faster than any per-visitor limit can see. Sized so no honest day
@@ -71,6 +81,26 @@ def global_discovery_daily_ceiling() -> int:
     except ValueError:
         return _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
     return parsed if parsed > 0 else _GLOBAL_DISCOVERY_DAILY_CEILING_DEFAULT
+
+
+# The research rail rides the default question path, not an opt-in surface, so
+# its circuit breaker is sized for ordinary conversation volume rather than
+# the discovery ceiling's opt-in profile (spec 2026-08-07 section 9). Still a
+# breaker, not a budget: no honest day should reach it.
+_GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT = 5000
+GLOBAL_RESEARCH_CEILING_SUBJECT = "00000000-0000-4000-8000-000000000d16"
+
+
+def global_research_daily_ceiling() -> int:
+    raw = os.getenv("ARGUS_RESEARCH_GLOBAL_DAILY_CEILING", "").strip()
+    if not raw:
+        return _GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return _GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT
+    return parsed if parsed > 0 else _GLOBAL_RESEARCH_DAILY_CEILING_DEFAULT
+
 
 _REGISTERED_ALLOWANCES: dict[str, list[tuple[str, int]]] = {
     MESSAGE_USAGE_RESOURCE: MESSAGE_ALLOWANCE_LIMITS,

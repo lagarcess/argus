@@ -2,6 +2,7 @@
 
 import { Layout, LayoutPanelLeft, MousePointer2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import AdaptivePanel from "@/components/ui/AdaptivePanel";
 
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
@@ -9,6 +10,8 @@ type SidebarPreferenceModalProps = {
   mode: SidebarMode;
   onSelect: (mode: SidebarMode) => void;
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
 };
 
 /**
@@ -19,6 +22,8 @@ export default function SidebarPreferenceModal({
   mode,
   onSelect,
   onClose,
+  onBack,
+  backLabel,
 }: SidebarPreferenceModalProps) {
   const { t } = useTranslation();
 
@@ -28,22 +33,18 @@ export default function SidebarPreferenceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center animate-in fade-in duration-200">
-      <button
-        className="absolute inset-0"
-        aria-label={t("settings.sidebar.close")}
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden p-3 shadow-2xl">
-        <div className="mb-3 px-1">
-          <h3 className="text-[14px] font-semibold text-black/90 dark:text-white/90">
-            {t("settings.sidebar.title")}
-          </h3>
-          <p className="text-[12px] text-black/50 dark:text-white/50">
-            {t("settings.sidebar.description")}
-          </p>
-        </div>
-        
+    <AdaptivePanel
+      title={t("settings.sidebar.title")}
+      closeLabel={t("settings.sidebar.close")}
+      onClose={onClose}
+      onBack={onBack}
+      backLabel={backLabel}
+      width="sm"
+    >
+      <p className="px-5 pt-3 text-[12px] text-black/50 dark:text-white/50">
+        {t("settings.sidebar.description")}
+      </p>
+      <div className="p-3">
         <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/35 rounded-2xl">
           <button
             onClick={() => handleSelect("expanded")}
@@ -88,6 +89,6 @@ export default function SidebarPreferenceModal({
           </button>
         </div>
       </div>
-    </div>
+    </AdaptivePanel>
   );
 }

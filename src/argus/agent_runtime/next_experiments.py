@@ -79,6 +79,40 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
     },
 }
 
+_SHORT_LABEL_KEY_PREFIX = "chat.next_experiments.labels_short."
+
+# Narrow screens get a shorter form of the same ask. The backend owns
+# user-facing copy, so the short form is composed here rather than clipped in
+# the client. Every entry must still read as a supported ask on its own.
+NEXT_EXPERIMENT_SHORT_LABELS: dict[str, dict[str, str]] = {
+    "en": {
+        "change_date_range": "Different dates",
+        "same_setup_peer_asset": "Similar asset",
+        "same_rule_peer_asset": "Same rule, similar asset",
+        "supported_rsi_threshold": "Supported RSI rule",
+        "recurring_monthly_buys": "Monthly buys",
+        "supported_ma_crossover": "SMA/EMA crossover",
+        "supported_rsi_or_ma_rule": "Simplify the rule",
+        "adjust_indicator_thresholds": "Other thresholds",
+        "adjust_signal_periods": "Other signal periods",
+        "adjust_contribution_cadence": "Other cadence",
+        "compare_buy_and_hold": "Compare with holding",
+    },
+    "es-419": {
+        "change_date_range": "Otras fechas",
+        "same_setup_peer_asset": "Activo similar",
+        "same_rule_peer_asset": "Misma regla, activo similar",
+        "supported_rsi_threshold": "Regla RSI compatible",
+        "recurring_monthly_buys": "Compras mensuales",
+        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_rsi_or_ma_rule": "Simplificar la regla",
+        "adjust_indicator_thresholds": "Otros umbrales",
+        "adjust_signal_periods": "Otros períodos",
+        "adjust_contribution_cadence": "Otra cadencia",
+        "compare_buy_and_hold": "Comparar con mantener",
+    },
+}
+
 _REFINEMENT_KINDS = frozenset(
     {
         "recurring_monthly_buys",
@@ -146,6 +180,10 @@ def next_experiment_label_key(kind: str) -> str:
     return f"{_LABEL_KEY_PREFIX}{kind}"
 
 
+def next_experiment_short_label_key(kind: str) -> str:
+    return f"{_SHORT_LABEL_KEY_PREFIX}{kind}"
+
+
 def next_experiments_sidecar(
     result_facts: dict[str, Any],
     *,
@@ -186,11 +224,15 @@ def next_experiments_sidecar(
     rows = []
     for kind in ordered[:NEXT_EXPERIMENTS_ROW_CAP]:
         label_key = next_experiment_label_key(kind)
+        short_label = NEXT_EXPERIMENT_SHORT_LABELS["en"].get(kind)
         row: dict[str, Any] = {
             "kind": kind,
             "label": english.get(label_key) or labels[kind],
             "label_key": label_key,
         }
+        if short_label:
+            row["label_short"] = short_label
+            row["label_short_key"] = next_experiment_short_label_key(kind)
         prebaked = _prebaked_row_fields(
             kind,
             params=prebake_params,
@@ -312,7 +354,11 @@ def detect_next_experiment_acceptance(
     normalized = message.strip().casefold()
     if not normalized:
         return None
-    sends = thread_metadata.get("next_experiments_offered_texts") if isinstance(thread_metadata, dict) else None
+    sends = (
+        thread_metadata.get("next_experiments_offered_texts")
+        if isinstance(thread_metadata, dict)
+        else None
+    )
     if isinstance(sends, dict):
         for kind, send_text in sends.items():
             if (
@@ -359,9 +405,7 @@ def _prebake_params(result_facts: dict[str, Any]) -> dict[str, Any] | None:
         or ([resolved_strategy["symbol"]] if resolved_strategy.get("symbol") else None)
     )
     symbol = (
-        str(symbols[0]).strip().upper()
-        if isinstance(symbols, list) and symbols
-        else ""
+        str(symbols[0]).strip().upper() if isinstance(symbols, list) and symbols else ""
     )
     date_range = config.get("date_range") or resolved_params.get("date_range")
     start = end = ""
@@ -468,9 +512,7 @@ def _peer_is_grounded(
 
     executor = ThreadPoolExecutor(max_workers=1)
     try:
-        return bool(
-            executor.submit(_probe).result(timeout=_PREBAKE_PROBE_BUDGET_SECONDS)
-        )
+        return bool(executor.submit(_probe).result(timeout=_PREBAKE_PROBE_BUDGET_SECONDS))
     except Exception:
         return False
     finally:

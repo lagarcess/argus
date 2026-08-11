@@ -139,7 +139,10 @@ def normalize_legacy_data_caveat(value: object, *, language: str = "en") -> str:
     if timeframe is not None:
         if _parse_timeframe(timeframe) is not None:
             return format_timeframe_data_caveat(timeframe, language=language)
-    if normalized == "recurring entries use the first available bar in each cadence window":
+    if (
+        normalized
+        == "recurring entries use the first available bar in each cadence window"
+    ):
         return format_recurring_entry_caveat("1D", language=language)
     return text
 

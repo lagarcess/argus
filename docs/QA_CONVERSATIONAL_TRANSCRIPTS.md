@@ -28,7 +28,6 @@ bun run dev
 Recommended local settings:
 
 - `NEXT_PUBLIC_MOCK_AUTH=true`
-- `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`
 - `NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1`
 - `OPENROUTER_API_KEY` set in backend `.env`
 - Alpaca credentials set in backend `.env`
@@ -88,17 +87,18 @@ Run these as separate focused checks after the main transcript set.
 3. Click `Run backtest`.
 4. Confirm no fake user text such as `yes` or `Run backtest` is submitted.
 5. Confirm the result card shows before the result summary.
-6. Confirm result actions are `Explain result` and `Refine idea`, with no Save control when `NEXT_PUBLIC_STRATEGIES_ENABLED=false`.
+6. Confirm result actions are `Explain result` and `Refine idea`, with no Save control.
 7. Click `Explain result` and verify the answer explains metrics, assumptions, benchmark, chart caveats, and data limits without inventing fields.
 8. Click `Refine idea` and verify Argus keeps the latest run context.
 
-### Save Strategy And Strategies Surface
+### Retired Strategy And Collection Surfaces
 
-1. With private-alpha defaults, run a supported backtest.
-2. Confirm the in-card Save control and Strategies sidebar item are hidden.
+1. Run a supported backtest.
+2. Confirm there is no in-card Save control or Strategies sidebar item.
 3. Confirm completed results remain available after refresh through conversation/history/Recents.
-4. If Strategies are explicitly enabled in a separate test configuration, verify Save creates a visible, reopenable Strategies artifact.
-5. Confirm Collections UI remains fully hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
+4. Confirm there is no Collections navigation, picker, setting, or empty state.
+5. Replay a historical saved-result transcript and confirm it remains readable
+   without exposing a new write action.
 
 ### Persistence And Reload
 

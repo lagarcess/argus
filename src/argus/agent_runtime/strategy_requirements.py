@@ -47,9 +47,7 @@ def missing_required_fields_for_strategy(
     if strategy_type == "buy_and_hold":
         required = ["asset_universe", "date_range"]
     if strategy_type == "signal_strategy":
-        required = [
-            field_name for field_name in required if field_name != "exit_logic"
-        ]
+        required = [field_name for field_name in required if field_name != "exit_logic"]
 
     missing: list[str] = []
     payload = strategy.model_dump(mode="python")

@@ -123,9 +123,7 @@ def _pending_date_claim_is_explicitly_owned(
 ) -> bool:
     field_provenance = strategy.extra_parameters.get("field_provenance")
     provenance = (
-        field_provenance.get("date_range")
-        if isinstance(field_provenance, dict)
-        else None
+        field_provenance.get("date_range") if isinstance(field_provenance, dict) else None
     )
     if provenance not in (None, "explicit_user"):
         return False
@@ -193,8 +191,7 @@ def _pending_date_claim_is_explicitly_owned(
         )
         if (
             resolved_evidence is not None
-            and _date_range_endpoints(resolved_evidence.payload)
-            == candidate_endpoints
+            and _date_range_endpoints(resolved_evidence.payload) == candidate_endpoints
         ):
             return True
     return False
@@ -244,7 +241,9 @@ def _strategy_date_evidence_candidates(strategy: StrategySummary) -> list[str]:
             value = evidence_spans.get(key)
             if value not in (None, "", [], {}):
                 candidates.append(str(value))
-    return list(dict.fromkeys(candidate.strip() for candidate in candidates if candidate.strip()))
+    return list(
+        dict.fromkeys(candidate.strip() for candidate in candidates if candidate.strip())
+    )
 
 
 def _strategy_date_range_needs_current_message_repair(
@@ -323,7 +322,6 @@ def _strategy_has_non_executable_timeframe_label(
         return False
     normalized = str(strategy.timeframe).strip().casefold().replace(" ", "")
     supported = {
-        str(value).strip().casefold().replace(" ", "")
-        for value in supported_timeframes
+        str(value).strip().casefold().replace(" ", "") for value in supported_timeframes
     }
     return bool(normalized and normalized not in supported)

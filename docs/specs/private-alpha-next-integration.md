@@ -279,6 +279,13 @@ The private-alpha promotion path still uses the CI/CD SOTA gate in
 `docs/specs/private-alpha-ci-cd-sota.md` plus the operator instructions in
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`.
 
+**Production promotion executed 2026-08-05:** the sixteen-landing checkpoint
+batch plus the acceptance-walk fixes shipped to production at `7ef89a90`
+(`argus-api`, `argus-app`, and workflow version `wfv-d9p88253erlc73d3u8s0`).
+Evidence: [`docs/release-manifests/2026-08-05-main-production-promotion.md`](../release-manifests/2026-08-05-main-production-promotion.md).
+`main` and `codex/private-alpha-next` were identical at that SHA; the branch
+resumes its staging-lane role for the next cycle from this baseline.
+
 Before testers are invited, the release captain must prove:
 
 - local smoke passed for the candidate SHA;

@@ -42,7 +42,7 @@ export default function NextMoveRow({
       >
         ↳
       </span>
-      <span className="min-w-0 py-2 text-[14px] leading-[1.5] tracking-tight text-black/80 [overflow-wrap:anywhere] dark:text-white/80">
+      <span className="argus-next-move-text min-w-0 py-2 text-[14px] leading-[1.5] tracking-tight text-black/80 [overflow-wrap:anywhere] dark:text-white/80">
         {children}
       </span>
     </button>
@@ -62,6 +62,22 @@ export function NextMoveTitle({ children }: { children: ReactNode }) {
 export function NextMoveSeparator({ children }: { children: string }) {
   return (
     <span aria-hidden="true" className="px-1 text-black/30 dark:text-white/30">
+      {children}
+    </span>
+  );
+}
+
+/**
+ * The resolver-verified ticker, as an object in the sentence rather than
+ * punctuation around it: one step off the surface, hairline bordered, quiet
+ * enough that the sentence stays the loudest thing in the row.
+ *
+ * Spacing is a real space in the DOM, not a margin: copied text and every
+ * text-level reader must see "Netflix NFLX", never "NetflixNFLX".
+ */
+export function NextMoveTicker({ children }: { children: string }) {
+  return (
+    <span className="inline-flex translate-y-[-1px] items-center rounded-[5px] border border-black/10 bg-black/[0.04] px-1.5 py-px align-middle font-mono text-[11px] font-normal leading-[1.4] tracking-[0.02em] text-black/55 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/55">
       {children}
     </span>
   );

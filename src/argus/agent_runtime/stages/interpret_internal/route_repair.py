@@ -30,7 +30,9 @@ def _repair_retry_route_when_pending_need_is_active(
         return interpretation
     if snapshot.latest_failed_action_reference is not None:
         return interpretation
-    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
     prior_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if not requested_field and prior_outcome != "await_user_reply":
         return interpretation
@@ -75,8 +77,7 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
     if (
         prior_outcome not in {"await_user_reply", "needs_clarification"}
         and not requested_field
-        and selected_thread_metadata.get("fallback_source")
-        != "pending_strategy_metadata"
+        and selected_thread_metadata.get("fallback_source") != "pending_strategy_metadata"
     ):
         return interpretation
     prior = snapshot.pending_strategy_summary
@@ -90,7 +91,11 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
     )
     if not _strategy_has_execution_anchor(candidate):
         return interpretation
-    if not candidate.strategy_type or not candidate.asset_universe or not candidate.date_range:
+    if (
+        not candidate.strategy_type
+        or not candidate.asset_universe
+        or not candidate.date_range
+    ):
         return interpretation
     if not _strategy_has_fresh_execution_detail(strategy=candidate, prior=prior):
         return interpretation

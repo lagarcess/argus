@@ -1,0 +1,30 @@
+QQQ Top Holdings
+What are the top holdings inside QQQ?
+QQQ’s top holdings
+
+Holdings data retrieved August 9, 2026. The data provider does not specify the portfolio’s exact snapshot date.
+
+RANK	COMPANY	TICKER	QQQ WEIGHT
+1	NVIDIA	NVDA	8.10%
+2	Apple	AAPL	7.90%
+3	Microsoft	MSFT	4.81%
+4	Amazon	AMZN	4.34%
+5	Micron Technology	MU	4.29%
+6	Advanced Micro Devices	AMD	3.64%
+7	Alphabet Class A	GOOGL	3.33%
+8	Meta Platforms	META	3.18%
+9	Tesla	TSLA	3.15%
+10	Alphabet Class C	GOOG	3.12%
+
+These ten positions represent 45.86% of QQQ. Alphabet appears twice because QQQ owns two share classes; together, they account for 6.45%.
+
+QQQ tracks the Nasdaq-100, so it is heavily concentrated in large technology and growth-oriented companies. Holdings and weights change with stock prices and index rebalancing. This is informational only, not investment advice.
+
+TRY NEXT
+↳
+Test Invesco QQQ Trust, Series 1 [QQQ] against history
+↳
+Test Invesco QQQ Trust, Series 1 [QQQ] against NVIDIA Corporation Common Stock [NVDA], Apple Inc. Common Stock [AAPL], Microsoft Corporation Common Stock [MSFT] and Comcast Corporation Class A Common Stock [CMCSA]
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

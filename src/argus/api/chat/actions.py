@@ -9,6 +9,7 @@ from argus.agent_runtime.next_experiments import (
     continuity_next_experiment_label_key,
 )
 from argus.agent_runtime.recovery_messages import recovery_message
+from argus.agent_runtime.stages.artifact_context import confirmation_card_is_dead
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     _metadata_invalidates_confirmation,
@@ -111,10 +112,13 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
     if action_type in _BACKEND_OWNED_LABEL_ACTIONS:
         # Backend-owned product actions: the client's display copy carries no
         # authority, so the turn text always comes from the canonical label key.
-        return _localized_action_label(
-            _ACTION_TYPE_LABEL_KEYS[action_type],
-            language=language,
-        ) or _ACTION_TYPE_LABEL_KEYS[action_type]
+        return (
+            _localized_action_label(
+                _ACTION_TYPE_LABEL_KEYS[action_type],
+                language=language,
+            )
+            or _ACTION_TYPE_LABEL_KEYS[action_type]
+        )
     if action_type == "select_discovery_candidate":
         # The chip label is the exact natural-language turn the user saw and
         # tapped; the runtime interprets it as ordinary text.
@@ -166,8 +170,7 @@ def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") ->
     label_key = (
         _ACTION_TYPE_LABEL_KEYS[payload.action.type]
         if payload.action.type in _BACKEND_OWNED_LABEL_ACTIONS
-        else payload.action.label_key
-        or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
+        else payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
     )
     if label_key:
         localized = _localized_action_label(label_key, language=language)
@@ -267,6 +270,10 @@ def confirmation_cancellation_admission(
             return None
         card = metadata.get("confirmation_card")
         if isinstance(card, dict):
+            if confirmation_card_is_dead(metadata):
+                # Cancel-the-pending-card has nothing to act on once the
+                # card is consumed; cancelling the run is the job's affair.
+                return None
             active_id = _confirmation_id_from_card(card)
             if active_id != requested_id:
                 return None
@@ -419,7 +426,7 @@ def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
         if _metadata_invalidates_confirmation(metadata):
             return False
         if metadata.get("confirmation_card"):
-            return True
+            return not confirmation_card_is_dead(metadata)
     return False
 
 
@@ -434,7 +441,7 @@ def recent_metadata_invalidates_confirmation(
         if _metadata_invalidates_confirmation(message.metadata):
             return True
         if message.metadata.get("confirmation_card"):
-            return False
+            return confirmation_card_is_dead(message.metadata)
     return False
 
 
@@ -497,7 +504,71 @@ def latest_active_confirmation_id(
         card = metadata.get("confirmation_card")
         if not isinstance(card, dict):
             continue
+        if confirmation_card_is_dead(metadata):
+            # The card row is the liveness truth: a consumed, cancelled, or
+            # superseded card closes the confirmation surface.
+            return None
         return _confirmation_id_from_card(card)
+    return None
+
+
+@dataclass(frozen=True)
+class ActiveConfirmationRead:
+    """One consistent read backing a non-turn confirmation request.
+
+    The active check, the source snapshot the guarded write compares
+    against, and the latest-message witness all come from the same window,
+    so no append can slip between the checks a request reasons from; the
+    guarded write still refuses anything that lands between this read and
+    the write.
+    """
+
+    source_message: Message
+    source_payload: dict[str, Any]
+    expected_source_metadata: dict[str, Any]
+    expected_latest_message_id: str
+
+
+def active_confirmation_read(
+    *,
+    user_id: str,
+    conversation_id: str,
+    confirmation_id: str,
+) -> ActiveConfirmationRead | None:
+    import copy as _copy
+
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    if not messages:
+        return None
+    active_id = latest_active_confirmation_id(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        recent_messages=messages,
+    )
+    if active_id is None or active_id != confirmation_id:
+        return None
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        card = message.metadata.get("confirmation_card")
+        if (
+            not isinstance(card, dict)
+            or str(card.get("confirmation_id") or "") != confirmation_id
+        ):
+            continue
+        payload = message.metadata.get("confirmation_payload")
+        if not isinstance(payload, dict):
+            return None
+        return ActiveConfirmationRead(
+            source_message=message,
+            source_payload=payload,
+            expected_source_metadata=_copy.deepcopy(message.metadata),
+            expected_latest_message_id=messages[-1].id,
+        )
     return None
 
 

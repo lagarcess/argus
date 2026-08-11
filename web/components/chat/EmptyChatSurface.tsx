@@ -1,14 +1,16 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import ChatInput from "./ChatInput";
 import ChatLegalNotice from "./ChatLegalNotice";
+import EmptyChatGreeting from "./EmptyChatGreeting";
 import EmptyChatHeading from "./EmptyChatHeading";
 import StarterActions, {
   type StarterSelectionMetadata,
 } from "./StarterActions";
 import type { ChatMention } from "./types";
-import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
+import { researchRailEnabled } from "@/lib/private-alpha-flags";
 
 type EmptyChatSurfaceProps = {
   isGuest: boolean;
@@ -17,14 +19,14 @@ type EmptyChatSurfaceProps = {
   guestSubmissionError: boolean;
   isStreamingResponse: boolean;
   isHydratingConversation: boolean;
-  showSuggestions: boolean;
+  /** A setting the user stated, never something Argus inferred. */
+  preferredName?: string | null;
   placeholder: string;
   onSend: (
     text: string,
     selection?: ChatMention[] | StarterSelectionMetadata,
   ) => void | boolean | Promise<void | boolean>;
   onRetryGuestSubmission: () => void;
-  onToggleSuggestions: () => void;
   onToast: (message: string) => void;
 };
 
@@ -35,22 +37,44 @@ export default function EmptyChatSurface({
   guestSubmissionError,
   isStreamingResponse,
   isHydratingConversation,
-  showSuggestions,
+  preferredName,
   placeholder,
   onSend,
   onRetryGuestSubmission,
-  onToggleSuggestions,
   onToast,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
+  const { isBelowTablet } = useResponsiveLayout();
   const disabled =
     isStreamingResponse || isHydratingConversation || guestSubmissionPending;
 
-  return (
-    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-8 pt-[24vh] sm:pt-[28vh]">
-      <EmptyChatHeading isGuest={isGuest} />
+  const showSignedInGreeting = researchRailEnabled && !isGuest;
 
-      <div aria-busy={guestSubmissionPending} className="w-full max-w-2xl">
+  // The tall top inset belongs to tablet and up. Expressing it as a min-width
+  // variant rather than overriding a base value keeps `sm:` from winning the
+  // cascade between 400 and 719px, where most phones actually sit.
+  return (
+    <div className="flex h-full flex-col items-center justify-start overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 tablet:pb-8 tablet:pt-[28vh]">
+      {/* The heading absorbs the free space below the mobile threshold, which
+          settles the pills and the composer onto the bottom edge where a thumb
+          rests. Above it, the surface keeps its centered composition. */}
+      <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
+        {showSignedInGreeting ? (
+          // Guests never reach this, so they always get the nameless pool.
+          <EmptyChatGreeting preferredName={preferredName} />
+        ) : (
+          <EmptyChatHeading isGuest={isGuest} />
+        )}
+      </div>
+
+      <div
+        aria-busy={guestSubmissionPending}
+        className={
+          showSignedInGreeting
+            ? "order-3 w-full max-w-2xl"
+            : "order-3 w-full max-w-2xl tablet:order-2"
+        }
+      >
         <ChatInput
           key="new-conversation"
           onSend={onSend}
@@ -91,46 +115,28 @@ export default function EmptyChatSurface({
         <ChatLegalNotice
           expiresAt={expiresAt}
           isGuest={isGuest}
+          showRegisteredDisclaimer={showSignedInGreeting}
+          showGuestSafetyLine={researchRailEnabled}
           variant="before_message"
         />
       </div>
 
-      <StarterActions disabled={disabled} onSelect={onSend} />
-
-      {chatExploratorySuggestionsEnabled && (
-        <div className="mt-4">
-          <button
-            onClick={onToggleSuggestions}
-            className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
-          >
-            {showSuggestions
-              ? t("chat.hide_suggestions")
-              : t("chat.show_suggestions")}
-          </button>
-        </div>
-      )}
-
-      {chatExploratorySuggestionsEnabled && showSuggestions && (
-        <div className="mt-8 flex flex-col items-center gap-4 text-center">
-          {(["q1", "q2", "q3"] as const).map((queryKey) => {
-            const fallback = {
-              q1: "What if I bought Apple after big drops?",
-              q2: "What if I bought Bitcoin when it starts rising?",
-              q3: "What if I bought Tesla every month?",
-            }[queryKey];
-            const prompt = t(`chat.example_queries.${queryKey}`, fallback);
-            return (
-              <button
-                key={queryKey}
-                onClick={() => onSend(prompt)}
-                className="text-[14px] text-black/50 transition-colors hover:text-black hover:underline dark:text-white/50 dark:hover:text-white"
-              >
-                {prompt}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* One owner for the chips, always on. Flag off they sit above the
+          composer on narrow screens and under it from tablet up; flag on, above
+          at every width. They stop when this surface stops rendering. */}
+      <div
+        className={
+          showSignedInGreeting
+            ? "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:mb-2"
+            : "order-2 w-full max-w-2xl max-tablet:mb-3 tablet:order-3"
+        }
+      >
+        <StarterActions
+          disabled={disabled}
+          onSelect={onSend}
+          layout={isBelowTablet ? "scroll" : "wrap"}
+        />
+      </div>
     </div>
   );
 }

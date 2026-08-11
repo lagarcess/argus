@@ -1,0 +1,51 @@
+argus
+New chat
+Search
+Recents
+Settings
+Costco vs. Walmart vs. Target
+Compare Costco against Walmart and Target
+
+I have enough to give a clear comparison.
+
+Costco vs. Walmart vs. Target, the short answer
+
+Walmart is the giant by revenue, Costco is the market's favorite (highest valuation multiple by far), and Target is the smaller, cheaper turnaround story. All three sell general merchandise and groceries at a discount, but their business models, growth, and how the market prices them differ sharply.
+
+Market snapshot (as of Aug 7, 2026 close)
+METRIC	COSTCO (COST)	WALMART (WMT)	TARGET (TGT)
+Share price	$947.82	$111.85	$149.70
+Market cap	$420.3B	$890.1B	$68.0B
+P/E ratio	47.7	39.3	19.8
+EPS (TTM)	$19.72	$2.70	$7.98
+Dividend yield (TTM)	~1%	~1%	~3%
+52-week range	$844, $1,097	$95, $135	$83, $150
+Business scale (trailing 12 months)
+METRIC	COSTCO	WALMART	TARGET
+Revenue	$293.6B	$725.3B	$106.4B
+Gross margin	13%	25%	28%
+Operating margin	~4%	~4%	~4%
+Net margin	~3%	~3%	~3%
+Net income	$8.8B	$23.1B	$3.5B
+Total assets	$86.4B	$289.6B	$58.0B
+Employees	341,000	2,100,000	415,000
+What actually makes each one different
+Costco (COST), Membership-warehouse model. Sells fewer SKUs in bulk at razor-thin gross margins (~13%), but earns high-margin, recurring membership fees that drop almost entirely to the bottom line. Investors reward it with the richest multiple of the three (P/E ~48) because of consistent traffic, member loyalty, and steady comp-sales growth. CEO: Ron Vachris.
+Walmart (WMT), The behemoth. Nearly 2.5× Costco's revenue and about 6.8× Target's. Broadest format mix (supercenters, Neighborhood Market, Sam's Club, Flipkart, walmart.com). Big pushes into e-commerce, advertising, and marketplace/fulfillment are why the market has re-rated it higher (P/E ~39) than it used to trade. CEO: John Furner.
+Target (TGT), Smallest and cheapest on a P/E basis (~20). Focus on discretionary categories (apparel, home, décor via owned brands like Cat & Jack, Threshold, Good & Gather) makes it more sensitive to consumer swings than the other two. Highest dividend yield of the group (~3%). CEO: Michael Fiddelke.
+How to think about the valuation gap
+
+Walmart and Target both run higher gross margins than Costco, but the market pays up most for Costco. Why? Because Costco's membership fees produce reliable, high-quality earnings and its comparable-sales growth has been more consistent. Walmart's premium (vs. its own history) reflects e-commerce and advertising growth. Target trades at a discount because comp sales and traffic have been choppier.
+
+One caveat
+
+Total debt figures weren't returned by the data source in this pull, so I'm not showing a leverage comparison rather than estimating one. Everything else above is exact from the reported financials and Aug 7, 2026 quotes.
+
+Not investment advice, just a factual side-by-side.
+
+TRY NEXT
+↳
+Test Costco Wholesale Corporation Common Stock [COST], Walmart Inc. Common Stock [WMT] and Target Corporation [TGT] against each other
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

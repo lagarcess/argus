@@ -24,6 +24,23 @@ ALLOWED_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
 
 STABLECOINS = {"USDC", "USDT", "DAI", "BUSD", "TUSD"}
 
+# The accepted-value envelope for a runnable configuration. Every layer that
+# admits a value the engine will execute reads these names: the run-time
+# validator below, the edit resolver's cost gate, the confirm preflight, and
+# the card's advertised edit constraints. A card may never promise a run
+# these bounds refuse.
+MIN_STARTING_CAPITAL = 1000.0
+MAX_STARTING_CAPITAL = 100_000_000.0
+# Slippage above five percent per trade stops modeling anything real; fees
+# ride the same ceiling until the founder retunes it.
+MAX_FEE_RATE = 0.05
+MAX_SLIPPAGE_RATE = 0.05
+
+_COST_RATE_CAPS = {
+    "fee_bps": MAX_FEE_RATE * 10000,
+    "slippage_bps": MAX_SLIPPAGE_RATE * 10000,
+}
+
 
 @dataclass(frozen=True)
 class SymbolAsset:
@@ -125,6 +142,8 @@ def _coerce_execution_realism_bps(source: dict[str, Any], key: str) -> float:
         raise ValueError(f"invalid_execution_realism_{key}") from exc
     if not math.isfinite(value) or value < 0.0:
         raise ValueError(f"invalid_execution_realism_{key}")
+    if value > _COST_RATE_CAPS[key]:
+        raise ValueError(f"invalid_execution_realism_{key}")
     return value
 
 
@@ -212,7 +231,11 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
         raise ValueError("unsupported_side")
     if config["allocation_method"] != "equal_weight":
         raise ValueError("unsupported_allocation_method")
-    if not 1000 <= float(config["starting_capital"]) <= 100000000:
+    if (
+        not MIN_STARTING_CAPITAL
+        <= float(config["starting_capital"])
+        <= MAX_STARTING_CAPITAL
+    ):
         raise ValueError("invalid_starting_capital")
     if len(config["symbols"]) < 1 or len(config["symbols"]) > 5:
         raise ValueError("invalid_symbol_count")

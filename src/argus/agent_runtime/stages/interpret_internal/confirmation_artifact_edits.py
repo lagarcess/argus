@@ -105,9 +105,13 @@ def apply_resolved_artifact_edit_to_strategy_summary(
 
 def strategy_summary_uses_rsi(strategy: StrategySummary) -> bool:
     parameters = canonical_indicator_parameters_from_strategy(strategy)
-    indicator = str(
-        parameters.get("indicator")
-        or strategy.extra_parameters.get("indicator")
-        or ""
-    ).strip().casefold()
+    indicator = (
+        str(
+            parameters.get("indicator")
+            or strategy.extra_parameters.get("indicator")
+            or ""
+        )
+        .strip()
+        .casefold()
+    )
     return indicator == "rsi"

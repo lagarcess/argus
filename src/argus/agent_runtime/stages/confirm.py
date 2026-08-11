@@ -13,6 +13,12 @@ from argus.agent_runtime.confirmation_artifacts import (
 )
 from argus.agent_runtime.coverage_recovery import coverage_recovery_stage_patch
 from argus.agent_runtime.stages.interpret import StageResult
+from argus.agent_runtime.stages.launch_validation_recovery import (  # noqa: F401
+    _launch_validation_failure,
+    _tagged_launch_validation_failure,
+    _validate_launch_envelope,
+    _with_unsupported_constraint,
+)
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
@@ -22,6 +28,10 @@ from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
+from argus.domain.backtesting.confirmation_preflight import (
+    materialize_confirmation_strategy,
+    prepare_confirmation_launch,
+)
 from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -103,6 +113,12 @@ def confirm_stage(
         "strategy": strategy,
         "optional_parameters": optional_parameters,
     }
+    edit_disclosure = _popped_edit_disclosure(strategy)
+    if edit_disclosure is not None:
+        # §3.2: a change the edit turn could not apply is disclosed on the
+        # card it produced. Single-use by construction: popped from the
+        # persisted strategy so it cannot outlive this transition.
+        confirmation_payload["edit_disclosure"] = edit_disclosure
     confirmation_id = new_confirmation_id()
     validation_result = _validated_launch_payload(
         state=state,
@@ -133,12 +149,8 @@ def confirm_stage(
             },
         )
     launch_payload = dict(coverage_result["launch_payload"])
-    canonical_strategy = _strategy_with_launch_benchmark(
+    canonical_strategy = materialize_confirmation_strategy(
         strategy,
-        launch_payload=launch_payload,
-    )
-    canonical_strategy = _strategy_with_effective_date_range(
-        canonical_strategy,
         launch_payload=launch_payload,
     )
     card_assumptions = _visible_card_assumptions(
@@ -197,16 +209,17 @@ def _validated_launch_payload(
         )
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
+        _validate_launch_envelope(request)
     except ValidationError as exc:
-        return _launch_validation_failure(_validation_error_code(exc))
+        return _tagged_launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
-        return _launch_validation_failure(
+        return _tagged_launch_validation_failure(
             str(exc),
             raw_value=launch_payload.get("timeframe"),
             optional_parameter_status=state.optional_parameter_status,
         )
     except Exception:
-        return _launch_validation_failure("missing_rule_group")
+        return _tagged_launch_validation_failure("missing_rule_group")
     return {
         "outcome": "ready_to_confirm",
         "launch_payload": launch_payload,
@@ -221,113 +234,18 @@ def _coverage_preflight(
     *,
     optional_parameter_status: dict[str, Any],
 ) -> dict[str, Any]:
-    from argus.domain.backtesting.coverage import (
-        MarketDataCoverageError,
-        prepare_market_data,
-    )
-    from argus.domain.engine_launch.adapter import (
-        validate_request_benchmark,
-        validate_request_symbols,
-    )
-
-    try:
-        request = LaunchBacktestRequest.model_validate(launch_payload)
-        symbol_validation = validate_request_symbols(request)
-        if symbol_validation.outcome == "unavailable":
-            return coverage_recovery_stage_patch(
-                error_code="market_data_unavailable",
-                launch_payload=launch_payload,
-                optional_parameter_status=optional_parameter_status,
-            )
-        if symbol_validation.outcome != "resolved":
-            return _launch_validation_failure(
-                symbol_validation.error_code or "invalid_symbol"
-            )
-        symbols = list(symbol_validation.symbols)
-        asset_class = symbol_validation.asset_class
-        if asset_class is None:
-            return _launch_validation_failure("invalid_asset_class")
-        benchmark_validation = validate_request_benchmark(
-            request,
-            asset_class=asset_class,
-        )
-        if benchmark_validation.outcome == "unavailable":
-            return coverage_recovery_stage_patch(
-                error_code="market_data_unavailable",
-                launch_payload=launch_payload,
-                optional_parameter_status=optional_parameter_status,
-            )
-        if (
-            benchmark_validation.outcome != "resolved"
-            or benchmark_validation.benchmark_symbol is None
-        ):
-            return _launch_validation_failure(
-                benchmark_validation.error_code or "invalid_benchmark_symbol"
-            )
-        canonical_launch_payload = {
-            **launch_payload,
-            "benchmark_symbol": benchmark_validation.benchmark_symbol,
-        }
-        request = LaunchBacktestRequest.model_validate(canonical_launch_payload)
-        requested_range = request.requested_date_range or request.date_range
-        config = {
-            "asset_class": asset_class,
-            "symbols": symbols,
-            "timeframe": request.timeframe,
-            "start_date": request.date_range.start,
-            "end_date": request.date_range.end,
-            "requested_date_range": requested_range.model_dump(),
-            "benchmark_symbol": request.benchmark_symbol,
-        }
-        prepared = prepare_market_data(config)
-    except MarketDataCoverageError as exc:
+    preflight = prepare_confirmation_launch(launch_payload)
+    if preflight.outcome == "coverage_failure":
         return coverage_recovery_stage_patch(
-            error_code=exc.code,
+            error_code=preflight.error_code or "market_data_unavailable",
             launch_payload=launch_payload,
             optional_parameter_status=optional_parameter_status,
         )
-    except ValueError as exc:
-        return _launch_validation_failure(str(exc))
-
-    requested = prepared.requested_date_range.model_dump()
-    effective = prepared.effective_date_range.model_dump()
-    coverage = prepared.coverage_payload()
-    coverage["preflight_id"] = coverage.pop("dataset_id")
-    adjusted_launch_payload = {
-        **canonical_launch_payload,
-        "date_range": effective,
-        "requested_date_range": requested,
-        "coverage_preflight": coverage,
-    }
-    try:
-        adjusted_request = LaunchBacktestRequest.model_validate(adjusted_launch_payload)
-        validate_launch_supported(adjusted_request)
-    except ValidationError as exc:
-        return _launch_validation_failure(_validation_error_code(exc))
-    except ValueError as exc:
-        return _launch_validation_failure(str(exc))
+    if preflight.outcome != "ready_to_confirm" or preflight.launch_payload is None:
+        return _launch_validation_failure(preflight.error_code or "missing_rule_group")
     return {
         "outcome": "ready_to_confirm",
-        "launch_payload": adjusted_launch_payload,
-    }
-
-
-def _strategy_with_effective_date_range(
-    strategy: dict[str, Any],
-    *,
-    launch_payload: dict[str, Any],
-) -> dict[str, Any]:
-    effective = launch_payload.get("date_range")
-    requested = launch_payload.get("requested_date_range")
-    if not isinstance(effective, dict) or not isinstance(requested, dict):
-        return strategy
-    extra_parameters = dict(strategy.get("extra_parameters") or {})
-    extra_parameters["requested_date_range"] = dict(requested)
-    extra_parameters["effective_date_range"] = dict(effective)
-    return {
-        **strategy,
-        "date_range": dict(effective),
-        "extra_parameters": extra_parameters,
+        "launch_payload": preflight.launch_payload,
     }
 
 
@@ -341,15 +259,12 @@ def _strategy_with_requested_date_range_for_preflight(
     effective = extra_parameters.get("effective_date_range")
     current = strategy.get("date_range")
     if not all(
-        _is_structured_date_range(value)
-        for value in (requested, effective, current)
+        _is_structured_date_range(value) for value in (requested, effective, current)
     ):
         return strategy
     artifact_patch = extra_parameters.get("artifact_patch")
     changed_fields = (
-        artifact_patch.get("changed_fields")
-        if isinstance(artifact_patch, dict)
-        else []
+        artifact_patch.get("changed_fields") if isinstance(artifact_patch, dict) else []
     )
     if isinstance(changed_fields, list) and "date_range" in changed_fields:
         return strategy
@@ -364,9 +279,7 @@ def _strategy_with_requested_date_range_provenance(
     extra_parameters = dict(strategy.get("extra_parameters") or {})
     artifact_patch = extra_parameters.get("artifact_patch")
     changed_fields = (
-        artifact_patch.get("changed_fields")
-        if isinstance(artifact_patch, dict)
-        else []
+        artifact_patch.get("changed_fields") if isinstance(artifact_patch, dict) else []
     )
     date_was_edited = isinstance(changed_fields, list) and (
         "date_range" in changed_fields
@@ -434,180 +347,41 @@ def _validation_error_code(exc: ValidationError) -> str:
     return "missing_rule_group"
 
 
-def _launch_validation_failure(
-    error_code: str,
-    *,
-    raw_value: Any | None = None,
-    optional_parameter_status: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    if error_code == "unsupported_timeframe":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["timeframe"],
-            "requested_field": "timeframe",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                dict(optional_parameter_status or {}),
-                {
-                    "category": "unsupported_time_granularity",
-                    "raw_value": raw_value or error_code,
-                    "explanation": (
-                        "That bar size is not supported by the current backtest "
-                        "engine. Choose a supported timeframe to keep the rest of "
-                        "the strategy unchanged."
-                    ),
-                    "simplification_options": [
-                        {
-                            "label": "Retry with daily bars",
-                            "replacement_values": {"timeframe": "1D"},
-                        },
-                        {
-                            "label": "Retry with 1-hour bars",
-                            "replacement_values": {"timeframe": "1h"},
-                        },
-                    ],
-                },
-            ),
-        }
-    if error_code == "future_end_date":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["date_range"],
-            "requested_field": "date_range",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "future_date_window",
-                    "raw_value": error_code,
-                    "explanation": (
-                        "The requested end date is after the latest available "
-                        "data Argus can test."
-                    ),
-                    "simplification_options": [
-                        {"label": "Use the latest available date"},
-                        {"label": "Choose an earlier end date"},
-                        {"label": "Change the date range"},
-                    ],
-                },
-            ),
-        }
-    if error_code == "invalid_chronological_date_range":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["date_range"],
-            "requested_field": "date_range",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "invalid_date_window",
-                    "raw_value": "selected date range",
-                    "explanation": (
-                        "The requested window is not usable because the start "
-                        "date is not before the end date."
-                    ),
-                    "simplification_options": [
-                        {"label": "Choose a new start date"},
-                        {"label": "Choose a new end date"},
-                        {"label": "Change the date range"},
-                    ],
-                },
-            ),
-        }
-    if error_code == "indicator_data_insufficient":
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["date_range"],
-            "requested_field": "date_range",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "data_window_too_short_for_rule",
-                    "raw_value": "selected date range",
-                    "explanation": (
-                        "The selected window does not provide enough bars for "
-                        "the confirmed signal rule."
-                    ),
-                    "simplification_options": [
-                        {"label": "Use a longer date range"},
-                        {"label": "Use a shorter indicator period"},
-                        {"label": "Choose a simpler supported rule"},
-                    ],
-                },
-            ),
-        }
-    if error_code in {
-        "missing_rule_group",
-        "unsupported_rule_operator",
-        "unsupported_indicator",
-        "unsupported_indicator_threshold",
-    }:
-        return {
-            "outcome": "needs_clarification",
-            "missing_required_fields": ["entry_logic"],
-            "requested_field": "entry_logic",
-            "assistant_prompt": None,
-            "optional_parameter_status": _with_unsupported_constraint(
-                {},
-                {
-                    "category": "unsupported_indicator_rule",
-                    "raw_value": error_code,
-                    "explanation": (
-                        "The strategy direction is understandable, but the "
-                        "entry rule is not executable as structured."
-                    ),
-                    "simplification_options": [
-                        {"label": "Use a supported RSI threshold rule"},
-                        {"label": "Use a supported moving-average crossover"},
-                        {"label": "Keep the full idea as a draft"},
-                    ],
-                },
-            ),
-        }
-    return {
-        "outcome": "needs_clarification",
-        "missing_required_fields": [],
-        "requested_field": None,
-        "assistant_prompt": None,
-        "optional_parameter_status": _with_unsupported_constraint(
-            {},
-            {
-                "category": "launch_payload_not_executable",
-                "raw_value": error_code,
-                "explanation": (
-                    "One part of the draft is not executable in the current "
-                    "backtest engine."
-                ),
-                "simplification_options": [
-                    {"label": "Adjust the strategy rule"},
-                    {"label": "Adjust the asset"},
-                    {"label": "Adjust the date range"},
-                ],
-            },
-        ),
-    }
-
-
 def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, Any]:
     if isinstance(strategy, StrategySummary):
         return strategy.model_dump(mode="python")
     return dict(strategy)
 
 
-def _strategy_with_launch_benchmark(
-    strategy: dict[str, Any],
-    *,
-    launch_payload: dict[str, Any],
-) -> dict[str, Any]:
-    benchmark = launch_payload.get("benchmark_symbol")
-    if not isinstance(benchmark, str) or not benchmark.strip():
-        return strategy
-    return {
-        **strategy,
-        "comparison_baseline": benchmark.strip().upper(),
+def _popped_edit_disclosure(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    disclosure = extra_parameters.pop("edit_disclosure", None)
+    if not isinstance(disclosure, dict):
+        return None
+    unapplied = disclosure.get("unapplied")
+    note = str(disclosure.get("note") or "").strip()
+    if not isinstance(unapplied, list):
+        unapplied = []
+    if not unapplied and not note:
+        return None
+    cleaned: dict[str, Any] = {
+        "unapplied": [
+            {
+                "op": str(entry.get("op") or "set"),
+                "target": str(entry.get("target") or ""),
+                "reason": str(entry.get("reason") or "unsupported_operation"),
+            }
+            for entry in unapplied
+            if isinstance(entry, dict) and str(entry.get("target") or "").strip()
+        ],
     }
+    if note:
+        cleaned["note"] = note
+    if not cleaned["unapplied"] and "note" not in cleaned:
+        return None
+    return cleaned
 
 
 def _strategy_with_runtime_language(
@@ -1064,21 +838,6 @@ def _recoverable_constraint_patch(
             optional_parameter_status,
             constraint,
         ),
-    }
-
-
-def _with_unsupported_constraint(
-    optional_parameter_status: dict[str, Any],
-    constraint: dict[str, Any],
-) -> dict[str, Any]:
-    unsupported_constraints = [
-        item
-        for item in optional_parameter_status.get("unsupported_constraints", [])
-        if isinstance(item, dict)
-    ]
-    return {
-        **optional_parameter_status,
-        "unsupported_constraints": [*unsupported_constraints, constraint],
     }
 
 

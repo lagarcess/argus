@@ -25,7 +25,7 @@ from argus.agent_runtime.capabilities.answers import (
     capability_fact_packet,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.discovery import discovery_stage_result_for
+from argus.agent_runtime.research_answer import discovery_turn_stage_result
 from argus.agent_runtime.coverage_recovery import (
     preserved_optional_parameter_status_from_response_intent,
 )
@@ -74,6 +74,9 @@ from argus.agent_runtime.stages.artifact_context import (
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
 )
+from argus.agent_runtime.stages.artifact_context import (
+    live_pending_confirmation,
+)
 from argus.agent_runtime.stages.interpret_actions import (
     approval_stage_result_if_applicable as _approval_stage_result_if_applicable,
 )
@@ -120,6 +123,11 @@ from argus.agent_runtime.stages.interpret_internal.answer_composition import (  
     _supported_strategy_family_token_spans,
     _token_sequence_spans,
 )
+from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.shared import (
+    carries_broader_edit_than_dates,
+)
+from argus.agent_runtime.knowledge_answer import knowledge_answer_stage_result
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (  # noqa: F401
     _USER_GROUNDED_CADENCE_SOURCES,
     _USER_GROUNDED_CAPITAL_SOURCES,
@@ -233,6 +241,7 @@ from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
 )
 from argus.agent_runtime.stages.interpret_internal.pending_date_answer import (
     pending_date_answer_interpretation as _pending_date_answer_interpretation,
+    repair_pending_date_answer_route_when_pending_need_is_active as _route_repair_pending_date_answer,
 )
 from argus.agent_runtime.stages.interpret_internal.date_contract import (  # noqa: F401
     _DATE_RANGE_EVIDENCE_KEYS,
@@ -251,7 +260,6 @@ from argus.agent_runtime.stages.interpret_internal.offline_recovery import (  # 
     _offline_interpreter_unavailable_result,
     _offline_recovery_message,
     _pending_assumption_edit_was_not_applied,
-    _strategies_enabled,
 )
 from argus.agent_runtime.stages.interpret_internal.route_repair import (  # noqa: F401
     _repair_fresh_restatement_route_when_pending_need_is_active,
@@ -374,47 +382,45 @@ async def interpret_stage_async(
     if structured_action_result is not None:
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
-    if structured_interpreter is None:
+
+    async def _unavailable(*, retryable: bool = True) -> StageResult:
         return await _interpreter_unavailable_result(
-            state=state,
-            user=user,
-            snapshot=snapshot,
+            state=state, user=user, snapshot=snapshot,
             current_user_message=state.current_user_message,
             capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
+            selected_thread_metadata=selected_metadata, retryable=retryable,
         )
 
+    if structured_interpreter is None:
+        return await _unavailable()
     interpretation = await _call_structured_interpreter(
         structured_interpreter,
         InterpretationRequest(
             current_user_message=state.current_user_message,
             recent_thread_history=list(state.recent_thread_history),
             latest_task_snapshot=snapshot,
-            selected_thread_metadata=selected_metadata,
-            user=user,
+            selected_thread_metadata=selected_metadata, user=user,
         ),
     )
     if interpretation is None:
         logger.debug("Interpret stage structured interpreter returned no result")
-        return await _interpreter_unavailable_result(
-            state=state,
-            user=user,
-            snapshot=snapshot,
-            current_user_message=state.current_user_message,
-            capability_contract=capability_contract,
-            selected_thread_metadata=selected_metadata,
-        )
+        failure_kind = getattr(structured_interpreter, "last_failure_kind", None)
+        return await _unavailable(retryable=failure_kind != "contract_rejected")
     pending_response_option_interpretation = (
         _pending_response_option_interpretation_from_typed_selection(
-            state=state,
-            user=user,
-            snapshot=snapshot,
+            state=state, user=user, snapshot=snapshot,
             current_user_message=state.current_user_message,
             selected_thread_metadata=selected_metadata,
         )
     )
     if pending_response_option_interpretation is not None:
         interpretation = pending_response_option_interpretation
+    knowledge_result = await knowledge_answer_stage_result(
+        interpretation=interpretation, state=state, user=user, snapshot=snapshot,
+        selected_thread_metadata=selected_metadata,
+    )
+    if knowledge_result is not None:
+        return knowledge_result
     logger.debug(
         "Interpret stage structured interpreter completed",
         intent=interpretation.intent,
@@ -422,11 +428,8 @@ async def interpret_stage_async(
         requires_clarification=interpretation.requires_clarification,
         missing_required_fields=interpretation.missing_required_fields,
     )
-
     return await _stage_result_from_interpretation(
-        state=state,
-        user=user,
-        snapshot=snapshot,
+        state=state, user=user, snapshot=snapshot,
         interpretation=interpretation,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_metadata,
@@ -498,8 +501,10 @@ async def _stage_result_from_interpretation(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
     ) or (
+        # A resolved asset or date alone names what the user is talking about;
+        # only execution evidence may pull a non-strategy turn onto this route.
         interpretation.semantic_turn_act != "result_followup"
-        and _candidate_strategy_has_backtest_shape(
+        and strategy_has_execution_evidence(
             interpretation.candidate_strategy_draft
         )
     )
@@ -1093,7 +1098,7 @@ async def _stage_result_from_interpretation(
     )
     if retry_result is not None:
         return retry_result
-    discovery_result = await discovery_stage_result_for(
+    discovery_result = await discovery_turn_stage_result(
         interpretation=interpretation, decision=decision, state=state, user=user
     )
     if discovery_result is not None:
@@ -1680,55 +1685,10 @@ def _date_range_from_strategy_bounded_evidence(
 
 
 def _repair_pending_date_answer_route_when_pending_need_is_active(
-    *,
-    interpretation: StructuredInterpretation,
-    current_user_message: str,
-    language: str | None,
-    snapshot: TaskSnapshot | None,
-    selected_thread_metadata: dict[str, Any],
+    **kwargs: Any,
 ) -> StructuredInterpretation:
-    requested_field = _selected_requested_field(selected_thread_metadata)
-    if requested_field != "date_range":
-        return interpretation
-    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
-    if last_stage_outcome and last_stage_outcome != "await_user_reply":
-        return interpretation
-    candidate_endpoints = _date_range_endpoints(interpretation.candidate_strategy_draft.date_range)
-    if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
-        return interpretation
-    if candidate_endpoints is not None and any(candidate_endpoints):
-        return interpretation
-    if (
-        interpretation.semantic_turn_act != "answer_pending_need"
-        and "date_range_refinement" not in interpretation.reason_codes
-        and not interpretation.requires_clarification
-        and _candidate_strategy_has_backtest_shape(
-            interpretation.candidate_strategy_draft
-        )
-    ):
-        return interpretation
-    repaired = _pending_date_answer_interpretation(
-        current_user_message=current_user_message,
-        language=language,
-        snapshot=snapshot,
-        selected_thread_metadata=selected_thread_metadata,
-        today=date.today(), allow_result_anchor=True,
-        require_explicit_range=(
-            "pending_date_answer_unowned_candidate_stripped"
-            in interpretation.reason_codes
-        ),
-        reason_code=(
-            "pending_date_answer_current_message_repaired"
-            if interpretation.semantic_turn_act == "answer_pending_need"
-            else "pending_date_answer_route_repaired"
-        ),
-    )
-    if repaired is None:
-        return interpretation
-    repaired.reason_codes = list(
-        dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
-    )
-    return repaired
+    # This module's date stays the clock seam tests patch.
+    return _route_repair_pending_date_answer(today=date.today(), **kwargs)
 
 
 def _repair_pending_date_answer_noop_from_current_message(
@@ -2415,6 +2375,7 @@ async def _interpreter_unavailable_result(
     current_user_message: str = "",
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any] | None = None,
+    retryable: bool = True,
 ) -> StageResult:
     selected_metadata = selected_thread_metadata or {}
     planned_refinement_edit = await _planned_pending_refinement_edit_interpretation(
@@ -2515,6 +2476,7 @@ async def _interpreter_unavailable_result(
         snapshot=snapshot,
         current_user_message=current_user_message,
         selected_thread_metadata=selected_metadata,
+        retryable=retryable,
     )
 
 
@@ -2691,12 +2653,10 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    if (
-        snapshot is None
-        or snapshot.pending_strategy_summary is None
-        or snapshot.active_confirmation_reference is None
-        or not current_user_message.strip()
-    ):
+    # Liveness, not existence: a cancelled card can leave a leftover draft in
+    # the snapshot, and this recovery path must never speak for it.
+    live = live_pending_confirmation(snapshot)
+    if live is None or not current_user_message.strip():
         return None
     if _pending_assumption_edit_was_not_applied(
         current_user_message=current_user_message,
@@ -2713,7 +2673,7 @@ async def _active_confirmation_followup_when_interpreter_unavailable(
     )
     if planned_edit is not None:
         return planned_edit
-    strategy = snapshot.pending_strategy_summary
+    strategy = live.pending
     setup_phrase = _current_setup_phrase(strategy)
     assumptions_response = _draft_assumptions_response(snapshot)
     action_guidance = recovery_message(
@@ -2854,7 +2814,7 @@ async def _latest_result_followup_recovery_if_applicable(
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     focus = decision.result_followup_focus or "general"
-    if save_requested and not _strategies_enabled():
+    if save_requested:
         response = await compose_private_alpha_save_response(
             metadata=metadata,
             user_message=current_user_message,
@@ -2877,13 +2837,13 @@ async def _latest_result_followup_recovery_if_applicable(
                 "latest_result_followup_unavailable",
                 language=user.language_preference,
             )
-    if save_requested and not _strategies_enabled():
+    if save_requested:
         used_recovery = False
     stage_patch: dict[str, Any] = {
         "assistant_response": response,
     }
     # Failure prose never wears result chrome; the recovery patch owns it.
-    if not (save_requested and not _strategies_enabled()) and not used_recovery:
+    if not save_requested and not used_recovery:
         stage_patch["response_intent"] = result_followup_response_intent(focus)
     if used_recovery:
         stage_patch.update(
@@ -2929,8 +2889,6 @@ async def _private_alpha_save_request_result_if_applicable(
     current_user_message: str,
 ) -> StageResult | None:
     if not _latest_result_save_requested(decision):
-        return None
-    if _strategies_enabled():
         return None
     if decision.artifact_target != "latest_result":
         return None

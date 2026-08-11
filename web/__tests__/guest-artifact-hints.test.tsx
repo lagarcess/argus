@@ -14,7 +14,7 @@ describe("guest artifact education", () => {
 
     expect(existsSync(hintPath)).toBe(true);
     expect(message).toMatch(
-      /message\.kind === "strategy_confirmation" && message\.confirmation[\s\S]{0,900}<GuestArtifactHint/,
+      /message\.kind === "strategy_confirmation" && message\.confirmation[\s\S]{0,1500}<GuestArtifactHint/,
     );
     expect(message).toMatch(
       /message\.kind === "strategy_result" && message\.result[\s\S]{0,900}<GuestArtifactHint/,
@@ -30,7 +30,10 @@ describe("guest artifact education", () => {
     const hint = readFileSync(hintPath, "utf-8");
     expect(hint).toContain("argus:guest-hint:confirmation:v1");
     expect(hint).toContain("argus:guest-hint:result:v1");
-    expect(hint).toContain("localStorage");
+    // Browser-local, and through the storage chokepoint so the keys stay in
+    // the registry the privacy disclosure derives from.
+    expect(hint).toContain("@/lib/browser-storage");
+    expect(hint).toContain("writeStored");
     expect(hint).not.toContain("setTimeout");
     expect(hint).not.toContain("patchMe");
     expect(hint).not.toContain("postFeedback");

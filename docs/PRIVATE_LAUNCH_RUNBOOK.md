@@ -90,20 +90,28 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Manually deploy `argus-api`, then `argus-app` from the candidate commit.
+8. Manually deploy `argus-api`, then `argus-app` from the candidate commit. Do
+   not create or deploy `argus-maintenance` in the current promotion. The cron
+   remains deliberately absent until a separate founder decision applies the
+   blueprint.
 
 9. Confirm the live `argus-api` and `argus-app` deploy commits match the
-   candidate commit you intend to test and that both latest deploys are `live`:
+   candidate commit you intend to test and that the latest deploys are `live`.
+   Also confirm the deliberately unapplied cron is still absent:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh api-deploy-status
 .github/render-env-sync.sh web-deploy-status
+.github/render-env-sync.sh cron-deploy-status
 ```
 
-If either commit is not `ARGUS_RELEASE_SHA`, stop and deploy the stale service
-before running the strict canaries. The canary script enforces the same deployed
-SHA/status check with `ARGUS_CANARY_SHA`.
+If either deployed commit is not `ARGUS_RELEASE_SHA`, stop and deploy that stale
+service before running the strict canaries. The canary script enforces the same
+deployed SHA/status check with `ARGUS_CANARY_SHA`. For the current promotion,
+`cron-deploy-status` must report `status=absent`. Any other cron status is a
+finding and a stop: do not deploy it as part of this promotion. A failed Render
+lookup is also a real failure, never proof of absence.
 
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -266,10 +274,22 @@ name the candidate SHA, deployed API/web SHAs, `workflow_task`,
 `real_workflow_task`, backtest service mode, workflow-service proof for
 `argus-backtests`, canary evidence, rollback target, and approver.
 
-If you need to run only the stale job scan during incident triage:
+The stale job scan is a manual step today. The `argus-maintenance` cron service
+that would run it every fifteen minutes is declared in `render.yaml` and
+deliberately not created (see Scheduled Maintenance), so nothing runs this scan
+automatically.
+
+**Destructive ops jobs refuse to guess their target.** `DATABASE_URL`,
+`SUPABASE_URL` (or `SUPABASE_PROJECT_URL`), and `SUPABASE_SERVICE_ROLE_KEY`
+must be set explicitly in the process environment. Dotenv discovery is disabled,
+so a job with none of them set exits 2 rather than resolving whatever `.env`
+happens to sit above it. Each job prints the resolved database and Supabase host,
+without credentials, before doing anything destructive; read that line and
+confirm it is the environment you meant.
 
 ```bash
-.github/stale-backtest-jobs.sh --json
+DATABASE_URL=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  .github/stale-backtest-jobs.sh --json
 ```
 
 For privacy-safe aggregate job health over the existing Supabase
@@ -344,6 +364,76 @@ profiles.
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
 
+## Scheduled Maintenance
+
+**The `argus-maintenance` service is declared but deliberately not created.**
+At current scale there is no accumulated guest data to delete and no stranded
+job to rescue, so an always-on paid service would buy nothing. Until it is
+created, every recurring janitor runs when an operator runs it, and the
+retention windows documented in `DATA_MODEL.md` hold exactly that often.
+
+Create it when running the scripts by hand becomes impractical, which is a
+guest-volume question rather than a date. Everything below describes the service
+as defined, so it is accurate the moment a blueprint sync creates it.
+
+It is declared in `render.yaml` and runs one entry point:
+
+```bash
+poetry run python scripts/ops/scheduled_maintenance.py
+```
+
+That pass runs guest workspace retention first, then stale and stranded backtest
+job reconciliation, in that order. Every job runs even when an earlier one
+fails, so one failure never hides another.
+
+| Field | Value |
+| --- | --- |
+| Service | `argus-maintenance` (Render cron, `region: virginia`, `plan: starter`) |
+| Schedule | `*/15 * * * *`, UTC |
+| Owner | Render workspace owner for `lagarcess/argus` |
+| Alert destination | `support@get-argus.com`, via Render service notifications for `argus-maintenance` set to notify on failure |
+| Env contract | `ARGUS_RENDER_CRON_ENV` in `.github/argus-env.sh`, cron surface of `.github/private-alpha-release-profile.json` |
+
+Every fifteen minutes, not daily, because the reconciler's own stale thresholds
+are fifteen minutes (`DEFAULT_STALE_QUEUED_SECONDS` and
+`DEFAULT_STALE_RUNNING_SECONDS`). A slower schedule would mean a user whose job
+was stranded by a deploy waits the threshold plus the schedule gap. The same
+cadence raises the retention ceiling from one bounded batch per day to ninety
+six, so the seven-day guest window in `DATA_MODEL.md` holds under load instead
+of only at low volume. Both jobs are no-ops on an empty window and safe to run
+twice, so a retry costs a few cheap Supabase queries.
+
+This runs on Render, not as a GitHub Actions cron, because the job deletes
+production rows. Actions would put a production service-role key in a CI runner
+and make write access to a workflow file equal to production delete access.
+Render keeps the destructive step inside the boundary where that key already
+lives.
+
+The pass exits nonzero if any job fails, and prints a final JSON summary line
+with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
+`"status": "degraded"`. Keep the per-job output: guest cleanup prints its
+`selected`/`auth_deleted`/`auth_delete_failed`/`purge_failed` counts, and the
+reconciler prints its scan report.
+
+Secrets stay manual on this service, same as `argus-api`: `DATABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `RENDER_API_KEY`, and `POSTHOG_PROJECT_TOKEN` are
+`sync: false` and must be set in Render before the first run. `RENDER_API_KEY`
+is what lets the reconciler read terminal task runs; without it the stale scan
+reports errors instead of reconciling.
+
+For the current promotion, the cron is deliberately absent and is not deployed.
+Both the canary and `release-config-audit` verify that absence:
+`cron-deploy-status` must report `status=absent`, and `cron_env_status` must be
+`absent`. Those values are read back from the Render API rather than assumed.
+
+If a later founder decision applies the blueprint and creates the service, it
+becomes a deployed release surface. From that point onward, promotions must
+verify its candidate SHA, live deploy state, and ready environment contract. To
+close such a later promotion, record one real scheduled run: the run timestamp,
+the summary line, and either nonzero selected/purged counts or documented zeros
+on an empty window. While the service remains absent, record the two absent
+statuses and the manual operator-job evidence instead.
+
 ## Runtime Tuning Flags
 
 These are optional runtime knobs (not secrets). Defaults are safe for
@@ -405,23 +495,42 @@ site key, non-loopback production preserves the auth landing rather than
 beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
 as part of a code promotion.
 
-Run guest cleanup first as a dry run:
+Guest cleanup is a manual step today. The `argus-maintenance` cron service that
+would run a bounded batch every fifteen minutes is declared in `render.yaml` but
+deliberately not created at current scale, so nothing runs this deletion
+automatically. Its owner, schedule, and alert destination are recorded under
+Scheduled Maintenance and take effect the moment the service is created.
+
+Until then the at-least-daily floor is an operator's responsibility, and the
+retention windows in `DATA_MODEL.md` hold exactly as often as someone runs the
+command below.
+
+To inspect what the next scheduled pass would select, without deleting:
 
 ```bash
-poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
+DATABASE_URL=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --dry-run --limit 25
 ```
 
-Then, only from the scheduled trusted operations environment:
+Run the deleting form by hand only to drain a backlog faster than the schedule,
+and only against an environment you intend to delete rows in:
 
 ```bash
-poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
+DATABASE_URL=… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  poetry run python scripts/ops/cleanup_expired_guest_workspaces.py --limit 25
 ```
 
-Schedule a bounded batch at least daily after public guest exposure. Record the
-owner, effective schedule, selected/deleted/preserved/failed counts, oldest
-eligible expiry, and alert destination. A nonzero `auth_delete_failed` result
-or a failed cleanup transaction must alert and retry; never compensate by
-deleting product rows manually. Product deletion, anonymous-identity
+Record the selected/deleted/preserved/failed counts and oldest eligible expiry
+in the release manifest. A nonzero `auth_delete_failed` result or a failed
+cleanup transaction must alert and retry; never compensate by deleting product
+rows manually.
+
+The same run is the retention boundary for the visitor-keyed tables, which are
+deliberately not foreign-key bound and so have no owner to cascade from. It
+reports `visitor_usage_purged`, `funnel_milestones_purged`, and `purge_failed`.
+A nonzero `purge_failed` also exits nonzero and must alert: while it persists,
+IP-derived visitor digests are being retained past their stated window. A dry
+run deletes nothing and always reports zero for all three. Product deletion, anonymous-identity
 revalidation, and Auth-row deletion are one database transaction. Claimed
 source identities use a fifteen-minute reconciliation grace; incomplete
 bootstrap identities use five minutes.
@@ -508,15 +617,15 @@ Use an allowlisted account and verify:
 - Clicking a cold-start starter chip submits a natural-language prompt into the
   normal chat runtime.
 - A Spanish prompt reaches confirmation without coaching or manual translation.
-- Confirmation actions stay card-scoped and structured:
+- The confirmation card shows exactly three card-scoped, structured actions:
   - `Run backtest` starts the supported job path.
-  - `Change dates` updates the confirmation/result period before execution, for
-    example Jan 1, 2025 to Apr 1, 2025.
-  - `Change asset` preserves the explicit period, capital, and benchmark while
-    changing the symbol.
-  - `Adjust assumptions` preserves the explicit period, symbol, and benchmark
-    while changing the assumption being edited.
+  - `Change assumptions` is the single editing entry point. Single-field and
+    compound edits preserve every explicit assumption the user did not change.
   - `Cancel` marks the draft canceled and removes the executable action.
+- `Change dates` and `Change asset` do not render as separate actions.
+- With `ARGUS_IN_PLACE_CARD_EDITS_ENABLED=false`, the capital and dates drawers
+  do not render. Capital and date changes continue through the conversational
+  `Change assumptions` path.
 - A supported backtest completes and shows a result card.
 - The result includes a readable Quick take.
 - Explain result opens a deeper card-scoped explanation without replacing the

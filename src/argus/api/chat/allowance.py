@@ -43,9 +43,7 @@ def check_message_allowance(request: Request, user: User) -> None:
                 limits=list(GUEST_MESSAGE_VISITOR_LIMITS),
                 now=datetime.now(timezone.utc),
             ):
-                raise QuotaExceededError(
-                    "Quota exceeded for chat_messages (day)"
-                )
+                raise QuotaExceededError("Quota exceeded for chat_messages (day)")
         else:
             api_state.supabase_gateway.check_usage_limits(
                 user_id=user.id,

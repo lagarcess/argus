@@ -1,18 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
-  Compass,
   History,
   MessageCirclePlus,
-  PanelLeft,
   Pin,
   Search,
   User,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ArgusLogo } from "@/components/ArgusLogo";
 import {
   ConversationActivityIndicator,
   conversationActivityLabelDescriptor,
@@ -21,8 +18,8 @@ import {
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
+import SidebarHeader, { type SidebarVariant } from "./SidebarHeader";
 import ProfileMenu from "./ProfileMenu";
 import RecentChatActions from "./RecentChatActions";
 import {
@@ -45,14 +42,15 @@ import {
   type RecentChatGroupKey,
 } from "@/lib/chat-recents";
 
-import type { HistoryItem, SearchConversationItem } from "@/lib/argus-api";
+import type { ApiUser, HistoryItem, SearchConversationItem } from "@/lib/argus-api";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
+import { sidebarShortcutHintsVisible } from "@/lib/sidebar-shortcuts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
-type View = "chat" | "strategies" | "settings";
+type View = "chat" | "settings";
 
 type ConversationActivityReadOwner = Readonly<{
   hasEffectiveUnread: (conversationId: string) => boolean;
@@ -103,6 +101,8 @@ export type ChatSidebarProps = {
   onOpenSearch: () => void;
   /** Callback when a chat is mutated (pin/archive/delete/rename) so parent can refresh */
   onHistoryMutated?: () => void;
+  /** Callback when a profile setting is saved, so the shell's account copy follows */
+  onProfileUpdated?: (user: ApiUser) => void;
   /** Callback when archive/delete removes a chat from the active recents surface */
   onConversationRemoved?: (conversationId: string) => void;
   /** Callback when every non-deleted conversation is moved to Recently Deleted */
@@ -117,7 +117,6 @@ export type ChatSidebarProps = {
   onOpenSidebarPreference?: () => void;
   onOpenKeyboardShortcuts?: () => void;
   settingsOpenRequest?: number;
-  strategiesEnabled?: boolean;
   omnisearchEnabled?: boolean;
   /** Keep background shortcut hints visually quiet while a foreground surface owns focus. */
   shortcutHintsSuppressed?: boolean;
@@ -125,6 +124,12 @@ export type ChatSidebarProps = {
   showProfileMenu?: boolean;
   isGuest?: boolean;
   guestExpiresAt?: string | null;
+  /** Rail on desktop, off-canvas drawer below the mobile threshold. */
+  variant?: SidebarVariant;
+  /** Drawer only: the X in the sidebar header dismisses the panel. */
+  onRequestClose?: () => void;
+  /** Guest settings entry point, which lives at the drawer bottom. */
+  guestSettings?: ReactNode;
 };
 
 function historyConversationId(item: HistoryItem): string {
@@ -153,6 +158,7 @@ export default function ChatSidebar({
   onLoadMoreHistory,
   onOpenSearch,
   onHistoryMutated,
+  onProfileUpdated,
   onConversationRemoved,
   onAllConversationsDeleted,
   onToast,
@@ -161,13 +167,15 @@ export default function ChatSidebar({
   onOpenSidebarPreference,
   onOpenKeyboardShortcuts,
   settingsOpenRequest = 0,
-  strategiesEnabled = false,
   omnisearchEnabled = false,
   shortcutHintsSuppressed = false,
   canManageConversation = true,
   showProfileMenu = true,
   isGuest = false,
   guestExpiresAt = null,
+  variant = "rail",
+  onRequestClose,
+  guestSettings = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
   const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
@@ -185,8 +193,11 @@ export default function ChatSidebar({
   >(() => new Set());
   const [usesCommandKey, setUsesCommandKey] = useState(false);
   const [showShortcutHints, setShowShortcutHints] = useState(false);
-  const shortcutHintsVisible =
-    showShortcutHints && !shortcutHintsSuppressed;
+  const shortcutHintsVisible = sidebarShortcutHintsVisible({
+    modifierHeld: showShortcutHints,
+    suppressed: shortcutHintsSuppressed,
+    variant,
+  });
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const previousSettingsOpenRequestRef = useRef(settingsOpenRequest);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -461,43 +472,28 @@ export default function ChatSidebar({
     [chatItems, pendingDeleteId],
   );
 
+  const isDrawer = variant === "drawer";
+  // No rail exists in drawer mode, so its preference entry is absent, not greyed.
+  const sidebarPreferenceHandler = isDrawer ? undefined : onOpenSidebarPreference;
+
   return (
     <aside
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`flex shrink-0 flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
-        isOpen ? "w-72" : "w-14"
-      }`}
+      onMouseEnter={isDrawer ? undefined : handleMouseEnter}
+      onMouseLeave={isDrawer ? undefined : handleMouseLeave}
+      className={
+        isDrawer
+          ? "flex h-full w-full flex-col border-r border-black/5 bg-white dark:border-white/5 dark:bg-[#141517]"
+          : `flex shrink-0 flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
+              isOpen ? "w-72" : "w-14"
+            }`
+      }
     >
-      {/* Sidebar Header: Brand + Panel Toggle */}
-      <div className="flex h-20 items-center px-[6px] pb-4 pt-6">
-        <Tooltip
-          content={isOpen ? t("sidebar.close", "Close sidebar") : t("sidebar.open", "Open sidebar")}
-          side="right"
-          delay={150}
-        >
-          <button
-            onClick={onToggle}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-            aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {/* Swap: PanelLeft when open → ArgusLogo when collapsed */}
-            {isOpen ? (
-              <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
-            ) : (
-              <ArgusLogo className="h-8 w-8 text-black dark:text-white" />
-            )}
-          </button>
-        </Tooltip>
-        {/* "argus" text — font-display (Space Grotesk) per DESIGN.md */}
-        <span
-          className={`ml-1 whitespace-nowrap font-display text-[22px] font-medium tracking-tight text-black transition-[opacity,max-width] duration-300 ease-in-out dark:text-white ${
-            isOpen ? "max-w-[200px] opacity-100" : "max-w-0 overflow-hidden opacity-0"
-          }`}
-        >
-          argus
-        </span>
-      </div>
+      <SidebarHeader
+        variant={variant}
+        isOpen={isOpen}
+        onToggle={onToggle}
+        onRequestClose={onRequestClose}
+      />
 
       <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-[6px] pb-4 pt-2">
         {/* Main Navigation */}
@@ -522,16 +518,6 @@ export default function ChatSidebar({
             showShortcutHint={shortcutHintsVisible}
             onClick={onOpenSearch}
             iconSize={20}
-          />
-        )}
-
-        {strategiesEnabled && (
-          <SidebarNavButton
-            icon={Compass}
-            label={t("common.strategies")}
-            active={currentView === "strategies"}
-            collapsed={!isOpen}
-            onClick={() => onNavigate("strategies")}
           />
         )}
 
@@ -900,6 +886,16 @@ export default function ChatSidebar({
         </>
       )}
 
+      {/* Footer: guest settings live here, since the top bar is already full. */}
+      {guestSettings ? (
+        <div
+          data-testid="sidebar-guest-settings"
+          className="border-t border-black/5 p-[6px] dark:border-white/5"
+        >
+          {guestSettings}
+        </div>
+      ) : null}
+
       {/* Footer: Profile menu trigger */}
       {showProfileMenu ? (
         <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
@@ -910,10 +906,12 @@ export default function ChatSidebar({
             onFeedback={onFeedback}
             onDeleteAllConversations={handleRequestDeleteAllConversations}
             onHistoryMutated={onHistoryMutated}
-            onOpenSidebarPreference={onOpenSidebarPreference}
+            onProfileUpdated={onProfileUpdated}
+            onOpenSidebarPreference={sidebarPreferenceHandler}
             onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
             anchorRef={profileButtonRef}
             sidebarCollapsed={!isOpen}
+            placement={variant}
           />
           <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
             <SidebarNavButton

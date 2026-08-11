@@ -8,7 +8,6 @@ from loguru import logger
 from argus.agent_runtime.turn_execution import detach_turn_execution
 from argus.api.artifact_naming import (
     maybe_generate_conversation_title,
-    maybe_generate_saved_strategy_name,
 )
 from argus.api.chat.previews import is_degraded_clarification_compatibility_text
 from argus.api.chat.route_receipts import persist_route_receipts
@@ -31,6 +30,7 @@ def finalize_conversation_title_after_turn(
     assistant_metadata: dict[str, object] | None = None,
     message_id: str | None = None,
     run_id: str | None = None,
+    viewport: str | None = None,
 ) -> str | None:
     """Finalize a conversation title as fail-open utility-tier polish."""
 
@@ -48,6 +48,7 @@ def finalize_conversation_title_after_turn(
                 assistant_message,
                 metadata=assistant_metadata,
             ),
+            viewport=viewport,
         )
         if title is not None:
             fallback_failure_mode = None
@@ -85,56 +86,18 @@ def finalize_conversation_title_after_turn(
         )
 
 
-def finalize_saved_strategy_name_after_turn(
-    *,
-    user_id: str,
-    conversation_id: str,
-    strategy_id: str,
-    run: BacktestRun,
-    language: str | None,
-    message_id: str | None = None,
-) -> str | None:
-    """Finalize saved strategy names without affecting run truth."""
-
-    receipt_token = begin_openrouter_route_receipt_capture()
-    try:
-        return maybe_generate_saved_strategy_name(
-            user_id=user_id,
-            strategy_id=strategy_id,
-            run=run,
-            language=language,
-        )
-    except Exception:
-        logger.opt(exception=True).warning(
-            "Saved strategy name finalization failed",
-            user_id=user_id,
-            conversation_id=conversation_id,
-            strategy_id=strategy_id,
-        )
-        return None
-    finally:
-        persist_route_receipts(
-            receipts=end_openrouter_route_receipt_capture(receipt_token),
-            user_id=user_id,
-            conversation_id=conversation_id,
-            run_id=run.id,
-            message_id=message_id,
-            metadata={"runtime_artifact": "saved_strategy_name"},
-        )
-
-
 def schedule_artifact_naming_after_stream(
     *,
     user_id: str,
     conversation_id: str,
     language: str | None,
     current_run: BacktestRun | None = None,
-    saved_strategy_id: str | None = None,
     user_message: str | None = None,
     assistant_message: str | None = None,
     assistant_metadata: dict[str, object] | None = None,
     message_id: str | None = None,
     run_id: str | None = None,
+    viewport: str | None = None,
 ) -> None:
     """Start fail-open artifact naming after the canonical stream is complete."""
 
@@ -154,17 +117,8 @@ def schedule_artifact_naming_after_stream(
             assistant_metadata=assistant_metadata,
             message_id=message_id,
             run_id=run_id,
+            viewport=viewport,
         )
-        if saved_strategy_id is not None and current_run is not None:
-            await asyncio.to_thread(
-                finalize_saved_strategy_name_after_turn,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                strategy_id=saved_strategy_id,
-                run=current_run,
-                language=language,
-                message_id=message_id,
-            )
 
     try:
         asyncio.get_running_loop().create_task(_run())
@@ -173,7 +127,6 @@ def schedule_artifact_naming_after_stream(
             "Artifact naming skipped because no running event loop was available",
             user_id=user_id,
             conversation_id=conversation_id,
-            saved_strategy_id=saved_strategy_id,
         )
 
 

@@ -63,9 +63,9 @@ def no_progress_response_if_equivalent(
     if not missing_fields or semantic_turn_act != "answer_pending_need":
         return None
     try:
-        prior_intent = ResponseIntent.model_validate(
-            prior_response_intent
-        ).model_dump(mode="python")
+        prior_intent = ResponseIntent.model_validate(prior_response_intent).model_dump(
+            mode="python"
+        )
     except ValueError:
         return None
 
@@ -200,7 +200,9 @@ def resolve_artifact_anchor(
 
     run_id = _payload_id(payload, "run_id", "runId")
     if run_id:
-        anchor = _matching_result_anchor(snapshot.latest_backtest_result_reference, run_id)
+        anchor = _matching_result_anchor(
+            snapshot.latest_backtest_result_reference, run_id
+        )
         if anchor.kind != "none":
             return anchor
         return _matching_historical_result_anchor(
@@ -376,9 +378,7 @@ def _normalized_symbol(value: Any) -> str | None:
 
 def _normalized_symbols(values: list[Any]) -> set[str]:
     return {
-        symbol
-        for value in values
-        if (symbol := _normalized_symbol(value)) is not None
+        symbol for value in values if (symbol := _normalized_symbol(value)) is not None
     }
 
 

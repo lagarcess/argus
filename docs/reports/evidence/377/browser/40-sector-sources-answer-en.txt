@@ -1,0 +1,62 @@
+argus
+New chat
+Search
+Recents
+Settings
+Cybersecurity Stock Performance Update
+What's happening in cybersecurity stocks?
+
+Cybersecurity stocks are in a broad, AI-driven upswing. On Friday, August 7, 2026, the latest completed session, the four major cybersecurity ETFs gained 1.51%, 2.36%, beating the SPY’s 0.61% and generally outperforming the QQQ’s 1.17%. Most are now close to their 52-week highs.
+
+Sector performance
+ETF	AUG. 7 CLOSE	DAILY MOVE	BELOW 52-WEEK HIGH
+BUG	$41.68	+2.36%	2.41%
+HACK	$115.42	+1.97%	1.16%
+IHAK	$65.58	+1.77%	1.03%
+CIBR	$97.85	+1.51%	2.12%
+QQQ	$723.03	+1.17%	3.42%
+SPY	$773.26	+0.61%	0.46%
+
+Prices and daily moves are as of August 7, 2026.
+
+What is driving it
+
+AI has shifted from a perceived threat to a demand catalyst. More AI agents, cloud workloads and machine identities create more network traffic, privileged accounts and attack surfaces to secure. That favors cloud-security and platform vendors such as PANW, CRWD, ZS, OKTA and S.
+
+Corporate cybersecurity spending remains unusually resilient. Security is being prioritized even when businesses scrutinize other IT spending, because ransomware, automated attacks and AI-enabled intrusion techniques increase the cost of underinvestment.
+
+Strong earnings and raised outlooks have validated the theme. Recent results across the group have shown continued revenue growth and demand for consolidated security platforms. OKTA, for example, gained nearly 48% over two sessions following its fiscal-Q1 beat and improved outlook earlier in the earnings cycle.
+
+Platform consolidation is helping the largest vendors. Customers increasingly prefer fewer suppliers covering endpoint, network, cloud, identity and AI security. That particularly supports PANW, CRWD and FTNT, although it can pressure smaller single-product vendors.
+
+Valuations are elevated, creating sharp stock-level divergence. The rally is not indiscriminate: companies with weaker growth or disappointing execution can lag badly even when the sector rises.
+
+Leaders and laggards
+TICKER	AUG. 7 CLOSE	DAILY MOVE	POSITION VERSUS 52-WEEK HIGH
+GEN	$29.17	+3.81%	9.47% below
+ZS	$168.68	+3.74%	49.95% below
+CRWD	$214.42	+3.39%	2.25% below
+OKTA	$148.32	+3.35%	5.53% below
+S	$21.40	+3.08%	0.47% below
+CHKP	$127.82	+2.03%	39.33% below
+PANW	$363.86	+1.22%	3.48% below
+TENB	$36.38	+0.58%	16.69% below
+FTNT	$159.64	−0.29%	7.23% below
+
+The clearest momentum leaders are PANW, CRWD, OKTA and S: all are within roughly 6% of their annual highs, with S just $0.10 below its high. PANW is also the sector’s largest listed pure-play here, with a $296.55 billion market value, followed by CRWD at $218.34 billion and FTNT at $117.13 billion.
+
+The more meaningful laggards are ZS and CHKP. Both rose strongly Friday, but ZS remains 49.95% below its 52-week high and CHKP remains 39.33% below, showing that the latest rally has not repaired their earlier declines. FTNT was the only major name in this group to fall Friday, down 0.29%, though it remains only 7.23% below its high.
+
+A current figure for CYBR is unavailable; its displayed quote is stale and therefore not comparable.
+
+Bottom line: cybersecurity is currently outperforming as investors conclude that AI expands, not replaces, the need for security. Leadership is concentrated in scalable platforms and identity/endpoint vendors, while ZS, CHKP and, in the latest session, FTNT trail the strongest momentum names. The sector is strong, but expensive valuations and wide gaps between winners and laggards make it more volatile than the ETF-level rally suggests.
+
+5 sources ›
+TRY NEXT
+↳
+Test First Trust NASDAQ Cybersecurity ETF CIBR over the last 3 years
+↳
+Test First Trust NASDAQ Cybersecurity ETF CIBR vs Amplify Cybersecurity ETF HACK, iShares Cybersecurity and Tech ETF IHAK and Global X Cybersecurity ETF BUG over the last 3 years
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

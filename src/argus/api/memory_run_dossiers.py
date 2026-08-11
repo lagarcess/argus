@@ -42,8 +42,7 @@ def list_memory_run_dossier_source_rows(
         for artifact_key, artifact in store.evidence_artifacts.items():
             if (
                 store.evidence_artifact_owners.get(artifact_key) != user_id
-                or text(_field(artifact, "source_conversation_id"))
-                != conversation_id
+                or text(_field(artifact, "source_conversation_id")) != conversation_id
             ):
                 continue
             run_id = text(_field(artifact, "source_run_id"))
@@ -61,14 +60,12 @@ def list_memory_run_dossier_source_rows(
 
         latest_decision_by_artifact: dict[str, tuple[datetime, str, str]] = {}
         current_artifact_ids = {
-            artifact_id
-            for _, artifact_id, _ in latest_artifact_by_run.values()
+            artifact_id for _, artifact_id, _ in latest_artifact_by_run.values()
         }
         for decision_key, decision in store.decision_notes.items():
             if (
                 store.decision_note_owners.get(decision_key) != user_id
-                or text(_field(decision, "source_conversation_id"))
-                != conversation_id
+                or text(_field(decision, "source_conversation_id")) != conversation_id
             ):
                 continue
             artifact_id = text(_field(decision, "evidence_artifact_id"))
@@ -101,9 +98,7 @@ def list_memory_run_dossier_source_rows(
                 continue
             run_id = text(_field(run, "id"))
             artifact_ref = (
-                latest_artifact_by_run.get(run_id)
-                if run_id is not None
-                else None
+                latest_artifact_by_run.get(run_id) if run_id is not None else None
             )
             if run_id is None or artifact_ref is None:
                 continue
@@ -140,19 +135,13 @@ def list_memory_run_dossier_source_rows(
                 heapq.heapreplace(page_keys, candidate)
 
         if cursor_completed_at is not None and not cursor_is_eligible:
-            raise RunDossierCursorError(
-                "Run dossier cursor pivot is not eligible."
-            )
+            raise RunDossierCursorError("Run dossier cursor pivot is not eligible.")
 
         selected = [
             (
                 _row(store.backtest_runs[run_key]),
                 _row(store.evidence_artifacts[artifact_key]),
-                (
-                    _row(store.decision_notes[decision_key])
-                    if decision_key
-                    else None
-                ),
+                (_row(store.decision_notes[decision_key]) if decision_key else None),
             )
             for _, _, run_key, artifact_key, decision_key in sorted(
                 page_keys,
@@ -161,9 +150,7 @@ def list_memory_run_dossier_source_rows(
         ]
 
     selected_run_ids = {
-        run_id
-        for run, _, _ in selected
-        if (run_id := text(run.get("id"))) is not None
+        run_id for run, _, _ in selected if (run_id := text(run.get("id"))) is not None
     }
     with store.conversation_message_lock:
         latest_message_by_run: dict[
@@ -180,9 +167,7 @@ def list_memory_run_dossier_source_rows(
             referenced_run_ids = {
                 run_id
                 for key in ("result_run_id", "latest_run_id")
-                if (
-                    run_id := text(metadata.get(key))
-                ) is not None
+                if (run_id := text(metadata.get(key))) is not None
                 and run_id in selected_run_ids
             }
             result_card = metadata.get("result_card")

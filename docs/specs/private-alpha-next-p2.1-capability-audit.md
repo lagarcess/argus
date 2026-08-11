@@ -6,4 +6,4 @@ Full historical audit:
 [`docs/archive/private-alpha-next-p2.1-capability-audit.md`](../archive/private-alpha-next-p2.1-capability-audit.md).
 
 Current execution source:
-[`docs/specs/private-alpha-interim-roadmap.md`](private-alpha-interim-roadmap.md).
+[`docs/archive/private-alpha-interim-roadmap.md`](../archive/private-alpha-interim-roadmap.md).

@@ -31,10 +31,14 @@ def resolved_rule_summary(facts: dict[str, Any]) -> str | None:
     if strategy_type == "signal_strategy":
         return _signal_strategy_summary(resolved_strategy)
     if strategy_type == "buy_and_hold":
-        return "Entry rule: buy at the start of the period; exit rule: hold through the end."
+        return (
+            "Entry rule: buy at the start of the period; exit rule: hold through the end."
+        )
     if strategy_type == "dca_accumulation":
         cadence = str(resolved_parameters.get("cadence") or "recurring").strip()
-        return f"Entry rule: buy on the {cadence} cadence; exit rule: hold through the end."
+        return (
+            f"Entry rule: buy on the {cadence} cadence; exit rule: hold through the end."
+        )
     return None
 
 

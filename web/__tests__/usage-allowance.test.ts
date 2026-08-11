@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  allowanceMeterTone,
   classifyAllowance,
   formatAllowancePeriodEnd,
   showsHourlyWindow,
+  type UsageAllowance,
 } from "@/lib/usage-allowance";
 
 const root = join(import.meta.dir, "..");
@@ -16,6 +18,127 @@ function readLocale(locale: "en" | "es-419") {
 }
 
 describe("private-alpha usage allowance", () => {
+  test("colors each allowance from its lowest normalized active window", () => {
+    const allowanceAtThirtyPercent: UsageAllowance = {
+      hour: {
+        limit: 60,
+        used: 0,
+        remaining: 60,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 100,
+        used: 70,
+        remaining: 30,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "day",
+    };
+    const allowanceBelowThirtyPercent: UsageAllowance = {
+      ...allowanceAtThirtyPercent,
+      day: {
+        ...allowanceAtThirtyPercent.day,
+        used: 71,
+        remaining: 29,
+      },
+    };
+    const allowanceAtTenPercent: UsageAllowance = {
+      ...allowanceAtThirtyPercent,
+      day: {
+        ...allowanceAtThirtyPercent.day,
+        used: 90,
+        remaining: 10,
+      },
+    };
+    const allowanceExhausted: UsageAllowance = {
+      ...allowanceAtThirtyPercent,
+      day: {
+        ...allowanceAtThirtyPercent.day,
+        used: 100,
+        remaining: 0,
+      },
+      available_now: false,
+    };
+    const tighterHourlyWindow: UsageAllowance = {
+      hour: {
+        limit: 60,
+        used: 54,
+        remaining: 6,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 200,
+        used: 100,
+        remaining: 100,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "hour",
+    };
+    const guestDailyWindow: UsageAllowance = {
+      hour: null,
+      day: {
+        limit: 10,
+        used: 8,
+        remaining: 2,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "day",
+    };
+
+    expect(allowanceMeterTone(allowanceAtThirtyPercent)).toBe("teal");
+    expect(allowanceMeterTone(allowanceBelowThirtyPercent)).toBe("warning");
+    expect(allowanceMeterTone(allowanceAtTenPercent)).toBe("danger");
+    expect(allowanceMeterTone(allowanceExhausted)).toBe("danger");
+    expect(allowanceMeterTone(tighterHourlyWindow)).toBe("danger");
+    expect(allowanceMeterTone(guestDailyWindow)).toBe("warning");
+  });
+
+  test("classifies message and backtest gauges independently", () => {
+    const messageAllowance: UsageAllowance = {
+      hour: {
+        limit: 60,
+        used: 54,
+        remaining: 6,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 200,
+        used: 40,
+        remaining: 160,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "hour",
+    };
+    const backtestAllowance: UsageAllowance = {
+      hour: {
+        limit: 10,
+        used: 0,
+        remaining: 10,
+        period_end: "2026-08-06T15:00:00Z",
+      },
+      day: {
+        limit: 50,
+        used: 36,
+        remaining: 14,
+        period_end: "2026-08-07T00:00:00Z",
+      },
+      guest_session: null,
+      available_now: true,
+      limiting_window: "day",
+    };
+
+    expect(allowanceMeterTone(messageAllowance)).toBe("danger");
+    expect(allowanceMeterTone(backtestAllowance)).toBe("warning");
+  });
+
   test("classifies presentation state from backend-derived truth only", () => {
     expect(
       classifyAllowance({
@@ -81,7 +204,12 @@ describe("private-alpha usage allowance", () => {
     expect(usageLib).toContain("backtests: UsageAllowance");
     expect(usageLib).toContain('limiting_window: "hour" | "day"');
     expect(profileMenu).toContain('openModal("usage")');
-    expect(profileMenu).toContain("<UsageModal");
+    expect(
+      readFileSync(
+        join(root, "components/sidebar/ProfileSettingsPanels.tsx"),
+        "utf-8",
+      ),
+    ).toContain("<UsageModal");
     expect(modal).toContain("getUsageAllowances");
     expect(modal).toContain("usage.allowances.messages");
     expect(modal).toContain("usage.allowances.backtests");
@@ -119,9 +247,18 @@ describe("private-alpha usage allowance", () => {
       join(root, "components/settings/UsageModal.tsx"),
       "utf-8",
     );
-    expect(modal).toContain("dialogTabTarget");
-    expect(modal).toContain('event.key === "Escape"');
-    expect(modal).toContain("returnFocusRef");
+    // Tab containment belongs to the shared hook now. Running a private copy
+    // beside it moved focus twice per press and skipped a control each time.
+    expect(modal).not.toContain("dialogTabTarget");
+    // Ownership moved to the shell, which supplies it to every panel.
+    expect(modal).toContain("AdaptivePanel");
+    expect(
+      readFileSync(join(root, "components/ui/AdaptivePanel.tsx"), "utf-8"),
+    ).toContain("useModalSurface");
+    expect(modal).not.toContain('document.addEventListener("keydown"');
+    // The opener can be gone by the time this closes, so the fallback is
+    // handed to the hook rather than managed here.
+    expect(modal).toContain("returnFocusRef,");
   });
 
   test("uses flat styling and mobile-sized Usage controls", () => {
@@ -139,7 +276,10 @@ describe("private-alpha usage allowance", () => {
     );
 
     expect(modal).not.toContain("shadow-sm");
-    expect(modal).toContain("min-h-11 min-w-11");
+    // The 44px close target is the shell's, so every panel inherits it.
+    expect(
+      readFileSync(join(root, "components/ui/AdaptivePanel.tsx"), "utf-8"),
+    ).toContain("min-h-11 min-w-11");
     expect(modal.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
     expect(usageButton).toContain("min-h-11");
   });

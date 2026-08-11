@@ -1,0 +1,50 @@
+argus
+New chat
+Search
+Recents
+Settings
+Netflix performance overview
+How is Netflix doing?
+
+Netflix is doing well operationally: revenue is growing at a double-digit rate, margins are strong, and management says subscriber retention, pricing and advertising are progressing well. The main caveats are slower profit growth, modest viewing-hour growth, and a share price far below its 52-week high.
+
+Latest snapshot
+METRIC	LATEST RESULT	CHANGE
+Revenue	$12.560 billion in Q2 2026	+13.4% year over year
+Operating profit	$4.193 billion	+11.1%
+Operating margin	33%	34% a year earlier
+Net income	$3.401 billion	+8.8%
+Diluted EPS	$0.80	$0.72 a year earlier
+Quarterly free cash flow*	$1.525 billion	$2.267 billion a year earlier
+Cash	$9.099 billion at June 30, 2026	-
+
+*Operating cash flow plus capital expenditures.
+
+Revenue was slightly below analysts’ Q2 consensus by $21.26 million, while EPS exceeded consensus by $0.01. That is essentially a mixed but close-to-expectations quarter.
+
+What is going right
+Healthy growth: Q2 revenue rose 13.4%, supported by more memberships, price increases and advertising.
+High profitability: A 33% operating margin means Netflix kept roughly one-third of revenue as operating profit.
+Advertising is becoming a meaningful growth driver, according to management, although a current advertising-revenue figure was unavailable.
+Retention remains strong: Management reported healthy customer acquisition and “industry-leading” retention.
+Global growth is broad-based: Q2 constant-currency revenue grew 10% in the U.S./Canada, 11% in Europe/Middle East/Africa, 16% in Latin America and 18% in Asia-Pacific.
+Management expects momentum to continue: It forecast 12% reported revenue growth for Q3 and 13%, 14% for full-year 2026.
+What bears watching
+Margins slipped slightly: Operating margin was 33%, versus 34% in Q2 2025.
+Free cash flow declined year over year in the quarter, despite remaining strongly positive.
+Engagement growth is modest: Viewing hours increased 2% in the first half of 2026, following 1.5% growth in 2025. Netflix argues that retention, customer acquisition and monetization matter more than viewing hours alone.
+Content remains expensive: Netflix expects 2026 content expense to rise 10%, though management says that is slower than revenue growth.
+Live programming has trade-offs: It helps attract subscribers and advertisers but can produce somewhat higher churn among event-driven sign-ups.
+Subscriber totals: A current paid-membership figure was unavailable, so it should not be inferred.
+Stock-market view
+
+As of the latest market quote on August 7, 2026, NFLX traded at $74.14, with a market capitalization of $308.715 billion and a price/earnings ratio of 23.31. Its 52-week range was $65.08, $126.71. The stock was therefore 41.5% below its 52-week high, despite the company’s solid operating results.
+
+Bottom line: Netflix’s underlying business appears healthy and highly profitable, with double-digit revenue growth and credible growth engines in pricing and advertising. But growth is no longer translating into uniformly faster profits or cash flow, and the market’s expectations, and recent stock performance, are less enthusiastic than the operating numbers alone might suggest.
+
+TRY NEXT
+↳
+Test Netflix NFLX over the last 3 years
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

@@ -1,0 +1,115 @@
+{
+  "probe": "equity_steps2",
+  "http_status": 200,
+  "elapsed_s": 6.56,
+  "response": {
+    "background": false,
+    "completed_at": 1786099501,
+    "created_at": 1786099501,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_29270f89-91bc-458c-9253-037b9d008541",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## AAPL Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | previousClose | currency | change | changesPercentage | afterHoursPrice |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| AAPL | Apple Inc. | 2026-08-06 20:00:00 UTC | 2026-08-07 10:45:05 UTC | pre_market | 312.41 | 311.00 | USD | 1.41 | 0.45 | 311.82 |\n\nData available in: `AAPL_quotes_fe0313.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/AAPL?cited_at=1786099497"
+            ],
+            "tickers": [
+              "AAPL"
+            ]
+          }
+        ],
+        "tickers": [
+          "AAPL"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "Apple\u2019s latest closing price was **$312.41 USD** per share on **August 6, 2026**.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_2b8ce12d-531d-4d5b-bb43-fc8180216f00",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.03888,
+        "cache_read_cost": 0.00393,
+        "currency": "USD",
+        "input_cost": 0.00041,
+        "output_cost": 0.00573,
+        "tool_calls_cost": 0.005,
+        "tool_calls_cost_details": {
+          "finance_search": 0.005
+        },
+        "total_cost": 0.05395
+      },
+      "input_tokens": 14166,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 6221,
+        "cache_read_input_tokens": 7864,
+        "cached_tokens": 7864
+      },
+      "output_tokens": 191,
+      "output_tokens_details": {
+        "reasoning_tokens": 101
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "invocation": 1
+        }
+      },
+      "total_tokens": 14357
+    },
+    "user": null
+  }
+}

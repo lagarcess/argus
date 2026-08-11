@@ -73,6 +73,21 @@ GuestFunnelConversionReason = Literal[
     "discovery_searches",
 ]
 
+# Milestone-class kinds are recorded at most once per subject, ever: the kinds
+# whose own name asserts a first-time semantic, plus the conversion completions
+# the funnel counts once per visitor. Every other kind stays repeatable volume
+# or step data, which a guest reaches as many times as they actually do.
+MILESTONE_EVENT_KINDS: frozenset[GuestFunnelEventKind] = frozenset(
+    {
+        "first_useful_assistant_response_completed",
+        "first_simulation_admitted",
+        "first_result_completed",
+        "account_creation_completed",
+        "existing_account_sign_in_completed",
+        "temporary_workspace_claimed",
+    }
+)
+
 GUEST_FUNNEL_EVENT_MAP: dict[
     GuestFunnelEventKind,
     tuple[EventType, EventAction],
@@ -131,6 +146,26 @@ def build_guest_funnel_event(
         status=terminal_outcome,
         attributes={key: value for key, value in attributes.items() if value is not None},
     )
+
+
+def is_milestone_event(kind: GuestFunnelEventKind | str) -> bool:
+    return kind in MILESTONE_EVENT_KINDS
+
+
+def milestone_subject(*, visitor_key: str | None, user_id: str | None) -> str | None:
+    """The durable identity a milestone is claimed against.
+
+    Prefers the visitor key so a workspace renewal, which mints a fresh user
+    id, does not re-emit a milestone the visitor already reached. Falls back to
+    the pseudonymous actor when no visitor key is bound, which still bars a
+    replay within one workspace, and returns None when neither exists rather
+    than claiming every anonymous emission against one shared subject.
+    """
+    key = (visitor_key or "").strip()
+    if key:
+        return key
+    actor_hash = actor_hash_for_user(user_id)
+    return f"actor:{actor_hash}" if actor_hash else None
 
 
 def capture_guest_funnel_event(

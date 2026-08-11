@@ -49,8 +49,7 @@ def project_chat_turn_lifecycle_messages(
     hidden_protocol_turn_ids = {
         message.id
         for message in messages
-        if message.role == "user"
-        and is_legacy_onboarding_marker(message.content)
+        if message.role == "user" and is_legacy_onboarding_marker(message.content)
     }
     by_assistant_message_id = {
         str(row["assistant_message_id"]): row
@@ -114,10 +113,7 @@ def project_chat_turn_lifecycle_messages(
                 "code": "runtime_failure",
                 "retryable": True,
             }
-        if (
-            message.role != "user"
-            and runtime_turn["turn_id"] in hidden_protocol_turn_ids
-        ):
+        if message.role != "user" and runtime_turn["turn_id"] in hidden_protocol_turn_ids:
             metadata.pop("retry_last_turn", None)
         projected.append(message.model_copy(update={"metadata": metadata}))
     return projected

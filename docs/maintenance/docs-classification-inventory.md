@@ -17,11 +17,12 @@ progresses**, ready for specification only.
 
 Current source stack after the canon docs:
 
-1. `docs/specs/private-alpha-interim-roadmap.md` is the active founder-outcome
-   and live-QA slate for the interim pivot.
-2. `docs/specs/private-alpha-next-roadmap.md` is the parent Private Alpha Next
-   execution board; its remaining P2 compounding loop is paused during the
-   interim.
+1. `docs/specs/argus-active-roadmap.md` is the active execution board
+   (opened 2026-08-06). It owns current priorities, execution order, and the
+   serial-versus-parallel rules.
+2. `docs/specs/private-alpha-next-roadmap.md` is superseded P2 history and
+   contract reference. The interim roadmap completed with the 2026-08-05
+   promotion and is archived.
 3. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
    north star and slice-onboarding source.
 4. `docs/specs/private-alpha-ci-cd-sota.md`,
@@ -70,8 +71,9 @@ roadmap links.
 | `docs/API_CONTRACT.md` | canon | Defined as canon API contract source of truth. | None | Current |
 | `docs/DATA_MODEL.md` | canon | Defined as canon data model source of truth. | None | Current |
 | `.agent/designs/argus/DESIGN.md` | canon | Explicitly listed as canon design source of truth. | None | Current |
-| `docs/specs/private-alpha-interim-roadmap.md` | current interim execution slate | Owns founder outcomes, completion truth, selected pillar, live-QA discipline, and interim exit criteria. | Use as the first non-canon execution source while the interim pivot is active. | Capability truth complete; Argus always progresses ready to spec |
-| `docs/specs/private-alpha-next-roadmap.md` | active parent roadmap | Owns the broader Private Alpha Next P2 board, slice stop criteria, and integration criteria; points to the interim slate while the compounding loop is paused. | Use after the interim slate and resume its paused P2 sequencing only by founder direction. | Created after P0 reintegration |
+| `docs/specs/argus-active-roadmap.md` | active execution board | Owns current priorities, execution order, serial-versus-parallel rules, operating rules, and the deliberately-not-doing list. | Use as the first non-canon execution source. | Opened 2026-08-06 |
+| `docs/archive/private-alpha-interim-roadmap.md` | archived | Interim pivot slate; completed with the 2026-08-05 production promotion. | Historical reference only. | Archived 2026-08-06 |
+| `docs/specs/private-alpha-next-roadmap.md` | superseded reference | P2 history, execution-realism contract, and slice provenance. | Read for provenance; do not take work from it. | Superseded 2026-08-06 |
 | `docs/specs/private-alpha-next-decision-memo.md` | active strategic source | Strategic north star for Private Alpha Next; contains the addenda and details each slice must onboard through. | Read relevant sections before planning or implementation. | Current |
 | `docs/specs/private-alpha-ci-cd-sota.md` | release-discipline reference | Completed CI/CD SOTA plan; still owns canary, manifest, Render validation, and deployment discipline. | Use for release gates, not product sequencing. | Completed/reference |
 | `docs/PRIVATE_LAUNCH_RUNBOOK.md` | release-discipline reference | Operational gate for controlled private-alpha validation and launch steps. | Keep as operator runbook. | Current release ops |

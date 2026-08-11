@@ -4,6 +4,7 @@ import {
   shouldApplyConversationRequestUpdate,
   type ActiveConversationRouteState,
 } from "./chat-conversation-routing";
+import { randomId } from "./random-id";
 
 type ActiveOperationKind = Exclude<ConversationOperationKind, null>;
 
@@ -86,7 +87,7 @@ export function createChatRequestSessionController(options: Readonly<{
   let accountScopeKey = options.accountScopeKey;
   let accountEpoch = 0;
   let routeContext = options.routeContext;
-  const createRequestId = options.createRequestId ?? (() => crypto.randomUUID());
+  const createRequestId = options.createRequestId ?? (() => randomId());
 
   const isCurrent = (
     session: ChatRequestSession,

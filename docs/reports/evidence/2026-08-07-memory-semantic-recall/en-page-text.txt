@@ -1,0 +1,78 @@
+argus
+New chat
+Search
+Recents
+Settings
+Apple vs SPY 12-Month Comparison
+Compare Apple with SPY over the last 12 months.
+AAPL
+Buy and Hold
+Run complete
+STARTING CAPITAL
+$1,000
+PERIOD
+Aug 7, 2025 → Aug 6, 2026
+Stocks
+Daily data
+Through Aug 6
+No fees
+No slippage
+Benchmark: SPY
+Run backtest
+AAPL
+Buy and Hold
+
+Aug 7, 2025 → Aug 6, 2026 · Daily data
+
+Simulation Complete
+	
+	
+
+	
+	
+TradingView Lightweight Charts
+1M
+3M
+YTD
+All
+Range details
+
+Visible period: Aug 7, 2025 to Aug 6, 2026.
+
+Ending value
+
+$1,205
+
++$205 gain · +20.5% total return
+
+Compared with SPY
+Lagged by 6.0 percentage points
+Worst drop
+0.0%
+
+Stocks · Historical simulation · No fees/slippage · Not advice
+
+View details
+Explain result
+Refine idea
+Decision: Rejected
+
+Saved to memory. Manage it in Data Controls under Personalization.
+
+QUICK TAKE
+
+AAPL's buy-and-hold return of +20.5% over the past year lagged the SPY benchmark, which returned +26.5% over the same period. That's a difference of 6.0 percentage points. Keep in mind this is a straight return comparison, not a causal attribution, and it's based on daily data only
+
+which idea did I turn down for being too volatile?
+
+I couldn’t answer that follow-up. Your result is still here.
+
+Retry
+
+FROM YOUR MEMORY
+
+AAPL Buy and Hold: Rejected: Rejected the higher drawdown Apple momentum variant and kept the steadier buy and hold.
+
+Saved decisions you confirmed. Manage them in Data Controls.
+
+Argus can make mistakes. For education only. Not financial advice.

@@ -81,9 +81,7 @@ def _symbol_prefix_end(prefix: str | None) -> str | None:
         successor = codepoint + 1
         if 0xD800 <= successor <= 0xDFFF:
             successor = 0xE000
-        return "".join(
-            chr(value) for value in (*codepoints[:index], successor)
-        )
+        return "".join(chr(value) for value in (*codepoints[:index], successor))
     return None
 
 
@@ -1259,8 +1257,7 @@ def _conversation_match_ctes(
     chat_title_haystack = _normalized("conversation.title")
     chat_preview_haystack = _normalized("coalesce(conversation.last_message_preview, '')")
     chat_index_haystack = _normalized(
-        "conversation.title || ' ' "
-        "|| coalesce(conversation.last_message_preview, '')"
+        "conversation.title || ' ' " "|| coalesce(conversation.last_message_preview, '')"
     )
     message_haystack = _normalized("message.content")
     run_haystack = _normalized(
@@ -1385,9 +1382,7 @@ def _conversation_match_ctes(
         source_sql: sql.Composable,
         cursor_relative: bool,
     ) -> sql.Composed:
-        text_rank_sql = conversation_text_rank(
-            sql.SQL("source_winner.matched_text")
-        )
+        text_rank_sql = conversation_text_rank(sql.SQL("source_winner.matched_text"))
         cursor_predicate = (
             sql.SQL(
                 """
@@ -1535,9 +1530,7 @@ def _conversation_match_ctes(
         )
         """
     )
-    idea_matched_text = sql.SQL(
-        "concat_ws(' ', idea.title, nullif(idea.summary, ''))"
-    )
+    idea_matched_text = sql.SQL("concat_ws(' ', idea.title, nullif(idea.summary, ''))")
     evidence_matched_text = sql.SQL(
         "concat_ws(' ', evidence.title, nullif(evidence.digest, ''))"
     )
@@ -1718,6 +1711,7 @@ def _conversation_match_ctes(
         evidence_predicate=evidence_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
     )
+
     def decision_source(indexed_joins: sql.Composable) -> sql.Composed:
         return sql.SQL(
             """
@@ -2349,12 +2343,9 @@ def _conversation_search_sql(
 
 def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
     chat_title_haystack = _normalized("conversation.title")
-    chat_preview_haystack = _normalized(
-        "coalesce(conversation.last_message_preview, '')"
-    )
+    chat_preview_haystack = _normalized("coalesce(conversation.last_message_preview, '')")
     chat_index_haystack = _normalized(
-        "conversation.title || ' ' "
-        "|| coalesce(conversation.last_message_preview, '')"
+        "conversation.title || ' ' " "|| coalesce(conversation.last_message_preview, '')"
     )
     message_haystack = _normalized("message.content")
     run_haystack = _normalized(
@@ -3050,12 +3041,8 @@ class PostgresSearchReader:
         normalized_query = normalize_search_text(query)
         normalized_tokens = tuple(dict.fromkeys(normalized_query.split()))
         symbol_query = normalize_search_symbol(query)
-        text_search_enabled = (
-            not normalized_query or search_has_indexable_token(query)
-        )
-        conversation_search_enabled = (
-            text_search_enabled or symbol_query is not None
-        )
+        text_search_enabled = not normalized_query or search_has_indexable_token(query)
+        conversation_search_enabled = text_search_enabled or symbol_query is not None
         anchor_token = max(
             (token for token in normalized_tokens if len(token) >= 3),
             key=len,
@@ -3115,9 +3102,7 @@ class PostgresSearchReader:
         with self.pool.connection(timeout=_SEARCH_ACQUIRE_TIMEOUT_SECONDS) as connection:
             with connection.cursor(row_factory=dict_row) as cursor:
                 if requested_conversation_ids:
-                    grouped = {
-                        group: [] for group in _CONVERSATION_ROW_GROUPS
-                    }
+                    grouped = {group: [] for group in _CONVERSATION_ROW_GROUPS}
                     grouped["conversations"] = [
                         {"id": str(conversation_id)}
                         for conversation_id in requested_conversation_ids
@@ -3127,9 +3112,7 @@ class PostgresSearchReader:
                         cursor=cursor,
                         owner_id=owner_id,
                         grouped=grouped,
-                        guest_conversation_id=(
-                            workspace_id if guest_scope else None
-                        ),
+                        guest_conversation_id=(workspace_id if guest_scope else None),
                     )
                 elif has_cursor:
                     cursor.execute(
@@ -3179,9 +3162,7 @@ class PostgresSearchReader:
                         cursor=cursor,
                         owner_id=owner_id,
                         grouped=grouped,
-                        guest_conversation_id=(
-                            workspace_id if guest_scope else None
-                        ),
+                        guest_conversation_id=(workspace_id if guest_scope else None),
                     )
                 ledger_counts = None
                 if include_ledger_groups and not guest_scope:
@@ -3195,9 +3176,7 @@ class PostgresSearchReader:
                             "cursor_updated_at": None,
                         }
                         cursor.execute(
-                            _conversation_ledger_sql(
-                                has_anchor=anchor_token is not None
-                            ),
+                            _conversation_ledger_sql(has_anchor=anchor_token is not None),
                             ledger_params,
                         )
                         for row in cursor.fetchall():

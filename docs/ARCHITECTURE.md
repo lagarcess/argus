@@ -93,15 +93,10 @@ Mixed chronological feed of:
 - completed backtests
 - durable idea/evidence activity
 
-### Strategies
+### Legacy Strategy and Collection Records
 
-Flagged saved-executable-idea surface. Hidden under private-alpha defaults;
-durable idea/evidence recall currently lives in Omnisearch.
-
-### Collections
-
-Flagged organizational model. Hidden and indefinitely deferred from the
-private-alpha UI.
+Retained only for owner-scoped historical reads. No dedicated UI, API router,
+or write path remains; durable idea/evidence recall lives in Omnisearch.
 
 ### Settings
 
@@ -242,8 +237,6 @@ workflow-duration backtests.
 - Settings
 - CRUD operations
 - History
-- Collections
-- Strategies
 - Run requests
 - Detail fetches
 
@@ -272,8 +265,7 @@ Canonical state store.
 - Conversations
 - Messages
 - Durable chat-turn lifecycle records
-- Strategies
-- Collections
+- Legacy Strategy and Collection rows (read compatibility only)
 - Backtest jobs
 - Backtest history
 - Archived / deleted records
@@ -296,7 +288,9 @@ portfolio results, persistence, or quotas.
 
 ### API Layer
 
-Request in -> response out. Decomposed into focused routers (`api/routers/auth`, `conversations`, `strategies`, `collections`, `backtest`, `agent`). The `api/main.py` registers routers and contains no business logic.
+Request in -> response out. Decomposed into focused routers (`api/routers/auth`,
+`conversations`, `backtest`, `agent`, and supporting product routers). The
+`api/main.py` registers routers and contains no business logic.
 
 ### AI Orchestrator (Stateless Per Request)
 
@@ -387,9 +381,12 @@ Argus does not have one canonical object. It has multiple first-class objects.
 - **User**: Identity + preferences.
 - **Conversation**: A thread representing one isolated idea journey.
 - **Message**: A unit inside a conversation.
-- **Strategy**: A supported executable template + parameters.
+- **Strategy definition**: A supported executable template + parameters used in
+  conversational drafts and immutable run configuration, not a saved-record
+  surface.
 - **Backtest Run**: Immutable simulation result.
-- **Collection**: User grouping of strategies.
+- **Legacy Strategy / Collection record**: Owner-scoped historical data kept
+  read-compatible without a current create, manage, or navigation surface.
 - **Asset**: Supported symbol/instrument metadata (includes `asset_class`).
 
 Authenticated profile language is product state, not browser state. Signup
@@ -422,7 +419,9 @@ Each conversation is isolated.
 *AI should not depend on unrelated thread memory.*
 
 > [!TIP]
-> **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
+> **Global Rule**: Historical Collection rows may contain mixed asset classes.
+> Backtest runs may not mix asset classes operationally, and no current flow
+> creates or manages Collections.
 
 ## Conversational Runtime Architecture
 
@@ -644,15 +643,6 @@ need; that abstraction belongs to the later engine-leverage experiment.
 
 # 14. Search Architecture
 
-## Surface Search
-
-Scoped search.
-
-**Examples:**
-
-- Strategies page searches strategies
-- Collections page searches collections
-
 ## Global Search
 
 Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency + pin boost.
@@ -673,11 +663,11 @@ Semantic retrieval (Vector embeddings) is deferred from Alpha.
   Structured Supabase product records and run metadata are sufficient until
   Argus needs semantic recall across large histories.
 
-## Structured Recall Versus Personalization Memory
+## Structured Recall Versus Memory
 
 P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
 `EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
-That structured recall is not personalization memory. A future `MemoryRecord`
+That structured recall is not memory. A future `MemoryRecord`
 or equivalent cross-conversation preference layer remains post-PMF and requires
 earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?"
 controls before activation.
@@ -844,7 +834,6 @@ Never leave user confused.
 
 ### Layer 5: Polish Layer
 - Search
-- Collections
 - Feedback
 - Feature flags
 

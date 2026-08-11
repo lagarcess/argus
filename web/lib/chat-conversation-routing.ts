@@ -1,3 +1,4 @@
+import { consumeOverlayEntriesForNavigation } from "./overlay-history";
 import type { ChatActionOption } from "@/components/chat/types";
 
 export type ActiveConversationRouteState = {
@@ -63,6 +64,12 @@ export function rememberActiveConversationId(
     } else {
       url.searchParams.delete(ACTIVE_MESSAGE_QUERY_KEY);
     }
+    // Navigating rewrites the URL onto whatever entry is current, and with an
+    // overlay open that is the entry the overlay pushed. Popping it on teardown
+    // would put the previous conversation back in the address bar while the new
+    // one is on screen. Spending them here rather than at each navigation site,
+    // because every site is one somebody has to remember.
+    consumeOverlayEntriesForNavigation();
     window.history.replaceState(
       window.history.state,
       "",
@@ -83,6 +90,7 @@ export function clearActiveConversationPointer(): string | null {
     url.searchParams.delete(ACTIVE_MESSAGE_QUERY_KEY);
     const query = url.searchParams.toString();
     const nextRoute = query ? `${url.pathname}?${query}` : url.pathname;
+    consumeOverlayEntriesForNavigation();
     window.history.replaceState(window.history.state, "", nextRoute);
     return nextRoute;
   } catch {

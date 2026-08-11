@@ -18,6 +18,11 @@ def admission_rejection_envelope(decision: str) -> dict[str, Any]:
     elif decision == "conflict":
         error_type = "tool_execution_error"
         failure_code = "idempotency_conflict"
+    elif decision == "confirmation_changed":
+        # The card changed between the click and admission; the run refuses
+        # rather than executing values the card no longer shows.
+        error_type = "tool_execution_error"
+        failure_code = "confirmation_changed"
     else:
         error_type = "tool_execution_error"
         failure_code = "backtest_admission_unavailable"
@@ -40,6 +45,9 @@ def public_backtest_job_payload(job: dict[str, Any]) -> dict[str, Any]:
         "conversation_id",
         "request_message_id",
         "confirmation_message_id",
+        # Additive: lets clients tell research jobs from backtest jobs; absent
+        # on legacy rows, which clients treat as chat.run_backtest.
+        "operation_scope",
         "status",
         "result_run_id",
         "failure_code",

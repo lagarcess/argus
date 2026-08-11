@@ -169,9 +169,7 @@ def run_backtest(
                     limits=list(GUEST_SIMULATION_VISITOR_LIMITS),
                     now=datetime.now(timezone.utc),
                 ):
-                    raise QuotaExceededError(
-                        "Quota exceeded for backtest_runs (day)"
-                    )
+                    raise QuotaExceededError("Quota exceeded for backtest_runs (day)")
             else:
                 api_state.supabase_gateway.check_usage_limits(
                     user_id=user.id,
@@ -866,8 +864,7 @@ def _linked_confirmation_launch_hash(
         active_reference.get("artifact_kind") != "confirmation"
         or active_reference.get("artifact_id") != confirmation_id
         or not isinstance(reference_metadata, dict)
-        or reference_metadata.get("canonical_launch_payload_hash")
-        != launch_payload_hash
+        or reference_metadata.get("canonical_launch_payload_hash") != launch_payload_hash
     ):
         raise _by_action_internal_error(request)
     return str(launch_payload_hash)

@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends, Query, Request
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.api.chat.confirmation import public_confirmation_projection
+from argus.api.chat.confirmation import (
+    DeadConfirmationCardError,
+    public_confirmation_projection,
+)
 from argus.api.chat.legacy_onboarding_markers import is_legacy_onboarding_marker
 from argus.api.chat.turn_lifecycle_projection import (
     reconcile_and_project_chat_turns,
@@ -30,8 +33,16 @@ from argus.api.message_store import (
     reconcile_reload_message_metadata,
 )
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
+from argus.api.public_excerpts import (
+    revoke_all_receipts,
+    revoke_receipts_for_conversation,
+)
 from argus.api.schemas import (
     BulkConversationDeleteResponse,
+    ConfirmationDirectEditRequest,
+    ConfirmationDirectEditResponse,
+    ConfirmationPeerAssetsRequest,
+    ConfirmationPeerAssetsResponse,
     Conversation,
     ConversationCreate,
     ConversationPatch,
@@ -52,6 +63,7 @@ from argus.domain.backtest_message_projection import (
 from argus.domain.postgres_run_dossier_reader import RunDossierCursorError
 from argus.domain.run_dossiers import project_run_dossier
 from argus.domain.store import utcnow
+from argus.domain.supabase_conversation_messages import StaleMessageArtifactError
 from argus.domain.supabase_gateway import (
     ConversationCursorError,
     MessageAnchorError,
@@ -328,8 +340,7 @@ def list_conversations(
         reconcile=True,
     )
     page_items = [
-        item.model_copy(update={"activity": activities[item.id]})
-        for item in page_items
+        item.model_copy(update={"activity": activities[item.id]}) for item in page_items
     ]
     next_cursor = None
     if has_more and page_items:
@@ -369,6 +380,11 @@ def delete_all_conversations(
                 update={"deleted_at": now, "updated_at": now},
             )
             deleted_count += 1
+        # Supabase revokes inside the same statement, through the deleted_at
+        # trigger. Repeating it here would add a request after the delete already
+        # committed, and a timeout on that request would report 500 for work that
+        # durably succeeded.
+        revoke_all_receipts(user_id=user.id)
     return BulkConversationDeleteResponse(success=True, deleted_count=deleted_count)
 
 
@@ -428,9 +444,7 @@ def patch_conversation(
         data["updated_at"] = utcnow()
         updated = Conversation.model_validate(data)
         api_state.store.conversations[conversation_id] = updated
-    return ConversationResponse(
-        conversation=_with_activity(updated, user_id=user.id)
-    )
+    return ConversationResponse(conversation=_with_activity(updated, user_id=user.id))
 
 
 @router.delete("/conversations/{conversation_id}", response_model=SuccessResponse)
@@ -474,6 +488,13 @@ def delete_conversation(
         api_state.store.conversations[conversation_id] = conversation.model_copy(
             update={"deleted_at": utcnow(), "updated_at": utcnow()}
         )
+        # In-memory only. Supabase revokes in the same statement via the
+        # deleted_at trigger, so calling this after the delete committed would add
+        # a failure window that could turn a successful delete into a 500.
+        revoke_receipts_for_conversation(
+            user_id=user.id,
+            conversation_id=conversation_id,
+        )
     return SuccessResponse(success=True)
 
 
@@ -484,17 +505,13 @@ def delete_conversation(
         400: {
             "description": "The pagination cursor is invalid or stale.",
             "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/Error"}
-                }
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
             },
         },
         404: {
             "description": "The conversation was not found.",
             "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/Error"}
-                }
+                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
             },
         },
     },
@@ -528,11 +545,7 @@ def list_run_dossiers(
             allow_unowned=False,
         )
     )
-    if (
-        conversation is None
-        or conversation.deleted_at is not None
-        or not memory_owned
-    ):
+    if conversation is None or conversation.deleted_at is not None or not memory_owned:
         raise problem(
             request,
             status_code=404,
@@ -571,10 +584,7 @@ def list_run_dossiers(
             cursor_completed_at = datetime.fromisoformat(raw_completed_at)
         except ValueError:
             raise invalid_cursor_problem(request) from None
-        if (
-            cursor_completed_at.tzinfo is None
-            or cursor_completed_at.utcoffset() is None
-        ):
+        if cursor_completed_at.tzinfo is None or cursor_completed_at.utcoffset() is None:
             raise invalid_cursor_problem(request)
 
     try:
@@ -803,3 +813,353 @@ def list_messages(
         last = page_items[-1]
         next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedMessages(items=page_items, next_cursor=next_cursor)
+
+
+@router.post(
+    "/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets",
+    response_model=ConfirmationPeerAssetsResponse,
+)
+def add_confirmation_peer_assets(
+    conversation_id: str,
+    confirmation_id: str,
+    payload: ConfirmationPeerAssetsRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConfirmationPeerAssetsResponse:
+    """Grow or restore the active confirmation's basket without a turn.
+
+    Deterministic by construction: no LLM call, no message allowance, no
+    interpretation. Only symbols the active turn offered as peer rows are
+    addable, restore undoes the latest add from the card's own typed
+    adjustment data, and every patched draft re-passes the same execution and
+    coverage validation every confirmation passes. No turn is spent, so the
+    card is updated in place; motion, chips, and inline period disclosure
+    carry the change, never a narration banner.
+    """
+    from argus.agent_runtime.research_basket import (
+        confirmation_symbols_restoration,
+        peer_add_rows,
+        peer_added_confirmation_preparation,
+    )
+    from argus.api.chat.actions import active_confirmation_read
+    from argus.api.chat.confirmation import apply_pending_card_update
+    from argus.api.chat.research_evidence import record_research_turn_evidence
+    from argus.domain.research.config import research_rail_enabled
+
+    if not research_rail_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
+    from argus.domain.edit_contract_config import in_place_card_edits_enabled
+
+    if not in_place_card_edits_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
+    invalid_state = problem(
+        request,
+        status_code=409,
+        code="artifact_action_invalid_state",
+        title="Conflict",
+        detail="The confirmation is no longer active.",
+    )
+    # One consistent read: the active check, the source snapshot the
+    # guarded write compares against, and the latest-message witness all
+    # come from the same window, so no append can slip between them.
+    read = active_confirmation_read(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        confirmation_id=confirmation_id,
+    )
+    if read is None:
+        raise invalid_state
+    source_message = read.source_message
+    source_payload = read.source_payload
+    expected_source_metadata = read.expected_source_metadata
+    expected_latest_message_id = read.expected_latest_message_id
+    offered_symbols: list[str] = []
+    rows_sidecar = source_message.metadata.get("next_experiments")
+    rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
+    for row in rows or []:
+        if not isinstance(row, dict) or not str(row.get("kind") or "").startswith(
+            "research_add_peer"
+        ):
+            continue
+        why = row.get("why")
+        params = why.get("params") if isinstance(why, dict) else None
+        for symbol in (params or {}).get("symbols") or []:
+            normalized = str(symbol).strip().upper()
+            if normalized and normalized not in offered_symbols:
+                offered_symbols.append(normalized)
+    language = str(getattr(user, "language", None) or "en")
+
+    if payload.restore_previous:
+        preparation = confirmation_symbols_restoration(source_payload, language=language)
+        restored = set(offered_symbols)
+        adjustment = source_payload.get("assets_adjustment")
+        if isinstance(adjustment, dict):
+            previous = {
+                str(symbol).strip().upper()
+                for symbol in adjustment.get("previous_symbols") or []
+            }
+            current = {
+                str(symbol).strip().upper()
+                for symbol in (source_payload.get("strategy") or {}).get("asset_universe")
+                or []
+            }
+            restored |= current - previous
+        remaining_symbols = sorted(restored)
+    else:
+        requested = [str(symbol).strip().upper() for symbol in payload.symbols or []]
+        # Every candidate passed the resolver before it became a row;
+        # anything else is not addable, whoever asks.
+        if not requested or any(symbol not in offered_symbols for symbol in requested):
+            raise invalid_state
+        added = _resolved_peer_identities(dict.fromkeys(requested))
+        if added is None:
+            raise invalid_state
+        preparation = peer_added_confirmation_preparation(
+            source_payload,
+            added=added,
+            language=language,
+        )
+        remaining_symbols = [
+            symbol for symbol in offered_symbols if symbol not in set(requested)
+        ]
+
+    if preparation.confirmation_payload is None:
+        error_code = preparation.error_code or "confirmation_not_executable"
+        if error_code == "market_data_unavailable":
+            raise problem(
+                request,
+                status_code=503,
+                code="market_data_unavailable",
+                title="Service Unavailable",
+                detail="Market data is unavailable for the requested basket.",
+            )
+        if error_code in {
+            "confirmation_payload_invalid",
+            "nothing_to_restore",
+            "no_new_assets",
+        }:
+            # State conflicts: the request does not fit the card as it stands;
+            # no value change would help.
+            raise invalid_state
+        raise problem(
+            request,
+            status_code=422,
+            code=error_code,
+            title="Validation Error",
+            detail="The requested basket cannot run as one test.",
+        )
+    new_payload = preparation.confirmation_payload
+    remaining_peers = _resolved_peer_identities(remaining_symbols) or []
+    basket = [
+        str(symbol).strip().upper()
+        for symbol in (new_payload.get("strategy") or {}).get("asset_universe") or []
+    ]
+    peer_rows = peer_add_rows(
+        remaining_peers,
+        basket_symbols=basket,
+        basket_asset_class=str(
+            (new_payload.get("strategy") or {}).get("asset_class") or "equity"
+        ),
+        language=language,
+    )
+    # peer_rows=None removes a fully consumed offer set from the updated card.
+    try:
+        updated = apply_pending_card_update(
+            user_id=user.id,
+            conversation_id=conversation_id,
+            source_message=source_message,
+            expected_source_metadata=expected_source_metadata,
+            expected_latest_message_id=expected_latest_message_id,
+            confirmation_id=confirmation_id,
+            confirmation_payload=new_payload,
+            language=language,
+            metadata_extra={"next_experiments": peer_rows},
+            runtime_workflow=api_state.get_agent_runtime_workflow(request),
+        )
+    except DeadConfirmationCardError as exc:
+        raise invalid_state from exc
+    except StaleMessageArtifactError as exc:
+        raise _confirmation_changed_conflict(request) from exc
+    if updated is None:
+        raise invalid_state
+    record_research_turn_evidence(
+        research={
+            "capability_class": "peer_expansion",
+            "shape": None,
+            "usage": {
+                "cache_status": "bypass",
+                "cost_usd": 0.0,
+                "invocations": 0,
+                "latency_ms": 0,
+            },
+        },
+        user_id=user.id,
+        conversation_id=conversation_id,
+        message_id=updated.id,
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return ConfirmationPeerAssetsResponse(message=updated)
+
+
+@router.post(
+    "/conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit",
+    response_model=ConfirmationDirectEditResponse,
+)
+def direct_edit_confirmation(
+    conversation_id: str,
+    confirmation_id: str,
+    payload: ConfirmationDirectEditRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> ConfirmationDirectEditResponse:
+    """Edit the active confirmation's capital, dates, or costs without a turn.
+
+    Deterministic by construction: no LLM call, no message allowance, no
+    interpretation, and no backtest row. The typed values become the same edit
+    operations the conversational planner emits, applied by the same code and
+    assembled by the real confirm stage, so a direct edit and the equivalent
+    conversational edit produce one canonical artifact. An in-place edit
+    updates the card it edits: same confirmation id, same message, nothing new
+    in the transcript. Only turn-based edits supersede; failures persist
+    nothing.
+    """
+    from argus.agent_runtime.confirmation_direct_edit import (
+        direct_edit_confirmation_preparation,
+    )
+    from argus.api.chat.actions import active_confirmation_read
+    from argus.api.chat.confirmation import apply_pending_card_update
+    from argus.domain.edit_contract_config import in_place_card_edits_enabled
+
+    if not in_place_card_edits_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="This capability is not available.",
+        )
+    invalid_state = problem(
+        request,
+        status_code=409,
+        code="artifact_action_invalid_state",
+        title="Conflict",
+        detail="The confirmation is no longer active.",
+    )
+    # One consistent read: the active check, the source snapshot the
+    # guarded write compares against, and the latest-message witness all
+    # come from the same window, so no append can slip between them.
+    read = active_confirmation_read(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        confirmation_id=confirmation_id,
+    )
+    if read is None:
+        raise invalid_state
+    source_message = read.source_message
+    source_payload = read.source_payload
+    expected_source_metadata = read.expected_source_metadata
+    expected_latest_message_id = read.expected_latest_message_id
+    language = str(getattr(user, "language", None) or "en")
+
+    preparation = direct_edit_confirmation_preparation(
+        source_payload,
+        capital=payload.capital,
+        date_window=(
+            payload.date_window.model_dump(mode="python")
+            if payload.date_window is not None
+            else None
+        ),
+        fee_rate=payload.fee_rate,
+        slippage=payload.slippage,
+        language=language,
+    )
+    if preparation.confirmation_payload is None:
+        error_code = preparation.error_code or "confirmation_not_executable"
+        if error_code == "market_data_unavailable":
+            raise problem(
+                request,
+                status_code=503,
+                code="market_data_unavailable",
+                title="Service Unavailable",
+                detail="Market data is unavailable for the requested test.",
+            )
+        if error_code in {"confirmation_payload_invalid", "capital_not_applicable"}:
+            # The card cannot host this edit at all; a value change would not
+            # help, so this stays a state conflict rather than a field error.
+            raise invalid_state
+        # Every other refusal is a typed value rejection: the field survives,
+        # the value does not, and the client renders the exact reason.
+        raise problem(
+            request,
+            status_code=422,
+            code=error_code,
+            title="Validation Error",
+            detail="The requested change cannot run as one test.",
+        )
+    try:
+        updated = apply_pending_card_update(
+            user_id=user.id,
+            conversation_id=conversation_id,
+            source_message=source_message,
+            expected_source_metadata=expected_source_metadata,
+            expected_latest_message_id=expected_latest_message_id,
+            confirmation_id=confirmation_id,
+            confirmation_payload=preparation.confirmation_payload,
+            language=language,
+            runtime_workflow=api_state.get_agent_runtime_workflow(request),
+        )
+    except DeadConfirmationCardError as exc:
+        raise invalid_state from exc
+    except StaleMessageArtifactError as exc:
+        raise _confirmation_changed_conflict(request) from exc
+    if updated is None:
+        raise invalid_state
+    return ConfirmationDirectEditResponse(message=updated)
+
+
+def _confirmation_changed_conflict(request: Request):
+    """A guarded in-place write lost to a concurrent writer.
+
+    The card the request read is no longer the card on record, so nothing
+    was applied; a retry re-reads the current card and composes cleanly.
+    """
+    return problem(
+        request,
+        status_code=409,
+        code="confirmation_changed",
+        title="Conflict",
+        detail="The card changed while this request was in flight. "
+        "Nothing was applied.",
+    )
+
+
+def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:
+    """Resolver-owned identity for peer symbols; None when any fails."""
+    from argus.domain.market_data.assets import resolve_asset
+
+    resolved: list[dict[str, str]] = []
+    for symbol in symbols:
+        try:
+            asset = resolve_asset(str(symbol))
+        except Exception:  # noqa: BLE001
+            return None
+        resolved.append(
+            {
+                "symbol": asset.canonical_symbol.upper(),
+                "name": asset.name or asset.canonical_symbol.upper(),
+                "asset_class": asset.asset_class,
+            }
+        )
+    return resolved

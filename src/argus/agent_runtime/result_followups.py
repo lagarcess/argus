@@ -103,10 +103,11 @@ class PrivateAlphaSaveDraft(BaseModel):
 
     answer: str = Field(
         description=(
-            "A short natural-language response. It must explain that the latest "
-            "completed run cannot be promoted into Strategies while that surface is "
-            "off, and that the run remains retrievable through the conversation or "
-            "Recents/history. Do not claim that a Strategy was created."
+            "A short natural-language response. It must explain that the legacy "
+            "Strategies library and Save action have been retired, that the run "
+            "remains retrievable through the conversation or Recents/history, and "
+            "that Refine idea is the supported way to continue testing it. Do not "
+            "claim that a Strategy was created."
         )
     )
     answer_blocks: list[str] = Field(
@@ -253,11 +254,11 @@ async def compose_private_alpha_save_response(
 ) -> str | None:
     fact_bank = result_followup_fact_bank(metadata)
     fact_bank["save_surface_status"] = (
-        "The Strategies library and Save action are not exposed in private alpha"
+        "The legacy Strategies library and Save action have been retired"
     )
     fact_bank["retrieval_path"] = (
         "Completed runs remain available in the current conversation and through "
-        "Recents/history"
+        "Recents/history; Refine idea continues testing from the completed run"
     )
     required_fact_ids = {"save_surface_status", "retrieval_path"}
     context_packet_ids = context_packet_ids_from_fact_bank(fact_bank)
@@ -310,13 +311,12 @@ def private_alpha_save_llm_messages(
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 f"{language_instruction}\n\n"
                 "The user is asking to save, bookmark, or keep the latest completed "
-                "backtest result. In private alpha, Strategies and Save are not "
-                "exposed as a user-facing destination, so do not claim a Strategy "
-                "was created and do not point the user to hidden surfaces. Use the "
-                "fact_bank as hard product truth, but own the wording naturally. "
-                "Keep the response short. It should make the user feel that their "
-                "work is not lost while being clear that no hidden strategy object "
-                "was created."
+                "backtest result. The legacy Strategies library and Save action are "
+                "retired, so do not claim a Strategy was created and do not imply "
+                "that a hidden or disabled save surface still exists. Use the "
+                "fact_bank as hard product truth, name the supported conversation, "
+                "Recents, and Refine idea continuity path, and own the wording "
+                "naturally. Keep the response short."
             ),
         },
         {
@@ -626,10 +626,9 @@ def render_result_followup_draft(
     if not body:
         return None
     if focus == "next_experiment":
-        return render_next_experiment_followup(
-            draft=draft,
-            fact_bank=fact_bank,
-        )
+        # Deterministic next-experiment prose is retired; the
+        # argus_next_experiments rows sidecar owns this surface.
+        return None
     rendered = body
     max_words = 360 if fact_bank.get("context_packet_facts") else 240
     if len(rendered.split()) > max_words:
@@ -911,9 +910,7 @@ def _execution_cost_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
         entries["return_drag"] = _format_percentage_points(abs(return_drag))
     benchmark_treatment = str(costs.get("benchmark_treatment") or "").strip()
     if benchmark_treatment == "same_modeled_costs":
-        entries["benchmark_cost_treatment"] = (
-            "Benchmark used the same modeled costs"
-        )
+        entries["benchmark_cost_treatment"] = "Benchmark used the same modeled costs"
     return entries
 
 
@@ -1004,92 +1001,6 @@ def _context_packets_from_metadata(metadata: dict[str, Any]) -> list[dict[str, A
     if not isinstance(packets, list):
         return []
     return [packet for packet in packets if isinstance(packet, dict)]
-
-
-def render_next_experiment_followup(
-    *,
-    draft: ResultFollowupDraft,
-    fact_bank: dict[str, str],
-) -> str | None:
-    options = structured_next_experiment_options(fact_bank)
-    if not options:
-        return None
-    selected_options = selected_next_experiment_options(
-        options=options,
-        selected_kinds=draft.next_experiment_option_kinds,
-    )
-    if not selected_options:
-        selected_options = options[:3]
-    bullets = "\n".join(
-        f"- {_ensure_sentence(_sentence_case(str(option['label'])))}"
-        for option in selected_options[:3]
-    )
-    return "A good next move is to isolate one assumption.\n\n" + bullets
-
-
-def selected_next_experiment_options(
-    *,
-    options: list[dict[str, Any]],
-    selected_kinds: list[str],
-) -> list[dict[str, Any]]:
-    by_kind = {
-        str(option.get("kind") or ""): option
-        for option in options
-        if str(option.get("kind") or "")
-    }
-    selected: list[dict[str, Any]] = []
-    for kind_value in selected_kinds:
-        kind = str(kind_value or "").strip()
-        option = by_kind.get(kind)
-        if option is not None and option not in selected:
-            selected.append(option)
-    return selected
-
-
-def structured_next_experiment_options(
-    fact_bank: dict[str, str],
-) -> list[dict[str, Any]]:
-    raw_options = fact_bank.get("next_experiment_options")
-    if not raw_options:
-        return []
-    try:
-        parsed = json.loads(raw_options)
-    except (TypeError, ValueError):
-        return []
-    if not isinstance(parsed, list):
-        return []
-    options: list[dict[str, Any]] = []
-    for option in parsed:
-        if not isinstance(option, dict):
-            continue
-        if option.get("contract") != "supported_backtest_experiment":
-            continue
-        label = clean_fragment(option.get("label"))
-        kind = clean_fragment(option.get("kind"))
-        if not label or not kind:
-            continue
-        options.append(
-            {
-                "kind": kind,
-                "label": label,
-                "contract": "supported_backtest_experiment",
-            }
-        )
-    return options
-
-
-def _ensure_sentence(value: str) -> str:
-    cleaned = clean_fragment(value)
-    if not cleaned:
-        return ""
-    return cleaned if cleaned.endswith((".", "!", "?")) else cleaned + "."
-
-
-def _sentence_case(value: str) -> str:
-    cleaned = clean_fragment(value)
-    if not cleaned:
-        return ""
-    return cleaned[:1].upper() + cleaned[1:]
 
 
 def append_sentence_piece(current: str, piece: str) -> str:

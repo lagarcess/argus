@@ -79,6 +79,47 @@ def test_reliability_contract_locks_admission_and_run_reconciliation() -> None:
     )
 
 
+def test_api_contract_documents_backend_owned_retest_period_truth() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    message_start = contract.index("\n## Message\n")
+    message_end = contract.index("\n## Legacy Strategy Record\n", message_start)
+    message_contract = " ".join(contract[message_start:message_end].split())
+
+    for exact_rule in (
+        "`retest_period`: optional backend-owned typed sidecar",
+        "`original_date_range`",
+        "`requested_date_range`",
+        "`effective_date_range`",
+        "`duration_days`",
+        "`duration = { unit, count, approximate }`",
+        "Same-period Retest never reaches confirmation",
+        "pre-click availability gate",
+        "Run action always keeps its normal localized label",
+        "There is no second action, modal, toast, or client-owned execution state",
+    ):
+        assert exact_rule in message_contract
+
+
+def test_api_contract_documents_retest_provider_coverage_admission() -> None:
+    contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
+    action_start = contract.index("\n### Structured Action Semantics\n")
+    action_end = contract.index(
+        "\n### Conversation Artifact Continuity Contract\n",
+        action_start,
+    )
+    action_contract = " ".join(contract[action_start:action_end].split())
+
+    for exact_rule in (
+        "makes no LLM, research, or discovery call",
+        "provider-backed coverage preflight",
+        "`503 market_data_unavailable`",
+        "`422 no_common_data_window`",
+        "`422 insufficient_common_data`",
+        "never executes a backtest",
+    ):
+        assert exact_rule in action_contract
+
+
 def test_reliability_contract_locks_stale_direct_job_reconciliation() -> None:
     contract = (ROOT / "docs" / "API_CONTRACT.md").read_text(encoding="utf-8")
     data_model = (ROOT / "docs" / "DATA_MODEL.md").read_text(encoding="utf-8")
@@ -162,6 +203,7 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
         "`GET /health`",
         "`GET /internal/readiness`",
         "`POST /internal/access-requests/approve`",
+        "`POST /internal/canary/requested-signup-denial`",
         "`POST /api/v1/dev/reset`",
         "`POST /api/v1/chat/stream` 200 `text/event-stream` response body",
         "`/api/v1` appears exactly once",
@@ -177,6 +219,7 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
         "`GET /health`",
         "`GET /internal/readiness`",
         "`POST /internal/access-requests/approve`",
+        "`POST /internal/canary/requested-signup-denial`",
         "`POST /api/v1/dev/reset`",
     }
 
@@ -277,10 +320,11 @@ def test_active_openapi_uses_alpha_contract_names() -> None:
         "/api/v1/conversations",
         "/api/v1/chat/stream",
         "/api/v1/backtests/run",
-        "/api/v1/collections",
         "/api/v1/history",
     ):
         assert path in text
+    assert "/api/v1/collections" not in text
+    assert "/api/v1/strategies" not in text
     assert "conversation_result_card" in text
     assert "backtest_runs" in text
     assert "portfolios" not in text.lower()
@@ -420,6 +464,15 @@ def test_password_auth_openapi_requires_bounded_captcha_tokens() -> None:
             "minLength": 1,
             "maxLength": 4096,
         }
+
+
+def test_signup_openapi_keeps_private_alpha_denial_generic() -> None:
+    openapi = yaml.safe_load(
+        (ROOT / "docs" / "api" / "openapi.yaml").read_text(encoding="utf-8")
+    )
+
+    responses = openapi["paths"]["/api/v1/auth/signup"]["post"]["responses"]
+    assert "403" not in responses
 
 
 def test_authenticated_openapi_declares_session_verification_unavailable() -> None:

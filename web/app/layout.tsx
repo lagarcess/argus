@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { THEME_STORAGE_KEY } from "@/lib/browser-storage";
 import { I18nProvider } from "@/components/I18nProvider";
 import localFont from "next/font/local";
 
@@ -20,10 +21,22 @@ export const metadata: Metadata = {
   title: "Argus",
   description: "Next Generation Platform",
   manifest: "/manifest.json",
+  // iOS ignores manifest icons, so the home-screen icon comes from this link.
+  icons: {
+    apple: [{ url: "/icons/apple-touch-icon-180.png", sizes: "180x180" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Argus",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#191c1f",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#191c1f" },
+  ],
 };
 
 export default function RootLayout({
@@ -36,8 +49,8 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${inter.variable} min-h-full flex flex-col font-sans transition-colors duration-200`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
-          storageKey="argus-theme"
+          defaultTheme="system"
+          storageKey={THEME_STORAGE_KEY}
           enableSystem
           disableTransitionOnChange
         >

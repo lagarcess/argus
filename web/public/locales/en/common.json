@@ -1,56 +1,55 @@
 {
   "common": {
-    "backtest": "Backtest",
-    "strategy": "Strategy",
-    "collection": "Collection",
-    "chat": "Chat",
-    "history": "History",
-    "settings": "Settings",
-    "conversation": "Conversation",
-    "strategies": "Strategies",
-    "collections": "Collections",
-    "recents": "Recents",
-    "run_simulation": "Run simulation",
-    "add_to_collection": "Add to collection",
-    "rename": "Rename",
-    "delete": "Delete",
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "loading": "Loading...",
-    "retry": "Retry",
-    "try_again": "Try again",
-    "back": "Back",
-    "error_occurred": "An error occurred",
-    "save": "Save",
-    "confirm": "Confirm",
-    "cancel": "Cancel",
-    "done": "Done",
-    "search": "Search",
+    "and": "and",
     "archive": "Archive",
     "archived": "Archived",
-    "today": "today",
-    "yesterday": "yesterday",
-    "no_items": "No items found",
-    "restore": "Restore",
-    "permanently_delete": "Permanently delete",
-    "submit": "Submit",
-    "more": "More",
-    "current": "Current",
+    "back": "Back",
+    "backtest": "Backtest",
+    "cancel": "Cancel",
+    "chat": "Chat",
+    "close": "Close",
     "collapse": "Collapse",
+    "collection": "Collection",
+    "confirm": "Confirm",
+    "conversation": "Conversation",
+    "current": "Current",
+    "delete": "Delete",
+    "done": "Done",
+    "error_occurred": "An error occurred",
     "expand": "Expand",
+    "history": "History",
     "learn_more": "Learn more",
-    "and": "and",
+    "loading": "Loading...",
+    "more": "More",
+    "navigation": "Navigation",
+    "no_items": "No items found",
     "or": "or",
-    "tap_to_cancel": "Tap elsewhere to cancel"
+    "permanently_delete": "Permanently delete",
+    "pin": "Pin",
+    "recents": "Recents",
+    "rename": "Rename",
+    "restore": "Restore",
+    "retry": "Retry",
+    "run_simulation": "Run simulation",
+    "save": "Save",
+    "search": "Search",
+    "settings": "Settings",
+    "strategy": "Strategy",
+    "submit": "Submit",
+    "tap_to_cancel": "Tap elsewhere to cancel",
+    "today": "today",
+    "try_again": "Try again",
+    "unpin": "Unpin",
+    "yesterday": "yesterday"
   },
   "legal": {
-    "eyebrow": "Private Alpha Legal",
-    "effective_date": "Effective date: June 30, 2026",
-    "footer_label": "Argus private alpha",
+    "eyebrow": "Early access legal",
+    "effective_date": "Effective date: August 7, 2026",
+    "footer_label": "Argus early access",
     "back_to_argus": "Back to Argus",
     "terms": {
       "title": "Terms of Use",
-      "intro": "Argus is a private alpha product for educational investing research. These terms describe the current tester experience and do not replace final legal review.",
+      "intro": "Argus is an early access product for educational investing research. These terms describe how Argus works today. Argus is still being built, so these terms will change as the product does.",
       "sections": {
         "no_investment_advice": {
           "title": "No investment advice",
@@ -64,9 +63,9 @@
           "title": "Historical simulations are hypothetical",
           "body": "Historical simulations are hypothetical and depend on the assumptions, data availability, asset support, benchmark defaults, and time windows shown in the product. Simulated returns are not guarantees of future performance."
         },
-        "alpha_changes": {
-          "title": "Alpha availability and changes",
-          "body": "Argus is in private alpha. Features may change, break, reset, or be removed without notice. We may limit access, suspend accounts, or remove content that creates security, abuse, compliance, or operational risk."
+        "early_access_changes": {
+          "title": "Early access availability and changes",
+          "body": "Argus is in early access and is provided as is, without warranties. Features may change, break, reset, or be removed without notice, and some may never reach a full release. We may limit access, suspend accounts, or remove content that creates security, abuse, compliance, or operational risk."
         },
         "eligibility": {
           "title": "Eligibility",
@@ -78,18 +77,18 @@
         },
         "third_party_services": {
           "title": "Third-party services",
-          "body": "Argus relies on third-party services for hosting, authentication, market data, model access, and chart rendering. TradingView Lightweight Charts is used for chart rendering and attribution, not as an Argus market data source."
+          "body": "Argus relies on third-party services for hosting, authentication, market data, model access, bot protection, and chart rendering. TradingView Lightweight Charts is used for chart rendering and attribution, not as an Argus market data source."
         },
         "account_support": {
           "title": "Account support",
-          "body_before_email": "During private alpha, account deletion and support requests are handled manually. Contact",
+          "body_before_email": "While Argus is in early access, account deletion and support requests are handled by a person. Contact",
           "body_after_email": " or use the in-app account deletion request."
         }
       }
     },
     "privacy": {
       "title": "Privacy Policy",
-      "intro": "This policy explains what Argus handles during private alpha so testers know what happens to account data, conversations, feedback, and provider-backed requests.",
+      "intro": "This policy explains what Argus does with your account data, conversations, feedback, and the requests it sends to outside providers while the product is in early access.",
       "sections": {
         "data_collect": {
           "title": "Data we collect",
@@ -97,7 +96,7 @@
         },
         "data_use": {
           "title": "How we use data",
-          "body": "We use data to run the product, authenticate users, save and restore conversations, generate and review historical simulations, debug failures, protect the service, respond to support, and improve private alpha quality."
+          "body": "We use data to run the product, authenticate users, save and restore conversations, generate and review historical simulations, debug failures, protect the service, respond to support, and improve Argus while it is in early access."
         },
         "ai_market_data": {
           "title": "AI and market data providers",
@@ -105,20 +104,43 @@
         },
         "infrastructure": {
           "title": "Infrastructure and product services",
-          "body": "Argus uses Supabase for authentication and product persistence, Render for hosting, OpenRouter for model access, and PostHog only if product analytics are intentionally enabled. TradingView Lightweight Charts is used as a charting library with attribution; it is not the source of Argus market data."
+          "body": "Argus uses Supabase for authentication and product persistence, Render for hosting, OpenRouter for model access, and Cloudflare for domain delivery and bot protection. Product analytics through PostHog run on Argus servers, and only when they are intentionally enabled. TradingView Lightweight Charts is used as a charting library with attribution; it is not the source of Argus market data."
+        },
+        "cookies": {
+          "title": "Cookies and browser storage",
+          "body": "Argus stores a small amount of data in your browser. All of it either keeps the product working or remembers your settings, and none of it is advertising or tracking, which is why Argus does not show a cookie consent banner.",
+          "items": {
+            "sign_in": {
+              "label": "Sign-in cookies",
+              "body": "These keep you signed in as you move between pages. Supabase authentication sets them, and Argus refreshes them while you keep using the product. They stay after you close the browser, and signing out clears them. Signing in or resetting your password also sets a short-lived cookie that completes the exchange securely, discarded once it finishes. If you block them, signing in will not work."
+            },
+            "guest_handoff": {
+              "label": "Guest handoff cookies",
+              "body": "If you start as a guest and then create an account, Argus sets two short-lived cookies so your temporary conversation can move onto the new account. They last ten minutes, are limited to Argus authentication routes, and are cleared as soon as the handoff finishes."
+            },
+            "security": {
+              "label": "Security cookies",
+              "body": "Cloudflare Turnstile checks that sign-in and guest requests come from a person rather than a bot, and Cloudflare may set short-lived challenge cookies to do that. They are scoped to Argus and are not used to follow you across other sites."
+            },
+            "preferences": {
+              "label": "Preferences you set",
+              "body": "Your browser’s local storage holds your language, which starts from your browser’s own setting until you change it, along with your appearance and layout choices, tips you dismissed, and the conversations you marked temporary. This stays on your device and Argus never sends it to advertisers."
+            }
+          },
+          "body_after": "Argus does not use advertising cookies, ad pixels, marketing trackers, or cross-site tracking, and it does not share browser data with advertising partners. Product analytics, when enabled, run on Argus servers and store nothing in your browser. You can clear or block this storage in your browser settings, though signing in will stop working if you block the sign-in cookies."
         },
         "access_retention": {
           "title": "Access and retention",
-          "body": "Founder and administrator access is limited to operating, debugging, securing, and improving the private alpha. We keep data while your account is active, while needed for support or security, or while required by operational records."
+          "body": "Founder and administrator access is limited to operating, debugging, securing, and improving Argus during early access. We keep data while your account is active, while needed for support or security, or while required by operational records."
         },
         "your_controls": {
           "title": "Your controls",
-          "body_before_email": "You can archive or delete conversations in the app. During private alpha, account deletion is handled manually through the in-app request or by contacting",
+          "body_before_email": "You can archive or delete conversations in the app. While Argus is in early access, account deletion is handled by a person through the in-app request or by contacting",
           "body_after_email": "."
         },
         "sale_personal_info": {
-          "title": "Sale of personal information",
-          "body": "Argus does not sell personal information during private alpha. If this changes, the policy and product controls must be updated before that behavior ships."
+          "title": "Sale and sharing of personal information",
+          "body": "Argus does not sell or share your personal information, and it does not use it for targeted advertising. If that ever changes, this policy and the controls in the product will be updated before it takes effect."
         }
       }
     }
@@ -195,11 +217,13 @@
         "safety": "Safety or legal concern",
         "other": "Other"
       }
-    }
+    },
+    "close": "Close feedback"
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
-    "input_placeholder": "Describe an investing idea",
+    "input_placeholder": "Ask about any company or idea",
+    "input_placeholder_prerail": "Describe an investing idea",
     "followup_placeholder": "Add a follow-up",
     "message_empty": "Message is empty",
     "send_message": "Send message",
@@ -207,18 +231,35 @@
     "disclaimer": "Argus can make mistakes. For education only. Not financial advice.",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
-    "placeholder_prompts": [
-      "How has Apple performed against SPY this year so far?",
-      "What if I bought Bitcoin this year so far?",
-      "Explain a market term in simple words.",
-      "What happens if I hold Nvidia over the last 12 months?",
-      "Compare Ethereum and Bitcoin over the last 12 months.",
-      "Test buying SPY this year so far.",
-      "How does buying strong stocks work?",
-      "What if I bought $250 of Nvidia every week over the last 12 months?",
-      "Try a simple Solana buy-and-hold idea over the last 6 months.",
-      "Why do people compare a stock to SPY?"
-    ],
+    "greeting": {
+      "early_a": "Hey, early bird. What should we look at?",
+      "early_b": "Early start. What are we testing?",
+      "early_c": "Morning. What is on your mind?",
+      "early_named_a": "Morning, {{name}}. What should we look at?",
+      "day_a": "What should we try today?",
+      "day_b": "What are we testing today?",
+      "day_c": "Got a hunch worth checking?",
+      "day_d": "What should we look into?",
+      "day_e": "Something you have been meaning to test?",
+      "day_f": "What is worth a look today?",
+      "day_named_a": "What should we try today, {{name}}?",
+      "day_named_b": "Where do we start, {{name}}?",
+      "evening_a": "What should we look into tonight?",
+      "evening_b": "Evening. What are we testing?",
+      "evening_c": "Anything you want to check before the day is done?",
+      "evening_d": "What is worth a look tonight?",
+      "evening_named_a": "Evening, {{name}}. What should we look into?",
+      "night_a": "Hello, night owl. What are you curious about?",
+      "night_b": "Still up. What should we look at?",
+      "night_c": "Late one. What are we testing?",
+      "night_named_a": "Still up, {{name}}. What are you curious about?",
+      "session_closed_weekend_a": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test.",
+      "session_closed_weekend_b": "The stock market is shut for the weekend. Crypto keeps going, and past data is always there to test.",
+      "session_closed_holiday_a": "Stocks are closed for the holiday. Crypto is still trading.",
+      "session_closed_holiday_b": "The stock market is shut today. Crypto never closes, and past data is always there to test.",
+      "session_pre_market_a": "Regular trading opens in a few hours. Crypto has been going all night.",
+      "session_after_hours_a": "The regular session is over, and extended hours are still running. Crypto is still going."
+    },
     "view_history": "View history",
     "chat_options": "Chat options",
     "jump_to_latest": "Jump to latest",
@@ -245,8 +286,6 @@
       "announce_needs_input": "{{title}} needs your input.",
       "announce_new_activity": "{{title}} is ready."
     },
-    "show_suggestions": "Show suggestions",
-    "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",
@@ -262,9 +301,28 @@
       }
     },
     "example_queries": {
-      "q1": "What if I bought Apple after big drops?",
-      "q2": "What if I bought Bitcoin when it starts rising?",
-      "q3": "What if I bought Tesla every month?"
+      "q1": "How does Netflix make money?",
+      "q2": "Compare Costco against Walmart and Target",
+      "q3": "What if I had bought Coca-Cola every month for five years?"
+    },
+    "research_job": {
+      "queued": {
+        "title": "Research queued",
+        "body": "Argus is lining up a deeper look. You can keep chatting; the answer will appear here."
+      },
+      "running": {
+        "title": "Researching",
+        "body": "Argus is reading financial data and sources for this one. The answer will appear here."
+      },
+      "succeeded": {
+        "title": "Research ready",
+        "body": "The full answer is below.",
+        "status": "Ready"
+      },
+      "failed": {
+        "title": "Research didn't finish",
+        "body": "Argus couldn't complete this research run. Ask again, or test the idea directly."
+      }
     },
     "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
     "error_offline": "Argus can’t reach its service right now. Check your connection and try again in a moment.",
@@ -275,11 +333,12 @@
     "error_generic": "Something went wrong. Try again.",
     "recovery": {
       "interpreter_unavailable": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+      "interpreter_unavailable_not_retryable": "I saved your message, but I could not turn it into a reliable test setup. Sending it again as written will hit the same problem, so try rewording it, or tell me the asset and the period you want.",
       "assumption_edit_unapplied": "I saved your reply, but I could not safely apply that assumption change, so I left the current idea unchanged. Please retry the change in a moment.",
       "setup_change_unapplied": "I still have the {{setup_phrase}} in this chat, but I could not safely apply that change. Please retry in a moment.",
       "confirmation_change_unapplied": "I still have the {{setup_phrase}} confirmation in this chat, but I could not safely apply that change. {{action_guidance}}",
       "latest_result_followup_unavailable": "I couldn’t answer that follow-up. Your result is still here.",
-      "private_alpha_save_unavailable": "I cannot move this into Strategies while that surface is off for private alpha, but the completed run is still part of this chat and can be reopened from the conversation or Recents.",
+      "private_alpha_save_unavailable": "The legacy Strategies library and Save action have been retired. This completed run remains available in this chat and Recents, and you can use Refine idea to continue testing it.",
       "confirmation_action_guidance": "The visible confirmation is still ready. Use the card to start the simulation, or use the card controls to change it.",
       "confirmation_action_missing_context": "I do not have an active confirmation to change. Describe the investing idea again and I will prepare a fresh draft.",
       "confirmation_action_missing_identity": "That confirmation action is missing its card identity. Use the latest card action before continuing.",
@@ -351,6 +410,9 @@
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
       "insufficient_common_data": "The assets and benchmark share too little history for one trustworthy test. Change the dates, an asset, or the benchmark.",
       "market_data_unavailable": "The shared history is not available for one trustworthy test right now. Change the dates, an asset, or the benchmark.",
+      "kraken_ohlc_window_exceeded": "That date range is too long for this market and timeframe. Shorten the dates or use a wider timeframe.",
+      "provider_history_start_unavailable": "Market history is not available that far back. Choose a later start date.",
+      "provider_timeframe_unavailable": "That timeframe is not available for this market. Choose a supported timeframe.",
       "actions": {
         "change_dates": "Change dates",
         "change_asset": "Change asset",
@@ -378,7 +440,26 @@
         "month_other": "same {{count}}-month duration",
         "day_one": "same {{count}}-day duration",
         "day_other": "same {{count}}-day duration"
-      }
+      },
+      "effective_duration": {
+        "exact": {
+          "year_one": "{{formattedCount}} year",
+          "year_other": "{{formattedCount}} years",
+          "month_one": "{{formattedCount}} month",
+          "month_other": "{{formattedCount}} months",
+          "day_one": "{{formattedCount}} day",
+          "day_other": "{{formattedCount}} days"
+        },
+        "approximate": {
+          "year_one": "about {{formattedCount}} year",
+          "year_other": "about {{formattedCount}} years",
+          "month_one": "about {{formattedCount}} month",
+          "month_other": "about {{formattedCount}} months",
+          "day_one": "about {{formattedCount}} day",
+          "day_other": "about {{formattedCount}} days"
+        }
+      },
+      "updated_duration": "Updated span: {{duration}}"
     },
     "result_readout": {
       "quick_take": "Quick take"
@@ -397,8 +478,9 @@
       "sources_panel_open_one": "{{count}} source ›",
       "sources_panel_open_other": "{{count}} sources ›",
       "sources_panel_title": "Sources Argus read",
-      "sources_panel_note": "Argus read these while answering. Not recommended reading.",
+      "sources_panel_note": "Sources used to inform this answer. Links open in a new tab.",
       "sources_panel_close": "Close sources",
+      "sources_panel_external_link_new_tab": "Opens in a new tab",
       "allowance_banner": "Grounded search allowance used",
       "allowance_banner_cta": "Sign in for more searches"
     },
@@ -484,7 +566,6 @@
     "past_sessions": "Past sessions",
     "archive_chat": "Archive chat",
     "no_past_sessions": "No past sessions yet.",
-    "added_to_collection": "Added to \"{{name}}\"",
     "good_response": "Good response",
     "poor_response": "Poor response",
     "more_actions": "More Actions",
@@ -494,8 +575,6 @@
     "copy_failed": "Copy failed",
     "report_issue": "Report Issue",
     "rename_failed": "Could not rename this chat. Try again.",
-    "saved": "Saved",
-    "saving": "Saving",
     "simulation_complete": "Simulation Complete",
     "activity_rail": {
       "aria_label": "Conversation activity",
@@ -546,7 +625,6 @@
         "rejected": "Rejected",
         "revisit_later": "Revisit later"
       },
-      "save": "Save",
       "unavailable": "Unavailable",
       "return_unavailable": "return unavailable",
       "change": "change",
@@ -685,6 +763,8 @@
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
       "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
+      "undo": "Undo",
+      "peer_add_failed": "Couldn't change that test. The card is unchanged.",
       "status": {
         "ready_to_run": "Ready to run",
         "needs_change": "Needs change",
@@ -711,7 +791,7 @@
         "run_backtest": "Run backtest",
         "change_dates": "Change dates",
         "change_asset": "Change asset",
-        "adjust_assumptions": "Adjust assumptions",
+        "adjust_assumptions": "Change assumptions",
         "cancel": "Cancel"
       },
       "assumptions": {
@@ -722,19 +802,56 @@
         "modeled_costs": "Modeled costs: {{fee}} bps fee + {{slippage}} bps slippage"
       },
       "cost_editor": {
-        "edit_chip": "Edit costs",
         "fee_label": "Fee % per trade",
         "slippage_label": "Slippage % per trade",
+        "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%)."
+      },
+      "direct_edit": {
+        "edit_capital": "Edit capital",
+        "edit_contribution": "Edit contribution",
+        "edit_dates": "Edit dates",
+        "capital_label": "Starting capital",
+        "contribution_label": "Contribution",
+        "start_label": "Start date",
+        "end_label": "End date",
         "apply": "Apply",
         "cancel": "Cancel",
-        "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
-        "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
+        "invalid_capital": "Enter an amount above zero.",
+        "invalid_dates": "Pick a start date on or before the end date.",
+        "failed": "That change did not go through. The card is unchanged.",
+        "edit_costs": "Edit costs",
+        "errors": {
+          "invalid_starting_capital": "Starting capital must be between {{min}} and {{max}}.",
+          "future_end_date": "Pick an end date on or before today.",
+          "invalid_chronological_date_range": "Pick a start date before the end date.",
+          "provider_history_start": "Data for this test starts later; pick a start date on or after {{min}}.",
+          "no_common_data": "These assets do not share enough data for that window.",
+          "invalid_contribution": "Each contribution must be between {{min}} and {{max}}.",
+          "confirmation_changed": "Another change landed at the same time. Try again."
+        }
+      },
+      "edit_disclosure": {
+        "unapplied": "I could not change {{targets}}; the rest is applied below.",
+        "targets": {
+          "asset": "the assets",
+          "benchmark": "the benchmark",
+          "cadence": "the cadence",
+          "capital": "the starting capital",
+          "date_window": "the dates",
+          "fees": "the fees",
+          "recurring_contribution": "the contribution",
+          "slippage": "the slippage",
+          "strategy_family": "the strategy",
+          "timeframe": "the timeframe",
+          "generic": "that part"
+        }
       },
       "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
     },
     "next_experiments": {
       "section": "Try next",
       "labels": {
+        "research_dynamic": "{{defaultValue}}",
         "change_date_range": "Test a different date range",
         "same_setup_peer_asset": "Test the same setup on a similar asset",
         "same_rule_peer_asset": "Test the same rule on a similar asset",
@@ -751,76 +868,37 @@
         "lost_to_benchmark": "Lagged the benchmark by {{points}} points",
         "beat_benchmark": "Beat the benchmark by {{points}} points",
         "deep_drawdown": "Worst drop was {{drawdown}}%"
-      }
-    }
-  },
-  "strategies": {
-    "empty_state": "Strategies you save from chat will appear here.",
-    "no_match": "No strategies match your search.",
-    "error_load": "Could not load strategies. Make sure the API is running.",
-    "search_placeholder": "Search strategies...",
-    "metrics": {
-      "overall_profit": "overall profit",
-      "max_drawdown": "max drawdown",
-      "win_rate": "win rate"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Other cadence",
+        "adjust_indicator_thresholds": "Other thresholds",
+        "adjust_signal_periods": "Other signal periods",
+        "change_date_range": "Different dates",
+        "compare_buy_and_hold": "Compare with holding",
+        "recurring_monthly_buys": "Monthly buys",
+        "same_rule_peer_asset": "Same rule, similar asset",
+        "same_setup_peer_asset": "Similar asset",
+        "supported_ma_crossover": "SMA/EMA crossover",
+        "supported_rsi_or_ma_rule": "Simplify the rule",
+        "supported_rsi_threshold": "Supported RSI rule"
+      },
+      "test_verb": "Test"
     },
-    "unexecuted_hint": "Run this strategy to see performance",
-    "run_hint": "Run this strategy to see how {{symbols}} would have performed.",
-    "best_performer": "Best performer",
-    "suggestions": [
-      {
-        "title": "RSI Threshold",
-        "desc": "Buy or sell when RSI reaches chosen levels.",
-        "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
-      },
-      {
-        "title": "10% Stop-Loss",
-        "desc": "Protect your capital with an automated exit rule.",
-        "prompt": "I want a strategy that buys any stock in my list and automatically sells if the price drops 10% from my entry."
-      },
-      {
-        "title": "Trend Follower",
-        "desc": "Ride the momentum while the price is above the 50-day MA.",
-        "prompt": "Create a strategy that buys whenever the price is above the 50-day moving average on QQQ."
-      },
-      {
-        "title": "Monthly DCA",
-        "desc": "Build positions steadily with fixed recurring buys.",
-        "prompt": "Create a simple monthly DCA strategy that buys SPY on the first trading day of each month."
-      }
-    ]
-  },
-  "collections": {
-    "empty_state": "Add strategy to collection or save from chat to see them here.",
-    "no_match": "No collections match your search.",
-    "error_load": "Could not load collections. Make sure the API is running.",
-    "search_placeholder": "Search collections",
-    "new_collection": "New collection",
-    "no_strategies": "No strategies yet",
-    "strategy_count_one": "{{count}} strategy",
-    "strategy_count_other": "{{count}} strategies",
-    "suggestions": [
-      {
-        "title": "Tech Giants",
-        "desc": "Group FAANG or top semiconductor companies in one place.",
-        "prompt": "I want to create a collection of the top 5 tech giants like AAPL, MSFT, and NVDA."
-      },
-      {
-        "title": "Energy Transition",
-        "desc": "Climate-focused ideas and clean energy plays.",
-        "prompt": "I want to start a collection for energy transition and solar power ideas."
-      },
-      {
-        "title": "Dividend Kings",
-        "desc": "Safe, consistent yield plays for a defensive portfolio.",
-        "prompt": "How should I structure a collection for long-term dividend growth stocks?"
-      },
-      {
-        "title": "Crypto HODL",
-        "desc": "Store your Bitcoin and Ethereum dip-buying logic.",
-        "prompt": "Create a collection for my long-term crypto accumulation strategies."
-      }
-    ]
+    "memory": {
+      "recall_title": "From your memory",
+      "recall_show": "Show",
+      "recall_hide": "Hide",
+      "recall_note": "Saved decisions you confirmed. Manage them in Data Controls.",
+      "private_on": "Private chat: on",
+      "private_off": "Private chat",
+      "proposal_title": "Remember this saved decision?",
+      "proposal_benefit": "Argus would keep “{{label}}” so you can revisit and compare it later. You can inspect or remove it any time in Data Controls.",
+      "proposal_confirm": "Remember",
+      "proposal_decline": "No thanks",
+      "proposal_error": "Could not update memory. Try again.",
+      "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
+    },
+    "send_busy": "Argus is still finishing the last message. Try again in a moment."
   },
   "settings": {
     "title": "Settings",
@@ -831,6 +909,12 @@
       "delete_account": "Delete account",
       "delete_account_note": "Request permanent deletion of your Argus account. Support will follow up by email.",
       "display_name_save_error": "Could not save that name yet.",
+      "display_name_too_long": "Keep this to {{count}} characters or fewer.",
+      "preferred_name": "What should Argus call you?",
+      "preferred_name_placeholder": "Leave blank for no name",
+      "preferred_name_unset": "Not set",
+      "preferred_name_save_error": "Could not save that name yet.",
+      "preferred_name_too_long": "Keep this to {{count}} characters or fewer.",
       "language_save_error": "Could not update language yet.",
       "avatar_theme": {
         "label": "Avatar color",
@@ -852,7 +936,7 @@
       "title": "Profile",
       "request_deletion": {
         "title": "Request account deletion",
-        "body": "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+        "body": "Support handles account deletion. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
         "contact_support": "Contact support",
         "submitting": "Sending...",
         "success": "Request sent. We'll follow up by email.",
@@ -878,7 +962,8 @@
         "light": "Light",
         "dark": "Dark",
         "system": "System"
-      }
+      },
+      "close_appearance": "Close appearance"
     },
     "sidebar": {
       "title": "Sidebar preference",
@@ -893,6 +978,48 @@
     },
     "data": {
       "title": "Data Controls",
+      "personalization": {
+        "menu": "Personalization",
+        "title": "Memory",
+        "close": "Close memory",
+        "loading": "Loading memory...",
+        "load_error": "Memory could not be loaded.",
+        "retry": "Try again",
+        "intro": "Argus only remembers what you confirm. You can review, edit, delete, or turn off everything here.",
+        "toggle_label": "Remember confirmed memories",
+        "toggle_on_note": "On. New memories still need your confirmation.",
+        "toggle_off_note": "Off. Existing memories stay until you delete them.",
+        "records_title": "What Argus remembers",
+        "empty": "Nothing yet. When you confirm a memory it will appear here.",
+        "saved_on": "Saved {{date}}",
+        "why_stored": "Why is this stored?",
+        "edit": "Edit memory",
+        "edit_label": "Memory label",
+        "edit_value": "Memory content",
+        "save_edit": "Save",
+        "delete": "Delete memory",
+        "confirm_delete": "Confirm?",
+        "explanation_intro": "You confirmed this memory on {{date}}.",
+        "explanation_source": "Source: {{kind}}.",
+        "export": "Export memory data",
+        "reset": "Reset memory",
+        "reset_confirm": "Delete everything?",
+        "categories": {
+          "personalization_preference": "Personalization preference",
+          "workflow_preference": "Workflow preference",
+          "explicit_decision_note": "Saved decision",
+          "past_session_anchor": "Past session anchor"
+        },
+        "errors": {
+          "explain": "Could not load the explanation. Try again.",
+          "edit": "Could not save that change. Try again.",
+          "restricted": "Argus keeps sensitive details out of memory.",
+          "delete": "Could not delete that memory. Try again.",
+          "toggle": "Could not update memory settings. Try again.",
+          "reset": "Could not reset memory. Try again.",
+          "export": "Could not export your memory data. Try again."
+        }
+      },
       "archived_chats": "Archived chats",
       "recently_deleted": "Recently deleted",
       "close_recently_deleted": "Close recently deleted",
@@ -900,7 +1027,6 @@
       "deleted_item_note": "Currently restorable.",
       "no_deleted_items": "No recently deleted items",
       "chat_item": "Chat",
-      "strategy_item": "Strategy",
       "delete_all_conversations": "Delete all conversations",
       "delete_all_confirm": {
         "title": "Delete all conversations?",
@@ -928,7 +1054,10 @@
         "close": "Close usage",
         "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
         "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
-      }
+      },
+      "shared_links": "Shared links",
+      "close_archived": "Close archived chats",
+      "close_deleted": "Close recently deleted"
     },
     "help": {
       "title": "Help & Legal",
@@ -1113,6 +1242,12 @@
     "result_count_other": "{{count}} results",
     "retest_current_data": "Retest with current data",
     "retest_tooltip": "Reuse this setup with the latest available data. You’ll review it before it runs.",
+    "retest_already_current": "Already up to date",
+    "retest_no_new_data": "No new market data is available since this run.",
+    "retest_available_dates": "Use available dates",
+    "retest_repaired_period": "Retest from {{start}} through {{end}}.",
+    "retest_unavailable": "Retest unavailable",
+    "retest_timeframe_unavailable": "This run’s timeframe is not available for this market.",
     "retry_load_more": "Try loading more",
     "retry_search": "Try searching again",
     "save_decision": "Save decision",
@@ -1140,7 +1275,9 @@
       "idea": "Idea",
       "run": "Run",
       "strategy": "Strategy"
-    }
+    },
+    "row_actions": "Conversation actions",
+    "close_dossier": "Close dossier"
   },
   "auth": {
     "captcha": {
@@ -1172,7 +1309,7 @@
       }
     },
     "signup": {
-      "subtitle": "Create your private alpha account",
+      "subtitle": "Create your Argus account",
       "name_placeholder": "Name",
       "submit": "Sign up",
       "loading": "Creating account...",
@@ -1333,7 +1470,8 @@
     },
     "shell": {
       "value_title": "Test an investing idea against history.",
-      "input_placeholder": "What do you want to test?",
+      "input_placeholder": "Ask about any company or idea",
+      "input_placeholder_prerail": "What do you want to test?",
       "sign_in": "Sign in",
       "settings": "Guest settings",
       "language": "Language",
@@ -1359,6 +1497,176 @@
       "confirmation": "Review the assumptions, then run the test.",
       "result": "Change the chart range or ask a follow-up.",
       "dismiss": "Dismiss hint"
+    }
+  },
+  "receipt": {
+    "page_title": "Tested with Argus",
+    "eyebrow": "Shared with you",
+    "provenance": "Tested with Argus",
+    "wordmark": "ARGUS",
+    "framing": {
+      "headline": "This is a what if, not a tip.",
+      "detail": "Someone wondered how this idea would have gone, so Argus checked it against what the market actually did on those dates. No real money moved, nobody bought anything, and this says nothing about what happens next.",
+      "short": "A what if, run on past market data. Not a tip."
+    },
+    "sections": {
+      "result": "How it went",
+      "what_was_tested": "What they tried",
+      "assumptions": "What Argus assumed",
+      "note": "They left a note",
+      "chart": "How the test money moved"
+    },
+    "plan": {
+      "heading": "What ran",
+      "buy_and_hold": "Bought once at the start and held to the end. It never sold.",
+      "dca": "Bought {{cadence}}, whatever the price was that day. It never sold.",
+      "buy_the_dip": "Bought after each sharp drop, then sold about a week later.",
+      "indicator_entry": "Bought when {{indicator}} fell to {{entry}}.",
+      "indicator_exit": "Sold when {{indicator}} climbed back to {{exit}}.",
+      "crossover_entry": "Bought when the {{fast_period}} day average rose above the {{slow_period}} day average.",
+      "crossover_exit_mirrored": "Sold when it crossed back below.",
+      "crossover_exit_own": "Sold when the {{fast_period}} day average fell below the {{slow_period}} day average.",
+      "macd_entry": "Bought when MACD crossed above its signal line.",
+      "macd_exit": "Sold when MACD crossed back below its signal line.",
+      "unnamed": "Ran as {{label}}.",
+      "long_only": "These numbers are locked and will not change."
+    },
+    "cadence_values": {
+      "daily": "every day",
+      "weekly": "every week",
+      "biweekly": "every two weeks",
+      "monthly": "every month",
+      "quarterly": "every quarter"
+    },
+    "assumptions": {
+      "long_only": "Long only",
+      "equal_weight": "Equal weight",
+      "no_costs": "No fees or slippage",
+      "modeled_costs": "{{fee}} bps fee + {{slippage}} bps slippage",
+      "modeled_fee_bps": "{{bps}} bps fee",
+      "modeled_slippage_bps": "{{bps}} bps slippage",
+      "benchmark": "Compared with {{symbol}}",
+      "benchmark_same_modeled_costs": "Compared with {{symbol}}, same costs",
+      "recurring_contribution": "${{amount}} each time",
+      "recurring_contribution_cadence": "${{amount}} {{cadence}}",
+      "starting_principal": "${{amount}} to start"
+    },
+    "strategy_type_values": {
+      "buy and hold": "Buy and hold",
+      "dca accumulation": "Recurring buys",
+      "buy the dip": "Buy the dip",
+      "rsi threshold": "RSI threshold",
+      "indicator threshold": "Indicator threshold",
+      "moving average crossover": "Moving average crossover",
+      "macd crossover": "MACD crossover"
+    },
+    "metric_labels": {
+      "cash_value": "Ending value",
+      "total_return_pct": "Total return",
+      "max_drawdown_pct": "Worst dip",
+      "win_rate": "Win rate",
+      "benchmark_return_pct": "Benchmark",
+      "delta_vs_benchmark_pct": "Difference"
+    },
+    "hero": {
+      "ahead": "{{value}} ahead of {{symbol}}",
+      "behind": "{{value}} behind {{symbol}}",
+      "vs": "{{symbol}} did {{value}}",
+      "window": "{{range}}",
+      "drawdown": "Worst dip along the way: {{value}}"
+    },
+    "fine_print": {
+      "heading": "The fine print",
+      "settings": "Exact settings",
+      "assumed": "What Argus assumed"
+    },
+    "fields": {
+      "asset": "What",
+      "asset_class": "Kind",
+      "strategy": "The plan",
+      "dates": "When",
+      "benchmark": "Compared with"
+    },
+    "asset_class_values": {
+      "equity": "Stocks",
+      "crypto": "Crypto",
+      "currency_pair": "Currency pair"
+    },
+    "date_range": "{{start}} to {{end}}",
+    "frozen_note": "Saved on {{date}}. These numbers are locked, so they will look the same whenever you come back.",
+    "frozen_note_undated": "These numbers were locked when the link was made, so they will look the same whenever you come back.",
+    "chart_unavailable": "No chart was saved with this one.",
+    "cta": {
+      "headline": "Got an idea? Try it.",
+      "detail": "Tell Argus an idea in your own words and it will show you how it would have gone. Free to try, no account needed.",
+      "action": "Test your own idea"
+    },
+    "tombstone": {
+      "title": "This one is gone",
+      "detail": "The person who shared it took the link down, or deleted the result behind it. There is nothing left to show.",
+      "cta_detail": "You can still try Argus for yourself."
+    },
+    "unavailable": {
+      "title": "We could not load this one",
+      "detail": "Something went wrong on our end, not yours. The link may well still work, so try again in a moment."
+    },
+    "owner": {
+      "share": "Share this",
+      "share_hint": "Makes a link anyone can open. It shows these numbers, locked as they are right now. Your chat, your name, and anything Argus remembers all stay out of it.",
+      "note_label": "Add a note if you want",
+      "note_placeholder": "Why is this worth a look?",
+      "note_public_warning": "Anyone with the link can read this. Keep it free of anything private.",
+      "note_counter": "{{count}} of {{max}} characters",
+      "create": "Make the link",
+      "creating": "Making the link...",
+      "cancel": "Never mind",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "copy_failed": "Copying did not work. Select the link and copy it.",
+      "created_note": "Your name is not on it, search engines cannot find it, and you can take it down any time from Data Controls.",
+      "errors": {
+        "create": "Argus could not make that link. Try again.",
+        "note_rejected": "That note cannot go public. Take out any keys or long codes.",
+        "rate_limited": "You have made a lot of links just now. Try again shortly."
+      }
+    },
+    "list": {
+      "menu": "Shared links",
+      "title": "Shared links",
+      "close": "Close shared links",
+      "intro": "Everything you have shared. Each link shows locked numbers and nothing about you.",
+      "loading": "Loading your links...",
+      "load_error": "Your shared links did not load.",
+      "load_more": "Show older links",
+      "retry": "Try again",
+      "empty": "You have not shared anything yet.",
+      "created_on": "Shared {{date}}",
+      "revoked_on": "Taken down {{date}}",
+      "revoked_by_source": "Taken down on its own when you deleted the chat behind it.",
+      "open": "Open it",
+      "copy": "Copy link",
+      "revoke": "Take it down",
+      "revoking": "Taking it down...",
+      "confirm_revoke": "Sure?",
+      "revoke_error": "That link did not come down. Try again.",
+      "cache_note": "The link dies on Argus right away. Chat apps sometimes keep an old preview card in threads where it was already pasted, and Argus cannot reach into those."
+    },
+    "strategy_facts": {
+      "strategy_type": "Strategy",
+      "cadence": "How often",
+      "indicator": "Indicator",
+      "indicator_period": "Indicator period",
+      "fast_indicator": "Fast average",
+      "fast_period": "Fast window",
+      "slow_indicator": "Slow average",
+      "slow_period": "Slow window",
+      "exit_fast_indicator": "Fast average on exit",
+      "exit_fast_period": "Fast window on exit",
+      "exit_slow_indicator": "Slow average on exit",
+      "exit_slow_period": "Slow window on exit",
+      "signal_period": "Signal window",
+      "entry_threshold": "Buys at",
+      "exit_threshold": "Sells at"
     }
   }
 }

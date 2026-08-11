@@ -1,0 +1,659 @@
+{
+  "probe": "sector_radar_web_annotations",
+  "tier": "balanced",
+  "elapsed_s": 44.97,
+  "response": {
+    "background": false,
+    "completed_at": 1786271787,
+    "created_at": 1786271787,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_b6a7eaa0-236e-447b-a535-2faba73876d7",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 2048,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## CIBR Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | yearLow | yearHigh | previousClose |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| CIBR | First Trust Nasdaq Cybersecurity ETF | 2026-08-07 20:00:01 UTC | 2026-08-09 10:36:34 UTC | after_hours | 97.85 | USD | 1.46 | 1.51 | 10,573,460,231 | None | 60.07 | 99.97 | 96.39 |\n\nData available in: `CIBR_HACK_BUG_1_more_quotes_c88698.csv` (row key column: symbol)\n\n## HACK Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | yearLow | yearHigh | previousClose |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| HACK | Amplify Cybersecurity ETF | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 115.42 | USD | 2.23 | 1.97 | 2,155,464,691 | None | 69.66 | 116.78 | 113.19 |\n\nData available in: `CIBR_HACK_BUG_1_more_quotes_c88698.csv` (row key column: symbol)\n\n## BUG Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | yearLow | yearHigh | previousClose |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| BUG | Global X - Cybersecurity ETF | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 41.68 | USD | 0.96 | 2.36 | 947,140,196 | None | 23.14 | 42.71 | 40.72 |\n\nData available in: `CIBR_HACK_BUG_1_more_quotes_c88698.csv` (row key column: symbol)\n\n## IHAK Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | yearLow | yearHigh | previousClose |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| IHAK | iShares Cybersecurity and Tech ETF | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 65.58 | USD | 1.14 | 1.77 | 799,003,701 | None | 40.97 | 66.26 | 64.44 |\n\nData available in: `CIBR_HACK_BUG_1_more_quotes_c88698.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/BUG?cited_at=1786147169",
+              "https://www.perplexity.ai/finance/CIBR?cited_at=1786147178",
+              "https://www.perplexity.ai/finance/HACK?cited_at=1786146920",
+              "https://www.perplexity.ai/finance/IHAK?cited_at=1786145651"
+            ],
+            "tickers": [
+              "CIBR",
+              "HACK",
+              "BUG",
+              "IHAK"
+            ]
+          }
+        ],
+        "tickers": [
+          "CIBR",
+          "HACK",
+          "BUG",
+          "IHAK"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## PANW Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| PANW | Palo Alto Networks, Inc. | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 363.86 | USD | 4.37 | 1.22 | 296,545,900,000 | 316.40 | 3.76 | 139.57 | 376.98 |\n\nData available in: `PANW_CRWD_FTNT_2_more_quotes_7f3208.csv` (row key column: symbol)\n\n## CRWD Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| CRWD | CrowdStrike Holdings, Inc. | 2026-08-07 20:00:01 UTC | 2026-08-09 10:36:34 UTC | after_hours | 214.42 | USD | 7.03 | 3.39 | 218,335,154,818 | -4,514.11 | 1.03 | 85.68 | 219.35 |\n\nData available in: `PANW_CRWD_FTNT_2_more_quotes_7f3208.csv` (row key column: symbol)\n\n## FTNT Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| FTNT | Fortinet, Inc. | 2026-08-07 20:00:01 UTC | 2026-08-09 10:36:34 UTC | after_hours | 159.64 | USD | -0.47 | -0.29 | 117,130,047,565 | 56.21 | 3.01 | 73.55 | 172.09 |\n\nData available in: `PANW_CRWD_FTNT_2_more_quotes_7f3208.csv` (row key column: symbol)\n\n## ZS Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| ZS | Zscaler, Inc. | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 168.68 | USD | 6.08 | 3.74 | 27,277,162,677 | -351.42 | 3.94 | 114.62 | 336.99 |\n\nData available in: `PANW_CRWD_FTNT_2_more_quotes_7f3208.csv` (row key column: symbol)\n\n## OKTA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| OKTA | Okta, Inc. | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 148.32 | USD | 4.81 | 3.35 | 24,638,918,400 | 107.48 | 3.54 | 62.66 | 157 |\n\nData available in: `PANW_CRWD_FTNT_2_more_quotes_7f3208.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/CRWD?cited_at=1786147093",
+              "https://www.perplexity.ai/finance/FTNT?cited_at=1786146815",
+              "https://www.perplexity.ai/finance/OKTA?cited_at=1786146939",
+              "https://www.perplexity.ai/finance/PANW?cited_at=1786147130",
+              "https://www.perplexity.ai/finance/ZS?cited_at=1786147134"
+            ],
+            "tickers": [
+              "PANW",
+              "CRWD",
+              "FTNT",
+              "ZS",
+              "OKTA"
+            ]
+          }
+        ],
+        "tickers": [
+          "PANW",
+          "CRWD",
+          "FTNT",
+          "ZS",
+          "OKTA"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## S Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| S | SentinelOne, Inc. | 2026-08-07 20:00:02 UTC | 2026-08-09 10:36:34 UTC | after_hours | 21.40 | USD | 0.64 | 3.08 | 7,206,343,257 | -22.29 | 0.22 | 11.81 | 21.50 |\n\nData available in: `S_CYBR_TENB_2_more_quotes_6802b1.csv` (row key column: symbol)\n\n## CYBR Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| CYBR | CyberArk Software Ltd. | 2026-02-13 14:30:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 408.85 | USD | 0.00 | 0.00 | 20,637,502,330 | -139.54 | -2.94 | 288.63 | 526.19 |\n\nData available in: `S_CYBR_TENB_2_more_quotes_6802b1.csv` (row key column: symbol)\n\n## TENB Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| TENB | Tenable Holdings, Inc. | 2026-08-07 20:00:01 UTC | 2026-08-09 10:36:34 UTC | after_hours | 36.38 | USD | 0.21 | 0.58 | 4,011,695,360 | 583.95 | 1.71 | 15.73 | 43.67 |\n\nData available in: `S_CYBR_TENB_2_more_quotes_6802b1.csv` (row key column: symbol)\n\n## QLYS Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| QLYS | Qualys, Inc. | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 183.48 | USD | 1.70 | 0.94 | 6,461,615,160 | 31.74 | 7.66 | 74.51 | 201.54 |\n\nData available in: `S_CYBR_TENB_2_more_quotes_6802b1.csv` (row key column: symbol)\n\n## RDWR Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | marketCap | pe | eps | yearLow | yearHigh |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| RDWR | Radware Ltd. | 2026-08-07 20:00:00 UTC | 2026-08-09 10:36:34 UTC | after_hours | 28.30 | USD | 0.39 | 1.40 | 1,221,031,800 | 74.55 | 1.18 | 21.68 | 32.79 |\n\nData available in: `S_CYBR_TENB_2_more_quotes_6802b1.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/CYBR?cited_at=1770993000",
+              "https://www.perplexity.ai/finance/QLYS?cited_at=1786145651",
+              "https://www.perplexity.ai/finance/RDWR?cited_at=1786145649",
+              "https://www.perplexity.ai/finance/S?cited_at=1786146831",
+              "https://www.perplexity.ai/finance/TENB?cited_at=1786146826"
+            ],
+            "tickers": [
+              "S",
+              "CYBR",
+              "TENB",
+              "QLYS",
+              "RDWR"
+            ]
+          }
+        ],
+        "tickers": [
+          "S",
+          "CYBR",
+          "TENB",
+          "QLYS",
+          "RDWR"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "queries": [
+          "cybersecurity stocks August 2026 CIBR PANW CRWD FTNT",
+          "cybersecurity sector stocks latest August 2026 earnings",
+          "cybersecurity ETF performance 2026 CIBR HACK"
+        ],
+        "results": [
+          {
+            "date": "2026-07-10",
+            "id": 1,
+            "last_updated": "2026-08-09",
+            "snippet": "- CIBR beat HACK by 90 percentage points over a decade, but HACK's defense-contractor tilt now leads year-to-date, 35% versus 29%.\n...\nOver the past decade, CIBR returned 446.18% against HACK's 355.74%, a roughly 90-percentage-point gap driven by CIBR's heavier weight in platform consolidation winners.\n...\nIn 2026, the picture reverses.\nHACK is up 35.44% year-to-date against CIBR's 28.62%, and its one-month gain of 12.47% nearly doubled CIBR's 6.51%.\n...\n|Factor|CIBR|HACK|\n...\n|YTD 2026 return|28.62%|35.44%|\n|10-year return|446.18%|355.74%|",
+            "source": "web",
+            "title": "CIBR vs. HACK: Which Cybersecurity ETF Is the Smarter ...",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/cibr-vs-hack-cybersecurity-etf-142144448.html"
+          },
+          {
+            "date": "2026-06-04",
+            "id": 2,
+            "last_updated": "2026-08-07",
+            "snippet": "- CIBR's $14.4 billion market-cap approach returned 32% this year, while BUG's 25-stock equal-weight pure-play fund lagged at just 10%.\n- HACK, the original cybersecurity ETF from 2014, blends pure-plays with IT services firms and delivered 28% one-year and 81% five-year returns.\n...\nYear to date, CIBR is up 32%, HACK is up 28%, and BUG is up 27%.\n...\nPerformance has been competitive across recent windows.\nHACK delivered a 28% one-year return and 81% over five years, narrowly trailing CIBR but well ahead of BUG over both windows.",
+            "source": "web",
+            "title": "After Reviewing Every Cybersecurity ETF These 3 Capture the Full ...",
+            "url": "https://247wallst.com/investing/2026/06/04/after-reviewing-every-cybersecurity-etf-these-3-capture-the-full-stack-most-investors-miss/"
+          },
+          {
+            "id": 3,
+            "last_updated": "2026-08-06",
+            "snippet": "CIBR is up 37.42% year-to-date (YTD) with +$558M in YTD flows.\nHACK performs better with 41.86% YTD performance, and -$68M in YTD flows.\n...\nData as of 08/04/2026\n| | |1M|3M|YTD|1Y|3Y|5Y|\n...\n|Perf.|CIBR HACK|+5.39%+3.46%|+40.45%+38.70%|+37.42%+41.86%|+35.20%+34.15%|+120.05%+125.13%|+105.73%+84.66%|\n...\n### As of August 4, 2026, CIBR is up 37.42% year-to-date (YTD), while HACK has returned 41.86%.\nThat puts HACK better performer ahead so far this year.",
+            "source": "web",
+            "title": "CIBR vs. HACK ETF Comparison Analysis",
+            "url": "https://www.etfcentral.com/compare-etfs/CIBR-vs-HACK"
+          },
+          {
+            "date": "2026-05-20",
+            "id": 4,
+            "last_updated": "2026-07-15",
+            "snippet": "- The top cybersecurity ETFs in 2026 are CIBR (Cybereason), HACK (Invesco CyberSecurity ETF), and IHAK (iShares Global Tech ETF) based on 1-year performance and expense ratios\n- Cybersecurity ETFs returned an average of 24.3% in 2025, outpacing the S&P 500\u2019s 18.7% return (S&P Capital IQ 2026 )\n...\nHACK (Invesco CyberSecurity ETF) is the largest by assets.\nIt holds 40 companies: Palo Alto Networks, CrowdStrike, Fortinet.\nExpense ratio is 0.60%.\nHACK returned 26.4% in 2025 (Invesco Fund Performance Report 2026 ).\nCIBR (Cybereason) is more concentrated.\nHolds 30 companies, pure-play cybersecurity specialists (companies where security is the primary business, not a side product).\nExpense ratio is 0.67%.\nCIBR returned 24.1% in 2025 (Cybereason Fund Data 2026 ).\n...\nIHAK returned 22.3% in 2025 because diversification beyond cyber mattered (iShares Fund Data 2026).\n...\n|ETF|Expense Ratio|Holdings|2025 Return|Best For|\n...\n|HACK|0.60%|40 companies|26.4%|Broad cyber exposure|\n|CIBR|0.67%|30 companies|24.1%|Pure-play cyber focus|\n...\nYes.\nBuy individual stocks: Palo Alto Networks (PANW), CrowdStrike (CRWD), Fortinet (FTNT), or Okta (OKTA).\n...\nThe top three ETFs (HACK, CIBR, IHAK) returned 22-26% in 2025, beating the broader market.",
+            "source": "web",
+            "title": "Best Cybersecurity ETFs to Buy and Why They Are Smart ...",
+            "url": "https://techbiva.com/security/best-cybersecurity-etfs/"
+          },
+          {
+            "date": "2026-06-16",
+            "id": 5,
+            "last_updated": "2026-07-19",
+            "snippet": "First Trust Exchange-Traded Fund II - First Trust Nasdaq Cybersecurity ETF\nNASDAQ: CIBR\n$84.54\n(+0.37%)+$0.31\nGlobal X Funds - Global X Cybersecurity ETF\n...\nFortinet\nNASDAQ: FTNT\n$144.73\n(+0.41%)+$0.59\nElastic\n...\n(+1.45%)+$0.22\nCrowdStrike\nNASDAQ: CRWD\n$684.86\n(+0.28%)+$1.90\nCloudflare\nNYSE: NET\n$223.93\n(-1.30%)-$2.94\nPalo Alto Networks\nNASDAQ: PANW\n$288.02\n(+2.09%)+$5.89",
+            "source": "web",
+            "title": "8 Best Cybersecurity Stocks for 2026 and How to Invest | The Motley Fool",
+            "url": "https://www.fool.com/investing/stock-market/market-sectors/information-technology/cybersecurity-stocks/"
+          },
+          {
+            "date": "2026-07-20",
+            "id": 6,
+            "last_updated": "2026-08-09",
+            "snippet": "Cybersecurity Stocks Are Holding Up as the AI Trade Starts to Crack Written by Ryan Hasson | Reviewed by Shannon HarmsJuly 20, 2026Add As Preferred SourceShareShareShare This ArticleLink copied to clipboard.Close Key PointsCybersecurity stocks have shown notable relative strength as many semiconductor and AI infrastructure names have pulled back.CrowdStrike, Fortinet and Palo Alto Networks remain near their highs, supported by AI-driven security demand and platform strategies.Valuations and analyst price targets remain key risks, but the group\u2019s resilience could signal a leadership rotation.MarketBeat previews the top five stocks to own by September 1st.\n...\nCrowdStrike: The Platform Leader Keeps CompoundingCrowdStrike TodayCRWDCrowdStrike$214.42 +7.03 (+3.39%) As of 08/7/2026 04:00 PM Eastern52-Week Range$85.68\u25bc$219.35Price Target$185.78Add to WatchlistCrowdStrike NASDAQ: CRWD is up around 75% year to date and trades within striking distance of its 52-week high of $217.50.\n...\nFortinet: The Stock That Doubled While Nobody Was WatchingFortinet TodayFTNTFortinet$159.64 -0.47 (-0.29%) As of 08/7/2026 04:00 PM Eastern52-Week Range$72.83\u25bc$172.09P/E Ratio56.21Price Target$150.91Add to WatchlistFortinet NASDAQ: FTNT has quietly been one of the best large-cap stocks in the entire market, up almost 100% year to date, and it still sits roughly within 6% of its 52-week high.\n...\nPalo Alto Networks: The Sector Heavyweight at the HighsPalo Alto Networks TodayPANWPalo Alto Networks$363.86 +4.37 (+1.22%) As of 08/7/2026 04:00 PM Eastern52-Week Range$139.57\u25bc$376.98P/E Ratio298.25Price Target$333.76Add to WatchlistPalo Alto Networks NASDAQ: PANW is the largest name in the group, with a market cap of almost $295 billion, up over 90% year to date and trading within 5% of its 52-week high.\n...\nCompanies Mentioned in This ArticleCompanyMarketRank\u2122Current PricePrice ChangeDividend YieldP/E RatioConsensus RatingConsensus Price TargetCrowdStrike (CRWD)2.3794 of 5 stars$214.423.4%N/AN/AModerate Buy$185.78Fortinet (FTNT)\n3.3499 of 5 stars$159.64-0.3%N/A56.21Hold$150.91Palo Alto Networks (PANW)3.2527 of 5 stars$363.861.2%N/A298.25Moderate Buy$333.76 Compare These",
+            "source": "web",
+            "title": "Cybersecurity Stocks Are Holding Up as the AI Trade Starts to Crack",
+            "url": "https://www.marketbeat.com/articles/cybersecurity-stocks-are-holding-up-as-the-ai-trade-starts-to-crack/"
+          },
+          {
+            "date": "2026-08-06",
+            "id": 7,
+            "last_updated": "2026-08-06",
+            "snippet": "CIBR U.S.: Nasdaq\n# First Trust NASDAQ Cybersecurity ETF\n...\nLast Updated: Aug 6, 2026 10:47 a.m.\nEDT Real time quote\n## $ 96.57\n-1.00 -1.02%\n...\n|$97.57|\n...\n|Symbol|Price|Change|% Chg|\n...\n|Company|Symbol|Total Net Assets|\n|--|--|--|\n|Palo Alto Networks Inc.|PANW|9.61%|\n|Fortinet Inc.|FTNT|8.84%|\n|CrowdStrike Holdings Inc.\nCl A|CRWD|8.29%|\n|Cisco Systems Inc.|CSCO|7.74%|\n...\nView Holdings As of 06/30/2026",
+            "source": "web",
+            "title": "CIBR Holdings",
+            "url": "https://www.marketwatch.com/investing/fund/cibr/holdings"
+          },
+          {
+            "date": "2021-08-21",
+            "id": 8,
+            "last_updated": "2026-04-01",
+            "snippet": "### CIBR vs. HACK - Yearly Performance Comparison\n| |2026 (YTD)|2025|2024|2023|2022|2021|2020|2019|2018|2017|\n|--|--|--|--|--|--|--|--|--|--|--|\n|CIBR First Trust NASDAQ Cybersecurity ETF|-12.12%|13.06%|18.21%|39.71%|-26.46%|19.67%|50.53%|28.52%|1.47%|18.61%|\n|HACK ETFMG Prime Cyber Security ETF|-6.57%|7.97%|23.49%|37.44%|-28.16%|7.03%|41.51%|23.39%|6.61%|19.68%|\n...\nIn the year-to-date period, CIBR achieves a -12.12% return, which is significantly lower than HACK's -6.57% return.\nOver the past 10 years, CIBR has outperformed HACK with an annualized return of 14.52%, while HACK has yielded a comparatively lower 12.57% annualized return.\n...\nThe current volatility for First Trust NASDAQ Cybersecurity ETF (CIBR) is **7.04%**, while ETFMG Prime Cyber Security ETF (HACK) has a volatility of **8.05%**.",
+            "source": "web",
+            "title": "CIBR vs HACK: Returns, Risk & Fees - PortfoliosLab",
+            "url": "https://portfolioslab.com/tools/stock-comparison/CIBR/HACK"
+          },
+          {
+            "date": "2026-07-27",
+            "id": 9,
+            "last_updated": "2026-08-08",
+            "snippet": "### $93.88\n+7.02%\n(1W)\n...\nCIBR Performance Breakdown\nShare Price\n$93.88\nToday's change\n2.23%\nYear to date change (YTD)\n32.82%\nDividend yield\n0.24\nLast dividend paid\n$0.07\nLast dividend pay date\n6/30/2026",
+            "source": "web",
+            "title": "First Trust NASDAQ CEA Cybersecurity ETF",
+            "url": "https://www.stash.com/investments/etfs/first-trust-nasdaq-cea-cybersecurity-etf-cibr"
+          },
+          {
+            "date": "2015-07-06",
+            "id": 10,
+            "last_updated": "2026-08-09",
+            "snippet": "#### Top 10 Holdings (57.71% of Total Assets)\nSymbolCompany% Assets\nPANW\nPalo Alto Networks, Inc.\n9.16%\nFTNT\nFortinet, Inc.\n8.85%\nCRWD\nCrowdStrike Holdings, Inc.\n8.03%\nCSCO\nCisco Systems, Inc.\n7.47%\nAVGO\nBroadcom Inc.\n6.87%\nNET\nCloudflare, Inc.\n4.64%\nOKTA",
+            "source": "web",
+            "title": "First Trust NASDAQ Cybersecurity ETF (CIBR)",
+            "url": "https://finance.yahoo.com/quote/CIBR/"
+          },
+          {
+            "date": "2026-08-03",
+            "id": 11,
+            "last_updated": "2026-08-07",
+            "snippet": "Key Points Seven cybersecurity stocks to watch are Palo Alto Networks, Fortinet, CrowdStrike, SentinelOne, BlackBerry, Globant, and NetScout Systems, selected for having the highest recent dollar trading volume among cybersecurity stocks.\n...\nCybersecurity Stocks Are Holding Up as the AI Trade Starts to CrackPalo Alto Networks, Fortinet, CrowdStrike, SentinelOne, BlackBerry, Globant, and NetScout Systems are the seven Cybersecurity stocks to watch today, according to MarketBeat's stock screener tool.\n...\nGet Palo Alto Networks alerts:Sign UpPalo Alto Networks (PANW)Palo Alto Networks, Inc.",
+            "source": "web",
+            "title": "Best Cybersecurity Stocks To Keep An Eye On - August 3rd",
+            "url": "https://www.marketbeat.com/instant-alerts/best-cybersecurity-stocks-to-keep-an-eye-on-august-3rd-2026-08-03/"
+          },
+          {
+            "date": "2026-07-06",
+            "id": 12,
+            "last_updated": "2026-07-06",
+            "snippet": "The First Trust Nasdaq Cybersecurity ETF (CIBR) is pushing toward its first record close in over a month Monday \u2014 with CrowdStrike (CRWD), JFrog (FROG), Palo Alto Networks (PANW), and Fortinet (FTNT) all notching intraday record highs.",
+            "source": "web",
+            "title": "Software's strongest pocket is back near records: Chart of the Day",
+            "url": "https://finance.yahoo.com/markets/article/softwares-strongest-pocket-is-back-near-records-chart-of-the-day-165443761.html"
+          },
+          {
+            "date": "2026-01-01",
+            "id": 13,
+            "last_updated": "2026-01-30",
+            "snippet": "In 2025, CIBR experienced a rise of 14.5%, yet it lagged behind the Nasdaq-100 by almost 7 percentage points.",
+            "source": "web",
+            "title": "The NASDAQ Cybersecurity ETF Looks Like One of 2026's Best Investments",
+            "url": "https://finance.yahoo.com/news/nasdaq-cybersecurity-etf-looks-one-121608785.html"
+          },
+          {
+            "date": "2026-06-09",
+            "id": 14,
+            "last_updated": "2026-08-08",
+            "snippet": "Cybersecurity Earnings: 1 AI Standout and 2 Stocks Under Pressure Written by Leo Miller | Reviewed by Jessica MitacekJune 9, 2026Add As Preferred SourceShareShareShare This ArticleLink copied to clipboard.Close Key PointsOkta surged nearly 48% over two days after beating estimates and citing\nstrong demand for its AI agent identity offerings.Zscaler dropped more than 31% despite a beat-and-raise quarter, as investors focused on a lowered free cash flow margin outlook and slowing ARR growth guidance.CrowdStrike fell 7% after its fiscal Q1 2027 report despite beating estimates and raising net new ARR growth guidance by 520 basis points to 27.7%.\n...\nThe latest cybersecurity earnings reports show that investors are rewarding clean execution\u2014and punishing anything less.Get Okta alerts:Sign UpOkta Surges on a Clean Beat and AI Agent Identity MomentumOkta TodayOKTAOkta$148.32 +4.81 (+3.35%) As of 08/7/\n2026 04:00 PM Eastern52-Week Range$62.66\u25bc$157.00P/E Ratio107.48Price Target$121.81Add to Watchlist Identity and access management giant Okta NASDAQ: OKTA was the standout in this cybersecurity earnings cycle.The day after Okta's fiscal Q1 2027 earnings report was released, the stock popped 30% and then climbed another 13% the next day, for a total two-day gain of nearly 48%.\n...\n(ZS) Price Chart for Saturday, August, 8, 2026 CrowdStrike Slips as a Strong Report Runs Into a High BarCrowdStrike TodayCRWDCrowdStrike$214.42 +7.03 (+3.39%) As of 08/7/2026 04:00 PM Eastern52-Week Range$85.68\u25bc$219.35Price Target$185.78Add to Watchlist One of the biggest names in cybersecurity, CrowdStrike NASDAQ: CRWD, also tumbled after reporting its fiscal Q1 2027 report.",
+            "source": "web",
+            "title": "Cybersecurity Earnings: 1 AI Standout and 2 Stocks Under ...",
+            "url": "https://www.marketbeat.com/articles/cybersecurity-earnings-1-ai-standout-and-2-stocks-under-pressure/"
+          },
+          {
+            "date": "2026-06-08",
+            "id": 15,
+            "last_updated": "2026-08-07",
+            "snippet": "That is what happened among the fund\u2019s largest cybersecurity holdings \u2014 **Palo Alto Networks** (NASDAQ:PANW | PANW Price Prediction), **CrowdStrike** (NASDAQ:CRWD), and **Fortinet** (NASDAQ:FTNT) \u2014 each of which posted accelerating numbers tied to the same AI-security narrative.",
+            "source": "web",
+            "title": "Cybersecurity Goes Vertical: CIBR Just Crushed the S&P 500 by ...",
+            "url": "https://247wallst.com/investing/2026/06/08/cybersecurity-goes-vertical-cibr-just-crushed-the-sp-500-by-three-to-one/"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "queries": [
+          "PANW FTNT CRWD 2026 latest earnings AI security platform consolidation",
+          "Okta Zscaler CrowdStrike fiscal 2027 Q1 earnings ARR guidance",
+          "SentinelOne 2026 earnings cybersecurity stock"
+        ],
+        "results": [
+          {
+            "date": "2026-03-12",
+            "id": 16,
+            "last_updated": "2026-08-08",
+            "snippet": "SentinelOne Inc.\n(NYSE:S) presented its fourth quarter and full-year fiscal 2026 earnings results on March 12, 2026, marking a transformational milestone as the AI-powered cybersecurity company surpassed $1 billion in annual revenue while achieving full-year operating profitability.\nDespite beating Wall Street\u2019s EPS forecast with $0.07 versus the expected $0.06, shares declined 0.92% in aftermarket trading to $14.03, reflecting a cautious investor stance even as the company demonstrated significant operational improvements.\nThe cybersecurity provider reported fourth quarter revenue of $271 million, up 20% year-over-year, with annualized recurring revenue (ARR) reaching $1.119 billion, representing 22% growth.\nMore notably, the company expanded its operating margin by over 600 basis points year-over-year, signaling a decisive shift toward profitable growth after years of investment-heavy expansion.\n...\nRevenue for the full year reached $1.001 billion, up 22% from the prior year, while the company achieved a 3% non-GAAP operating margin\u2014a remarkable turnaround from negative margins in previous years.\nThe 79% gross margin for the full year remained consistent with historical levels, demonstrating the company\u2019s ability to scale efficiently.\n...\nARR expanded from $920 million in Q4 FY25 to $1.119 billion in Q4 FY26, with steady quarter-over-quarter increases throughout the year.\nRevenue similarly progressed from $226 million to $271 million over the same period, with the company meeting or exceeding guidance in each quarter.\n...\nOperating margin improved from 1.2% in Q4 FY25 to 5.7% in Q4 FY26, while net income margin expanded from 5.4% to 8.7% over the same period.\nFree cash flow margin on a trailing twelve-month basis reached 5.2% for FY26, up from just 0.8% in the prior year, marking the company\u2019s first full year of positive free cash flow generation.\n...\nDespite the strong operational results and achievement of profitability milestones, SentinelOne\u2019s stock declined in aftermarket trading following the earnings release.\nThe shares closed at $14.16 in regular trading before falling to $14.03 aftermarket, extending a challenging period that has seen the stock decline 28.6% over the past year and trade 34.39% below its 52-week high of $21.40.",
+            "source": "web",
+            "title": "SentinelOne Q4 2026 slides: crosses $1B revenue as margins ...",
+            "url": "https://www.investing.com/news/company-news/sentinelone-q4-2026-slides-crosses-1b-revenue-as-margins-expand-600bps-93CH-4558703"
+          },
+          {
+            "date": "2026-03-12",
+            "id": 17,
+            "last_updated": "2026-08-08",
+            "snippet": "MOUNTAIN VIEW, Calif.--(BUSINESS WIRE)--SentinelOne, Inc.\n(NYSE: S) today announced financial results for the fourth quarter and fiscal year 2026 ended January 31, 2026.",
+            "source": "web",
+            "title": "SentinelOne Announces Fourth Quarter and Fiscal Year ...",
+            "url": "https://www.businesswire.com/news/home/20260312383715/en/SentinelOne-Announces-Fourth-Quarter-and-Fiscal-Year-2026-Financial-Results"
+          },
+          {
+            "date": "2026-05-28",
+            "id": 18,
+            "last_updated": "2026-08-02",
+            "snippet": "Cybersecurity AI platform provider SentinelOne (NYSE:S) met Wall Street's revenue expectations in Q1 CY2026, with sales up 20.8% year on year to $276.7 million.\nOn the other hand, next quarter's revenue guidance of $290 million was less impressive, coming in 0.6% below analysts' estimates.\nIts non-GAAP profit of $0.04 per share was $0.02 above analysts' consensus estimates.\n...\n### SentinelOne (S) Q1 CY2026 Highlights:\n- **Revenue:**$276.7 million vs analyst estimates of $277.2 million (20.8% year-on-year growth, in line)\n- **Adjusted EPS:**$0.04 vs analyst estimates of $0.02 ($0.02 beat)\n- **Adjusted Operating Income:**$10.55 million vs analyst estimates of $5.30 million (3.8% margin, 99.1% beat)\n...\n- **Annual Recurring Revenue:**$1.16 billion vs analyst estimates of $1.16 billion (22.7% year-on-year growth, in line)\n...\nThe stock traded down 16.8% to $15.03 immediately after reporting.",
+            "source": "web",
+            "title": "SentinelOne (NYSE:S) Posts Q1 CY2026 Sales In Line With Estimates ...",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/sentinelone-nyse-posts-q1-cy2026-204327791.html"
+          },
+          {
+            "date": "2026-07-27",
+            "id": 19,
+            "last_updated": "2026-07-29",
+            "snippet": "- **Fiscal 2027 Net New ARR Guidance (period ending Jan. 31, 2027)** -- Raised by more than $50 million, now expecting YoY growth of 27.7% at the midpoint compared to fiscal 2026.\n...\n**CrowdStrike**(NASDAQ:CRWD) reported fiscal Q1 2027 results (period ending Jan. 31, 2027) featuring accelerated growth in annual recurring revenue, net new ARR, and total revenue, supported by surging demand linked to the rapid adoption of AI and the pivotal Mythos inflection point.\n...\n1, record Q1 net new ARR of $256 million, up 32% year over year and exceeding the high end of our guidance.\n...\nWe achieved record Q1 net new ARR of $255.8 million up 32% year over year, driving ending ARR to $5.51 billion, accelerating growth to more than 24% year over year.\n...\nWe now expect FY27 net new ARR growth to accelerate over FY 2026, with year over year growth of 27.7% at the midpoint a 520 basis point increase in year over year growth from our prior guidance translating to an increase of $52 million to $1.291 billion of net new ARR.\n...\nFor the full fiscal year 2027, we expect annual recurring revenue to be in the range of $6.532 to $6.556 billion reflecting a year-over-year growth rate of 24 to 25% and translating to net new ARR of $1.279 to $1.303 billion reflecting a year over year growth rate of 27 to 29%.",
+            "source": "web",
+            "title": "CrowdStrike (CRWD) Q1 2027 Earnings Transcript",
+            "url": "https://www.theglobeandmail.com/investing/markets/stocks/CRWD/pressreleases/2292616/crowdstrike-crwd-q1-2027-earnings-transcript/"
+          },
+          {
+            "date": "2025-05-28",
+            "id": 20,
+            "last_updated": "2026-02-19",
+            "snippet": "SentinelOne\nInc (NYSE:\nS\n) reported first-quarter fiscal 2026 results that met expectations, but its shares tumbled more than 14% in premarket trading Thursday due to disappointing guidance.\nThe cybersecurity firm posted adjusted earnings per share of $0.02, in line with analyst estimates.\nRevenue for the quarter rose 23% YoY to $229 million, slightly above the consensus of $228.34 million.\nAnnualized recurring revenue (ARR) grew 24% YoY to $948.1 million.\n...\nThe company forecast second-quarter revenue of $242 million, below the $245 million analysts anticipated.\nFor fiscal year 2026, SentinelOne expects revenue between $996 million and $1.001 billion, also below the consensus estimate of $1.01 billion.",
+            "source": "web",
+            "title": "SentinelOne stock falls sharply as weak guidance overshadows in-line Q1 results",
+            "url": "https://www.investing.com/news/earnings/sentinelone-stock-tumbles-on-weak-guidance-despite-inline-q1-results-4068765"
+          },
+          {
+            "date": "2026-03-19",
+            "id": 21,
+            "last_updated": "2026-07-26",
+            "snippet": "Revenue reached $1,001.3 million, up 22% from $821.5 million in fiscal 2025, reflecting continued customer adoption across endpoints, cloud, and identity security.\nThe company remains unprofitable, with a fiscal 2026 net loss of $450.7\u00a0million versus $288.4\u00a0million a year earlier as it invests heavily in R&D and go-to-market.\n...\n**SentinelOne** delivered fiscal 2026 revenue of $1,001.3 million, a 22% increase over fiscal 2025, showing solid demand for its AI-powered Singularity cybersecurity platform across endpoints, cloud workloads, and identity protection.",
+            "source": "web",
+            "title": "SentinelOne posts 22% revenue growth in 2026 | S Annual Report (10-K)",
+            "url": "https://www.stocktitan.net/sec-filings/S/10-k-sentinel-one-inc-files-annual-report-d97954d9b3f2.html"
+          },
+          {
+            "date": "2026-06-03",
+            "id": 22,
+            "last_updated": "2026-08-05",
+            "snippet": "Achieves record Q1 net new ARR of $256 million, up 32% year-over-year\n...\nRaises FY27 net new ARR growth guidance by 520 basis points at the midpoint\n...\nWe delivered record Q1 net new ARR of $256 million, record cash flow from operations of $591 million, and record\nfree cash flow of $468 million.\nWe are raising our full-year net new ARR growth expectations to 27.7%, at the midpoint, now an\n...\nAnnual Recurring Revenue (ARR) grew 24% year-over-year to $5.51 billion as of April 30, 2026, of which $255.8 million\nwas net new ARR added in the quarter.\n...\nAnnual recurring revenue\n$5,792.6 - $5,794.6\nmillion\n$6,531.7 - $6,555.5\nmillion\nTotal revenue\n$1,436.0 - $1,442.0\n...\n$5,914.7 - $5,958.7\nmillion\n...\n$300.7 - $303.4\nmillion",
+            "source": "web",
+            "title": "[PDF] CrowdStrike Reports First Quarter Fiscal Year 2027 Financial Results",
+            "url": "https://ir.crowdstrike.com/node/16821/pdf"
+          },
+          {
+            "id": 23,
+            "last_updated": "2026-08-09",
+            "snippet": "",
+            "source": "web",
+            "title": "[PDF] Palo Alto Networks, Inc. (PANW)",
+            "url": "https://investors.paloaltonetworks.com/static-files/16d1b661-d762-4918-b2c6-e3ed8bef4e32"
+          },
+          {
+            "date": "2026-06-09",
+            "id": 24,
+            "last_updated": "2026-08-08",
+            "snippet": "Cybersecurity Earnings: 1 AI Standout and 2 Stocks Under Pressure Written by Leo Miller | Reviewed by Jessica MitacekJune 9, 2026Add As Preferred SourceShareShareShare This ArticleLink copied to clipboard.Close Key PointsOkta surged nearly 48% over two days after beating estimates and citing\nstrong demand for its AI agent identity offerings.Zscaler dropped more than 31% despite a beat-and-raise quarter, as investors focused on a lowered free cash flow margin outlook and slowing ARR growth guidance.CrowdStrike fell 7% after its fiscal Q1 2027 report despite beating estimates and raising net new ARR growth guidance by 520 basis points to 27.7%.\n...\nAdding to the positives, Okta also raised the midpoints of both its full-year revenue and adjusted operating margin guidance.\nThese figures each increased by 50 basis points to 9.5% YOY and 25.5%, respectively.\n...\nIt also guided for 16% to 17% annual recurring revenue growth next fiscal year, a sharp slowdown from its current-year ARR growth expectation of 24%.\n...\n(ZS) Price Chart for Saturday, August, 8, 2026 CrowdStrike Slips as a Strong Report Runs Into a High BarCrowdStrike TodayCRWDCrowdStrike$214.42 +7.03 (+3.39%) As of 08/7/2026 04:00 PM Eastern52-Week Range$85.68\u25bc$219.35Price Target$185.78Add to Watchlist One of the biggest names in cybersecurity, CrowdStrike NASDAQ: CRWD, also tumbled after reporting its fiscal Q1 2027 report.\n...\nCrowdStrike also increased its net new ARR growth guidance for its full fiscal year by a very significant 520 basis points to 27.7%.",
+            "source": "web",
+            "title": "Cybersecurity Earnings: 1 AI Standout and 2 Stocks Under Pressure",
+            "url": "https://www.marketbeat.com/articles/cybersecurity-earnings-1-ai-standout-and-2-stocks-under-pressure/"
+          },
+          {
+            "date": "2026-07-31",
+            "id": 25,
+            "last_updated": "2026-08-03",
+            "snippet": "",
+            "source": "web",
+            "title": "Okta (OKTA) Q1 2027 Earnings Call Transcript",
+            "url": "https://www.theglobeandmail.com/investing/markets/markets-news/motley/2189068/okta-okta-q1-2027-earnings-call-transcript/"
+          },
+          {
+            "date": "2026-05-29",
+            "id": 26,
+            "last_updated": "2026-08-08",
+            "snippet": "",
+            "source": "web",
+            "title": "SentinelOne stock drops after lackluster guidance, layoffs",
+            "url": "https://www.cnbc.com/2026/05/29/sentinelone-s-stock-earnings-ai-layoffs.html"
+          },
+          {
+            "date": "2026-02-19",
+            "id": 27,
+            "last_updated": "2026-05-11",
+            "snippet": "In a decisive display of market dominance, Palo Alto Networks (NASDAQ: PANW) reported fiscal second-quarter 2026 results that surpassed analyst expectations, signaling a successful acceleration of its \"platformization\" strategy.\nFor the period ending January 31, 2026, the cybersecurity giant posted revenue of $2.59 billion\u2014a 15% year-over-year increase\u2014and non-GAAP diluted earnings per share of $1.03, beating the consensus estimate of $0.94.\n...\nPalo Alto Networks now boasts over 1,550 \"platformized\" customers\u2014large enterprises that have committed to multiple pillars of the company\u2019s ecosystem\u2014representing a 35% increase from the previous year.\n...\n**CrowdStrike (NASDAQ: CRWD)** continues to be a formidable challenger, recently reporting its own strong revenue of $1.23 billion for its fiscal third quarter.",
+            "source": "web",
+            "title": "Palo Alto Networks Q2 2026 Results: Platformization and AI ...",
+            "url": "http://markets.chroniclejournal.com/chroniclejournal/article/marketminute-2026-2-19-palo-alto-networks-q2-2026-results-platformization-and-ai-governance-take-center-stage"
+          },
+          {
+            "date": "2026-06-04",
+            "id": 28,
+            "last_updated": "2026-08-06",
+            "snippet": "Measuring against the prior-year period's loss of $104.3 million, or 42 cents per share, the quarter ended April 30 saw the cybersecurity company earn $27.8 million in net income, equal to 11 cents per share.\nAdjusted earnings came in at $1.10 per share.\n...\nThe quarter brought in $255.8 million in net new ARR, pushing the company's annual recurring revenue figure up 24% to $5.51 billion.\nLooking ahead to the full fiscal year 2027, management lifted its total revenue target to a range of $5.91 billion to $5.96 billion, revising upward from the previous forecast of $5.87 billion to $5.93 billion.\nAdjusted earnings guidance was similarly revised higher, moving to $4.88 to $4.96 per share from what had been a range of $4.78 to $4.90.",
+            "source": "web",
+            "title": "CrowdStrike Q1 2027 earnings: profit, raised outlook, stock ...",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/crowdstrike-q1-2027-earnings-profit-114408133.html"
+          },
+          {
+            "date": "2021-09-08",
+            "id": 29,
+            "last_updated": "2026-06-26",
+            "snippet": "Cybersecurity AI platform provider SentinelOne (NYSE:S) met Wall Street\u2019s revenue expectations in Q1 CY2026, with sales up 20.8% year on year to $276.7 million.\nOn the other hand, next quarter\u2019s revenue guidance of $290 million was less impressive, coming in 0.6% below analysts\u2019 estimates.\nIts non-GAAP profit of $0.04 per share was $0.02 above analysts\u2019 consensus estimates.\n### SentinelOne (S) Q1 CY2026 Highlights:\n- **Revenue:** $276.7 million vs analyst estimates of $277.2 million (20.8% year-on-year growth, in line)\n- **Adjusted EPS:** $0.04 vs analyst estimates of $0.02 ($0.02 beat)\n- **Adjusted Operating Income:** $10.55 million vs analyst estimates of $5.3 million (3.8% margin, 99.1% beat)\n- The company **reconfirmed its revenue guidance for the full year** of $1.2 billion at the midpoint\n- Management **reiterated its full-year Adjusted EPS guidance** of $0.35 at the midpoint\n- **Operating Margin:** -28.8%, up from -38.2% in the same quarter last year\n- **Free Cash Flow** was $30.72 million, up from -$2.31 million in the previous quarter\n...\n- **Annual Recurring Revenue:** $1.16 billion vs analyst estimates of $1.16 billion (22.7% year-on-year growth, in line)",
+            "source": "web",
+            "title": "SentinelOne (S) Research Report",
+            "url": "https://stockstory.org/us/stocks/nyse/s"
+          },
+          {
+            "date": "2026-03-13",
+            "id": 30,
+            "last_updated": "2026-07-24",
+            "snippet": "SentinelOne reported fourth-quarter and full fiscal year 2026 results for the period ended January 31, 2026, saying it surpassed $1 billion in revenue and grew 22% year-over-year.\nThe company also said it achieved full-year operating profitability.\nWhile fourth-quarter earnings came in above estimates and revenue met expectations, SentinelOne issued first-quarter adjusted earnings-per-share guidance that was below Wall Street estimates and forecasted quarterly profit that missed analyst forecasts.\n...\nThe company achieved over $1 billion in revenue for fiscal 2026, grew revenue 22% year-over-year, and reached full-year operating profitability, but its near-term profit guidance came in below analyst expectations.\n...\nSentinelOne (NYSE:S) reported fiscal fourth quarter 2026 results on March 12, posting revenue and earnings slightly above analyst expectations, even as the company offered cautious guidance for the first quarter of 2027.\n...\nachieved a milestone with over $1.0B in annual revenue for FY 2026, reflecting rapid growth in the cybersecurity market.",
+            "source": "web",
+            "title": "SentinelOne Tops $1 Billion Revenue for FY26 but Issues ...",
+            "url": "https://www.alphaspread.com/market-news/earnings/sentinelone-tops-1-billion-revenue-for-fy26-but-issues-cautious-quarterly-profit-outlook"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "queries": [
+          "CyberArk acquisition closed 2026 PANW CYBR",
+          "cybersecurity mergers acquisitions 2026 CyberArk"
+        ],
+        "results": [
+          {
+            "date": "2026-02-11",
+            "id": 31,
+            "last_updated": "2026-08-02",
+            "snippet": "SANTA CLARA, Calif., Feb. 11, 2026 /PRNewswire/ -- Palo Alto Networks\u00ae (NASDAQ: PANW), the global cybersecurity leader, today announced the completion of its acquisition of CyberArk, establishing Identity Security as a core pillar of its platformization strategy.\nThe addition of the CyberArk Identity Security Platform enables Palo Alto Networks to secure every identity across the enterprise - human, machine, and agentic.\n...\nCyberArk's Identity Security solutions will continue to be available as a standalone platform.\nIn addition, integration is underway to infuse CyberArk's best-in-class capabilities into the\u00a0Palo Alto Networks security ecosystem.\n...\nBuilding on CyberArk's heritage and\u00a0Israel's position as a global cybersecurity powerhouse, Palo Alto Networks announces its intent to pursue a secondary listing on the Tel Aviv Stock Exchange (TASE).\nAs part of this historic move, the company plans to adopt the \"CYBR\" ticker on the TASE, providing a world-class tribute to the brand CyberArk built while ensuring its identity remains a cornerstone of the global strategy.\n...\nUnder the terms of the agreement, CyberArk shareholders are entitled to receive $45.00 in cash and 2.2005 shares of Palo Alto Networks common stock for each CyberArk ordinary share.",
+            "source": "web",
+            "title": "Palo Alto Networks Completes Acquisition of CyberArk to Secure the ...",
+            "url": "https://investors.paloaltonetworks.com/news-releases/news-release-details/palo-alto-networks-completes-acquisition-cyberark-secure--ai-era"
+          },
+          {
+            "date": "2026-02-12",
+            "id": 32,
+            "last_updated": "2026-02-12",
+            "snippet": "ERUSA, Feb12 () - Palo Alto Networks (PANW.O), a cybersecurity enterprise listed on Nasdaq, announced on Thursday that it will also be available for trading on the Tel Aviv Stock Exchange (TASE).\nThis development follows the company's completion of a $25 billion acquisition of Israeli counterpart CyberArk Software (CYBG.F).\n...\nThe firm indicated that it will trade under the ticker \"CYBR\" in Tel Aviv.\n\"This reflects that while CyberArk is now part of Palo Alto Networks, its identity is a fundamental aspect of our global strategy,\" the company noted, having finalized the acquisition on Wednesday.\nAccording to the terms of the deal, CyberArk shareholders will receive $45 in cash along with2.5 shares Palo Alto common stock for every ordinary share of CyberArk.",
+            "source": "web",
+            "title": "Palo Alto plans dual listing in Tel Aviv after closing $25 billion ...",
+            "url": "https://www.reuters.com/business/palo-alto-plans-dual-listing-tel-aviv-after-closing-25-billion-cyberark-deal-2026-02-12/"
+          },
+          {
+            "date": "2026-02-11",
+            "id": 33,
+            "last_updated": "2026-08-08",
+            "snippet": "**Palo Alto Networks** has completed its acquisition of **CyberArk**, making identity security a core part of its cybersecurity platform.\nCyberArk shareholders will receive **$45.00 in cash** plus **2.2005 Palo Alto Networks shares** for each CyberArk ordinary share.\nCyberArk\u2019s 0.00% Convertible Senior Notes due 2030 are now exchangeable into Palo Alto Networks common stock and cash, and Palo Alto Networks has guaranteed CyberArk\u2019s obligations under these notes.\nRelated capped call transactions were amended so dealers deliver Palo Alto Networks shares instead of CyberArk shares.\nPalo Alto Networks also announced its intent to seek a secondary listing on the **Tel Aviv Stock Exchange** under the \u201cCYBR\u201d ticker while remaining listed on Nasdaq as \u201cPANW.\u201d\nThe company plans to discuss results and updates on its Q2 FY2026 earnings call on **February 17, 2026**.\n...\n**Palo Alto Networks** has finalized its acquisition of **CyberArk**, bringing CyberArk\u2019s identity security platform into its broader security portfolio.\n...\nPalo Alto Networks also plans a secondary listing on the **Tel Aviv Stock Exchange** under the \u201cCYBR\u201d ticker, leveraging CyberArk\u2019s Israeli roots while keeping \u201cPANW\u201d on Nasdaq.\n...\nPalo Alto Networks announced it has completed its acquisition of CyberArk.\nCyberArk becomes a wholly owned subsidiary, and its Identity Security Platform will both remain available standalone and be integrated into Palo Alto Networks\u2019 broader cybersecurity ecosystem.\n...\nCyberArk shareholders are entitled to receive $45.00 in cash plus 2.2005 shares of Palo Alto Networks common stock for each CyberArk ordinary share.\n...\nFollowing the merger, CyberArk\u2019s 0.00% Convertible Senior Notes due 2030 are no longer convertible into CyberArk ordinary shares.\nUnder a supplemental indenture, they become exchangeable into Palo Alto Networks common stock and cash, and Palo Alto Networks guarantees CyberArk\u2019s obligations on these notes.\n...\nPalo Alto Networks announced its intent to pursue a secondary listing on the Tel Aviv Stock Exchange under the \u201cCYBR\u201d ticker.\nThe company will continue trading on the Nasdaq Global Select Market under \u201cPANW,\u201d aiming to honor CyberArk\u2019s heritage and strengthen its Israeli innovation hub.",
+            "source": "web",
+            "title": "Palo Alto Networks closes CyberArk acquisition | PANW 8-K Filing",
+            "url": "https://www.stocktitan.net/sec-filings/PANW/8-k-palo-alto-networks-inc-reports-material-event-83b07eaa0dfd.html"
+          },
+          {
+            "date": "2026-02-19",
+            "id": 34,
+            "last_updated": "2026-07-19",
+            "snippet": "SANTA CLARA, Calif., Feb. 19, 2026 /PRNewswire/ -- Today, Palo Alto Networks, Inc.\n(NASDAQ: PANW) (\"Palo Alto Networks\") announced that, in connection with the closing of the transaction (the \"Acquisition\") contemplated by the Agreement and Plan of Merger, dated as of July 30, 2025, by and among Palo Alto Networks, CyberArk Software Ltd., a\ncompany organized under the laws of the State of Israel (\"CyberArk\"), and Athens Strategies Ltd., a company organized under the laws of the State of Israel, Palo Alto Networks has made an offer to purchase (the \"Offer to Purchase\") for cash, any and all of CyberArk's 0.00% Convertible Senior Notes due 2030 (the \"Notes\").\n...\nThe Acquisition closed on, and therefore the Effective Date (as defined in the Indenture) of the Make-Whole Fundamental Change (as defined in the Indenture) was, February 11, 2026.\nIn connection with the Fundamental Change, and as more fully described in the Offer to Purchase, on or before 5:00 p.m., New York City time, on March 20, 2026, each holder of Notes shall, subject to certain conditions, have the right to require the repurchase of all of\nsuch holder's Notes, or any portion of the principal amount thereof that is equal to $100,000 or an integral multiple of $100,000 in excess thereof, on March 24, 2026 (the \"Fundamental Change Repurchase Date\") at a repurchase price equal to 100% of the principal amount of such Notes or such portion of the principal amount of Notes, as applicable, plus any accrued and unpaid Special Interest (as defined in the Indenture) thereon from February 11, 2026 to, but excluding, the Fundamental Change Repurchase Date.",
+            "source": "web",
+            "title": "Palo Alto Networks Announces Offer to Purchase Relating ...",
+            "url": "https://www.paloaltonetworks.com/company/press/2026/palo-alto-networks-announces-offer-to-purchase-relating-to-cyberark-software-ltd--s-0-00--convertible-senior-notes-due-2030"
+          },
+          {
+            "date": "2026-02-13",
+            "id": 35,
+            "last_updated": "2026-03-19",
+            "snippet": "**SANTA CLARA, Calif.** \u2014 In a move that fundamentally redraws the map of the cybersecurity industry, Palo Alto Networks (NASDAQ: PANW) officially closed its landmark $25 billion acquisition of identity security leader CyberArk (NASDAQ: CYBR) on February 11, 2026.\n...\nUnder the final terms, CyberArk shareholders received $45.00 in cash and 2.2005 shares of Palo Alto Networks common stock for each share held, representing a roughly 26% premium over CyberArk\u2019s valuation prior to the acquisition rumors.\nIn a nod to CyberArk\u2019s Israeli roots and its dominant market position, Palo Alto Networks also pursued a secondary listing on the Tel Aviv Stock Exchange (TASE) under the ticker \u201cCYBR,\u201d ensuring continued visibility in one of the world's most vibrant cybersecurity hubs.",
+            "source": "web",
+            "title": "Palo Alto Networks Closes $25 Billion Acquisition of CyberArk to ...",
+            "url": "https://investor.wedbush.com/wedbush/article/marketminute-2026-2-13-the-identity-fortress-palo-alto-networks-closes-25-billion-acquisition-of-cyberark-to-secure-the-era-of-ai-agents"
+          },
+          {
+            "date": "2026-02-09",
+            "id": 36,
+            "last_updated": "2026-08-04",
+            "snippet": "### Resources: - SEC Filing|At a special meeting held on November 13, 2025, the shareholders of CyberArk Software Ltd.\n(CYBR) approved the proposed merger with Palo Alto Networks (PANW).\nThe merger closed prior to the market open on February 11, 2026 In anticipation of the closing, the stock was halted immediately following the after-hours session at or around 7:50 p.m. on February 10, 2026.\nThe stock will remain halted on the day of closing (February 11th) and will be suspended effective February 12, 2026.\nThe details are as follows: <table><tr><td>**Company Name/Issue:**</td><td>CyberArk Software Ltd.\nOrdinary Shares</td></tr><tr><td>**CUSIP#:**</td><td>M2682V108</td></tr><tr><td>**Symbol:**</td><td>CYBR</td></tr><tr><td>**Last Trading Date:**</td><td>February 10, 2026</td></tr><tr><td>**Marketplace Effective Date for Suspension:**</td><td>February 12, 2026</td></tr><tr><td>**Merger Consideration:**</td><td>$45.00 and 2.2005 shares of Palo Alto Networks Common Stock (PANW) for each share held.</td></tr></table>|",
+            "source": "web",
+            "title": "Closed) Information Regarding the Merger of CyberArk Software Ltd ...",
+            "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ECA2026-84"
+          },
+          {
+            "id": 37,
+            "last_updated": "2026-07-16",
+            "snippet": "February 11, 2026 \n...\nAs a result of the acquisition of CyberArk Software Ltd.\n(\u201cCYBR\u201d) by Palo Alto \nNetworks, Inc.\n(\u201cPANW\u201d), you have the right to receive 2.2005 shares of PANW\ncommon stock and US$45.00 cash for each CYBR ordinary share you held as of the \nclosing of the acquisition (the \u201cmerger consideration\u201d).\nThe acquisition closed on \nFebruary 11, 2026.\n...\nAs a result of the acquisition, you will receive a combination of PANW shares of \ncommon stock (\u201cPANW shares\u201d) and cash for each CYBR ordinary share (\u201cCYBR\nshares\u201d) you held as of the closing of the acquisition.\nFor each CYBR share you held at the closing of the acquisition you will be entitled to \nreceive 2.2005 PANW shares and US$45.00 cash, without interest, subject to \nwithholding requirements, if applicable.",
+            "source": "web",
+            "title": "Frequently Asked Questions",
+            "url": "https://investors.paloaltonetworks.com/static-files/bf8f0229-a353-4ab3-a210-658cc02aa56d"
+          },
+          {
+            "date": "2025-11-13",
+            "id": 38,
+            "last_updated": "2026-07-28",
+            "snippet": "**Newton, Mass. and Petach Tikva, Israel \u2013 November 13, 2025 \u2013 ** CyberArk (NASDAQ: CYBR), the global leader in identity security, today announced that its shareholders have voted to approve the previously announced acquisition of CyberArk by Palo Alto Networks (\u201cPANW\u201d) at a special meeting of shareholders held on November 13, 2025.\nThe transaction is expected to close during the second half of PANW\u2019s fiscal year 2026, subject to the satisfaction of remaining customary closing conditions, including the receipt of regulatory approvals.\n...\nOn July 30, 2025, CyberArk announced that it has entered into a definitive agreement under which PANW intends to acquire CyberArk in a cash-and-stock transaction for a per-share consideration of $45.00 in cash and 2.2005 shares of PANW common stock.",
+            "source": "web",
+            "title": "CyberArk Shareholders Approve the Company's ...",
+            "url": "https://www.cyberark.com/press/cyberark-shareholders-approve-the-companys-acquisition-by-palo-alto-networks/"
+          },
+          {
+            "date": "2025-08-01",
+            "id": 39,
+            "last_updated": "2026-07-12",
+            "snippet": "The headline cybersecurity merger and acquisition (M&A) news in July came with Palo Alto Networks\u2019 announcement that it had reached a definitive agreement to acquire identity security firm CyberArk for $25bn.\n...\n## Palo Alto Networks Agrees $25bn CyberArk Acquisition\nIn the biggest M&A news of the month, Palo Alto Networks announced it had entered into a definitive agreement to purchase CyberArk for approximately $25bn.\nThe transaction, announced on July 30, will mark Palo Alto\u2019s formal entry into identity security, establishing this area as a core pillar of the company\u2019s multi-platform strategy.\nThe deal is expected to close during the second half of Palo Alto Networks' fiscal 2026, subject to the satisfaction of customary closing conditions, including the receipt of regulatory clearances and approval by CyberArk shareholders.",
+            "source": "web",
+            "title": "Palo Alto Networks Agrees $25bn Deal to Acquire CyberArk",
+            "url": "https://www.infosecurity-magazine.com/news-features/ma-roundup-palo-alto-acquire/"
+          },
+          {
+            "date": "2026-02-11",
+            "id": 40,
+            "last_updated": "2026-08-07",
+            "snippet": "# Palo Alto Networks Completes $25B Acquisition Of CyberArk For Identity Security Push\n...\nPalo Alto Networks announced Wednesday it has completed its blockbuster acquisition of CyberArk, in a $25 billion deal aimed at providing a crucial missing piece for the cybersecurity giant\u2019s broad platform.\n...\nThe deal for CyberArk\u2014initially announced in July 2025\u2014is by far the largest acquisition in Palo Alto Networks\u2019 history.\nCyberArk will remain available as a stand-alone offering going forward, while CyberArk\u2019s capabilities will also be integrated across the Palo Alto Networks platform, the company said in a news release Wednesday.\n...\nPalo Alto Networks also disclosed Wednesday that the company plans to seek a secondary listing for its shares on the Tel Aviv Stock Exchange, adopting the ticker \u201cCYBR\u201d from CyberArk.",
+            "source": "web",
+            "title": "Palo Alto Networks Completes $25B Acquisition Of CyberArk For Identity Security Push",
+            "url": "https://www.crn.com/news/security/2026/palo-alto-networks-completes-25b-acquisition-of-cyberark-for-identity-security-push"
+          },
+          {
+            "date": "2026-03-21",
+            "id": 41,
+            "last_updated": "2026-06-24",
+            "snippet": "In 2025, Palo Alto Networks completed its landmark acquisition of identity security leader CyberArk for approximately **$25 billion**, along with cloud observability platform Chronosphere for $3.35 billion, AI security startup Protect AI for $700 million, and browser security company Talon for $625 million.\n...\nThe following table captures the most significant cybersecurity acquisitions of 2025-2026, illustrating the breadth and scale of the consolidation wave:\n|Acquirer|Target|Deal Value|Strategic Focus|Year|\n...\n|Palo Alto Networks|CyberArk|$25.0 billion|Identity security|2025|",
+            "source": "web",
+            "title": "38 Cybersecurity M&A Deals in March 2026 Alone [Analysis]",
+            "url": "https://tech-insider.org/cybersecurity-ma-consolidation-2026/"
+          },
+          {
+            "date": "2026-01-15",
+            "id": 42,
+            "last_updated": "2026-06-08",
+            "snippet": "- Palo Alto Networks agreed to acquire CyberArk for approximately $25B at ~13.5x EV/Revenue, establishing identity as the central control plane for Zero Trust security.\n...\nThe three largest deals of 2025 were Google's $32B acquisition of Wiz (cloud/CNAPP), Palo Alto Networks' ~$25B acquisition of CyberArk (identity security), and ServiceNow's $7.75B acquisition of Armis (OT/IoT).",
+            "source": "web",
+            "title": "Cybersecurity M&A Activity: Q1 2026 | Windsor Drake Research",
+            "url": "https://windsordrake.com/market-intelligence/reports/cybersecurity-m-a-activity-q1-2026"
+          },
+          {
+            "id": 43,
+            "last_updated": "2026-07-16",
+            "snippet": "\u2022\nPalo Alto Networks / CyberArk ($25B) closed in February 2026.\n...\nPalo Alto Networks bought CyberArk to make identity a core platform pillar.\n...\nValued at $32B, closed March 2026.\nPalo Alto Networks / CyberArk\nValued at about $25B, closed February 2026.",
+            "source": "web",
+            "title": "Cybersecurity M&A Activity: Q2 2026",
+            "url": "https://windsordrake.com/market-intelligence/reports/files/cybersecurity-ma-activity-q2-2026-deck.pdf"
+          },
+          {
+            "id": 44,
+            "last_updated": "2026-07-12",
+            "snippet": "8 Mega-Deals >$1B defined the landscape, including\nGoogle/Wiz ($32B) and PANW/CyberArk ($25B), signaling\naggressive platformization.\n...\nPANW / CyberArk\n~$25 Billion\n...\n(~$25B Identity)",
+            "source": "web",
+            "title": "CybersecurityM&AReport: Q1 2026",
+            "url": "https://windsordrake.com/wp-content/uploads/2026/01/Cybersecurity-MA-Report-Q1-2026.pdf"
+          },
+          {
+            "date": "2026-07-27",
+            "id": 45,
+            "last_updated": "2026-07-27",
+            "snippet": "Palo Alto Networks completed its $25 billion CyberArk deal in February.\n...\nThe biggest cybersecurity acquisitions of this cycle are Google's $32 billion purchase of Wiz, closed in March 2026, Palo Alto Networks' $25 billion acquisition of CyberArk, closed in February 2026, ServiceNow's $7.75 billion Armis deal, closed in April 2026, and Accenture's $4.175 billion agreement for Dragos, runZero, and NetRise, announced in June 2026.\n...\nThe largest cybersecurity acquisitions of this cycle are Google's $32 billion purchase of Wiz (closed March 2026), Palo Alto Networks' $25 billion acquisition of CyberArk (closed February 2026), ServiceNow's $7.75 billion Armis deal (closed April 2026), Accenture's $4.175 billion agreement for Dragos, runZero, and NetRise (announced June 2026), Palo Alto Networks' $3.3 billion Chronosphere deal, and Francisco Partners' $2.2 billion take-private of Jamf.",
+            "source": "web",
+            "title": "Cybersecurity M&A 2026: Trends, Deals & Valuations",
+            "url": "https://www.feinternational.com/blog/cybersecurity-ma"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "categories": [
+          "etf_holdings"
+        ],
+        "results": [
+          {
+            "category": "etf_holdings",
+            "content": "## CIBR ETF Holdings\nETF Holdings for CIBR (First Trust Nasdaq Cybersecurity ETF):\n\nTotal Holdings: 44\n44 rows (showing sample)\n\n| etf | symbol | name | shares | weight | market_value |\n| --- | --- | --- | --- | --- | --- |\n| CIBR | PANW | Palo Alto Networks, Inc. | 3,979,660 | 9.42 | 1,455,415,257.52 |\n| CIBR | CRWD | CrowdStrike Holdings, Inc. (Class A) | 6,134,136 | 8.56 | 1,321,978,206.56 |\n| CIBR | FTNT | Fortinet, Inc. | 8,125,095 | 8.44 | 1,303,695,430.44 |\n| CIBR | DDOG | Datadog, Inc. (Class A) | 1,133,067 | 1.72 | 266,409,542.99 |\n| CIBR | ACN | Accenture plc | 1,498,146 | 1.71 | 264,595,310.16 |\n| CIBR | GOOGL | Alphabet Inc. (Class A) | 736,900 | 1.70 | 262,415,838 |\n| CIBR | RDWR | Radware Ltd. | 744,278 | 0.14 | 21,170,381 |\n| CIBR | ATO.FP | Atos Group | 0 | 0.13 | 20,157,585.22 |\n| CIBR | $CAD | Canadian Dollar | 0 | 0 | 0.75 |\n\nData available in: `CIBR_etf_holdings.csv` (row key column: symbol)\n\n## HACK ETF Holdings\nETF Holdings for HACK (Amplify Cybersecurity ETF):\n\nTotal Holdings: 23\n| etf | symbol | name | shares | weight | market_value |\n| --- | --- | --- | --- | --- | --- |\n| HACK | PANW | Palo Alto Networks Inc | 511,268 | 6.39 | 186,029,974.48 |\n| HACK | AVGO | Broadcom Inc | 421,232 | 6.19 | 180,186,200.32 |\n| HACK | CRWD | Crowdstrike Holdings Inc | 768,844 | 5.66 | 164,855,530.48 |\n| HACK | CSCO | Cisco Systems Inc | 1,305,848 | 5.45 | 158,569,122.64 |\n| HACK | NET | Cloudflare Inc | 522,806 | 5.39 | 156,982,957.62 |\n| HACK | FTNT | Fortinet Inc | 923,840 | 5.06 | 147,481,817.60 |\n| HACK | QLYS | Qualys Inc | 797,438 | 5.02 | 146,313,924.24 |\n| HACK | GD | General Dynamics Corp | 368,308 | 4.96 | 144,395,151.40 |\n| HACK | NOC | Northrop Grumman Corp | 223,657 | 4.39 | 127,837,868.06 |\n| HACK | OKTA | Okta Inc | 861,700 | 4.39 | 127,807,344 |\n| HACK | ZS | Zscaler Inc | 755,308 | 4.38 | 127,405,353.44 |\n| HACK | S | SentinelOne Inc | 5,569,075 | 4.09 | 119,178,205 |\n| HACK | RBRK | Rubrik Inc | 1,313,624 | 4.06 | 118,318,113.68 |\n| HACK | GEN | GEN DIGITAL INC | 3,925,994 | 3.93 | 114,521,244.98 |\n| HACK | VRNS | Varonis Systems Inc | 2,576,435 | 3.85 | 112,126,451.20 |\n| HACK | FFIV | F5 Inc | 276,631 | 3.80 | 110,716,025.13 |\n| HACK | TENB | Tenable Holdings Inc | 3,018,417 | 3.77 | 109,810,010.46 |\n| HACK | FSLY | Fastly Inc | 4,724,795 | 3.73 | 108,481,293.20 |\n| HACK | 4704.T | Trend Micro Inc/Japan | 2,434,023 | 3.56 | 103,750,548.24 |\n| HACK | NTSK | Netskope Inc | 6,846,884 | 3.50 | 101,813,165.08 |\n| HACK | CHKP | Check Point Software Technologies Ltd | 749,360 | 3.29 | 95,783,195.20 |\n| HACK | ATEN | A10 Networks Inc | 2,714,987 | 2.50 | 72,870,251.08 |\n| HACK | RDWR | Radware Ltd | 2,430,205 | 2.36 | 68,774,801.50 |\n\nData available in: `HACK_etf_holdings.csv` (row key column: symbol)\n\n## BUG ETF Holdings\nETF Holdings for BUG (Global X Cybersecurity ETF):\n\nTotal Holdings: 31\n| etf | symbol | name | shares | weight | market_value |\n| --- | --- | --- | --- | --- | --- |\n| BUG | PANW | PALO ALTO NETWORKS INC | 316,066 | 7.87 | 115,003,774.76 |\n| BUG | OKTA | OKTA INC | 769,611 | 7.81 | 114,148,703.52 |\n| BUG | CRWD | CROWDSTRIKE HOLDINGS INC - A | 508,768 | 7.47 | 109,090,034.56 |\n| BUG | FTNT | FORTINET INC | 672,398 | 7.35 | 107,341,616.72 |\n| BUG | QLYS | QUALYS INC | 489,055 | 6.14 | 89,731,811.40 |\n| BUG | TENB | TENABLE HOLDINGS INC | 2,035,274 | 5.07 | 74,043,268.12 |\n| BUG | ZS | ZSCALER INC | 433,898 | 5.01 | 73,189,914.64 |\n| BUG | RBRK | RUBRIK INC-A | 799,519 | 4.93 | 72,012,676.33 |\n| BUG | VRNS | VARONIS SYSTEMS INC | 1,616,672 | 4.82 | 70,357,565.44 |\n| BUG | SAIL | SAILPOINT INC | 3,723,059 | 4.76 | 69,472,280.94 |\n| BUG | GEN | GEN DIGITAL INC | 2,204,156 | 4.40 | 64,295,230.52 |\n| BUG | S | SENTINELONE INC -CLASS A | 3,002,542 | 4.40 | 64,254,398.80 |\n| BUG | NTSK | NETSKOPE INC-CL A | 4,268,764 | 4.35 | 63,476,520.68 |\n| BUG | AKAM | AKAMAI TECHNOLOGIES INC | 550,591 | 4.17 | 60,862,329.14 |\n| BUG | CVLT | COMMVAULT SYSTEMS INC | 429,880 | 3.98 | 58,149,867.60 |\n| BUG | 4704.T | TREND MICRO INC | 1,216,796 | 3.55 | 51,866,088.40 |\n| BUG | CHKP | CHECK POINT SOFTWARE TECH | 378,072 | 3.31 | 48,325,163.04 |\n| BUG | ATEN | A10 NETWORKS INC | 1,442,799 | 2.65 | 38,724,725.16 |\n| BUG | RDWR | RADWARE LTD | 867,829 | 1.68 | 24,559,560.70 |\n| BUG | RPD | RAPID7 INC | 1,327,682 | 1.05 | 15,361,280.74 |\n| BUG | OSPN | ONESPAN INC | 745,055 | 0.86 | 12,502,022.90 |\n| BUG | NCC.L | NCC GROUP PLC | 5,652,724 | 0.74 | 10,827,074.31 |\n| BUG |  | AHNLAB INC | 222,287 | 0.64 | 9,300,842.55 |\n| BUG | 2326.T | DIGITAL ARTS INC | 284,447 | 0.56 | 8,239,750.69 |\n| BUG | TLS | TELOS CORPORATION | 1,558,415 | 0.51 | 7,449,223.70 |\n| BUG | GRRR | GORILLA TECHNOLOGY GROUP INC | 549,871 | 0.49 | 7,230,803.65 |\n| BUG | 3692.T | FFRI SECURITY INC | 163,117 | 0.37 | 5,380,945.14 |\n| BUG | 4258.T | AMIYA CORP | 150,661 | 0.31 | 4,540,769.05 |\n| BUG | ARQQ | ARQIT QUANTUM INC | 195,183 | 0.31 | 4,469,690.70 |\n| BUG | 4475.T | HENNGE KK | 459,670 | 0.29 | 4,295,899.71 |\n| BUG |  | NASDAQ 100 E-MINI SEP26 | 2 | 0.08 | 1,193,390 |\n\nData available in: `BUG_etf_holdings.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/BUG/holdings",
+              "https://www.perplexity.ai/finance/CIBR/holdings",
+              "https://www.perplexity.ai/finance/HACK/holdings"
+            ],
+            "tickers": [
+              "CIBR",
+              "HACK",
+              "BUG"
+            ]
+          }
+        ],
+        "tickers": [
+          "CIBR",
+          "HACK",
+          "BUG"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "## Cybersecurity stocks: strong sector, but increasingly selective\n\n**As of Friday, August 7, 2026**, cybersecurity remains one of software\u2019s strongest areas. The main ETFs are trading near 52-week highs, and the largest platforms\u2014**Palo Alto Networks (PANW), CrowdStrike (CRWD), and Fortinet (FTNT)**\u2014have driven much of the advance.\n\nOn August 7:\n\n- **CIBR** gained **1.51%** to **$97.85**, 2.12% below its 52-week high.\n- **HACK** gained **1.97%** to **$115.42**, 1.16% below its high.\n- **BUG** gained **2.36%** to **$41.68**, 2.41% below its high.\n- **IHAK** gained **1.77%** to **$65.58**, 1.03% below its high.\n\nAs of August 4, **CIBR had returned 37.42% year to date and HACK 41.86%**, versus three-month gains of 40.45% and 38.70%, respectively. Those exact returns vary somewhat by data provider and calculation date, but the message is consistent: cybersecurity has experienced a major 2026 re-rating rather than a mild defensive move.\n\n## What is driving the sector\n\n### 1. AI is expanding the attack surface\u2014and security budgets\n\nCompanies are deploying copilots, autonomous agents and machine identities faster than traditional access-control systems were designed to handle. That creates spending on:\n\n- identity and privileged-access security;\n- cloud and application protection;\n- endpoint detection;\n- data security;\n- monitoring of machine and AI-agent activity.\n\nThis is helping **CRWD, PANW, OKTA, ZS, S** and cloud-security providers. Importantly, cybersecurity spending is being viewed as a necessary component of AI adoption, not merely another discretionary software project.\n\n**CrowdStrike\u2019s latest numbers illustrate the demand:** fiscal Q1 2027 annual recurring revenue reached **$5.51 billion**, up **24%**, with net new ARR of **$255.8 million**, up **32%**. It raised full-year net-new-ARR growth guidance to **27.7%** at the midpoint and revenue guidance to **$5.9147 billion\u2013$5.9587 billion**.\n\n### 2. Customers are consolidating vendors onto broad platforms\n\nThe market is rewarding vendors that can replace multiple point products. That is central to:\n\n- **PANW:** network, cloud, operations and identity;\n- **CRWD:** endpoint-led expansion into identity, cloud and next-generation SIEM;\n- **FTNT:** networking plus security through \u201csecure networking\u201d;\n- **OKTA:** workforce, customer and machine/agent identity.\n\nPalo Alto reported fiscal Q2 2026 revenue of **$2.59 billion**, up **15%**, and more than **1,550 platformized customers**, up **35%**. Platform consolidation can pressure near-term billings when vendors offer incentives to migrate, but investors currently believe it increases long-term wallet share and retention.\n\n### 3. M&A has validated the strategic value of cyber assets\n\n**PANW completed its $25 billion acquisition of CyberArk on February 11**, turning identity security into another core platform pillar. Former Nasdaq ticker **CYBR is no longer an independently traded U.S. stock**; its stale February quote should not be treated as a current market price.\n\nOther large transactions\u2014including Google\u2019s acquisition of Wiz\u2014reinforce the idea that cloud, identity and data-security assets are strategically scarce. They also support valuation expectations for remaining independent vendors.\n\n### 4. Earnings reactions show that expectations are extremely high\n\nThis is not a sector where every beat is rewarded:\n\n- **OKTA** rose nearly **48% over two sessions** after its fiscal Q1 report, helped by AI-agent identity demand and increases in full-year revenue-growth and operating-margin guidance.\n- **CRWD** initially fell **7%** despite beating estimates and raising guidance\u2014the stock had already priced in exceptional execution.\n- **ZS** dropped more than **31%** after a beat-and-raise quarter because investors focused on lower free-cash-flow-margin expectations and guidance implying ARR growth would eventually slow.\n- **S** fell **16.8%** following its May report. Revenue rose **20.8%** to **$276.7 million** and ARR rose **22.7%** to **$1.16 billion**, but next-quarter revenue guidance was **0.6% below** consensus.\n\nThe sector is therefore strong at the index level but highly sensitive to guidance quality, ARR momentum and cash-flow margins.\n\n## Leaders\n\n### **PANW \u2014 scale and platform leader**\n\n- Price: **$363.86**\n- August 7 move: **+1.22%**\n- Market capitalization: **$296.546 billion**\n- Distance below 52-week high: **3.48%**\n- CIBR weight: **9.42%**\n\nPANW is now the sector\u2019s clear heavyweight. Its strength reflects platform consolidation, the integration of CyberArk and expectations that it can bundle security across network, cloud, operations and identity. The risk is valuation: the quoted trailing P/E is **316.40**, leaving little room for integration or growth disappointments.\n\n### **CRWD \u2014 strongest underlying recurring-revenue momentum**\n\n- Price: **$214.42**\n- August 7 move: **+3.39%**\n- Market capitalization: **$218.335 billion**\n- Distance below 52-week high: **2.25%**\n- CIBR weight: **8.56%**\n\nCRWD\u2019s **24% ARR growth** and **32% net",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_472457e7-f214-41a1-a2fb-8e834c71eefe",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "web_search"
+      },
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "fetch_url"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.15661,
+        "cache_read_cost": 0.01214,
+        "currency": "USD",
+        "input_cost": 6e-05,
+        "output_cost": 0.07218,
+        "tool_calls_cost": 0.0275,
+        "tool_calls_cost_details": {
+          "finance_search": 0.02,
+          "search_web": 0.0075
+        },
+        "total_cost": 0.26849
+      },
+      "input_tokens": 49344,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 25058,
+        "cache_read_input_tokens": 24274,
+        "cached_tokens": 24274
+      },
+      "output_tokens": 2406,
+      "output_tokens_details": {
+        "reasoning_tokens": 674
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "invocation": 4
+        },
+        "search_web": {
+          "invocation": 3
+        }
+      },
+      "total_tokens": 51750
+    },
+    "user": null
+  }
+}

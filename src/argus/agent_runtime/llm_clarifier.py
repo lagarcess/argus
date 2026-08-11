@@ -309,8 +309,8 @@ def _response_intent_for_voice(response_intent: dict[str, Any]) -> dict[str, Any
     if isinstance(constraints, list) and all(
         isinstance(item, dict) for item in constraints
     ):
-        sanitized_facts["unsupported_constraints"] = (
-            _unsupported_constraints_for_voice(constraints)
+        sanitized_facts["unsupported_constraints"] = _unsupported_constraints_for_voice(
+            constraints
         )
     sanitized["facts"] = sanitized_facts
     return sanitized

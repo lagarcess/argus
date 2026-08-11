@@ -7,6 +7,7 @@ from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
+    _edit_plan_reshapes_non_recurring_strategy,
     apply_edit_operations,
 )
 from argus.agent_runtime.artifact_edit_planner import (
@@ -17,9 +18,6 @@ from argus.agent_runtime.artifacts.asset_edits import (
     same_asset_universe,
 )
 from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
-from argus.agent_runtime.interpreter.artifact_assumption_edit import (
-    _edit_plan_reshapes_non_recurring_strategy,
-)
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     planned_cost_change_is_grounded,
 )

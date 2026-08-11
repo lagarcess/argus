@@ -89,7 +89,9 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "raw_metrics": run.metrics,
         "execution_note": execution_note(result_facts),
         "rule_summary": resolved_rule_summary(result_facts),
-        "context_packets": card.get("context_packets") if isinstance(card, dict) else None,
+        "context_packets": card.get("context_packets")
+        if isinstance(card, dict)
+        else None,
         "language": config_snapshot.get("language"),
     }
 
@@ -405,8 +407,6 @@ def _benchmark_comparison_phrase(
 ) -> str:
     comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
     return comparison.user_phrase
-
-
 
 
 def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:
@@ -865,7 +865,6 @@ def fallback_result_breakdown_message(
         "Use this as historical simulation evidence, not a prediction or trading "
         "recommendation."
     )
-
 
 
 def _localized_rule_summary(context: dict[str, Any], *, language: str) -> str | None:

@@ -161,9 +161,7 @@ def search(
                 "user_id": user.id,
                 "query": query,
                 "source_limit": (
-                    len(requested_conversation_ids)
-                    if id_scoped_recall
-                    else limit + 1
+                    len(requested_conversation_ids) if id_scoped_recall else limit + 1
                 ),
                 "cursor_updated_at": cursor_dt,
                 "cursor_id": cursor_id,
@@ -201,9 +199,7 @@ def search(
                 user=user,
                 query=query,
                 source_limit=(
-                    len(requested_conversation_ids)
-                    if id_scoped_recall
-                    else limit + 1
+                    len(requested_conversation_ids) if id_scoped_recall else limit + 1
                 ),
                 decision_action_availability=decision_action_availability,
                 include_conversation_rows=conversation_search_enabled,
@@ -243,9 +239,7 @@ def search(
     if id_scoped_recall:
         requested_ids = set(requested_conversation_ids)
         scored_items = [
-            pair
-            for pair in scored_items
-            if pair[1].conversation_id in requested_ids
+            pair for pair in scored_items if pair[1].conversation_id in requested_ids
         ]
 
     scored_items.sort(

@@ -17,8 +17,8 @@ The data model must support:
 - multi-chat conversations
 - persistent user preferences
 - AI-generated titles/names
-- saved strategies
-- strategy collections
+- legacy saved strategies (read compatibility only)
+- legacy strategy collections (read compatibility only)
 - reproducible backtest runs
 - symbol-level and aggregate metrics
 - soft deletion and archive behavior
@@ -62,9 +62,9 @@ profiles
 conversations
 messages
 chat_turn_lifecycles
-strategies
-collections
-collection_strategies
+strategies                         # legacy read compatibility; no new writes
+collections                        # legacy read compatibility; no new writes
+collection_strategies               # legacy read compatibility; no new writes
 backtest_jobs
 backtest_runs
 ideas
@@ -74,6 +74,19 @@ decision_notes
 cost_ledger_entries
 feedback
 usage_counters
+```
+
+Incubation-only, with no API/runtime/UI consumer:
+```text
+memory_settings
+memory_candidates
+memory_consent_actions
+memory_records
+memory_provenance
+memory_prompt_history
+memory_reconciliations
+memory_provider_projections
+memory_provider_cleanup
 ```
 
 Optional or later:
@@ -126,6 +139,7 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `email`: `text` (Nullable only for a verified anonymous Auth user)
 - `username`: `text` (Unique, Nullable)
 - `display_name`: `text` (Nullable)
+- `preferred_name`: `text` (Nullable; 1 to 40 characters when present)
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
 - `theme`: `text` (Default: `'dark'`)
@@ -159,7 +173,14 @@ product behavior reads it, and no API path writes it.
   the profile creation path. Browser detection is only a pre-auth hint; after
   authentication this row is authoritative and no frontend repair update is
   required.
-- `display_name` is used for personalization.
+- `display_name` is an identity field. It is what the account is called.
+- `preferred_name` is what Argus calls the user when it addresses them, and
+  it is deliberately separate from `display_name`: people fill an identity
+  field with a legal name. It is optional, and null means surfaces use no
+  name. It is stated in settings and never inferred from conversation, so no
+  runtime path writes it. A registered-account preference: restrictive
+  policies read the trusted `is_anonymous` JWT claim to keep it off the guest
+  surface, because anonymous Auth users share the `authenticated` role.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.
@@ -342,6 +363,39 @@ Represents individual messages within a conversation.
   row, inserts the message, and updates `last_message_preview` in one
   transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
   function or mutate `messages` directly.
+- The one sanctioned in-place rewrite, a non-turn edit of a pending
+  confirmation card, uses the service-role-only
+  `update_conversation_message_artifact` RPC on the same serialized spine: it
+  locks the owned conversation row and applies only while the caller's read
+  still holds, comparing both the row's `metadata` and the conversation's
+  latest message id (an empty result is the conflict signal, never a silent
+  last-writer win). When the rewritten row is the conversation's latest
+  message it carries `last_message_preview` with it while leaving
+  `updated_at` untouched, so a non-turn change never reorders recents.
+- A confirmation card's liveness truth lives on its own row:
+  `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
+  `cancelled`, `superseded`). Run admission stamps `consumed` through the
+  guarded writer before dispatch; a run that dies without a result restores
+  `active`; a cancelled or superseded card is never restored. Every
+  liveness reader derives from one oracle over this field
+  (`confirmation_card_is_dead`), with a compatibility clause for durable
+  transcripts that predate the stamp and carry consumption only as later
+  result messages. No reader may re-implement the predicate or infer
+  liveness from job tables.
+- Job success is one-way against the card lifecycle: both success writers
+  (the worker's SQL update and the API gateway's PostgREST update) embed a
+  predicate generated beside the card-restore classification in
+  `argus.domain.backtest_job_lifecycle`, so success can only follow a state
+  a worker legitimately holds (queued, running, or a re-claimable failure).
+  A state the card was restored from can never convert into a result; a
+  refused success write leaves the terminal state standing and is logged by
+  its caller. This tightens a spine invariant so it can carry the
+  consumption feature; the unguarded write was correct self-healing before
+  cards were consumed at admission.
+- Recent-window reads use `list_messages(newest_first_window=True)`: the
+  newest N messages of the conversation restored to chronological order.
+  An ascending read with a limit returns the head of the conversation and
+  starves every recent-state reader on long conversations (#433).
 - Conversation message order is deterministic by `(created_at DESC, id DESC)`.
   Under the conversation lock, a new append receives `created_at` at least one
   microsecond newer than the current maximum. Metadata-only updates do not
@@ -374,6 +428,13 @@ Represents individual messages within a conversation.
   it is not projected into later model history or `last_message_preview`, so
   Recents and conversation search do not expose the fallback language. Exact
   `llm_generated` prose remains eligible for those continuity surfaces.
+- User-message `metadata.mentions` may additionally preserve a selected asset
+  or indicator's optional `message_range: { start, end }`. This is a UTF-16
+  display span into immutable `content`, stored only when it exactly matches
+  that mention's `insert_text`. It lets the transcript render the selected
+  occurrence of repeated text after reload. A missing or malformed range falls
+  back to legacy best-effort display matching; it is not resolution provenance,
+  runtime state, or an Omnisearch input, and needs no migration.
 - When a turn follows an artifact-backed setup, the runtime must reconstruct the
   working draft from canonical artifact state before applying the new user
   message as a patch. Canonical artifact state comes from, in order of
@@ -526,7 +587,9 @@ message, job, Run, artifact, or sort timestamps.
 
 # 9. strategies
 
-Represents a saved, executable strategy idea backed by an engine template.
+Legacy saved executable-idea record. The table remains owner-scoped and readable
+so historical runs and history entries do not break; no active product path
+creates, patches, restores, or deletes Strategy rows.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -553,16 +616,19 @@ Represents a saved, executable strategy idea backed by an engine template.
 - **Note**: Strategies may target multiple symbols but only within the same `asset_class`.
 
 > [!TIP]
-> **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
+> **Global Rule**: Historical Collection rows may contain mixed asset classes.
+> Backtest runs may not mix asset classes operationally, and no current flow
+> creates or manages Collections.
 
 ### Notes
-- Strategies can be created directly or derived from a chat conversation.
-- Display metrics are derived from the most recent `backtest_runs`, not stored statically here.
+- Existing rows may still parent an owner-scoped direct backtest through
+  `backtest_runs.strategy_id` compatibility.
+- Display metrics on old rows remain readable; there is no Strategies surface.
 ---
 
 # 10. collections
 
-Collections grouping related strategies. These serve as lightweight organizational themes in Alpha.
+Legacy groupings retained only for owner-scoped historical reads.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -576,10 +642,11 @@ Collections grouping related strategies. These serve as lightweight organization
 - `updated_at`: `timestamptz`
 
 ### Notes
-- Collections do **not** perform aggregate portfolio simulations in Alpha.
-- They help users organize strategies by theme (e.g., "Tech Growth", "Crypto Dips").
-- **Asset Mixing**: Collections may contain Equity, Crypto, and Currency Pair
-  strategies, but they cannot be executed as a mixed-asset batch.
+- No active product path creates, patches, restores, deletes, attaches, or
+  detaches Collection records.
+- Collections do **not** perform aggregate portfolio simulations.
+- **Historical asset mixing**: Existing rows may contain Equity, Crypto, and
+  Currency Pair strategies, but they cannot be executed as a mixed-asset batch.
 ---
 
 # 11. collection_strategies
@@ -651,7 +718,8 @@ Represents an immutable result of a simulation. Every run is reproducible from i
   `conversation_result_card.execution_costs` stores structured result evidence:
   `fee_bps`, `slippage_bps`, gross/net total return, return drag, and benchmark
   cost treatment. Idealized runs omit this object.
-- Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
+- Historical `strategy_id` linkage must be read from canonical stored records,
+  never reconstructed from frontend display text.
 - Follow-up refinements from a result card must be seeded from
   `config_snapshot` or equivalent canonical run metadata. A user's partial
   change request may update the relevant field, but omitted run fields such as
@@ -978,6 +1046,266 @@ Cost model notes:
 - Cost rows never store raw prompts, transcripts, credentials, balances,
   holdings, full audio, or frontend-only payloads.
 
+## 12.1.3 public_excerpt_snapshots
+
+A public evidence receipt: an immutable, sanitized snapshot of one completed
+backtest, created by its owner and revocable by its owner. Behind the default-off
+`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
+
+The pipeline is `EvidenceArtifact -> PublicExcerptSnapshot -> PublicExcerptView`.
+The snapshot is frozen at creation and the public read never queries the source
+conversation. Immutable means the numbers never move: re-running the idea later
+produces a new artifact and leaves the receipt showing what it showed the day it
+was shared.
+
+Fields:
+- `id`: `uuid` (Primary Key)
+- `public_id`: `text` (Unique, `^[A-Za-z0-9_-]{22,64}$`, 24 bytes of urlsafe
+  entropy; this is the url token)
+- `owner_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
+- `evidence_artifact_id`: `uuid` (Nullable, references `evidence_artifacts.id`
+  ON DELETE SET NULL)
+- `source_conversation_id`: `uuid` (Nullable, references `conversations.id`
+  ON DELETE SET NULL)
+- `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
+  ON DELETE SET NULL)
+- `title`: `text`
+- `payload`: `jsonb` (the closed public payload; see below)
+- `payload_digest`: `text` (`^[0-9a-f]{64}$`, sha256 over the canonical payload)
+- `created_at`: `timestamptz`
+- `revoked_at`: `timestamptz` (Nullable)
+- `revocation_reason`: `text` (Nullable, `owner_revoked` or `source_deleted`)
+
+The source references are `ON DELETE SET NULL` rather than cascade so a tombstone
+outlives whatever it pointed at. They exist only for revocation and the owner's
+audit list; the public read never selects them.
+
+### Closed payload
+
+`payload` carries exactly these keys and no others, enforced by `extra="forbid"`
+on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
+`idea_title`, `asset_class`, `symbols`, `strategy_facts`, `assumptions`,
+`date_range`, `metrics`, `benchmark_symbol`, `visual`, `owner_note`,
+`content_language`, `framing`, `provenance_mark`.
+
+Source conversation ids, route receipts, provider or model metadata, retry
+payloads, raw transcripts, broker or account data, and user-private memory are
+never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audits
+keys and values before any receipt is written and fails closed, so a payload that
+cannot be proven clean is never stored.
+
+### Nothing rendered is frozen
+
+A receipt is read by strangers, so the payload freezes facts and never sentences.
+`strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
+under a closed key enum (`StrategyFactKey`, `AssumptionKey`, `MetricKey`), where
+`value` is the bare scalar the run reported, and `date_range` is `{start, end}` as
+ISO dates. Labels, sentences, thousands separators, and date formats are all
+composed by the client in the reader's language. There is deliberately no label
+field, no rendered `display` string, and no free-text passthrough anywhere in the
+list models.
+
+`assumptions` keys are `long_only`, `equal_weight`, `no_costs`, `modeled_fee_bps`,
+`modeled_slippage_bps`, `benchmark`, `benchmark_same_modeled_costs`,
+`recurring_contribution`, `contribution_cadence`, and `starting_principal`. Costs
+are read from the frozen run config rather than through the live execution-realism
+flag, so a flag flipped after the run cannot rewrite what the receipt says the run
+assumed.
+
+`MetricKey` is `cash_value`, `total_return_pct`, `max_drawdown_pct`, `win_rate`,
+`benchmark_return_pct`, and `delta_vs_benchmark_pct`. The first four are the result
+card's own row keys. The card's `benchmark_delta` row is deliberately not carried
+under its own key, because its value is a rendered sentence rather than a number;
+the last two are read from the run's `metrics.aggregate.performance` instead, so
+the comparison survives as figures the page can speak in either language. Values
+are the run's own display strings, except `delta_vs_benchmark_pct`, which is a bare
+signed number because its unit is percentage points and every way of writing that
+unit is a word.
+
+A metric key the projection does not know is refused, not dropped, and a payload
+that names a `benchmark_symbol` must carry a benchmark figure. Dropping is how the
+comparison could disappear from a receipt while the page went on naming a
+benchmark. Likewise a run whose assumptions or tested window will not project is
+refused rather than published with the prose the run happened to freeze.
+
+### Reading a stored payload
+
+The public read validates stored JSON against this model, and `extra="forbid"`
+means a row written by a different shape raises rather than degrades. That path
+answers `503` with `Retry-After`, which the viewer's page reads as temporarily
+unavailable. It deliberately does not answer with the tombstone: the row is
+intact, so saying the receipt is gone for good would be a permanent-sounding lie
+about a live link. Owner-side reads are not wrapped this way; an owner's list is
+the only place a receipt can be revoked, so a row it cannot parse should surface
+loudly rather than vanish from that list.
+
+`idea_title` and `owner_note` are the only author-written fields, and
+`content_language` names the language they are in. `owner_note` is also the only
+free-text field: bounded at 280 characters, stripped of control characters, and
+refused if it contains an identifier or a credential-shaped token.
+
+`visual` freezes the run's equity series, downsampled to at most 500 points with
+the endpoints preserved. The public view renders it client side; nothing is
+fetched at view time.
+
+### Immutability and revocation
+
+`prevent_public_excerpt_immutable_update` rejects any change to `id`,
+`public_id`, `owner_id`, `title`, `payload`, `payload_digest`, or `created_at`,
+and rejects any change to the revocation columns once `revoked_at` is set.
+Revocation is one way.
+
+`enforce_public_excerpt_source_is_live` refuses an insert whose source conversation
+is soft-deleted or gone. Revocation-on-delete only revokes snapshots that exist when
+`deleted_at` changes, so without this a stale result card, or a create racing behind
+the delete, could publish a page for a conversation the owner had already removed.
+The trigger takes `FOR SHARE` on the conversation row, which is the part an
+application check cannot do: a check-then-insert could pass and have the delete
+commit before the insert lands, whereas the lock makes a concurrent soft delete block
+the insert, which then reads the delete's result and refuses.
+
+`revoke_public_excerpts_for_deleted_source` revokes a receipt when its source
+goes away, so deleting a chat cannot leave a live public page behind:
+- `conversations` soft delete (`deleted_at` null to not null)
+- `conversations`, `backtest_runs`, or `evidence_artifacts` hard delete
+
+Every branch skips rows whose owner profile is already gone. Account deletion
+cascades to conversations and fires the purge trigger while the profile no longer
+exists; revoking there would fail the owner foreign key and take account deletion
+with it. Those rows are cascade-deleted moments later, reaching the same outcome.
+
+A partial unique index on `(owner_id, evidence_artifact_id) where revoked_at is
+null` allows at most one live receipt per result, so re-sharing returns the
+existing link instead of minting a second page the owner must revoke twice.
+Revoked rows are excluded, so revoking does not forbid sharing that result again.
+
+Note a pre-existing constraint: a conversation with a captured idea spine cannot
+be hard deleted at all, because `idea_versions.source_conversation_id` is
+`ON DELETE SET NULL` while `prevent_idea_version_immutable_update` forbids
+changing that column. Argus only soft deletes conversations, so this never
+surfaces in the product; the purge triggers are a backstop, not the live path.
+
+### RLS
+
+Row level security is enabled and there is deliberately **no** policy and **no**
+grant for `anon` or `authenticated`. Neither the public read nor the owner's list
+goes through the browser: both are served by the backend, which is where the
+audience split is enforced. The public read selects only
+`public_id, payload, created_at, revoked_at`. A select policy without a matching
+grant would be dead code that reads like protection, and adding the grant would
+put the owner and source columns one PostgREST call away from the browser.
+
+## 12.1.2 Memory Persistence Incubation
+
+Memory is an isolated, no-consumer persistence checkpoint. It
+does not change P2 recall, Omnisearch, canonical Ideas, EvidenceArtifacts,
+DecisionNotes, conversations, backtests, LangGraph state, or ordinary Guest
+chat. Product exposure, API wiring, runtime retrieval, Data Controls, providers,
+analytics, and hosted-database application remain closed.
+
+Memory is registered-account-only and off by absence. Supabase Auth and
+`guest_workspaces` are the database-canonical eligibility boundary:
+
+- `auth.users.is_anonymous` must be false;
+- no same-identity Guest workspace may be `active` or `claiming`;
+- browser/Data API roles (`PUBLIC`, `anon`, `authenticated`, and
+  `service_role`) have no direct table or sequence privileges;
+- a fixed-search-path private predicate is called by every memory-table insert
+  and update trigger;
+- owner identity is immutable; forged JWT claims cannot replace Auth/workspace
+  truth.
+
+All memory tables have RLS enabled and forced, with no client policies. The
+private backend Postgres adapter is the only intended access path and must
+still derive a registered owner from a verified request before entering the
+store.
+
+### Canonical and derivative tables
+
+- `memory_settings`: one enabled category row per owner. No rows means memory is
+  disabled. Categories are closed to personalization preference, workflow
+  preference, explicit decision note, and past-session anchor.
+- `memory_candidates`: bounded pending proposal content, trigger/context,
+  exact opt-in scope, and sensitivity-policy digest. A candidate is not a
+  durable memory.
+- `memory_consent_actions`: immutable direct-enable or
+  candidate-confirmation evidence with exact requested, granted, and effective
+  scopes plus schema/policy versions and idempotency identity. Direct enable
+  has no candidate and grants a non-empty scope. Confirmation requires an
+  existing same-owner candidate whose category appears in the requested scope.
+- `memory_records`: confirmed canonical label/value state. The owner, candidate,
+  consent action, category, and creation identity are immutable. An edit may
+  change only label/value with the next positive revision and a later
+  `updated_at`.
+- `memory_provenance`: immutable, ordered owner-scoped pointers attached to
+  exactly one candidate or record. Source kinds are closed to Argus-owned
+  EvidenceArtifact, DecisionNote, Idea, IdeaVersion, Conversation, and Message
+  identities.
+- `memory_prompt_history`: category-scoped proactive-prompt and decline
+  timestamps used for durable cooldown/suppression decisions.
+- `memory_reconciliations`: positive, ordered provider-projection work
+  generations. Rows start pending, then move through an exact leased claim to
+  running before reaching immutable succeeded/failed terminal state. The claim
+  token, expiry, and attempt count make restart recovery inspectable: a live
+  lease cannot be stolen, an expired lease may be reclaimed with a new token,
+  and only the exact, unexpired current claim may commit a provider pointer or
+  terminal outcome. Terminal rows erase the bearer token and lease. Lower
+  unfinished generations cause a bounded, lock-free wait before later work for
+  the same record, while other owners remain independent. Unfinished work
+  restricts record deletion so derivative cleanup cannot disappear silently.
+  Owner-wide reset uses the reserved `operation = reset`, `record_id = ''`
+  sentinel. Record operations require a non-empty record id. Reset first
+  removes canonical and user-visible memory, snapshots every provider pointer
+  into cleanup, and retains one retryable reset generation. Failed attempts
+  remain terminal evidence; a retry appends the next generation, while a crash
+  before a terminal outcome reuses or reclaims the unfinished generation.
+  While reset metadata remains unresolved, fresh canonical memory may be
+  confirmed after a new opt-in but record-specific provider work cannot claim
+  a lease. A later reset recognizes the existing owner-reset history and
+  atomically supersedes that post-reset canonical work instead of waiting on
+  its intentionally blocked provider reconciliation. The first reset still
+  performs a bounded wait for genuine pre-reset provider work.
+- `memory_provider_projections`: the current derivative provider pointer and
+  positive generation for a canonical record. A provider pointer is unique per
+  owner but may be reused independently by another owner. Replacements are
+  atomic with a durable cleanup snapshot of the prior pointer.
+- `memory_provider_cleanup`: durable, owner-scoped cleanup targets that survive
+  canonical record deletion and process restarts. Rows begin pending, may move
+  only once to resolved, and never reopen; a successful resolution also removes
+  the matching same-record projection when it still exists. Bounded reads
+  return at most 100 unique pending targets in deterministic newest-first
+  order. Cleanup scheduling refuses a pointer currently projected by another
+  record for the same owner, preventing deletion of live reused provider state.
+  While any cleanup row remains pending, its `(owner_id, provider_ref)` is a
+  fail-closed reservation: neither application code nor direct SQL may assign
+  that pointer to a live projection. The reservation ends only when cleanup is
+  resolved.
+  Provider pointers are derivative identifiers, never canonical memory content.
+
+An owner reset calls any derivative provider only after the canonical
+transaction commits and only when cleanup exists. A synchronized provider
+result may clear cleanup, projections, and reset metadata only with the exact
+unexpired reset claim. Provider failure, malformed output, or
+`not_applicable` retains cleanup for retry. Completion never deletes canonical
+records created after the earlier reset.
+
+Composite foreign keys include `owner_id` at every live relationship so a
+candidate, consent action, record, provenance row, reconciliation, or provider
+projection cannot cross owners. Candidate-confirmation receipts survive
+candidate consumption; records link to the immutable receipt by owner,
+candidate identity, and receipt identity. Account deletion cascades the full
+owner state, including durable cleanup targets.
+
+### Guest conversion zero state
+
+Memory never enters the Guest transfer graph. A `BEFORE UPDATE` trigger on
+`guest_workspaces` counts all nine memory tables when an `active`/`claiming`
+workspace moves to `claimed`. Any row blocks both same-identity link and
+existing-account handoff, and the surrounding conversion transaction rolls
+back without transferring memory. A clean conversion carries zero memory,
+performs no retrospective extraction, and leaves personalization disabled until
+the registered user later completes a fresh scoped opt-in.
+
 ## 12.2 backtest_jobs
 
 Represents durable lifecycle state for a backtest execution job. Jobs bridge
@@ -996,7 +1324,8 @@ canonical immutable `backtest_runs` row and reference it through
 - `request_message_id`: `uuid` (Nullable, references `messages.id`)
 - `confirmation_message_id`: `uuid` (Required for `chat.run_backtest`, null for
   `backtests.run`; references the retained immutable confirmation `messages.id`)
-- `operation_scope`: `text` (`chat.run_backtest` or `backtests.run`)
+- `operation_scope`: `text` (`chat.run_backtest`, `backtests.run`, or
+  `chat.research`)
 - `idempotency_key`: `text` (Required, 1-128 visible ASCII characters)
 - `identity_hash`: `text` (`sha256:` plus 64 lowercase hex characters for the
   operation's canonical identity object)
@@ -1021,7 +1350,10 @@ canonical immutable `backtest_runs` row and reference it through
 
 ### Enums
 - **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
-- **operation_scope**: `chat.run_backtest`, `backtests.run`
+- **operation_scope**: `chat.run_backtest`, `backtests.run`, `chat.research`
+  (thorough research runs ride this same lifecycle; a succeeded research job
+  keeps `result_run_id` null and references its answer message through
+  `execution_metadata.research_result_message_id`)
 - **priority**: `normal` initially; future values may support admin or canary
   jobs.
 - A new `chat.run_backtest` row starts `queued` with `queued_at` set and
@@ -1196,8 +1528,16 @@ foreign key to `profiles.id`.
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
   execute `settle_visitor_usage` or `purge_expired_visitor_usage`.
-- Expired rows are disposable operational data and must be removed through the
-  bounded purge function.
+- Expired rows are disposable operational data, but `period_end` is not a timer
+  and nothing in the database acts on it. The row has no owner to cascade from,
+  so it is deleted only when a successful non-dry-run of the guest cleanup job
+  reaches the purge: `purge_expired_visitor_usage` is registered in
+  `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every non-dry-run
+  `scripts/ops/cleanup_expired_guest_workspaces.py`. Retention therefore holds
+  exactly as often as that job is run. `render.yaml` declares an
+  `argus-maintenance` Render cron service to run it, but **that service has
+  deliberately not been created** at current scale, so today the job runs only
+  when an operator runs it. See the runbook's Scheduled Maintenance section.
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the
@@ -1208,6 +1548,65 @@ foreign key to `profiles.id`.
 - If counter truth cannot be read, admission currently fails closed into the
   existing `discovery_limit_reached` recovery. Issue #244 retains that
   user-facing truth limitation for follow-up.
+
+---
+
+## 14.2 guest_funnel_milestones
+
+Records that a guest funnel milestone has been reached, so it is emitted at most
+once per subject. Milestone events are the acquisition funnel's numerator, and a
+duplicate inflates conversion counts in one direction.
+
+The subject is the same visitor key that meters guest allowances, not a
+`user_id`: renewing a temporary workspace mints a fresh `user_id`, so a
+user-keyed milestone would re-fire on every renewal. Like
+`visitor_usage_counters` this table is deliberately not foreign-key bound.
+
+### Fields
+- `subject_key`: `text` (visitor key; falls back to a pseudonymous actor hash
+  when no visitor key is bound to the request)
+- `milestone`: `text` (guest funnel event kind)
+- `recorded_at`: `timestamptz`
+- `expires_at`: `timestamptz`
+
+### Constraints, access, and retention
+- **Primary key**: `(subject_key, milestone)`. The primary key is the
+  idempotency guarantee. It holds across retries, restarts, concurrent
+  requests, and multiple workers in a way application logic cannot.
+- **Expiry index**: `(expires_at)`
+- RLS is enabled with no policies. Only `service_role` has table access and may
+  execute `claim_guest_funnel_milestone` or
+  `purge_expired_guest_funnel_milestones`.
+- Claims are marked expired 30 days after they are recorded, outliving the
+  seven-day guest workspace with headroom. A visitor-keyed table with no expiry
+  would become a durable visitor log.
+- `expires_at` is not a timer, and nothing in the database acts on it. The row
+  has no owner to cascade from, so the guest cleanup job is the only thing that
+  deletes it: `purge_expired_guest_funnel_milestones` is registered
+  in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
+  non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
+  never returns is deleted by that job, not by the takeover path. Retention
+  therefore holds exactly as often as that job is run, and the
+  `argus-maintenance` cron service that would run it is declared but **not
+  created** at current scale. Today that means an operator run.
+- `claim_guest_funnel_milestone` also takes over an already-expired claim in the
+  same statement, so a returning visitor is correct even between purge runs.
+
+### Milestone policy
+- Milestone-class kinds are `first_useful_assistant_response_completed`,
+  `first_simulation_admitted`, `first_result_completed`,
+  `account_creation_completed`, `existing_account_sign_in_completed`, and
+  `temporary_workspace_claimed`.
+- Every other guest funnel kind is repeatable volume or step data and is not
+  claimed. A guest reaches confirmation, sees a conversion prompt, hits a limit,
+  and submits feedback as many times as they actually do.
+- A duplicate claim is a silent no-op. A retried request must not fail because
+  it already succeeded.
+- A milestone whose claim cannot be resolved or persisted is suppressed rather
+  than emitted, because duplicates bias the funnel in one direction.
+- Visitor keys are IP-derived, so callers sharing one egress address share a
+  subject and a second visitor's milestone can be suppressed. This is the same
+  property guest allowance metering already accepts.
 
 ---
 
@@ -1231,7 +1630,9 @@ private-alpha support requests such as account deletion requests.
 # 16. Soft Delete & Archive Rules
 
 ### Soft Delete
-Used for **conversations**, **strategies**, and **collections**. These items should be filtered out by default but remain in the DB for "Recently Deleted" recovery.
+Used for **conversations** and retained on legacy **strategies** and
+**collections** rows. Legacy rows remain filtered/read-safe, but only
+conversation recovery is exposed in the current product.
 
 ### Archive
 Used specifically for **conversations** to hide them from the primary sidebar without deleting the data.
@@ -1243,9 +1644,9 @@ Recents is a mixed-type feed displaying activity across the platform.
 
 ### Supported Types
 - `chat`
-- `strategy`
-- `collection`
 - `run`
+- `strategy` (legacy read compatibility only)
+- `collection` (legacy read compatibility only)
 
 ### Standard History Shape
 ```json
@@ -1272,13 +1673,15 @@ types. It is not stored on the conversation and does not affect History order.
 Alpha supports keyword-based search across core entities.
 
 ### Scope
-- **Surface Search**: Filter-by-type search (e.g., searching only Strategies).
-- **Global Search**: Omni-search spanning Conversations, Strategies, and Collections.
+- **Global Search**: Omni-search spanning current Conversation, Run, Idea,
+  Evidence, and Decision artifacts.
 
 ### Future
 Semantic search using embeddings is deferred until post-Alpha.
 - Do not add embedding or pgvector tables for the production readiness chat/backtest branch.
-- Use structured Supabase records, run metadata, saved strategies, and keyword search until Argus needs semantic recall across large histories.
+- Use structured Supabase records, run metadata, Idea/Evidence/Decision
+  artifacts, and keyword search until Argus needs semantic recall across large
+  histories.
 
 ---
 
@@ -1307,7 +1710,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
-  `usage_counters`, `guest_workspaces`.
+  `usage_counters`, `guest_workspaces`, `memory_settings`,
+  `memory_candidates`, `memory_consent_actions`, `memory_records`,
+  `memory_provenance`, `memory_prompt_history`, `memory_reconciliations`,
+  `memory_provider_projections`, `memory_provider_cleanup`.
 
 ### Guest ownership
 - Supabase anonymous identities use the `authenticated` role, so every guest
@@ -1315,6 +1721,8 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   authorization.
 - Expired guest identities cannot read or write product rows.
 - Another guest and a permanent user see zero guest workspace rows.
+- Guest memory state must be zero before either same-identity claim or
+  existing-account handoff. Memory rows are rejected rather than transferred.
 - `profiles.avatar_theme` is a registered-account preference. The database
   default keeps every row valid, but restrictive profile RLS policies use the
   trusted `is_anonymous` JWT claim so a guest cannot read or write it through
@@ -1362,11 +1770,24 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **usage_counters**: `(user_id, resource, period_start DESC)`
 - **usage_counters**: `(period_end)`
 - **usage_counters unique**: `(user_id, resource, period, period_start)`
+- **memory_candidates**: `(owner_id, created_at, id)`
+- **memory_consent_actions**: `(owner_id, recorded_at, id)`, unique confirmed
+  `(owner_id, candidate_id)`
+- **memory_records**: `(owner_id, created_at, id)`, covering
+  `(owner_id, consent_action_id, candidate_id)`, unique
+  `(owner_id, candidate_id)`
+- **memory_provenance**: unique ordered candidate and record indexes on
+  `(owner_id, parent_id, ordinal)`
+- **memory_reconciliations**: partial pending/running index on
+  `(owner_id, status, record_id, generation)`
+- **memory_provider_cleanup**: partial pending index on
+  `(owner_id, status, created_at, record_id)`
 ---
 
 # 21. Naming & Title Defaults
 
-AI-generated names and titles are the default for conversations, strategies, and collections.
+AI-generated titles are the default for conversations. Historical Strategy and
+Collection names are read-only compatibility data.
 
 ### Source Tracking
 - `system_default`: The initial placeholder before AI processing.

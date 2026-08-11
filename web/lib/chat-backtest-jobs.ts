@@ -230,6 +230,7 @@ function backtestJobFromUnknown(value: unknown): BacktestJob | null {
     request_message_id: stringOrNull(record.request_message_id),
     confirmation_message_id: stringOrNull(record.confirmation_message_id),
     status,
+    operation_scope: operationScopeOrNull(record.operation_scope),
     result_run_id: stringOrNull(record.result_run_id),
     failure_code: stringOrNull(record.failure_code),
     failure_detail: stringOrNull(record.failure_detail),
@@ -240,6 +241,19 @@ function backtestJobFromUnknown(value: unknown): BacktestJob | null {
     created_at: stringOrNull(record.created_at),
     updated_at: stringOrNull(record.updated_at),
   };
+}
+
+function operationScopeOrNull(
+  value: unknown,
+): BacktestJob["operation_scope"] {
+  if (
+    value === "chat.run_backtest" ||
+    value === "backtests.run" ||
+    value === "chat.research"
+  ) {
+    return value;
+  }
+  return null;
 }
 
 function backtestJobStatusOrNull(value: unknown): BacktestJobStatus | null {

@@ -109,6 +109,9 @@ WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
 WORKFLOW_VERSION_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS=""
+CRON_DEPLOY_SHA=""
 ENV_FINGERPRINT=""
 RELEASE_PROFILE_HASH=""
 WORKFLOW_ENV_FINGERPRINT=""
@@ -582,7 +585,12 @@ run_deploy_status_probe() {
   if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
     fail_canary "deploy_status" "workflow_version_status_failed"
   fi
+  if ! CRON_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status)"; then
+    fail_canary "deploy_status" "cron_deploy_status_failed"
+  fi
 
+  CRON_DEPLOY_STATUS="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" status || true)"
+  CRON_DEPLOY_SHA="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
@@ -613,11 +621,27 @@ run_deploy_status_probe() {
   if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
     fail_canary "deploy_status" "workflow_version_id_mismatch"
   fi
+  # Integration owns the maintenance release surface. No service is a valid,
+  # explicit state for this promotion; a failed lookup or a deployed janitor
+  # on another commit is not.
+  if [ -z "$CRON_DEPLOY_STATUS" ] || [ "$CRON_DEPLOY_STATUS" = "lookup_failed" ]; then
+    fail_canary "deploy_status" "cron_status_unavailable"
+  fi
+  if [ "$CRON_DEPLOY_STATUS" != "absent" ]; then
+    if [ "$CRON_DEPLOY_STATUS" != "live" ]; then
+      fail_canary "deploy_status" "cron_deploy_not_live"
+    fi
+    if [ "$API_DEPLOY_SHA" != "$CRON_DEPLOY_SHA" ]; then
+      fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"
+    fi
+  fi
 
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
+  echo "canary_cron_deploy_status=$CRON_DEPLOY_STATUS"
+  echo "canary_cron_deploy_sha=$CRON_DEPLOY_SHA"
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
   echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"

@@ -1,14 +1,10 @@
-"""Deterministic Ready-to-run confirmation materialization for a stored run.
-
-The retest action replays canonical run truth, so the confirmation artifact is
-built from the reloaded setup alone: no LLM, research, discovery, or market-data
-provider is consulted before the user approves the ordinary confirmation.
-"""
+"""Deterministic Ready-to-run confirmation materialization for a stored run."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, replace
+from datetime import date
+from typing import Any, cast
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import (
@@ -19,7 +15,15 @@ from argus.agent_runtime.presentation_i18n import confirmation_rule_display_valu
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.domain.backtesting.config import _execution_realism_feature_enabled
-from argus.domain.retest_setup import RetestSetup
+from argus.domain.backtesting.confirmation_preflight import (
+    materialize_confirmation_strategy,
+    prepare_confirmation_launch,
+)
+from argus.domain.market_data.capabilities import (
+    AssetClass,
+    validate_market_data_window,
+)
+from argus.domain.retest_setup import RetestSetup, latest_complete_retest_end
 
 _INDICATOR_PARAMETER_KEYS = (
     "indicator",
@@ -40,16 +44,22 @@ class _RuleProjection:
     indicator_parameters: dict[str, Any] | None = None
 
 
+@dataclass(frozen=True)
+class RetestConfirmationPreparation:
+    confirmation_payload: dict[str, Any] | None = None
+    coverage_error_code: str | None = None
+
+
 def retest_confirmation_payload(
     setup: RetestSetup,
     *,
     language: str = "en",
     confirmation_id: str | None = None,
 ) -> dict[str, Any] | None:
-    """Materialize an executable confirmation payload, or None when unsupported.
+    """Project a structurally eligible candidate, or None when unsupported.
 
-    Eligibility and admission call this same function, so an offered retest is
-    always one the backend can actually confirm.
+    Eligibility uses this structural projection. Admission must pass the
+    candidate through provider coverage before persisting a runnable card.
     """
     if _costs_the_engine_would_drop(setup):
         # The kill switch idealizes execution, so a costed source run cannot be
@@ -86,6 +96,115 @@ def retest_confirmation_payload(
     return payload
 
 
+def prepare_retest_confirmation_payload(
+    setup: RetestSetup,
+    *,
+    language: str = "en",
+    confirmation_id: str | None = None,
+) -> RetestConfirmationPreparation:
+    """Materialize a Retest card with provider-actual coverage truth."""
+    raw_violation_code = retest_window_violation_code(
+        setup,
+        end_date=setup.end,
+    )
+    effective_end = latest_complete_retest_end(setup)
+    window_violation_code = retest_window_violation_code(
+        setup,
+        end_date=effective_end,
+    )
+    requested_date_range: dict[str, str] | None = None
+    # Keep normal provider coverage adjustment intact. Clamp before preflight
+    # only when an incomplete final candle creates the violation by itself,
+    # while retaining the raw request as durable coverage provenance.
+    if raw_violation_code is not None and window_violation_code is None:
+        requested_date_range = {
+            "start": setup.start.isoformat(),
+            "end": setup.end.isoformat(),
+        }
+        setup = replace(setup, end=effective_end)
+
+    payload = retest_confirmation_payload(
+        setup,
+        language=language,
+        confirmation_id=confirmation_id,
+    )
+    if payload is None:
+        return RetestConfirmationPreparation()
+    if requested_date_range is not None:
+        launch_payload = dict(payload["launch_payload"])
+        launch_payload["requested_date_range"] = requested_date_range
+        payload = {**payload, "launch_payload": launch_payload}
+
+    if window_violation_code is not None:
+        return RetestConfirmationPreparation(
+            coverage_error_code=window_violation_code,
+        )
+
+    preflight = prepare_confirmation_launch(dict(payload["launch_payload"]))
+    if preflight.outcome == "coverage_failure":
+        return RetestConfirmationPreparation(
+            coverage_error_code=(preflight.error_code or "market_data_unavailable")
+        )
+    if preflight.outcome != "ready_to_confirm" or preflight.launch_payload is None:
+        return RetestConfirmationPreparation()
+
+    launch_payload = preflight.launch_payload
+    strategy = materialize_confirmation_strategy(
+        dict(payload["strategy"]),
+        launch_payload=launch_payload,
+    )
+    covered_payload = {
+        **payload,
+        "strategy": strategy,
+        "launch_payload": launch_payload,
+    }
+    validation = validate_confirmation_execution_payload(covered_payload)
+    if not validation.executable or validation.launch_payload is None:
+        return RetestConfirmationPreparation()
+    try:
+        pending_strategy = StrategySummary.model_validate(strategy)
+    except ValueError:
+        return RetestConfirmationPreparation()
+    if not strategy_can_be_approved(pending_strategy):
+        return RetestConfirmationPreparation()
+
+    validated_launch_payload = validation.launch_payload
+    if requested_date_range is not None:
+        coverage = dict(validated_launch_payload["coverage_preflight"])
+        coverage["adjustment_reason"] = "provider_coverage_adjustment"
+        validated_launch_payload = {
+            **validated_launch_payload,
+            "coverage_preflight": coverage,
+        }
+    covered_payload["launch_payload"] = validated_launch_payload
+    covered_payload["validation"] = {
+        "status": "ready_to_run",
+        "executable": True,
+        "date_adjusted": _has_effective_window_adjustment(validated_launch_payload),
+    }
+    return RetestConfirmationPreparation(
+        confirmation_payload=covered_payload,
+    )
+
+
+def retest_window_violation_code(
+    setup: RetestSetup,
+    *,
+    end_date: date,
+) -> str | None:
+    """Return a provider-window violation for the supplied Retest end."""
+    try:
+        validate_market_data_window(
+            asset_class=cast(AssetClass, setup.asset_class),
+            timeframe=setup.timeframe,
+            start_date=setup.start,
+            end_date=end_date,
+        )
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
 def retest_runtime_result(
     confirmation_payload: dict[str, Any],
 ) -> dict[str, Any]:
@@ -94,6 +213,11 @@ def retest_runtime_result(
         "stage_outcome": "await_approval",
         "confirmation_payload": confirmation_payload,
     }
+
+
+def _has_effective_window_adjustment(launch_payload: dict[str, Any]) -> bool:
+    coverage = launch_payload.get("coverage_preflight")
+    return isinstance(coverage, dict) and coverage.get("outcome") == ("adjusted_coverage")
 
 
 def _costs_the_engine_would_drop(setup: RetestSetup) -> bool:

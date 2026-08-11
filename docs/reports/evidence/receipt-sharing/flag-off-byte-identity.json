@@ -1,0 +1,16 @@
+{
+  "digest": "b0411118c770f8f6881177566f6dfab6bb52002efb07004efeafca99f52e43d3",
+  "probes": [
+    "POST /api/v1/evidence-receipts -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "POST /api/v1/evidence-receipts -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "POST /api/v1/evidence-receipts -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "GET /api/v1/evidence-receipts -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "GET /api/v1/evidence-receipts?limit=5 -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "DELETE /api/v1/evidence-receipts/anything -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "GET /api/v1/public/receipts/abcdefghijklmnopqrstuvwx -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "POST /api/v1/public/receipt-funnel -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'",
+    "PATCH /api/v1/evidence-receipts -> 404 content-length,content-type,x-request-id b'{\"detail\":\"Not Found\"}'"
+  ],
+  "note": "Same digest at base 01044cda, where no receipt code exists, and at the merged head with the flag off. Nine probes: status, header names and body.",
+  "base_commit": "01044cda16e678311095c2b748c9d9ad6162a2fc"
+}

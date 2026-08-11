@@ -173,6 +173,28 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     assert "POSTHOG" not in CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
 
 
+def test_private_alpha_canary_resolves_the_deployed_release_and_gates_cron() -> None:
+    workflow = _canary_workflow()
+    steps_by_name = {
+        step["name"]: step for step in workflow["jobs"]["canary"]["steps"]
+    }
+    resolve = steps_by_name["Resolve deployed canary release"]["run"]
+
+    # main owns release resolution: API, web, and workflow identify the
+    # coherent deployed tree, and that exact commit is checked out detached.
+    assert ".github/canary-deployed-sha.py" in resolve
+    assert 'git checkout --detach "$deployed_sha"' in resolve
+    assert "--cron-status" not in resolve
+
+    # Integration owns the separate cron release surface. The maintenance
+    # service may be absent, but a failed lookup, bad status, or stale live
+    # commit must still fail before the deployed checkout can be certified.
+    assert ".github/render-env-sync.sh cron-deploy-status" in resolve
+    assert "cron_status_unavailable" in resolve
+    assert "cron_deploy_not_live" in resolve
+    assert "cron_deploy_sha_mismatch" in resolve
+
+
 def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> None:
     workflow = _canary_workflow()
     job = workflow["jobs"]["canary"]
