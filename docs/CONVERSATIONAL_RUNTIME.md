@@ -70,6 +70,23 @@ structured LLM clarifier with bounded facts and requested fields. Deterministic
 user-facing copy is reserved for explicit artifact-action recovery, such as a
 stale or non-retryable failed-run action, where code owns the safety boundary.
 
+The edit disclosure boundary: a compound edit's guarantee is that every
+requested change is applied or disclosed with a reason, and it holds when at
+least one interpretation layer (the primary read, the edit planner, or the
+stated-run-field audit) extracted the change as a typed value. When all three
+fail to extract it, nothing typed exists to require, complete, or disclose,
+and the change is lost without a record. Observed rate: once in six es-419
+live capture attempts of the compound slippage scenario. Deterministic code
+cannot close this without parsing prose, which the runtime forbids.
+
+Recovery copy may only speak for live artifacts. Argus never contradicts its
+own card: a confirmation that was cancelled or superseded is not "still
+ready", however much of it survives in runtime state, and recovery paths read
+pending confirmation state through one liveness accessor
+(`live_pending_confirmation`) rather than testing that a draft merely exists.
+If a recovery path cannot honestly speak for an artifact, it says so and
+offers something real.
+
 ## Language-Agnostic Prose Composition
 
 Runtime copy is composed, not templated per language. Since the B4 language-gate
@@ -143,7 +160,6 @@ Result actions are available only after a completed run:
 
 - `show_breakdown`
 - `refine_strategy`
-- `save_strategy`
 
 Response-option actions may answer a structured clarification choice:
 
@@ -153,7 +169,9 @@ These actions must carry typed option metadata such as `option_index` or
 `replacement_values`. The runtime may use that metadata in degraded recovery,
 but it must not infer the chosen option from translated display labels.
 
-`save_strategy` belongs inside the result card when Strategies are enabled. It saves from canonical run/result state, not reconstructed frontend prose. Under private-alpha defaults (`NEXT_PUBLIC_STRATEGIES_ENABLED=false`, `ARGUS_STRATEGIES_ENABLED=false`), hide Save in the UI and respond to save intent by reminding the user that the result remains available in conversation/history instead of creating a hidden strategy object.
+New result cards never emit or render `save_strategy`. A stale persisted
+`save_strategy` action is accepted only as a non-mutating compatibility turn:
+Argus explains that the completed run remains in conversation/history.
 
 ## Post-Result Continuity
 
@@ -210,10 +228,9 @@ short affirmative answer, deterministic guardrails may accept only that stored
 candidate for that stored field after LLM interpretation. This keeps ordinary
 language LLM-first while preventing repeated binary clarifications.
 
-Collections remain in the schema, but Collections are indefinitely deferred from
-private alpha. Keep `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`; no sidebar entry,
-settings link, picker, command/search result, result action, or empty state
-should expose Collections.
+Legacy Collection rows remain in the schema for owner-scoped historical reads.
+There is no sidebar entry, settings link, picker, command/search result, result
+action, CRUD endpoint, or new Collection write path.
 
 ## Fully Supported
 

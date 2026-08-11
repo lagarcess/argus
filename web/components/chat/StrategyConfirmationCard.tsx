@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Check,
   CheckCircle2,
   CircleSlash2,
   type LucideIcon,
@@ -12,6 +13,7 @@ import {
   Send,
   SlidersHorizontal,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useState } from "react";
@@ -23,25 +25,31 @@ import {
 } from "@/lib/artifact-status-tones";
 import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
-import {
-  costEditDraftFromDisplayFacts,
-  executionCostEditMessage,
-  isValidCostEditDraft,
-  MAX_SLIPPAGE_PERCENT,
-  type ExecutionCostEditDraft,
-} from "@/lib/confirmation-cost-edit";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
+import {
+  retestEffectiveDurationLabel,
+  retestPeriodFromValue,
+  retestPeriodTransformationLabel,
+  type RetestPeriod,
+} from "@/lib/chat-retest";
 import {
   strategyDisplayLabel,
   strategyTypeFromConfirmation,
 } from "@/lib/strategy-display";
 import {
   type ChatActionOption,
+  type ConfirmationDirectEditPayload,
   type StrategyConfirmationPayload,
   type StrategyConfirmationRowKey,
   type StrategyConfirmationStatus,
 } from "./types";
+import {
+  ConfirmationDirectEditControls,
+  inlineEditControlClassName,
+  inlineEditFieldClassName,
+} from "./ConfirmationDirectEdit";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import { EntityToken } from "./entity-token";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
@@ -56,6 +64,7 @@ import {
 type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
   onAction?: (action: ChatActionOption) => void;
+  onDirectEdit?: (edit: ConfirmationDirectEditPayload) => Promise<void>;
 };
 
 type ConfirmationCardRow = StrategyConfirmationPayload["rows"][number] & {
@@ -81,7 +90,7 @@ const CONFIRMATION_STATUS_ICON_STATE = {
 } satisfies Record<StrategyConfirmationStatus, ConfirmationStatusIconState>;
 
 const actionClassName =
-  "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
+  "inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 bg-black/[0.03] px-3.5 py-1.5 text-[13px] font-medium tracking-tight tablet:min-h-9 tablet:px-3 tablet:text-[12px] text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
 
 const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "could_not_run",
@@ -90,7 +99,7 @@ const TERMINAL_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
   "run_complete",
 ]);
 
-export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
+export default function StrategyConfirmationCard({ confirmation, onAction, onDirectEdit }: StrategyConfirmationCardProps) {
   const { t, i18n } = useTranslation();
   const displayState = confirmationDisplayState(confirmation, t);
   const viewModel = confirmationCardViewModel(confirmation, t, i18n.language);
@@ -98,10 +107,29 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
     (confirmation.confirmation_state === "active" || !confirmation.confirmation_state) &&
     confirmationStatusAllowsActions(displayState.status);
   const activeActions = canShowActions ? confirmation.actions ?? [] : [];
-  const canEditCosts =
+  const canDirectEdit =
     canShowActions &&
-    confirmation.capabilities?.execution_costs_editable === true;
+    onDirectEdit !== undefined &&
+    (confirmation.capabilities?.direct_edits?.length ?? 0) > 0;
   const StatusIcon = displayState.icon;
+  // Motion is the feedback for a deliberate add: freshly added chips animate
+  // in, and nothing narrates the action back to the user.
+  const addedSymbols = new Set(
+    (confirmation.assets_adjustment?.added ?? []).map((item) => item.symbol),
+  );
+  // Consequences the user did not choose disclose inline where they land:
+  // a basket change that clamps the shared history window notes it next to
+  // the period value, never in a banner.
+  const periodChange = confirmation.assets_adjustment?.period_change ?? null;
+  const periodChangeNote = periodChange
+    ? t("chat.confirmation.period_adjustment", {
+        defaultValue:
+          "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
+        period:
+          compactDateRangeDisplay(periodChange.to, i18n.language) ??
+          `${periodChange.to.start} → ${periodChange.to.end}`,
+      })
+    : null;
 
   return (
     <section className="argus-card-reveal argus-confirmation-reveal w-full overflow-hidden rounded-[20px] border border-[#c9c9cd] bg-white text-[#191c1f] dark:border-white/12 dark:bg-[#1d2023] dark:text-white">
@@ -109,7 +137,10 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {viewModel.assetSymbols.length > 0 && (
-              <AssetSymbols symbols={viewModel.assetSymbols} />
+              <AssetSymbols
+                symbols={viewModel.assetSymbols}
+                animatedSymbols={addedSymbols}
+              />
             )}
             <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
               {viewModel.strategyLabel}
@@ -138,9 +169,25 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
                     {displayConfirmationRowLabel(row, t)}
                   </dt>
                   <ConfirmationValue row={row} variant="summary" />
+                  {row.key === "period" && periodChangeNote ? (
+                    <p
+                      data-testid="confirmation-period-change-note"
+                      className="mt-1 text-[12px] leading-snug text-[#8d969e]"
+                    >
+                      {periodChangeNote}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </dl>
+          )}
+
+          {viewModel.retestPeriod && (
+            <RetestPeriodDisclosure
+              period={viewModel.retestPeriod}
+              language={i18n.language}
+              t={t}
+            />
           )}
 
           {viewModel.detailRows.length > 0 && (
@@ -158,7 +205,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
         </div>
       )}
 
-      {(viewModel.assumptions.length > 0 || canEditCosts) && (
+      {viewModel.assumptions.length > 0 && (
         <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {viewModel.assumptions.map((text) => (
@@ -167,20 +214,20 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
                 {text}
               </span>
             ))}
-            {canEditCosts && (
-              <ExecutionCostEditor
-                displayFacts={confirmation.display_facts}
-                onSubmit={(message) =>
-                  // A plain labeled action (no type) sends the composed edit as
-                  // a normal chat message, so it flows through the existing
-                  // natural-language edit planner rather than the generic
-                  // adjust-assumptions clarify route.
-                  onAction?.({ label: message })
-                }
-                t={t}
-              />
-            )}
           </div>
+        </div>
+      )}
+
+      {canDirectEdit && (
+        // The editing strip: one line of Edit capital, Edit dates, Edit
+        // costs between its own hairlines; the open editor's drawer expands
+        // in flow directly under the pill row, pushing the actions down.
+        <div className="border-t border-[#c9c9cd]/22 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/[0.04] sm:px-5">
+          <ConfirmationDirectEditControls
+            confirmation={confirmation}
+            onDirectEdit={onDirectEdit}
+            t={t}
+          />
         </div>
       )}
 
@@ -199,6 +246,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
           ))}
         </div>
       )}
+
     </section>
   );
 }
@@ -327,7 +375,36 @@ function confirmationCardViewModel(
       promotedValues,
       t,
     }),
+    retestPeriod: retestPeriodFromValue(confirmation.retest_period),
   };
+}
+
+function RetestPeriodDisclosure({
+  period,
+  language,
+  t,
+}: {
+  period: RetestPeriod;
+  language: string;
+  t: TFunction;
+}) {
+  const duration = retestEffectiveDurationLabel(period.duration, t, language);
+  return (
+    <div
+      className="mt-4 border-t border-[#c9c9cd]/22 pt-4 dark:border-white/[0.04]"
+      data-retest-period="extended"
+    >
+      <p className="whitespace-normal break-words text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76">
+        {retestPeriodTransformationLabel(period, language)}
+      </p>
+      <p className="mt-1 text-[12px] leading-snug text-[#8d969e]">
+        {t("chat.retest.updated_duration", {
+          defaultValue: "Updated span: {{duration}}",
+          duration,
+        })}
+      </p>
+    </div>
+  );
 }
 
 function displayConfirmationRowValue(
@@ -385,15 +462,26 @@ function confirmationAssetTitle(
   return fallbackTitle.trim() || t("chat.confirmation.selected_asset", "Selected asset");
 }
 
-function AssetSymbols({ symbols }: { symbols: string[] }) {
+function AssetSymbols({
+  symbols,
+  animatedSymbols,
+}: {
+  symbols: string[];
+  animatedSymbols?: Set<string>;
+}) {
   return (
     <span className="flex flex-wrap gap-1.5">
       {symbols.map((symbol) => (
         <span
           key={symbol}
-          className="rounded-[7px] border border-[#c9c9cd]/65 px-2 py-1 text-[12px] font-medium leading-none tracking-[0.16px] text-[#505a63] dark:border-white/14 dark:text-[#8d969e]"
+          data-testid={
+            animatedSymbols?.has(symbol) ? "confirmation-added-chip" : undefined
+          }
+          className={animatedSymbols?.has(symbol) ? "argus-chip-appear" : undefined}
         >
-          {symbol}
+          <EntityToken kind="asset" surface="card">
+            {symbol}
+          </EntityToken>
         </span>
       ))}
     </span>
@@ -432,97 +520,3 @@ function ConfirmationActionIcon({ action }: { action: ChatActionOption }) {
   return <PencilLine className="h-3.5 w-3.5" />;
 }
 
-function ExecutionCostEditor({
-  displayFacts,
-  onSubmit,
-  t,
-}: {
-  displayFacts: StrategyConfirmationPayload["display_facts"];
-  onSubmit: (message: string) => void;
-  t: TFunction;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [draft, setDraft] = useState<ExecutionCostEditDraft>(() =>
-    costEditDraftFromDisplayFacts(displayFacts),
-  );
-  const isValid = isValidCostEditDraft(draft);
-
-  if (!isOpen) {
-    return (
-      <button
-        type="button"
-        data-testid="edit-execution-costs"
-        onClick={() => {
-          setDraft(costEditDraftFromDisplayFacts(displayFacts));
-          setIsOpen(true);
-        }}
-        className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-full border border-black/10 bg-black/[0.02] px-2 py-0.5 text-[11px] font-medium text-black/60 transition-colors hover:border-black/18 hover:text-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60 dark:hover:border-white/18 dark:hover:text-white/80"
-      >
-        <PencilLine aria-hidden="true" className="h-3 w-3" />
-        {t("chat.confirmation.cost_editor.edit_chip", "Edit costs")}
-      </button>
-    );
-  }
-
-  const submit = () => {
-    const message = executionCostEditMessage(draft, t);
-    if (!message) {
-      return;
-    }
-    setIsOpen(false);
-    onSubmit(message);
-  };
-
-  return (
-    <div className="mt-1 flex w-full flex-wrap items-end gap-2" data-testid="execution-cost-editor">
-      <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
-        {t("chat.confirmation.cost_editor.fee_label", "Fee % per trade")}
-        <input
-          type="text"
-          inputMode="decimal"
-          value={draft.feePercent}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, feePercent: event.target.value }))
-          }
-          className="h-8 w-24 rounded-md border border-black/12 bg-white px-2 text-[13px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-[#24282c] dark:text-white"
-        />
-      </label>
-      <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
-        {t("chat.confirmation.cost_editor.slippage_label", "Slippage % per trade")}
-        <input
-          type="text"
-          inputMode="decimal"
-          value={draft.slippagePercent}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, slippagePercent: event.target.value }))
-          }
-          className="h-8 w-24 rounded-md border border-black/12 bg-white px-2 text-[13px] text-[#191c1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/14 dark:bg-[#24282c] dark:text-white"
-        />
-      </label>
-      <button
-        type="button"
-        onClick={submit}
-        disabled={!isValid}
-        className={`${actionClassName} disabled:cursor-not-allowed disabled:opacity-45`}
-      >
-        {t("chat.confirmation.cost_editor.apply", "Apply")}
-      </button>
-      <button
-        type="button"
-        onClick={() => setIsOpen(false)}
-        className={actionClassName}
-      >
-        {t("chat.confirmation.cost_editor.cancel", "Cancel")}
-      </button>
-      {!isValid && (
-        <p role="alert" className={`w-full text-[11px] ${inlineFailureTextClass}`}>
-          {t("chat.confirmation.cost_editor.invalid", {
-            defaultValue:
-              "Enter percentages of 0 or more (slippage up to {{max}}%).",
-            max: MAX_SLIPPAGE_PERCENT,
-          })}
-        </p>
-      )}
-    </div>
-  );
-}

@@ -15,6 +15,20 @@ from argus.agent_runtime.state.models import ResponseProfileOverrides
 from argus.domain.capability_registry import RegisteredStrategyTemplate
 
 
+class InterpretationContractError(ValueError):
+    """A model response the runtime cannot act on.
+
+    Distinct from a transport or schema failure: the provider answered, and this
+    rejection is a pure function of (response, request), so repeating the same
+    call reproduces it exactly.
+    """
+
+    def __init__(self, reason: str, *, corrective_hint: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.corrective_hint = corrective_hint
+
+
 class LLMRiskRule(BaseModel):
     type: str
     value_pct: float | None = None
@@ -117,7 +131,16 @@ class LLMDateRangeIntent(BaseModel):
             "the previous day. This is canonical machine data, not localized text."
         ),
     )
-    count: int | None = Field(default=None, ge=1)
+    count: float | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Quantity of unit for rolling windows; may be fractional. The "
+            "last 8.5 months is count=8.5 unit=month, and hace 2,5 meses is "
+            "count=2.5 unit=month. Never round or truncate a stated "
+            "fractional duration; deterministic date math computes from it."
+        ),
+    )
     unit: Literal["day", "week", "month", "quarter", "year"] | None = None
     anchor: Literal["today", "current_date"] | None = "today"
     year: int | None = Field(default=None, ge=1900, le=2100)

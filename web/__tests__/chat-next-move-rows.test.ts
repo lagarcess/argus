@@ -287,9 +287,10 @@ describe("sources panel", () => {
     expect(trigger).toContain("relative");
 
     const close = panel.slice(
-      panel.indexOf("sources_panel_close") - 400,
-      panel.indexOf("sources_panel_close") + 400,
+      panel.indexOf("<button\n            type=\"button\"\n            data-autofocus"),
+      panel.indexOf("</button>", panel.indexOf("data-autofocus\n")),
     );
+    expect(close).toContain("aria-label={closeLabel}");
     expect(close).toContain("min-h-11");
     expect(close).toContain("min-w-11");
   });
@@ -315,9 +316,9 @@ describe("sources panel", () => {
     expect(formattedSourceDate("not-a-date", "en-US")).toBe("");
   });
 
-  test("framing is descriptive rather than endorsing", () => {
+  test("framing explains source provenance and new-tab behavior", () => {
     expect(en.chat.discovery_results.sources_panel_note).toContain(
-      "Not recommended reading",
+      "Sources used to inform this answer",
     );
   });
 });
@@ -329,6 +330,7 @@ describe("locale parity for the new surface", () => {
     "sources_panel_title",
     "sources_panel_note",
     "sources_panel_close",
+    "sources_panel_external_link_new_tab",
   ])("%s exists in both catalogs", (key) => {
     expect(typeof en.chat.discovery_results[key]).toBe("string");
     expect(typeof es.chat.discovery_results[key]).toBe("string");

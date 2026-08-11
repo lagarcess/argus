@@ -1,0 +1,74 @@
+argus
+New chat
+Search
+Recents
+Settings
+SPY Top Holdings
+What are the top holdings inside SPY?
+SPY’s top holdings
+
+As of August 6, 2026, SPY’s ten largest positions were:
+
+RANK	COMPANY	TICKER	WEIGHT
+1	NVIDIA	NVDA	8.00%
+2	Apple	AAPL	6.92%
+3	Microsoft	MSFT	5.60%
+4	Amazon	AMZN	4.02%
+5	Alphabet Class A	GOOGL	3.16%
+6	Broadcom	AVGO	3.00%
+7	Alphabet Class C	GOOG	2.54%
+8	Meta Platforms	META	1.95%
+9	Micron Technology	MU	1.50%
+10	Berkshire Hathaway Class B	BRK.B	1.45%
+
+Together, these positions represented 38.14% of SPY. Alphabet appears twice because SPY owns two different share classes. The fund held 504 securities in total, reflecting the index’s multiple share classes.
+
+Holdings and weights change with stock prices and index adjustments.
+Source: State Street’s official SPY holdings.
+
+Test buying and holding SPY over the last three years
+SPY
+Buy and Hold
+Ready to run
+STARTING CAPITAL
+$1,000
+PERIOD
+Aug 9, 2023 → Aug 7, 2026
+Stocks
+Daily data
+Through Aug 7
+No fees
+No slippage
+Benchmark: SPY
+SPY
+NVDA
+Buy and Hold
+Ready to run
+STARTING CAPITAL
+$1,000
+PERIOD
+Aug 9, 2023 → Aug 7, 2026
+Stocks
+Daily data
+Through Aug 7
+No fees
+No slippage
+Benchmark: SPY
+Edit costs
+Run backtest
+Change dates
+Change asset
+Adjust assumptions
+Cancel
+TRY NEXT
+↳
+Add Apple Inc. Common Stock [AAPL] to this test
+↳
+Add Microsoft Corporation Common Stock [MSFT] to this test
+↳
+Add Prudential Financial, Inc. [PRU] to this test
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.
+
+Undo

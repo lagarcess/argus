@@ -17,6 +17,12 @@ const CONTINUITY_KINDS = new Set([
   "compare_buy_and_hold",
 ]);
 
+/** One typed segment of a row label: prose, or a resolver-verified ticker. */
+export type NextExperimentLabelPart = {
+  type: "text" | "ticker";
+  value: string;
+};
+
 export type NextExperimentReason = {
   code: string;
   params: Record<string, unknown>;
@@ -26,6 +32,11 @@ export type NextExperimentRow = {
   kind: string;
   label: string;
   labelKey: string;
+  /** Backend-composed short form for narrow screens; the client never clips. */
+  labelShort: string | null;
+  labelShortKey: string | null;
+  /** Typed identity segments; absent on rows composed before badges. */
+  labelParts: NextExperimentLabelPart[] | null;
   detail: string | null;
   sendText: string | null;
   why: NextExperimentReason | null;
@@ -35,6 +46,18 @@ function recordOrNull(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function labelPartsOrNull(value: unknown): NextExperimentLabelPart[] | null {
+  if (!Array.isArray(value)) return null;
+  const parts = value.flatMap((entry) => {
+    const raw = recordOrNull(entry);
+    const text = typeof raw?.value === "string" ? raw.value : "";
+    if (!text) return [];
+    const type = raw?.type === "ticker" ? "ticker" : "text";
+    return [{ type, value: text } as NextExperimentLabelPart];
+  });
+  return parts.length > 0 ? parts : null;
 }
 
 function rowOrNull(value: unknown): NextExperimentRow | null {
@@ -48,10 +71,18 @@ function rowOrNull(value: unknown): NextExperimentRow | null {
   const whyCode = why && typeof why.code === "string" ? why.code : "";
   const detail = typeof raw.detail === "string" ? raw.detail.trim() : "";
   const sendText = typeof raw.send_text === "string" ? raw.send_text.trim() : "";
+  const labelShort =
+    typeof raw.label_short === "string" ? raw.label_short.trim() : "";
+  const labelShortKey =
+    typeof raw.label_short_key === "string" ? raw.label_short_key.trim() : "";
+  const labelParts = labelPartsOrNull(raw.label_parts);
   return {
     kind,
     label,
     labelKey,
+    labelShort: labelShort || null,
+    labelShortKey: labelShortKey || null,
+    labelParts,
     detail: detail || null,
     sendText: sendText || null,
     why: whyCode
@@ -73,11 +104,25 @@ export function nextExperimentRowsFromMetadata(
   return rows.length > 0 ? rows : null;
 }
 
+const RESEARCH_ADD_PEER_KIND_PREFIX = "research_add_peer";
+
 export function nextExperimentAction(
   row: NextExperimentRow,
   localizedLabel?: string,
   sourceRunId?: string,
 ): ChatActionOption {
+  if (row.kind.startsWith(RESEARCH_ADD_PEER_KIND_PREFIX)) {
+    // No turn is spent: the typed endpoint patches the pending card with the
+    // resolver-verified symbols the row's why payload carries.
+    const symbols = Array.isArray(row.why?.params?.symbols)
+      ? (row.why?.params?.symbols as unknown[]).map((symbol) => String(symbol))
+      : [];
+    return {
+      label: localizedLabel || row.label,
+      type: "add_confirmation_peer",
+      payload: { symbols },
+    };
+  }
   // A prebaked row sends its fully specified ask; nothing is missing, so
   // the normal lifecycle answers with the next confirmation card.
   const send = row.sendText || localizedLabel || row.label;

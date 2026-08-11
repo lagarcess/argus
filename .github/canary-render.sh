@@ -109,6 +109,9 @@ WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
 WORKFLOW_VERSION_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS=""
+CRON_DEPLOY_SHA=""
 ENV_FINGERPRINT=""
 RELEASE_PROFILE_HASH=""
 WORKFLOW_ENV_FINGERPRINT=""
@@ -119,6 +122,7 @@ WORKFLOW_TASK=""
 REAL_WORKFLOW_TASK=""
 API_DEPLOY_SHA=""
 WEB_DEPLOY_SHA=""
+DEPLOYED_SHA=""
 API_DEPLOY_STATUS=""
 WEB_DEPLOY_STATUS=""
 WORKFLOW_VERSION_COMMIT=""
@@ -239,6 +243,7 @@ build_release_evidence_json() {
   CANARY_REAL_WORKFLOW_TASK="$REAL_WORKFLOW_TASK" \
   CANARY_API_DEPLOY_SHA="$API_DEPLOY_SHA" \
   CANARY_WEB_DEPLOY_SHA="$WEB_DEPLOY_SHA" \
+  CANARY_DEPLOYED_SHA="$DEPLOYED_SHA" \
   CANARY_API_DEPLOY_STATUS="$API_DEPLOY_STATUS" \
   CANARY_WEB_DEPLOY_STATUS="$WEB_DEPLOY_STATUS" \
   CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
@@ -289,6 +294,7 @@ payload = {
     "real_workflow_task": optional(os.environ["CANARY_REAL_WORKFLOW_TASK"]),
     "api_deploy_sha": optional(os.environ["CANARY_API_DEPLOY_SHA"]),
     "web_deploy_sha": optional(os.environ["CANARY_WEB_DEPLOY_SHA"]),
+    "deployed_sha": optional(os.environ["CANARY_DEPLOYED_SHA"]),
     "api_deploy_status": optional(os.environ["CANARY_API_DEPLOY_STATUS"]),
     "web_deploy_status": optional(os.environ["CANARY_WEB_DEPLOY_STATUS"]),
     "workflow_version_commit": optional(os.environ["CANARY_WORKFLOW_VERSION_COMMIT"]),
@@ -582,7 +588,12 @@ run_deploy_status_probe() {
   if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
     fail_canary "deploy_status" "workflow_version_status_failed"
   fi
+  if ! CRON_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status)"; then
+    fail_canary "deploy_status" "cron_deploy_status_failed"
+  fi
 
+  CRON_DEPLOY_STATUS="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" status || true)"
+  CRON_DEPLOY_SHA="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
@@ -598,26 +609,45 @@ run_deploy_status_probe() {
   if [ "$WEB_DEPLOY_STATUS" != "live" ]; then
     fail_canary "deploy_status" "web_deploy_not_live"
   fi
-  if [ "$API_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
-    fail_canary "deploy_status" "api_deploy_sha_mismatch"
-  fi
-  if [ "$WEB_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
-    fail_canary "deploy_status" "web_deploy_sha_mismatch"
-  fi
   if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
     fail_canary "deploy_status" "workflow_version_not_ready"
   fi
-  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
-    fail_canary "deploy_status" "workflow_version_commit_mismatch"
-  fi
   if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
     fail_canary "deploy_status" "workflow_version_id_mismatch"
+  fi
+  if [ -z "$API_DEPLOY_SHA" ] || [ "$API_DEPLOY_SHA" != "$WEB_DEPLOY_SHA" ]; then
+    fail_canary "deploy_status" "api_web_deploy_sha_mismatch"
+  fi
+  if [ "$API_DEPLOY_SHA" != "$WORKFLOW_VERSION_COMMIT" ]; then
+    fail_canary "deploy_status" "api_workflow_deploy_sha_mismatch"
+  fi
+  # A deployed janitor runs with the service-role key, so it may not lag the
+  # release this canary certifies. absent means Render has no such service; a
+  # failed lookup already exited nonzero above and never reaches this exemption.
+  if [ -z "$CRON_DEPLOY_STATUS" ] || [ "$CRON_DEPLOY_STATUS" = "lookup_failed" ]; then
+    fail_canary "deploy_status" "cron_status_unavailable"
+  fi
+  if [ "$CRON_DEPLOY_STATUS" != "absent" ]; then
+    if [ "$CRON_DEPLOY_STATUS" != "live" ]; then
+      fail_canary "deploy_status" "cron_deploy_not_live"
+    fi
+    if [ "$API_DEPLOY_SHA" != "$CRON_DEPLOY_SHA" ]; then
+      fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"
+    fi
+  fi
+
+  DEPLOYED_SHA="$API_DEPLOY_SHA"
+  if [ "$CANDIDATE_SHA" != "$DEPLOYED_SHA" ]; then
+    fail_canary "deploy_status" "candidate_sha_does_not_match_deployed_sha"
   fi
 
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
+  echo "canary_deployed_sha=$DEPLOYED_SHA"
+  echo "canary_cron_deploy_status=$CRON_DEPLOY_STATUS"
+  echo "canary_cron_deploy_sha=$CRON_DEPLOY_SHA"
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
   echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
@@ -693,16 +723,16 @@ validate_release_evidence_contract() {
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
 }
 
-run_browser_canary_phase() {
-  local phase="$1"
+run_browser_canary() {
   if ! env -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
     ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
-    ARGUS_CANARY_BROWSER_PHASE="$phase" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
     "$SCRIPT_DIR/canary-browser.sh" 2>&1 | tee "$BROWSER_PHASE_OUTPUT"; then
+    BROWSER_CANARY_STATUS="failed"
     return 1
   fi
+  BROWSER_CANARY_STATUS="passed"
 }
 
 browser_auth_challenge_timed_out() {
@@ -760,20 +790,10 @@ PY
 }
 
 run_requested_signup_denial_canary() {
-  env -u SUPABASE_SERVICE_ROLE_KEY \
-    -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
-    CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
+  CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
     CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN="${ARGUS_OPS_TOKEN:-}" \
     python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
-}
-
-run_browser_canary() {
-  if ! run_browser_canary_phase "full"; then
-    BROWSER_CANARY_STATUS="failed"
-    return 1
-  fi
-  BROWSER_CANARY_STATUS="passed"
 }
 
 verify_browser_identity_handoff() {
@@ -1547,10 +1567,10 @@ if ! prepare_signup_identity; then
   fail_canary "auth" "canary_signup_identity_setup_failed"
 fi
 if ! run_requested_signup_denial_canary; then
-  fail_canary "auth" "requested_signup_was_not_denied"
+  fail_canary "requested_signup_denial" "requested_signup_denial_probe_failed"
 fi
 if ! verify_no_signup_auth_identity; then
-  fail_canary "auth" "requested_signup_created_auth_identity"
+  fail_canary "requested_signup_denial" "requested_signup_created_auth_identity"
 fi
 if ! promote_requested_signup_allowlist; then
   fail_canary "auth" "requested_signup_promotion_failed"

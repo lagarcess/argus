@@ -162,8 +162,9 @@ def _response_from_executable_strategy_grounding_audit(
             ]
         )
     )
-    if canonical_strategy_type(
-        repaired.candidate_strategy_draft.strategy_type
-    ) in {"buy_and_hold", "dca_accumulation"}:
+    if canonical_strategy_type(repaired.candidate_strategy_draft.strategy_type) in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }:
         repaired.candidate_strategy_draft.strategy_type = None
     return repaired

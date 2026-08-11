@@ -1929,7 +1929,15 @@ def test_default_interpreter_retries_empty_refinement_candidate(
     )
 
     assert result is not None
-    assert calls == ["primary/model", "primary/model", "fallback/model"]
+    # The primary tier gets its own bounded self-correction pass before the
+    # fallback tier is tried, so an empty refinement is re-asked in place first.
+    assert calls == [
+        "primary/model",
+        "primary/model",
+        "primary/model",
+        "primary/model",
+        "fallback/model",
+    ]
     assert result.candidate_strategy_draft.date_range == "last 6 months"
 
 
@@ -3203,8 +3211,67 @@ def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> Non
     assert "model=test/model" in message
     assert "max_tokens=3200" in message
     assert "error_type=RuntimeError" in message
-    assert "provider rejected request" not in message
+    # The detail belongs in the rendered message: the default sink drops extra,
+    # so binding it alone left production with only the exception type.
+    assert "provider rejected request" in message
     assert kwargs["error_type"] == "RuntimeError"
+    assert kwargs["error"] == "provider rejected request"
+
+
+def _captured_failure_log(monkeypatch, exc: Exception) -> str:
+    observed: list[str] = []
+    monkeypatch.setattr(
+        "argus.llm.openrouter.logger.warning",
+        lambda message, **_kwargs: observed.append(message),
+    )
+    log_openrouter_failure(
+        task="interpretation",
+        model_name="test/model",
+        exc=exc,
+        message="LLM interpretation failed",
+    )
+    return observed[0]
+
+
+def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
+    def _raise_local_rejection() -> None:
+        raise ValueError(
+            "OpenRouter interpretation returned an incomplete strategy draft"
+        )
+
+    try:
+        _raise_local_rejection()
+    except ValueError as exc:
+        message = _captured_failure_log(monkeypatch, exc)
+
+    assert "error_type=ValueError" in message
+    assert "OpenRouter interpretation returned an incomplete strategy draft" in message
+    # Points at the raising line so a deterministic local rejection is
+    # distinguishable from a provider transport failure.
+    assert "error_origin=test_openrouter_policy.py:" in message
+
+
+def test_openrouter_failure_log_survives_braces_in_detail() -> None:
+    # Real loguru here: a stubbed warning would not exercise its formatting.
+    try:
+        raise ValueError('provider said {"error": {"code": 400}}')
+    except ValueError as exc:
+        log_openrouter_failure(
+            task="interpretation",
+            model_name="test/model",
+            exc=exc,
+            message="LLM interpretation failed",
+        )
+
+
+def test_openrouter_failure_log_bounds_long_provider_detail(monkeypatch) -> None:
+    try:
+        raise RuntimeError("x" * 5000)
+    except RuntimeError as exc:
+        message = _captured_failure_log(monkeypatch, exc)
+
+    assert "<truncated>" in message
+    assert len(message) < 1000
 
 
 def test_direct_json_schema_payload_uses_interpretation_profile_reasoning(
@@ -4036,3 +4103,70 @@ def test_json_content_prose_brace_before_real_fence_still_yields_body() -> None:
         assert (
             openrouter._json_content_without_code_fences(content) == '{"ok": true}'
         ), content
+
+
+def _empty_refine_response() -> LLMInterpretationResponse:
+    return LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        user_goal_summary="Change the date range.",
+        semantic_turn_act="refine_current_idea",
+        candidate_strategy_draft=LLMStrategyDraft(),
+    )
+
+
+def _active_card_request(message: str) -> InterpretationRequest:
+    return InterpretationRequest(
+        current_user_message=message,
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                date_range="past year",
+            )
+        ),
+        user=UserState(user_id="u1"),
+    )
+
+
+def test_contract_rejection_is_recorded_as_a_distinct_route_receipt(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        return _empty_refine_response()
+
+    monkeypatch.setattr(
+        llm_interpreter, "invoke_openrouter_json_schema", fake_direct_schema
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        _structured_model_candidates_with_fallback,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    token = openrouter.begin_openrouter_route_receipt_capture()
+    try:
+        result = interpreter(_active_card_request("Use the last 6 months instead."))
+    finally:
+        receipts = openrouter.end_openrouter_route_receipt_capture(token)
+
+    assert result is None
+    rejected = [
+        receipt
+        for receipt in receipts
+        if receipt.failure_mode == "interpretation_contract_rejected"
+    ]
+    # Both tiers rejected, and neither is invisible in telemetry any more.
+    assert {receipt.model for receipt in rejected} == {
+        "primary/model",
+        "fallback/model",
+    }
+    assert all(receipt.outcome == "failed" for receipt in rejected)
+    assert interpreter.last_failure_kind == "contract_rejected"

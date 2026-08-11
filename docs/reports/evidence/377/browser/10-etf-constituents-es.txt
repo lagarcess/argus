@@ -1,0 +1,38 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Posiciones principales del ETF SPY
+¿Qué contiene el ETF SPY? Muéstrame sus principales posiciones
+
+SPY contiene las acciones que integran el índice S&P 500, por lo que ofrece exposición a grandes empresas estadounidenses de tecnología, finanzas, salud, consumo y otros sectores. Actualmente registra 504 posiciones; el número supera 500 porque algunas compañías, como Alphabet, tienen más de una clase de acciones.
+
+Principales posiciones de SPY
+
+Datos al 6 de agosto de 2026:
+
+POSICIÓN	EMPRESA	TICKER	PESO
+1	NVIDIA	NVDA	8,00%
+2	Apple	AAPL	6,92%
+3	Microsoft	MSFT	5,60%
+4	Amazon.com	AMZN	4,02%
+5	Alphabet, clase A	GOOGL	3,16%
+6	Broadcom	AVGO	3,00%
+7	Alphabet, clase C	GOOG	2,54%
+8	Meta Platforms, clase A	META	1,95%
+9	Micron Technology	MU	1,50%
+10	Berkshire Hathaway, clase B	BRK.B	1,45%
+
+Estas diez posiciones representan 38,14% del ETF. Esto muestra que, aunque SPY está ampliamente diversificado, una parte considerable se concentra en grandes compañías tecnológicas. Los pesos cambian diariamente con los precios de mercado y los ajustes del índice.
+
+Fuente: State Street, página oficial de SPY y archivo oficial de posiciones.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar State Street SPDR S&P 500 ETF Trust [SPY] con datos históricos
+↳
+Probar State Street SPDR S&P 500 ETF Trust [SPY] frente a NVIDIA Corporation Common Stock [NVDA], Apple Inc. Common Stock [AAPL], Microsoft Corporation Common Stock [MSFT] y Prudential Financial, Inc. [PRU]
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

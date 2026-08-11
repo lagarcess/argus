@@ -295,6 +295,11 @@ users.
 
 ## Promotion Boundary
 
+**2026-08-05: production promotion executed at `7ef89a90`** (manifest in
+`docs/release-manifests/`); the guest surface is live behind Turnstile with
+the eyes-open postures above in effect. The boundary text below is preserved
+for future cycles.
+
 Merging the Guest implementation into the internal integration branch requires
 its normal code, database, Auth, frontend, and regression evidence. It does not
 require buying or configuring hosted bot products, exposing traffic, scheduling

@@ -96,11 +96,15 @@ def emit_runtime_measurement_events(
     next_experiments = metadata.get("next_experiments")
     if isinstance(next_experiments, dict):
         rows = next_experiments.get("rows")
-        kinds = [
-            str(row.get("kind"))
-            for row in rows
-            if isinstance(row, dict) and row.get("kind")
-        ] if isinstance(rows, list) else []
+        kinds = (
+            [
+                str(row.get("kind"))
+                for row in rows
+                if isinstance(row, dict) and row.get("kind")
+            ]
+            if isinstance(rows, list)
+            else []
+        )
         if kinds:
             # Stage-1 ordering consumes these impressions; acceptance rides
             # the persisted select_response_option turns.

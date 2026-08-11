@@ -156,9 +156,10 @@ def _response_from_stated_starting_capital_audit(
     draft = repaired.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         return None
-    if draft.capital_amount == audit.starting_capital and draft.field_provenance.get(
-        "capital_amount"
-    ) == "starting_capital":
+    if (
+        draft.capital_amount == audit.starting_capital
+        and draft.field_provenance.get("capital_amount") == "starting_capital"
+    ):
         return None
     draft.capital_amount = float(audit.starting_capital)
     draft.field_provenance["capital_amount"] = "starting_capital"

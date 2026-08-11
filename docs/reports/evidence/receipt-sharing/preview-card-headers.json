@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "headers": {
+    "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "cache-control": "no-store, max-age=0",
+    "content-type": "image/png",
+    "x-robots-tag": "noindex, nofollow, noimageindex",
+    "date": "Sat, 08 Aug 2026 23:09:38 GMT",
+    "connection": "keep-alive",
+    "keep-alive": "timeout=5",
+    "transfer-encoding": "chunked"
+  }
+}

@@ -193,7 +193,9 @@ class PostgresRunDossierReader:
             owner_id = UUID(user_id)
             owned_conversation_id = UUID(conversation_id)
         except (TypeError, ValueError) as exc:
-            raise ValueError("Run dossier owner and conversation ids must be UUIDs.") from exc
+            raise ValueError(
+                "Run dossier owner and conversation ids must be UUIDs."
+            ) from exc
 
         has_cursor = cursor_completed_at is not None or cursor_run_id is not None
         if has_cursor and (
@@ -224,9 +226,10 @@ class PostgresRunDossierReader:
                 if cursor_completed_at is not None:
                     cursor.execute(_CURSOR_PIVOT_SQL, params)
                     pivots = cursor.fetchall()
-                    if len(pivots) != 1 or pivots[0].get(
-                        "completed_at"
-                    ) != cursor_completed_at:
+                    if (
+                        len(pivots) != 1
+                        or pivots[0].get("completed_at") != cursor_completed_at
+                    ):
                         raise RunDossierCursorError(
                             "Run dossier cursor pivot is not eligible."
                         )

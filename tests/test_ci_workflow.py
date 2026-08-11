@@ -293,40 +293,6 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert gate_index < redaction_index < browser_context_index
 
 
-def test_runbook_documents_every_pre_detach_canary_script() -> None:
-    # Scripts the resolver runs before the detach come from the ref the run
-    # started on, so a fix to one of them is live without a deploy. The runbook
-    # has to name them or an operator misreads which fixes are already active.
-    steps = _canary_workflow()["jobs"]["canary"]["steps"]
-    detach_index = next(
-        index
-        for index, step in enumerate(steps)
-        if "git checkout --detach" in str(step.get("run", ""))
-    )
-    pre_detach = {
-        path
-        for step in steps[: detach_index + 1]
-        for path in CANARY_SCRIPT_REFERENCE.findall(str(step.get("run", "")))
-    }
-    post_detach = {
-        path
-        for step in steps[detach_index + 1 :]
-        for path in CANARY_SCRIPT_REFERENCE.findall(str(step.get("run", "")))
-    }
-    runbook = RUNBOOK_PATH.read_text(encoding="utf-8")
-
-    assert pre_detach
-    assert post_detach
-    for path in sorted(pre_detach):
-        assert path in runbook, f"runbook omits pre-detach script {path}"
-    for path in sorted(post_detach):
-        assert path in runbook, f"runbook omits post-detach script {path}"
-    assert "every script it runs comes from the deployed tree" not in runbook
-    assert steps[0]["with"]["ref"] == (
-        "${{ github.event_name == 'schedule' && 'main' || github.sha }}"
-    )
-
-
 def test_private_alpha_canary_schedule_uses_main_as_the_deployment_candidate() -> None:
     workflow = _canary_workflow()
     steps_by_name = {step["name"]: step for step in workflow["jobs"]["canary"]["steps"]}

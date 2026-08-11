@@ -1,0 +1,18 @@
+argus
+New chat
+Search
+Recents
+Settings
+Bitcoin Trading Price Check
+What is Bitcoin trading at right now?
+
+Bitcoin is trading at 64,741.46 right now.
+
+This price is from Argus's own market data, not live stock or ETF feeds.
+
+TRY NEXT
+↳
+Test XBT/USD [BTC] against history
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

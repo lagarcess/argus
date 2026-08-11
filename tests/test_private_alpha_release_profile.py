@@ -30,6 +30,7 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert profile["release_mode"] == "real-workflow"
     assert profile["services"]["api"]["name"] == "argus-api"
     assert profile["services"]["web"]["name"] == "argus-app"
+    assert profile["services"]["cron"]["name"] == "argus-maintenance"
     assert profile["services"]["workflow"]["name"] == "argus-backtests"
     assert profile["workflow"]["real_task"] == "argus-backtests/run_backtest_job"
     assert profile["locales"]["supported"] == ["en", "es-419"]
@@ -123,7 +124,7 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
         for service in render_blueprint["services"]
     }
 
-    for surface in ("api", "web"):
+    for surface in ("api", "web", "cron"):
         service_profile = profile["services"][surface]
         rendered_env = render_services[service_profile["name"]]
         expected_keys = set(service_profile["env"])

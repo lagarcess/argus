@@ -13,7 +13,11 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
 
-from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
+from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
+    _apply_legacy_flat_edit_fields,
+    _edit_plan_reshapes_non_recurring_strategy,
+    plan_artifact_assumption_edit,
+)
 from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
@@ -33,18 +37,18 @@ from argus.agent_runtime.benchmark_evidence import (
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: F401
     ARTIFACT_EDIT_PENDING_FIELDS,
-    _apply_legacy_flat_edit_fields,
     _apply_resolved_edit_to_draft,
     _current_artifact_asset_universe,
     _current_artifact_strategy,
-    _edit_plan_reshapes_non_recurring_strategy,
     _normalized_ticker_symbol,
     _request_targets_pending_artifact_assumption_edit,
+    _scoped_date_reply_carries_broader_edit,
     _request_targets_post_result_artifact_edit,
     _required_edit_targets_from_primary_draft,
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
     materialized_artifact_edit_targets,
+    stated_cost_edit_operations,
 )
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
@@ -120,6 +124,7 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
 from argus.agent_runtime.interpreter.draft_shape import (  # noqa: F401
     _elapsed_ms,
     _refinement_reply_needs_full_interpretation,
+    strategy_has_execution_evidence,
     _llm_signal_strategy_is_underfilled,
     _llm_strategy_draft_has_executable_shape,
     _llm_strategy_draft_has_structural_execution_fields,
@@ -147,6 +152,7 @@ from argus.agent_runtime.interpreter.executable_grounding import (  # noqa: F401
     _response_needs_launch_field_fidelity_repair,
 )
 from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
+    response_from_focused_strategy_extraction,
     strategy_extraction_repair_is_allowed,
     _base_response_was_unsupported,
     _comparison_baseline_provenance,
@@ -326,6 +332,7 @@ from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa
     _supported_partial_draft_has_repairable_shape,
     _vague_strategy_start_as_guidance,
 )
+from argus.agent_runtime.interpreter import contract_recovery
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedDateWindowExtraction,
     FocusedStrategyExtraction,
@@ -343,10 +350,6 @@ from argus.agent_runtime.presentation_i18n import (
 from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
-)
-from argus.agent_runtime.rule_specs import (
-    moving_average_crossover_text,
-    opposite_moving_average_crossover_rule,
 )
 from argus.agent_runtime.run_field_contract import (
     current_message_execution_context_tokens,
@@ -367,7 +370,6 @@ from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
     executable_strategy_type,
-    executable_strategy_type_from_extracted_fields,
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
@@ -426,6 +428,7 @@ class OpenRouterStructuredInterpreter:
         self.contract = contract
         self.model_name = model_name
         self.last_status: str | None = None
+        self.last_failure_kind: str | None = None
 
     def __call__(self, request: InterpretationRequest) -> StructuredInterpretation | None:
         return asyncio.run(self.ainvoke(request))
@@ -436,6 +439,7 @@ class OpenRouterStructuredInterpreter:
         """
         Executes the interpretation turn.
         """
+        self.last_failure_kind, self.correction_attempted = None, False
         candidate_models: list[str] | None = None
         if self.model_name is None:
             candidate_models = openrouter_structured_model_candidates()
@@ -474,15 +478,19 @@ class OpenRouterStructuredInterpreter:
                     self.last_status = "used" if index == 0 else "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
                 except Exception as exc:
-                    log_openrouter_failure(
-                        task="interpretation",
-                        model_name=candidate_model,
+                    recovered = await contract_recovery.handle_candidate_failure(
+                        interpreter=self,
                         exc=exc,
-                        message=(
-                            "Direct LLM interpretation candidate failed; "
-                            "trying next configured model"
-                        ),
+                        is_primary=index == 0,
+                        request=request,
+                        candidate_model=candidate_model,
+                        wire_messages=_openrouter_wire_messages(messages),
+                        invoke_schema=invoke_openrouter_json_schema,
+                        ready_for_runtime=_response_ready_for_runtime,
+                        asset_resolution_context=asset_resolution_context,
                     )
+                    if recovered is not None:
+                        return recovered
             repaired_response = await _plan_pending_artifact_assumption_edit(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
@@ -766,7 +774,9 @@ class OpenRouterStructuredInterpreter:
             "a strategy draft is present. Put the exact bounded date/window phrase in candidate_strategy_draft.date_range_raw_text. For relative "
             "or semantic time windows, also fill candidate_strategy_draft."
             "date_range_intent with canonical fields: kind=rolling_window with "
-            "count/unit, kind=year_to_date with optional year, kind=calendar_year "
+            "count/unit where count keeps a stated fractional quantity exactly "
+            "(the last 8.5 months means count=8.5, never 8 or 5), "
+            "kind=year_to_date with optional year, kind=calendar_year "
             "with year, kind=since with start/year, kind=explicit_range with "
             "ISO start/end, kind=endpoint_patch with endpoint plus ISO date or "
             "anchor=today and day_offset for relative day edits, or "
@@ -2198,7 +2208,9 @@ async def _response_ready_for_runtime(
     if discovery_response is not None:
         return discovery_response
     return await _audited_response_ready_for_runtime(
-        response=response, preferred_model=preferred_model, request=request,
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
         asset_resolution_context=asset_resolution_context,
     )
 
@@ -2553,9 +2565,8 @@ async def _audited_response_ready_for_runtime(
                 preferred_model=preferred_model,
                 request=request,
             )
-        raise ValueError(
-            "OpenRouter unsupported clarification omitted recoverable artifact context"
-        )
+        # Entered only when the response already carries assistant text.
+        return _carry_asset_blocker(response, asset_resolution_context)
     if _response_needs_structured_strategy_repair(response=response):
         repaired_response = await _repair_incomplete_strategy_extraction(
             failed_response=response,
@@ -2611,10 +2622,7 @@ async def _audited_response_ready_for_runtime(
         )
         if planned_response is not None:
             return _carry_asset_blocker(planned_response, asset_resolution_context)
-        raise ValueError(
-            "OpenRouter interpretation replayed the active artifact without a "
-            "material current-turn update"
-        )
+        raise contract_recovery.replay_without_update_error()
     audited_response = await _audit_stated_run_fields(
         response=response,
         preferred_model=preferred_model,
@@ -2673,7 +2681,7 @@ async def _audited_response_ready_for_runtime(
             preferred_model=preferred_model,
             request=request,
         )
-    raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+    raise contract_recovery.incomplete_response_error(response=response, request=request)
 
 
 async def _ready_active_artifact_edit_planned_response(
@@ -2702,6 +2710,9 @@ async def _ready_active_artifact_edit_planned_response(
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
         or _request_targets_post_result_artifact_edit(request)
+        or _scoped_date_reply_carries_broader_edit(
+            request, response.candidate_strategy_draft
+        )
     ):
         return None
     if response.semantic_turn_act in {
@@ -3419,6 +3430,7 @@ async def _plan_pending_artifact_assumption_edit(
     if not (
         _request_targets_pending_artifact_assumption_edit(request)
         or _request_targets_post_result_artifact_edit(request)
+        or _scoped_date_reply_carries_broader_edit(request, primary_draft)
     ):
         return None
     if (
@@ -3444,6 +3456,7 @@ async def _plan_pending_artifact_assumption_edit(
         language=request.user.language_preference,
         required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
         materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
+        stated_cost_operations=stated_cost_edit_operations(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
     )
     # fmt: on
     if plan is None:
@@ -4768,184 +4781,12 @@ def _response_from_focused_strategy_extraction(
     request: InterpretationRequest,
     base_response: LLMInterpretationResponse | None = None,
 ) -> LLMInterpretationResponse:
-    strategy_type = executable_strategy_type_from_extracted_fields(
-        extraction.model_dump(mode="python")
-    )
-    entry_logic = extraction.entry_logic or moving_average_crossover_text(
-        extraction.entry_rule
-    )
-    exit_logic = (
-        extraction.exit_logic
-        or moving_average_crossover_text(extraction.exit_rule)
-        or moving_average_crossover_text(
-            opposite_moving_average_crossover_rule(extraction.entry_rule)
-        )
-    )
-    asset_universe, resolved_asset_class = _canonical_asset_universe_from_llm_extraction(
-        extraction.asset_universe
-    )
-    extraction_date_range = extraction.date_range
-    if _llm_value_is_empty(extraction_date_range):
-        resolved_date_intent = resolve_date_range_intent(extraction.date_range_intent)
-        if resolved_date_intent is not None:
-            extraction_date_range = resolved_date_intent.payload
-    if strategy_type is None:
-        return LLMInterpretationResponse(
-            intent="unsupported_or_out_of_scope",
-            task_relation="new_task",
-            requires_clarification=True,
-            user_goal_summary=extraction.user_goal_summary,
-            candidate_strategy_draft=LLMStrategyDraft(
-                raw_user_phrasing=request.current_user_message,
-                language=extraction.language,
-                strategy_thesis=extraction.strategy_thesis
-                or extraction.user_goal_summary,
-                asset_universe=asset_universe,
-                asset_class=extraction.asset_class or resolved_asset_class,
-                timeframe=extraction.timeframe,
-                date_range=extraction_date_range,
-                date_range_raw_text=extraction.date_range_raw_text,
-                date_range_intent=extraction.date_range_intent,
-                comparison_baseline=extraction.comparison_baseline,
-                capital_amount=extraction.capital_amount,
-                recurring_contribution=extraction.recurring_contribution,
-                cadence=extraction.cadence,
-                entry_logic=entry_logic,
-                exit_logic=exit_logic,
-                indicator=extraction.indicator,
-                indicator_period=extraction.indicator_period,
-                entry_threshold=extraction.entry_threshold,
-                exit_threshold=extraction.exit_threshold,
-                evidence_spans=dict(extraction.evidence_spans or {}),
-                field_provenance=_focused_extraction_field_provenance(
-                    extraction=extraction,
-                    current_message=request.current_user_message,
-                ),
-                extra_parameters={
-                    "raw_strategy_type": extraction.strategy_type,
-                }
-                if extraction.strategy_type
-                else {},
-            ),
-            unsupported_constraints=[
-                LLMUnsupportedConstraint(
-                    category="unsupported_strategy_logic",
-                    raw_value=(
-                        extraction.entry_logic
-                        or extraction.strategy_thesis
-                        or extraction.strategy_type
-                        or extraction.user_goal_summary
-                    ),
-                    explanation=(
-                        extraction.assistant_response
-                        or "This idea depends on strategy logic that is not executable yet."
-                    ),
-                    simplification_options=(
-                        _options.unsupported_strategy_logic_simplification_options()
-                    ),
-                )
-            ],
-            confidence=extraction.confidence,
-            reason_codes=["focused_strategy_extraction_unrecognized_contract"],
-            semantic_turn_act="unsupported_request",
-        )
-    response = LLMInterpretationResponse(
-        intent="strategy_drafting"
-        if extraction.requires_clarification
-        else "backtest_execution",
-        task_relation="new_task",
-        requires_clarification=extraction.requires_clarification,
-        user_goal_summary=extraction.user_goal_summary,
-        candidate_strategy_draft=LLMStrategyDraft(
-            raw_user_phrasing=request.current_user_message,
-            language=extraction.language,
-            strategy_type=strategy_type,
-            strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
-            asset_universe=asset_universe,
-            asset_class=extraction.asset_class or resolved_asset_class,
-            timeframe=extraction.timeframe,
-            date_range=extraction_date_range,
-            date_range_raw_text=extraction.date_range_raw_text,
-            date_range_intent=extraction.date_range_intent,
-            comparison_baseline=extraction.comparison_baseline,
-            capital_amount=extraction.capital_amount,
-            recurring_contribution=extraction.recurring_contribution,
-            cadence=extraction.cadence,
-            entry_logic=entry_logic,
-            exit_logic=exit_logic,
-            entry_rule=extraction.entry_rule,
-            exit_rule=extraction.exit_rule,
-            rule_spec=extraction.rule_spec,
-            indicator=extraction.indicator,
-            indicator_period=extraction.indicator_period,
-            entry_threshold=extraction.entry_threshold,
-            exit_threshold=extraction.exit_threshold,
-            evidence_spans=dict(extraction.evidence_spans or {}),
-            field_provenance=_focused_extraction_field_provenance(
-                extraction=extraction,
-                current_message=request.current_user_message,
-            ),
-        ),
-        missing_required_fields=list(extraction.missing_required_fields),
-        assistant_response=extraction.assistant_response,
-        confidence=extraction.confidence,
-        reason_codes=["focused_strategy_extraction_repair"],
-        semantic_turn_act="new_idea",
-    )
-    response = _merge_focused_repair_with_base(
-        response=response,
+    return response_from_focused_strategy_extraction(
+        extraction=extraction,
+        request=request,
         base_response=base_response,
+        resolve_asset_candidate=_resolve_asset_candidate,
     )
-    # Missing fields derive from the merged draft so already-grounded context is
-    # not re-asked.
-    response.missing_required_fields = (
-        _capability_required_missing_fields_for_canonical_strategy(
-            response.missing_required_fields,
-            draft=response.candidate_strategy_draft,
-        )
-    )
-    if response.missing_required_fields or response.ambiguous_fields:
-        response.intent = "strategy_drafting"
-        response.requires_clarification = True
-        response.assistant_response = None
-    return response
-
-
-def _canonical_asset_universe_from_llm_extraction(
-    values: list[str],
-) -> tuple[list[str], str | None]:
-    symbols: list[str] = []
-    seen: set[str] = set()
-    asset_classes: set[str] = set()
-    for index, value in enumerate(values):
-        raw_text = str(value or "").strip()
-        if not raw_text:
-            continue
-        symbol = ""
-        try:
-            resolution = _resolve_asset_candidate(
-                raw_text,
-                field=f"asset_universe[{index}]",
-                source="llm_extraction",
-            )
-        except Exception:
-            resolution = None
-        if (
-            resolution is not None
-            and resolution.status == "resolved"
-            and resolution.asset is not None
-        ):
-            symbol = str(resolution.asset.canonical_symbol or "").upper()
-            asset_class = str(resolution.asset.asset_class or "").strip()
-            if asset_class:
-                asset_classes.add(asset_class)
-        if not symbol:
-            symbol = raw_text.upper()
-        if symbol and symbol not in seen:
-            seen.add(symbol)
-            symbols.append(symbol)
-    resolved_asset_class = next(iter(asset_classes)) if len(asset_classes) == 1 else None
-    return symbols, resolved_asset_class
 
 
 def _structured_interpretation_has_required_shape(
@@ -4969,9 +4810,9 @@ def _structured_interpretation_has_required_shape(
         response.intent == "unsupported_or_out_of_scope"
         and response.requires_clarification
         and not response.unsupported_constraints
-        and not _llm_strategy_draft_has_extractable_fields(
-            response.candidate_strategy_draft
-        )
+        # A reference-only draft (resolved asset, date) is not an answer; fail
+        # the shape without text so the corrective re-ask demands one.
+        and not strategy_has_execution_evidence(response.candidate_strategy_draft)
     ):
         return bool(response.assistant_response)
     if _response_underfills_pending_result_refinement(
@@ -5229,7 +5070,9 @@ def _validate_capability_boundaries(
             continue
         canonical_symbols.append(resolution.asset.canonical_symbol)
         context_asset_classes = (
-            provider_context_assets.resolved_asset_classes_from_strategy_context(strategy, symbol)
+            provider_context_assets.resolved_asset_classes_from_strategy_context(
+                strategy, symbol
+            )
         )
         asset_classes.update(context_asset_classes or {resolution.asset.asset_class})
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))

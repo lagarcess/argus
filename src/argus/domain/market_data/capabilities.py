@@ -77,8 +77,8 @@ def fetch_alpaca_market_calendar(
     end_date: date,
 ) -> tuple[EquityMarketSession, ...]:
     provider_mode = (
-        os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider"
-    ).strip().lower()
+        (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip().lower()
+    )
     if provider_mode == "synthetic_unit_fixture":
         raise ValueError("market_calendar_unavailable")
 

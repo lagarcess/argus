@@ -34,7 +34,7 @@ Before making code changes, agents must review these source-of-truth docs in thi
 - Strategy drafting through conversation
 - Simple, trustworthy backtests
 - Recents/history retrieval
-- Collections (organizational, not portfolios)
+- Idea and evidence recall through Omnisearch
 - English + Spanish support
 - Fast iteration over feature breadth
 
@@ -54,7 +54,8 @@ Before making code changes, agents must review these source-of-truth docs in thi
 - **Logic**: Long-only, equal-weight multi-symbol runs.
 - **Limits**: Max 5 symbols per run.
 - **Localization**: Static UI must support English (`en`) and Spanish (`es-419`).
-- **Organization**: Collections may mix themes/assets; runs may not mix asset classes.
+- **Organization**: Legacy Collection rows may contain mixed themes/assets, but no
+  current Collection surface creates or manages them; runs may not mix asset classes.
 
 # 🚀 Implementation Priority Order
 
@@ -103,15 +104,20 @@ under "Standing release discipline".
 
 Tool-specific choices and sequencing live in
 `docs/specs/private-alpha-next-decision-memo.md`; the active execution board
-lives in `docs/specs/private-alpha-next-roadmap.md`.
+lives in `docs/specs/argus-active-roadmap.md`.
 
 # 🧭 Current Milestone: Private Alpha Next P1
 
 When working from `codex/private-alpha-next` or its clean reintegration lane,
-use `docs/specs/private-alpha-next-roadmap.md` as the active execution board
-after reading the mandatory canon docs above. That roadmap owns the current
-P0/P1 board, done/next/deferred labels, slice stop criteria, and integration
-criteria.
+use `docs/specs/argus-active-roadmap.md` as the active execution board after
+reading the mandatory canon docs above. It owns the current priorities, their
+execution order, the serial-versus-parallel rules, and what is deliberately not
+being built. `docs/specs/private-alpha-next-roadmap.md` is superseded P2 history
+and contract reference; read it for provenance, do not take work from it.
+
+Lanes are built production-ready end to end. There are no phases and no
+incubation branches: work that is not ready for users ships behind a default-off
+flag, not behind a staged branch.
 
 Use `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
 star and task-onboarding source for Private Alpha Next product work. Any
@@ -338,7 +344,7 @@ Argus is chat-first, AI-first, and trust-first. The assistant should help a norm
 - **Simplicity beats breadth**: Prefer the smallest supported path that lets the user test an idea safely and understand the result.
 - **Trust through clarity**: Never hide defaults, unsupported behavior, missing data, or asset-class constraints. Explain limitations in product language, not provider plumbing.
 - **Beginner-friendly by default**: Use plain language, small follow-up choices, and honest educational context. Avoid trading-terminal complexity unless the user explicitly asks for more depth.
-- **Chat-first continuity**: Confirmation cards, result cards, saved strategies, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
+- **Chat-first continuity**: Confirmation cards, result cards, historical legacy links, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
 
 ## Runtime Migration Principles
 
@@ -347,14 +353,15 @@ These principles come from the recent modular monolith / LangGraph migration pla
 - **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, localized stop-word or alias tables, display-label token matching, or legacy NLU shortcuts before the interpreter. Offline fallback choices must use typed action metadata such as button ids or `replacement_values`, not per-language phrasebooks.
 - **Deterministic guardrails after interpretation**: Code validates facts the LLM cannot own: asset resolution, provider availability, same-asset constraints, max symbol limits, date/data windows, executable indicator support, benchmark defaults, and required fields.
 - **One active chat brain**: The LangGraph runtime is the only active conversational runtime. Do not restore or recreate a parallel legacy orchestrator, state machine, or second intent taxonomy.
-- **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns product persistence such as messages, conversations, backtest runs, strategies, collections, feedback, and usage counters.
-- **Supabase product records are durable artifacts**: Messages store assistant/user text and structured metadata. Backtest runs store immutable result truth. Strategies are saved from canonical run/result state, not reconstructed frontend prose.
+- **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns current product persistence such as messages, conversations, backtest runs, feedback, and usage counters, plus read-compatible legacy Strategy and Collection rows.
+- **Supabase product records are durable artifacts**: Messages store assistant/user text and structured metadata. Backtest runs store immutable result truth. Legacy Strategy and Collection records remain readable, but no current writer creates or manages them.
 - **Canonical SSE is data-only**: Production chat streaming should emit canonical `data: {"type": ...}` frames: `stage_start`, `token`, `stage_outcome`, `final`, then `[DONE]`. Legacy named `event:` parsing may be tolerated by the frontend during migration, but new backend paths should not depend on it.
 - **Thin FastAPI routers**: API routes perform auth, quota checks, request validation, transport, persistence, and error shaping. They must not become a second conversational orchestrator.
 - **Frontend renders, it does not invent**: The web app renders backend-provided stages, cards, actions, and persisted metadata. It should not fake progress states, reconstruct strategies from text, or infer hidden run context.
 - **Composer mentions are provenance, not shortcuts around validation**: The `@` tool must use provider-backed asset discovery and the supported indicator catalog, not a tiny static menu. Selected mentions help bound ambiguous references for the backend, but normal LLM interpretation and backend validation still own executable meaning. Browser-session discovery caching is acceptable; durable Supabase discovery/market-data caches require explicit schema, freshness, and invalidation design.
-- **No Alpha RAG/vector overreach**: Do not add embeddings, pgvector, semantic memory, or agentic RAG for the launch chat/backtest loop. Use provider catalogs, structured state, run metadata, saved strategies, and text search until a concrete Beta need exists.
+- **No Alpha RAG/vector overreach**: Do not add embeddings, pgvector, semantic memory, or agentic RAG for the launch chat/backtest loop. Use provider catalogs, structured state, run metadata, typed idea/evidence records, and text search until a concrete Beta need exists.
 - **Provider details stay internal**: Users should hear capability truth ("I can test BTC over that period" or "that data range is not available for this instrument"), not vendor-specific implementation details unless the product explicitly decides otherwise.
+- **Research informs, Argus providers execute (truth-boundary lock, same standing as S10)**: quoting research-grounded prices, figures, or valuations to the reader is correct and encouraged, but no `finance_search` value may ever reach a simulation. A test launched from a research answer re-grounds through Argus market-data providers, research turns never write strategy/confirmation/execution state, and the shared research cache is public-market data only, never reusable for anything user-scoped. Guarded by `tests/research/test_research_truth_boundary.py`.
 
 ---
 
@@ -635,8 +642,8 @@ versioned, manual QA should use `live_provider` so symbol recognition exercises
 the same provider-backed resolution path production will use.
 
 ### Feature Flags (All Private-Alpha)
-Keep deferred surfaces disabled unless explicitly testing. Omnisearch is enabled
-by default and should only be disabled for a targeted regression check:
+Omnisearch is enabled by default and should only be disabled for a targeted
+regression check:
 
 - Once the founder accepts and merges a feature as part of the normal Argus
   product shape, its runtime default is **on**. Retain its flag as an emergency
@@ -646,10 +653,8 @@ by default and should only be disabled for a targeted regression check:
   exact-SHA canary before tester exposure.
 
 ```bash
-NEXT_PUBLIC_STRATEGIES_ENABLED=false
-NEXT_PUBLIC_COLLECTIONS_ENABLED=false
 NEXT_PUBLIC_OMNISEARCH_ENABLED=true
-NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 ```
 
 ### Frontend Environment (web/.env.local)
@@ -662,18 +667,14 @@ For fast Dev Mode:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=true
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
-NEXT_PUBLIC_STRATEGIES_ENABLED=false
-NEXT_PUBLIC_COLLECTIONS_ENABLED=false
-NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 ```
 
 For QA Mode with real Supabase auth:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=false
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
-NEXT_PUBLIC_STRATEGIES_ENABLED=false
-NEXT_PUBLIC_COLLECTIONS_ENABLED=false
-NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 ```
 
 ---
@@ -693,9 +694,10 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Canon docs**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
   `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and
   `.agent/designs/argus/DESIGN.md`. These define intended Alpha direction.
-- **Current active roadmap**: `docs/specs/private-alpha-next-roadmap.md` owns
-  the P0/P1 board, done/next/deferred labels, slice stop criteria, and
-  integration criteria.
+- **Current active roadmap**: `docs/specs/argus-active-roadmap.md` owns the
+  current priorities, execution order, serial-versus-parallel rules, operating
+  rules, and the deliberately-not-doing list. `docs/specs/private-alpha-next-roadmap.md`
+  is superseded P2 history and contract reference only.
 - **Current strategic source**:
   `docs/specs/private-alpha-next-decision-memo.md` is the north star for the
   Private Alpha Next product direction. Read the relevant memo sections and
@@ -729,7 +731,7 @@ logout, persistence, reload, and private-alpha allowlist behavior.
 **Benefits for Agents:**
 - **Auth Bypass**: Instantly logs in as "Mock Developer" (mock user).
 - **Sticky Sessions**: Automatically hydrated session across all refreshes.
-- **Access Control**: Grants access to `/builder`, `/strategies`, etc., without OAuth.
+- **Access Control**: Grants access to current routes such as `/chat` and `/settings` without OAuth.
 
 
 ---

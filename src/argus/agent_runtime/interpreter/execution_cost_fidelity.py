@@ -43,6 +43,7 @@ def apply_cost_fidelity(
     changed = False
     validated_fields: set[str] = set()
     grounded_conflicts: set[str] = set()
+    refused_fields: set[str] = set()
     for audit_field, draft_field in (
         ("fee", "fee_rate"),
         ("slippage", "slippage"),
@@ -52,7 +53,14 @@ def apply_cost_fidelity(
         if evidence_span is None:
             continue
         rate = _supported_cost_rate(cost, field_name=draft_field)
-        if rate is None or not _candidate_agrees_with_cost(
+        if rate is None:
+            # The user stated the value and it anchors in the message; the
+            # value itself cannot be modeled. That is a refusal, not an
+            # ambiguity.
+            refused_fields.add(draft_field)
+            grounded_conflicts.add(draft_field)
+            continue
+        if not _candidate_agrees_with_cost(
             draft.extra_parameters.get(draft_field),
             rate,
         ):
@@ -69,15 +77,23 @@ def apply_cost_fidelity(
             draft.field_provenance[draft_field] = "explicit_user"
             changed = True
         validated_marker = (rate, evidence_span)
-        if draft._validated_execution_cost_evidence.get(
-            draft_field
-        ) != validated_marker:
+        if draft._validated_execution_cost_evidence.get(draft_field) != validated_marker:
             draft._validated_execution_cost_evidence[draft_field] = validated_marker
             changed = True
 
     unresolved_fields: list[str] = []
     for field_name in ("fee_rate", "slippage"):
         if field_name in validated_fields:
+            continue
+        if field_name not in grounded_conflicts and _cost_retains_validated_evidence(
+            draft,
+            field_name=field_name,
+            current_message=current_message,
+        ):
+            # Deterministic validation already earned this turn survives an
+            # absent or empty audit; re-litigating it is how a repair pass
+            # silently drops a stated cost (#367). A conflicting audit above
+            # still wins, because it read the same message and disagreed.
             continue
         if field_name in grounded_conflicts or _introduces_unowned_cost(
             draft, field_name=field_name, prior_strategy=prior_strategy
@@ -96,6 +112,24 @@ def apply_cost_fidelity(
 
     if not unresolved_fields:
         return changed
+    for field_name in unresolved_fields:
+        if field_name in refused_fields:
+            _record_cost_refusal_disclosure(draft, field_name=field_name)
+            changed = True
+    if all(field_name in refused_fields for field_name in unresolved_fields):
+        # Every unresolved cost is a disclosed refusal: the card names it with
+        # a reason, exactly as the planner route would, so the turn proceeds
+        # instead of stalling the rest of the user's edit (§3.2).
+        response.reason_codes = list(
+            dict.fromkeys(
+                [
+                    *response.reason_codes,
+                    "stated_run_field_fidelity_audit",
+                    "execution_cost_refusal_disclosed",
+                ]
+            )
+        )
+        return True
     response.requires_clarification = True
     response.assistant_response = None
     response.missing_required_fields = list(
@@ -111,6 +145,53 @@ def apply_cost_fidelity(
         )
     )
     return True
+
+
+_COST_FIELD_DISCLOSURE_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def _record_cost_refusal_disclosure(draft: LLMStrategyDraft, *, field_name: str) -> None:
+    """Card turns drop assistant prose, so a refused stated cost rides the
+    draft as a typed disclosure record instead of vanishing (§3.2)."""
+
+    target = _COST_FIELD_DISCLOSURE_TARGETS.get(field_name, field_name)
+    disclosure = draft.extra_parameters.get("edit_disclosure")
+    if not isinstance(disclosure, dict):
+        disclosure = {}
+    unapplied = [
+        entry for entry in (disclosure.get("unapplied") or []) if isinstance(entry, dict)
+    ]
+    if any(entry.get("target") == target for entry in unapplied):
+        return
+    unapplied.append({"op": "set", "target": target, "reason": "unsupported_value"})
+    disclosure["unapplied"] = unapplied
+    draft.extra_parameters["edit_disclosure"] = disclosure
+
+
+def _cost_retains_validated_evidence(
+    draft: LLMStrategyDraft,
+    *,
+    field_name: str,
+    current_message: str,
+) -> bool:
+    """A cost the deterministic channel already validated for this value.
+
+    A str span must still anchor in the current message; a None span is typed
+    edit-plan provenance and needs no quote. A value that no longer matches
+    the validated marker is a new claim and gets no pass.
+    """
+    marker = draft._validated_execution_cost_evidence.get(field_name)
+    if marker is None:
+        return False
+    rate, span = marker
+    candidate = draft.extra_parameters.get(field_name)
+    if isinstance(candidate, bool) or not isinstance(candidate, (int, float)):
+        return False
+    if float(candidate) != float(rate):
+        return False
+    if span is None:
+        return True
+    return bool(span) and span in str(current_message or "")
 
 
 def _bounded_cost_evidence(
@@ -135,11 +216,18 @@ def _supported_cost_rate(
 
 
 def supported_cost_rate_value(rate: float, *, field_name: str) -> float | None:
-    """One rate-sanity rule for every channel that can own a modeled cost."""
+    """One rate-sanity rule for every channel that can own a modeled cost.
+
+    The caps are the engine envelope's, imported rather than restated, so the
+    resolver can never admit a rate the run-time validator refuses.
+    """
+    from argus.domain.backtesting.config import MAX_FEE_RATE, MAX_SLIPPAGE_RATE
 
     if not math.isfinite(rate) or rate < 0.0:
         return None
-    if field_name == "slippage" and rate > 0.05:
+    if field_name == "slippage" and rate > MAX_SLIPPAGE_RATE:
+        return None
+    if field_name == "fee_rate" and rate > MAX_FEE_RATE:
         return None
     return rate
 
@@ -247,7 +335,6 @@ def _unit_equivalent_cost(candidate: object, rate: object) -> bool:
     if stated is None or target is None:
         return False
     return any(stated / divisor == target for divisor in _COST_UNIT_DIVISORS)
-
 
 
 def _decimal_or_none(value: object) -> Decimal | None:

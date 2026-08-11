@@ -1,9 +1,17 @@
 # Private Alpha Next Roadmap
 
-Status: **INTERIM PRIVATE-ALPHA PIVOT ACTIVE.** P2.0 + P2.1 remain done, but
-the remaining P2 compounding loop is paused while the bounded
-[Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) runs after the
-latest `main` promotion checkpoint. The Gate A/B loop landed through
+Status: **SUPERSEDED 2026-08-06 — P2 history and contract reference, not the
+active board.** The active execution board is
+[`argus-active-roadmap.md`](argus-active-roadmap.md). The interim pivot that
+this document waited on completed with the 2026-08-05 production promotion and
+is archived at
+[`docs/archive/private-alpha-interim-roadmap.md`](../archive/private-alpha-interim-roadmap.md).
+The P2 compounding loop referenced below is now carried by the active board:
+A1b linked versions and A2 comparison are its product-memory item. Keep reading
+this document for P2 history, the execution-realism contract, and slice
+provenance. Do not take work from it.
+
+P2.0 + P2.1 remain done. The Gate A/B loop landed through
 2026-07-07: refine routing
 (#141/PR #148), Idea Ledger portfolio browse (#147), latest-result fact answers
 (#140/PR #153), messy company-name asset preservation (#142/PR #146), and the
@@ -227,8 +235,9 @@ discovery — the sixteenth and final landing of the checkpoint-gap batch.
 everything after it stacks for the next cycle** (#335 inline editing, #332,
 #369, #377, the parked #363 design, and the allowance session).
 
-The [Private Alpha Interim Roadmap](private-alpha-interim-roadmap.md) is the
-authoritative founder-outcome and live-QA source for this pivot, with #213
+The [Private Alpha Interim Roadmap](../archive/private-alpha-interim-roadmap.md)
+(archived, complete) was the authoritative founder-outcome and live-QA source
+for this pivot, with #213
 excluded by founder direction. Issues #228-#253 remain supporting evidence and
 possible implementation material; they do not define the next slice or program
 completion. The retired issue dependency map and waves are preserved in
@@ -258,7 +267,7 @@ default.** The prior assumption was that closing the interim hands control
 straight back to the A1b → A2 → A4 sequence as originally planned. Instead:
 after promotion, run a real Guest-canary/public-exposure window (target
 2–4 weeks, per the same external validation) before committing engineering
-time to any of A1b, A2, A4, or personalization memory. Prioritize among
+time to any of A1b, A2, A4, or memory. Prioritize among
 them using observed signal — return-visit rate, decision-note save rate,
 refinement/version-creation rate, Omnisearch return-recall usage — not the
 original planning order alone. If that signal is weak across the board,
@@ -276,7 +285,7 @@ and the core loop, not building further ahead of evidence.
    compounding-loop items already named above. Paused pending founder
    resume; sequenced by the signal-driven rule above once resumed, not
    built in isolation from usage data.
-3. **Personalization memory** — the incubation lane (`codex/personalization-
+3. **Memory** — the incubation lane (`codex/personalization-
    memory-incubation-persistence-v1` and its planned successors), tracked
    separately in
    [`docs/specs/lanes/personalization-memory-contract.md`](lanes/personalization-memory-contract.md).
@@ -333,6 +342,16 @@ Pre-flight is complete and its findings are the promotion agent's brief:
   `cost_ledger_entries`; canary cadence (keep daily vs thin out) is a
   founder decision made from that measured number.
 
+### Next-cycle boards — 2026-08-05
+
+The interim roadmap is complete (promotion executed; #228/#233 closed). The
+two next-cycle draft boards it pointed at were folded into the single active
+board on 2026-08-06: [`argus-active-roadmap.md`](argus-active-roadmap.md).
+Their drafts are archived at
+[`2026-08-05-next-cycle-stabilization-roadmap.md`](../archive/2026-08-05-next-cycle-stabilization-roadmap.md)
+and
+[`2026-08-05-next-cycle-product-roadmap.md`](../archive/2026-08-05-next-cycle-product-roadmap.md).
+
 ### Acceptance walk amendment — 2026-08-04 evening
 
 A founder-witnessed acceptance walk on the local candidate stack (guest lane,
@@ -353,6 +372,26 @@ workspace not message language (#378), and the Run-backtest action's shape
 parked for founder design discussion (#379 closed pending it; the dossier
 retest token chip is the candidate pattern). None are batch regressions;
 promotion proceeds on `70ba33cc`.
+
+### Production promotion complete — 2026-08-05
+
+Promotion shipped: `argus-api`, `argus-app`, and the `argus-backtests`
+workflow (version `wfv-d9p88253erlc73d3u8s0`) are live at `7ef89a90`, four
+migrations applied, env contract reconciled (three red-gate rounds fixed the
+contract itself: visitor secret + support email, then discovery/realism/
+PostHog, then the runbook secret checklist). Full evidence:
+[`docs/release-manifests/2026-08-05-main-production-promotion.md`](../release-manifests/2026-08-05-main-production-promotion.md).
+
+Recorded deviation: Turnstile correctly blocks headless browser automation in
+every widget mode, so the authoritative canary's browser phase cannot pass
+unattended. The journey was founder-operated in a real browser and verified
+server-side (job succeeded through `argus-backtests/run_backtest_job`,
++12.84% result, benchmark lag 13.30 points, cost ledger `$0.00015585` for the
+turn); the requested-signup denial was proven at the API layer. Issue #383
+holds the rework (API-layer denial probe, session-injected journey, staging
+testing sitekey). **Until #383 ships, the scheduled daily canary will stay
+red at its browser auth phase — an explained red, not a production alarm;
+the meaningful daily signal is the warmup and pre-browser gates.**
 
 Statements below that say “A1b is next” or describe `main` promotion as still
 pending are preserved as pre-promotion history. They do not override this
@@ -423,7 +462,7 @@ Every agent starts here:
 5. `docs/DATA_MODEL.md`
 6. `.agent/designs/argus/DESIGN.md`
 7. This roadmap
-8. `docs/specs/private-alpha-interim-roadmap.md` for every current interim slice
+8. `docs/specs/argus-active-roadmap.md` for every current slice
 9. `docs/specs/private-alpha-next-decision-memo.md`
 10. `docs/specs/private-alpha-ci-cd-sota.md`
 11. `docs/PRIVATE_LAUNCH_RUNBOOK.md`
@@ -506,7 +545,7 @@ In scope for the next implementation wave:
 Out of scope until explicitly started:
 
 - generic RAG/vector memory as canonical truth;
-- automatic personalization memory beyond explicit or assisted saved-decision
+- automatic memory beyond explicit or assisted saved-decision
   moments;
 - standalone Idea Ledger dashboard;
 - broker account connection, broker execution, or order submission;
@@ -626,6 +665,13 @@ slices below describe delivered scope, not pending work.
 
 ### Design-Only Until Later
 
+- Guided first-run tour (alpha-user suggested, 2026-08-05): not a wizard; a
+  fluid one-click layer that makes Argus aware of where it is leading you.
+  Founder wants a worth-it brainstorm before any build.
+- Recency-aware suggestion context (2026-08-05): in-chat suggestions must
+  weight the latest run heavily (never re-suggest the asset just tested;
+  NVDA was suggested right after an NVDA backtest). Macro pattern spans chat
+  context, product memory, and the personalization-memory incubation lane.
 - Memory/data controls.
 - Voice-to-composer STT.
 - Public evidence excerpts.
@@ -823,7 +869,7 @@ second-engine need.
 
 Memory must be earned opt-in, inspectable, editable, deletable, resettable, and
 explainable ("why was this used?"). Alpha legal/Data Controls work (#137) is the
-surface to extend. Do not add automatic broad personalization memory before these
+surface to extend. Do not add automatic broad memory before these
 controls exist.
 
 **Parallel design/prototype lanes.**
@@ -1023,7 +1069,7 @@ LANES BY GATE (the board agents execute from):
   used?"). POST-PMF READY-SPEC (extends the #137 Data Controls surface).
   Personalization-memory implementation is not required for P2 and remains
   blocked until PMF evidence justifies a user-confirmed `MemoryRecord` contract.
-  No automatic broad personalization memory before these controls exist.
+  No automatic broad memory before these controls exist.
 
 **Design-only lanes** (all READY for notes/mocks; no runtime, schema, or UI
 code): sanitized public excerpt design, voice-to-composer STT prototype, thin

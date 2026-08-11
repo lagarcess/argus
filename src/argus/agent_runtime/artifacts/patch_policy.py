@@ -40,11 +40,7 @@ def executable_artifact_patch_missing_fields(
 ) -> list[str]:
     if not strategy_can_be_approved(strategy):
         return list(missing_fields)
-    return [
-        field
-        for field in missing_fields
-        if field != "strategy_thesis"
-    ]
+    return [field for field in missing_fields if field != "strategy_thesis"]
 
 
 def relevant_unsupported_constraints_for_artifact_patch(
@@ -108,8 +104,4 @@ def artifact_patch_changed_fields(strategy: StrategySummary) -> set[str]:
     changed_fields = artifact_patch.get("changed_fields")
     if not isinstance(changed_fields, list):
         return set()
-    return {
-        str(field).strip()
-        for field in changed_fields
-        if str(field).strip()
-    }
+    return {str(field).strip() for field in changed_fields if str(field).strip()}

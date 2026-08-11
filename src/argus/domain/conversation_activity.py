@@ -224,9 +224,7 @@ def project_conversation_activity(
     else:
         operation = ConversationOperation(status="idle", kind=None, updated_at=None)
 
-    terminal_candidates: list[
-        tuple[ActivitySource, ConversationAttentionStatus]
-    ] = []
+    terminal_candidates: list[tuple[ActivitySource, ConversationAttentionStatus]] = []
     for source in owned_sources:
         terminal_status = terminal_attention_status(source)
         if terminal_status is not None:
@@ -258,9 +256,7 @@ def project_conversation_activity(
         else:
             projected_attention = ConversationAttention(status="none", cursor=None)
     elif read_state is not None and read_state.manual_unread_at is not None:
-        projected_attention = ConversationAttention(
-            status="manual_unread", cursor=None
-        )
+        projected_attention = ConversationAttention(status="manual_unread", cursor=None)
     else:
         projected_attention = ConversationAttention(status="none", cursor=None)
 

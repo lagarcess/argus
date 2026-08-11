@@ -1,0 +1,56 @@
+argus
+New chat
+Search
+Recents
+Settings
+Cybersecurity Stocks Surge Driven by AI
+What's happening in cybersecurity stocks?
+Cybersecurity stocks are surging, but the rally is sharply divided
+
+As of the latest close, Friday, August 7, 2026, cybersecurity ETFs are near 52-week highs and have substantially outperformed the broader U.S. market in 2026. Investors are treating cybersecurity as a major beneficiary of AI: more AI agents and automated systems create more identities, data and attack surfaces that need protection.
+
+The catch is that execution matters enormously. Companies showing accelerating recurring revenue, strong margins or credible AI-security demand are soaring; those with slowing growth or weaker cash-flow guidance are being punished even after beating earnings estimates.
+
+Sector performance
+FUND	AUG. 7 CLOSE	FRIDAY MOVE	2026 YTD RETURN
+CIBR, First Trust Nasdaq Cybersecurity ETF	$97.85	+1.51%	+37.31%
+HACK, Amplify Cybersecurity ETF	$115.42	+1.97%	+33.19%
+IHAK, iShares Cybersecurity and Tech ETF	$65.58	+1.77%	Current YTD figure unavailable
+
+CIBR was only 2.12% below its $99.97 52-week high, HACK 1.16% below its high and IHAK 1.03% below its high. For context, the S&P 500 was reported up roughly 7% through July, versus gains above 30% for the large cybersecurity ETFs.
+
+Return methodologies differ slightly by source: CIBR’s figure is daily total return through August 7; HACK’s reported figure is current through August 9. CIBR data | HACK data
+
+Who is leading and lagging?
+
+These are the clearest large-company moves. The YTD returns are through July 31, 2026; prices are updated to August 7.
+
+TICKER	AUG. 7 PRICE	YTD THROUGH JULY 31	WHAT THE MARKET IS REACTING TO
+FTNT	$159.64	+102.5%	Earnings acceleration and very large revenue beats
+PANW	$363.86	+79.6%	AI security growth and successful “platformization”
+OKTA	$148.32	+62.9%	Strong identity demand, especially for AI agents
+CRWD	$214.42	+61.1%	Endpoint leadership and stronger net-new ARR growth
+ZS	$168.68	−33.3%	Slower ARR growth and weaker free-cash-flow outlook
+
+Source for July 31 returns: Investing.com sector analysis.
+
+The leaders
+Fortinet (FTNT) is the clearest 2026 momentum leader. Its July-quarter revenue was $2.0479 billion, beating consensus by $159.424 million; EPS was $0.90 versus $0.75 expected. Its preceding quarter produced a 20.03% one-day post-earnings gain.
+Palo Alto Networks (PANW) is winning the consolidation story: customers increasingly want fewer vendors and broader integrated platforms. Fiscal Q3 revenue grew 31% to $3.0 billion, while next-generation security ARR rose 60% to $8.1 billion. The stock gained 11.4% after that report.
+Okta (OKTA) became the standout identity-security name after management cited strong demand for protecting AI-agent identities. Its shares gained nearly 48% over two sessions following fiscal Q1 results.
+CrowdStrike (CRWD) remains a major ETF driver. It is CIBR’s second-largest position at 8.56%, behind PANW at 9.42%. The stock initially fell 7% after its latest report because expectations were already extremely high, despite management raising net-new ARR growth guidance to 27.7%.
+
+Among a broader interpretation of cybersecurity, Fastly (FSLY) was the strongest one-year performer in the Nasdaq CTA Cybersecurity Index, up 259.28% through August 3. That figure should not be confused with a pure-play large-cap comparison: Fastly is primarily an edge-cloud and application-delivery company.
+
+The laggards
+Zscaler (ZS) is the obvious large-cap laggard. It fell more than 31% following its latest earnings reaction, despite beating and raising guidance, because investors focused on decelerating ARR growth and a reduced free-cash-flow-margin outlook. Revenue still grew 25.4% to $850.5 million, illustrating how demanding valuations and expectations have become.
+SentinelOne (S) had also been under pressure after quarterly revenue of $276.7 million, up 20.8%, came with weaker-than-expected billings and next-quarter EPS guidance. It subsequently recovered to $21.40 on August 7, only $0.10 below its 52-week high, so a reliable current YTD return is needed before calling it a continuing price laggard.
+Gen Digital (GEN) has participated much less dramatically: it closed at $29.17 and had gained only 1.67% over the preceding year, versus gains of 65%, 90
+TRY NEXT
+↳
+Test First Trust NASDAQ Cybersecurity ETF CIBR over the last 3 years
+↳
+Test First Trust NASDAQ Cybersecurity ETF CIBR vs Amplify Cybersecurity ETF HACK, iShares Cybersecurity and Tech ETF IHAK and CrowdStrike Holdings, Inc. Class A CRWD
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

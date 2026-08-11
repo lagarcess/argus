@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "bun test __tests__",
     "test:e2e": "playwright test",
-    "test:e2e:guest-captcha-ux": "playwright test --config e2e/guest-auth-captcha-ux.playwright.config.ts"
+    "test:e2e:guest-captcha-ux": "playwright test --config e2e/guest-auth-captcha-ux.playwright.config.ts",
+    "test:e2e:breakpoints": "playwright test --config e2e/breakpoint-baselines.playwright.config.ts",
+    "test:e2e:breakpoints:update": "playwright test --config e2e/breakpoint-baselines.playwright.config.ts --update-snapshots"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
@@ -28,7 +30,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",

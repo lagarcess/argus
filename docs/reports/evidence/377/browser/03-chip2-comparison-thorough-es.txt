@@ -1,0 +1,57 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Comparación de Costco, Walmart y Target
+Compara Costco con Walmart y Target
+Comparación: Costco (COST) vs. Walmart (WMT) vs. Target (TGT)
+
+En resumen: Walmart es el gigante por tamaño de ventas y valor de mercado; Costco es el favorito del mercado por su modelo de membresías y crecimiento (con el múltiplo más caro); Target es el más pequeño de los tres y cotiza al múltiplo más bajo tras un desempeño más débil. Los tres pertenecen al mismo sector (Consumer Defensive, Discount Stores).
+
+Datos de mercado (al cierre del 7 de agosto de 2026)
+MÉTRICA	COST	WMT	TGT
+Precio	US$947.82	US$111.85	US$149.70
+Capitalización de mercado	~US$420.3 B	~US$890.1 B	~US$68.0 B
+P/E (precio/utilidad)	47.7x	39.3x	19.8x
+EPS (TTM)	US$19.72	US$2.70	US$7.98
+Rendimiento por dividendo (TTM)	~1%	~1%	~3%
+Máx. 52 semanas	US$1,096.50	US$135.16	US$150.07
+Mín. 52 semanas	US$844.06	US$95.42	US$83.44
+
+Lectura rápida: TGT cotiza cerca de su máximo anual; COST y WMT están por debajo de sus máximos. El P/E de COST es más del doble del de TGT, el mercado paga una prima por su consistencia.
+
+Fundamentales (últimos 12 meses, TTM)
+MÉTRICA	COST (TTM AL 10-MAY-2026)	WMT (TTM AL 30-ABR-2026)	TGT (TTM AL 2-MAY-2026)
+Ingresos totales	US$293.6 B	US$725.3 B	US$106.4 B
+Utilidad bruta	US$37.8 B	US$181.2 B	US$29.9 B
+Margen bruto	~13%	~25%	~28%
+Utilidad operativa	US$11.2 B	US$30.2 B	US$4.8 B
+Margen operativo	~4%	~4%	~4%
+Utilidad neta	US$8.8 B	US$23.1 B	US$3.5 B
+Margen neto	~3%	~3%	~3%
+
+Nota: los cierres fiscales difieren entre las tres empresas, por lo que los períodos no coinciden exactamente.
+
+Perfil corporativo
+	COST	WMT	TGT
+CEO	Ron Vachris	John R. Furner	Michael J. Fiddelke
+Empleados	~341,000	~2,100,000	~415,000
+Sede	Issaquah, WA	Bentonville, AR	Minneapolis, MN
+Modelo	Almacenes por membresía	Supercentros + Sam's Club + e-commerce global	Tiendas de mercancía general
+Presencia	14 países	~24 países	Solo EE. UU.
+Cómo interpretar la comparación
+Escala: Walmart vende más del doble que Costco y casi 7x que Target. Es el líder absoluto en ingresos y también en valor bursátil.
+Margen bruto vs. modelo de negocio: El margen bruto de Costco (~13%) parece bajo, pero es intencional: vende cerca del costo y gana con las cuotas de membresía. Target tiene el margen bruto más alto (~28%) porque vende más mercancía discrecional (ropa, hogar, decoración), aunque eso también la hace más sensible al ciclo económico.
+Margen operativo similar (~4%): Los tres terminan con márgenes operativos parecidos, lo que refleja que el retail de descuento es un negocio de márgenes delgados por naturaleza.
+Valuación: El P/E de ~48x de Costco frente a ~20x de Target indica que los inversionistas están dispuestos a pagar mucho más por cada dólar de utilidad de Costco (crecimiento constante, membresías recurrentes) que por Target (crecimiento más volátil).
+Dividendo: Target ofrece el mayor rendimiento por dividendo (~3%); COST y WMT rondan el 1%.
+
+Esto es una comparación informativa, no una recomendación de inversión.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar Costco Wholesale Corporation Common Stock [COST], Walmart Inc. Common Stock [WMT] y Target Corporation [TGT] entre sí
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

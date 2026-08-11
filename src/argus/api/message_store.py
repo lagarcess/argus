@@ -20,6 +20,7 @@ from argus.domain.chat_turn_lifecycle import (
     TurnStatus,
 )
 from argus.domain.store import utcnow
+from argus.domain.supabase_conversation_messages import StaleMessageArtifactError
 from argus.domain.usage_limits import settle_memory_usage
 
 _AUTHORITATIVE_ARTIFACT_KEYS = {
@@ -398,8 +399,7 @@ def claim_response_option_action(
             preceding = [
                 message
                 for message in conversation_messages
-                if (message.created_at, message.id)
-                < (existing.created_at, existing.id)
+                if (message.created_at, message.id) < (existing.created_at, existing.id)
             ]
             replay_source = (
                 max(preceding, key=lambda item: (item.created_at, item.id))
@@ -611,6 +611,129 @@ def create_message(
     )
 
 
+def latest_message(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> Message | None:
+    """The conversation's newest message by (created_at, id), both stores.
+
+    The activity guard on in-place writes compares against this value, so
+    it must come from a dedicated newest-first read, never from a bounded
+    recent-window listing whose tail is not the conversation's tail.
+    """
+    if api_state.supabase_gateway is not None:
+        try:
+            return api_state.supabase_gateway.latest_message(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase latest-message read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    with api_state.store.conversation_message_lock:
+        messages = api_state.store.messages.get(conversation_id, [])
+        return max(messages, key=lambda item: (item.created_at, item.id), default=None)
+
+
+def update_message_artifact(
+    *,
+    user_id: str,
+    conversation_id: str,
+    message_id: str,
+    content: str,
+    metadata: dict[str, Any],
+    expected_source_metadata: dict[str, Any] | None,
+    expected_latest_message_id: str | None,
+    preview: str | None = None,
+) -> Message:
+    """Rewrite one owned message's content and metadata in place.
+
+    The in-place half of the edit contract: a direct edit updates the card's
+    own record, so the transcript gains nothing and the message identity,
+    role, and position stay fixed. Turn-based edits keep superseding through
+    create_message. The write is conditional on what the caller read, in
+    two parts: the row guard compares the card's metadata, and the activity
+    guard compares the conversation's latest message id, because every
+    superseding event appends a message while a non-turn edit appends
+    nothing, so an interleaved append invalidates the caller's active-state
+    check. Either mismatch raises ``StaleMessageArtifactError`` in both
+    stores instead of rolling the other writer back. When the rewritten row
+    is the conversation's latest message, ``preview`` follows it into the
+    conversation record without touching ``updated_at``: a non-turn change
+    spends nothing and must not reorder recents.
+    """
+    if api_state.supabase_gateway is not None:
+        try:
+            return api_state.supabase_gateway.update_message_artifact(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=message_id,
+                content=content,
+                metadata=metadata,
+                expected_source_metadata=expected_source_metadata,
+                expected_latest_message_id=expected_latest_message_id,
+                preview=preview,
+            )
+        except StaleMessageArtifactError:
+            # A conflict is an answer, not an outage; it must never be
+            # retried against the memory fallback.
+            raise
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase message update failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    with api_state.store.conversation_message_lock:
+        if api_state.store.conversation_owners.get(conversation_id) != user_id:
+            raise ValueError("Conversation not found or not owned by user.")
+        messages = api_state.store.messages.get(conversation_id, [])
+        latest = max(messages, key=lambda item: (item.created_at, item.id), default=None)
+        for index, existing in enumerate(messages):
+            if existing.id != message_id:
+                continue
+            if (
+                expected_latest_message_id is not None
+                and latest is not None
+                and latest.id != expected_latest_message_id
+            ):
+                raise StaleMessageArtifactError(
+                    "The card changed while this update was in flight."
+                )
+            if (
+                expected_source_metadata is not None
+                and existing.metadata != expected_source_metadata
+            ):
+                raise StaleMessageArtifactError(
+                    "The card changed while this update was in flight."
+                )
+            updated = existing.model_copy(
+                update={"content": content, "metadata": metadata}
+            )
+            messages[index] = updated
+            api_state.store.bump_search_revision()
+            conversation = api_state.store.conversations.get(conversation_id)
+            if (
+                preview
+                and conversation
+                and latest is not None
+                and latest.id == message_id
+            ):
+                api_state.store.conversations[conversation_id] = conversation.model_copy(
+                    update={"last_message_preview": preview}
+                )
+            return updated
+    raise ValueError("Message not found or not owned by user.")
+
+
 def _append_idempotent_memory_message(
     *,
     user_id: str,
@@ -755,13 +878,10 @@ def _recent_persisted_messages_for_guard(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    if (
-        not messages
-        or (
-            dev_memory_fallback_enabled()
-            and conversation_id in api_state.store.conversations
-            and api_state.store.messages.get(conversation_id)
-        )
+    if not messages or (
+        dev_memory_fallback_enabled()
+        and conversation_id in api_state.store.conversations
+        and api_state.store.messages.get(conversation_id)
     ):
         messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
     return sorted(messages, key=lambda item: (item.created_at, item.id))

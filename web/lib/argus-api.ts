@@ -12,8 +12,11 @@ import {
   normalizeEnabledLanguage,
   type ArgusLocale,
 } from "./language-features";
+import { isConversationMemoryOptOut } from "./memory-privacy";
+import { currentViewportBand } from "./responsive-layout";
 import { runActionIdempotencyKey } from "./usage-allowance";
 import type { UsageAllowanceResponse } from "./usage-allowance";
+import type { MarketSessionPhase } from "@/components/chat/greetingPool";
 import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
@@ -171,6 +174,8 @@ export type BacktestJob = {
   conversation_id: string;
   request_message_id?: string | null;
   confirmation_message_id?: string | null;
+  // Absent on legacy rows; treat missing as a backtest job.
+  operation_scope?: "chat.run_backtest" | "backtests.run" | "chat.research" | null;
   status: BacktestJobStatus;
   result_run_id?: string | null;
   failure_code?: string | null;
@@ -226,48 +231,6 @@ export type ApiMessage = {
   content: string;
   created_at: string;
   metadata?: Record<string, unknown> | null;
-};
-
-export type StrategySurfaceMetricRow = {
-  symbol: string;
-  asset_name: string;
-  values: Record<string, string>;
-};
-
-export type StrategySurfaceMetrics = {
-  display_mode: string;
-  as_of_run_id: string | null;
-  columns: Array<{ key: string; label: string }>;
-  rows: StrategySurfaceMetricRow[];
-  headline?: { label: string; value: string } | null;
-};
-
-export type Strategy = {
-  id: string;
-  name: string;
-  name_source: TitleSource;
-  template: string;
-  asset_class: AssetClass;
-  symbols: string[];
-  parameters: Record<string, unknown>;
-  metrics_preferences: string[];
-  benchmark_symbol: string;
-  pinned: boolean;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-  strategy_surface_metrics?: StrategySurfaceMetrics | null;
-};
-
-export type Collection = {
-  id: string;
-  name: string;
-  name_source: TitleSource;
-  pinned: boolean;
-  strategy_count: number;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 type HistoryItemBase = {
@@ -596,6 +559,8 @@ export type ProfilePatch = {
   locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
+  /** Empty clears it, which is how a user opts out of being addressed by name. */
+  preferred_name?: string | null;
   avatar_theme?: AvatarTheme;
 };
 
@@ -605,6 +570,23 @@ export async function getMe() {
 
 export async function getUsageAllowances() {
   return apiFetch<UsageAllowanceResponse>("/me/usage");
+}
+
+export type MarketSessionResponse = {
+  session: {
+    phase: MarketSessionPhase;
+    is_market_day: boolean;
+    as_of: string;
+  } | null;
+};
+
+/**
+ * Which session US equities are in, resolved by the backend in Eastern time
+ * against the real trading calendar. `session` is null when that calendar is
+ * unreachable, and callers say nothing about the market rather than guessing.
+ */
+export async function getMarketSession(signal?: AbortSignal) {
+  return apiFetch<MarketSessionResponse>("/market/session", { signal });
 }
 
 export async function patchMe(patch: ProfilePatch) {
@@ -750,6 +732,64 @@ export async function getConversationMessages(
   );
 }
 
+export async function addConfirmationPeerAssets(
+  conversationId: string,
+  confirmationId: string,
+  symbols: string[],
+) {
+  // Deterministic basket growth: no chat turn, no allowance spend. The
+  // backend re-validates every symbol against the active turn's peer rows.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    },
+  );
+  return response.message;
+}
+
+export async function restoreConfirmationAssets(
+  conversationId: string,
+  confirmationId: string,
+) {
+  // Undo for a peer add: the backend re-materializes the exact previous
+  // asset set from the card's own typed adjustment data.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/peer-assets`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restore_previous: true }),
+    },
+  );
+  return response.message;
+}
+
+export async function directEditConfirmation(
+  conversationId: string,
+  confirmationId: string,
+  edit: {
+    capital?: number;
+    date_window?: { start: string; end: string };
+  },
+) {
+  // Direct capital/date edit: no chat turn, no allowance spend, no backtest
+  // row. The backend applies the typed values through the same edit contract
+  // and validation chain as a conversational edit and returns the
+  // superseding card message.
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${conversationId}/confirmations/${confirmationId}/direct-edit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(edit),
+    },
+  );
+  return response.message;
+}
+
 export async function patchConversation(
   conversationId: string,
   patch: {
@@ -822,66 +862,6 @@ export async function listHistory(
   );
 }
 
-// ─── Strategies ───────────────────────────────────────────────────────────────
-
-export async function listStrategies(
-  params: { limit?: number; cursor?: string; deleted?: boolean } = {},
-) {
-  const { limit = 50, cursor, deleted } = params;
-  const searchParams = new URLSearchParams({ limit: String(limit) });
-  if (cursor) searchParams.append("cursor", cursor);
-  if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-
-  return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
-    `/strategies?${searchParams.toString()}`,
-  );
-}
-
-export async function createStrategy(payload: {
-  name?: string | null;
-  template: string;
-  asset_class: AssetClass;
-  symbols: string[];
-  parameters?: Record<string, unknown>;
-  metrics_preferences?: string[];
-  benchmark_symbol?: string | null;
-}) {
-  return apiFetch<{ strategy: Strategy }>("/strategies", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function patchStrategy(
-  strategyId: string,
-  patch: { name?: string; pinned?: boolean; deleted_at?: string | null },
-) {
-  return apiFetch<{ strategy: Strategy }>(`/strategies/${strategyId}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-}
-
-export async function deleteStrategy(strategyId: string) {
-  return apiFetch<{ success: boolean }>(`/strategies/${strategyId}`, {
-    method: "DELETE",
-  });
-}
-
-// ─── Collections ──────────────────────────────────────────────────────────────
-
-export async function listCollections(
-  params: number | { limit?: number; cursor?: string } = 50,
-) {
-  const limit = typeof params === "number" ? params : (params.limit ?? 50);
-  const cursor = typeof params === "number" ? undefined : params.cursor;
-  const searchParams = new URLSearchParams({ limit: String(limit) });
-  if (cursor) searchParams.append("cursor", cursor);
-  return apiFetch<{ items: Collection[]; next_cursor: string | null }>(
-    `/collections?${searchParams.toString()}`,
-  );
-}
-
 export async function searchGlobal(params: {
   q: string;
   limit?: number;
@@ -927,39 +907,6 @@ export async function createEvidenceDecision(
   });
 }
 
-export async function createCollection(name?: string) {
-  return apiFetch<{ collection: Collection }>("/collections", {
-    method: "POST",
-    body: JSON.stringify({ name: name ?? null }),
-  });
-}
-
-export async function patchCollection(
-  collectionId: string,
-  patch: { name?: string; pinned?: boolean },
-) {
-  return apiFetch<{ collection: Collection }>(`/collections/${collectionId}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-}
-
-export async function deleteCollection(collectionId: string) {
-  return apiFetch<{ success: boolean }>(`/collections/${collectionId}`, {
-    method: "DELETE",
-  });
-}
-
-export async function attachStrategyToCollection(
-  collectionId: string,
-  strategyId: string,
-) {
-  return apiFetch<{ collection: Collection }>(
-    `/collections/${collectionId}/strategies`,
-    { method: "POST", body: JSON.stringify({ strategy_ids: [strategyId] }) },
-  );
-}
-
 // ─── Backtests ────────────────────────────────────────────────────────────────
 
 export async function runBacktest(payload: {
@@ -977,7 +924,7 @@ export async function runBacktest(payload: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": randomId(),
     },
     body: JSON.stringify(payload),
   });
@@ -1008,7 +955,7 @@ export async function streamChatMessage(
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
-  const submittedRequestId = options.requestId ?? crypto.randomUUID();
+  const submittedRequestId = options.requestId ?? randomId();
   if (!isMockAuth) {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -1029,7 +976,7 @@ export async function streamChatMessage(
       "X-Request-Id": submittedRequestId,
       "Idempotency-Key":
         (typeof input !== "string" && runActionIdempotencyKey(input)) ||
-        crypto.randomUUID(),
+        randomId(),
       ...authHeaders,
     },
     body: JSON.stringify({
@@ -1040,6 +987,13 @@ export async function streamChatMessage(
       // that a discovery selection attaches to its action turn.
       ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
+      // Temporary chat: only ever narrows behavior, so the transport layer
+      // owns it and ordinary conversations send an unchanged body.
+      ...(isConversationMemoryOptOut(conversationId)
+        ? { memory_opt_out: true }
+        : {}),
+      // Width band, so a generated title is composed short rather than clipped.
+      viewport: currentViewportBand(),
     }),
   }).catch(() => { throw new ChatStreamError(CHAT_STREAM_INTERRUPTED_MESSAGE, 0, "stream_interrupted", submittedRequestId); });
   const responseRequestId = response.headers.get("X-Request-Id")?.trim() || submittedRequestId;
@@ -1236,6 +1190,7 @@ export async function postFeedback(payload: {
   });
 }
 import type { UserResponse } from "./guest-account";
+import { randomId } from "./random-id";
 
 export type {
   AccountCapabilities,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from typing import Any
@@ -25,6 +26,7 @@ from argus.agent_runtime.turn_execution import (
     turn_execution_summary,
 )
 from argus.api import state as api_state
+from argus.api.chat import confirmation as chat_confirmation
 from argus.api.chat import retry as chat_retry
 from argus.api.chat.actions import (
     chat_display_message,
@@ -49,7 +51,6 @@ from argus.api.chat.artifacts import (
     confirmation_id_for_runtime_card,
     result_fact_bank,
     result_followup_metadata_from_run,
-    saved_strategy_metadata,
 )
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
@@ -61,13 +62,11 @@ from argus.api.chat.cancellation import (
     complete_confirmation_cancellation,
     prepare_confirmation_cancellation,
 )
-from argus.api.chat.discovery_evidence import (
-    discovery_allowance_available,
-    record_discovery_search_evidence,
-)
+from argus.api.chat.discovery_evidence import discovery_allowance_for_turn
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
+from argus.api.chat.memory_recall import memory_recalls_for_turn_async
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -81,6 +80,10 @@ from argus.api.chat.recovery import (
 from argus.api.chat.request_admission import (
     prepare_chat_request_admission,
     reject_invalid_non_run_confirmation_action,
+)
+from argus.api.chat.research_evidence import (
+    guest_research_visitor_key,
+    research_allowance_for_turn,
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.retest import (
@@ -98,7 +101,6 @@ from argus.api.chat.runtime_worker import (
     runtime_worker_enabled,
     threaded_runtime_event_source,
 )
-from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
     runtime_result_card,
     runtime_result_envelope,
@@ -109,6 +111,7 @@ from argus.api.chat.streaming import (
     sse_keepalive,
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
+from argus.api.chat.turn_metering import settle_metered_turn
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
@@ -188,11 +191,6 @@ def _runtime_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
     return dict(diagnostics) if isinstance(diagnostics, dict) else None
 
 
-def _strategies_enabled() -> bool:
-    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
 async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
     from argus.agent_runtime.result_followups import (
         compose_private_alpha_save_response as _compose_private_alpha_save_response,
@@ -230,13 +228,15 @@ def missing_result_action_run_message(
     if action_type == "save_strategy":
         if is_es:
             return (
-                "No pude encontrar el backtest completado para guardarlo. "
-                "Ejecuta la estrategia de nuevo y luego guárdala desde la "
-                "tarjeta de resultado."
+                "La acción heredada Guardar se retiró. No pude encontrar el "
+                "backtest completado para esta solicitud antigua; continúa "
+                "desde una ejecución que siga disponible en este chat o en "
+                "Recientes."
             )
         return (
-            "I could not find the completed backtest to save. Run the strategy "
-            "again, then save it from the result card."
+            "The legacy Save action has been retired. I could not find the "
+            "completed backtest for this stale request; continue from a run "
+            "that is still available in this chat or Recents."
         )
     if is_es:
         return (
@@ -267,14 +267,17 @@ async def chat_stream(
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
     turn_account = account_context(request)
+    # One turn, one subject: allowance read, job row and settlement agree.
+    turn_is_guest = turn_account.kind == "guest"
+    turn_client_identity = client_identity(request)
+    turn_guest_research_key = guest_research_visitor_key(
+        is_guest=turn_is_guest, client_identity=turn_client_identity
+    )
     clean_idempotency_key = validated_optional_idempotency_key(
         request,
         idempotency_key,
     )
-    headers = {
-        "X-Request-Id": request.state.request_id,
-        "X-Accel-Buffering": "no",
-    }
+    headers = {"X-Request-Id": request.state.request_id, "X-Accel-Buffering": "no"}
     is_run_backtest_turn = (
         payload.action is not None and payload.action.type == "run_backtest"
     )
@@ -403,13 +406,16 @@ async def chat_stream(
         stale_confirmation_message=stale_confirmation_message,
         language=language,
     )
-    retest_turn = prepare_retest_turn(
-        payload=payload,
-        request=request,
-        user_id=user.id,
-        conversation_id=conversation.id,
-        language=language,
-    )
+    retest_turn = None
+    if is_retest_action(payload):
+        retest_turn = await asyncio.to_thread(
+            prepare_retest_turn,
+            payload=payload,
+            request=request,
+            user_id=user.id,
+            conversation_id=conversation.id,
+            language=language,
+        )
     request_admission = prepare_chat_request_admission(
         payload=payload,
         request=request,
@@ -436,9 +442,8 @@ async def chat_stream(
             raise RuntimeError("Response-option admission returned no request.")
         request_message = accepted_option_request.content
         display_message = accepted_option_request.content
-        if (
-            payload.action is not None
-            and payload.action.payload.get("request_message_id")
+        if payload.action is not None and payload.action.payload.get(
+            "request_message_id"
         ):
             mention_provenance = []
     lifecycle_hooks = (
@@ -558,6 +563,7 @@ async def chat_stream(
             conversation_id=conversation.id,
             recent_messages=confirmation_action_messages,
             language=language,
+            admit_consumed_run_replay=is_run_backtest_turn,
         )
         missing_run_confirmation_action_id = (
             payload.action is not None
@@ -680,7 +686,6 @@ async def chat_stream(
             assistant_message: str | None,
             assistant_metadata: dict[str, Any] | None = None,
             current_run: BacktestRun | None = None,
-            saved_strategy_id: str | None = None,
             message_id: str | None = None,
         ) -> None:
             try:
@@ -689,19 +694,18 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     language=naming_language,
                     current_run=current_run,
-                    saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
                     assistant_metadata=assistant_metadata,
                     message_id=message_id,
                     run_id=current_run.id if current_run is not None else None,
+                    viewport=payload.viewport,
                 )
             except Exception:
                 logger.opt(exception=True).warning(
                     "Artifact naming scheduling failed",
                     user_id=user.id,
                     conversation_id=conversation.id,
-                    saved_strategy_id=saved_strategy_id,
                 )
 
         if runtime_fallback.recovery_message:
@@ -728,7 +732,7 @@ async def chat_stream(
                     is_run_backtest_turn=is_run_backtest_turn,
                     account=turn_account,
                     visitor_key=(
-                        visitor_key_for(client_identity(request))
+                        visitor_key_for(turn_client_identity)
                         if turn_account.kind == "guest"
                         else None
                     ),
@@ -771,7 +775,7 @@ async def chat_stream(
                         is_run_backtest_turn=False,
                         account=turn_account,
                         visitor_key=(
-                            visitor_key_for(client_identity(request))
+                            visitor_key_for(turn_client_identity)
                             if turn_account.kind == "guest"
                             else None
                         ),
@@ -832,7 +836,7 @@ async def chat_stream(
                     SIMULATION_USAGE_RESOURCE,
                 ),
                 visitor_key=(
-                    visitor_key_for(client_identity(request))
+                    visitor_key_for(turn_client_identity)
                     if turn_account.kind == "guest"
                     else None
                 ),
@@ -905,9 +909,7 @@ async def chat_stream(
                     raise RuntimeError("agent_runtime_typed_recovery")
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
-                from argus.api.chat.confirmation import runtime_confirmation_card
-
-                confirmation_card = runtime_confirmation_card(
+                confirmation_card = chat_confirmation.runtime_confirmation_card(
                     runtime_result,
                     confirmation_id=confirmation_id_for_runtime_card(
                         runtime_result,
@@ -935,9 +937,23 @@ async def chat_stream(
                     and isinstance(final_response_payload.get("backtest_job"), dict)
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
+                if backtest_job is None and "research_job_request" in runtime_result:
+                    from argus.api.chat.research_jobs import (
+                        apply_research_job_request,
+                    )
+
+                    backtest_job = apply_research_job_request(
+                        runtime_result,
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        request_message_id=lifecycle_hooks.turn_id,
+                        request_id=request.state.request_id,
+                        guest_visitor_key=turn_guest_research_key,
+                    )
+                    if backtest_job is None:
+                        assistant_text = runtime_result.get("assistant_response")
                 run = None
                 result_action_run = validated_result_action_run
-                saved_strategy_id_for_naming: str | None = None
                 result_action_type = result_action_request_type(runtime_result)
                 if (
                     result_action_type is None
@@ -1015,27 +1031,18 @@ async def chat_stream(
                                 action_type=result_action_type,
                                 language=runtime_user.language_preference,
                             )
-                        elif not _strategies_enabled():
+                        else:
                             assistant_text = await compose_private_alpha_save_response(
                                 metadata=result_followup_metadata_from_run(
                                     result_action_run
                                 ),
                                 user_message=request_message,
+                                language=runtime_user.language_preference,
                             )
                             if assistant_text is None:
                                 assistant_text = fallback_private_alpha_save_response(
                                     language=runtime_user.language_preference
                                 )
-                        else:
-                            strategy = save_strategy_from_run(
-                                user=user,
-                                run=result_action_run,
-                            )
-                            saved_strategy_id_for_naming = strategy.id
-                            metadata.update(
-                                saved_strategy_metadata(result_action_run, strategy.id)
-                            )
-                            assistant_text = f"Saved {strategy.name} to Strategies."
                     if assistant_text:
                         runtime_result["assistant_response"] = assistant_text
                     if result_action_run is not None:
@@ -1049,13 +1056,6 @@ async def chat_stream(
                         runtime_result["result_strategy_id"] = (
                             result_action_run.strategy_id
                         )
-                        if saved_strategy_id_for_naming is not None:
-                            runtime_result["saved_strategy_id"] = (
-                                saved_strategy_id_for_naming
-                            )
-                            runtime_result["result_strategy_id"] = (
-                                saved_strategy_id_for_naming
-                            )
                 for key in (
                     "latest_run_id",
                     "source_result_run_id",
@@ -1068,6 +1068,7 @@ async def chat_stream(
                     "clarification",
                     "discovery",
                     "next_experiments",
+                    "research",
                 ):
                     value = runtime_result.get(key)
                     if value is not None:
@@ -1110,6 +1111,13 @@ async def chat_stream(
                             confirmation_reference.model_dump(mode="python")
                         ]
                     runtime_result["confirmation"] = confirmation_card
+                    chat_confirmation.attach_research_peer_rows(
+                        runtime_result,
+                        metadata,
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        language=runtime_user.language_preference or "en",
+                    )
                 if result_card is not None:
                     metadata["result_card"] = result_card
                 if backtest_job is not None:
@@ -1223,6 +1231,15 @@ async def chat_stream(
                                 if key in durable_retry
                             }
                     else:
+                        memory_recalls = await memory_recalls_for_turn_async(
+                            user=user,
+                            account=turn_account,
+                            user_message=display_message,
+                            memory_opt_out=payload.memory_opt_out,
+                        )
+                        if memory_recalls:
+                            metadata["memory_recalls"] = memory_recalls
+                            runtime_result["memory_recalls"] = memory_recalls
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
                             metadata=metadata,
@@ -1230,7 +1247,7 @@ async def chat_stream(
                                 is_run_backtest_turn=is_run_backtest_turn,
                                 account=turn_account,
                                 visitor_key=(
-                                    visitor_key_for(client_identity(request))
+                                    visitor_key_for(turn_client_identity)
                                     if turn_account.kind == "guest"
                                     else None
                                 ),
@@ -1242,11 +1259,13 @@ async def chat_stream(
                     ):
                         runtime_result.pop("retry_last_turn", None)
                     receipt_message_id = assistant_message.id
-                record_discovery_search_evidence(
-                    usage=discovery_usage_evidence,
+                settle_metered_turn(
+                    runtime_result,
+                    discovery_usage=discovery_usage_evidence,
                     user_id=user.id,
-                    is_guest=turn_account.kind == "guest",
-                    client_identity=client_identity(request),
+                    is_guest=turn_is_guest,
+                    client_identity=turn_client_identity,
+                    guest_research_visitor_key=turn_guest_research_key,
                     conversation_id=conversation.id,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
@@ -1274,12 +1293,13 @@ async def chat_stream(
                     and assistant_text
                 ):
                     yield sse_data({"type": "token", "content": assistant_text})
-                from argus.api.chat.confirmation import public_confirmation_projection
 
                 yield sse_data(
                     {
                         "type": "final",
-                        "payload": public_confirmation_projection(runtime_result),
+                        "payload": chat_confirmation.public_confirmation_projection(
+                            runtime_result
+                        ),
                     }
                 )
                 yield sse_done()
@@ -1293,7 +1313,6 @@ async def chat_stream(
                     assistant_message=persisted_text,
                     assistant_metadata=metadata,
                     current_run=result_action_run or run,
-                    saved_strategy_id=saved_strategy_id_for_naming,
                     message_id=(
                         assistant_message.id if assistant_message is not None else None
                     ),
@@ -1403,16 +1422,21 @@ async def chat_stream(
             turn_execution_scope(entry_state=checkpoint_values or {}),
         ):
             workflow_input_error: Exception | None = None
+            research_allowance = research_allowance_for_turn(
+                user.id, guest_visitor_key=turn_guest_research_key
+            )
             try:
                 workflow_input = build_workflow_input(
                     user=runtime_user,
                     message=request_message,
                     recent_thread_history=recent_thread_history,
-                    discovery_allowance_available=discovery_allowance_available(
+                    discovery_allowance_available=discovery_allowance_for_turn(
                         user.id,
-                        is_guest=turn_account.kind == "guest",
-                        client_identity=client_identity(request),
+                        is_guest=turn_is_guest,
+                        client_identity=turn_client_identity,
                     ),
+                    research_allowance_available=research_allowance.available,
+                    research_guest_allowance_exhausted=research_allowance.guest_exhausted,
                     context_hints=[
                         item.model_dump(mode="python") for item in mention_provenance
                     ],

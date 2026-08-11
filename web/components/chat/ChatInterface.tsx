@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useProfileUpdates } from "@/components/chat/useProfileUpdates";
 import { useTranslation } from "react-i18next";
+import { readStored, writeStored } from "@/lib/browser-storage";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcutSurfaces";
 import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import ConversationActivityAnnouncement from "@/components/chat/ConversationActivityAnnouncement";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
@@ -56,7 +56,7 @@ import {
   type SearchConversationItem,
 } from "@/lib/argus-api";
 import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";
-import { omnisearchEnabled, strategiesEnabled } from "@/lib/private-alpha-flags";
+import { omnisearchEnabled, researchRailEnabled } from "@/lib/private-alpha-flags";
 import {
   useTranscriptTurnAnchor,
   type PendingMessageAnchor,
@@ -76,7 +76,7 @@ import {
   retryLastTurnRequestMessageIdFromAction,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
-import { applyRetestReceipt, retestReceiptFromFinalPayload } from "@/lib/chat-retest";
+import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
 import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
@@ -98,10 +98,12 @@ import {
   isMissingConversationLoadError,
   POST_TURN_TITLE_REFRESH_DELAYS_MS,
 } from "@/lib/chat-conversation-view-helpers";
+import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
+  researchSourcesForFinalPayload,
 } from "@/lib/chat-discovery-sidecar";
 import {
   recoveryActionsFromMetadata,
@@ -118,8 +120,6 @@ import {
 } from "@/lib/chat-message-hydration";
 import {
   hydrateResultActionsForRun,
-  markResultCardSaved,
-  markResultCardSaving,
 } from "@/lib/chat-result-actions";
 import {
   appendOrReplacePendingAssistantMessage,
@@ -155,7 +155,6 @@ import {
 import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import SettingsView from "../views/SettingsView";
-import StrategiesView from "../views/StrategiesView";
 import ChatHeaderMenu from "./ChatHeaderMenu";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
@@ -166,12 +165,12 @@ import ConversationRetrievalState, {
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import {
   type ChatActionOption,
-  type ChatMention,
   type Message,
   type StrategyConfirmationPayload,
 } from "./types";
+import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction,
+  chatActionRequestFromAction, chatHttpErrorDisplay,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
   hasActiveArtifactActionSet,
@@ -180,13 +179,22 @@ import {
   markComposerActionsInactive,
   messageStreamPresentation,
   messagesWithSavedDecisionState,
-  resultRunIdFromFinalPayload,
-  savedStrategyIdFromFinalPayload,
   settleOpenConfirmationsFromFinalPayload,
 } from "./chat-message-projection";
 import { openFeedbackDialogState } from "./feedback-dialog-state";
 import { messageElementRegistrar } from "./transcript-element-refs";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
+import SidebarShell from "@/components/sidebar/SidebarShell";
+import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
+import GuestSettingsMenu from "@/components/guest/GuestSettingsMenu";
+import { useMobileShell } from "@/components/chat/useMobileShell";
+import { memoryRecallsFromFinalPayload, useMemoryChrome } from "./memory-chrome";
+import {
+  isStarterSelectionMetadata,
+  type GuestPendingSubmission,
+  type SendOptions,
+  type SendSelection,
+} from "./chat-send-selection";
 export {
   hydrateMessagesFromApi,
   latestInputActions,
@@ -199,32 +207,11 @@ import {
   isStaleConfirmationActionRejectionCode,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
-  resultActionRunId,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
-type View = "chat" | "strategies" | "settings";
-type SendOptions = { renderUserMessage?: boolean; replacementAssistantId?: string; bypassGuestGate?: boolean };
-type SendSelection =
-  | ChatMention[]
-  | ChatActionOption
-  | StarterSelectionMetadata;
-type GuestPendingSubmission = {
-  text: string;
-  mentionsOrAction?: SendSelection;
-  actionArg?: ChatActionOption;
-  options?: SendOptions;
-};
-function isStarterSelectionMetadata(
-  selection: SendSelection | undefined,
-): selection is StarterSelectionMetadata {
-  return (
-    !Array.isArray(selection) &&
-    typeof selection === "object" &&
-    selection !== null &&
-    "strategy_category" in selection &&
-    !("type" in selection)
-  );
-}
+import { randomId } from "@/lib/random-id";
+import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/send-refusal";
+type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -248,10 +235,18 @@ export default function ChatInterface() {
     setProfileState("established");
     return nextAccount;
   }, [i18n]);
+  const { onProfileUpdated, greetingName } = useProfileUpdates(account, setAccount);
   const [messages, setMessages] = useState<Message[]>([]);
+  // Long-lived handlers (the undo toast) need the current transcript, not
+  // the render that created them.
+  const latestMessagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const mobileShell = useMobileShell();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [pendingHeaderDelete, setPendingHeaderDelete] = useState<KeyboardDeleteRequest | null>(null);
@@ -260,7 +255,6 @@ export default function ChatInterface() {
   const [isRenamingHeaderChat, setIsRenamingHeaderChat] = useState(false);
   const [isSavingHeaderRename, setIsSavingHeaderRename] = useState(false);
   const [isPinningHeaderChat, setIsPinningHeaderChat] = useState(false);
-  const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [activityCausalClock] = useState(createConversationActivityCausalClock);
   const [activityTranscriptReadiness] = useState(createConversationActivityTranscriptReadiness);
@@ -287,10 +281,7 @@ export default function ChatInterface() {
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
-  // First paint waits for the authenticated profile language so a fresh
-  // browser cannot send starter prompts in the wrong language.
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const { toast, showToast } = useChatToast();
+  const { toast, showToast, hideToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
@@ -530,32 +521,16 @@ export default function ChatInterface() {
   }, [isSidebarOpen]);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(
-        "argus:sidebar_mode",
-      ) as SidebarMode | null;
-      if (saved === "expanded" || saved === "collapsed" || saved === "hover") {
-        setSidebarMode(saved);
-        setIsSidebarOpen(saved === "expanded");
-      }
-    } catch {
-      // Local preferences are optional.
+    const saved = readStored("argus:sidebar_mode") as SidebarMode | null;
+    if (saved === "expanded" || saved === "collapsed" || saved === "hover") {
+      setSidebarMode(saved);
+      setIsSidebarOpen(saved === "expanded");
     }
   }, []);
 
-  useEffect(() => {
-    if (!strategiesEnabled && currentView === "strategies") {
-      setCurrentView("chat");
-    }
-  }, [currentView]);
-
   const handleSetSidebarMode = (mode: SidebarMode) => {
     setSidebarMode(mode);
-    try {
-      window.localStorage.setItem("argus:sidebar_mode", mode);
-    } catch {
-      // Local preferences are optional.
-    }
+    writeStored("argus:sidebar_mode", mode);
     if (mode === "expanded") setIsSidebarOpen(true);
     if (mode === "collapsed" || mode === "hover") setIsSidebarOpen(false);
   };
@@ -564,14 +539,18 @@ export default function ChatInterface() {
     setIsSidebarOpen((open) => !open);
   };
 
+  const closeDrawer = mobileShell.closeDrawer;
   const closeTransientSidebar = useCallback(() => {
+    // Navigating out of the drawer always dismisses it; the rail keeps its own
+    // transient rule, which depends on the user's sidebar mode.
+    closeDrawer();
     setIsSidebarOpen((currentOpen) =>
       sidebarOpenAfterTransientNavigation({
         currentOpen,
         mode: sidebarMode,
       }),
     );
-  }, [sidebarMode]);
+  }, [closeDrawer, sidebarMode]);
 
   function rememberCurrentConversationScroll(): void {
     const currentConversationId = readyTranscriptConversationIdRef.current;
@@ -860,13 +839,6 @@ export default function ChatInterface() {
       void loadConversation(item.id);
       return;
     }
-    if (strategiesEnabled && item.type === "strategy") {
-      rememberCurrentConversationScroll();
-      cancelTranscriptNavigation();
-      setCurrentView("strategies");
-      closeTransientSidebar();
-      return;
-    }
     if (item.type === "run") {
       void loadConversationForRun(item);
       return;
@@ -922,7 +894,14 @@ export default function ChatInterface() {
         type: "general",
         context: { surface: "guest_header", conversation_id: conversationId },
       }),
-    onOpenOmnisearch: () => setSearchOverlayOpen(true),
+    // The one door into Omnisearch, so the drawer closes here rather than at
+    // each caller. The palette paints below the drawer, and gating the shortcut
+    // hook alone still left the guest shell's own key listener opening it into
+    // a layer nobody can see.
+    onOpenOmnisearch: () => {
+      closeDrawer();
+      setSearchOverlayOpen(true);
+    },
     onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
     onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
@@ -941,7 +920,13 @@ export default function ChatInterface() {
         ),
         "error",
       ),
-    omnisearchShortcutEnabled: omnisearchEnabled,
+    // The single owner of the Omnisearch shortcut; useChatKeyboardShortcuts
+    // never claims it. Whether any surface is open is asked at press time
+    // against the layer registry, rather than named here one surface at a
+    // time: naming only the drawer left the same bug behind every other modal.
+    // Withheld below the mobile threshold on the same rule as the rest of the
+    // layer, so there is one answer to whether this width has shortcuts.
+    omnisearchShortcutEnabled: omnisearchEnabled && !mobileShell.isBelowTablet,
   });
   const {
     isGuest,
@@ -963,6 +948,8 @@ export default function ChatInterface() {
     clearResumeDecision,
   } = guestExperience;
 
+  const memoryChrome = useMemoryChrome(isGuest, conversationId);
+
   const actionDisplayLabel = useCallback(
     (action: ChatActionOption) =>
       action.labelKey
@@ -974,26 +961,6 @@ export default function ChatInterface() {
     [t],
   );
 
-  const handleTriggerPrompt = async (
-    _type: "strategy",
-    customPrompt?: string,
-  ) => {
-    // 1. Switch view
-    setCurrentView("chat");
-    closeTransientSidebar();
-
-    // 2. Start new chat
-    await startNewChat();
-
-    // 3. Define the localized prompt or use custom
-    const prompt =
-      customPrompt ??
-      t("chat.trigger_create_strategy", "I want to create a new strategy.");
-
-    // 4. Send it
-    void handleSend(prompt);
-  };
-
   // ── Send message ───────────────────────────────────────────────────────────
 
   const handleSend = async (
@@ -1004,6 +971,8 @@ export default function ChatInterface() {
   ) => {
     const trimmed = text.trim();
     let guestSubmissionHandedToStream = false;
+    // Never decline a real message in silence; see lib/send-refusal.ts.
+    const refuseSend = sendRefusal(showToast, t);
     if (!trimmed) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
@@ -1094,9 +1063,11 @@ export default function ChatInterface() {
       }
     }
 
-    if (!targetConversationId) return false;
+    if (!targetConversationId) {
+      return refuseSend("chat.error_generic", SEND_GENERIC_FALLBACK);
+    }
     if (conversationActivity.isConversationLocked(targetConversationId)) {
-      return false;
+      return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     }
     const transcriptMutation: TranscriptMutation =
       action?.type === "retry_last_turn"
@@ -1114,18 +1085,18 @@ export default function ChatInterface() {
 
     closeTransientSidebar();
     shouldAutoScrollRef.current = true;
-    const renderUserMessage =
-      options?.renderUserMessage ?? !isRetryAction(action);
+    const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       role: "user",
       kind: action?.type ? "action" : "text",
       content: action?.type ? actionDisplayLabel(action) : trimmed,
       mentions,
       selectedAction: action,
+      retestReceiptPending: action?.type === RETEST_ACTION_TYPE,
     };
-    const assistantId = replacementAssistantId ?? crypto.randomUUID();
+    const assistantId = replacementAssistantId ?? randomId();
     const retryLastTurnAction = action?.type
       ? null
       : retryLastTurnActionFromMessage(trimmed, {
@@ -1167,7 +1138,7 @@ export default function ChatInterface() {
       targetConversationId,
       requestKind,
     );
-    if (!initialRequestSession) return false;
+    if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
@@ -1227,8 +1198,7 @@ export default function ChatInterface() {
         }
         const persistedErrorMessageId = event.data.message_id?.trim();
         const errorRecoveryDisplay = recoveryDisplayFromMetadata(errorPayload);
-        const errorStrategyPathContext =
-          strategyPathContextFromMetadata(errorPayload);
+        const errorStrategyPathContext = strategyPathContextFromMetadata(errorPayload);
         // Same gate the `final` frame applies: a retryable failure wears the
         const errorAssistantRecoveryCode = retryableAssistantRecoveryCode(
           errorPayload.recovery,
@@ -1251,7 +1221,7 @@ export default function ChatInterface() {
         setMessages((prev) =>
           normalizeDurableRetryActionHistory(
             settleOpenConfirmationsAfterStreamError(
-              prev.map((m) =>
+              applyRetestReceipt(prev, userMsg.id, null).map((m) =>
                 durableRetry && m.id === userMsg.id
                   ? {
                       ...m,
@@ -1310,6 +1280,7 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
+        const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1336,21 +1307,15 @@ export default function ChatInterface() {
           if (compositionRetry) finalTextActions.push(compositionRetry);
         }
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
-        const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
-        if (action?.type === "save_strategy" && savedStrategyId) {
-          setMessages((prev) =>
-            markResultCardSaved(
-              prev,
-              resultRunIdFromFinalPayload(finalPayload, action),
-              savedStrategyId,
-            ),
-          );
-        }
         if (event.data.confirmation) {
           const confirmation = event.data
             .confirmation as StrategyConfirmationPayload;
           const finalAssistantId = finalMessageId ?? assistantId;
+          // Researched peer adds ride the ordinary Try-next surface below
+          // the card's turn (research rail, spec section 6).
+          const confirmationNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1362,6 +1327,7 @@ export default function ChatInterface() {
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
+                  nextExperiments: confirmationNextExperiments,
                 }),
               ),
             ),
@@ -1376,7 +1342,7 @@ export default function ChatInterface() {
           );
           const card = {
             ...baseCard,
-            savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
+            savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
           const finalNextExperiments =
@@ -1393,6 +1359,7 @@ export default function ChatInterface() {
                   actions: resultActions,
                   nextExperiments: finalNextExperiments,
                   savedStrategyId: card.savedStrategyId,
+                  memoryRecalls: finalMemoryRecalls,
                 }),
               ),
             ),
@@ -1422,6 +1389,11 @@ export default function ChatInterface() {
         } else if (finalText) {
           const finalFactHeadingKey =
             resultFactHeadingKeyFromMetadata(finalPayload);
+          const finalTextNextExperiments =
+            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
+          const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
+          const finalTextPresentation =
+            action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
             const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
@@ -1434,10 +1406,10 @@ export default function ChatInterface() {
                   strategyPathContext: finalStrategyPathContext,
                   assistantRecoveryCode: finalAssistantRecoveryCode,
                   discovery: finalDiscovery,
-                  contentPresentation:
-                    action?.type === "show_breakdown"
-                      ? "result_breakdown"
-                      : undefined,
+                  memoryRecalls: finalMemoryRecalls,
+                  researchSources: finalResearchSources,
+                  nextExperiments: finalTextNextExperiments,
+                  contentPresentation: finalTextPresentation,
                   resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
@@ -1453,10 +1425,10 @@ export default function ChatInterface() {
                 strategyPathContext: finalStrategyPathContext,
                 assistantRecoveryCode: finalAssistantRecoveryCode,
                 discovery: finalDiscovery,
-                contentPresentation:
-                  action?.type === "show_breakdown"
-                    ? "result_breakdown"
-                    : undefined,
+                memoryRecalls: finalMemoryRecalls,
+                researchSources: finalResearchSources,
+                nextExperiments: finalTextNextExperiments,
+                contentPresentation: finalTextPresentation,
                 resultFactHeadingKey: finalFactHeadingKey,
               },
             );
@@ -1501,6 +1473,7 @@ export default function ChatInterface() {
       if (event.event === "done") {
         if (!requestSessions.authorize(requestSession, "done")) return;
         clearNeutralGuestSubmission();
+        setMessages((prev) => applyRetestReceipt(prev, userMsg.id, null));
         terminalReadiness.finish(true); finishRequestTransport(requestSession);
       }
     };
@@ -1599,7 +1572,7 @@ export default function ChatInterface() {
           );
           if (requestSessions.authorize(requestSession, "ambiguity")) {
             if (canApplyVisibleStreamUpdate()) {
-              setMessages(view.messages);
+              setMessages((current) => settleRetestReceiptProjection(view.messages, current, userMsg.id));
             }
             terminalReadiness.finish(true);
             finishRequestTransport(requestSession);
@@ -1673,26 +1646,26 @@ export default function ChatInterface() {
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
+        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               settleConfirmationAfterActionTransportError(
-                prev.map((m) =>
+                applyRetestReceipt(prev, userMsg.id, null).map((m) =>
                   m.id === assistantId
                     ? {
                         ...m,
                         content: staleConfirmationRejected
                           ? ""
-                          : isRateLimit
-                            ? t("chat.rate_limit_error")
-                            : fallbackMessage,
+                          : isRateLimit ? t("chat.rate_limit_error") : httpErrorDisplay.content,
                         recoveryDisplay: staleConfirmationRejected
                           ? {
                               kind: "recovery_code" as const,
                               code: rejectionCode,
                             }
-                          : m.recoveryDisplay,
-                        actions: m.actions,
+                          : isRateLimit
+                            ? m.recoveryDisplay
+                            : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
                       }
                     : m,
                 ),
@@ -1730,117 +1703,6 @@ export default function ChatInterface() {
   useGuestSendBridge(guestSendRef, handleSend);
   // ── Action routing ─────────────────────────────────────────────────────────
 
-  const handleSaveStrategyAction = async (action: ChatActionOption) => {
-    const routeState = readActiveConversationRouteState();
-    const targetConversationId = targetConversationIdForSend({
-      routeConversationId: routeState.conversationId,
-      stateConversationId: conversationId,
-      action,
-    });
-    if (!targetConversationId) return;
-    if (targetConversationId !== conversationId) {
-      rememberActiveConversationId(targetConversationId);
-      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, targetConversationId, "chat");
-      setConversationId(targetConversationId);
-    }
-    if (!strategiesEnabled) {
-      showToast(
-        t(
-          "chat.private_alpha_result_kept",
-          "This result is already kept in conversation/history.",
-        ),
-      );
-      return;
-    }
-    const runId = resultActionRunId(action) ?? null;
-    const streamInput: ChatActionRequest = {
-      type: "save_strategy",
-      label: action.label,
-      labelKey: action.labelKey,
-      payload: action.payload,
-      presentation: action.presentation,
-    };
-    const request = requestSessions.begin(targetConversationId, "chat_turn");
-    if (!request) return;
-    const terminalReadiness = beginConversationActivityTerminalReadiness(() => request);
-
-    try {
-      setMessages((prev) => markResultCardSaving(prev, runId, true));
-      await streamChatMessage(
-        targetConversationId,
-        streamInput,
-        i18n.language,
-        (event) => {
-          if (event.event === "stage_start") {
-            if (!requestSessions.authorize(request, "stage")) return;
-            conversationActivity.progressRequest(request.identity.conversationId, request.identity.requestId, "running");
-          }
-          if (event.event === "final") {
-            const identityAuthorized = requestSessions.authorize(request, "final");
-            if (!identityAuthorized) return;
-            const finalPayload = event.data as typeof event.data &
-              Record<string, unknown>;
-            const savedStrategyId =
-              savedStrategyIdFromFinalPayload(finalPayload);
-            if (savedStrategyId) {
-              setMessages((prev) =>
-                markResultCardSaved(
-                  prev,
-                  resultRunIdFromFinalPayload(finalPayload, action),
-                  savedStrategyId,
-                ),
-              );
-              invalidateTranscriptForMutation(targetConversationId, "durable_result_action");
-              showToast(t("chat.saved"));
-            } else if (event.data.assistant_response) {
-              showToast(event.data.assistant_response);
-            }
-            if (requestSessions.authorize(request, "save_cleanup")) {
-              setMessages((prev) => markResultCardSaving(prev, runId, false));
-            }
-            terminalReadiness.accept(event.data, identityAuthorized);
-          }
-          if (event.event === "error") {
-            if (!requestSessions.authorize(request, "error")) return;
-            if (requestSessions.canWriteVisible(request)) {
-              showToast(
-                chatStreamErrorText(event.data.detail, t("chat.error_generic")),
-                "error",
-              );
-              setMessages((prev) => markResultCardSaving(prev, runId, false));
-            }
-            terminalReadiness.finish(true); finishRequestTransport(request);
-          }
-          if (event.event === "done") {
-            if (!requestSessions.authorize(request, "done")) return;
-            if (requestSessions.authorize(request, "save_cleanup")) {
-              setMessages((prev) => markResultCardSaving(prev, runId, false));
-            }
-            terminalReadiness.finish(true);
-            finishRequestTransport(request);
-          }
-        },
-        [],
-        {
-          requestId: request.identity.requestId,
-          signal: request.controller.signal,
-        },
-      );
-    } catch (err: unknown) {
-      if (!requestSessions.authorize(request, "catch")) return;
-      const message =
-        err instanceof ChatStreamError && err.message
-          ? err.message
-          : t("chat.error_generic");
-      if (requestSessions.authorize(request, "save_cleanup")) {
-        showToast(message, "error");
-        setMessages((prev) => markResultCardSaving(prev, runId, false));
-      }
-      terminalReadiness.finish(true);
-      finishRequestTransport(request);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       const result = await logoutFromApi();
@@ -1859,7 +1721,6 @@ export default function ChatInterface() {
       transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
       clearHistory();
-      setSearchText("");
       window.location.href = "/";
     } catch {
       showToast(
@@ -1958,12 +1819,14 @@ export default function ChatInterface() {
 
   const handleAction = (action: ChatActionOption) => {
     const value = action.value ?? "";
-    if (action.type === "save_strategy") {
-      void handleSaveStrategyAction(action);
-      return;
-    }
     if (action.type === "cancel_confirmation") {
       void handleCancelConfirmationAction(action);
+      return;
+    }
+    if (action.type === "add_confirmation_peer") {
+      // No turn is spent: the typed endpoint patches the pending card
+      // deterministically and returns the superseding card message.
+      void handleAddConfirmationPeer(action);
       return;
     }
     if (value === "/action:new-chat") {
@@ -2017,6 +1880,20 @@ export default function ChatInterface() {
     }
     void handleSend(action.label || value, action.type ? action : undefined);
   };
+
+  const {
+    handleAddConfirmationPeer,
+    handleDirectEditConfirmation,
+  } = confirmationSupersedingHandlers(() => ({
+    activeConversationId: () => activeConversationIdRef.current,
+    // Through the ref: the undo toast outlives its render.
+    activeConfirmationId: () => activeConfirmationIdFrom(latestMessagesRef.current),
+    hydrate: (created) => hydrateMessagesFromApi(created),
+    setMessages,
+    showToast,
+    hideToast,
+    t,
+  }));
 
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
@@ -2146,9 +2023,20 @@ export default function ChatInterface() {
     messages,
     isStreamingResponse,
   );
+  // Spec 10b: both empty-state placeholders carry the same invitation once the
+  // rail ships; the pre-rail strings stay behind the flag so flag-off behavior
+  // is unchanged. The follow-up placeholder is deliberately untouched.
   const chatInputPlaceholder =
     messages.length === 0
-      ? t(isGuest ? "guest.shell.input_placeholder" : "chat.input_placeholder")
+      ? t(
+          isGuest
+            ? researchRailEnabled
+              ? "guest.shell.input_placeholder"
+              : "guest.shell.input_placeholder_prerail"
+            : researchRailEnabled
+              ? "chat.input_placeholder"
+              : "chat.input_placeholder_prerail",
+        )
       : t("chat.followup_placeholder", "Ask a follow-up...");
   const showEmptyChatSurface = conversationId === null && messages.length === 0;
   const conversationComposerUnavailable =
@@ -2158,13 +2046,21 @@ export default function ChatInterface() {
     failedConversationId === conversationId;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
+    enabled: !mobileShell.isBelowTablet,
     isChatView: currentView === "chat",
     canManageConversation,
     conversationId,
     isGuest,
     searchOverlayOpen,
     deleteConfirmationOpen: Boolean(pendingHeaderDelete),
-    modalOpen: isSidebarPreferenceModalOpen || feedbackState.isOpen || showChatOptions,
+    // The drawer is a modal too. Left out, its shortcuts still fired, and
+    // Recents Quick Peek opened at z-65 behind a z-68 drawer: a real modal
+    // nobody could see, reachable only by keyboard or switch control.
+    modalOpen:
+      isSidebarPreferenceModalOpen ||
+      feedbackState.isOpen ||
+      showChatOptions ||
+      mobileShell.isDrawerOpen,
     sidebarOpen: isSidebarOpen,
     setSidebarOpen: setIsSidebarOpen,
     recentsExpanded: isRecentsExpanded,
@@ -2205,10 +2101,27 @@ export default function ChatInterface() {
       selectPresentation={conversationActivity.selectPresentation}
       selectAggregatePresentation={conversationActivity.selectAggregatePresentation} selectOperationLabel={conversationActivity.selectOperationLabel}
     >
-      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
-      {/* ── Desktop sidebar ── */}
+      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white tablet:flex-row">
+      {/* ── Sidebar: rail on desktop, off-canvas drawer below the mobile threshold ── */}
+      <SidebarShell
+        isBelowTablet={mobileShell.isBelowTablet}
+        isDrawerOpen={mobileShell.isDrawerOpen}
+        onCloseDrawer={mobileShell.closeDrawer}
+        label={t("common.navigation", "Navigation")}
+      >
       <ChatSidebar
-        isOpen={isSidebarOpen}
+        variant={mobileShell.isBelowTablet ? "drawer" : "rail"}
+        onRequestClose={mobileShell.closeDrawer}
+        guestSettings={
+          mobileShell.isBelowTablet && isGuest ? (
+            <GuestSettingsMenu
+              feedbackEnabled={canSubmitFeedback}
+              onFeedback={requestGuestFeedback}
+              placement="drawer"
+            />
+          ) : null
+        }
+        isOpen={mobileShell.isBelowTablet ? true : isSidebarOpen}
         onToggle={toggleSidebar}
         currentView={currentView}
         conversationId={conversationId}
@@ -2235,11 +2148,13 @@ export default function ChatInterface() {
         onOpenItem={openHistoryItem}
         onLoadMoreHistory={loadMoreHistory}
         onOpenSearch={() => {
+          closeDrawer();
           if (omnisearchEnabled) {
             requestOmnisearch();
           }
         }}
         onHistoryMutated={refreshHistory}
+        onProfileUpdated={onProfileUpdated}
         onConversationRemoved={handleConversationRemoved}
         onAllConversationsDeleted={handleAllConversationsDeleted}
         onToast={showToast}
@@ -2259,7 +2174,6 @@ export default function ChatInterface() {
         }
         settingsOpenRequest={keyboardShortcuts.settingsOpenRequest}
         mode={sidebarMode}
-        strategiesEnabled={strategiesEnabled}
         omnisearchEnabled={
           omnisearchEnabled && (!isGuest || canUseOmnisearch)
         }
@@ -2269,6 +2183,7 @@ export default function ChatInterface() {
         isGuest={guestExperience.isEstablishedGuest}
         guestExpiresAt={account?.guest?.expires_at}
       />
+      </SidebarShell>
 
       <KeyboardShortcutSurfaces
         keyboardShortcutsOpen={keyboardShortcuts.keyboardShortcutsOpen}
@@ -2331,9 +2246,23 @@ export default function ChatInterface() {
       <section className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]">
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
-          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-4 px-4 pointer-events-none md:px-8">
+          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between gap-2 px-4 pointer-events-none tablet:gap-4 tablet:px-8">
+            {mobileShell.isBelowTablet && (
+              <div className="pointer-events-auto shrink-0">
+                <ChatShellMenuTrigger
+                  onOpen={mobileShell.openDrawer}
+                  activityPresentation={
+                    mobileShell.isDrawerOpen
+                      ? null
+                      : conversationActivity.selectAggregatePresentation(
+                          historyItems.map((item) => item.conversation_id ?? item.id),
+                        )
+                  }
+                />
+              </div>
+            )}
             {/* Title (left-aligned; truncates before the action cluster) */}
-            <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+            <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 tablet:text-[18px]">
               {currentView === "chat" &&
                 (conversationId !== null || messages.length > 0) && (
                   <ChatHeaderTitle
@@ -2342,7 +2271,6 @@ export default function ChatInterface() {
                     titleSource={headerConversationTitleSource}
                   />
                 )}
-              {currentView === "strategies" && t("common.strategies")}
             </h1>
 
             {/* Action cluster (guest settings or durable owner menu) */}
@@ -2353,6 +2281,7 @@ export default function ChatInterface() {
                   feedbackEnabled={canSubmitFeedback}
                   onFeedback={requestGuestFeedback}
                   onSignIn={requestGuestSignIn}
+                  showSettings={!mobileShell.isBelowTablet}
                 />
               ) : currentView === "chat" &&
                 conversationId &&
@@ -2376,17 +2305,9 @@ export default function ChatInterface() {
                   onTogglePin={() => void handleToggleHeaderPin()}
                   isDeleting={isDeletingHeaderChat}
                   onRequestDelete={() => handleRequestHeaderDelete()}
+                  memoryChrome={memoryChrome}
                 />
               ) : null}
-              {strategiesEnabled && currentView === "strategies" && (
-                <button
-                  onClick={() => handleTriggerPrompt("strategy")}
-                  className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                  aria-label="New item"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              )}
             </div>
           </header>
         )}
@@ -2401,11 +2322,10 @@ export default function ChatInterface() {
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
-                showSuggestions={showSuggestions}
+                preferredName={greetingName}
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
-                onToggleSuggestions={() => setShowSuggestions(!showSuggestions)}
                 onToast={showToast}
               />
             ) : (
@@ -2460,6 +2380,7 @@ export default function ChatInterface() {
                           <ChatMessage
                             message={msg}
                             onAction={handleAction}
+                            onDirectEdit={handleDirectEditConfirmation}
                             onFeedback={(type, context, rating) => {
                               setFeedbackState(
                                 openFeedbackDialogState(type, context, rating, conversationId),
@@ -2470,6 +2391,7 @@ export default function ChatInterface() {
                             isLatest={isLatestAi}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
+                            memoryProposalEnabled={memoryChrome.proposalEnabled}
                             nextMovesEnabled={nextMovesEnabled}
                             turnInFlight={turnInFlight}
                             isGuest={isGuest}
@@ -2545,16 +2467,6 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {strategiesEnabled && currentView === "strategies" && (
-          <StrategiesView
-            onMenuClick={() => setIsSidebarOpen((o) => !o)}
-            onAddClick={() => handleTriggerPrompt("strategy")}
-            searchText={searchText}
-            onSearchChange={setSearchText}
-            isSidebarOpen={isSidebarOpen}
-            onTriggerPrompt={handleTriggerPrompt}
-          />
-        )}
         {currentView === "settings" && (
           <SettingsView
             onClose={() => setCurrentView("chat")}
@@ -2573,7 +2485,11 @@ export default function ChatInterface() {
           />
         )}
 
-        <ChatToast message={toast?.message ?? null} variant={toast?.variant} />
+        <ChatToast
+          message={toast?.message ?? null}
+          variant={toast?.variant}
+          action={toast?.action}
+        />
       </section>
 
       {/* ── Feedback Dialog ── */}

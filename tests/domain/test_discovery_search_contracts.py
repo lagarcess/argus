@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-from argus.domain.discovery_search import (
+from argus.domain.research.search import (
     MAX_RESULTS,
     DiscoverySearchConfig,
     SearchProvider,

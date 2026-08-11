@@ -11,7 +11,7 @@ from argus.agent_runtime.discovery.contracts import (
     ExtractedCandidate,
 )
 from argus.agent_runtime.discovery.validation import validated_candidates
-from argus.domain.discovery_search import SearchResultPacket, sanitize_search_result
+from argus.domain.research.search import SearchResultPacket, sanitize_search_result
 
 
 @dataclass(frozen=True)

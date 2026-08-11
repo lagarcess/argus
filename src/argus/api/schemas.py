@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
@@ -129,11 +130,33 @@ class OnboardingState(BaseModel):
     ) = None
 
 
+PREFERRED_NAME_MAX_LENGTH = 40
+
+
+def _blank_preferred_name_is_no_name(value: Any) -> Any:
+    """Whitespace is not a name, and clearing the field is the way to opt out."""
+
+    if not isinstance(value, str):
+        return value
+    return value.strip() or None
+
+
+# Normalize first, then enforce the bound: `max_length` measures the trimmed
+# value. One annotation serves the read model and the patch, so it cannot drift.
+PreferredName = Annotated[
+    Annotated[str, Field(max_length=PREFERRED_NAME_MAX_LENGTH)] | None,
+    BeforeValidator(_blank_preferred_name_is_no_name),
+]
+
+
 class User(BaseModel):
     id: str
     email: str | None
     username: str | None = None
     display_name: str | None = None
+    #: What the user asked Argus to call them, distinct from `display_name`,
+    #: which is an identity field. Null means greetings use no name.
+    preferred_name: PreferredName = None
     language: Language = "en"
     locale: Locale = "en-US"
     theme: Theme = "dark"
@@ -241,6 +264,7 @@ class UsageAllowanceResponse(BaseModel):
 
 class ProfilePatch(BaseModel):
     display_name: str | None = None
+    preferred_name: PreferredName = None
     language: Language | None = None
     locale: Locale | None = None
     theme: Theme | None = None
@@ -337,31 +361,6 @@ class PaginatedConversations(BaseModel):
     next_cursor: str | None = None
 
 
-class StrategyCreate(BaseModel):
-    name: str | None = None
-    template: StrategyTemplate
-    asset_class: AssetClass
-    symbols: list[str] = Field(min_length=1, max_length=5)
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    metrics_preferences: list[str] = Field(
-        default_factory=lambda: [
-            "total_return_pct",
-            "win_rate",
-            "max_drawdown_pct",
-        ]
-    )
-    benchmark_symbol: str | None = None
-    conversation_id: str | None = None
-
-
-class StrategyPatch(BaseModel):
-    name: str | None = None
-    pinned: bool | None = None
-    metrics_preferences: list[str] | None = None
-    parameters: dict[str, Any] | None = None
-    deleted_at: datetime | None = None
-
-
 class Strategy(BaseModel):
     id: str
     name: str
@@ -383,35 +382,11 @@ class Strategy(BaseModel):
     def _tolerate_retired_template(cls, value: Any) -> Any:
         # Persisted strategies saved before a template was retired (e.g. the draft
         # momentum_breakout / trend_follow) must still load. Coerce any non-executable
-        # template to buy_and_hold on read, matching the save-path fallback in
-        # api/chat/strategies.strategy_template_from_run. Write models (StrategyCreate,
-        # BacktestRunRequest) intentionally stay strict so the API still rejects drafts
-        # at the request boundary.
+        # template to buy_and_hold on read. BacktestRunRequest intentionally stays
+        # strict so direct execution still rejects retired drafts.
         if value not in EXECUTABLE_TEMPLATES:
             return "buy_and_hold"
         return value
-
-
-class StrategyResponse(BaseModel):
-    strategy: Strategy
-
-
-class PaginatedStrategies(BaseModel):
-    items: list[Strategy]
-    next_cursor: str | None = None
-
-
-class CollectionCreate(BaseModel):
-    name: str | None = None
-
-
-class CollectionPatch(BaseModel):
-    name: str | None = None
-    pinned: bool | None = None
-
-
-class CollectionAttach(BaseModel):
-    strategy_ids: list[str]
 
 
 class Collection(BaseModel):
@@ -423,15 +398,6 @@ class Collection(BaseModel):
     deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
-
-class CollectionResponse(BaseModel):
-    collection: Collection
-
-
-class PaginatedCollections(BaseModel):
-    items: list[Collection]
-    next_cursor: str | None = None
 
 
 class BacktestRunRequest(BaseModel):
@@ -477,6 +443,9 @@ class BacktestJob(BaseModel):
     request_message_id: str | None = None
     confirmation_message_id: str | None = None
     status: BacktestJobStatus
+    # Absent means an ordinary backtest; 'chat.research' jobs succeed without
+    # a run, so every serialized job surface must carry the scope.
+    operation_scope: str | None = None
     result_run_id: str | None = None
     failure_code: str | None = None
     failure_detail: str | None = None
@@ -642,6 +611,20 @@ class SearchDossierOutcome(BaseModel):
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
 
 
+RetestDossierState = Literal["new_data_available", "no_new_data", "cant_do_it"]
+RetestWindowViolationCode = Literal[
+    "provider_history_start_unavailable",
+    "kraken_ohlc_window_exceeded",
+    "provider_timeframe_unavailable",
+]
+
+
+class SearchRetestRepair(BaseModel):
+    kind: Literal["clamp_start"] = "clamp_start"
+    start_date: date
+    end_date: date
+
+
 class SearchRetestAction(BaseModel):
     """Bounded typed retest envelope (spec 2.2).
 
@@ -653,10 +636,29 @@ class SearchRetestAction(BaseModel):
     type: Literal["retest_run"] = "retest_run"
     source_run_id: str
     run_label: str = Field(max_length=160)
-    window_policy: Literal["same_duration_ending_today"] = (
-        "same_duration_ending_today"
+    window_policy: Literal["preserve_start_ending_latest_available"] = (
+        "preserve_start_ending_latest_available"
     )
-    contract_version: Literal["argus_retest_run/v1"] = "argus_retest_run/v1"
+    contract_version: Literal["argus_retest_run/v2"] = "argus_retest_run/v2"
+    state: RetestDossierState
+    reason_code: RetestWindowViolationCode | None = None
+    repair: SearchRetestRepair | None = None
+
+    @model_validator(mode="after")
+    def validate_state_shape(self) -> SearchRetestAction:
+        if self.state != "cant_do_it":
+            if self.reason_code is not None or self.repair is not None:
+                raise ValueError("Only cant_do_it may carry a reason or repair")
+            return self
+        if self.reason_code is None:
+            raise ValueError("cant_do_it requires a reason_code")
+        repairable = self.reason_code in {
+            "provider_history_start_unavailable",
+            "kraken_ohlc_window_exceeded",
+        }
+        if repairable != (self.repair is not None):
+            raise ValueError("Retest repair must match the reason_code")
+        return self
 
 
 class SearchDecisionAction(BaseModel):
@@ -826,6 +828,11 @@ class ChatActionPayload(BaseModel):
         return payload
 
 
+class ChatMentionTextRange(BaseModel):
+    start: int
+    end: int
+
+
 class ChatMentionPayload(BaseModel):
     id: str = Field(max_length=CHAT_STREAM_MAX_MENTION_ID_LENGTH)
     type: Literal["asset", "indicator"]
@@ -844,7 +851,28 @@ class ChatMentionPayload(BaseModel):
         default=None,
         max_length=CHAT_STREAM_MAX_MENTION_PROVIDER_LENGTH,
     )
+    message_range: ChatMentionTextRange | None = None
     support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+    @field_validator("message_range", mode="before")
+    @classmethod
+    def discard_malformed_message_range(cls, value: Any) -> Any:
+        if isinstance(value, ChatMentionTextRange):
+            start, end = value.start, value.end
+        elif isinstance(value, dict):
+            start, end = value.get("start"), value.get("end")
+        else:
+            return None
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(end, int)
+            or isinstance(end, bool)
+            or start < 0
+            or end < start
+        ):
+            return None
+        return {"start": start, "end": end}
 
 
 class ChatStreamRequest(BaseModel):
@@ -856,6 +884,12 @@ class ChatStreamRequest(BaseModel):
         max_length=CHAT_STREAM_MAX_MENTIONS,
     )
     language: Language | None = None
+    # Temporary chat: the client may opt a conversation out of memory. Opting
+    # out only ever disables recall and proposals; it grants nothing.
+    memory_opt_out: bool = False
+    # Width band the turn was sent from. Narrow shortens generated titles at
+    # the point of generation; the client never clips what it is given.
+    viewport: Literal["narrow", "wide"] | None = None
 
     @model_validator(mode="after")
     def require_message_or_action(self) -> "ChatStreamRequest":
@@ -864,6 +898,21 @@ class ChatStreamRequest(BaseModel):
         if self.message is not None and self.message.strip():
             return self
         raise ValueError("message_or_action_required")
+
+
+from argus.api.confirmation_schemas import (  # noqa: E402, F401 — re-exported API surface
+    ConfirmationDirectEditRequest,
+    ConfirmationDirectEditWindow,
+    ConfirmationPeerAssetsRequest,
+)
+
+
+class ConfirmationPeerAssetsResponse(BaseModel):
+    message: Message
+
+
+class ConfirmationDirectEditResponse(BaseModel):
+    message: Message
 
 
 def _validate_chat_action_payload_value(value: Any, *, depth: int) -> None:
@@ -904,6 +953,34 @@ class DiscoveryItem(BaseModel):
 
 class DiscoveryResponse(BaseModel):
     items: list[DiscoveryItem]
+
+
+class MarketSession(BaseModel):
+    """Which session US equities are in, resolved in Eastern time."""
+
+    model_config = ConfigDict(frozen=True)
+
+    phase: Literal[
+        "pre_market",
+        "open",
+        "after_hours",
+        "closed_weekend",
+        "closed_holiday",
+        "closed",
+    ]
+    is_market_day: bool
+    as_of: datetime
+
+
+class MarketSessionResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    session: MarketSession | None = Field(
+        description=(
+            "Null when the trading calendar is unreachable. Callers say nothing "
+            "about the market rather than guessing an open or a holiday."
+        )
+    )
 
 
 class FeedbackRequest(BaseModel):

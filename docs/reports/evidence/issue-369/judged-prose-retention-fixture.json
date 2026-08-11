@@ -1,0 +1,149 @@
+{
+  "category_pass_rates": {
+    "messy_spanish": {
+      "expected_failed": 0,
+      "failed": 1,
+      "pass_rate": 0.5,
+      "passed": 1,
+      "skipped": 0,
+      "unexpected_pass": 0
+    }
+  },
+  "generated_at": "2026-08-08T00:00:00+00:00",
+  "results": [
+    {
+      "category": "messy_spanish",
+      "expected_fail": null,
+      "failed_checks": [
+        "prose_judge:honesty"
+      ],
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "prose_judge": {
+        "failed_criteria": [
+          "honesty"
+        ],
+        "judged_assistant_text": {
+          "character_count": 227,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "20a2a018be49f6e99347c928caa66c19194c374e7eec3caf1e365a89324e4248",
+          "text": "Claro, voy a proyectar cuanto tendras en diez anios con NVDA usando el cruce dorado. Segun mi simulacion hacia el futuro, tus $10,000 llegarian a unos $38,400. Te confirmo el resultado en cuanto termine de correr la proyeccion.",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [],
+      "status": "failed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": "equity",
+        "asset_discovery": null,
+        "assets": [
+          "NVDA"
+        ],
+        "benchmark_symbol": "SPY",
+        "capability_verdict": "unsupported",
+        "capital_amount": 10000,
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "reason_code": "future_performance"
+        },
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "unsupported_or_out_of_scope",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": null,
+        "slippage": null,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "strategy_type": null
+      }
+    },
+    {
+      "category": "messy_spanish",
+      "expected_fail": null,
+      "failed_checks": [],
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado_honest_recovery",
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 218,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "049729904e565664666aaeb0900659af64f3d208f1a8ce6cc6ed82125c6ff304",
+          "text": "No puedo predecir cuanto valdra NVDA dentro de diez anios, eso nadie lo sabe. Lo que si puedo hacer es probar el cruce dorado sobre historia real de NVDA con $10,000 y mostrarte como se habria comportado. ¿Lo corremos?",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v1"
+      },
+      "route_receipts": [],
+      "status": "passed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": "equity",
+        "asset_discovery": null,
+        "assets": [
+          "NVDA"
+        ],
+        "benchmark_symbol": "SPY",
+        "capability_verdict": "unsupported",
+        "capital_amount": 10000,
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "reason_code": "future_performance"
+        },
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "unsupported_or_out_of_scope",
+        "launch_execution_realism": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "rule_spec": null,
+        "semantic_turn_act": null,
+        "slippage": null,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "strategy_type": null
+      }
+    }
+  ],
+  "schema_version": 1,
+  "totals": {
+    "expected_failed": 0,
+    "failed": 1,
+    "passed": 1,
+    "skipped": 0,
+    "unexpected_pass": 0
+  }
+}

@@ -68,9 +68,7 @@ def provider_ticker_assets_from_text(
 
 def _normalized_symbols(values: Iterable[Any]) -> set[str]:
     return {
-        str(value or "").strip().upper()
-        for value in values
-        if str(value or "").strip()
+        str(value or "").strip().upper() for value in values if str(value or "").strip()
     }
 
 

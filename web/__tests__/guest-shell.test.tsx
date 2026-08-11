@@ -86,7 +86,7 @@ describe("guest shell contract", () => {
     const chat = source("components/chat/ChatInterface.tsx");
 
     expect(chat).toMatch(
-      /<ChatSidebar[\s\S]{0,2200}isGuest=\{guestExperience\.isEstablishedGuest\}/,
+      /<ChatSidebar[\s\S]{0,3200}isGuest=\{guestExperience\.isEstablishedGuest\}/,
     );
     expect(sidebar).toContain("item.expires_at");
     expect(sidebar).toContain('"guest.history.keep_history"');
@@ -204,8 +204,16 @@ describe("guest shell contract", () => {
       ).toBeString();
     }
 
-    expect(en.guest.shell.input_placeholder).toBe("What do you want to test?");
-    expect(es.guest.shell.input_placeholder).toBe("¿Qué quieres probar?");
+    // Spec 2026-08-07 section 10b: the guest empty-state placeholder invites
+    // questions; the pre-rail string stays behind the flag-off path.
+    expect(en.guest.shell.input_placeholder).toBe("Ask about any company or idea");
+    expect(es.guest.shell.input_placeholder).toBe(
+      "Pregunta sobre cualquier empresa o idea",
+    );
+    expect(en.guest.shell.input_placeholder_prerail).toBe(
+      "What do you want to test?",
+    );
+    expect(es.guest.shell.input_placeholder_prerail).toBe("¿Qué quieres probar?");
     expect(en.guest.shell.temporary_until).toBe(
       "Temporary chat · available until {{date}}",
     );

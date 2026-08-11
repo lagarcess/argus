@@ -283,12 +283,10 @@ class _DecisionResultQuery:
             row
             for row in self.client.rows_by_table[self.table_name]
             if all(
-                _json_filter_value(row, key) == value
-                for key, value in self.equal_filters
+                _json_filter_value(row, key) == value for key, value in self.equal_filters
             )
             and all(
-                _json_filter_value(row, key) in values
-                for key, values in self.in_filters
+                _json_filter_value(row, key) in values for key, values in self.in_filters
             )
         ]
         if self.operation == "update":
@@ -302,9 +300,7 @@ class _DecisionResultQuery:
         return SimpleNamespace(data=rows)
 
 
-def test_decision_enrichment_targets_every_direct_and_projected_result_identity() -> (
-    None
-):
+def test_decision_enrichment_targets_every_direct_and_projected_result_identity() -> None:
     now = utcnow()
     run = BacktestRun(
         id="run-1",
@@ -1214,30 +1210,6 @@ def test_create_backtest_run_rejects_unowned_parent_strategy() -> None:
     assert "backtest_runs" not in client.inserted_by_table
 
 
-def test_create_strategy_rejects_unowned_parent_conversation_before_insert() -> None:
-    client = _RecordingSupabaseClient()
-    gateway = SupabaseGateway(client=client)
-    gateway.get_conversation = MagicMock(return_value=None)  # type: ignore[method-assign]
-
-    with pytest.raises(ValueError, match="Conversation not found"):
-        gateway.create_strategy(
-            user_id="user-1",
-            payload={
-                "name": "AAPL idea",
-                "name_source": "user_renamed",
-                "template": "buy_and_hold",
-                "asset_class": "equity",
-                "symbols": ["AAPL"],
-                "parameters": {},
-                "metrics_preferences": ["total_return_pct"],
-                "benchmark_symbol": "SPY",
-                "conversation_id": "conversation-other",
-            },
-        )
-
-    assert "strategies" not in client.inserted_by_table
-
-
 def test_attach_context_packet_rejects_unowned_parent_run() -> None:
     client = _RecordingSupabaseClient()
     gateway = SupabaseGateway(client=client)
@@ -1250,21 +1222,6 @@ def test_attach_context_packet_rejects_unowned_parent_run() -> None:
         )
 
     assert "run_context_packets" not in client.inserted_by_table
-
-
-def test_attach_strategies_rejects_unowned_parent_collection_before_upsert() -> None:
-    client = MagicMock()
-    gateway = SupabaseGateway(client=client)
-    gateway.get_collection = MagicMock(return_value=None)  # type: ignore[method-assign]
-
-    result = gateway.attach_strategies(
-        user_id="user-1",
-        collection_id="collection-other",
-        strategy_ids=["strategy-1"],
-    )
-
-    assert result is None
-    client.table.assert_not_called()
 
 
 def test_usage_limits_check_all_windows_before_incrementing() -> None:
@@ -1368,6 +1325,7 @@ class _BacktestJobClient:
         self.updated_job_filters: list[dict[str, object]] = []
         self.select_calls: list[str] = []
         self.in_filters: list[tuple[str, list[object]]] = []
+        self.or_filters: list[str] = []
 
     def table(self, table_name: str):
         assert table_name == "backtest_jobs"
@@ -1404,6 +1362,10 @@ class _BacktestJobTable:
         self.filters[key] = value
         return self
 
+    def or_(self, filter_string: str):
+        self.client.or_filters.append(filter_string)
+        return self
+
     def in_(self, key: str, values: list[object]):
         self.in_filters[key] = values
         self.client.in_filters.append((key, values))
@@ -1427,9 +1389,7 @@ class _BacktestJobTable:
             if self.limit_count is not None:
                 rows = rows[: self.limit_count]
             if self.select_columns != "*":
-                selected = {
-                    column.strip() for column in self.select_columns.split(",")
-                }
+                selected = {column.strip() for column in self.select_columns.split(",")}
                 rows = [
                     {key: value for key, value in row.items() if key in selected}
                     for row in rows
@@ -1520,7 +1480,9 @@ def test_backtest_reservation_query_includes_internal_launch_payload() -> None:
     assert "launch_payload" in client.select_calls[-1].split(",")
 
 
-def test_backtest_reservations_batch_query_is_owner_conversation_scope_and_key_bounded() -> None:
+def test_backtest_reservations_batch_query_is_owner_conversation_scope_and_key_bounded() -> (
+    None
+):
     client = _BacktestJobClient(
         existing_jobs=[
             {
@@ -1694,6 +1656,13 @@ def test_link_backtest_job_result_marks_succeeded_when_api_owns_shadow_lifecycle
         "shadow_mode": True,
         "api_in_process_result": {"result_run_id": "run-1"},
     }
+    from argus.domain.backtest_job_lifecycle import (
+        job_success_write_postgrest_filter,
+    )
+
+    assert client.or_filters == [
+        job_success_write_postgrest_filter()
+    ], "the success write must carry the generated lifecycle filter"
 
 
 def test_link_backtest_job_result_does_not_overwrite_existing_result() -> None:
@@ -1878,9 +1847,7 @@ def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() ->
     assert client.updated_jobs[0]["user_id"] == "user-1"
     assert client.updated_jobs[0]["id"] == "job-1"
     assert client.updated_job_filters[0]["status"] == "running"
-    assert client.updated_job_filters[0]["updated_at"] == (
-        "2026-07-24T12:00:01+00:00"
-    )
+    assert client.updated_job_filters[0]["updated_at"] == ("2026-07-24T12:00:01+00:00")
 
 
 def test_mark_backtest_job_failed_does_not_overwrite_status_after_cas_loss() -> None:

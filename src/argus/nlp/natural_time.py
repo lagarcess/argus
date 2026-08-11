@@ -66,6 +66,8 @@ def resolve_date_range_text(
     raw = str(text or "").strip()
     if not raw:
         return None
+    if text_has_fractional_duration(raw):
+        return None
     current_date = today or date.today()
     matches = _search_date_spans(raw, today=current_date, languages=languages)
     if not matches:
@@ -136,6 +138,15 @@ def resolve_rolling_window_intent_text(
     if not raw:
         return None
     current_date = today or date.today()
+    idiom_window = _trailing_window_fields_from_idiom(raw)
+    if idiom_window is not None:
+        return {
+            "kind": "rolling_window",
+            **idiom_window,
+            "anchor": "today",
+            "confidence": confidence,
+            "evidence": raw,
+        }
     resolved = resolve_date_range_text(
         raw,
         today=current_date,
@@ -237,7 +248,7 @@ def resolve_date_range_intent(
         return None
 
     if kind == "rolling_window":
-        count = _positive_int(payload.get("count"))
+        count = _positive_number(payload.get("count"))
         unit = _intent_unit(payload.get("unit"))
         if count is None or unit is None:
             return None
@@ -357,6 +368,156 @@ def _rolling_window_fields_from_range(
     return {"count": day_delta, "unit": "day"}
 
 
+_WINDOW_UNIT_TOKENS: dict[str, DateIntentUnit] = {
+    "day": "day", "days": "day", "dia": "day", "día": "day",
+    "dias": "day", "días": "day",
+    "week": "week", "weeks": "week", "semana": "week", "semanas": "week",
+    "month": "month", "months": "month", "mes": "month", "meses": "month",
+    "year": "year", "years": "year", "ano": "year", "año": "year",
+    "anos": "year", "años": "year",
+}
+_WINDOW_QUALIFIER_TOKENS = frozenset(
+    {
+        "last", "past", "trailing",
+        "ultimo", "último", "ultima", "última",
+        "ultimos", "últimos", "ultimas", "últimas",
+        "pasado", "pasada", "pasados", "pasadas",
+    }
+)
+_WINDOW_FILLER_TOKENS = frozenset(
+    {"del", "de", "desde", "el", "la", "los", "las", "the", "from", "este", "esta"}
+)
+# Trailing anchors: the phrase explicitly runs up to today.
+_WINDOW_ANCHOR_PHRASES = (
+    ("para", "aca"), ("para", "acá"),
+    ("hasta", "hoy"), ("hasta", "ahora"), ("hasta", "la", "fecha"),
+    ("a", "la", "fecha"), ("al", "dia", "de", "hoy"), ("al", "día", "de", "hoy"),
+    ("to", "now"), ("to", "date"), ("to", "today"),
+    ("until", "now"), ("until", "today"), ("till", "now"), ("till", "today"),
+    ("so", "far"),
+)
+_WINDOW_COUNT_WORDS = {"un": 1, "una": 1, "one": 1, "a": 1}
+
+
+def _trailing_window_fields_from_idiom(text: str) -> dict[str, Any] | None:
+    """Recognize "del último año para acá" / "last year to now" shaped spans.
+
+    dateparser resolves these idioms to a single calendar date, which downstream
+    turned into a zero-day window; the shape is deterministic, so read it as a
+    trailing window anchored on today.
+    """
+    tokens = [
+        token
+        for token in _split_preserving_decimal_commas(text.casefold())
+        if token
+    ]
+    tokens = [token.strip(".,!?") for token in tokens if token.strip(".,!?")]
+    if not tokens:
+        return None
+    anchored = False
+    for phrase in _WINDOW_ANCHOR_PHRASES:
+        size = len(phrase)
+        if len(tokens) > size and tuple(tokens[-size:]) == phrase:
+            tokens = tokens[:-size]
+            anchored = True
+            break
+    while tokens and tokens[0] in _WINDOW_FILLER_TOKENS:
+        tokens = tokens[1:]
+    qualified = False
+    if tokens and tokens[0] in _WINDOW_QUALIFIER_TOKENS:
+        qualified = True
+        tokens = tokens[1:]
+    count: float = 1
+    decimal_count = _decimal_count_token(tokens[0]) if tokens else None
+    if tokens and (decimal_count is not None or tokens[0] in _WINDOW_COUNT_WORDS):
+        count = (
+            decimal_count
+            if decimal_count is not None
+            else _WINDOW_COUNT_WORDS[tokens[0]]
+        )
+        tokens = tokens[1:]
+    if not tokens or count <= 0:
+        return None
+    unit = _WINDOW_UNIT_TOKENS.get(tokens[0])
+    if unit is None or unit == "quarter":
+        return None
+    trailing = tokens[1:]
+    if trailing and not (
+        len(trailing) <= 1 and trailing[0] in _WINDOW_QUALIFIER_TOKENS
+    ):
+        return None
+    if trailing:
+        qualified = True
+    # A bare count+unit ("6 meses") is only a window when the phrase anchors
+    # or qualifies it; otherwise leave it to the general parser.
+    if not qualified and not anchored:
+        return None
+    # Whole counts stay integers so existing intent payloads are unchanged.
+    if float(count) == int(count):
+        count = int(count)
+    return {"count": count, "unit": unit}
+
+
+def _split_preserving_decimal_commas(text: str) -> list[str]:
+    """Split on whitespace and commas, keeping a comma between digits.
+
+    es-419 writes fractional quantities with a decimal comma ("8,5 meses");
+    list commas ("enero, febrero") still separate tokens.
+    """
+    output: list[str] = []
+    for index, char in enumerate(text):
+        if char == "," and not (
+            index > 0
+            and index + 1 < len(text)
+            and text[index - 1].isdigit()
+            and text[index + 1].isdigit()
+        ):
+            output.append(" ")
+        else:
+            output.append(char)
+    return "".join(output).split()
+
+
+def _decimal_count_token(token: str) -> float | None:
+    """Read a bare or decimal numeric token: "8", "8.5", or "8,5"."""
+    cleaned = str(token or "").strip()
+    if not cleaned:
+        return None
+    if cleaned.isdigit():
+        return float(cleaned)
+    for separator in (".", ","):
+        head, sep, tail = cleaned.partition(separator)
+        if sep and head.isdigit() and tail.isdigit():
+            return float(f"{head}.{tail}")
+    return None
+
+
+def text_has_fractional_duration(
+    text: str,
+) -> bool:
+    """A decimal quantity immediately before a duration-unit token.
+
+    dateparser reads only the digits after the separator ("8.5 months ago"
+    becomes "5 months ago"), so any dateparser-backed read of such text is
+    untrustworthy and must refuse rather than guess (#332). This bounds the
+    existing deterministic fallback parser; it is not a language gate in
+    front of LLM interpretation.
+    """
+    tokens = [
+        token.strip(".,!?")
+        for token in _split_preserving_decimal_commas(str(text or "").casefold())
+    ]
+    tokens = [token for token in tokens if token]
+    for token, next_token in zip(tokens, tokens[1:], strict=False):
+        if next_token not in _WINDOW_UNIT_TOKENS:
+            continue
+        value = _decimal_count_token(token)
+        if value is None or token.isdigit():
+            continue
+        return True
+    return False
+
+
 def _rolling_window_fields_from_single_date_evidence(
     text: str,
     *,
@@ -402,7 +563,7 @@ def resolve_date_range_endpoint_patch(
     if not _intent_confidence_is_usable(base) or not _intent_confidence_is_usable(patch):
         return None
 
-    count = _positive_int(base.get("count"))
+    count = _positive_number(base.get("count"))
     unit = _intent_unit(base.get("unit"))
     endpoint = str(patch.get("endpoint") or "").strip()
     if count is None or unit is None or endpoint not in {"start", "end"}:
@@ -472,6 +633,23 @@ def _positive_int(value: Any) -> int | None:
     return parsed if parsed > 0 else None
 
 
+def _positive_number(value: Any) -> float | None:
+    """A strictly positive finite quantity; fractional durations are valid.
+
+    The LLM interprets "the last 8.5 months" into count=8.5; deterministic
+    code only validates and computes from it (#332).
+    """
+    if value in (None, "") or isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0 or parsed != parsed or parsed in (float("inf"), float("-inf")):
+        return None
+    return parsed
+
+
 def _intent_unit(value: Any) -> DateIntentUnit | None:
     normalized = str(value or "").strip()
     if normalized in {"day", "week", "month", "quarter", "year"}:
@@ -516,6 +694,8 @@ def parse_date_text(
     prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> date | None:
     current_date = today or date.today()
+    if text_has_fractional_duration(str(text or "")):
+        return None
     parsed = _parse_date_span(
         str(text or ""),
         today=current_date,
@@ -542,6 +722,29 @@ def dateparser_languages_for_user_language(language: str | None) -> tuple[str, .
     if primary == "en":
         return ("en",)
     return (primary, "en")
+
+
+def _rounded_days(value: float) -> int:
+    """Half-up day rounding: deterministic, direction-free, test-stable."""
+    return int(value + 0.5)
+
+
+def _split_months(months: float) -> tuple[int, float]:
+    whole = int(months)
+    fraction = months - whole
+    if fraction < 1e-9:
+        return whole, 0.0
+    return whole, fraction
+
+
+def _add_fractional_months(value: date, months: float) -> date:
+    whole_months, fraction = _split_months(months)
+    anchor = shift_months(value, whole_months)
+    if fraction == 0.0:
+        return anchor
+    # Forward, the fraction traverses the month the anchor sits in.
+    days_in_month = calendar.monthrange(anchor.year, anchor.month)[1]
+    return anchor + timedelta(days=_rounded_days(fraction * days_in_month))
 
 
 def shift_months(value: date, months: int) -> date:
@@ -649,6 +852,8 @@ def _single_searched_date_span(
     languages: tuple[str, ...] | None,
     prefer_dates_from: Literal["past", "future"] | None = None,
 ) -> _ParsedDate | None:
+    if text_has_fractional_duration(text):
+        return None
     matches = _search_date_spans(
         text,
         today=today,
@@ -818,7 +1023,7 @@ def _next_non_space_index(value: str, index: int) -> int | None:
     return None
 
 
-def _relative_label(*, count: int, unit: str) -> str:
+def _relative_label(*, count: float, unit: str) -> str:
     unit_name = {
         "d": "day",
         "w": "week",
@@ -827,28 +1032,44 @@ def _relative_label(*, count: int, unit: str) -> str:
         "q": "quarter",
         "y": "year",
     }.get(unit, unit.removesuffix("s"))
-    return f"past {unit_name}" if count == 1 else f"past {count} {unit_name}s"
+    if count == 1:
+        return f"past {unit_name}"
+    display = str(int(count)) if float(count) == int(count) else f"{count:g}"
+    return f"past {display} {unit_name}s"
 
 
-def _subtract_period(today: date, *, count: int, unit: str) -> date:
+def _subtract_period(today: date, *, count: float, unit: str) -> date:
     if unit in {"d", "day", "days"}:
-        return today - timedelta(days=count)
+        return today - timedelta(days=_rounded_days(count))
     if unit in {"w", "week", "weeks"}:
-        return today - timedelta(days=count * 7)
+        return today - timedelta(days=_rounded_days(count * 7))
     if unit in {"m", "mo", "month", "months"}:
-        return shift_months(today, -count)
-    if unit in {"q", "quarter", "quarters"}:
-        return shift_months(today, -(count * 3))
-    return shift_months(today, -(count * 12))
+        months = count
+    elif unit in {"q", "quarter", "quarters"}:
+        months = count * 3
+    else:
+        months = count * 12
+    whole_months, fraction = _split_months(months)
+    anchor = shift_months(today, -whole_months)
+    if fraction == 0.0:
+        return anchor
+    # The fractional remainder crosses backward into the previous month, so
+    # its calendar length converts the fraction to days: half a month before
+    # December 1 lands mid-November.
+    crossed = anchor - timedelta(days=1)
+    days_in_crossed = calendar.monthrange(crossed.year, crossed.month)[1]
+    return anchor - timedelta(days=_rounded_days(fraction * days_in_crossed))
 
 
-def _add_period(value: date, *, count: int, unit: str) -> date:
+def _add_period(value: date, *, count: float, unit: str) -> date:
     if unit in {"d", "day", "days"}:
-        return value + timedelta(days=count)
+        return value + timedelta(days=_rounded_days(count))
     if unit in {"w", "week", "weeks"}:
-        return value + timedelta(days=count * 7)
+        return value + timedelta(days=_rounded_days(count * 7))
     if unit in {"m", "mo", "month", "months"}:
-        return shift_months(value, count)
-    if unit in {"q", "quarter", "quarters"}:
-        return shift_months(value, count * 3)
-    return shift_months(value, count * 12)
+        months = count
+    elif unit in {"q", "quarter", "quarters"}:
+        months = count * 3
+    else:
+        return _add_fractional_months(value, count * 12)
+    return _add_fractional_months(value, months)

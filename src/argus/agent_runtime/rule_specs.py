@@ -146,9 +146,7 @@ def opposite_moving_average_crossover_rule(
     if rule is None or rule.get("type") != "moving_average_crossover":
         return None
     opposite = dict(rule)
-    opposite["direction"] = (
-        "bearish" if rule.get("direction") == "bullish" else "bullish"
-    )
+    opposite["direction"] = "bearish" if rule.get("direction") == "bullish" else "bullish"
     return opposite
 
 

@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from argus.agent_runtime.interpreter.shared import carries_broader_edit_than_dates
 from argus.agent_runtime.stages.interpret_internal.asset_resolution import (
     _active_strategy_from_snapshot,
+    _candidate_strategy_has_backtest_shape,
 )
 from argus.agent_runtime.stages.interpret_internal.date_contract import (
     _date_range_endpoints,
@@ -27,6 +29,7 @@ from argus.nlp.natural_time import (
     resolve_date_range_endpoint_patch,
     resolve_date_range_intent,
     resolve_date_range_text,
+    resolve_rolling_window_intent_text,
 )
 
 
@@ -50,10 +53,7 @@ def pending_date_answer_interpretation(
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
-    if (
-        snapshot.latest_backtest_result_reference is not None
-        and not allow_result_anchor
-    ):
+    if snapshot.latest_backtest_result_reference is not None and not allow_result_anchor:
         return None
     last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
     if last_stage_outcome and last_stage_outcome != "await_user_reply":
@@ -68,9 +68,7 @@ def pending_date_answer_interpretation(
     if not text:
         return None
     prior_endpoints = _date_range_endpoints(prior.date_range)
-    prior_has_complete_date_range = prior_endpoints is not None and all(
-        prior_endpoints
-    )
+    prior_has_complete_date_range = prior_endpoints is not None and all(prior_endpoints)
     languages = dateparser_languages_for_user_language(language)
     resolved_range = resolve_date_range_text(
         text,
@@ -79,8 +77,24 @@ def pending_date_answer_interpretation(
     )
     date_range: dict[str, str] | None = None
     date_range_intent: dict[str, Any] | None = None
+    rolling_intent = resolve_rolling_window_intent_text(
+        text,
+        today=current_date,
+        languages=languages,
+    )
     if resolved_range is not None:
         date_range = resolved_range.payload
+    elif rolling_intent is not None:
+        # "del último año para acá" and kin: a trailing window anchored today,
+        # which the endpoint fallback below misread as a zero-day range.
+        intent_resolution = resolve_date_range_intent(
+            rolling_intent,
+            today=current_date,
+        )
+        if intent_resolution is None:
+            return None
+        date_range = intent_resolution.payload
+        date_range_intent = rolling_intent
     elif require_explicit_range:
         return None
     else:
@@ -216,3 +230,61 @@ def _prior_strategy_allows_pending_date_answer_fallback(
     candidate = prior.model_copy(deep=True)
     candidate.date_range = {"start": "2000-01-01", "end": "2000-12-31"}
     return strategy_can_be_approved(candidate)
+
+
+def repair_pending_date_answer_route_when_pending_need_is_active(
+    *,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    language: str | None,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    today: date | None = None,
+) -> StructuredInterpretation:
+    requested_field = _selected_requested_field(selected_thread_metadata)
+    if requested_field != "date_range":
+        return interpretation
+    last_stage_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if last_stage_outcome and last_stage_outcome != "await_user_reply":
+        return interpretation
+    candidate_endpoints = _date_range_endpoints(interpretation.candidate_strategy_draft.date_range)
+    if interpretation.candidate_strategy_draft.date_range not in (None, "", [], {}):
+        return interpretation
+    if candidate_endpoints is not None and any(candidate_endpoints):
+        return interpretation
+    if (
+        interpretation.semantic_turn_act != "answer_pending_need"
+        and "date_range_refinement" not in interpretation.reason_codes
+        and not interpretation.requires_clarification
+        and _candidate_strategy_has_backtest_shape(
+            interpretation.candidate_strategy_draft
+        )
+    ):
+        return interpretation
+    if carries_broader_edit_than_dates(interpretation.candidate_strategy_draft):
+        # §3.3: a scoped date prompt answered with more than a date is a
+        # compound edit. Replacing it with a date-only reading would drop the
+        # rest of the request, so the broader turn keeps its interpretation.
+        return interpretation
+    repaired = pending_date_answer_interpretation(
+        current_user_message=current_user_message,
+        language=language,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        today=today or date.today(), allow_result_anchor=True,
+        require_explicit_range=(
+            "pending_date_answer_unowned_candidate_stripped"
+            in interpretation.reason_codes
+        ),
+        reason_code=(
+            "pending_date_answer_current_message_repaired"
+            if interpretation.semantic_turn_act == "answer_pending_need"
+            else "pending_date_answer_route_repaired"
+        ),
+    )
+    if repaired is None:
+        return interpretation
+    repaired.reason_codes = list(
+        dict.fromkeys([*interpretation.reason_codes, *repaired.reason_codes])
+    )
+    return repaired

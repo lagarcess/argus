@@ -1,0 +1,56 @@
+argus
+New chat
+Search
+Recents
+Settings
+Cybersecurity Stocks Performance Overview
+What's happening in cybersecurity stocks?
+
+Cybersecurity stocks are one of 2026’s stronger technology themes, but performance is sharply divided. Large platform vendors and identity-security companies are leading, while Zscaler (ZS) and Check Point (CHKP) remain well below their 52-week highs. On Friday, August 7, the group rallied broadly: the major cybersecurity ETFs gained 1.51%, 2.36%.
+
+Sector performance
+ETF	AUG. 7 CLOSE	AUG. 7 MOVE	2026 YTD*	BELOW 52-WEEK HIGH
+HACK	$115.42	+1.97%	+41.86%	1.16%
+CIBR	$97.85	+1.51%	+37.42%	2.12%
+BUG	$41.68	+2.36%	Unavailable	2.41%
+IHAK	$65.58	+1.77%	Unavailable	1.03%
+
+*YTD returns are as of August 4, 2026; prices and daily moves are as of the August 7 close.
+
+This is not merely a one-day bounce: HACK and CIBR are both close to 52-week highs after gaining more than 37% in 2026.
+
+What is driving it
+AI is increasing security demand as well as attack risk. Companies need to protect AI agents, cloud workloads, identities and machine-to-machine access. That is benefiting vendors able to sell several security products through one platform.
+Platform consolidation is favoring scale. Customers increasingly prefer fewer vendors, helping Palo Alto Networks (PANW), CrowdStrike (CRWD) and Fortinet (FTNT).
+Identity security has become a major subtheme. Demand for controlling human and AI-agent identities has supported Okta (OKTA) and helped revive interest in SentinelOne (S).
+Earnings expectations remain unforgiving. Strong headline growth is not always enough: ZS was punished after investors focused on slower recurring-revenue growth and weaker cash-flow expectations.
+Valuation risk is high. As of August 7, PANW traded at 316.40 times reported earnings, OKTA at 107.48 times and FTNT at 56.21 times. Several others still had negative reported earnings, so their P/E ratios were not meaningful.
+Leaders and laggards
+TICKER	AUG. 7 PRICE	DAILY MOVE	MARKET CAP	POSITION VERSUS 52-WEEK HIGH
+PANW	$363.86	+1.22%	$296.55B	3.48% below
+CRWD	$214.42	+3.39%	$218.34B	2.25% below
+FTNT	$159.64	−0.29%	$117.13B	7.23% below
+OKTA	$148.32	+3.35%	$24.64B	5.53% below
+S	$21.40	+3.08%	$7.21B	0.47% below
+ZS	$168.68	+3.74%	$27.28B	49.95% below
+CHKP	$127.82	+2.03%	$13.05B	39.32% below
+TENB	$36.38	+0.58%	$4.01B	16.69% below
+
+Figures are as of the August 7, 2026 close.
+
+PANW and CRWD are the large-cap leaders: both sit within 4% of their 52-week highs, and PANW was up 91.82% for 2026 through early August. FTNT has also been a major 2026 winner, although it was the conspicuous laggard on August 7 with a 0.29% decline.
+
+Among smaller names, S is showing the strongest current momentum, it closed only $0.10 below its 52-week high. Conversely, ZS is the clearest major laggard despite Friday’s 3.74% rebound, remaining almost 50% below its 52-week high. CHKP is similarly weak relative to its prior high, though its lower 13.08 P/E distinguishes it from the richly valued growth leaders.
+
+Bottom line: cybersecurity is in a strong sector-wide uptrend, powered by AI-related security spending and consolidation around large platforms. But the market is rewarding companies with platform breadth and convincing growth, especially PANW, CRWD, FTNT, OKTA and S, while penalizing any hint of slower recurring revenue or weaker cash generation, most visibly at ZS and CHKP.
+
+These figures come from market data rather than linked articles, so there are no source links to open.
+
+TRY NEXT
+↳
+Test First Trust NASDAQ Cybersecurity ETF CIBR over the last 3 years
+↳
+Test First Trust NASDAQ Cybersecurity ETF CIBR vs Amplify Cybersecurity ETF HACK, Global X Cybersecurity ETF BUG and iShares Cybersecurity and Tech ETF IHAK over the last 3 years
+Add a follow-up
+
+Argus can make mistakes. For education only. Not financial advice.

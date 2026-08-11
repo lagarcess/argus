@@ -177,6 +177,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
     const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const profilePanels = readFileSync(join(root, "components/sidebar/ProfileSettingsPanels.tsx"), "utf-8");
     const settings = readFileSync(join(root, "components/views/SettingsView.tsx"), "utf-8");
     const archived = readFileSync(join(root, "components/settings/ArchivedChatsView.tsx"), "utf-8");
     const deleted = readFileSync(join(root, "components/settings/DeletedItemsView.tsx"), "utf-8");
@@ -184,7 +185,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("onHistoryMutated={refreshHistory}");
     expect(sidebar).toContain("onHistoryMutated={onHistoryMutated}");
     expect(profileMenu).toContain("onHistoryMutated?: () => void");
-    expect(profileMenu).toContain("onRestored={onHistoryMutated}");
+    // The menu threads it to the panel dispatch, which owns the panels.
+    expect(profileMenu).toContain("onHistoryMutated={onHistoryMutated}");
+    expect(profilePanels).toContain("onRestored={onHistoryMutated}");
     expect(settings).toContain("onHistoryMutated?: () => void");
     expect(settings).toContain("onHistoryMutated?.()");
     expect(archived).toContain("onRestored?: () => void");
@@ -336,6 +339,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(sendCatch).toContain(
       'requestSessions.authorize(requestSession, "ambiguity")',
     );
+    expect(sendCatch).toContain(
+      "settleRetestReceiptProjection(view.messages, current, userMsg.id)",
+    );
     expect(sendCatch).toContain("finishRequestTransport(requestSession)");
     expect(sendCatch).not.toContain("conversationActivity.settleRequest");
     expect(chat).not.toContain("cancelOrdinaryTransportReconciliation();");
@@ -370,7 +376,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
   });
 
-  test("successful durable result actions invalidate the owning transcript cache", () => {
+  test("successful durable decisions invalidate the owning transcript cache", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -398,24 +404,6 @@ describe("chat archive/delete lifecycle source contract", () => {
       decisionSuccessStart,
       decisionSuccessEnd,
     );
-    const saveActionStart = chat.indexOf(
-      "const handleSaveStrategyAction = async",
-    );
-    const saveActionEnd = chat.indexOf(
-      "const handleLogout = async",
-      saveActionStart,
-    );
-    const saveAction = chat.slice(saveActionStart, saveActionEnd);
-    const savedStrategyStart = saveAction.indexOf("if (savedStrategyId)");
-    const savedStrategyEnd = saveAction.indexOf(
-      "} else if",
-      savedStrategyStart,
-    );
-    const savedStrategySuccess = saveAction.slice(
-      savedStrategyStart,
-      savedStrategyEnd,
-    );
-
     expect(decisionSuccessStart).toBeGreaterThan(-1);
     expect(decisionSuccessEnd).toBeGreaterThan(decisionSuccessStart);
     expect(decisionSuccess).toContain(
@@ -432,9 +420,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
     expect(message).toContain("onDecisionSaved={onDecisionSaved}");
     expect(chat).toContain("onDecisionSaved={(decisionState) =>");
-    expect(savedStrategySuccess).toContain("invalidateTranscriptForMutation(");
-    expect(savedStrategySuccess).toContain("targetConversationId");
-    expect(savedStrategySuccess).toContain('"durable_result_action"');
+    expect(chat).toContain(
+      'invalidateTranscriptForMutation(conversationId, "durable_result_action")',
+    );
     expect(cache).toContain('| "durable_result_action"');
   });
 

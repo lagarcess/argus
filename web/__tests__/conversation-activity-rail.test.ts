@@ -1095,7 +1095,8 @@ describe("rail source discipline", () => {
 
   test("rail sits on the right edge and hides on small screens", () => {
     expect(componentSource).toMatch(/absolute bottom-40 right-0 top-24/);
-    expect(componentSource).toContain("hidden md:block");
+    // The mobile spec removes it below 720; `md:` is Tailwind's 768.
+    expect(componentSource).toContain("hidden tablet:block");
   });
 
   test("saved decisions propagate to the transcript state immediately", () => {

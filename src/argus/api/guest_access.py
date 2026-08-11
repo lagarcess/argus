@@ -10,6 +10,7 @@ from fastapi import Request
 
 from argus.api.schemas import AccountCapabilities
 from argus.domain.guest_workspaces import GuestWorkspace
+from argus.domain.visitor_usage import visitor_key_for
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
@@ -58,6 +59,10 @@ class AccountContext:
     user_id: str
     expires_at: datetime | None
     capabilities: AccountCapabilities
+    # Carried so funnel milestones can be claimed against the visitor rather
+    # than a guest user id that renewal replaces. None when the context was
+    # built without a request.
+    visitor_key: str | None = None
 
 
 _current_account_context: ContextVar[AccountContext | None] = ContextVar(
@@ -81,6 +86,11 @@ def client_identity(request: Request) -> str:
     if request.client and request.client.host:
         return request.client.host
     return "unknown"
+
+
+def visitor_key_for_request(request: Request) -> str:
+    """The one notion of visitor subject, shared with guest allowances."""
+    return visitor_key_for(client_identity(request))
 
 
 def guest_capabilities() -> AccountCapabilities:
@@ -111,21 +121,31 @@ def registered_capabilities() -> AccountCapabilities:
     )
 
 
-def guest_account_context(workspace: GuestWorkspace) -> AccountContext:
+def guest_account_context(
+    workspace: GuestWorkspace,
+    *,
+    visitor_key: str | None = None,
+) -> AccountContext:
     return AccountContext(
         kind="guest",
         user_id=workspace.user_id,
         expires_at=workspace.expires_at,
         capabilities=guest_capabilities(),
+        visitor_key=visitor_key,
     )
 
 
-def registered_account_context(user_id: str) -> AccountContext:
+def registered_account_context(
+    user_id: str,
+    *,
+    visitor_key: str | None = None,
+) -> AccountContext:
     return AccountContext(
         kind="registered",
         user_id=user_id,
         expires_at=None,
         capabilities=registered_capabilities(),
+        visitor_key=visitor_key,
     )
 
 

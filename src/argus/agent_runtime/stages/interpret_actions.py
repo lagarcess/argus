@@ -42,6 +42,7 @@ from argus.agent_runtime.stages.artifact_context import (
     has_pending_confirmation_context,
     latest_run_id_for_action,
     launch_payload_from_failed_action,
+    live_pending_confirmation,
     prior_stage_was_await_approval,
     semantic_need_for_action,
     stale_confirmation_action_response,
@@ -696,7 +697,7 @@ def approval_stage_result_if_applicable(
             ),
             stage_patch=_confirmation_action_guidance_patch(language),
         )
-    if snapshot.active_confirmation_reference is not None and (
+    if live_pending_confirmation(snapshot) is not None and (
         decision_requests_confirmation_card_action(
             decision=decision,
             visible_strategy=visible_confirmation_strategy,
@@ -733,7 +734,7 @@ def approval_stage_result_if_applicable(
         ),
     ):
         return None
-    if snapshot.active_confirmation_reference is not None:
+    if live_pending_confirmation(snapshot) is not None:
         return StageResult(
             outcome="ready_to_respond",
             decision=decision.model_copy(
@@ -812,10 +813,14 @@ def _confirmation_action_guidance_patch(language: str | None) -> dict[str, Any]:
 
 
 def _active_confirmation_is_valid(snapshot: TaskSnapshot) -> bool:
-    reference = snapshot.active_confirmation_reference
-    if reference is None:
+    # Liveness before validity: a cancelled or superseded card must never be
+    # spoken for, however executable its stored payload still looks.
+    live = live_pending_confirmation(snapshot)
+    if live is None:
         return False
-    payload = confirmation_payload_dict(reference.metadata.get("confirmation_payload"))
+    payload = confirmation_payload_dict(
+        live.reference.metadata.get("confirmation_payload")
+    )
     return confirmation_payload_is_validated_executable(payload)
 
 
@@ -954,6 +959,8 @@ def _retry_failed_action_stage_result(
             ),
         },
     )
+
+
 def _retry_failed_action_response_intent(
     *,
     status: ArtifactActionRecoveryStatus,
@@ -1084,9 +1091,11 @@ async def artifact_followup_stage_result_if_applicable(
         decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": response,
-            **({} if used_recovery else {
-                "response_intent": result_followup_response_intent(focus)
-            }),
+            **(
+                {}
+                if used_recovery
+                else {"response_intent": result_followup_response_intent(focus)}
+            ),
             **(
                 recovery_state_stage_patch(
                     "latest_result_followup_unavailable",

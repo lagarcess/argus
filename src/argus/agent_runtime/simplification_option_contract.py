@@ -12,6 +12,7 @@ SimplificationOptionKind = Literal[
     "moving_average_crossover",
 ]
 
+
 def simplification_option_kind(
     replacement_values: Any,
 ) -> SimplificationOptionKind | None:

@@ -45,7 +45,5 @@ def _supports_client_capability(
     ):
         return False
     return capability in {
-        token.strip()
-        for token in raw_client_capabilities.split(",")
-        if token.strip()
+        token.strip() for token in raw_client_capabilities.split(",") if token.strip()
     }

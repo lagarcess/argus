@@ -5,7 +5,11 @@ import {
   type ChatActionRequest,
 } from "@/lib/argus-api";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
-import { discoverySidecarFromMetadata } from "@/lib/chat-discovery-sidecar";
+import {
+  discoverySidecarFromMetadata,
+  researchSourcesFromMetadata,
+} from "@/lib/chat-discovery-sidecar";
+import { memoryRecallsFromMetadata } from "@/lib/memory-recalls";
 import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
 import {
   applyHydratedBacktestJobTruth,
@@ -30,7 +34,10 @@ import {
   hydrateResultActions,
 } from "@/lib/chat-result-actions";
 import { retainCanonicalResultProjectionOwners } from "@/lib/chat-result-projection-ownership";
-import { visibleComposerResponseActions } from "@/lib/chat-recovery-display";
+import {
+  type RecoveryDisplay,
+  visibleComposerResponseActions,
+} from "@/lib/chat-recovery-display";
 import {
   applyConsumedResultActions,
   applyConfirmationActionEffects,
@@ -344,6 +351,7 @@ export function hydrateMessagesFromApi(
           nextExperiments:
             nextExperimentRowsFromMetadata(metadata) ?? undefined,
           savedStrategyId,
+          memoryRecalls: memoryRecallsFromMetadata(metadata) ?? undefined,
         };
       }
       const jobMessage = backtestJobMessageFromApi(message);
@@ -367,6 +375,10 @@ export function hydrateMessagesFromApi(
             message.id,
           ),
           actions: confirmation.actions ?? [],
+          // Researched peer adds ride the ordinary Try-next surface below
+          // the card's turn (research rail, spec section 6).
+          nextExperiments:
+            nextExperimentRowsFromMetadata(metadata) ?? undefined,
         };
       }
       const hydratedText = hydrateTextMessageFromApi(message, {
@@ -380,7 +392,32 @@ export function hydrateMessagesFromApi(
       });
       if (message.role !== "user") {
         const discovery = discoverySidecarFromMetadata(metadata);
-        if (discovery) return { ...hydratedText, discovery };
+        const researchSources = researchSourcesFromMetadata(metadata);
+        // Grounded knowledge answers carry Try next rows on a plain message;
+        // a discovery sidecar owns its message and suppresses them. Memory
+        // recalls overlay either shape independently.
+        const nextExperiments = discovery
+          ? null
+          : nextExperimentRowsFromMetadata(metadata);
+        const memoryRecalls = memoryRecallsFromMetadata(metadata);
+        if (
+          discovery ||
+          nextExperiments ||
+          memoryRecalls ||
+          researchSources.length > 0
+        ) {
+          return {
+            ...hydratedText,
+            ...(discovery ? { discovery } : {}),
+            // A discovery turn already renders its own sources panel; one
+            // answer must never offer two source surfaces.
+            ...(!discovery && researchSources.length > 0
+              ? { researchSources }
+              : {}),
+            ...(nextExperiments ? { nextExperiments } : {}),
+            ...(memoryRecalls ? { memoryRecalls } : {}),
+          };
+        }
       }
       return hydratedText;
     });
@@ -408,4 +445,26 @@ export function chatStreamErrorText(
   fallback: string,
 ): string {
   return detail || fallback;
+}
+
+const RETEST_COVERAGE_PROBLEM_CODES: ReadonlySet<string> = new Set([
+  "market_data_unavailable",
+  "insufficient_common_data",
+  "no_common_data_window",
+  "kraken_ohlc_window_exceeded",
+  "provider_history_start_unavailable",
+  "provider_timeframe_unavailable",
+]);
+
+export function chatHttpErrorDisplay(
+  problemCode: string | null,
+  backendMessage: string,
+): { content: string; recoveryDisplay: RecoveryDisplay | null } {
+  if (!problemCode || !RETEST_COVERAGE_PROBLEM_CODES.has(problemCode)) {
+    return { content: backendMessage, recoveryDisplay: null };
+  }
+  return {
+    content: "",
+    recoveryDisplay: { kind: "coverage_recovery", code: problemCode },
+  };
 }

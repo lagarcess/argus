@@ -4,6 +4,7 @@ import { useCallback, useEffect } from "react";
 import type { UserResponse } from "@/lib/guest-account";
 import type { GuestDecisionResumeTarget } from "@/lib/guest-conversion";
 import { decideGuestNewConversationGate } from "@/lib/guest-capability-gates";
+import { hasOpenOverlay } from "@/components/layout/overlayStack";
 import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 
 type GuestShellActionsInput = {
@@ -89,6 +90,13 @@ export function useGuestShellActions({
     if (!omnisearchShortcutEnabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!matchesKeyboardShortcut("omnisearch", event)) {
+        return;
+      }
+      // Asked at press time, because the registry is the only thing that knows
+      // what is open right now. Opening the palette over a dialog made it the
+      // topmost layer at a lower z-index: invisible, but holding focus and the
+      // keys meant for the surface the user could see.
+      if (hasOpenOverlay()) {
         return;
       }
       event.preventDefault();

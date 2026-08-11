@@ -1,14 +1,11 @@
-export const strategiesEnabled =
-  process.env.NEXT_PUBLIC_STRATEGIES_ENABLED === "true";
-
-export const collectionsEnabled =
-  process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
-
 export const omnisearchEnabled =
   process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false";
 
-export const chatExploratorySuggestionsEnabled =
-  process.env.NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED === "true";
+// Research rail presentation: entry copy, range-spanning chips, the signed-in
+// empty-chat greeting, and confirmation peer offers. Default off; flag-off
+// behavior stays byte-identical to the pre-rail surface.
+export const researchRailEnabled =
+  process.env.NEXT_PUBLIC_RESEARCH_RAIL_ENABLED === "true";
 
 export function guestAccessEnabledFromEnv(value: string | undefined): boolean {
   if (value === undefined || value.trim() === "") return true;
@@ -20,3 +17,8 @@ export function guestAccessEnabledFromEnv(value: string | undefined): boolean {
 export const guestAccessEnabled = guestAccessEnabledFromEnv(
   process.env.NEXT_PUBLIC_GUEST_ACCESS_ENABLED,
 );
+
+// Default off, and it stays off when this lane lands. Turning sharing on is a
+// separate founder decision from merging it.
+export const evidenceReceiptSharingEnabled =
+  process.env.NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED === "true";

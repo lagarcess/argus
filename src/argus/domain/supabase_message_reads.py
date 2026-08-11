@@ -183,6 +183,7 @@ class SupabaseMessageReadMixin:
         cursor_id: str | None = None,
         anchor_message_id: str | None = None,
         page: bool = False,
+        newest_first_window: bool = False,
     ) -> list[Message]:
         if anchor_message_id is not None and (
             cursor_created_at is not None or cursor_id is not None
@@ -222,6 +223,12 @@ class SupabaseMessageReadMixin:
             cursor_id = anchor.id
         if page and limit is None:
             raise ValueError("Message pages require a finite limit.")
+        if newest_first_window and (
+            page or cursor_id is not None or anchor_message_id is not None
+        ):
+            raise ValueError("A newest-first window cannot combine with paging.")
+        if newest_first_window and limit is None:
+            raise ValueError("A newest-first window requires a finite limit.")
         if not page and cursor_created_at is not None:
             raise ValueError("Message cursors are only valid for page reads.")
 
@@ -255,7 +262,10 @@ class SupabaseMessageReadMixin:
                         f"created_at.gt.{timestamp},"
                         f"and(created_at.eq.{timestamp},id.{id_operator}.{cursor_id})"
                     )
-            ordered = query.order("created_at", desc=False).order("id", desc=False)
+            descending = bool(newest_first_window)
+            ordered = query.order("created_at", desc=descending).order(
+                "id", desc=descending
+            )
             rows_data: list[Any]
             if page:
                 assert limit is not None
@@ -266,6 +276,10 @@ class SupabaseMessageReadMixin:
                 )
             else:
                 rows_data = ordered.limit(limit).execute().data or []
+            if descending:
+                # A recent window reads the tail newest-first, then restores
+                # chronological order so every consumer sees one shape.
+                rows_data = list(reversed(rows_data))
             messages = [Message.model_validate(row) for row in rows_data]
         jobs_by_id = self.get_backtest_jobs_by_ids(
             user_id=user_id,

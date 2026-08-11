@@ -1,0 +1,56 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Tendencias alcistas en ciberseguridad
+¿Qué está pasando en el sector de ciberseguridad?
+La ciberseguridad está en una fase alcista, pero muy selectiva
+
+El sector mantiene un fuerte impulso: CIBR, uno de sus principales ETF, acumula 37.31% de retorno total en 2026 y cerró el 7 de agosto en US$97.85, apenas por debajo de su máximo de 52 semanas de US$99.97. El viernes 7, los ETF CIBR, HACK y BUG subieron 1.51%, 1.97% y 2.36%, respectivamente.
+
+Lo que está ocurriendo no es simplemente “más gasto en seguridad”: las empresas están concentrando proveedores, incorporando inteligencia artificial y priorizando identidad, nube, protección de datos y recuperación ante ataques. Eso favorece a las plataformas amplias y a compañías con crecimiento recurrente; deja rezagadas a algunas firmas de productos más puntuales.
+
+Quién lidera y quién se queda atrás
+
+Cifras al cierre del 7 de agosto de 2026; precios en dólares.
+
+TICKER	PRECIO	CAMBIO DIARIO	MÁXIMO 52 SEMANAS	LECTURA
+RBRK	90.07	+6.47%	99.75	Líder del día; recuperación de datos y resiliencia siguen fuertes
+ZS	168.68	+3.74%	336.99	Rebote fuerte, pero continúa muy lejos de su máximo anual
+GEN	29.17	+3.81%	32.22	Buen comportamiento en seguridad para consumidores
+CRWD	214.42	+3.39%	219.35	Uno de los líderes estructurales; cerca de máximo
+OKTA	148.32	+3.35%	157.00	Identidad vuelve a atraer demanda
+S	21.40	+3.08%	21.50	Prácticamente en máximo anual, aunque todavía no es rentable
+PANW	363.86	+1.22%	376.98	Mayor plataforma cotizada del grupo por capitalización
+FTNT	159.64	−0.29%	172.09	Único retroceso relevante de la muestra
+CHKP	127.82	+2.03%	210.66	Valuación baja, pero desempeño relativo débil
+VRNS	43.52	+2.54%	63.90	Recuperación parcial; aún lejos del máximo
+TENB	36.38	+0.58%	43.67	Menor impulso que las plataformas líderes
+Qué está impulsando el sector
+
+Consolidación de proveedores. Las grandes empresas quieren administrar menos herramientas separadas. Esto favorece especialmente a PANW, CRWD y FTNT, que pueden vender varios módulos dentro de una sola plataforma.
+
+La identidad se convirtió en el nuevo perímetro. El crecimiento de cuentas de máquinas, agentes de IA y accesos remotos aumenta la importancia de OKTA, CYBR, CRWD y ZS. La operación de más de US$20,000 millones anunciada entre PANW y CYBR confirma el valor estratégico de esta área. La última cotización disponible de CYBR no es actual, por lo que no es comparable con las cifras del 7 de agosto.
+
+IA: oportunidad y nueva superficie de ataque. La IA ayuda a automatizar detección y respuesta, pero también produce más identidades, aplicaciones y datos que proteger. Los inversionistas están premiando a quienes pueden convertirla en ventas adicionales, no solo incluirla en sus presentaciones.
+
+Demanda recurrente todavía sólida. CRWD informó ingresos de US$1,170 millones, crecimiento interanual de 21%, y ARR final de US$4,660 millones, con aumento de 20%. Ese tipo de crecimiento recurrente ayuda a explicar por qué cotiza cerca de su máximo anual.
+
+Recuperación y protección de datos ganan prioridad. Los ataques destructivos y el ransomware hacen que restaurar operaciones sea tan importante como prevenir intrusiones. Eso está beneficiando especialmente a RBRK, que fue el líder diario de la muestra.
+
+El punto débil
+
+Las valuaciones siguen siendo exigentes y muy desiguales. PANW cotiza a 316.40 veces utilidades y OKTA a 107.48 veces; CRWD, ZS, S, RBRK y VRNS presentan múltiplos P/E negativos porque las utilidades contables de los últimos doce meses no son positivas. En contraste, CHKP cotiza a 13.08 veces y GEN a 16.96 veces, pero el mercado les asigna menor crecimiento.
+
+En síntesis: la tendencia sectorial es positiva y los ETF están cerca de máximos, pero el liderazgo se concentra en plataformas integradas, identidad y resiliencia de datos. CRWD, PANW, RBRK, OKTA y S muestran el mejor impulso; ZS está rebotando desde una posición rezagada, mientras CHKP, VRNS y TENB continúan por debajo del grupo y FTNT fue la excepción negativa en la última sesión.
+
+5 fuentes ›
+QUÉ PROBAR DESPUÉS
+↳
+Probar First Trust NASDAQ Cybersecurity ETF CIBR en los últimos 3 años
+↳
+Probar First Trust NASDAQ Cybersecurity ETF CIBR frente a Amplify Cybersecurity ETF HACK, Global X Cybersecurity ETF BUG y CrowdStrike Holdings, Inc. Class A CRWD en los últimos 3 años
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

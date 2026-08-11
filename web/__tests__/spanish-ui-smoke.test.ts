@@ -88,7 +88,8 @@ describe("Spanish UI Smoke Harness", () => {
     "settings.sidebar.collapsed": "Solo iconos",
     "settings.sidebar.hover": "Al pasar el cursor",
     "settings.sidebar.close": "Cerrar modal de preferencias de la barra lateral",
-    "guest.shell.input_placeholder": "¿Qué quieres probar?",
+    "guest.shell.input_placeholder": "Pregunta sobre cualquier empresa o idea",
+    "guest.shell.input_placeholder_prerail": "¿Qué quieres probar?",
     "guest.shell.language": "Idioma",
     "guest.shell.temporary_until": "Chat temporal · disponible hasta {{date}}",
   };
@@ -229,7 +230,7 @@ describe("Spanish UI Smoke Harness", () => {
       "utf-8",
     );
 
-    expect(sidebarPreferenceSource).toContain('aria-label={t("settings.sidebar.close")}');
+    expect(sidebarPreferenceSource).toContain('closeLabel={t("settings.sidebar.close")}');
     for (const key of [
       "settings.sidebar.title",
       "settings.sidebar.description",

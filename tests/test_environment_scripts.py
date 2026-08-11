@@ -106,6 +106,9 @@ def _run_render_release_audit(
     api_env_json: str,
     web_env_json: str,
     workflow_env_json: str | None = None,
+    cron_env_json: str | None = None,
+    cron_service_id: str | None = "srv-fake-maintenance",
+    cron_lookup_fails: bool = False,
     expect_mode: str = "safe-off",
     isolate: bool = False,
 ) -> subprocess.CompletedProcess[str]:
@@ -126,6 +129,8 @@ case "$*" in
   *"$FAKE_WORKFLOW_SERVICE_ID"*)
     printf "%s" "$FAKE_WORKFLOW_ENV_JSON"
     ;;
+  *type=cron_job*) [ -n "$FAKE_CRON_LOOKUP_FAIL" ] && exit 22; printf "%s" "$FAKE_CRON_LOOKUP_JSON" ;;
+  *env-vars*) printf "%s" "$FAKE_CRON_ENV_JSON" ;;
   *)
     echo "unexpected curl request: $*" >&2
     exit 9
@@ -135,6 +140,7 @@ esac
     )
     fake_curl.chmod(0o755)
 
+    cron_row = {"service": {"id": cron_service_id, "name": "argus-maintenance"}}
     env = os.environ.copy()
     env.update(
         {
@@ -147,6 +153,10 @@ esac
             "FAKE_API_ENV_JSON": api_env_json,
             "FAKE_WEB_ENV_JSON": web_env_json,
             "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
+            "FAKE_CRON_LOOKUP_JSON": json.dumps([cron_row] if cron_service_id else []),
+            "FAKE_CRON_LOOKUP_FAIL": "1" if cron_lookup_fails else "",
+            "FAKE_CRON_ENV_JSON": cron_env_json
+            or _render_env_payload("argus-maintenance"),
             "FAKE_CURL_REQUEST_LOG": str(request_log),
         }
     )
@@ -391,6 +401,72 @@ def test_env_example_declares_render_api_key_once() -> None:
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
+    assert set(_contract_array("ARGUS_RENDER_CRON_ENV")) == set(
+        _render_env("argus-maintenance")
+    )
+
+
+def _cron_service() -> dict[str, object]:
+    render_config = yaml.safe_load(_source("render.yaml"))
+    for service in render_config["services"]:
+        if service["name"] == "argus-maintenance":
+            return service
+    raise AssertionError("argus-maintenance cron service missing from render.yaml")
+
+
+def test_render_blueprint_schedules_maintenance_on_the_contract_cadence() -> None:
+    service = _cron_service()
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert service["type"] == "cron"
+    assert service["schedule"] == "*/15 * * * *"
+    assert service["autoDeployTrigger"] is False
+    assert 'ARGUS_RENDER_CRON_SCHEDULE="*/15 * * * *"' in env_contract
+    assert (
+        'ARGUS_RENDER_CRON_START_COMMAND="poetry run python '
+        'scripts/ops/scheduled_maintenance.py"'
+    ) in env_contract
+    assert service["startCommand"] == (
+        "poetry run python scripts/ops/scheduled_maintenance.py"
+    )
+
+
+def test_maintenance_cron_builds_exactly_like_the_api_it_imports() -> None:
+    service = _cron_service()
+    api_service = next(
+        entry
+        for entry in yaml.safe_load(_source("render.yaml"))["services"]
+        if entry["name"] == "argus-api"
+    )
+    env_contract = ENV_CONTRACT.read_text()
+
+    assert service["buildCommand"] == api_service["buildCommand"]
+    assert 'ARGUS_RENDER_CRON_BUILD_COMMAND="$ARGUS_RENDER_API_BUILD_COMMAND"' in (
+        env_contract
+    )
+
+
+def test_maintenance_cron_keeps_deleting_credentials_manual() -> None:
+    cron_env = _render_env("argus-maintenance")
+
+    for key in (
+        "DATABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "RENDER_API_KEY",
+        "POSTHOG_PROJECT_TOKEN",
+    ):
+        assert cron_env[key] == {"key": key, "sync": False}
+    assert "SUPABASE_JWT_SECRET" not in cron_env
+    assert "ARGUS_OPS_TOKEN" not in cron_env
+
+
+def test_scheduled_maintenance_env_contract_is_documented_in_env_example() -> None:
+    env_example = _source(".env.example")
+
+    assert "scripts/ops/scheduled_maintenance.py" in env_example
+    assert "ARGUS_RENDER_CRON_ENV" in env_example
+    for key in _contract_array("ARGUS_RENDER_CRON_ENV"):
+        assert key in env_example
 
 
 def test_render_web_declares_exact_server_only_https_app_origin() -> None:
@@ -720,11 +796,11 @@ def test_mode_scripts_pin_render_workflow_dispatch_off() -> None:
 
     # QA mode: default-off; ceremony runs opt in by exporting before qa.sh.
     assert (
-        'ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED='
+        "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED="
         '"${ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED:-false}"' in qa_block
     )
     assert (
-        'ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED='
+        "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED="
         '"${ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED:-false}"' in qa_block
     )
 
@@ -858,10 +934,7 @@ def test_render_env_sync_audit_accepts_required_turnstile_site_key(
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (
-        "ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>"
-        in result.stdout
-    )
+    assert "ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>" in result.stdout
     assert "status=ready" in result.stdout
 
 
@@ -1149,26 +1222,37 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert "NEXT_PUBLIC_POSTHOG_KEY" in runbook
 
 
-def test_private_launch_runbook_smoke_covers_final_readiness_path() -> None:
+def test_private_launch_runbook_smoke_matches_three_action_card_and_dark_drawers() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     smoke_test = runbook.split("## Smoke Test", maxsplit=1)[1].split(
         "## Supabase Persistence Check",
         maxsplit=1,
     )[0]
+    normalized_smoke_test = " ".join(smoke_test.split())
 
     for expected in (
         "Cold-start starter chips are visible",
         "do not reference 2024",
         "Spanish prompt",
+        "exactly three card-scoped, structured actions",
         "Run backtest",
-        "Change dates",
-        "Change asset",
-        "Adjust assumptions",
+        "Change assumptions",
         "Cancel",
+        "`Change dates` and `Change asset` do not render as separate actions",
+        "ARGUS_IN_PLACE_CARD_EDITS_ENABLED=false",
+        "the capital and dates drawers do not render",
         "Quick take",
         "Explain result",
         "Retry",
         "Reloading the page preserves the conversation, job state, and result",
         "Feedback can be submitted",
     ):
-        assert expected in smoke_test
+        assert expected in normalized_smoke_test
+
+    assert (
+        "`Change dates` updates the confirmation/result period"
+        not in normalized_smoke_test
+    )
+    assert (
+        "`Change asset` preserves the explicit period" not in normalized_smoke_test
+    )

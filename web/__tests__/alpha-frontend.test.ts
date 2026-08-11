@@ -10,6 +10,7 @@ import {
   type ChatStreamEvent,
 } from "../lib/argus-api";
 import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
+import { effectivePaletteLayout } from "../components/sidebar/command-palette/paletteLayout";
 
 const root = join(import.meta.dir, "..");
 
@@ -84,7 +85,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(result.chart?.kind).toBe("portfolio_equity");
   });
 
-  test("collections are indefinitely deferred from private-alpha UI", () => {
+  test("legacy collections and strategies surfaces are removed", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -106,7 +107,8 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(flags).toContain("NEXT_PUBLIC_COLLECTIONS_ENABLED");
+    expect(flags).not.toContain("NEXT_PUBLIC_COLLECTIONS_ENABLED");
+    expect(flags).not.toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(chat).not.toContain("collectionsEnabled");
     expect(chat).toContain("useRecentConversations");
     expect(chat).not.toContain("trigger_create_collection");
@@ -115,10 +117,19 @@ describe("Argus Alpha frontend contract", () => {
     expect(sidebar).not.toContain("Collections");
     expect(settings).not.toContain("collection");
     expect(settings).toContain("items.filter(isDeletedItemVisible)");
-    expect(settings).toContain("strategiesEnabled");
+    expect(settings).not.toContain("strategy");
     expect(settings).not.toContain("<Layers");
     expect(settings).not.toContain("{item.type}");
     expect(palette).toContain("item.canManageConversation");
+    expect(
+      existsSync(join(root, "components/views/CollectionsView.tsx")),
+    ).toBe(false);
+    expect(
+      existsSync(join(root, "components/chat/CollectionPicker.tsx")),
+    ).toBe(false);
+    expect(
+      existsSync(join(root, "components/views/StrategiesView.tsx")),
+    ).toBe(false);
   });
 
   test("chat header keeps the history options affordance", () => {
@@ -149,7 +160,7 @@ describe("Argus Alpha frontend contract", () => {
 
   test("sidebar logo swap preserves toggle behavior and archives the legacy mark", () => {
     const sidebar = readFileSync(
-      join(root, "components/sidebar/ChatSidebar.tsx"),
+      join(root, "components/sidebar/SidebarHeader.tsx"),
       "utf-8",
     );
     const logo = readFileSync(join(root, "components/ArgusLogo.tsx"), "utf-8");
@@ -219,34 +230,49 @@ describe("Argus Alpha frontend contract", () => {
     const en = JSON.parse(enSource);
     const es = JSON.parse(esSource);
 
-    expect(flags).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED");
-    expect(flags).toContain("chatExploratorySuggestionsEnabled");
-    expect(envExample).toContain(
-      "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false",
+    // The research rail replaced the exploratory-suggestions flag and retired
+    // the composer typewriter; suggestions ship behind the rail flag instead.
+    expect(flags).toContain("NEXT_PUBLIC_RESEARCH_RAIL_ENABLED");
+    expect(flags).toContain("researchRailEnabled");
+    expect(flags).not.toContain("chatExploratorySuggestionsEnabled");
+    expect(envExample).toContain("NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false");
+    expect(envExample).not.toContain(
+      "NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED",
     );
-    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled");
-    expect(emptyChat).toContain("showSuggestions");
+    expect(emptyChat).toContain("researchRailEnabled");
+    // No control gates the chips. They render whenever the empty chat does and
+    // stop when it stops, so there is nothing to show, hide, or persist.
+    expect(emptyChat).not.toContain("showSuggestions");
+    expect(chat).not.toContain("showSuggestions");
+    expect(en.chat.show_suggestions).toBeUndefined();
+    expect(en.chat.hide_suggestions).toBeUndefined();
+    expect(es.chat.show_suggestions).toBeUndefined();
+    expect(es.chat.hide_suggestions).toBeUndefined();
     expect(starterActions).toContain("chat.starter_actions.tsla.value");
     expect(starterActions).toContain("chat.starter_actions.btc.value");
     expect(starterActions).toContain("chat.starter_actions.dca.value");
+    expect(starterActions).toContain("chat.example_queries");
     expect(emptyChat).toContain("<StarterActions");
-    expect(emptyChat).toContain("chatExploratorySuggestionsEnabled && showSuggestions &&");
-    expect(input).toContain("chatExploratorySuggestionsEnabled");
-    expect(input).toContain(
-      "const prompts = chatExploratorySuggestionsEnabled",
-    );
+    expect(input).not.toContain("placeholder_prompts");
+    expect(input).not.toContain("animState");
     expect(input).toContain("placeholder");
     expect(chat).toContain("chat.followup_placeholder");
+    expect(en.chat.placeholder_prompts).toBeUndefined();
+    expect(es.chat.placeholder_prompts).toBeUndefined();
 
     const starterAndPlaceholderText = [
-      ...en.chat.placeholder_prompts,
-      ...es.chat.placeholder_prompts,
       en.chat.starter_actions.tsla.value,
       en.chat.starter_actions.btc.value,
       en.chat.starter_actions.dca.value,
       es.chat.starter_actions.tsla.value,
       es.chat.starter_actions.btc.value,
       es.chat.starter_actions.dca.value,
+      en.chat.example_queries.q1,
+      en.chat.example_queries.q2,
+      en.chat.example_queries.q3,
+      es.chat.example_queries.q1,
+      es.chat.example_queries.q2,
+      es.chat.example_queries.q3,
     ].join("\n");
 
     expect(starterAndPlaceholderText).not.toContain("2024");
@@ -538,15 +564,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain("<ResultEquityChart");
     expect(card).toContain('presentation="heroDeltaEvidence"');
     expect(card).toContain("appearanceOverride={appearance}");
-    expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
-    expect(card).toContain("const saveAction = strategiesEnabled");
-    expect(card).toContain('action.type !== "save_strategy"');
+    expect(flags).not.toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
+    expect(card).not.toContain("strategiesEnabled");
+    expect(card).not.toContain('action.type === "save_strategy"');
     expect(labelHelper).toContain('"Explain result"');
     expect(labelHelper).toContain('"Refine idea"');
-    expect(card).toContain('action.type === "save_strategy"');
-    expect(card).toContain("<Save");
-    expect(chat).toContain("if (!strategiesEnabled)");
-    expect(chat).toContain("chat.private_alpha_result_kept");
+    expect(card).not.toContain("<Save");
+    expect(chat).not.toContain("handleSaveStrategyAction");
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
     expect(chart).toContain("buildVisibleSeriesMarkers");
@@ -602,9 +626,9 @@ describe("Argus Alpha frontend contract", () => {
     // The entrance motion belongs to the message that carries the actions now
     // that the floating composer strip is gone.
     expect(message).toContain("slide-in-from-bottom-2");
-    expect(message).toContain(
-      "<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />",
-    );
+    expect(message).toContain("<StrategyConfirmationCard");
+    expect(message).toContain("confirmation={message.confirmation}");
+    expect(message).toContain("onAction={onAction}");
   });
 
   test("artifact cards use compositor-safe reveal motion with a reduced-motion opt out", () => {
@@ -1157,12 +1181,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain('confirmation.confirmation_state === "active"');
     expect(card).toContain("!confirmation.confirmation_state");
     expect(card).not.toContain("ArrowRight");
-    expect(message).toContain(
-      "<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />",
-    );
+    expect(message).toContain("<StrategyConfirmationCard");
+    expect(message).toContain("confirmation={message.confirmation}");
+    expect(message).toContain("onAction={onAction}");
   });
 
-  test("result cards render artifact scoped actions and saved state", () => {
+  test("result cards render only active artifact scoped actions", () => {
     const card = readFileSync(
       join(root, "components/chat/StrategyResultCard.tsx"),
       "utf-8",
@@ -1171,36 +1195,27 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/chat-result-actions.ts"),
       "utf-8",
     );
-    const locale = readFileSync(
-      join(root, "public/locales/en/common.json"),
-      "utf-8",
-    );
-
     expect(card).toContain('action.type === "show_breakdown"');
     expect(card).toContain('action.type === "refine_strategy"');
-    expect(card).toContain('action.type === "save_strategy"');
+    expect(card).not.toContain('action.type === "save_strategy"');
     expect(card).toContain("isVisibleResultAction");
     expect(resultActions).toContain("VISIBLE_RESULT_ACTION_TYPES");
     expect(resultActions).toContain("isVisibleResultAction");
     expect(card).not.toContain("...resultActions.filter(");
     expect(resultActions).not.toContain("next_experiment");
     expect(resultActions).not.toContain("try_next");
-    expect(card).toContain("result.savedStrategyId");
-    expect(card).toContain("chat.saved");
-    expect(locale).toContain('"saved": "Saved"');
+    expect(resultActions).not.toContain('"save_strategy"');
   });
 
-  test("chat updates saved state from save strategy final payloads", () => {
+  test("legacy saved strategy metadata remains read-safe without a write action", () => {
     const chat = readChatImplementationSource();
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
 
     expect(types).toContain("savedStrategyId?: string | null");
-    expect(chat).toContain("handleSaveStrategyAction");
     expect(chat).toContain("hiddenSaveActionMessageIdsFromApi");
-    expect(chat).toContain("markResultCardSaved");
     expect(chat).toContain("saved_strategy_id");
-    expect(chat).toContain("result_strategy_id");
-    expect(chat).toContain('action.type === "save_strategy"');
+    expect(chat).not.toContain("handleSaveStrategyAction");
+    expect(chat).not.toContain("markResultCardSaved");
   });
 
   test("saved result state is not inferred from plain result strategy linkage", () => {
@@ -1536,6 +1551,11 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(contract).toContain('type: "retest_run"');
+    expect(contract).toContain(
+      'window_policy: "preserve_start_ending_latest_available"',
+    );
+    expect(contract).toContain('contract_version: "argus_retest_run/v2"');
+    expect(contract).not.toContain('contract_version: "argus_retest_run/v1"');
     // The typed envelope carries no client-authoritative setup.
     expect(contract).not.toContain("canonical_setup");
     expect(contract).not.toContain("send_text");
@@ -1581,7 +1601,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(palette).toContain("turnInFlight?: boolean");
     expect(palette).toContain("retestDisabled={turnInFlight}");
-    expect(dossier).toContain("disabled={retestDisabled}");
+    expect(dossier).toContain(
+      "retestButtonDisabled = retestDisabled || retestUnavailable",
+    );
+    expect(dossier).toContain("disabled={retestButtonDisabled}");
     expect(dossier).toContain("disabled:cursor-not-allowed");
     expect(dossier).toContain("disabled:opacity-50");
   });
@@ -1999,17 +2022,21 @@ describe("Argus Alpha frontend contract", () => {
     expect(readErrorPanel).toContain(
       "void loadLedgerBrowse(decisionStateFilter)",
     );
-    expect(palette).toContain("commandPaletteKeyboardAction");
+    // The keyboard policy moved to its own hook; the palette hands it the rows.
+    const paletteKeys = readFileSync(
+      join(root, "components/sidebar/command-palette/useCommandPaletteKeys.ts"),
+      "utf-8",
+    );
+    expect(palette).toContain("useCommandPaletteKeys({");
     expect(palette).toContain(
       "commandPaletteItemsInRenderedOrder(groupedItems)",
     );
-    expect(palette).toContain("itemCount: keyboardItems.length");
-    expect(palette).toContain("const item = keyboardItems[action.index]");
+    expect(paletteKeys).toContain("commandPaletteKeyboardAction");
+    expect(paletteKeys).toContain("itemCount: keyboardItems.length");
+    expect(paletteKeys).toContain("const item = keyboardItems[action.index]");
     expect(palette).toContain("const rowIndex = groupRowStart + itemIndex");
-    expect(palette).toContain(
-      "targetIsSearchInput: event.target === inputRef.current",
-    );
-    expect(palette).toContain("isEditableKeyboardTarget");
+    expect(paletteKeys).toContain("targetIsSearchInput: event.target === inputRef.current");
+    expect(paletteKeys).toContain("isEditableKeyboardTarget");
     expect(loadMore).toContain(
       "const capturedSignature = searchSignatureRef.current",
     );
@@ -2071,7 +2098,13 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(palette).toContain("command_palette.read_error");
     expect(palette).toContain("command_palette.try_searching");
-    expect(palette).toContain('window.matchMedia("(pointer: coarse)")');
+    // The mobile shell spec replaced pointer sniffing with the width bands:
+    // touch on a wide screen keeps the desktop layout, and a narrow window on a
+    // mouse machine gets the mobile one.
+    expect(palette).not.toContain('window.matchMedia("(pointer: coarse)")');
+    expect(palette).toContain("useResponsiveLayout()");
+    expect(palette).toContain("effectivePaletteLayout(layoutMode, isBelowTablet)");
+    expect(effectivePaletteLayout("expanded", true)).toBe("collapsed");
     expect(palette).toContain("text-[16px]");
     expect(palette).toContain("min-h-11");
   });
@@ -2085,11 +2118,19 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatCommandPalette.tsx"),
       "utf-8",
     );
+    const rowActions = readFileSync(
+      join(root, "components/sidebar/command-palette/rowActionItems.ts"),
+      "utf-8",
+    );
+    const rowActionsView = readFileSync(
+      join(root, "components/sidebar/command-palette/CommandPaletteRowActions.tsx"),
+      "utf-8",
+    );
 
     expect(chat).toContain("onMutated={refreshHistory}");
-    expect(palette).toContain("Edit2");
-    expect(palette).toContain("Archive");
-    expect(palette).toContain("Trash2");
+    expect(rowActions).toContain("Edit2");
+    expect(rowActions).toContain("Archive");
+    expect(rowActions).toContain("Trash2");
     expect(palette).toContain("editingId");
     expect(palette).toContain("editingTitle");
     expect(palette).toContain("handleRenameSave");
@@ -2097,12 +2138,21 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("handleDelete");
     expect(palette).toContain("patchConversation");
     expect(palette).toContain("apiDeleteConversation");
-    expect(palette).toContain(
+    expect(rowActionsView).toContain(
       'import { Tooltip } from "@/components/ui/Tooltip"',
     );
-    expect(palette).toContain('content={t("common.rename", "Rename")}');
-    expect(palette).toContain('content={t("common.archive", "Archive")}');
-    expect(palette).toContain('content={t("common.delete", "Delete")}');
+    // The eye reads the short verb, the same one Recents shows. The screen
+    // reader hears the object too, because an icon-only control has no context.
+    expect(rowActionsView).toContain("content={action.label}");
+    expect(rowActionsView).toContain("aria-label={action.accessibleName}");
+    for (const [visible, announced] of [
+      ['t("common.rename", "Rename")', "command_palette.rename_conversation"],
+      ['t("common.archive", "Archive")', "command_palette.archive_conversation"],
+      ['t("common.delete", "Delete")', "command_palette.delete_conversation"],
+    ]) {
+      expect(rowActions).toContain(visible);
+      expect(rowActions).toContain(announced);
+    }
     expect(palette).not.toContain("getConversationMessages");
     expect(palette).not.toContain("hydrateMessagesFromApi");
     expect(palette).not.toContain("ChatMessage");
@@ -2366,6 +2416,14 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "lib/language-features.ts"),
       "utf-8",
     );
+    const deleteRequestDialog = readFileSync(
+      join(root, "components/sidebar/ProfileDeleteRequestDialog.tsx"),
+      "utf-8",
+    );
+    const detailsDialog = readFileSync(
+      join(root, "components/sidebar/ProfileDetailsDialog.tsx"),
+      "utf-8",
+    );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const en = readFileSync(
       join(root, "public/locales/en/common.json"),
@@ -2378,17 +2436,24 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(languageFeatures).toContain("languageDisplayAbbreviation");
     expect(languageFeatures).toContain("localeForLanguage");
-    expect(profileMenu).toContain("ENABLED_LANGUAGES");
-    expect(profileMenu).toContain("languageDisplayAbbreviation");
+    // The dialog's markup lives in ProfileDetailsDialog; the menu keeps the
+    // state and the requests behind it.
+    expect(detailsDialog).toContain("ENABLED_LANGUAGES");
+    expect(detailsDialog).toContain("languageDisplayAbbreviation");
     expect(profileMenu).toContain("localeForLanguage");
     expect(profileMenu).toContain("postFeedback");
     expect(profileMenu).toContain('type: "account_deletion_request"');
     expect(profileMenu).toContain('source: "profile_modal"');
-    expect(profileMenu).toContain("argus-profile-language-trigger");
-    expect(profileMenu).toContain("absolute right-0 top-full");
-    expect(profileMenu).toContain("settings.profile.request_deletion.title");
+    expect(detailsDialog).toContain("argus-profile-language-trigger");
+    expect(detailsDialog).toContain("absolute right-0 top-full");
+    // Both dialogs live in their own components, because a body-portaled
+    // aria-modal surface has to register its own back, Escape, and focus.
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.title",
+    );
+    expect(detailsDialog).toContain("useModalSurface");
     expect(profileMenu).toContain("settings.profile.language_save_error");
-    expect(profileMenu).not.toContain(
+    expect(detailsDialog).not.toContain(
       "overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]",
     );
     expect(profileMenu).not.toContain('profile?.language ?? "en"');
@@ -2397,16 +2462,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain(
       "Request permanent deletion of your Argus account. Support will follow up by email.",
     );
-    expect(en).toContain(
-      "Support handles account deletion during private alpha.",
-    );
+    expect(en).toContain("Support handles account deletion. We'll verify");
     expect(en).toContain("Request sent. We'll follow up by email.");
     expect(es).toContain("Solicitar eliminación de cuenta");
     expect(es).toContain(
       "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
     );
     expect(es).toContain(
-      "Soporte gestiona la eliminación de cuentas durante la alfa privada.",
+      "Soporte gestiona la eliminación de cuentas. Verificaremos",
     );
     expect(es).toContain(
       "Solicitud enviada. Te contactaremos por correo electrónico.",
@@ -2511,7 +2574,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(legalPage).toContain("body_before_email");
     expect(legalPage).toContain("mailto:${supportEmail}");
 
-    expect(en).toContain('"effective_date": "Effective date: June 30, 2026"');
+    expect(en).toContain('"effective_date": "Effective date: August 7, 2026"');
     expect(en).toContain('"title": "No investment advice"');
     expect(en).toContain("not a broker");
     expect(en).toContain("Historical simulations are hypothetical");
@@ -2525,7 +2588,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain("prompts may be sent");
 
     expect(es).toContain(
-      '"effective_date": "Fecha de entrada en vigor: 30 de junio de 2026"',
+      '"effective_date": "Fecha de entrada en vigor: 7 de agosto de 2026"',
     );
     expect(es).toContain("No es asesoría de inversión");
     expect(es).toContain("Argus no es broker");
@@ -2661,9 +2724,8 @@ describe("Argus Alpha frontend contract", () => {
       securityLabel,
     );
     expect(securityButton).toContain(
-      'window.location.href = "/account/security"',
+      'navigateFromOverlay("/account/security", onClose)',
     );
-    expect(securityButton).toContain("onClose()");
     expect(securityButton).not.toContain("disabled");
     expect(securityButton).not.toContain("cursor-not-allowed");
     expect(en.settings.data.security).toBeTruthy();
@@ -2772,7 +2834,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(settings).toContain("{showSubscriptionSection && (");
   });
 
-  test("sidebar keeps strategies flagged while omnisearch is enabled by default", () => {
+  test("sidebar keeps omnisearch enabled without legacy strategy navigation", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -2786,7 +2848,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
+    expect(flags).not.toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(flags).toContain("NEXT_PUBLIC_OMNISEARCH_ENABLED");
     expect(flags).toContain(
       'process.env.NEXT_PUBLIC_OMNISEARCH_ENABLED !== "false"',
@@ -2794,26 +2856,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toMatch(
       /omnisearchEnabled &&\s*\(!isGuest \|\| canUseOmnisearch\) &&\s*searchOverlayOpen/,
     );
-    expect(sidebar).toContain("strategiesEnabled");
+    expect(sidebar).not.toContain("strategiesEnabled");
     expect(sidebar).toContain("omnisearchEnabled");
     expect(sidebar).toContain("{omnisearchEnabled && (");
-    expect(sidebar).toContain("{strategiesEnabled && (");
+    expect(sidebar).not.toContain('onNavigate("strategies")');
     expect(sidebar).toContain("common.recents");
   });
 
-  test("strategies surface renders dynamic metrics based on preferences", () => {
-    const file = readFileSync(
-      join(root, "components/views/StrategiesView.tsx"),
-      "utf-8",
-    );
-    expect(file).toContain("strategy.columns.map(");
-    expect(file).toContain("asset.pills.map(");
-    expect(file).not.toContain(
-      'className="grid grid-cols-4 gap-2 items-end pb-2 sticky top-[-1px]',
-    );
-    expect(file).toContain(
-      "style={{ gridTemplateColumns: `repeat(${strategy.columns.length + 1}, minmax(0, 1fr))` }}",
-    );
+  test("strategies view is no longer shipped", () => {
+    expect(
+      existsSync(join(root, "components/views/StrategiesView.tsx")),
+    ).toBe(false);
   });
 
   test("no shadow utility classes are used in chat input", () => {

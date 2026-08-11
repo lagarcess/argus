@@ -1,0 +1,62 @@
+.finePointerActions {
+  display: none;
+}
+
+.touchSafeActions {
+  display: flex;
+}
+
+.recentsOwnerAction {
+  opacity: 1;
+}
+
+.hoverLayoutDate {
+  right: 3.5rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .finePointerActions {
+    display: flex;
+  }
+
+  .touchSafeActions {
+    display: none;
+  }
+
+  .recentsOwnerAction {
+    opacity: 0;
+  }
+
+  :global(.group:hover) .recentsOwnerAction,
+  .recentsOwnerAction:focus,
+  .recentsOwnerAction[aria-expanded="true"] {
+    opacity: 1;
+  }
+
+  .hoverLayoutDate {
+    right: 0.75rem;
+  }
+}
+
+/*
+ * A hybrid laptop can expose both a fine pointer and touch. The touch-safe
+ * menu wins whenever any coarse pointer exists, so every available input can
+ * reach the row actions.
+ */
+@media (any-pointer: coarse) {
+  .finePointerActions {
+    display: none;
+  }
+
+  .touchSafeActions {
+    display: flex;
+  }
+
+  .recentsOwnerAction {
+    opacity: 1;
+  }
+
+  .hoverLayoutDate {
+    right: 3.5rem;
+  }
+}

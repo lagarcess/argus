@@ -1,56 +1,55 @@
 {
   "common": {
-    "backtest": "Simulación",
-    "strategy": "Estrategia",
-    "collection": "Colección",
-    "chat": "Chat",
-    "history": "Historial",
-    "settings": "Ajustes",
-    "conversation": "Conversación",
-    "strategies": "Estrategias",
-    "collections": "Colecciones",
-    "recents": "Recientes",
-    "run_simulation": "Ejecutar simulación",
-    "add_to_collection": "Añadir a colección",
-    "rename": "Renombrar",
-    "delete": "Eliminar",
-    "pin": "Anclar",
-    "unpin": "Desanclar",
-    "loading": "Cargando...",
-    "retry": "Reintentar",
-    "try_again": "Intentar de nuevo",
-    "back": "Volver",
-    "error_occurred": "Ha ocurrido un error",
-    "save": "Guardar",
-    "confirm": "Confirmar",
-    "cancel": "Cancelar",
-    "done": "Listo",
-    "search": "Buscar",
+    "and": "y",
     "archive": "Archivar",
     "archived": "Archivado",
-    "today": "hoy",
-    "yesterday": "ayer",
-    "no_items": "No se encontraron elementos",
-    "restore": "Restaurar",
-    "permanently_delete": "Eliminar permanentemente",
-    "submit": "Enviar",
-    "more": "Más",
-    "current": "Actual",
+    "back": "Volver",
+    "backtest": "Simulación",
+    "cancel": "Cancelar",
+    "chat": "Chat",
+    "close": "Cerrar",
     "collapse": "Contraer",
+    "collection": "Colección",
+    "confirm": "Confirmar",
+    "conversation": "Conversación",
+    "current": "Actual",
+    "delete": "Eliminar",
+    "done": "Listo",
+    "error_occurred": "Ha ocurrido un error",
     "expand": "Expandir",
+    "history": "Historial",
     "learn_more": "Más información",
-    "and": "y",
+    "loading": "Cargando...",
+    "more": "Más",
+    "navigation": "Navegación",
+    "no_items": "No se encontraron elementos",
     "or": "o",
-    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
+    "permanently_delete": "Eliminar permanentemente",
+    "pin": "Anclar",
+    "recents": "Recientes",
+    "rename": "Renombrar",
+    "restore": "Restaurar",
+    "retry": "Reintentar",
+    "run_simulation": "Ejecutar simulación",
+    "save": "Guardar",
+    "search": "Buscar",
+    "settings": "Ajustes",
+    "strategy": "Estrategia",
+    "submit": "Enviar",
+    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar",
+    "today": "hoy",
+    "try_again": "Intentar de nuevo",
+    "unpin": "Desanclar",
+    "yesterday": "ayer"
   },
   "legal": {
-    "eyebrow": "Legal de alfa privada",
-    "effective_date": "Fecha de entrada en vigor: 30 de junio de 2026",
-    "footer_label": "Alfa privada de Argus",
+    "eyebrow": "Legal de acceso anticipado",
+    "effective_date": "Fecha de entrada en vigor: 7 de agosto de 2026",
+    "footer_label": "Acceso anticipado de Argus",
     "back_to_argus": "Volver a Argus",
     "terms": {
       "title": "Términos de uso",
-      "intro": "Argus es un producto en alfa privada para investigación educativa de inversión. Estos términos describen la experiencia actual de testers y no reemplazan una revisión legal final.",
+      "intro": "Argus es un producto en acceso anticipado para investigación educativa de inversión. Estos términos describen cómo funciona Argus hoy. Argus sigue en construcción, así que estos términos van a cambiar conforme cambie el producto.",
       "sections": {
         "no_investment_advice": {
           "title": "No es asesoría de inversión",
@@ -64,9 +63,9 @@
           "title": "Las simulaciones históricas son hipotéticas",
           "body": "Las simulaciones históricas son hipotéticas y dependen de los supuestos, la disponibilidad de datos, los activos compatibles, las referencias predeterminadas y los periodos que se muestran en el producto. Los rendimientos simulados no garantizan resultados futuros."
         },
-        "alpha_changes": {
-          "title": "Disponibilidad y cambios de la alfa",
-          "body": "Argus está en alfa privada. Las funciones pueden cambiar, fallar, reiniciarse o eliminarse sin aviso. Podemos limitar el acceso, suspender cuentas o retirar contenido que genere riesgos de seguridad, abuso, cumplimiento u operación."
+        "early_access_changes": {
+          "title": "Disponibilidad y cambios del acceso anticipado",
+          "body": "Argus está en acceso anticipado y se ofrece tal cual, sin garantías. Las funciones pueden cambiar, fallar, reiniciarse o eliminarse sin aviso, y algunas podrían no llegar nunca a una versión final. Podemos limitar el acceso, suspender cuentas o retirar contenido que genere riesgos de seguridad, abuso, cumplimiento u operación."
         },
         "eligibility": {
           "title": "Elegibilidad",
@@ -78,18 +77,18 @@
         },
         "third_party_services": {
           "title": "Servicios de terceros",
-          "body": "Argus depende de servicios de terceros para hosting, autenticación, datos de mercado, acceso a modelos y renderizado de gráficos. TradingView Lightweight Charts se usa para renderizar gráficos y mostrar atribución, no como fuente de datos de mercado de Argus."
+          "body": "Argus depende de servicios de terceros para hosting, autenticación, datos de mercado, acceso a modelos, protección contra bots y renderizado de gráficos. TradingView Lightweight Charts se usa para renderizar gráficos y mostrar atribución, no como fuente de datos de mercado de Argus."
         },
         "account_support": {
           "title": "Soporte de cuenta",
-          "body_before_email": "Durante la alfa privada, las solicitudes de soporte y eliminación de cuenta se gestionan manualmente. Contacta a",
+          "body_before_email": "Mientras Argus está en acceso anticipado, las solicitudes de soporte y de eliminación de cuenta las atiende una persona. Contacta a",
           "body_after_email": " o usa la solicitud de eliminación de cuenta dentro de la app."
         }
       }
     },
     "privacy": {
       "title": "Política de privacidad",
-      "intro": "Esta política explica qué maneja Argus durante la alfa privada para que testers sepan qué ocurre con los datos de cuenta, conversaciones, comentarios y solicitudes respaldadas por proveedores.",
+      "intro": "Esta política explica qué hace Argus con los datos de tu cuenta, tus conversaciones, tus comentarios y las solicitudes que envía a proveedores externos mientras el producto está en acceso anticipado.",
       "sections": {
         "data_collect": {
           "title": "Datos que recopilamos",
@@ -97,7 +96,7 @@
         },
         "data_use": {
           "title": "Cómo usamos los datos",
-          "body": "Usamos datos para operar el producto, autenticar usuarios, guardar y restaurar conversaciones, generar y revisar simulaciones históricas, depurar fallas, proteger el servicio, responder soporte y mejorar la calidad de la alfa privada."
+          "body": "Usamos datos para operar el producto, autenticar usuarios, guardar y restaurar conversaciones, generar y revisar simulaciones históricas, depurar fallas, proteger el servicio, responder soporte y mejorar Argus mientras está en acceso anticipado."
         },
         "ai_market_data": {
           "title": "Proveedores de IA y datos de mercado",
@@ -105,20 +104,43 @@
         },
         "infrastructure": {
           "title": "Infraestructura y servicios del producto",
-          "body": "Argus usa Supabase para autenticación y persistencia del producto, Render para hosting, OpenRouter para acceso a modelos y PostHog solo si la analítica de producto se habilita intencionalmente. TradingView Lightweight Charts se usa como biblioteca de gráficos con atribución; no es la fuente de datos de mercado de Argus."
+          "body": "Argus usa Supabase para autenticación y persistencia del producto, Render para hosting, OpenRouter para acceso a modelos y Cloudflare para la entrega del dominio y la protección contra bots. La analítica de producto con PostHog corre en los servidores de Argus, y solo cuando se habilita intencionalmente. TradingView Lightweight Charts se usa como biblioteca de gráficos con atribución; no es la fuente de datos de mercado de Argus."
+        },
+        "cookies": {
+          "title": "Cookies y almacenamiento del navegador",
+          "body": "Argus guarda muy pocos datos en tu navegador. Todo lo que guarda sirve para que el producto funcione o para recordar tus ajustes, y nada de eso es publicidad ni rastreo, por eso Argus no muestra un aviso de consentimiento de cookies.",
+          "items": {
+            "sign_in": {
+              "label": "Cookies de inicio de sesión",
+              "body": "Mantienen tu sesión iniciada al moverte entre páginas. Las crea la autenticación de Supabase y Argus las renueva mientras sigas usando el producto. Se conservan aunque cierres el navegador, y cerrar sesión las elimina. Iniciar sesión o restablecer tu contraseña también crea una cookie de corta duración que completa el intercambio de forma segura y se descarta al terminar. Si las bloqueas, no vas a poder iniciar sesión."
+            },
+            "guest_handoff": {
+              "label": "Cookies de traspaso de invitado",
+              "body": "Si empiezas como invitado y luego creas una cuenta, Argus crea dos cookies de corta duración para trasladar tu conversación temporal a la cuenta nueva. Duran diez minutos, se limitan a las rutas de autenticación de Argus y se eliminan apenas termina el traspaso."
+            },
+            "security": {
+              "label": "Cookies de seguridad",
+              "body": "Cloudflare Turnstile verifica que las solicitudes de inicio de sesión y de invitado vengan de una persona y no de un bot, y para eso Cloudflare puede crear cookies de desafío de corta duración. Están limitadas a Argus y no se usan para seguirte por otros sitios."
+            },
+            "preferences": {
+              "label": "Preferencias que tú eliges",
+              "body": "El almacenamiento local de tu navegador guarda tu idioma, que empieza con el de tu propio navegador hasta que lo cambies, junto con tus preferencias de apariencia y diseño, los avisos que descartaste y las conversaciones que marcaste como temporales. Todo eso queda en tu dispositivo y Argus nunca se lo envía a anunciantes."
+            }
+          },
+          "body_after": "Argus no usa cookies publicitarias, píxeles de anuncios, rastreadores de marketing ni rastreo entre sitios, y no comparte datos de tu navegador con socios publicitarios. La analítica de producto, cuando está activa, corre en los servidores de Argus y no guarda nada en tu navegador. Puedes borrar o bloquear este almacenamiento desde la configuración de tu navegador, aunque el inicio de sesión dejará de funcionar si bloqueas las cookies de sesión."
         },
         "access_retention": {
           "title": "Acceso y retención",
-          "body": "El acceso del fundador y administradores se limita a operar, depurar, proteger y mejorar la alfa privada. Conservamos datos mientras tu cuenta esté activa, mientras sean necesarios para soporte o seguridad, o mientras los registros operativos lo requieran."
+          "body": "El acceso del fundador y administradores se limita a operar, depurar, proteger y mejorar Argus durante el acceso anticipado. Conservamos datos mientras tu cuenta esté activa, mientras sean necesarios para soporte o seguridad, o mientras los registros operativos lo requieran."
         },
         "your_controls": {
           "title": "Tus controles",
-          "body_before_email": "Puedes archivar o eliminar conversaciones en la app. Durante la alfa privada, la eliminación de cuentas se gestiona manualmente mediante la solicitud dentro de la app o contactando a",
+          "body_before_email": "Puedes archivar o eliminar conversaciones en la app. Mientras Argus está en acceso anticipado, la eliminación de cuentas la atiende una persona mediante la solicitud dentro de la app o contactando a",
           "body_after_email": "."
         },
         "sale_personal_info": {
-          "title": "Venta de información personal",
-          "body": "Argus no vende información personal durante la alfa privada. Si esto cambia, la política y los controles del producto deben actualizarse antes de enviar ese comportamiento."
+          "title": "Venta y compartición de información personal",
+          "body": "Argus no vende ni comparte tu información personal, y no la usa para publicidad dirigida. Si eso llega a cambiar, esta política y los controles del producto se actualizarán antes de que entre en vigor."
         }
       }
     }
@@ -195,11 +217,13 @@
         "safety": "Preocupación de seguridad o legal",
         "other": "Otro"
       }
-    }
+    },
+    "close": "Cerrar comentarios"
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
-    "input_placeholder": "Describe una idea de inversión...",
+    "input_placeholder": "Pregunta sobre cualquier empresa o idea",
+    "input_placeholder_prerail": "Describe una idea de inversión...",
     "followup_placeholder": "Haz una pregunta de seguimiento...",
     "message_empty": "El mensaje está vacío",
     "send_message": "Enviar mensaje",
@@ -207,18 +231,35 @@
     "disclaimer": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
-    "placeholder_prompts": [
-      "¿Cómo le ha ido a Apple contra SPY en lo que va del año?",
-      "¿Qué habría pasado si compraba Bitcoin en lo que va del año?",
-      "Explícame un término del mercado en palabras simples.",
-      "¿Qué pasa si mantengo Nvidia durante los últimos 12 meses?",
-      "Compara Ethereum y Bitcoin durante los últimos 12 meses.",
-      "Prueba comprar SPY en lo que va del año.",
-      "¿Cómo funciona comprar acciones fuertes?",
-      "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante el último año?",
-      "Prueba una idea simple de comprar y mantener Solana en los últimos 6 meses.",
-      "¿Por qué la gente compara una acción con SPY?"
-    ],
+    "greeting": {
+      "early_a": "Madrugaste hoy. ¿Qué miramos?",
+      "early_b": "Arrancaste temprano. ¿Qué probamos?",
+      "early_c": "Buenos días. ¿Qué tienes en mente?",
+      "early_named_a": "Buenos días, {{name}}. ¿Qué miramos?",
+      "day_a": "¿Qué probamos hoy?",
+      "day_b": "¿Qué miramos hoy?",
+      "day_c": "¿Tienes una corazonada que valga la pena revisar?",
+      "day_d": "¿Qué te gustaría investigar?",
+      "day_e": "¿Algo que tenías ganas de probar?",
+      "day_f": "¿Qué vale la pena revisar hoy?",
+      "day_named_a": "¿Qué probamos hoy, {{name}}?",
+      "day_named_b": "¿Por dónde empezamos, {{name}}?",
+      "evening_a": "¿Qué exploramos esta noche?",
+      "evening_b": "Buenas noches. ¿Qué probamos?",
+      "evening_c": "¿Algo que quieras revisar antes de terminar el día?",
+      "evening_d": "¿Qué vale la pena mirar esta noche?",
+      "evening_named_a": "Buenas noches, {{name}}. ¿Qué exploramos?",
+      "night_a": "Hola, noctámbulo. ¿Qué te da curiosidad?",
+      "night_b": "Todavía por aquí. ¿Qué miramos?",
+      "night_c": "Se hizo tarde. ¿Qué probamos?",
+      "night_named_a": "Todavía por aquí, {{name}}. ¿Qué te da curiosidad?",
+      "session_closed_weekend_a": "La bolsa está cerrada por el fin de semana. Las criptos no paran, así que hay mucho por probar.",
+      "session_closed_weekend_b": "La bolsa está cerrada el fin de semana. Las criptos siguen, y los datos históricos siempre están.",
+      "session_closed_holiday_a": "La bolsa está cerrada por el feriado. Las criptos siguen operando.",
+      "session_closed_holiday_b": "Hoy la bolsa no opera. Las criptos nunca cierran, y los datos históricos siempre están.",
+      "session_pre_market_a": "La sesión regular abre en unas horas. Las criptos llevan toda la noche operando.",
+      "session_after_hours_a": "La sesión regular terminó y el horario extendido sigue abierto. Las criptos siguen."
+    },
     "view_history": "Ver historial",
     "chat_options": "Opciones de chat",
     "jump_to_latest": "Ir a lo más reciente",
@@ -245,8 +286,6 @@
       "announce_needs_input": "{{title}} necesita tu respuesta.",
       "announce_new_activity": "{{title}} ya está lista."
     },
-    "show_suggestions": "Mostrar sugerencias",
-    "hide_suggestions": "Ocultar sugerencias",
     "starter_actions": {
       "tsla": {
         "label": "Prueba Apple vs SPY",
@@ -262,9 +301,28 @@
       }
     },
     "example_queries": {
-      "q1": "¿Y si comprara Apple en caídas importantes?",
-      "q2": "Prueba una estrategia de ruptura de impulso en Bitcoin.",
-      "q3": "¿Cómo funcionaría una estrategia DCA simple en Tesla?"
+      "q1": "¿Cómo gana dinero Netflix?",
+      "q2": "Compara Costco con Walmart y Target",
+      "q3": "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?"
+    },
+    "research_job": {
+      "queued": {
+        "title": "Investigación en espera",
+        "body": "Argus está preparando una mirada más profunda. Puedes seguir conversando; la respuesta aparecerá aquí."
+      },
+      "running": {
+        "title": "Investigando",
+        "body": "Argus está leyendo datos financieros y fuentes para esta pregunta. La respuesta aparecerá aquí."
+      },
+      "succeeded": {
+        "title": "Investigación lista",
+        "body": "La respuesta completa está abajo.",
+        "status": "Listo"
+      },
+      "failed": {
+        "title": "La investigación no terminó",
+        "body": "Argus no pudo completar esta investigación. Pregunta de nuevo, o prueba la idea directamente."
+      }
     },
     "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
     "error_offline": "Argus no puede conectarse con su servicio en este momento. Revisa tu conexión e inténtalo de nuevo en un momento.",
@@ -275,11 +333,12 @@
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
     "recovery": {
       "interpreter_unavailable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Intenta de nuevo en un momento.",
+      "interpreter_unavailable_not_retryable": "Guardé tu mensaje, pero no pude convertirlo en una configuración de prueba confiable. Enviarlo igual va a dar el mismo problema, así que intenta reformularlo, o dime el activo y el periodo que quieres.",
       "assumption_edit_unapplied": "Guardé tu respuesta, pero no pude aplicar ese cambio de supuesto con confianza, así que dejé la idea actual sin cambios. Intenta el cambio de nuevo en un momento.",
       "setup_change_unapplied": "Todavía tengo {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. Intenta de nuevo en un momento.",
       "confirmation_change_unapplied": "Todavía tengo la confirmación de {{setup_phrase}} en este chat, pero no pude aplicar ese cambio con confianza. {{action_guidance}}",
       "latest_result_followup_unavailable": "No pude responder ese seguimiento. Tu resultado sigue aquí.",
-      "private_alpha_save_unavailable": "No puedo mover esto a Estrategias mientras esa superficie está desactivada para la alfa privada, pero la ejecución completa sigue en este chat y puedes volver a abrirla desde la conversación o Recientes.",
+      "private_alpha_save_unavailable": "La biblioteca heredada de Estrategias y la acción Guardar se retiraron. Esta ejecución completa sigue disponible en este chat y en Recientes, y puedes usar Refinar idea para seguir probándola.",
       "confirmation_action_guidance": "La confirmación visible sigue lista. Usa la tarjeta para iniciar la simulación, o usa sus controles para cambiarla.",
       "confirmation_action_missing_context": "No tengo una confirmación activa para cambiar. Describe la idea de inversión otra vez y prepararé un borrador nuevo.",
       "confirmation_action_missing_identity": "A esa acción de confirmación le falta la identidad de la tarjeta. Usa la acción de la tarjeta más reciente antes de continuar.",
@@ -351,6 +410,9 @@
       "no_common_data_window": "Esos activos y la referencia no comparten un rango de datos utilizable para una prueba confiable. Cambia las fechas, un activo o la referencia.",
       "insufficient_common_data": "Los activos y la referencia comparten muy poco historial para una prueba confiable. Cambia las fechas, un activo o la referencia.",
       "market_data_unavailable": "El historial compartido no está disponible para una prueba confiable en este momento. Cambia las fechas, un activo o la referencia.",
+      "kraken_ohlc_window_exceeded": "Ese rango de fechas es demasiado largo para este mercado y marco temporal. Acorta las fechas o usa un marco temporal más amplio.",
+      "provider_history_start_unavailable": "El historial del mercado no está disponible desde una fecha tan antigua. Elige una fecha de inicio posterior.",
+      "provider_timeframe_unavailable": "Ese marco temporal no está disponible para este mercado. Elige un marco temporal compatible.",
       "actions": {
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",
@@ -378,7 +440,26 @@
         "month_other": "misma duración de {{count}} meses",
         "day_one": "misma duración de {{count}} día",
         "day_other": "misma duración de {{count}} días"
-      }
+      },
+      "effective_duration": {
+        "exact": {
+          "year_one": "{{formattedCount}} año",
+          "year_other": "{{formattedCount}} años",
+          "month_one": "{{formattedCount}} mes",
+          "month_other": "{{formattedCount}} meses",
+          "day_one": "{{formattedCount}} día",
+          "day_other": "{{formattedCount}} días"
+        },
+        "approximate": {
+          "year_one": "aproximadamente {{formattedCount}} año",
+          "year_other": "aproximadamente {{formattedCount}} años",
+          "month_one": "aproximadamente {{formattedCount}} mes",
+          "month_other": "aproximadamente {{formattedCount}} meses",
+          "day_one": "aproximadamente {{formattedCount}} día",
+          "day_other": "aproximadamente {{formattedCount}} días"
+        }
+      },
+      "updated_duration": "Duración actualizada: {{duration}}"
     },
     "result_readout": {
       "quick_take": "Lectura rápida"
@@ -397,8 +478,9 @@
       "sources_panel_open_one": "{{count}} fuente ›",
       "sources_panel_open_other": "{{count}} fuentes ›",
       "sources_panel_title": "Fuentes que Argus consultó",
-      "sources_panel_note": "Argus las consultó al responder. No son lecturas recomendadas.",
+      "sources_panel_note": "Fuentes usadas para fundamentar esta respuesta. Los enlaces se abren en una pestaña nueva.",
       "sources_panel_close": "Cerrar fuentes",
+      "sources_panel_external_link_new_tab": "Se abre en una pestaña nueva",
       "allowance_banner": "Cupo de búsqueda con fuentes agotado",
       "allowance_banner_cta": "Inicia sesión para más búsquedas"
     },
@@ -484,7 +566,6 @@
     "past_sessions": "Sesiones pasadas",
     "archive_chat": "Archivar chat",
     "no_past_sessions": "No hay sesiones pasadas aún.",
-    "added_to_collection": "Añadido a \"{{name}}\"",
     "good_response": "Buena respuesta",
     "poor_response": "Mala respuesta",
     "more_actions": "Más acciones",
@@ -494,8 +575,6 @@
     "copy_failed": "No se pudo copiar",
     "report_issue": "Reportar problema",
     "rename_failed": "No se pudo renombrar este chat. Inténtalo de nuevo.",
-    "saved": "Guardada",
-    "saving": "Guardando",
     "simulation_complete": "Simulación completa",
     "activity_rail": {
       "aria_label": "Actividad de la conversación",
@@ -546,7 +625,6 @@
         "rejected": "Rechazada",
         "revisit_later": "Revisar luego"
       },
-      "save": "Guardar",
       "unavailable": "No disponible",
       "return_unavailable": "rendimiento no disponible",
       "change": "cambio",
@@ -685,6 +763,8 @@
       "asset_count": "{{count}} activos",
       "selected_asset": "Activo seleccionado",
       "period_adjustment": "Ajusté el período de la prueba a {{period}} porque cada activo y la referencia necesitan un rango de datos compartido.",
+      "undo": "Deshacer",
+      "peer_add_failed": "No se pudo cambiar esa prueba. La tarjeta no cambió.",
       "status": {
         "ready_to_run": "Listo para ejecutar",
         "needs_change": "Necesita ajuste",
@@ -711,7 +791,7 @@
         "run_backtest": "Ejecutar backtest",
         "change_dates": "Cambiar fechas",
         "change_asset": "Cambiar activo",
-        "adjust_assumptions": "Ajustar supuestos",
+        "adjust_assumptions": "Cambiar supuestos",
         "cancel": "Cancelar"
       },
       "assumptions": {
@@ -722,19 +802,56 @@
         "modeled_costs": "Costos modelados: comisión de {{fee}} bps + deslizamiento de {{slippage}} bps"
       },
       "cost_editor": {
-        "edit_chip": "Editar costos",
         "fee_label": "Comisión % por operación",
         "slippage_label": "Deslizamiento % por operación",
+        "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%)."
+      },
+      "direct_edit": {
+        "edit_capital": "Editar capital",
+        "edit_contribution": "Editar aporte",
+        "edit_dates": "Editar fechas",
+        "capital_label": "Capital inicial",
+        "contribution_label": "Aporte por compra",
+        "start_label": "Fecha de inicio",
+        "end_label": "Fecha de fin",
         "apply": "Aplicar",
         "cancel": "Cancelar",
-        "invalid": "Ingresa porcentajes de 0 o más (deslizamiento hasta {{max}}%).",
-        "message": "Ajusta las comisiones a {{fee}}% y el deslizamiento a {{slippage}}% por operación."
+        "invalid_capital": "Ingresa un monto mayor que cero.",
+        "invalid_dates": "Elige una fecha de inicio igual o anterior a la fecha de fin.",
+        "failed": "Ese cambio no se aplicó. La tarjeta quedó igual.",
+        "edit_costs": "Editar costos",
+        "errors": {
+          "invalid_starting_capital": "El capital inicial debe estar entre {{min}} y {{max}}.",
+          "future_end_date": "Elige una fecha de fin igual o anterior a hoy.",
+          "invalid_chronological_date_range": "Elige una fecha de inicio anterior a la fecha de fin.",
+          "provider_history_start": "Los datos de esta prueba comienzan después; elige una fecha de inicio igual o posterior a {{min}}.",
+          "no_common_data": "Estos activos no comparten datos suficientes para ese periodo.",
+          "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}.",
+          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo."
+        }
+      },
+      "edit_disclosure": {
+        "unapplied": "No pude cambiar {{targets}}; el resto quedó aplicado abajo.",
+        "targets": {
+          "asset": "los activos",
+          "benchmark": "el benchmark",
+          "cadence": "la frecuencia",
+          "capital": "el capital inicial",
+          "date_window": "las fechas",
+          "fees": "las comisiones",
+          "recurring_contribution": "el aporte",
+          "slippage": "el deslizamiento",
+          "strategy_family": "la estrategia",
+          "timeframe": "el intervalo",
+          "generic": "esa parte"
+        }
       },
       "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
     },
     "next_experiments": {
       "section": "Qué probar después",
       "labels": {
+        "research_dynamic": "{{defaultValue}}",
         "change_date_range": "Probar otro rango de fechas",
         "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
         "same_rule_peer_asset": "Probar la misma regla en un activo similar",
@@ -751,76 +868,37 @@
         "lost_to_benchmark": "Quedó {{points}} puntos por debajo de la referencia",
         "beat_benchmark": "Superó la referencia por {{points}} puntos",
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
-      }
-    }
-  },
-  "strategies": {
-    "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",
-    "no_match": "No hay estrategias que coincidan con tu búsqueda.",
-    "error_load": "No se pudieron cargar las estrategias. Asegúrate de que la API esté funcionando.",
-    "search_placeholder": "Buscar estrategias...",
-    "metrics": {
-      "overall_profit": "ganancia total",
-      "max_drawdown": "caída máxima",
-      "win_rate": "tasa de éxito"
+      },
+      "labels_short": {
+        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_indicator_thresholds": "Otros umbrales",
+        "adjust_signal_periods": "Otros períodos",
+        "change_date_range": "Otras fechas",
+        "compare_buy_and_hold": "Comparar con mantener",
+        "recurring_monthly_buys": "Compras mensuales",
+        "same_rule_peer_asset": "Misma regla, activo similar",
+        "same_setup_peer_asset": "Activo similar",
+        "supported_ma_crossover": "Cruce SMA/EMA",
+        "supported_rsi_or_ma_rule": "Simplificar la regla",
+        "supported_rsi_threshold": "Regla RSI compatible"
+      },
+      "test_verb": "Probar"
     },
-    "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
-    "run_hint": "Ejecuta esta estrategia para ver cómo se habría comportado {{symbols}}.",
-    "best_performer": "Mejor rendimiento",
-    "suggestions": [
-      {
-        "title": "Reversión a la media RSI",
-        "desc": "Compra en caídas de sobreventa y vende en picos de sobrecompra.",
-        "prompt": "Diseña una estrategia que compre la caída cada vez que el RSI caiga por debajo de 30 y venda cuando llegue a 70 para BTC."
-      },
-      {
-        "title": "Stop-Loss del 10%",
-        "desc": "Protege tu capital con una regla de salida automatizada.",
-        "prompt": "Quiero una estrategia que compre cualquier acción de mi lista y venda automáticamente si el precio cae un 10% desde mi entrada."
-      },
-      {
-        "title": "Seguidor de Tendencia",
-        "desc": "Sigue el impulso mientras el precio esté por encima de la media móvil de 50 días.",
-        "prompt": "Crea una estrategia que compre siempre que el precio esté por encima de la media móvil de 50 días en QQQ."
-      },
-      {
-        "title": "DCA Mensual",
-        "desc": "Construye posiciones con compras fijas cada mes.",
-        "prompt": "Crea una estrategia DCA mensual simple que compre SPY el primer dia habil de cada mes."
-      }
-    ]
-  },
-  "collections": {
-    "empty_state": "Añade una estrategia a una colección o guárdala del chat para verlas aquí.",
-    "no_match": "No hay colecciones que coincidan con tu búsqueda.",
-    "error_load": "No se pudieron cargar las colecciones. Asegúrate de que la API esté funcionando.",
-    "search_placeholder": "Buscar colecciones",
-    "new_collection": "Nueva colección",
-    "no_strategies": "Sin estrategias aún",
-    "strategy_count_one": "{{count}} estrategia",
-    "strategy_count_other": "{{count}} estrategias",
-    "suggestions": [
-      {
-        "title": "Gigantes Tecnológicos",
-        "desc": "Agrupa FAANG o las mejores empresas de semiconductores en un solo lugar.",
-        "prompt": "Quiero crear una colección de los 5 gigantes tecnológicos más importantes, como AAPL, MSFT y NVDA."
-      },
-      {
-        "title": "Transición Energética",
-        "desc": "Ideas centradas en el clima y jugadas de energía limpia.",
-        "prompt": "Quiero empezar una colección para ideas de transición energética y energía solar."
-      },
-      {
-        "title": "Reyes de Dividendos",
-        "desc": "Jugadas de rendimiento seguras y consistentes para una cartera defensiva.",
-        "prompt": "¿Cómo debería estructurar una colección para acciones con crecimiento de dividendos a largo plazo?"
-      },
-      {
-        "title": "Cripto HODL",
-        "desc": "Guarda tu lógica de compra de caídas de Bitcoin y Ethereum.",
-        "prompt": "Crea una colección para mis estrategias de acumulación de criptomonedas a largo plazo."
-      }
-    ]
+    "memory": {
+      "recall_title": "De tu memoria",
+      "recall_show": "Mostrar",
+      "recall_hide": "Ocultar",
+      "recall_note": "Decisiones guardadas que confirmaste. Adminístralas en Controles de datos.",
+      "private_on": "Chat privado: activado",
+      "private_off": "Chat privado",
+      "proposal_title": "¿Recordar esta decisión guardada?",
+      "proposal_benefit": "Argus guardaría “{{label}}” para que puedas revisarla y compararla después. Puedes verla o quitarla cuando quieras en Controles de datos.",
+      "proposal_confirm": "Recordar",
+      "proposal_decline": "No, gracias",
+      "proposal_error": "No se pudo actualizar la memoria. Intenta de nuevo.",
+      "proposal_saved": "Guardado en memoria. Adminístralo en Controles de datos, en Personalización."
+    },
+    "send_busy": "Argus todavía está terminando el mensaje anterior. Inténtalo en un momento."
   },
   "settings": {
     "title": "Ajustes",
@@ -831,6 +909,12 @@
       "delete_account": "Eliminar cuenta",
       "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
       "display_name_save_error": "No pudimos guardar ese nombre todavía.",
+      "display_name_too_long": "Usa {{count}} caracteres o menos.",
+      "preferred_name": "¿Cómo quieres que Argus te llame?",
+      "preferred_name_placeholder": "Déjalo vacío para no usar nombre",
+      "preferred_name_unset": "Sin definir",
+      "preferred_name_save_error": "No se pudo guardar ese nombre todavía.",
+      "preferred_name_too_long": "Usa {{count}} caracteres o menos.",
       "language_save_error": "No pudimos actualizar el idioma todavía.",
       "avatar_theme": {
         "label": "Color del avatar",
@@ -852,7 +936,7 @@
       "title": "Perfil",
       "request_deletion": {
         "title": "Solicitar eliminación de cuenta",
-        "body": "Soporte gestiona la eliminación de cuentas durante la alfa privada. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
+        "body": "Soporte gestiona la eliminación de cuentas. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
         "contact_support": "Contactar soporte",
         "submitting": "Enviando...",
         "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
@@ -878,7 +962,8 @@
         "light": "Claro",
         "dark": "Oscuro",
         "system": "Sistema"
-      }
+      },
+      "close_appearance": "Cerrar apariencia"
     },
     "sidebar": {
       "title": "Preferencia de barra lateral",
@@ -893,6 +978,48 @@
     },
     "data": {
       "title": "Controles de datos",
+      "personalization": {
+        "menu": "Personalización",
+        "title": "Memoria",
+        "close": "Cerrar memoria",
+        "loading": "Cargando memoria...",
+        "load_error": "No se pudo cargar la memoria.",
+        "retry": "Intentar de nuevo",
+        "intro": "Argus solo recuerda lo que confirmas. Aquí puedes revisar, editar, borrar o apagar todo.",
+        "toggle_label": "Recordar memorias confirmadas",
+        "toggle_on_note": "Activado. Las memorias nuevas siguen necesitando tu confirmación.",
+        "toggle_off_note": "Apagado. Las memorias existentes se conservan hasta que las borres.",
+        "records_title": "Lo que Argus recuerda",
+        "empty": "Nada todavía. Cuando confirmes una memoria aparecerá aquí.",
+        "saved_on": "Guardada el {{date}}",
+        "why_stored": "¿Por qué se guardó?",
+        "edit": "Editar memoria",
+        "edit_label": "Etiqueta de la memoria",
+        "edit_value": "Contenido de la memoria",
+        "save_edit": "Guardar",
+        "delete": "Borrar memoria",
+        "confirm_delete": "¿Confirmar?",
+        "explanation_intro": "Confirmaste esta memoria el {{date}}.",
+        "explanation_source": "Fuente: {{kind}}.",
+        "export": "Exportar datos de memoria",
+        "reset": "Restablecer memoria",
+        "reset_confirm": "¿Borrar todo?",
+        "categories": {
+          "personalization_preference": "Preferencia de personalización",
+          "workflow_preference": "Preferencia de flujo de trabajo",
+          "explicit_decision_note": "Decisión guardada",
+          "past_session_anchor": "Referencia de sesión anterior"
+        },
+        "errors": {
+          "explain": "No se pudo cargar la explicación. Intenta de nuevo.",
+          "edit": "No se pudo guardar ese cambio. Intenta de nuevo.",
+          "restricted": "Argus mantiene los detalles sensibles fuera de la memoria.",
+          "delete": "No se pudo borrar esa memoria. Intenta de nuevo.",
+          "toggle": "No se pudo actualizar la configuración de memoria. Intenta de nuevo.",
+          "reset": "No se pudo restablecer la memoria. Intenta de nuevo.",
+          "export": "No se pudieron exportar tus datos de memoria. Intenta de nuevo."
+        }
+      },
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
       "close_recently_deleted": "Cerrar borrados recientemente",
@@ -900,7 +1027,6 @@
       "deleted_item_note": "Se puede restaurar actualmente.",
       "no_deleted_items": "No hay elementos borrados recientemente",
       "chat_item": "Chat",
-      "strategy_item": "Estrategia",
       "delete_all_conversations": "Eliminar todas las conversaciones",
       "delete_all_confirm": {
         "title": "¿Eliminar todas las conversaciones?",
@@ -928,7 +1054,10 @@
         "close": "Cerrar uso",
         "message_rule": "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
         "simulation_rule": "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar."
-      }
+      },
+      "shared_links": "Enlaces compartidos",
+      "close_archived": "Cerrar chats archivados",
+      "close_deleted": "Cerrar borrados recientemente"
     },
     "help": {
       "title": "Ayuda y legal",
@@ -1113,6 +1242,12 @@
     "result_count_other": "{{count}} resultados",
     "retest_current_data": "Volver a probar con datos actuales",
     "retest_tooltip": "Reutiliza esta configuración con los datos más recientes disponibles. Podrás revisarla antes de ejecutarla.",
+    "retest_already_current": "Ya está al día",
+    "retest_no_new_data": "No hay datos de mercado nuevos desde esta ejecución.",
+    "retest_available_dates": "Usar fechas disponibles",
+    "retest_repaired_period": "Volver a probar del {{start}} al {{end}}.",
+    "retest_unavailable": "No se puede volver a probar",
+    "retest_timeframe_unavailable": "El intervalo de esta ejecución no está disponible para este mercado.",
     "retry_load_more": "Intentar cargar más",
     "retry_search": "Intentar la búsqueda de nuevo",
     "save_decision": "Guardar decisión",
@@ -1140,7 +1275,9 @@
       "idea": "Idea",
       "run": "Ejecución",
       "strategy": "Estrategia"
-    }
+    },
+    "row_actions": "Acciones de la conversación",
+    "close_dossier": "Cerrar el expediente"
   },
   "auth": {
     "captcha": {
@@ -1172,7 +1309,7 @@
       }
     },
     "signup": {
-      "subtitle": "Crea tu cuenta de alpha privada",
+      "subtitle": "Crea tu cuenta de Argus",
       "name_placeholder": "Nombre",
       "submit": "Registrarse",
       "loading": "Creando cuenta...",
@@ -1333,7 +1470,8 @@
     },
     "shell": {
       "value_title": "Prueba una idea de inversión con datos históricos.",
-      "input_placeholder": "¿Qué quieres probar?",
+      "input_placeholder": "Pregunta sobre cualquier empresa o idea",
+      "input_placeholder_prerail": "¿Qué quieres probar?",
       "sign_in": "Iniciar sesión",
       "settings": "Ajustes de invitado",
       "language": "Idioma",
@@ -1359,6 +1497,176 @@
       "confirmation": "Revisa los supuestos y luego ejecuta la prueba.",
       "result": "Cambia el rango del gráfico o haz una pregunta de seguimiento.",
       "dismiss": "Descartar sugerencia"
+    }
+  },
+  "receipt": {
+    "page_title": "Probado con Argus",
+    "eyebrow": "Compartido contigo",
+    "provenance": "Probado con Argus",
+    "wordmark": "ARGUS",
+    "framing": {
+      "headline": "Esto es un qué habría pasado, no un consejo.",
+      "detail": "Alguien tuvo curiosidad por saber cómo le habría ido a esta idea, así que Argus la revisó con lo que el mercado hizo de verdad en esas fechas. No se movió dinero real, nadie compró nada, y esto no dice nada sobre lo que va a pasar.",
+      "short": "Un qué habría pasado, con datos del mercado del pasado. No es un consejo."
+    },
+    "sections": {
+      "result": "Cómo le fue",
+      "what_was_tested": "Qué probaron",
+      "assumptions": "Qué supuso Argus",
+      "note": "Dejaron una nota",
+      "chart": "Cómo se movió el dinero de prueba"
+    },
+    "plan": {
+      "heading": "Qué se ejecutó",
+      "buy_and_hold": "Compró una vez al principio y mantuvo hasta el final. Nunca vendió.",
+      "dca": "Compró {{cadence}}, sin importar el precio de ese día. Nunca vendió.",
+      "buy_the_dip": "Compró después de cada caída fuerte y vendió una semana más tarde.",
+      "indicator_entry": "Compró cuando {{indicator}} bajó a {{entry}}.",
+      "indicator_exit": "Vendió cuando {{indicator}} volvió a {{exit}}.",
+      "crossover_entry": "Compró cuando el promedio de {{fast_period}} días subió por encima del de {{slow_period}} días.",
+      "crossover_exit_mirrored": "Vendió cuando volvió a cruzar por debajo.",
+      "crossover_exit_own": "Vendió cuando el promedio de {{fast_period}} días bajó por debajo del de {{slow_period}} días.",
+      "macd_entry": "Compró cuando el MACD cruzó por encima de su línea de señal.",
+      "macd_exit": "Vendió cuando el MACD cruzó por debajo de su línea de señal.",
+      "unnamed": "Se ejecutó como {{label}}.",
+      "long_only": "Estos números quedaron fijos y no van a cambiar."
+    },
+    "cadence_values": {
+      "daily": "cada día",
+      "weekly": "cada semana",
+      "biweekly": "cada dos semanas",
+      "monthly": "cada mes",
+      "quarterly": "cada trimestre"
+    },
+    "assumptions": {
+      "long_only": "Solo largo",
+      "equal_weight": "Peso igual",
+      "no_costs": "Sin comisiones ni deslizamiento",
+      "modeled_costs": "Comisión {{fee}} bps + deslizamiento {{slippage}} bps",
+      "modeled_fee_bps": "Comisión de {{bps}} bps",
+      "modeled_slippage_bps": "Deslizamiento de {{bps}} bps",
+      "benchmark": "Comparado con {{symbol}}",
+      "benchmark_same_modeled_costs": "Comparado con {{symbol}}, mismos costos",
+      "recurring_contribution": "${{amount}} cada vez",
+      "recurring_contribution_cadence": "${{amount}} {{cadence}}",
+      "starting_principal": "${{amount}} al inicio"
+    },
+    "strategy_type_values": {
+      "buy and hold": "Comprar y mantener",
+      "dca accumulation": "Compras recurrentes",
+      "buy the dip": "Comprar la caída",
+      "rsi threshold": "Umbral RSI",
+      "indicator threshold": "Umbral de indicador",
+      "moving average crossover": "Cruce de medias móviles",
+      "macd crossover": "Cruce MACD"
+    },
+    "metric_labels": {
+      "cash_value": "Valor final",
+      "total_return_pct": "Retorno total",
+      "max_drawdown_pct": "Peor caída",
+      "win_rate": "Aciertos",
+      "benchmark_return_pct": "Referencia",
+      "delta_vs_benchmark_pct": "Diferencia"
+    },
+    "hero": {
+      "ahead": "{{value}} por encima de {{symbol}}",
+      "behind": "{{value}} por debajo de {{symbol}}",
+      "vs": "{{symbol}} hizo {{value}}",
+      "window": "{{range}}",
+      "drawdown": "Peor caída en el camino: {{value}}"
+    },
+    "fine_print": {
+      "heading": "La letra chica",
+      "settings": "Ajustes exactos",
+      "assumed": "Qué supuso Argus"
+    },
+    "fields": {
+      "asset": "Qué",
+      "asset_class": "Tipo",
+      "strategy": "El plan",
+      "dates": "Cuándo",
+      "benchmark": "Comparado con"
+    },
+    "asset_class_values": {
+      "equity": "Acciones",
+      "crypto": "Cripto",
+      "currency_pair": "Par de divisas"
+    },
+    "date_range": "{{start}} al {{end}}",
+    "frozen_note": "Guardado el {{date}}. Estos números quedaron fijos, así que se verán igual cuando vuelvas.",
+    "frozen_note_undated": "Estos números quedaron fijos cuando se creó el enlace, así que se verán igual cuando vuelvas.",
+    "chart_unavailable": "No se guardó ningún gráfico con este.",
+    "cta": {
+      "headline": "¿Tienes una idea? Pruébala.",
+      "detail": "Cuéntale a Argus una idea con tus propias palabras y te mostrará cómo le habría ido. Gratis y sin cuenta.",
+      "action": "Prueba tu propia idea"
+    },
+    "tombstone": {
+      "title": "Este ya no está",
+      "detail": "La persona que lo compartió quitó el enlace, o borró el resultado que había detrás. No queda nada por mostrar.",
+      "cta_detail": "Aun así puedes probar Argus por tu cuenta."
+    },
+    "unavailable": {
+      "title": "No pudimos cargar este",
+      "detail": "Algo falló de nuestro lado, no del tuyo. El enlace probablemente sigue sirviendo, así que inténtalo de nuevo en un momento."
+    },
+    "owner": {
+      "share": "Compartir esto",
+      "share_hint": "Crea un enlace que cualquiera puede abrir. Muestra estos números, fijos tal como están ahora. Tu chat, tu nombre y todo lo que Argus recuerda se quedan fuera.",
+      "note_label": "Agrega una nota si quieres",
+      "note_placeholder": "¿Por qué vale la pena verlo?",
+      "note_public_warning": "Cualquiera con el enlace puede leer esto. No pongas nada privado.",
+      "note_counter": "{{count}} de {{max}} caracteres",
+      "create": "Crear el enlace",
+      "creating": "Creando el enlace...",
+      "cancel": "Mejor no",
+      "copy": "Copiar enlace",
+      "copied": "Copiado",
+      "copy_failed": "No se pudo copiar. Selecciona el enlace y cópialo.",
+      "created_note": "Tu nombre no aparece, los buscadores no lo encuentran, y puedes quitarlo cuando quieras desde Controles de datos.",
+      "errors": {
+        "create": "Argus no pudo crear ese enlace. Inténtalo de nuevo.",
+        "note_rejected": "Esa nota no puede ser pública. Quita cualquier clave o código largo.",
+        "rate_limited": "Has creado muchos enlaces hace poco. Inténtalo de nuevo en un rato."
+      }
+    },
+    "list": {
+      "menu": "Enlaces compartidos",
+      "title": "Enlaces compartidos",
+      "close": "Cerrar enlaces compartidos",
+      "intro": "Todo lo que has compartido. Cada enlace muestra números fijos y nada sobre ti.",
+      "loading": "Cargando tus enlaces...",
+      "load_error": "Tus enlaces compartidos no se cargaron.",
+      "load_more": "Ver enlaces más antiguos",
+      "retry": "Intentar de nuevo",
+      "empty": "Todavía no has compartido nada.",
+      "created_on": "Compartido el {{date}}",
+      "revoked_on": "Quitado el {{date}}",
+      "revoked_by_source": "Se quitó solo cuando borraste el chat que había detrás.",
+      "open": "Abrirlo",
+      "copy": "Copiar enlace",
+      "revoke": "Quitarlo",
+      "revoking": "Quitándolo...",
+      "confirm_revoke": "¿Seguro?",
+      "revoke_error": "Ese enlace no se quitó. Inténtalo de nuevo.",
+      "cache_note": "El enlace muere en Argus de inmediato. Las apps de chat a veces guardan una tarjeta de vista previa antigua en las conversaciones donde ya se pegó, y Argus no puede entrar ahí."
+    },
+    "strategy_facts": {
+      "strategy_type": "Estrategia",
+      "cadence": "Cada cuánto",
+      "indicator": "Indicador",
+      "indicator_period": "Periodo del indicador",
+      "fast_indicator": "Promedio rápido",
+      "fast_period": "Ventana rápida",
+      "slow_indicator": "Promedio lento",
+      "slow_period": "Ventana lenta",
+      "exit_fast_indicator": "Promedio rápido al salir",
+      "exit_fast_period": "Ventana rápida al salir",
+      "exit_slow_indicator": "Promedio lento al salir",
+      "exit_slow_period": "Ventana lenta al salir",
+      "signal_period": "Ventana de señal",
+      "entry_threshold": "Compra en",
+      "exit_threshold": "Vende en"
     }
   }
 }

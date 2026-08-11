@@ -1,0 +1,74 @@
+[
+  {
+    "frame": "01-empty-chat-en-desktop",
+    "lang": "en",
+    "viewport": "1280x900",
+    "localTime": "2026-08-09T12:00:00",
+    "preferredName": null,
+    "greeting": "What is worth a look today?",
+    "hasToggle": false,
+    "chipsVisible": true,
+    "consoleErrors": []
+  },
+  {
+    "frame": "02-empty-chat-en-mobile",
+    "lang": "en",
+    "viewport": "390x844",
+    "localTime": "2026-08-09T12:00:00",
+    "preferredName": null,
+    "greeting": "What is worth a look today?",
+    "hasToggle": false,
+    "chipsVisible": true,
+    "consoleErrors": []
+  },
+  {
+    "frame": "03-empty-chat-es-desktop",
+    "lang": "es-419",
+    "viewport": "1280x900",
+    "localTime": "2026-08-09T12:00:00",
+    "preferredName": null,
+    "greeting": "\u00bfQu\u00e9 vale la pena revisar hoy?",
+    "hasToggle": false,
+    "chipsVisible": true,
+    "consoleErrors": []
+  },
+  {
+    "frame": "04-empty-chat-es-mobile",
+    "lang": "es-419",
+    "viewport": "390x844",
+    "localTime": "2026-08-09T12:00:00",
+    "preferredName": null,
+    "greeting": "\u00bfQu\u00e9 vale la pena revisar hoy?",
+    "hasToggle": false,
+    "chipsVisible": true,
+    "consoleErrors": []
+  },
+  {
+    "frame": "05-closed-market-en-desktop",
+    "lang": "en",
+    "viewport": "1280x900",
+    "consoleErrors": [],
+    "greeting": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test."
+  },
+  {
+    "frame": "06-closed-market-es-mobile",
+    "lang": "es-419",
+    "viewport": "390x844",
+    "consoleErrors": [],
+    "greeting": "La bolsa est\u00e1 cerrada por el fin de semana. Las criptos no paran, as\u00ed que hay mucho por probar."
+  },
+  {
+    "frame": "07-named-en-desktop",
+    "lang": "en",
+    "viewport": "1280x900",
+    "consoleErrors": [],
+    "greeting": "Still up, Lucas. What are you curious about?"
+  },
+  {
+    "frame": "08-named-es-mobile",
+    "lang": "es-419",
+    "viewport": "390x844",
+    "consoleErrors": [],
+    "greeting": "Todav\u00eda por aqu\u00ed, Lucas. \u00bfQu\u00e9 te da curiosidad?"
+  }
+]

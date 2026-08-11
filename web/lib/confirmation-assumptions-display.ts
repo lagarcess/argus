@@ -9,6 +9,8 @@ import {
 
 export type ConfirmationDisplayFacts = {
   benchmark_symbol?: string | null;
+  /** Typed seed for the direct capital editor; rows carry display text only. */
+  capital?: number | null;
   data_through?: string | null;
   fees?: number | string | null;
   slippage?: number | string | null;

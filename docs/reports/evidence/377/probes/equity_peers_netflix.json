@@ -1,0 +1,85 @@
+{
+  "probe": "equity_peers_netflix",
+  "http_status": 200,
+  "elapsed_s": 16.73,
+  "response": {
+    "background": false,
+    "completed_at": 1786099448,
+    "created_at": 1786099448,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_4bb39b72-6563-4dec-a215-5a05a080cf61",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": 1024,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "Netflix (NASDAQ: **NFLX**) has no true public pure-play peer at comparable scale. Its closest public competitors are:\n\n| Company | Ticker | Competitive overlap |\n|---|---:|---|\n| The Walt Disney Company | **DIS** | Disney+, Hulu, ESPN+; closest diversified streaming peer |\n| Warner Bros. Discovery | **WBD** | Max and Discovery+; premium film and television |\n| Comcast | **CMCSA** | Peacock and NBCUniversal content |\n| Paramount | **PARA** | Paramount+ and Pluto TV |\n| Amazon | **AMZN** | Prime Video, MGM Studios, and advertising-supported streaming |\n| Apple | **AAPL** | Apple TV+ and original programming |\n| Alphabet | **GOOGL** / **GOOG** | YouTube and YouTube TV; major competitor for viewing time and advertising |\n| Roku | **ROKU** | Streaming platform, advertising, and The Roku Channel |\n| Fox Corporation | **FOXA** / **FOX** | Tubi and sports/news video content |\n| Sony Group | **SONY** | Film and television production plus Crunchyroll |\n\n**Best core peer set for NFLX:** **DIS, WBD, CMCSA, PARA, AMZN, and ROKU**.\n\nFor a valuation comparison, use caution: Disney, Comcast, Amazon, Apple, and Alphabet are diversified businesses, while Netflix is much closer to a streaming pure play.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_084fb183-efce-4e87-b240-02841535234a",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.03063,
+        "cache_read_cost": 0.00194,
+        "currency": "USD",
+        "input_cost": 0.00039,
+        "output_cost": 0.01998,
+        "total_cost": 0.05294
+      },
+      "input_tokens": 8855,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 4900,
+        "cache_read_input_tokens": 3877,
+        "cached_tokens": 3877
+      },
+      "output_tokens": 666,
+      "output_tokens_details": {
+        "reasoning_tokens": 345
+      },
+      "total_tokens": 9521
+    },
+    "user": null
+  }
+}

@@ -13,7 +13,6 @@ import httpx
 
 from argus.api.schemas import (
     BacktestRun,
-    Collection,
     Conversation,
     DecisionNote,
     EvidenceArtifact,
@@ -69,6 +68,7 @@ from argus.domain.supabase_message_reads import (
 from argus.domain.supabase_message_reads import (
     MessageCursorError as MessageCursorError,
 )
+from argus.domain.supabase_public_excerpts import SupabasePublicExcerptMixin
 from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
@@ -135,6 +135,7 @@ class SupabaseGateway(
     ChatTurnLifecycleGatewayMixin,
     SupabaseConversationActivityMixin,
     SupabaseMessageReadMixin,
+    SupabasePublicExcerptMixin,
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
 ):
@@ -1009,6 +1010,7 @@ class SupabaseGateway(
         confirmation_message_id: str | None = None,
         idempotency_key: str | None = None,
         execution_metadata: dict[str, Any] | None = None,
+        operation_scope: str | None = None,
     ) -> dict[str, Any]:
         clean_idempotency_key = (
             idempotency_key.strip()
@@ -1047,8 +1049,48 @@ class SupabaseGateway(
             "max_attempts": 1,
             "execution_metadata": execution_metadata or {},
         }
+        if operation_scope is not None:
+            payload["operation_scope"] = operation_scope
         created = self.client.table("backtest_jobs").insert(payload).execute()
         return dict(_row_one(created) or {})
+
+    def complete_research_job(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Terminal success for a research-scope job. No run finalization:
+        the research result is an assistant message, referenced through
+        execution_metadata, and result_run_id stays null by design."""
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Research job not found or not owned by user.")
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata or {})
+        payload = {
+            "status": "succeeded",
+            "finished_at": _now_iso(),
+            "failure_code": None,
+            "failure_detail": None,
+            "retryable": False,
+            "execution_metadata": metadata,
+            "updated_at": _now_iso(),
+        }
+        updated = (
+            self.client.table("backtest_jobs")
+            .update(payload)
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .eq("operation_scope", "chat.research")
+            .in_("status", ["queued", "running"])
+            .execute()
+        )
+        row = _row_one(updated)
+        if row is None:
+            raise ValueError("Research job is not in a completable state.")
+        return dict(row)
 
     def admit_backtest_job(self, **kwargs: Any) -> dict[str, Any]:
         from argus.domain import backtest_admission_gateway as jobs
@@ -1197,14 +1239,29 @@ class SupabaseGateway(
             payload["failure_detail"] = None
             payload["retryable"] = False
 
-        updated = (
+        update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-            .execute()
         )
-        return dict(_row_one(updated) or {})
+        if mark_succeeded:
+            from argus.domain.backtest_job_lifecycle import (
+                job_success_write_postgrest_filter,
+            )
+
+            # Success may only follow a state a worker legitimately holds;
+            # the filter is generated beside the card-restore
+            # classification so the two cannot drift. A refused write
+            # returns the standing row and the caller logs the refusal.
+            update_query = update_query.or_(job_success_write_postgrest_filter())
+        updated = update_query.execute()
+        row = _row_one(updated)
+        if row is None and mark_succeeded:
+            standing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+            if standing is not None:
+                return dict(standing)
+        return dict(row or {})
 
     def mark_backtest_job_running(
         self,
@@ -1655,34 +1712,6 @@ class SupabaseGateway(
             cursor_run_id=cursor_run_id,
         )
 
-    def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
-        self._require_owned_conversation(
-            user_id=user_id,
-            conversation_id=payload.get("conversation_id"),
-        )
-        created = (
-            self.client.table("strategies")
-            .insert({"user_id": user_id, **payload})
-            .execute()
-        )
-        return Strategy.model_validate(_row_one(created))
-
-    def list_strategies(
-        self, *, user_id: str, limit: int | None, deleted: bool = False
-    ) -> list[Strategy]:
-        query = self.client.table("strategies").select("*").eq("user_id", user_id)
-        if deleted:
-            query = query.not_.is_("deleted_at", "null")
-        else:
-            query = query.is_("deleted_at", "null")
-
-        ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
-        if limit is None:
-            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
-        else:
-            rows_data = ordered.limit(limit).execute().data or []
-        return [Strategy.model_validate(row) for row in rows_data]
-
     def get_strategy(self, *, user_id: str, strategy_id: str) -> Strategy | None:
         rows = (
             self.client.table("strategies")
@@ -1694,154 +1723,6 @@ class SupabaseGateway(
         )
         row = _row_one(rows)
         return Strategy.model_validate(row) if row else None
-
-    def patch_strategy(
-        self, *, user_id: str, strategy_id: str, patch: dict[str, Any]
-    ) -> Strategy | None:
-        patch["updated_at"] = _now_iso()
-        self.client.table("strategies").update(patch).eq("id", strategy_id).eq(
-            "user_id", user_id
-        ).execute()
-        return self.get_strategy(user_id=user_id, strategy_id=strategy_id)
-
-    def soft_delete_strategy(self, *, user_id: str, strategy_id: str) -> bool:
-        result = (
-            self.client.table("strategies")
-            .update({"deleted_at": _now_iso(), "updated_at": _now_iso()})
-            .eq("id", strategy_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
-        return bool(result.data)
-
-    def create_collection(self, *, user_id: str, payload: dict[str, Any]) -> Collection:
-        created = (
-            self.client.table("collections")
-            .insert({"user_id": user_id, **payload})
-            .execute()
-        )
-        row = _row_one(created)
-        if row is None:
-            raise RuntimeError("Failed to create collection.")
-        row["strategy_count"] = 0
-        return Collection.model_validate(row)
-
-    def list_collections(self, *, user_id: str, limit: int | None) -> list[Collection]:
-        query = (
-            self.client.table("collections")
-            .select("*")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("pinned", desc=True)
-            .order("updated_at", desc=True)
-        )
-        if limit is None:
-            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
-        else:
-            rows_data = query.limit(limit).execute().data or []
-        items: list[Collection] = []
-        for row in rows_data:
-            count = (
-                self.client.table("collection_strategies")
-                .select("id", count="exact")
-                .eq("collection_id", row["id"])
-                .eq("user_id", user_id)
-                .execute()
-                .count
-                or 0
-            )
-            row["strategy_count"] = count
-            items.append(Collection.model_validate(row))
-        return items
-
-    def get_collection(self, *, user_id: str, collection_id: str) -> Collection | None:
-        rows = (
-            self.client.table("collections")
-            .select("*")
-            .eq("user_id", user_id)
-            .eq("id", collection_id)
-            .limit(1)
-            .execute()
-        )
-        row = _row_one(rows)
-        if not row:
-            return None
-        count = (
-            self.client.table("collection_strategies")
-            .select("id", count="exact")
-            .eq("collection_id", collection_id)
-            .eq("user_id", user_id)
-            .execute()
-            .count
-            or 0
-        )
-        row["strategy_count"] = count
-        return Collection.model_validate(row)
-
-    def patch_collection(
-        self, *, user_id: str, collection_id: str, patch: dict[str, Any]
-    ) -> Collection | None:
-        patch["updated_at"] = _now_iso()
-        self.client.table("collections").update(patch).eq("id", collection_id).eq(
-            "user_id", user_id
-        ).execute()
-        return self.get_collection(user_id=user_id, collection_id=collection_id)
-
-    def soft_delete_collection(self, *, user_id: str, collection_id: str) -> bool:
-        result = (
-            self.client.table("collections")
-            .update({"deleted_at": _now_iso(), "updated_at": _now_iso()})
-            .eq("id", collection_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
-        return bool(result.data)
-
-    def attach_strategies(
-        self, *, user_id: str, collection_id: str, strategy_ids: list[str]
-    ) -> Collection | None:
-        collection = self.get_collection(user_id=user_id, collection_id=collection_id)
-        if collection is None:
-            return None
-
-        if strategy_ids:
-            valid_strategies = (
-                self.client.table("strategies")
-                .select("id")
-                .eq("user_id", user_id)
-                .in_("id", strategy_ids)
-                .execute()
-            )
-            valid_ids = {row["id"] for row in (valid_strategies.data or [])}
-            if len(valid_ids) != len(set(strategy_ids)):
-                raise ValueError("One or more strategies not found or not owned by user.")
-
-        rows = [
-            {
-                "user_id": user_id,
-                "collection_id": collection_id,
-                "strategy_id": strategy_id,
-            }
-            for strategy_id in strategy_ids
-        ]
-        if rows:
-            self.client.table("collection_strategies").upsert(
-                rows, on_conflict="collection_id,strategy_id"
-            ).execute()
-        return self.get_collection(user_id=user_id, collection_id=collection_id)
-
-    def detach_strategy(
-        self, *, user_id: str, collection_id: str, strategy_id: str
-    ) -> bool:
-        result = (
-            self.client.table("collection_strategies")
-            .delete()
-            .eq("user_id", user_id)
-            .eq("collection_id", collection_id)
-            .eq("strategy_id", strategy_id)
-            .execute()
-        )
-        return bool(result.data)
 
     def check_and_increment_usage(
         self, *, user_id: str, resource: str, period: str, limit_count: int

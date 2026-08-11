@@ -1,0 +1,157 @@
+argus
+New chat
+Search
+Recents
+Netflix Business and Stock Performance
+Sign in
+How is Netflix doing?
+
+Netflix’s business is doing well: revenue and profits are growing at double-digit rates, advertising is expanding, and management expects strong growth for 2026. The stock, however, remains well below its 52-week high.
+
+Latest results
+Q2 2026, ENDED JUNE 30	RESULT	YEAR-OVER-YEAR
+Revenue	$12.560 billion	+13.4%
+Operating profit	$4.193 billion	+11.1%
+Net income	$3.401 billion	+8.8%
+Diluted EPS	$0.80	+11.1%
+Operating margin	33%	Down from 34%
+
+Revenue was $21.260 million below analysts’ consensus, while EPS was $0.01 above consensus, essentially a mixed but close-to-expectations quarter.
+
+What is going right
+Subscriptions, price increases and advertising are all contributing. Management reported healthy customer acquisition and retention, with recent price changes performing as expected.
+Advertising is becoming meaningful. Netflix previously projected roughly $3 billion of ad revenue in 2026, roughly double the prior year.
+Engagement is still growing. Viewing hours increased 2% in the first half of 2026, adding 1.5 billion hours from the prior-year period.
+Content spending remains controlled. Netflix expects content expense to rise 10% in 2026, slower than its expected revenue growth.
+Cash generation remains positive. Q2 operating cash flow was $1.744 billion; after $218.644 million of property and equipment purchases, that left $1.525 billion.
+Netflix had $9.099 billion in cash as of June 30, 2026. A reliable current total-debt figure was unavailable.
+Outlook and watch points
+
+Management expects 13%, 14% revenue growth for full-year 2026 and 12% reported growth in Q3. The main concerns are:
+
+Revenue growth has slowed from 17% in late 2025 to 12% on a constant-currency basis in Q2.
+Q2 operating profit grew more slowly than revenue, and the operating margin slipped one percentage point year over year.
+Viewing growth is modest, while live-event customers can show somewhat higher churn.
+Netflix must keep producing attractive content while expanding into ads, live events, games and other formats without overspending.
+Stock snapshot
+
+As of the August 7, 2026 market close, NFLX traded at $74.14, with a $308.715 billion market capitalization and a 23.31 price-to-earnings ratio. Its 52-week range was $65.08, $126.71, placing the shares 41.5% below the high.
+
+Bottom line: Netflix’s underlying business looks healthy and increasingly profitable, but growth is gradually moderating and the stock’s performance shows that investors are demanding continued strong execution.
+
+These figures come from market data rather than linked articles, so there are no source links to open.
+
+How is Apple doing?
+
+Apple is doing very well operationally: sales and profit are growing strongly, iPhone demand has accelerated, Services continues to expand, and cash generation remains substantial. The main concern is that the stock already carries a relatively high valuation, while supply constraints and rising component costs could pressure future growth and margins.
+
+Latest results
+
+Fiscal Q3 ended June 27, 2026:
+
+METRIC	RESULT	YEAR-OVER-YEAR
+Revenue	$109.417 billion	+16%
+Net income	$29.789 billion	+27%
+Diluted EPS	$2.02	+29%
+Gross margin	50%	Up from 46%
+Free cash flow*	$31.914 billion	+31%
+
+*Operating cash flow plus capital expenditures, which are reported as a negative cash outflow.
+
+Apple exceeded analyst expectations: revenue beat consensus by $378.1 million, while EPS of $2.02 beat the $1.88 estimate.
+
+What is driving the business?
+iPhone: Revenue rose 22% to $54.252 billion, making it the largest growth driver.
+Mac: Revenue rose 29% to $10.352 billion.
+Services: Revenue increased 12% to a record $30.739 billion. Apple now has more than 1.5 billion paid subscriptions across its services.
+Customer base: Apple’s installed base exceeded 2.5 billion active devices, supporting recurring Services revenue.
+China: Greater China revenue was $18.816 billion, and management reported a June-quarter record in mainland China.
+Outlook and risks
+
+For the September 2026 quarter, Apple expects:
+
+Revenue growth of 9%, 11%
+Mid-teens iPhone revenue growth
+Gross margin of 47%, 48%
+
+That still indicates healthy growth, but management flagged several pressures:
+
+Supply constraints affecting iPhone, Mac, and iPad chips.
+Rising memory prices, which are expected to weigh on margins.
+Foreign-exchange headwinds, particularly for Services.
+Tariff effects: the latest quarter benefited from refunds that added two percentage points to gross margin and $0.11 to EPS.
+AI execution and regulation: Apple is enthusiastic about Siri AI, but deployment remains at an early stage in China and faces regulatory limitations in the EU.
+Stock snapshot
+
+As of the latest market price on August 7, 2026:
+
+Share price: $313.33
+Market capitalization: $4,601,989,255,480
+Price-to-earnings ratio: 35.89
+52-week range: $223.78, $344.57
+
+Bottom line: Apple’s underlying business is performing strongly, with unusually robust iPhone and Mac growth, expanding Services revenue, and excellent cash generation. Its immediate challenges are largely about fulfilling demand and protecting margins, not weak customer demand. However, the stock’s 35.89 earnings multiple indicates that investors already expect substantial future success.
+
+These figures come from market data rather than linked articles, so there are no source links to open.
+
+How is Microsoft doing?
+
+Microsoft is doing very well. Its cloud and AI businesses are growing rapidly, annual revenue and profit reached records, and demand for Azure remains greater than available capacity. The main concern is the extraordinary cost of building AI infrastructure, which is consuming more cash and pressuring margins.
+
+Latest results
+FISCAL PERIOD ENDED JUNE 30, 2026	RESULT	YEAR-OVER-YEAR
+Revenue	$90.007 billion	+18%
+Operating income	$40.603 billion	+18%
+Net income attributable to shareholders	$35.766 billion	+31%
+Operating margin	45%	Slightly higher
+Azure and other cloud-services growth	43%	-
+
+Azure is the standout. Microsoft says customer demand still exceeds its available computing capacity, and it expects Azure growth of 45% in constant currency in the September 2026 quarter.
+
+For the full fiscal year, revenue rose to $331.839 billion, operating income reached $155.237 billion, and net income was $133.749 billion. Some profit growth benefited from investment gains, including a $3.2 billion gain related to Anthropic, so the headline net-income increase somewhat overstates underlying improvement.
+
+The trade-off: enormous AI spending
+
+Microsoft generated $182.935 billion in operating cash flow during fiscal 2026 but spent $115.948 billion on property and equipment. That left $66.987 billion after those purchases, down from $71.611 billion in fiscal 2025 despite stronger operations.
+
+Management expects:
+
+More than $50 billion of capital expenditure in the September quarter.
+Fiscal 2027 capital expenditure to grow again.
+Double-digit revenue and operating-income growth in fiscal 2027.
+Full-year operating margin to decline by less than one percentage point.
+
+In simple terms, Microsoft’s AI products are attracting strong demand, but the data centers and chips needed to serve that demand are exceptionally expensive.
+
+Stock snapshot
+
+As of the latest market close on August 7, 2026:
+
+Share price: $499.99
+Market value: $3,712,700,744,500
+Price-to-earnings ratio: 27.85
+52-week range: $349.20, $553.72
+Trailing dividend yield: 1%
+
+Bottom line: Microsoft’s core business is strong and Azure’s acceleration is particularly impressive. The central question is no longer whether AI demand exists, it clearly does, but whether Microsoft can turn its massive infrastructure spending into attractive, durable cash returns while protecting margins.
+
+These figures come from market data rather than linked articles, so there are no source links to open.
+
+How is Costco doing?
+
+Over the past year Costco shares fell 4.17 percent from 988.93 to 947.73.
+
+The biggest drop from any peak was 16.63 percent (a drawdown, meaning the largest slide before prices recovered).
+Price swings were 19.8 percent annualized (volatility, a simple measure of how much the stock moves up or down).
+
+Figures cover the 250 trading days ending 9 August 2026.
+
+You've used today's free research questions, so this answer comes from Argus's own data and what I already know. Create an account to keep researching; testing ideas is still available.
+
+TRY NEXT
+↳
+Test Costco Wholesale COST over the last 3 years
+
+Argus can make mistakes. For education only. Not financial advice. Terms · Privacy.
+
+Temporary chat · available until Aug 16, 2026

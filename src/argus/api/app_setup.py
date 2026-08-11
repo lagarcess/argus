@@ -16,6 +16,7 @@ from argus.api.dependencies import (
     request_id_middleware,
     validation_problem_body,
 )
+from argus.api.public_excerpts import EvidenceReceiptFlagGateMiddleware
 from argus.llm.openrouter_key_policy import validate_hosted_openrouter_configuration
 
 DEFAULT_CORS_ALLOW_ORIGINS = (
@@ -65,9 +66,16 @@ async def lifespan(app: FastAPI):
     app.state.agent_runtime_checkpointer = checkpointer
     app.state.agent_runtime_checkpointer_cm = checkpointer_cm
     app.state.agent_runtime_workflow = None
+    from argus.api.personalization_memory import (
+        start_personalization_memory,
+        stop_personalization_memory,
+    )
+
+    start_personalization_memory(app)
     try:
         yield
     finally:
+        stop_personalization_memory(app)
         if checkpointer_cm is not None:
             await checkpointer_cm.__aexit__(None, None, None)
 
@@ -112,6 +120,9 @@ async def validation_exception_handler(  # type: ignore[no-untyped-def]
 
 def add_core_middleware_and_handlers(app: FastAPI) -> None:
     app.add_middleware(ChatRequestBoundaryMiddleware)
+    # Added before request_id_middleware so it sits inside it: a gated 404 still
+    # carries X-Request-Id, exactly as a genuine unmatched route does.
+    app.add_middleware(EvidenceReceiptFlagGateMiddleware)
     app.middleware("http")(request_id_middleware)
     app.add_middleware(
         CORSMiddleware,

@@ -6,6 +6,7 @@ import type {
 } from "@/lib/argus-api";
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
+import type { MemoryRecallItem } from "@/lib/memory-recalls";
 
 export type StrategyResultMetric = {
   label: string;
@@ -91,7 +92,8 @@ export type ChatActionOption = {
     | "select_discovery_candidate"
     | "retry_last_turn"
     | "retry_load_conversation"
-    | "retest_run";
+    | "retest_run"
+    | "add_confirmation_peer";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -110,6 +112,10 @@ export type ChatMention = {
   description?: string | null;
   insert_text: string;
   provider?: string | null;
+  message_range?: {
+    start: number;
+    end: number;
+  };
 };
 
 export type StrategyResultPayload = {
@@ -202,6 +208,12 @@ export type StrategyConfirmationBenchmarkAdjustment = {
   effective_benchmark: string;
 };
 
+/** §3.2: requested changes the edit turn could not apply, with reasons. */
+export type StrategyConfirmationEditDisclosure = {
+  unapplied: { op: string; target: string; reason: string }[];
+  note?: string | null;
+};
+
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
@@ -219,15 +231,51 @@ export type StrategyConfirmationPayload = {
   display_facts?: ConfirmationDisplayFacts;
   capabilities?: StrategyConfirmationCapabilities;
   date_range?: StrategyConfirmationDateRange;
+  retest_period?: import("@/lib/chat-retest").RetestPeriodPayload | null;
   period_adjustment?: StrategyConfirmationPeriodAdjustment;
   benchmark_adjustment?: StrategyConfirmationBenchmarkAdjustment;
+  assets_adjustment?: StrategyConfirmationAssetsAdjustment;
+  edit_disclosure?: StrategyConfirmationEditDisclosure;
   rows: StrategyConfirmationRow[];
   assumptions?: string[];
   actions?: ChatActionOption[];
 };
 
+export type StrategyConfirmationAssetsAdjustment = {
+  code: string;
+  added: { symbol: string; name: string }[];
+  previous_symbols: string[];
+  symbols: string[];
+  /* The one consequence a basket change can produce: the shared history
+   * window clamps. Disclosed inline next to the period field. */
+  period_change?: {
+    from: { start: string; end: string };
+    to: { start: string; end: string };
+  } | null;
+};
+
 export type StrategyConfirmationCapabilities = {
   execution_costs_editable?: boolean;
+  /** Direct no-turn edits the typed endpoint accepts for this card. */
+  direct_edits?: ("capital" | "dates" | "costs")[];
+  /** The accepted-value envelope for this card's edits: the engine's own
+   * bounds, advertised so the client renders backend truth without owning
+   * it. Rates are decimals; dates are ISO. */
+  edit_constraints?: {
+    capital?: { min?: number; max?: number };
+    fees?: { min?: number; max?: number };
+    slippage?: { min?: number; max?: number };
+    date_window?: { min_start?: string; max_end?: string };
+  };
+};
+
+/** Typed values the direct-edit endpoint accepts; at least one is present.
+ * Costs are decimal rates, converted from the editor's percent inputs. */
+export type ConfirmationDirectEditPayload = {
+  capital?: number;
+  date_window?: { start: string; end: string };
+  fee_rate?: number;
+  slippage?: number;
 };
 
 export type StrategyPathContext = {
@@ -276,8 +324,14 @@ export type Message = {
   assistantRecoveryCode?: string | null;
   /** Backend-provided grounded-discovery sidecar (argus_discovery/v1). */
   discovery?: DiscoverySidecar | null;
+  /** Typed sources from a research turn; the one surface every shape uses. */
+  researchSources?: DiscoverySource[] | null;
+  /** Backend post-turn saved-decision recalls; rendered as context only. */
+  memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-owned structured context for a retest receipt turn. */
   retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
+  /** Ephemeral optimistic presentation; never hydrated or persisted. */
+  retestReceiptPending?: boolean;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
 };
 

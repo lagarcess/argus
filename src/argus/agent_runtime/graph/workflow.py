@@ -92,6 +92,8 @@ class WorkflowState(TypedDict, total=False):
     discovery: dict[str, Any]
     discovery_usage: dict[str, Any]
     next_experiments: dict[str, Any]
+    research: dict[str, Any]
+    research_job_request: dict[str, Any]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -117,6 +119,8 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "discovery",
         "discovery_usage",
         "next_experiments",
+        "research",
+        "research_job_request",
     }
 )
 
@@ -695,9 +699,7 @@ def _build_thread_metadata(
             prior_kinds = prior_offer_metadata.get("next_experiments_offered_kinds")
             if isinstance(prior_kinds, list) and prior_kinds:
                 metadata["next_experiments_offered_kinds"] = list(prior_kinds)
-                prior_sends = prior_offer_metadata.get(
-                    "next_experiments_offered_texts"
-                )
+                prior_sends = prior_offer_metadata.get("next_experiments_offered_texts")
                 if isinstance(prior_sends, dict) and prior_sends:
                     metadata["next_experiments_offered_texts"] = dict(prior_sends)
     requested_field = workflow_state.get("requested_field")

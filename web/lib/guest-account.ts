@@ -18,6 +18,12 @@ export type ApiUser = {
   email: string | null;
   username: string | null;
   display_name: string | null;
+  /**
+   * What the user asked Argus to call them. Distinct from `display_name`, which
+   * is an identity field. Absent for guests, and null when nobody has set one,
+   * which means greetings use no name.
+   */
+  preferred_name?: string | null;
   language: "en" | "es-419";
   locale: "en-US" | "es-419";
   avatar_theme?: AvatarTheme;

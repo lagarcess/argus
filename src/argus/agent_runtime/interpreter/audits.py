@@ -199,7 +199,7 @@ class StatedExecutionCost(BaseModel):
             "Canonical decimal rate explicitly stated by the current user message. "
             "For example, 10 basis points is 0.001. Preserve 0.0 when the user "
             "explicitly clears the cost."
-        )
+        ),
     )
     evidence_span: str = Field(
         min_length=1,

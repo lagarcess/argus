@@ -9,10 +9,22 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
-import NextMoveRow, { NextMoveDetail, NextMoveSeparator, NextMoveTitle } from "./NextMoveRow";
+import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
+import NextMoveRow, {
+  NextMoveDetail,
+  NextMoveSeparator,
+  NextMoveTicker,
+  NextMoveTitle,
+} from "./NextMoveRow";
 import { nextExperimentAction } from "@/lib/chat-next-experiments";
-import { type ChatActionOption, type ChatMention, Message } from "./types";
+import {
+  type ChatActionOption,
+  type ChatMention,
+  type ConfirmationDirectEditPayload,
+  Message,
+} from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
@@ -31,15 +43,23 @@ import {
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
+import { confirmationEditDisclosureText } from "@/lib/confirmation-edit-disclosure";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
+import { EntityToken } from "./entity-token";
+import { messageMentionPieces } from "./mention-rendering";
 
 
 type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
+  onDirectEdit?: (
+    confirmationId: string,
+    edit: ConfirmationDirectEditPayload,
+  ) => Promise<void>;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
@@ -49,6 +69,7 @@ type ChatMessageProps = {
   turnInFlight?: boolean;
   isGuest?: boolean;
   canSaveDecision?: boolean;
+  memoryProposalEnabled?: boolean;
   onDecisionUnavailable?: (artifactId: string) => void;
   onDecisionSaved?: (decisionState: DecisionState) => void;
   onRequestSearchUpgrade?: () => void;
@@ -62,6 +83,7 @@ const retryIconButtonClass =
 export default function ChatMessage({
   message,
   onAction,
+  onDirectEdit,
   onFeedback,
   onToast,
   isLatest,
@@ -71,6 +93,7 @@ export default function ChatMessage({
   turnInFlight = false,
   isGuest = false,
   canSaveDecision = true,
+  memoryProposalEnabled = false,
   onDecisionUnavailable,
   onDecisionSaved,
   onRequestSearchUpgrade,
@@ -78,6 +101,7 @@ export default function ChatMessage({
   onDecisionResumeHandled,
 }: ChatMessageProps) {
   const { t, i18n } = useTranslation();
+  const { isBelowTablet } = useResponsiveLayout();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
@@ -273,17 +297,26 @@ export default function ChatMessage({
     message.confirmation?.benchmark_adjustment,
     (key, options) => t(key, options),
   );
+  const confirmationEditDisclosureLeadIn = confirmationEditDisclosureText(
+    message.confirmation?.edit_disclosure,
+    t,
+  );
 
   if (isUser && message.kind === "action") {
     const actionText =
       displayContent ||
       (message.selectedAction ? actionLabel(message.selectedAction) : "");
+    const showRetestReceipt =
+      Boolean(message.retestReceipt) ||
+      (message.selectedAction?.type === RETEST_ACTION_TYPE &&
+        message.retestReceiptPending === true);
     return (
       <div className="flex w-full flex-col items-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {message.retestReceipt ? (
+        {showRetestReceipt ? (
           <RetestReceipt
-            receipt={message.retestReceipt}
+            receipt={message.retestReceipt ?? null}
             actionLabel={actionText}
+            pending={message.retestReceiptPending === true}
           />
         ) : (
           <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
@@ -339,6 +372,7 @@ export default function ChatMessage({
                 result={message.result}
                 onAction={onAction}
                 canSaveDecision={canSaveDecision}
+                memoryProposalEnabled={memoryProposalEnabled}
                 onDecisionUnavailable={onDecisionUnavailable}
                 onDecisionSaved={onDecisionSaved}
                 resumeDecisionArtifactId={resumeDecisionArtifactId}
@@ -371,7 +405,24 @@ export default function ChatMessage({
                   {confirmationBenchmarkLeadIn}
                 </p>
               ) : null}
-              <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
+              {confirmationEditDisclosureLeadIn ? (
+                <p
+                  data-testid="confirmation-edit-disclosure"
+                  className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75"
+                >
+                  {confirmationEditDisclosureLeadIn}
+                </p>
+              ) : null}
+              <StrategyConfirmationCard
+                confirmation={message.confirmation}
+                onAction={onAction}
+                onDirectEdit={
+                  onDirectEdit && message.confirmation.confirmation_id
+                    ? (edit) =>
+                        onDirectEdit(message.confirmation!.confirmation_id!, edit)
+                    : undefined
+                }
+              />
               {isGuest ? <GuestArtifactHint kind="confirmation" /> : null}
             </div>
           ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (
@@ -429,6 +480,9 @@ export default function ChatMessage({
             </div>
           )}
 
+          {!isUser && !isStreaming && message.memoryRecalls?.length ? (
+            <MemoryRecallNote recalls={message.memoryRecalls} />
+          ) : null}
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
               <div className="flex flex-col divide-y divide-black/8 dark:divide-white/8">
@@ -436,6 +490,12 @@ export default function ChatMessage({
                   const sendText = t("chat.discovery_results.test_candidate", {
                     symbol: candidate.symbol,
                     defaultValue: "Backtest {{symbol}}",
+                  });
+                  // One row vocabulary: the same verb the rail's rows use,
+                  // with the name leading and the ticker as its badge. The
+                  // sent text stays the backend-owned action string.
+                  const testVerb = t("chat.next_experiments.test_verb", {
+                    defaultValue: "Test",
                   });
                   const hasName =
                     Boolean(candidate.name) && candidate.name !== candidate.symbol;
@@ -465,13 +525,11 @@ export default function ChatMessage({
                         })
                       }
                     >
-                      <NextMoveTitle>{sendText}</NextMoveTitle>
-                      {hasName ? (
-                        <>
-                          <NextMoveSeparator>·</NextMoveSeparator>
-                          <NextMoveDetail>{candidate.name}</NextMoveDetail>
-                        </>
-                      ) : null}
+                      <NextMoveTitle>
+                        {testVerb}
+                        {hasName ? ` ${candidate.name}` : ""}{" "}
+                        <NextMoveTicker>{candidate.symbol}</NextMoveTicker>
+                      </NextMoveTitle>
                       {candidate.reason_text ? (
                         <>
                           <NextMoveSeparator>·</NextMoveSeparator>
@@ -588,6 +646,41 @@ export default function ChatMessage({
             </div>
           )}
 
+          {/* One sources surface for every rail shape: the model never writes
+              a citation line, and this renders only what the backend sidecar
+              carried. */}
+          {!message.discovery && (message.researchSources?.length ?? 0) > 0 ? (
+            <div className="mt-2 flex w-full max-w-[min(100%,660px)]">
+              <button
+                type="button"
+                onClick={() => setShowSources(true)}
+                data-testid="research-sources-open"
+                className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
+              >
+                {t("chat.discovery_results.sources_panel_open", {
+                  count: message.researchSources?.length ?? 0,
+                  defaultValue: "{{count}} sources ›",
+                  defaultValue_one: "{{count}} source ›",
+                })}
+              </button>
+            </div>
+          ) : null}
+
+          {!message.discovery &&
+          showSources &&
+          (message.researchSources?.length ?? 0) > 0 ? (
+            <DiscoverySourcesPanel
+              onClose={() => {
+                setShowSources(false);
+                setAnchorSourceIndex(null);
+              }}
+              sidecar={{
+                sources: message.researchSources ?? [],
+                retrieved_at: "",
+              }}
+            />
+          ) : null}
+
           {message.discovery && showSources ? (
             <DiscoverySourcesPanel
               onClose={() => {
@@ -599,12 +692,12 @@ export default function ChatMessage({
             />
           ) : null}
 
-          {/* The result's own Try next rows are the sanctioned next-move
-              surface; only mid-turn composition suppresses them. */}
+          {/* Try next rows are the sanctioned next-move surface for any
+              message that carries them (results, grounded knowledge answers);
+              only mid-turn composition suppresses them. */}
           {shouldShowAssistantFooter &&
             Boolean(isLatest) &&
             !turnInFlight &&
-            message.kind === "strategy_result" &&
             (message.nextExperiments?.length ?? 0) > 0 && (
               <section
                 aria-label={t("chat.next_experiments.section", "Try next")}
@@ -616,6 +709,12 @@ export default function ChatMessage({
                 <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
                   {(message.nextExperiments ?? []).map((row, rowIndex) => {
                     const rowLabel = t(row.labelKey, row.label);
+                    // Narrow screens read the backend's short form; the clamp
+                    // below is only a safety net, never a single-line ellipsis.
+                    const narrowLabel =
+                      isBelowTablet && row.labelShortKey
+                        ? t(row.labelShortKey, row.labelShort ?? row.label)
+                        : rowLabel;
                     // One result-level reason; captioning every row repeats it.
                     const whyText =
                       row.why && rowIndex === 0
@@ -639,7 +738,20 @@ export default function ChatMessage({
                           )
                         }
                       >
-                        <NextMoveTitle>{rowLabel}</NextMoveTitle>
+                        <NextMoveTitle>
+                          {row.labelParts
+                            ? row.labelParts.map((part, partIndex) =>
+                                part.type === "ticker" ? (
+                                  <span key={partIndex}>
+                                    {" "}
+                                    <NextMoveTicker>{part.value}</NextMoveTicker>
+                                  </span>
+                                ) : (
+                                  <span key={partIndex}>{part.value}</span>
+                                ),
+                              )
+                            : narrowLabel}
+                        </NextMoveTitle>
                         {row.detail ? (
                           <>
                             <NextMoveSeparator>·</NextMoveSeparator>
@@ -843,74 +955,24 @@ function ResultBreakdown({
 
 function UserMessageContent({ content, mentions }: { content: string; mentions: ChatMention[] }) {
   if (mentions.length === 0) return <>{content}</>;
-
-  const pieces: Array<string | ChatMention> = [];
-  let cursor = 0;
-  const remainingMentions = [...mentions];
-
-  while (cursor < content.length) {
-    let nextMatch:
-      | {
-          index: number;
-          mention: ChatMention;
-          text: string;
-          mentionIndex: number;
-        }
-      | null = null;
-
-    for (let mentionIndex = 0; mentionIndex < remainingMentions.length; mentionIndex++) {
-      const mention = remainingMentions[mentionIndex];
-      const candidates = [mention.insert_text, mention.symbol ?? "", mention.label]
-        .filter(Boolean)
-        .sort((a, b) => b.length - a.length);
-      for (const candidate of candidates) {
-        const index = content.indexOf(candidate, cursor);
-        if (index < 0) continue;
-        if (nextMatch === null || index < nextMatch.index) {
-          nextMatch = { index, mention, text: candidate, mentionIndex };
-        }
-      }
-    }
-
-    if (nextMatch === null) {
-      pieces.push(content.slice(cursor));
-      break;
-    }
-
-    if (nextMatch.index > cursor) {
-      pieces.push(content.slice(cursor, nextMatch.index));
-    }
-    pieces.push(nextMatch.mention);
-    cursor = nextMatch.index + nextMatch.text.length;
-    remainingMentions.splice(nextMatch.mentionIndex, 1);
-  }
+  const pieces = messageMentionPieces(content, mentions);
 
   return (
     <>
       {pieces.map((piece, index) =>
-        typeof piece === "string" ? (
-          <span key={`text-${index}`}>{piece}</span>
+        piece.kind === "text" ? (
+          <span key={`text-${index}`}>{piece.text}</span>
         ) : (
-          <MentionText key={`${piece.id}-${index}`} mention={piece} />
+          <EntityToken
+            key={`${piece.mention.id}-${index}`}
+            kind={piece.mention.type}
+            surface="transcript"
+            title={piece.mention.description ?? piece.mention.label}
+          >
+            {piece.text}
+          </EntityToken>
         ),
       )}
     </>
-  );
-}
-
-function MentionText({ mention }: { mention: ChatMention }) {
-  const label = mention.type === "asset" ? mention.insert_text : mention.label;
-  const color =
-    mention.type === "asset"
-      ? "text-[#c2a44d]"
-      : "text-[#494fdf] dark:text-[#8f93ff]";
-
-  return (
-    <span
-      className={`mx-0.5 inline-flex select-none items-baseline rounded-sm px-0.5 font-semibold ${color}`}
-      title={mention.description ?? mention.label}
-    >
-      {label}
-    </span>
   );
 }
