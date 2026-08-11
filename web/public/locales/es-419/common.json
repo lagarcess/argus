@@ -1524,15 +1524,12 @@
       "macd crossover": "Cruce MACD"
     },
     "metric_labels": {
-      "total_return_pct": "Retorno total",
-      "total_return": "Retorno total",
-      "benchmark_return_pct": "Referencia",
-      "max_drawdown_pct": "Peor caída",
-      "max_drawdown": "Peor caída",
-      "win_rate_pct": "Aciertos",
       "cash_value": "Valor final",
-      "benchmark_return": "Referencia",
-      "win_rate": "Aciertos"
+      "total_return_pct": "Retorno total",
+      "max_drawdown_pct": "Peor caída",
+      "win_rate": "Aciertos",
+      "benchmark_return_pct": "Referencia",
+      "delta_vs_benchmark_pct": "Frente a la referencia"
     },
     "hero": {
       "ahead": "{{value}} por encima de {{symbol}}",

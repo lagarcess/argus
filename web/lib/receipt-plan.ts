@@ -1,5 +1,6 @@
 import type {
   PublicReceiptAssumptionKey,
+  PublicReceiptMetricKey,
   PublicReceiptPayload,
   PublicReceiptStrategyFactKey,
 } from "./public-receipt-contract";
@@ -236,22 +237,31 @@ export function benchmarkVerdict(
 ): string | null {
   const symbol = payload.benchmark_symbol;
   if (!symbol) return null;
-  const find = (...keys: string[]) =>
-    payload.metrics.find((metric) => keys.includes(metric.key))?.value ?? null;
-  const mine = find("total_return_pct", "total_return");
-  const theirs = find("benchmark_return_pct", "benchmark_return");
-  if (!theirs) return null;
-
+  const find = (key: PublicReceiptMetricKey) =>
+    payload.metrics.find((metric) => metric.key === key)?.value ?? null;
   const parse = (value: string) => {
     const match = value.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
     return match ? Number.parseFloat(match[0]) : null;
   };
-  const left = mine ? parse(mine) : null;
-  const right = parse(theirs);
-  if (left === null || right === null) {
-    return interpolate(copy.hero.vs, { symbol, value: theirs });
+
+  // The engine's own delta, when the payload carries it. Subtracting two already
+  // rounded display strings can land a tenth of a point away from what the run
+  // actually computed, and this page is a record.
+  const frozenDelta = find("delta_vs_benchmark_pct");
+  const theirs = find("benchmark_return_pct");
+  const delta =
+    frozenDelta !== null
+      ? parse(frozenDelta)
+      : (() => {
+          const mine = find("total_return_pct");
+          const left = mine ? parse(mine) : null;
+          const right = theirs ? parse(theirs) : null;
+          return left === null || right === null ? null : left - right;
+        })();
+
+  if (delta === null) {
+    return theirs ? interpolate(copy.hero.vs, { symbol, value: theirs }) : null;
   }
-  const delta = left - right;
   const rounded = `${Math.abs(delta).toFixed(1)} pts`;
   return interpolate(delta >= 0 ? copy.hero.ahead : copy.hero.behind, {
     value: rounded,
@@ -263,8 +273,7 @@ export function benchmarkVerdict(
 export function benchmarkReturn(payload: PublicReceiptPayload): string | null {
   if (!payload.benchmark_symbol) return null;
   return (
-    payload.metrics.find((metric) =>
-      ["benchmark_return_pct", "benchmark_return"].includes(metric.key),
-    )?.value ?? null
+    payload.metrics.find((metric) => metric.key === "benchmark_return_pct")
+      ?.value ?? null
   );
 }

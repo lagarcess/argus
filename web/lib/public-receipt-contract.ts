@@ -62,19 +62,22 @@ export type PublicReceiptAssumption = {
 };
 
 /**
- * Closed key set, and no frozen label. `benchmark_delta` is deliberately absent:
- * its value is a sentence, so the page composes its own comparison from numbers.
+ * Closed key set, and no frozen label. The card's own `benchmark_delta` row is
+ * absent because its value is an English sentence; the two keys below carry the
+ * same comparison as numbers, read from the run's metrics, and the page composes
+ * the sentence in the reader's language.
+ *
+ * Values are the run's display strings, except `delta_vs_benchmark_pct`, which is
+ * a bare signed number because its unit is percentage points and that unit is a
+ * word.
  */
 export type PublicReceiptMetricKey =
   | "cash_value"
   | "total_return_pct"
-  | "total_return"
-  | "benchmark_return_pct"
-  | "benchmark_return"
   | "max_drawdown_pct"
-  | "max_drawdown"
   | "win_rate"
-  | "win_rate_pct";
+  | "benchmark_return_pct"
+  | "delta_vs_benchmark_pct";
 
 export type PublicReceiptMetric = {
   key: PublicReceiptMetricKey;
@@ -194,7 +197,7 @@ export async function fetchPublicReceipt(
 export function headlineReceiptMetric(
   payload: PublicReceiptPayload,
 ): PublicReceiptMetric | null {
-  const preferred: PublicReceiptMetricKey[] = ["total_return_pct", "total_return"];
+  const preferred: PublicReceiptMetricKey[] = ["total_return_pct"];
   for (const key of preferred) {
     const match = payload.metrics.find((metric) => metric.key === key);
     if (match) return match;

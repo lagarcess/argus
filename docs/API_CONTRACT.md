@@ -652,6 +652,12 @@ timestamps cannot drop or repeat a row across pages.
   one.
 - The request carries no credentials, and `payload` is the closed set documented in
   `docs/DATA_MODEL.md` section 12.1.3.
+- A stored payload this build cannot parse answers `503` with `Retry-After` and
+  code `receipt_unavailable`, which the viewer's page reads as temporarily
+  unavailable. It is not a tombstone: the row is intact, and telling a viewer their
+  live link is gone for good would be permanent-sounding and wrong. It is also not
+  an uncaught error, because this is the one Argus surface a stranger arrives at
+  from a message.
 
 `POST /public/receipt-funnel` takes `{"stage": "viewed" | "try_argus"}` and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
@@ -685,9 +691,15 @@ has nothing to do with the author's, so `assumptions`, `strategy_facts`, `metric
 and `date_range` all carry closed keys and bare scalars, and every sentence, label,
 number format, and date format is composed by the reader's client in the reader's
 language. `content_language` names the language of the two author-written fields
-that remain, `idea_title` and `owner_note`. A run whose assumptions or tested window
-will not project into that form answers `receipt_source_unsupported`; there is no
-passthrough string field, because one would reopen this defect under a new name.
+that remain, `idea_title` and `owner_note`. A run whose assumptions, numbers, or
+tested window will not project into that form answers
+`receipt_source_unsupported`; there is no passthrough string field, because one
+would reopen this defect under a new name.
+
+The same rule cuts the other way: a projection that cannot describe something
+refuses rather than dropping it silently. An unknown metric key is refused, and a
+payload that names a `benchmark_symbol` must carry a benchmark figure, so a receipt
+can never name a benchmark and then show nothing about it.
 
 ## Admin Bypass
 

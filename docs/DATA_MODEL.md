@@ -1077,11 +1077,34 @@ list models.
 `recurring_contribution`, `contribution_cadence`, and `starting_principal`. Costs
 are read from the frozen run config rather than through the live execution-realism
 flag, so a flag flipped after the run cannot rewrite what the receipt says the run
-assumed. `MetricKey` deliberately excludes `benchmark_delta`, whose card value is
-itself a sentence; the page composes its own comparison from the numbers.
+assumed.
 
-A run whose assumptions or tested window will not project into this form is refused
-rather than published with the prose the run happened to freeze.
+`MetricKey` is `cash_value`, `total_return_pct`, `max_drawdown_pct`, `win_rate`,
+`benchmark_return_pct`, and `delta_vs_benchmark_pct`. The first four are the result
+card's own row keys. The card's `benchmark_delta` row is deliberately not carried
+under its own key, because its value is a rendered sentence rather than a number;
+the last two are read from the run's `metrics.aggregate.performance` instead, so
+the comparison survives as figures the page can speak in either language. Values
+are the run's own display strings, except `delta_vs_benchmark_pct`, which is a bare
+signed number because its unit is percentage points and every way of writing that
+unit is a word.
+
+A metric key the projection does not know is refused, not dropped, and a payload
+that names a `benchmark_symbol` must carry a benchmark figure. Dropping is how the
+comparison could disappear from a receipt while the page went on naming a
+benchmark. Likewise a run whose assumptions or tested window will not project is
+refused rather than published with the prose the run happened to freeze.
+
+### Reading a stored payload
+
+The public read validates stored JSON against this model, and `extra="forbid"`
+means a row written by a different shape raises rather than degrades. That path
+answers `503` with `Retry-After`, which the viewer's page reads as temporarily
+unavailable. It deliberately does not answer with the tombstone: the row is
+intact, so saying the receipt is gone for good would be a permanent-sounding lie
+about a live link. Owner-side reads are not wrapped this way; an owner's list is
+the only place a receipt can be revoked, so a row it cannot parse should surface
+loudly rather than vanish from that list.
 
 `idea_title` and `owner_note` are the only author-written fields, and
 `content_language` names the language they are in. `owner_note` is also the only

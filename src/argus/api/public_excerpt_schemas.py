@@ -37,16 +37,19 @@ class PublicExcerptDateRange(BaseModel):
     end: str
 
 
+# Exactly what a receipt can carry, and nothing aspirational. The first four are
+# the result card's own row keys; the last two are read from the run's metrics
+# because the card renders that comparison as an English sentence rather than a
+# number. A key the projection does not know is refused rather than dropped, and
+# `tests/test_public_excerpt_language.py` drives the production generator across
+# every executable template to keep this set honest.
 MetricKey = Literal[
     "cash_value",
     "total_return_pct",
-    "total_return",
-    "benchmark_return_pct",
-    "benchmark_return",
     "max_drawdown_pct",
-    "max_drawdown",
     "win_rate",
-    "win_rate_pct",
+    "benchmark_return_pct",
+    "delta_vs_benchmark_pct",
 ]
 
 
@@ -54,10 +57,12 @@ class PublicExcerptMetric(BaseModel):
     """One result number, frozen as the run reported it, under a closed key.
 
     No frozen label, for the same reason the strategy facts and the assumptions have
-    none: the run writes it in the author's language. ``benchmark_delta`` is
-    deliberately absent from the key set because its value is itself a sentence
-    (``benchmark_comparison_from_delta``); the page composes its own comparison from
-    the numbers instead.
+    none: the run writes it in the author's language.
+
+    ``value`` is the run's own display string, which is digits and a percent sign and
+    reads the same in either language. ``delta_vs_benchmark_pct`` is the one
+    exception and carries a bare signed number, because its unit is percentage
+    points and every way of writing that unit is a word. The page supplies the word.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

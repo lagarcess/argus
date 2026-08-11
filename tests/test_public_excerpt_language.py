@@ -11,8 +11,15 @@ from __future__ import annotations
 from typing import Any, get_args
 
 import pytest
-from argus.api.public_excerpt_schemas import PublicExcerptPayload, PublicExcerptSnapshot
+from argus.api.public_excerpt_schemas import (
+    MetricKey,
+    PublicExcerptPayload,
+    PublicExcerptSnapshot,
+)
+from argus.domain.capability_registry import ALLOWED_TEMPLATES
 from argus.domain.public_excerpts import (
+    BENCHMARK_METRIC_KEYS,
+    PROSE_METRIC_KEYS,
     PublicExcerptSourceError,
     build_public_excerpt_payload,
     new_public_excerpt_id,
@@ -32,6 +39,8 @@ from tests.public_excerpt_factories import (
     build_chart,
     build_generated_artifact,
     build_result_card,
+    build_template_artifact,
+    generated_card_snapshot,
     utc,
 )
 
@@ -94,12 +103,15 @@ def test_the_generator_s_prose_is_not_read_at_all() -> None:
     card = dict(artifact.payload["result_card"])
     card["assumptions"] = ["nonsense the projection must never repeat"]
     card["date_range"] = {**card["date_range"], "display": "whenever to whenever"}
+    # Everything except the prose is carried over untouched, so the only difference
+    # between the two artifacts is the sentences the projection must not read.
     rewritten = build_artifact(
         title=artifact.title,
-        payload=build_artifact_payload(
-            result_card=card,
-            extra={"assumptions": list(card["assumptions"])},
-        ),
+        payload={
+            **artifact.payload,
+            "result_card": card,
+            "assumptions": list(card["assumptions"]),
+        },
     )
     baseline = _payload(
         artifact=artifact,
@@ -278,25 +290,176 @@ def test_the_owner_list_row_carries_the_window_as_dates() -> None:
     assert row.date_range.end == WINDOW_END
 
 
-def test_a_metric_key_outside_the_closed_set_is_left_out() -> None:
-    """Its label would have to be frozen to be readable, so it is not published."""
-    card = {
-        **build_result_card(),
-        "rows": [
-            {"key": "total_return_pct", "label": "Total return", "value": "+18.4%"},
-            {
-                "key": "benchmark_delta",
-                "label": "Compared with SPY",
-                "value": "Beat by 9.3 percentage points",
-            },
-        ],
-    }
-    payload = _payload(
-        artifact=build_artifact(payload=build_artifact_payload(result_card=card))
-    )
-    assert [metric.key for metric in payload.metrics] == ["total_return_pct"]
-
-
 def test_a_metric_freezes_its_number_and_no_label() -> None:
     metric = _payload().metrics[0]
     assert "label" not in metric.model_dump(mode="json")
+
+
+# ── Nothing vanishes: the other half of the invariant ─────────────────────────
+#
+# Cross-language equality alone could not see a field disappearing, because zero
+# metrics is byte-identical to zero metrics. That blindness let the benchmark
+# comparison drop out of every real receipt while the page went on naming a
+# benchmark. These drive the production generator across every executable template
+# and assert on presence and count, not only on sameness.
+
+TEMPLATE_CASES = [
+    (template, modeled_costs)
+    for template in sorted(ALLOWED_TEMPLATES)
+    for modeled_costs in (False, True)
+]
+
+
+def _template_payload(
+    template: str, *, modeled_costs: bool, language: str = "en"
+) -> tuple[PublicExcerptPayload, dict[str, Any]]:
+    artifact, card = build_template_artifact(
+        template, language=language, modeled_costs=modeled_costs
+    )
+    payload = build_public_excerpt_payload(
+        artifact=artifact,
+        run_chart=build_chart(),
+        run_config_snapshot=generated_card_snapshot(
+            template, modeled_costs=modeled_costs
+        ),
+        owner_note=None,
+        content_language=language,
+    )
+    return payload, card
+
+
+def test_every_executable_template_is_covered_by_these_cases() -> None:
+    """Derived from the registry, so a template added later has nowhere to hide."""
+    assert {template for template, _ in TEMPLATE_CASES} == set(ALLOWED_TEMPLATES)
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_the_metric_key_set_covers_everything_the_generator_emits(
+    template: str, modeled_costs: bool
+) -> None:
+    """The enum is checked against the generator instead of being remembered.
+
+    The previous set carried three keys nothing emits and omitted the only benchmark
+    number a real card contains, which is exactly the kind of drift a hand-kept list
+    accumulates.
+    """
+    _, card = _template_payload(template, modeled_costs=modeled_costs)
+    known = set(get_args(MetricKey)) | PROSE_METRIC_KEYS
+    emitted = {row["key"] for row in card["rows"]}
+    assert emitted <= known, f"unprojectable metric keys: {sorted(emitted - known)}"
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_no_result_card_number_is_lost_on_the_way_into_a_receipt(
+    template: str, modeled_costs: bool
+) -> None:
+    """Every row the card carried is accounted for, by name.
+
+    The one row that is not carried under its own key is the prose comparison, and
+    it is only allowed to be missing because the numbers behind it are present.
+    """
+    payload, card = _template_payload(template, modeled_costs=modeled_costs)
+    projected = {metric.key for metric in payload.metrics}
+    for row in card["rows"]:
+        if row["key"] in PROSE_METRIC_KEYS:
+            assert projected & BENCHMARK_METRIC_KEYS, (
+                f"{row['key']} was dropped and nothing typed replaced it, so the "
+                "receipt names a benchmark it cannot show"
+            )
+            continue
+        assert row["key"] in projected, f"{row['key']} vanished from the receipt"
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_a_receipt_never_names_a_benchmark_it_cannot_show(
+    template: str, modeled_costs: bool
+) -> None:
+    payload, _ = _template_payload(template, modeled_costs=modeled_costs)
+    assert payload.benchmark_symbol == "SPY"
+    assert {metric.key for metric in payload.metrics} >= BENCHMARK_METRIC_KEYS
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_no_assumption_the_card_stated_is_lost(
+    template: str, modeled_costs: bool
+) -> None:
+    """The card's sentences and the payload's facts, counted.
+
+    The projection derives its facts from the run rather than reading the card, so
+    the check that matters is that it never says less than the card did. It says
+    more for a recurring run, where one sentence carries both an amount and a
+    cadence.
+    """
+    payload, card = _template_payload(template, modeled_costs=modeled_costs)
+    assert len(payload.assumptions) >= len(card["assumptions"])
+    keys = {assumption.key for assumption in payload.assumptions}
+    # The classes the generator always writes, whatever the template.
+    assert "long_only" in keys
+    assert "equal_weight" in keys
+    assert keys & {"benchmark", "benchmark_same_modeled_costs"}
+    assert keys & {"no_costs", "modeled_fee_bps"}
+    if modeled_costs:
+        assert {"modeled_fee_bps", "modeled_slippage_bps"} <= keys
+        assert "benchmark_same_modeled_costs" in keys
+    else:
+        assert "no_costs" in keys
+        assert "benchmark" in keys
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_the_strategy_a_receipt_shows_is_never_empty(
+    template: str, modeled_costs: bool
+) -> None:
+    payload, _ = _template_payload(template, modeled_costs=modeled_costs)
+    keys = [fact.key for fact in payload.strategy_facts]
+    assert keys[0] == "strategy_type"
+    assert payload.strategy_facts[0].value
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_no_typed_projection_comes_back_empty(
+    template: str, modeled_costs: bool
+) -> None:
+    """The blunt version of the same question, asked of all three projections.
+
+    An empty list is the shape a silent drop leaves behind, and it is the shape a
+    cross-language comparison cannot see.
+    """
+    payload, _ = _template_payload(template, modeled_costs=modeled_costs)
+    assert payload.metrics
+    assert payload.assumptions
+    assert payload.strategy_facts
+    assert payload.date_range.start and payload.date_range.end
+
+
+@pytest.mark.parametrize(("template", "modeled_costs"), TEMPLATE_CASES)
+def test_the_whole_shape_space_is_language_invariant_too(
+    template: str, modeled_costs: bool
+) -> None:
+    """The original invariant, now run over every template rather than one."""
+    english, _ = _template_payload(
+        template, modeled_costs=modeled_costs, language="en"
+    )
+    spanish, _ = _template_payload(
+        template, modeled_costs=modeled_costs, language="es-419"
+    )
+    left = english.model_dump(mode="json")
+    right = spanish.model_dump(mode="json")
+    assert left.pop("content_language") == "en"
+    assert right.pop("content_language") == "es-419"
+    assert left == right
+
+
+def test_an_unknown_metric_key_refuses_rather_than_disappearing() -> None:
+    """A generator that grows a row must break loudly, not quietly say less."""
+    card = {
+        **build_result_card(),
+        "rows": [
+            *build_result_card()["rows"],
+            {"key": "sortino_ratio", "label": "Sortino", "value": "1.8"},
+        ],
+    }
+    with pytest.raises(PublicExcerptSourceError):
+        _payload(
+            artifact=build_artifact(payload=build_artifact_payload(result_card=card))
+        )

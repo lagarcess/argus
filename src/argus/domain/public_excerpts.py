@@ -72,6 +72,19 @@ _UNDESCRIBABLE_ASSUMPTIONS = (
     "cannot be shared."
 )
 
+# Same rule again, for the result numbers.
+_UNDESCRIBABLE_METRICS = (
+    "Argus cannot describe this result's numbers on a shared page, so this result "
+    "cannot be shared."
+)
+
+# The one card row whose value is a sentence rather than a number. It is skipped by
+# name, and the comparison it renders is carried typed from the run's own metrics
+# instead, so this is a redirection rather than a loss.
+PROSE_METRIC_KEYS = frozenset({"benchmark_delta"})
+
+BENCHMARK_METRIC_KEYS = frozenset({"benchmark_return_pct", "delta_vs_benchmark_pct"})
+
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # §3 of the sharing spec, from decision memo §15.7. Absolute.
@@ -139,6 +152,15 @@ class PublicExcerptOwnerNoteError(ValueError):
 
 class PublicExcerptSourceError(ValueError):
     """The artifact cannot back a receipt."""
+
+
+class PublicExcerptUnreadableError(RuntimeError):
+    """A stored receipt cannot be read by this build.
+
+    Separate from every other failure on this surface because it is temporary and
+    about Argus rather than about the receipt: the row is intact, the reader is
+    behind it. The viewer is told to try again, never that their link is dead.
+    """
 
 
 def new_public_excerpt_id() -> str:
@@ -228,7 +250,11 @@ def build_public_excerpt_payload(
             benchmark_symbol=benchmark_symbol,
         ),
         date_range=date_range,
-        metrics=_metrics(result_card.get("rows")),
+        metrics=_metrics(
+            result_card.get("rows"),
+            performance=_aggregate_performance(source),
+            benchmark_symbol=benchmark_symbol,
+        ),
         benchmark_symbol=benchmark_symbol,
         visual=_visual(run_chart),
         owner_note=owner_note,
@@ -482,28 +508,76 @@ def _iso_date(value: object) -> str | None:
     return text
 
 
-def _metrics(value: object) -> list[PublicExcerptMetric]:
-    """The result numbers, under keys the page can label in the viewer's language.
+def _metrics(
+    rows: object,
+    *,
+    performance: dict[str, Any],
+    benchmark_symbol: str | None,
+) -> list[PublicExcerptMetric]:
+    """The result numbers, under keys the page labels in the viewer's language.
 
     The row's own label is not read. It is written in the author's language, and a
-    frozen "Peor caída" is unreadable to half the people a link reaches. A row whose
-    key is outside the closed set is left out rather than published with a label
-    nobody can translate.
+    frozen "Peor caída" is unreadable to half the people a link reaches.
+
+    A key this projection does not know is refused, not dropped. Dropping is how the
+    benchmark comparison disappeared from every real receipt while the page went on
+    naming a benchmark: a silent skip turns a generator that grew a row into a
+    receipt that quietly says less than the run did.
     """
-    if not isinstance(value, list):
-        return []
     known = set(get_args(MetricKey))
     metrics: list[PublicExcerptMetric] = []
-    for entry in value:
+    for entry in rows if isinstance(rows, list) else []:
         row = _mapping(entry)
         key = _text(row.get("key"))
+        if key in PROSE_METRIC_KEYS:
+            continue
         display = _text(row.get("value"))
         if key not in known or display is None:
-            continue
+            raise PublicExcerptSourceError(_UNDESCRIBABLE_METRICS)
         metrics.append(PublicExcerptMetric(key=key, value=display))
-        if len(metrics) >= MAX_METRICS:
-            break
+    metrics.extend(_benchmark_metrics(performance))
+    if benchmark_symbol is not None and not any(
+        metric.key in BENCHMARK_METRIC_KEYS for metric in metrics
+    ):
+        # The payload would name a benchmark and then carry no number for it, which
+        # is the defect this projection exists to prevent rather than to commit.
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_METRICS)
+    if len(metrics) > MAX_METRICS:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_METRICS)
     return metrics
+
+
+def _benchmark_metrics(performance: dict[str, Any]) -> list[PublicExcerptMetric]:
+    """The comparison, read from the run's own metrics rather than from the card.
+
+    The card renders this one as a sentence, in English in both languages (see the
+    issue filed against ``benchmark_comparison_from_delta``), so the numbers behind
+    it are taken from where the engine put them. Both are frozen: the benchmark's
+    return so the page can show what it did, and the engine's own delta so the
+    comparison is not re-derived by subtracting two already rounded strings.
+    """
+    metrics: list[PublicExcerptMetric] = []
+    benchmark_return = _amount(performance.get("benchmark_return_pct"))
+    if benchmark_return is not None:
+        metrics.append(
+            PublicExcerptMetric(
+                key="benchmark_return_pct",
+                value=f"{benchmark_return:+.1f}%",
+            )
+        )
+    delta = _amount(performance.get("delta_vs_benchmark_pct"))
+    if delta is not None:
+        # Bare, because its unit is percentage points and that unit is a word.
+        metrics.append(
+            PublicExcerptMetric(key="delta_vs_benchmark_pct", value=_number(delta))
+        )
+    return metrics
+
+
+def _aggregate_performance(artifact_payload: dict[str, Any]) -> dict[str, Any]:
+    """Where the engine's own numbers live on the artifact."""
+    aggregate = _mapping(_mapping(artifact_payload.get("metrics")).get("aggregate"))
+    return _mapping(aggregate.get("performance"))
 
 
 def _assumptions(

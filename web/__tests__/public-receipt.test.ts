@@ -77,6 +77,8 @@ const PAYLOAD: PublicReceiptPayload = {
   metrics: [
     { key: "max_drawdown_pct", value: "-6.2%" },
     { key: "total_return_pct", value: "+18.4%" },
+    { key: "benchmark_return_pct", value: "+9.1%" },
+    { key: "delta_vs_benchmark_pct", value: "9.3" },
   ],
   benchmark_symbol: "SPY",
   strategy_facts: [
@@ -624,31 +626,50 @@ describe("the plan sentence", () => {
     const ahead = {
       ...PAYLOAD,
       metrics: [
-        { key: "total_return_pct", label: "Total return", value: "+18.4%" },
-        { key: "benchmark_return_pct", label: "SPY", value: "+9.1%" },
+        { key: "total_return_pct", value: "+18.4%" },
+        { key: "benchmark_return_pct", value: "+9.1%" },
       ],
-    };
+    } satisfies PublicReceiptPayload;
     expect(benchmarkVerdict(ahead, copy)).toBe("9.3 pts ahead of SPY");
     const behind = {
       ...PAYLOAD,
       metrics: [
-        { key: "total_return_pct", label: "Total return", value: "+2.0%" },
-        { key: "benchmark_return_pct", label: "SPY", value: "+9.1%" },
+        { key: "total_return_pct", value: "+2.0%" },
+        { key: "benchmark_return_pct", value: "+9.1%" },
       ],
-    };
+    } satisfies PublicReceiptPayload;
     expect(benchmarkVerdict(behind, copy)).toBe("7.1 pts behind SPY");
   });
 
-  test("says nothing when the payload carries no benchmark to compare against", () => {
-    // PAYLOAD has a return and no benchmark row, which is a real shape.
-    expect(benchmarkVerdict(PAYLOAD, copy)).toBeNull();
+  test("prefers the engine's own delta over subtracting two rounded strings", () => {
+    // The displayed figures round to a 9.3 point gap; the run computed 9.4. The
+    // page is a record, so it states what the engine measured.
+    const frozen = {
+      ...PAYLOAD,
+      metrics: [
+        { key: "total_return_pct", value: "+18.4%" },
+        { key: "benchmark_return_pct", value: "+9.1%" },
+        { key: "delta_vs_benchmark_pct", value: "9.4" },
+      ],
+    } satisfies PublicReceiptPayload;
+    expect(benchmarkVerdict(frozen, copy)).toBe("9.4 pts ahead of SPY");
+  });
+
+  test("says nothing when the payload names no benchmark at all", () => {
+    // A payload that names one always carries its numbers: the projection refuses
+    // to freeze a benchmark symbol it has no figure for.
+    const unbenchmarked = {
+      ...PAYLOAD,
+      benchmark_symbol: null,
+    } satisfies PublicReceiptPayload;
+    expect(benchmarkVerdict(unbenchmarked, copy)).toBeNull();
   });
 
   test("says nothing rather than guessing when a figure will not parse", () => {
     const unparseable = {
       ...PAYLOAD,
       benchmark_symbol: null,
-      metrics: [{ key: "total_return_pct", label: "Total return", value: "n/a" }],
+      metrics: [{ key: "total_return_pct", value: "n/a" }],
     };
     expect(benchmarkVerdict(unparseable, copy)).toBeNull();
   });
@@ -900,9 +921,14 @@ describe("metric labels", () => {
     const start = contract.indexOf("PublicReceiptMetricKey =");
     const union = contract.slice(start, contract.indexOf(";", start));
     const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
-    expect(keys).toHaveLength(9);
+    expect(keys).toHaveLength(6);
+    // The card's own benchmark row is a sentence, so the payload carries the two
+    // numbers behind it instead. Both need a label like every other key.
+    expect(keys).toContain("benchmark_return_pct");
+    expect(keys).toContain("delta_vs_benchmark_pct");
     for (const common of [enCommon, esCommon]) {
       const labels = common.receipt.metric_labels as Record<string, string>;
+      expect(Object.keys(labels).sort()).toEqual([...keys].sort());
       for (const key of keys) expect(labels[key]).toBeTruthy();
     }
   });

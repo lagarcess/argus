@@ -1001,3 +1001,35 @@ def test_an_undescribable_strategy_is_refused_with_a_readable_reason(
     assert "cannot be shared" in body["detail"]
     # Nothing was persisted, so no half-described receipt exists to be read later.
     assert api_state.store.public_excerpt_snapshots == {}
+
+
+def test_an_unreadable_stored_payload_answers_retryable_not_a_crash(
+    sharing_on: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The public read is the one Argus page strangers arrive at from a message.
+
+    A stored payload this build cannot parse is a deployment state, so it answers
+    503 with Retry-After, which the page reads as temporarily unavailable. An
+    uncaught validation error would answer 500, and the tombstone would tell a
+    viewer their live link is gone for good.
+    """
+    from argus.api import public_excerpts as receipts_module
+    from argus.domain.public_excerpts import PublicExcerptUnreadableError
+
+    class _UnreadableReader:
+        def read_public_excerpt_view(self, *, public_id: str) -> None:
+            raise PublicExcerptUnreadableError("That receipt could not be read.")
+
+    monkeypatch.setattr(
+        receipts_module, "public_excerpt_repository", lambda: _UnreadableReader()
+    )
+    client = _client()
+    response = client.get("/api/v1/public/receipts/abcdefghijklmnopqrstuvwx")
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "120"
+    body = response.json()
+    assert body["code"] == "receipt_unavailable"
+    # Never a tombstone: the frontend reads "revoked" as permanent.
+    assert "revoked" not in response.text

@@ -118,7 +118,18 @@ def build_artifact_payload(
             "strategy_id": STRATEGY_ID,
         },
         "assumptions": list(card["assumptions"]),
-        "metrics": {"aggregate": {"performance": {"total_return_pct": 18.4}}},
+        # The engine always computes a benchmark, so a fixture without one describes
+        # a run that cannot exist and would let the projection pass on a payload
+        # that names SPY and carries no number for it.
+        "metrics": {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 18.4,
+                    "benchmark_return_pct": 9.1,
+                    "delta_vs_benchmark_pct": 9.3,
+                }
+            }
+        },
         "quick_take": card.get("quick_take"),
         "breakdown": None,
         "result_card": card,
@@ -430,7 +441,10 @@ def build_generated_artifact(
         title=title,
         payload=build_artifact_payload(
             result_card=card,
-            extra={"assumptions": list(card["assumptions"])},
+            extra={
+                "assumptions": list(card["assumptions"]),
+                "metrics": GENERATED_CARD_METRICS,
+            },
         ),
     )
 
@@ -484,3 +498,146 @@ GENERIC_RULE_SPEC_CONFIG_SNAPSHOT: dict[str, Any] = {
         }
     },
 }
+
+
+# One engine config per executable template, so a projection can be driven with the
+# production generator across the whole shape space rather than one canonical run.
+# Derived from ALLOWED_TEMPLATES by test, so a template added later has nowhere to
+# hide.
+def generated_card_config(
+    template: str, *, modeled_costs: bool = False
+) -> dict[str, Any]:
+    config: dict[str, Any] = {
+        "template": template,
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": WINDOW_START,
+        "end_date": WINDOW_END,
+        "side": "long",
+        "starting_capital": 10_000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+    if template == "dca_accumulation":
+        config["starting_capital"] = 200
+        config["recurring_contribution"] = 200
+        config["starting_principal"] = 0.0
+        config["parameters"] = {"dca_cadence": "monthly"}
+    if modeled_costs:
+        config["_execution_realism"] = {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+        }
+    return config
+
+
+def generated_card_metrics(*, modeled_costs: bool = False) -> dict[str, Any]:
+    performance: dict[str, Any] = {
+        "profit": 120.0,
+        "total_return_pct": 18.4,
+        "benchmark_return_pct": 9.1,
+        "delta_vs_benchmark_pct": 9.3,
+        "annualized_return_pct": 24.0,
+    }
+    if modeled_costs:
+        performance["execution_realism"] = {
+            "enabled": True,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0,
+            "gross_total_return_pct": 19.0,
+            "net_total_return_pct": 18.4,
+            "return_drag_pct": 0.6,
+        }
+    return {
+        "aggregate": {
+            "performance": performance,
+            "risk": {"max_drawdown_pct": -6.2, "volatility_pct": 12.0},
+            # More than one trade, so the win-rate row is actually emitted for the
+            # templates that show it. A fixture that never triggers a row cannot
+            # prove the projection handles it.
+            "efficiency": {"total_trades": 3, "win_rate": 0.66},
+        }
+    }
+
+
+def build_template_artifact(
+    template: str,
+    *,
+    language: str = "en",
+    modeled_costs: bool = False,
+    title: str = "AAPL idea",
+) -> tuple[EvidenceArtifact, dict[str, Any]]:
+    """An artifact whose card came from the production generator, plus that card."""
+    card = generate_result_card(
+        generated_card_config(template, modeled_costs=modeled_costs),
+        generated_card_metrics(modeled_costs=modeled_costs),
+        language=language,
+    )
+    artifact = build_artifact(
+        title=title,
+        payload=build_artifact_payload(
+            result_card=card,
+            extra={
+                "assumptions": list(card["assumptions"]),
+                "metrics": generated_card_metrics(modeled_costs=modeled_costs),
+            },
+        ),
+    )
+    return artifact, card
+
+
+# The config snapshot the agent path stores for each of those runs.
+def generated_card_snapshot(
+    template: str, *, modeled_costs: bool = False
+) -> dict[str, Any]:
+    engine_config = generated_card_config(template, modeled_costs=modeled_costs)
+    resolved_strategy: dict[str, Any] = {"strategy_type": template}
+    if template == "moving_average_crossover":
+        resolved_strategy["entry_rule"] = {
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 20,
+            "slow_indicator": "sma",
+            "slow_period": 50,
+            "direction": "bullish",
+        }
+    if template == "rsi_mean_reversion":
+        resolved_strategy["entry_rule"] = {
+            "indicator": "RSI",
+            "period": 14,
+            "threshold": 30,
+            "direction": "below",
+        }
+        resolved_strategy["exit_rule"] = {
+            "indicator": "RSI",
+            "period": 14,
+            "threshold": 70,
+        }
+    if template == "signal_strategy":
+        resolved_strategy["entry_rule"] = {
+            "type": "macd_crossover",
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "direction": "bullish",
+        }
+    if template == "dca_accumulation":
+        resolved_strategy["cadence"] = "monthly"
+    return {
+        "template": template,
+        "symbols": ["AAPL"],
+        "benchmark_symbol": "SPY",
+        "resolved_strategy": resolved_strategy,
+        "resolved_parameters": {
+            "timeframe": "1D",
+            "indicator": "RSI",
+            "indicator_period": 14,
+            "entry_threshold": 30,
+            "exit_threshold": 70,
+            "engine_config": engine_config,
+        },
+        "engine_config": engine_config,
+    }

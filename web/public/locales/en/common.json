@@ -1524,15 +1524,12 @@
       "macd crossover": "MACD crossover"
     },
     "metric_labels": {
-      "total_return_pct": "Total return",
-      "total_return": "Total return",
-      "benchmark_return_pct": "Benchmark",
-      "max_drawdown_pct": "Worst dip",
-      "max_drawdown": "Worst dip",
-      "win_rate_pct": "Win rate",
       "cash_value": "Ending value",
-      "benchmark_return": "Benchmark",
-      "win_rate": "Win rate"
+      "total_return_pct": "Total return",
+      "max_drawdown_pct": "Worst dip",
+      "win_rate": "Win rate",
+      "benchmark_return_pct": "Benchmark",
+      "delta_vs_benchmark_pct": "Against the benchmark"
     },
     "hero": {
       "ahead": "{{value}} ahead of {{symbol}}",

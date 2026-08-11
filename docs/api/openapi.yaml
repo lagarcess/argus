@@ -4019,13 +4019,10 @@ components:
           enum:
           - cash_value
           - total_return_pct
-          - total_return
-          - benchmark_return_pct
-          - benchmark_return
           - max_drawdown_pct
-          - max_drawdown
           - win_rate
-          - win_rate_pct
+          - benchmark_return_pct
+          - delta_vs_benchmark_pct
         value:
           type: string
       additionalProperties: false
@@ -4038,13 +4035,16 @@ components:
 
         No frozen label, for the same reason the strategy facts and the assumptions have
 
-        none: the run writes it in the author''s language. ``benchmark_delta`` is
+        none: the run writes it in the author''s language.
 
-        deliberately absent from the key set because its value is itself a sentence
 
-        (``benchmark_comparison_from_delta``); the page composes its own comparison from
+        ``value`` is the run''s own display string, which is digits and a percent sign and
 
-        the numbers instead.'
+        reads the same in either language. ``delta_vs_benchmark_pct`` is the one
+
+        exception and carries a bare signed number, because its unit is percentage
+
+        points and every way of writing that unit is a word. The page supplies the word.'
     PublicExcerptPayload:
       properties:
         schema_version:
