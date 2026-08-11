@@ -997,8 +997,7 @@ def validate_request_symbols(
 
     if request.asset_class is not None:
         if any(
-            asset_class != request.asset_class
-            for asset_class in resolved_asset_classes
+            asset_class != request.asset_class for asset_class in resolved_asset_classes
         ):
             return RequestSymbolValidationResult(
                 outcome="conflict",

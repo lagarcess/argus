@@ -428,3 +428,84 @@ def _capital_source(field_provenance: dict[str, str], key: str) -> str:
     if not isinstance(field_provenance, dict):
         return ""
     return str(field_provenance.get(key) or "").strip()
+
+
+_BROADER_EDIT_MONEY_SOURCES = frozenset(
+    {
+        "user",
+        "explicit_user",
+        "starting_capital",
+        "starting_principal",
+        "recurring_contribution",
+        "contribution_amount",
+    }
+)
+
+
+def _broader_edit_field_provenance(strategy: Any) -> dict[str, Any]:
+    provenance = getattr(strategy, "field_provenance", None)
+    if isinstance(provenance, dict):
+        return provenance
+    extra_parameters = getattr(strategy, "extra_parameters", None) or {}
+    nested = (
+        extra_parameters.get("field_provenance")
+        if isinstance(extra_parameters, dict)
+        else None
+    )
+    return nested if isinstance(nested, dict) else {}
+
+
+def carries_broader_edit_than_dates(strategy: Any) -> bool:
+    """The turn states more than the date a scoped prompt asked for (§3.3).
+
+    One definition for both draft shapes (LLMStrategyDraft and
+    StrategySummary): a scoped date entry point widens when the reply carries
+    turn-owned money, an asset operation, an executable rule, or any other
+    explicit-user field beyond the date and timeframe.
+    """
+    provenance = _broader_edit_field_provenance(strategy)
+    extra_parameters = getattr(strategy, "extra_parameters", None) or {}
+    money_values = [
+        getattr(strategy, "capital_amount", None),
+        getattr(strategy, "initial_capital", None),
+        getattr(strategy, "recurring_contribution", None),
+        getattr(strategy, "total_capital", None),
+    ]
+    if isinstance(extra_parameters, dict):
+        money_values.extend(
+            extra_parameters.get(key)
+            for key in ("initial_capital", "recurring_contribution", "total_capital")
+        )
+    has_turn_money_provenance = any(
+        str(provenance.get(key) or "").strip() in _BROADER_EDIT_MONEY_SOURCES
+        for key in (
+            "capital_amount",
+            "initial_capital",
+            "recurring_contribution",
+            "total_capital",
+        )
+    )
+    if has_turn_money_provenance and any(value is not None for value in money_values):
+        return True
+    operation = getattr(strategy, "asset_universe_operation", None)
+    if operation is None and isinstance(extra_parameters, dict):
+        operation = extra_parameters.get("asset_universe_operation")
+    if str(operation or "").strip():
+        return True
+    if getattr(strategy, "asset_inclusions", None) or getattr(
+        strategy, "asset_exclusions", None
+    ):
+        return True
+    if (
+        getattr(strategy, "entry_rule", None)
+        or getattr(strategy, "exit_rule", None)
+        or getattr(strategy, "rule_spec", None)
+    ):
+        return True
+    for field_name, source in provenance.items():
+        base = str(field_name).split("[", 1)[0]
+        if base in {"date_range", "timeframe"}:
+            continue
+        if str(source or "").strip() == "explicit_user":
+            return True
+    return False

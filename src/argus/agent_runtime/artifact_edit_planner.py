@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, Literal, get_args
 
@@ -15,8 +15,13 @@ from argus.agent_runtime.artifacts.asset_edits import (
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     supported_cost_rate_value,
 )
-from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.interpreter.shared import _supported_dca_cadence_value
+from argus.agent_runtime.llm_interpreter_types import (
+    LLMDateRangeIntent,
+    LLMStrategyDraft,
+)
 from argus.agent_runtime.rule_specs import opposite_moving_average_crossover_rule
+from argus.agent_runtime.strategy_contract import canonical_strategy_type
 from argus.domain.backtesting.rules import (
     rule_spec_from_moving_average_crossover_rules,
 )
@@ -76,6 +81,82 @@ class ArtifactAssumptionEditPlan(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
+def _apply_legacy_flat_edit_fields(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    draft: LLMStrategyDraft,
+    field_provenance: dict[str, str],
+    extra_parameters: dict[str, Any],
+) -> None:
+    if plan.asset_universe:
+        operation = normalized_asset_universe_operation(plan.asset_universe_operation)
+        draft.asset_universe = list(plan.asset_universe)
+        if operation is not None:
+            draft.asset_universe_operation = operation
+            extra_parameters["asset_universe_operation"] = operation
+        field_provenance["asset_universe"] = "explicit_user"
+    if plan.comparison_baseline is not None:
+        benchmark = str(plan.comparison_baseline or "").strip().upper()
+        if benchmark:
+            draft.comparison_baseline = benchmark
+            field_provenance["comparison_baseline"] = "explicit_user"
+    if plan.initial_capital is not None:
+        draft.initial_capital = plan.initial_capital
+        field_provenance["initial_capital"] = "starting_capital"
+    if plan.recurring_contribution_amount is not None:
+        recurring_amount = float(plan.recurring_contribution_amount)
+        draft.capital_amount = recurring_amount
+        draft.recurring_contribution = recurring_amount
+        field_provenance["capital_amount"] = "recurring_contribution"
+        field_provenance["recurring_contribution"] = "recurring_contribution"
+        extra_parameters["recurring_contribution"] = recurring_amount
+    if plan.cadence is not None:
+        cadence = _supported_dca_cadence_value(plan.cadence)
+        if cadence is not None:
+            draft.cadence = cadence
+            field_provenance["cadence"] = "explicit_user"
+            extra_parameters["recurring_cadence"] = cadence
+    if plan.timeframe is not None:
+        draft.timeframe = plan.timeframe
+        field_provenance["timeframe"] = "explicit_user"
+    if plan.fee_rate is not None:
+        fee_rate = supported_cost_rate_value(plan.fee_rate, field_name="fee_rate")
+        if fee_rate is not None:
+            extra_parameters["fee_rate"] = fee_rate
+            field_provenance["fee_rate"] = "explicit_user"
+    if plan.slippage is not None:
+        slippage = supported_cost_rate_value(plan.slippage, field_name="slippage")
+        if slippage is not None:
+            extra_parameters["slippage"] = slippage
+            field_provenance["slippage"] = "explicit_user"
+
+
+def _edit_plan_reshapes_non_recurring_strategy(
+    plan: ArtifactAssumptionEditPlan,
+    *,
+    prior_strategy_type: Any,
+) -> bool:
+    """Recurring-buy plan fields aimed at a non-recurring strategy are a
+    reshape ("make it recurring buys instead"), not an assumption edit.
+
+    The edit-operation set cannot change strategy_type, so applying such a
+    plan would silently keep the old strategy; callers must step aside and
+    let a reshape-capable interpretation path handle the turn.
+    """
+
+    proposes_recurring_fields = (
+        plan.cadence is not None
+        or plan.recurring_contribution_amount is not None
+        or any(
+            operation.target in {"cadence", "recurring_contribution"}
+            for operation in plan.operations
+        )
+    )
+    if not proposes_recurring_fields:
+        return False
+    return canonical_strategy_type(prior_strategy_type) != "dca_accumulation"
+
+
 async def plan_artifact_assumption_edit(
     *,
     current_user_message: str,
@@ -86,6 +167,7 @@ async def plan_artifact_assumption_edit(
     required_targets: set[str] | None = None,
     materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
     | None = None,
+    stated_cost_operations: Sequence[EditOperation] | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
@@ -116,6 +198,7 @@ async def plan_artifact_assumption_edit(
             continue
         if not isinstance(plan, ArtifactAssumptionEditPlan):
             continue
+        plan = _completed_with_stated_cost_operations(plan, stated_cost_operations or ())
         if plan.outcome == "ready_to_confirm" and not _has_supported_edit(
             plan,
             prior_strategy=prior_strategy,
@@ -182,7 +265,9 @@ def _artifact_assumption_edit_messages(
                 "through today) — use it even when the user says 'change the start "
                 "to the beginning of this year'. For a named calendar year use "
                 "kind=calendar_year with year. For a rolling lookback such as 'last "
-                "12 months' use kind=rolling_window with count, unit, anchor=today. "
+                "12 months' use kind=rolling_window with count, unit, anchor=today; "
+                "a stated fractional quantity stays exact ('last 8.5 months' means "
+                "count=8.5, never 8 or 5). "
                 "For an explicit concrete endpoint date while keeping the other "
                 "endpoint, use kind=endpoint_patch with endpoint=start or end and a "
                 "concrete ISO date in the start or end field (or the literal today); "
@@ -194,7 +279,10 @@ def _artifact_assumption_edit_messages(
                 "- timeframe (use value, compact such as 1D or 1h): set the bar "
                 "size.\n"
                 "- fees (use number) and slippage (use number): set as decimal "
-                "fractions when explicitly supplied.\n"
+                "fractions when explicitly supplied. Always express a stated fee "
+                "or slippage change as its operation whatever the value; the "
+                "system validates it and discloses anything it cannot apply. "
+                "Never silently omit a requested cost change.\n"
                 "- indicator_entry_threshold and indicator_exit_threshold (use "
                 "number): set tunable RSI buy/entry and sell/exit thresholds on "
                 "an existing RSI confirmation. Use indicator_period for a tunable "
@@ -247,6 +335,40 @@ def _artifact_assumption_edit_messages(
         },
         {"role": "user", "content": current_user_message},
     ]
+
+
+_FLAT_PLAN_COST_FIELDS = {"fees": "fee_rate", "slippage": "slippage"}
+
+
+def _completed_with_stated_cost_operations(
+    plan: ArtifactAssumptionEditPlan,
+    stated_cost_operations: Sequence[EditOperation],
+) -> ArtifactAssumptionEditPlan:
+    """Carry a stated cost the plan left out into the operation list (§3.2).
+
+    The applier validates every value and the card discloses anything it
+    refuses, so completion decides only whether the request enters the
+    pipeline, never how it lands. Flat-only plans stay untouched because the
+    legacy application path would ignore their non-cost flat fields once an
+    operation list exists.
+    """
+
+    if plan.outcome != "ready_to_confirm" or not plan.operations:
+        return plan
+    present_targets = {operation.target for operation in plan.operations}
+    additions: list[EditOperation] = []
+    for stated in stated_cost_operations:
+        if stated.target in present_targets:
+            continue
+        flat_value = getattr(plan, _FLAT_PLAN_COST_FIELDS.get(stated.target, ""), None)
+        additions.append(
+            stated
+            if flat_value is None
+            else stated.model_copy(update={"number": float(flat_value)})
+        )
+    if not additions:
+        return plan
+    return plan.model_copy(update={"operations": [*plan.operations, *additions]})
 
 
 def _covers_required_targets(
@@ -422,6 +544,32 @@ _INDICATOR_PARAMETER_TARGETS = {
     "indicator_period": "indicator_period",
 }
 _TEXT_TARGETS = {"cadence", "timeframe"}
+
+
+_DROPPED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+
+def typed_unapplied_operations(
+    *,
+    resolved_unsupported: list[str],
+    dropped_cost_fields: list[str],
+) -> list[dict[str, str]]:
+    """Typed record of requested changes that did not land, with reasons."""
+    unapplied: list[dict[str, str]] = []
+    for entry in resolved_unsupported:
+        op, _, target = str(entry).partition(".")
+        if not target:
+            op, target = "set", op
+        unapplied.append({"op": op, "target": target, "reason": "unsupported_operation"})
+    for field_name in dropped_cost_fields:
+        unapplied.append(
+            {
+                "op": "set",
+                "target": _DROPPED_COST_TARGETS.get(field_name, field_name),
+                "reason": "cost_evidence_ungrounded",
+            }
+        )
+    return unapplied
 
 
 class ResolvedArtifactEdit(BaseModel):

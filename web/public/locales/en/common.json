@@ -791,7 +791,7 @@
         "run_backtest": "Run backtest",
         "change_dates": "Change dates",
         "change_asset": "Change asset",
-        "adjust_assumptions": "Adjust assumptions",
+        "adjust_assumptions": "Change assumptions",
         "cancel": "Cancel"
       },
       "assumptions": {
@@ -802,13 +802,49 @@
         "modeled_costs": "Modeled costs: {{fee}} bps fee + {{slippage}} bps slippage"
       },
       "cost_editor": {
-        "edit_chip": "Edit costs",
         "fee_label": "Fee % per trade",
         "slippage_label": "Slippage % per trade",
+        "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%)."
+      },
+      "direct_edit": {
+        "edit_capital": "Edit capital",
+        "edit_contribution": "Edit contribution",
+        "edit_dates": "Edit dates",
+        "capital_label": "Starting capital",
+        "contribution_label": "Contribution",
+        "start_label": "Start date",
+        "end_label": "End date",
         "apply": "Apply",
         "cancel": "Cancel",
-        "invalid": "Enter percentages of 0 or more (slippage up to {{max}}%).",
-        "message": "Set fees to {{fee}}% and slippage to {{slippage}}% per trade."
+        "invalid_capital": "Enter an amount above zero.",
+        "invalid_dates": "Pick a start date on or before the end date.",
+        "failed": "That change did not go through. The card is unchanged.",
+        "edit_costs": "Edit costs",
+        "errors": {
+          "invalid_starting_capital": "Starting capital must be between {{min}} and {{max}}.",
+          "future_end_date": "Pick an end date on or before today.",
+          "invalid_chronological_date_range": "Pick a start date before the end date.",
+          "provider_history_start": "Data for this test starts later; pick a start date on or after {{min}}.",
+          "no_common_data": "These assets do not share enough data for that window.",
+          "invalid_contribution": "Each contribution must be between {{min}} and {{max}}.",
+          "confirmation_changed": "Another change landed at the same time. Try again."
+        }
+      },
+      "edit_disclosure": {
+        "unapplied": "I could not change {{targets}}; the rest is applied below.",
+        "targets": {
+          "asset": "the assets",
+          "benchmark": "the benchmark",
+          "cadence": "the cadence",
+          "capital": "the starting capital",
+          "date_window": "the dates",
+          "fees": "the fees",
+          "recurring_contribution": "the contribution",
+          "slippage": "the slippage",
+          "strategy_family": "the strategy",
+          "timeframe": "the timeframe",
+          "generic": "that part"
+        }
       },
       "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
     },

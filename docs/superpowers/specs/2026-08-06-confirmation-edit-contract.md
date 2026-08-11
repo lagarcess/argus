@@ -120,9 +120,36 @@ so that lane does not invent a second primitive. See
 [`2026-08-06-mobile-pwa-responsive-shell.md`](2026-08-06-mobile-pwa-responsive-shell.md)
 section 3.
 
+### 3.4b Amendment 2026-08-10: one in-flow drawer at every width
+
+**This amendment is binding and supersedes the mobile row of the table above.**
+During the founder's hands-on review the sheet path failed in the exact way a
+second primitive fails: `BottomSheet` renders fixed-position without a portal,
+so inside the card's transform containing block it clipped into a view
+takeover that replaced the card. The founder's direction was one disclosure
+idiom, no exceptions.
+
+The shipped behavior at every width is the editable `ExecutionDetails` shape:
+the pill row stays where it is, the drawer expands downward in normal flow
+inside the card, pushing the content below it down, and closing rolls it back
+up. The mobile sheet reservation in the responsive-shell spec is unused by
+this surface. A drawer with more fields is simply taller; the layout never
+changes.
+
 Direct edits are ordinary edits: they obey the same validation, the same
 coverage and resolver gates, and the same disclosure rules as a conversational
 edit. Nothing becomes runnable that would not have been runnable through chat.
+
+### 3.4c Amendment 2026-08-11: the in-place surface ships default off
+
+**Binding.** Three review rounds found real defects in the run-consumption
+guard that protects non-turn card writes, each in a different place, and
+the founder's pre-stated exit fired: the whole in-place surface (both
+non-turn endpoints, the advertised `direct_edits`, and the consumption
+stamp) sits behind `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`, default off, and
+the guard finishes as its own lane. The flag flips at promotion only once
+that lane closes. Compound conversational editing, the pillar, is
+turn-based and unaffected.
 
 ### 3.5 Repair must not drop what the user already stated (#367)
 
@@ -211,20 +238,42 @@ history with phantom versions from abandoned edits.
 Material change is defined once, here, and consumed by comparison. There is no
 second definition anywhere.
 
-## 4. Open decision for the founder
+## 4. Versioning: decided
 
-**Does a confirmation-card edit mint a new `IdeaVersion`?**
+**Does a confirmation-card edit mint a new `IdeaVersion`? No.** Founder
+confirmed 2026-08-10: edits to a pending confirmation card mint nothing;
+only run finalization mints an `IdeaVersion`.
 
-Decision memo section 16.2 states that one material experiment definition maps
-to one immutable `IdeaVersion`, that material changes include assets, date
-range, benchmark, rules, cadence, capital, and modeled costs, and that multiple
-edits before one confirmed run collapse into a single version.
+Decision memo section 16.2 supports the same reading: one material
+experiment definition maps to one immutable `IdeaVersion`, and multiple
+edits before one confirmed run collapse into a single version. This is one
+face of the contract's record-creation rule, whose dividing line is whether
+a turn was spent: non-turn changes update the pending card in place and
+mint nothing anywhere; turn-based edits supersede with a new card message
+because the conversation records the change; run finalization alone mints
+the version.
 
-Read literally, that last clause resolves it: edits made while a card is still
-pending collapse, so no version is minted until the run is confirmed. This spec
-assumes that reading. It needs an explicit confirmation, because the alternative
-silently changes what product memory records for every edited experiment, and
-item 4 depends on that record being right.
+### 4b Amendment 2026-08-10: run admission consumes the card
+
+**Binding.** Pressing Run is a commitment: at run admission the card's own
+row is stamped `confirmation_state: "consumed"` through the guarded
+writer, before dispatch and idempotently on replays. The card row is the
+single source of liveness truth, and every reader (action admission, the
+non-turn routes, recovery fallback, the runtime) derives from one oracle
+over it; no reader infers liveness from job tables, and durable
+pre-amendment transcripts are honored by a compatibility clause that reads
+consumption from later result messages. A consumed card refuses every
+non-turn mutation, so a background run can never complete under a card
+claiming different values. Cancel-the-pending-card has nothing to act on
+once the card is consumed; cancelling the queued run keeps working, and a
+run that dies without a result restores the card to `"active"`, so the
+user who cancels edits and runs again, losing nothing. Restoration and
+the success write derive from one lifecycle statement
+(`argus.domain.backtest_job_lifecycle`), so a state the card was restored
+from can never convert into a result, and a re-claimable failure keeps
+the card consumed until its retries resolve. Founder directed 2026-08-10
+after three guard designs failed on split liveness truth; the one-way
+success rule followed 2026-08-11.
 
 ## 5. Non-goals
 

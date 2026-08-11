@@ -13,6 +13,15 @@ from argus.api.main import app
 from argus.api.message_store import create_message
 from fastapi.testclient import TestClient
 
+
+@pytest.fixture(autouse=True)
+def _in_place_surface_enabled(monkeypatch):
+    """These tests exercise the in-place surface, which ships default-off
+    behind ARGUS_IN_PLACE_CARD_EDITS_ENABLED until the consumption guard
+    lane closes."""
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+
 CONFIRMATION_ID = "11111111-1111-4111-8111-111111111111"
 
 
@@ -308,7 +317,7 @@ def test_the_relevant_research_wins_over_the_latest() -> None:
     ), "unrelated baskets get no researched peers"
 
 
-def test_add_peer_supersedes_without_narration_and_without_turn_spend() -> None:
+def test_add_peer_updates_in_place_without_narration_and_without_turn_spend() -> None:
     client = _client()
     conversation = _conversation(client)
     _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
@@ -319,7 +328,8 @@ def test_add_peer_supersedes_without_narration_and_without_turn_spend() -> None:
     message = response.json()["message"]
     assert message["role"] == "assistant"
     card = message["metadata"]["confirmation_card"]
-    assert card["confirmation_id"] != CONFIRMATION_ID, "a new identity supersedes"
+    # No turn was spent, so nothing new appears: the same card is the record.
+    assert card["confirmation_id"] == CONFIRMATION_ID
     adjustment = card["assets_adjustment"]
     # The resolver owns display names; the row label is never trusted.
     assert adjustment["added"] == [{"symbol": "AAPL", "name": "Apple Inc."}]
@@ -344,9 +354,10 @@ def test_restore_previous_undoes_the_latest_add() -> None:
 
     added = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert added.status_code == 200, added.text
-    new_id = added.json()["message"]["metadata"]["confirmation_card"]["confirmation_id"]
+    same_id = added.json()["message"]["metadata"]["confirmation_card"]["confirmation_id"]
+    assert same_id == CONFIRMATION_ID
 
-    restored = _add(client, conversation["id"], new_id, {"restore_previous": True})
+    restored = _add(client, conversation["id"], same_id, {"restore_previous": True})
     assert restored.status_code == 200, restored.text
     message = restored.json()["message"]
     card = message["metadata"]["confirmation_card"]
@@ -461,3 +472,34 @@ def test_add_peer_is_absent_with_the_flag_off(monkeypatch: pytest.MonkeyPatch) -
 
     response = _add(client, conversation["id"], CONFIRMATION_ID, {"symbols": ["AAPL"]})
     assert response.status_code == 404
+
+
+def test_peer_rows_survive_a_direct_edit_of_the_same_card() -> None:
+    """A capital edit does not change the basket, so the offered peer rows
+    ride the updated card unchanged; both writes share the same metadata
+    path, and neither may drop the other's sidecar."""
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(client, conversation["id"], symbols=["NFLX"], peers=PEERS)
+
+    response = client.post(
+        f"/api/v1/conversations/{conversation['id']}/confirmations/"
+        f"{CONFIRMATION_ID}/direct-edit",
+        json={"capital": 25000},
+    )
+    assert response.status_code == 200, response.text
+    message = response.json()["message"]
+    payload = message["metadata"]["confirmation_payload"]
+    assert payload["strategy"]["capital_amount"] == 25000
+    rows = message["metadata"]["next_experiments"]["rows"]
+    offered = sorted(
+        symbol
+        for row in rows
+        if row["kind"].startswith("research_add_peer")
+        and not row["kind"].endswith("_set")
+        for symbol in row["why"]["params"]["symbols"]
+    )
+    assert offered == [
+        "AAPL",
+        "MSFT",
+    ], "the peer offers must survive an in-place edit of the same card"

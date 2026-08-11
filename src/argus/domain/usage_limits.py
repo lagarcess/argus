@@ -45,9 +45,7 @@ GUEST_DISCOVERY_ALLOWANCE_LIMITS: list[tuple[str, int]] = [
 
 # Guest allowances follow the visitor per day; a fresh session grants
 # nothing new. Decision record: docs/PRODUCT.md (guest access).
-GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [
-    ("day", GUEST_MESSAGE_ALLOWANCE)
-]
+GUEST_MESSAGE_VISITOR_LIMITS: list[tuple[str, int]] = [("day", GUEST_MESSAGE_ALLOWANCE)]
 GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_SIMULATION_ALLOWANCE)
 ]
@@ -62,9 +60,7 @@ GUEST_SIMULATION_VISITOR_LIMITS: list[tuple[str, int]] = [
 # is cheap once the real number is known; refunding a month of underpriced
 # strangers is not.
 GUEST_RESEARCH_ALLOWANCE = 3
-GUEST_RESEARCH_VISITOR_LIMITS: list[tuple[str, int]] = [
-    ("day", GUEST_RESEARCH_ALLOWANCE)
-]
+GUEST_RESEARCH_VISITOR_LIMITS: list[tuple[str, int]] = [("day", GUEST_RESEARCH_ALLOWANCE)]
 
 # Circuit breaker, not a budget: the only bound that holds when someone rotates
 # identity faster than any per-visitor limit can see. Sized so no honest day

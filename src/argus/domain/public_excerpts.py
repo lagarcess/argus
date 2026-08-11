@@ -103,8 +103,7 @@ NEVER_EXPOSE_VALUE_MARKERS = (
 )
 
 _UUID_RE = re.compile(
-    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
-    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
 _SECRET_SHAPED_RE = re.compile(r"[A-Za-z0-9_\-]{24,}")
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -586,9 +585,7 @@ def _strategy_shape(
         return ("buy the dip", (), ())
     if identity & {"indicator_threshold", "rsi_mean_reversion"}:
         name = (
-            "rsi threshold"
-            if template == "rsi_mean_reversion"
-            else "indicator threshold"
+            "rsi threshold" if template == "rsi_mean_reversion" else "indicator threshold"
         )
         return (
             name,
@@ -628,8 +625,7 @@ def _crossover_required_keys(
     differing = {
         field
         for field in CROSSOVER_RULE_FIELDS
-        if _rule_field_token(exit_rule.get(field))
-        != _rule_field_token(mirror.get(field))
+        if _rule_field_token(exit_rule.get(field)) != _rule_field_token(mirror.get(field))
     }
     if not differing:
         return CROSSOVER_WINDOW_KEYS

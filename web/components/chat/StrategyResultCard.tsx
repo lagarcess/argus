@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   CalendarClock,
   Check,
-  ChevronDown,
   CircleX,
   Eye,
   FileText,
@@ -11,6 +10,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ExecutionDetails } from "./ExecutionDetails";
 import { createEvidenceDecision, type DecisionState } from "@/lib/argus-api";
 import {
   confirmMemoryCandidate,
@@ -597,38 +597,6 @@ function TrustRail({ groups, label }: { groups: string[]; label: string }) {
         <p key={group}>{group}</p>
       ))}
     </div>
-  );
-}
-
-function ExecutionDetails({
-  details,
-  triggerLabel,
-}: {
-  details: { label: string; value: string }[];
-  triggerLabel: string;
-}) {
-  if (details.length === 0) return null;
-
-  return (
-    <details className="group mt-3 rounded-[14px] text-[11px] leading-snug tracking-[0.16px] text-[#8d969e]">
-      <summary className="inline-flex cursor-pointer select-none items-center gap-1 rounded-full border border-black/8 bg-black/[0.02] px-2.5 py-1 font-medium text-[#505a63] transition-colors marker:text-transparent hover:border-black/14 hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/14 dark:border-white/8 dark:bg-white/[0.03] dark:text-[#8d969e] dark:hover:border-white/14 dark:hover:bg-white/[0.06] dark:focus-visible:ring-white/14">
-        {triggerLabel}
-        <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
-      </summary>
-      <dl className="mt-2 grid gap-x-5 gap-y-2 rounded-[12px] bg-black/[0.018] px-3 py-2.5 dark:bg-white/[0.025] sm:grid-cols-2">
-        {details.map((detail) => (
-          <div
-            key={`${detail.label}-${detail.value}`}
-            className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-x-3"
-          >
-            <dt className="text-[#8d969e]">{detail.label}</dt>
-            <dd className="break-words font-medium text-[#191c1f] dark:text-white/76">
-              {detail.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </details>
   );
 }
 

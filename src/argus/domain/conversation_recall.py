@@ -205,14 +205,10 @@ def project_conversation_recall(
         if _text(row.get("source_conversation_id")) == conversation_id
     ]
     conversation_messages = [
-        row
-        for row in messages
-        if _text(row.get("conversation_id")) == conversation_id
+        row for row in messages if _text(row.get("conversation_id")) == conversation_id
     ]
     relevant_messages = [
-        row
-        for row in conversation_messages
-        if row.get("role") == "user"
+        row for row in conversation_messages if row.get("role") == "user"
     ]
     completed_runs = [
         row for row in relevant_runs if row.get("status", "completed") == "completed"

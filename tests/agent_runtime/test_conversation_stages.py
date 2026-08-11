@@ -2838,7 +2838,7 @@ def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
         strategy_thesis="Buy and hold NU this year so far.",
         asset_universe=["NU"],
         asset_class="equity",
-        capital_amount=500,
+        capital_amount=5000,
         date_range={"start": "2026-01-01", "end": "2026-06-03"},
     )
 
@@ -2902,7 +2902,7 @@ def test_confirm_stage_clears_stale_latest_complete_data_adjustment(
         strategy_thesis="Buy and hold NU this year so far.",
         asset_universe=["NU"],
         asset_class="equity",
-        capital_amount=500,
+        capital_amount=5000,
         date_range={"start": "2026-01-01", "end": "2026-06-01"},
         extra_parameters={
             "data_availability_adjustment": {
@@ -2951,7 +2951,7 @@ def test_confirm_stage_blocks_far_future_date_instead_of_latest_data_clamp(
         strategy_thesis="Buy and hold NU through 2035.",
         asset_universe=["NU"],
         asset_class="equity",
-        capital_amount=500,
+        capital_amount=5000,
         date_range={"start": "2026-01-01", "end": "2035-12-31"},
     )
 

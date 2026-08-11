@@ -1,7 +1,4 @@
-import type { TFunction } from "i18next";
 import type { ConfirmationDisplayFacts } from "./confirmation-assumptions-display";
-
-type Translate = TFunction;
 
 export const MAX_SLIPPAGE_PERCENT = 5;
 
@@ -19,18 +16,36 @@ export function parseCostPercentInput(value: string): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-export function isValidFeePercent(value: number | null): boolean {
-  return value !== null && value >= 0;
+export type CostPercentCaps = {
+  feeMaxPercent?: number;
+  slippageMaxPercent?: number;
+};
+
+export function isValidFeePercent(
+  value: number | null,
+  maxPercent?: number,
+): boolean {
+  if (value === null || value < 0) return false;
+  return typeof maxPercent === "number" ? value <= maxPercent : true;
 }
 
-export function isValidSlippagePercent(value: number | null): boolean {
-  return value !== null && value >= 0 && value <= MAX_SLIPPAGE_PERCENT;
+export function isValidSlippagePercent(
+  value: number | null,
+  maxPercent: number = MAX_SLIPPAGE_PERCENT,
+): boolean {
+  return value !== null && value >= 0 && value <= maxPercent;
 }
 
-export function isValidCostEditDraft(draft: ExecutionCostEditDraft): boolean {
+export function isValidCostEditDraft(
+  draft: ExecutionCostEditDraft,
+  caps?: CostPercentCaps,
+): boolean {
   return (
-    isValidFeePercent(parseCostPercentInput(draft.feePercent)) &&
-    isValidSlippagePercent(parseCostPercentInput(draft.slippagePercent))
+    isValidFeePercent(parseCostPercentInput(draft.feePercent), caps?.feeMaxPercent) &&
+    isValidSlippagePercent(
+      parseCostPercentInput(draft.slippagePercent),
+      caps?.slippageMaxPercent ?? MAX_SLIPPAGE_PERCENT,
+    )
   );
 }
 
@@ -59,23 +74,24 @@ export function decimalRateToPercentInput(
   return String(percent);
 }
 
-export function executionCostEditMessage(
+export function costEditDraftToRates(
   draft: ExecutionCostEditDraft,
-  t: Translate,
-): string | null {
+  caps?: CostPercentCaps,
+): { fee_rate: number; slippage: number } | null {
   const fee = parseCostPercentInput(draft.feePercent);
   const slippage = parseCostPercentInput(draft.slippagePercent);
-  if (!isValidFeePercent(fee) || !isValidSlippagePercent(slippage)) {
+  if (
+    !isValidFeePercent(fee, caps?.feeMaxPercent) ||
+    !isValidSlippagePercent(
+      slippage,
+      caps?.slippageMaxPercent ?? MAX_SLIPPAGE_PERCENT,
+    )
+  ) {
     return null;
   }
-  return t("chat.confirmation.cost_editor.message", {
-    defaultValue: "Set fees to {{fee}}% and slippage to {{slippage}}% per trade.",
-    fee: formatPercentValue(fee as number),
-    slippage: formatPercentValue(slippage as number),
-  });
-}
-
-function formatPercentValue(value: number): string {
-  const rounded = Math.round(value * 10000) / 10000;
-  return String(rounded);
+  // The endpoint takes decimal rates; percent stays a display convention.
+  return {
+    fee_rate: (fee as number) / 100,
+    slippage: (slippage as number) / 100,
+  };
 }

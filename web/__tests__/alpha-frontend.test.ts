@@ -626,9 +626,9 @@ describe("Argus Alpha frontend contract", () => {
     // The entrance motion belongs to the message that carries the actions now
     // that the floating composer strip is gone.
     expect(message).toContain("slide-in-from-bottom-2");
-    expect(message).toContain(
-      "<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />",
-    );
+    expect(message).toContain("<StrategyConfirmationCard");
+    expect(message).toContain("confirmation={message.confirmation}");
+    expect(message).toContain("onAction={onAction}");
   });
 
   test("artifact cards use compositor-safe reveal motion with a reduced-motion opt out", () => {
@@ -1181,9 +1181,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain('confirmation.confirmation_state === "active"');
     expect(card).toContain("!confirmation.confirmation_state");
     expect(card).not.toContain("ArrowRight");
-    expect(message).toContain(
-      "<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />",
-    );
+    expect(message).toContain("<StrategyConfirmationCard");
+    expect(message).toContain("confirmation={message.confirmation}");
+    expect(message).toContain("onAction={onAction}");
   });
 
   test("result cards render only active artifact scoped actions", () => {

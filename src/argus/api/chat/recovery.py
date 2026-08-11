@@ -49,10 +49,13 @@ def _recent_messages_for_conversation(
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
         try:
+            # The newest window, chronological: the memory path always read
+            # the tail, and the hosted path must agree (#433).
             messages = api_state.supabase_gateway.list_messages(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 limit=limit,
+                newest_first_window=True,
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
@@ -182,6 +185,7 @@ def confirmation_metadata_fallback_context(
     conversation_id: str,
     recent_messages: list[Message] | None = None,
     language: str | None = None,
+    admit_consumed_run_replay: bool = False,
 ) -> RuntimeFallbackContext | None:
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
@@ -198,6 +202,11 @@ def confirmation_metadata_fallback_context(
             limit=20,
         )
     )
+    from argus.agent_runtime.stages.artifact_context import (
+        CONSUMED_CONFIRMATION_STATE,
+        confirmation_card_is_dead,
+    )
+
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):
             continue
@@ -206,6 +215,18 @@ def confirmation_metadata_fallback_context(
             return None
         if not metadata.get("confirmation_card"):
             continue
+        if confirmation_card_is_dead(metadata):
+            # The card row is the liveness truth: a consumed, cancelled, or
+            # superseded card must never be resurrected as fallback context.
+            # One carve-out, named for its reason: a run action on a
+            # consumed card flows through so admission can answer the
+            # replay idempotently; consumption blocks edits, not retries.
+            # Cancelled and superseded cards never had an admitted run, so
+            # they stay dead even for replays.
+            card = metadata.get("confirmation_card")
+            state = str((card or {}).get("confirmation_state") or "").strip().casefold()
+            if not (admit_consumed_run_replay and state == CONSUMED_CONFIRMATION_STATE):
+                return None
         payload = metadata.get("confirmation_payload")
         if not isinstance(payload, dict):
             return _confirmation_recovery_context(
@@ -304,25 +325,16 @@ def _confirmation_recovery_context(
 
 
 def _metadata_invalidates_confirmation(metadata: dict[str, Any]) -> bool:
-    if metadata.get("result_card"):
-        return True
-    if metadata.get("result_run_id") and not _metadata_is_latest_result_fact_reply(
-        metadata
-    ):
-        return True
-    action = metadata.get("chat_action")
-    if isinstance(action, dict) and action.get("type") == "cancel_confirmation":
-        return True
-    pending_strategy = metadata.get("pending_strategy")
-    if not isinstance(pending_strategy, dict):
-        return False
-    requested_field = pending_strategy.get("requested_field")
-    stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "")
-    return (
-        isinstance(requested_field, str)
-        and bool(requested_field.strip())
-        and stage_outcome in {"await_user_reply", "needs_clarification"}
+    """Derived from the liveness oracle; recovery keeps only the name.
+
+    The predicate itself lives beside the card-row oracle in
+    ``artifact_context`` so no reader can drift from another.
+    """
+    from argus.agent_runtime.stages.artifact_context import (
+        newer_message_supersedes_confirmation,
     )
+
+    return newer_message_supersedes_confirmation(metadata)
 
 
 def pending_strategy_metadata_fallback_context(
@@ -511,18 +523,12 @@ def _metadata_invalidates_pending_strategy(metadata: dict[str, Any]) -> bool:
 
 
 def _metadata_is_latest_result_fact_reply(metadata: dict[str, Any]) -> bool:
-    """Typed latest-result fact replies carry run continuity ids without
-    superseding an active confirmation."""
-
-    response_intent = metadata.get("response_intent")
-    if not isinstance(response_intent, dict):
-        return False
-    if response_intent.get("kind") not in {"beginner_guidance", "unsupported_recovery"}:
-        return False
-    facts = response_intent.get("facts")
-    return isinstance(facts, dict) and bool(
-        facts.get("fact_key") or facts.get("requested_metric")
+    """Derived from the liveness oracle module; recovery keeps the name."""
+    from argus.agent_runtime.stages.artifact_context import (
+        _metadata_is_latest_result_fact_reply_marker,
     )
+
+    return _metadata_is_latest_result_fact_reply_marker(metadata)
 
 
 def _metadata_has_pending_response_intent(metadata: dict[str, Any]) -> bool:

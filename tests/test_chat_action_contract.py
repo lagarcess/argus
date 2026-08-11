@@ -86,9 +86,9 @@ def test_confirmation_card_is_not_ready_without_validated_launch_payload() -> No
     assert card["status"] == "needs_change"
     assert card["statusLabel"] == "Needs change"
     assert all("labelKey" in action for action in card["actions"])
+    # §3.1 end state: the scoped change_dates/change_asset entry points are
+    # retired from emission; Change assumptions is the one editing entry.
     assert [action["type"] for action in card["actions"]] == [
-        "change_dates",
-        "change_asset",
         "adjust_assumptions",
         "cancel_confirmation",
     ]

@@ -83,9 +83,7 @@ class ChatTurnLifecycleGatewayMixin:
         )
         try:
             canonical_request_message_id = (
-                str(UUID(request_message_id))
-                if request_message_id is not None
-                else None
+                str(UUID(request_message_id)) if request_message_id is not None else None
             )
         except (AttributeError, TypeError, ValueError) as exc:
             raise ValueError(
@@ -177,9 +175,7 @@ class ChatTurnLifecycleGatewayMixin:
                     else None
                 ),
                 "p_visitor_key": (
-                    settle_usage.get("visitor_key")
-                    if settle_usage is not None
-                    else None
+                    settle_usage.get("visitor_key") if settle_usage is not None else None
                 ),
             },
         ).execute()

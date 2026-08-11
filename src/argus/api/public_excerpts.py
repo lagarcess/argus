@@ -282,9 +282,7 @@ def create_receipt_for_artifact(
     existing link, and the caller needs to know that so a retry or a reload is not
     counted as a new receipt in the funnel.
     """
-    artifact, conversation = _owned_artifact(
-        user_id=user.id, artifact_id=artifact_id
-    )
+    artifact, conversation = _owned_artifact(user_id=user.id, artifact_id=artifact_id)
     repository = public_excerpt_repository()
     existing = repository.get_live_public_excerpt_for_artifact(
         owner_id=user.id,
@@ -378,9 +376,7 @@ def _owned_artifact(
     if artifact is None:
         raise EvidenceReceiptSourceMissingError("That result is not available.")
     if artifact.artifact_type != "backtest":
-        raise PublicExcerptSourceError(
-            "Only completed backtest results are shareable."
-        )
+        raise PublicExcerptSourceError("Only completed backtest results are shareable.")
     # An artifact outlives its conversation, so ownership alone does not mean the
     # owner still has the thing they would be publishing. A stale result card in an
     # open tab is the ordinary way this happens.

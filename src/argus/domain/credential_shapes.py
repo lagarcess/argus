@@ -41,9 +41,7 @@ UPPERCASE_KEY_PATTERN = re.compile(
     r"\b(?:AKIA|ASIA|ABIA|ACCA|AIDA|PK|AK|CK|SK)[A-Z0-9]{16,}\b"
 )
 # A PEM banner names itself, so no entropy guess is needed.
-PRIVATE_KEY_BANNER_PATTERN = re.compile(
-    r"(?i)-{3,}\s*BEGIN[A-Z0-9 ]*PRIVATE KEY\s*-{3,}"
-)
+PRIVATE_KEY_BANNER_PATTERN = re.compile(r"(?i)-{3,}\s*BEGIN[A-Z0-9 ]*PRIVATE KEY\s*-{3,}")
 URL_USERINFO_PATTERN = re.compile(r"(?<=://)[^\s/:@]+:[^\s/@]+@")
 
 # ── The credential key names, in one place ────────────────────────────────────────
@@ -92,8 +90,7 @@ def _key_alternation(names: tuple[str, ...]) -> str:
     wins and the captured key is only the tail of the real one.
     """
     parts = [
-        r"[_\- ]?".join(re.escape(word) for word in name.split()) + "s?"
-        for name in names
+        r"[_\- ]?".join(re.escape(word) for word in name.split()) + "s?" for name in names
     ]
     return "(?:" + "|".join(sorted(parts, key=len, reverse=True)) + ")"
 
@@ -117,9 +114,28 @@ _CREDENTIAL_ASSIGNMENT_RE = re.compile(
 # write `secret = something`, so `=` is taken at face value.
 _PROSE_DETERMINERS = frozenset(
     {
-        "the", "a", "an", "my", "our", "your", "his", "her", "their", "its",
-        "this", "that", "these", "those", "no", "any", "some", "every", "each",
-        "one", "another", "whose",
+        "the",
+        "a",
+        "an",
+        "my",
+        "our",
+        "your",
+        "his",
+        "her",
+        "their",
+        "its",
+        "this",
+        "that",
+        "these",
+        "those",
+        "no",
+        "any",
+        "some",
+        "every",
+        "each",
+        "one",
+        "another",
+        "whose",
     }
 )
 
