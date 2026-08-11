@@ -405,6 +405,9 @@ GENERATED_CARD_METRICS: dict[str, Any] = {
         "performance": {
             "profit": 120.0,
             "total_return_pct": 18.4,
+            # The engine computes both halves of the comparison, so a fixture with
+            # only the delta describes a run it does not produce.
+            "benchmark_return_pct": 9.1,
             "delta_vs_benchmark_pct": 9.3,
             "execution_realism": {
                 "enabled": True,

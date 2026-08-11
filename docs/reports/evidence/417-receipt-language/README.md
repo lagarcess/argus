@@ -29,6 +29,13 @@ tested window read `2 de enero de 2024 al 1 de marzo de 2024`.
 None of that prose is in the payload. What the snapshot actually holds is:
 
 ```json
+"metrics": [
+  {"key": "cash_value", "value": "$600 -> $720"},
+  {"key": "total_return_pct", "value": "+18.4%"},
+  {"key": "max_drawdown_pct", "value": "-6.2%"},
+  {"key": "benchmark_return_pct", "value": "+9.1%"},
+  {"key": "delta_vs_benchmark_pct", "value": "9.3"}
+],
 "assumptions": [
   {"key": "recurring_contribution", "value": "200"},
   {"key": "contribution_cadence", "value": "monthly"},
@@ -46,6 +53,12 @@ So the English reader gets `It put in $200 every month.` and
 `Jan 2, 2024 to Mar 1, 2024`, and the Spanish reader gets `Aportó $200 cada mes.`
 and `2 ene 2024 al 1 mar 2024`, from one frozen object that contains neither
 sentence.
+
+The comparison line under the headline reads `9.3 pts ahead of SPY · SPY +9.1%`
+and `9.3 pts por encima de SPY · SPY +9.1%` from the same two numbers. The card
+this run produced states that comparison as `Beat by 9.3 percentage points`, in
+English in both languages, so the receipt carries the figures instead and composes
+the sentence for whoever opened the link.
 
 `rendered-text.json` holds the full rendered body text of both pages. Every frame
 here was checked by reading that text before the image was trusted: an earlier
