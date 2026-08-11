@@ -3253,7 +3253,11 @@ run row goes last. The refusal record on the job's execution metadata
 and the turn's message is the audit trail. The withheld terminal is only
 composed after the removal succeeds: if the removal itself fails, the
 turn fails as an ordinary runtime error instead, so the transcript never
-claims there is no result to show while one remains readable. The final
+claims there is no result to show while one remains readable. A failed
+removal also writes a durable `result_cleanup_pending` marker onto the
+job's execution metadata naming the leaked run; on the worker path the
+task run fails and its retry finishes the removal at entry before
+anything else, and the marker stays queryable for operators either way. The final
 frame of a withheld turn carries no `run`, `result_card`, or result
 continuity ids, so clients render the localized recovery text instead of
 a result, and the simulation allowance stays settled at admission per the

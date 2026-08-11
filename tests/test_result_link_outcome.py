@@ -199,9 +199,16 @@ def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
                     "result_run_id": None,
                 }
             )
+            self.metadata_merges: list[dict[str, object]] = []
 
         def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
             raise RuntimeError("cleanup unavailable")
+
+        def merge_backtest_job_execution_metadata(
+            self, **payload: object
+        ) -> dict[str, object]:
+            self.metadata_merges.append(payload)
+            return {"id": payload["job_id"]}
 
     restore_calls: list[str] = []
     monkeypatch.setattr(
@@ -215,13 +222,14 @@ def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
     metadata: dict[str, object] = {"result_card": {"title": "x"}}
     runtime_result: dict[str, object] = {"result_card": {"title": "x"}}
 
+    gateway = _BrokenCleanupGateway()
     with backtest_job_shadow_context(context):
         with pytest.raises(RuntimeError, match="cleanup unavailable"):
             apply_result_link_outcome(
                 run=_Run(),
                 metadata=metadata,
                 runtime_result=runtime_result,
-                gateway=_BrokenCleanupGateway(),
+                gateway=gateway,
                 user_id="user-1",
                 language="en",
                 dev_memory_fallback_enabled=True,
@@ -230,6 +238,8 @@ def test_failed_tuple_removal_fails_the_turn_instead_of_claiming_withheld(
     assert restore_calls == []
     assert "recovery" not in metadata
     assert "result_link_refused" not in metadata
+    marker = gateway.metadata_merges[-1]["execution_metadata"]
+    assert marker["result_cleanup_pending"]["run_id"] == "run-1"
 
 
 def test_link_outcome_tolerates_gateway_errors_only_in_dev_fallback() -> None:

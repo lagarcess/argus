@@ -224,8 +224,19 @@ def _withhold_refused_result_publication(
     # skips the restore re-attempt, so this path never itself hands back
     # an editable card while the tuple is still readable. Failing toward
     # consumed is the guard's stated bias; the finalizer that won the
-    # terminal state ran its own restore either way.
-    _remove_withheld_result_tuple(gateway, user_id=user_id, run_id=run_id)
+    # terminal state ran its own restore either way. Before the raise, a
+    # durable pending marker lands on the job row so the leaked tuple is
+    # queryable rather than known only to a log line.
+    try:
+        _remove_withheld_result_tuple(gateway, user_id=user_id, run_id=run_id)
+    except Exception:
+        _persist_cleanup_pending_marker(
+            gateway,
+            user_id=user_id,
+            job_id=str((link_outcome.job or {}).get("id") or ""),
+            run_id=run_id,
+        )
+        raise
     restore_pending_card_for_failed_job(
         gateway,
         user_id=user_id,
@@ -250,6 +261,41 @@ def _withhold_refused_result_publication(
     runtime_result["recovery"] = withheld_recovery
     runtime_result["assistant_response"] = assistant_text
     return assistant_text
+
+
+def _persist_cleanup_pending_marker(
+    gateway: Any | None,
+    *,
+    user_id: str,
+    job_id: str,
+    run_id: str,
+) -> None:
+    """Best-effort durable record of the leaked tuple on the job row,
+    under the shared RESULT_CLEANUP_PENDING_KEY vocabulary; the worker's
+    entry reconciler and operators query the same marker."""
+    from argus.domain.backtest_job_lifecycle import RESULT_CLEANUP_PENDING_KEY
+
+    merge = getattr(gateway, "merge_backtest_job_execution_metadata", None)
+    if merge is None or not job_id:
+        return
+    try:
+        merge(
+            user_id=user_id,
+            job_id=job_id,
+            execution_metadata={
+                RESULT_CLEANUP_PENDING_KEY: {
+                    "run_id": run_id,
+                    "failed_at": _utcnow_iso(),
+                }
+            },
+        )
+    except Exception:  # noqa: BLE001
+        logger.opt(exception=True).warning(
+            "Withheld-cleanup pending marker could not be persisted",
+            user_id=user_id,
+            job_id=job_id,
+            run_id=run_id,
+        )
 
 
 def _remove_withheld_result_tuple(

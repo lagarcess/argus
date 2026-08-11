@@ -24,6 +24,11 @@ JOB_HAS_RESULT = "has_result"
 JOB_DEAD = "dead"
 JOB_UNKNOWN = "unknown"
 
+# Execution-metadata key naming a withheld tuple whose removal failed:
+# durable, owner-scoped, and queryable, written by whichever side hit the
+# failure and cleared by the reconciliation that finishes the removal.
+RESULT_CLEANUP_PENDING_KEY = "result_cleanup_pending"
+
 
 def classify_job_for_card(*, status: Any, retryable: Any) -> str:
     """The one lifecycle statement both sides derive from.

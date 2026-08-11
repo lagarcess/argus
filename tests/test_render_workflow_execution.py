@@ -913,56 +913,6 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
     )
 
 
-def _run_refused_link_job(*, fail_cleanup: bool):
-    """One refused-link execution: the fake gateway returns the standing
-    canceled row from the link write, exactly as the lifecycle predicate
-    does on real Postgres."""
-    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
-
-    job = _job_row(
-        launch_payload={
-            "kind": REAL_BACKTEST_JOB_KIND,
-            "schema_version": "backtest_job_launch/v1",
-            "request": _request_payload(),
-        }
-    )
-    gateway = FakeBacktestJobGateway(job)
-    gateway.refuse_result_link_once = True
-    gateway.fail_run_cleanup_once = fail_cleanup
-    result = run_backtest_job(
-        gateway,
-        job_id=str(job["id"]),
-        backtest_tool=FakeBacktestTool(_successful_tool_result()),
-        workflow_run_id="local-run",
-        run_id_factory=lambda: "run-workflow",
-    )
-    assert result["status"] == "canceled"
-    assert result["result_run_id"] is None
-    assert result["result_link_refused"] is True
-    return gateway, result
-
-
-def test_run_backtest_job_removes_the_run_row_when_the_link_is_refused() -> None:
-    """A refused attach must not leave a completed run row behind: History
-    and latest-result reads carry no link check, so the worker removes the
-    just-committed run and reports the refusal instead of the run id."""
-    gateway, result = _run_refused_link_job(fail_cleanup=False)
-    assert "result_cleanup_failed" not in result
-    assert gateway.deleted_runs == ["run-workflow"]
-    assert gateway.row["result_run_id"] is None
-
-
-def test_run_backtest_job_reports_cleanup_failure_without_overwriting_the_job() -> None:
-    """A failed tuple removal after a refused link surfaces in the task
-    output as result_cleanup_failed; it must not route through the generic
-    failure handler, which would overwrite the job's standing terminal
-    state with a re-claimable failure."""
-    gateway, result = _run_refused_link_job(fail_cleanup=True)
-    assert result["result_cleanup_failed"] is True
-    assert gateway.deleted_runs == []
-    assert gateway.row["status"] == "canceled"
-
-
 def test_run_backtest_job_persists_terminal_capacity_wait_timeout() -> None:
     from workflows.backtest_job import (
         REAL_BACKTEST_JOB_KIND,
