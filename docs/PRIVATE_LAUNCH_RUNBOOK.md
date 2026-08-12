@@ -90,14 +90,25 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Manually deploy `argus-api`, then `argus-app` from the candidate commit. Do
-   not create or deploy `argus-maintenance` in the current promotion. The cron
-   remains deliberately absent until a separate founder decision applies the
-   blueprint.
+8. Manually deploy **all three live services** from the candidate commit:
+   `argus-api`, then `argus-app`, then **`argus-backtests`**.
 
-9. Confirm the live `argus-api` and `argus-app` deploy commits match the
-   candidate commit you intend to test and that the latest deploys are `live`.
-   Also confirm the deliberately unapplied cron is still absent:
+   **`argus-backtests` is the easiest one to forget and the one that breaks the
+   canary.** It is the Render Workflow service that actually runs backtests, it
+   is not declared in `render.yaml`, and it was missing from this step until
+   2026-08-11. On that promotion the API and web shipped while the workflow
+   service stayed a week behind, and the canary stopped at
+   `workflow_commit_mismatch` before spending money on a paid journey. Deploy it
+   every time, and never let a promotion finish with the three on different
+   commits.
+
+   Do not create or deploy `argus-maintenance`. The cron remains deliberately
+   absent until a separate founder decision applies the blueprint.
+
+9. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
+   commits match the candidate commit you intend to test and that the latest
+   deploys are `live`. Also confirm the deliberately unapplied cron is still
+   absent:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
@@ -106,12 +117,16 @@ ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh cron-deploy-status
 ```
 
-If either deployed commit is not `ARGUS_RELEASE_SHA`, stop and deploy that stale
-service before running the strict canaries. The canary script enforces the same
-deployed SHA/status check with `ARGUS_CANARY_SHA`. For the current promotion,
-`cron-deploy-status` must report `status=absent`. Any other cron status is a
-finding and a stop: do not deploy it as part of this promotion. A failed Render
-lookup is also a real failure, never proof of absence.
+If any of the three deployed commits is not `ARGUS_RELEASE_SHA`, stop and deploy
+that stale service before running the strict canaries. The canary script
+enforces the same deployed SHA/status check with `ARGUS_CANARY_SHA`, and its
+resolver compares all three, which is what caught the workflow service running
+behind on 2026-08-11.
+
+For the current promotion, `cron-deploy-status` must report `status=absent`. Any
+other cron status is a finding and a stop: do not deploy it as part of this
+promotion. A failed Render lookup is also a real failure, never proof of
+absence.
 
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the

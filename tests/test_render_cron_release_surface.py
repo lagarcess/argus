@@ -79,7 +79,12 @@ def test_current_promotion_keeps_the_unapplied_cron_absent() -> None:
     promotion = " ".join(promotion.split())
     maintenance = " ".join(maintenance.split())
 
-    assert "deploy `argus-api`, then `argus-app`" in promotion
+    # All three live services, in order. This assertion used to stop at
+    # `argus-app`, which is what let the workflow service go undeployed on
+    # 2026-08-11 while api and web shipped; the canary caught it as
+    # `workflow_commit_mismatch`. A step that names two of three services is
+    # the defect, so the test has to require the third.
+    assert "`argus-api`, then `argus-app`, then **`argus-backtests`**" in promotion
     assert "Do not create or deploy `argus-maintenance`" in promotion
     assert "`cron-deploy-status` must report `status=absent`" in promotion
     assert "then `argus-maintenance`" not in promotion
