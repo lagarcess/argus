@@ -1583,13 +1583,22 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   roles do not grant permanent access.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
-  method and path. It loads one active requested row and its language, sends
-  one localized approval email linking to
-  `${ARGUS_APP_ORIGIN}/?auth=signup`, then compare-and-sets
-  `role=requested AND disabled_at IS NULL` to `role=user`. Missing
-  configuration, missing or disabled state, SMTP failure, and a compare-and-set
-  miss do not return success. Missing or invalid ops authorization returns
-  `404`.
+  method and path. For a new approval, it loads one active requested row and
+  its language, sends one localized welcome email linking to
+  `${ARGUS_APP_ORIGIN}/?auth=signup`, then calls the database completion RPC.
+  That RPC records the provider-accepted delivery before activating access and
+  promotes `role=requested AND disabled_at IS NULL` to `role=user` in the same
+  transaction. The protected operation and its completion RPC are the sole
+  `requested`-to-`user` promotion boundary; operational callers must not patch
+  that role directly.
+- The normalized recipient has at most one durable access-welcome delivery
+  record. A repeated approval that finds the record calls the same completion
+  RPC without calling SMTP, so it can finish an interrupted promotion and
+  returns the unchanged `{"approved":true}` response. Delivery existence alone
+  never grants access: the RPC still rejects missing, disabled, privileged, or
+  otherwise ineligible allowlist rows. Missing configuration, missing or
+  disabled state, SMTP failure, database failure, and a completion miss do not
+  return success. Missing or invalid ops authorization returns `404`.
 - `POST /internal/canary/requested-signup-denial` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
   method and path. It reports whether a supplied email would be denied by the

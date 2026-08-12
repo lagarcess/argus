@@ -189,7 +189,3 @@ def send_access_welcome_email(
         content_version=ACCESS_WELCOME_CONTENT_VERSION,
         provider_receipt=receipt[:_MAX_RECEIPT_LENGTH] or "accepted",
     )
-
-
-# Temporary compatibility name until the approval route adopts the new result contract.
-send_access_approval_email = send_access_welcome_email

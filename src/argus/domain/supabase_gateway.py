@@ -366,17 +366,42 @@ class SupabaseGateway(
             return None
         return row
 
-    def approve_requested_private_alpha_access(self, *, email: str) -> bool:
-        updated = (
-            self.client.table("private_alpha_allowlist")
-            .update({"role": "user", "updated_at": _now_iso()})
-            .eq("email", _normalize_email(email))
-            .eq("role", "requested")
-            .is_("disabled_at", "null")
+    def get_private_alpha_access_welcome_delivery(
+        self,
+        email: str,
+    ) -> dict[str, Any] | None:
+        rows = (
+            self.client.table("private_alpha_access_welcome_deliveries")
+            .select(
+                "recipient_email,language,content_version,subject,"
+                "provider_receipt,sent_at"
+            )
+            .eq("recipient_email", _normalize_email(email))
+            .limit(1)
             .execute()
         )
-        row = _row_one(updated)
-        return bool(row and row.get("role") == "user")
+        return _row_one(rows)
+
+    def complete_private_alpha_access_welcome(
+        self,
+        *,
+        email: str,
+        language: Language,
+        content_version: str,
+        subject: str,
+        provider_receipt: str,
+    ) -> bool:
+        result = self.client.rpc(
+            "complete_private_alpha_access_welcome",
+            {
+                "p_email": _normalize_email(email),
+                "p_language": language,
+                "p_content_version": content_version,
+                "p_subject": subject,
+                "p_provider_receipt": provider_receipt,
+            },
+        ).execute()
+        return result.data is True
 
     def login(
         self,

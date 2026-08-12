@@ -21,6 +21,89 @@ from fastapi.testclient import TestClient
 client = TestClient(app)
 
 
+class _StatefulApprovalGateway:
+    def __init__(
+        self,
+        *,
+        role: str | None = "requested",
+        language: Language = "en",
+        disabled: bool = False,
+    ) -> None:
+        self.role = role
+        self.language = language
+        self.disabled = disabled
+        self.deliveries: dict[str, dict[str, str]] = {}
+        self.events: list[str] = []
+        self.complete_result: bool | None = None
+        self.complete_error: Exception | None = None
+        self.delivery_lookup_error: Exception | None = None
+
+    @staticmethod
+    def _normalize(email: str) -> str:
+        return email.strip().lower()
+
+    def get_private_alpha_access_welcome_delivery(
+        self,
+        email: str,
+    ) -> dict[str, str] | None:
+        if self.delivery_lookup_error is not None:
+            raise self.delivery_lookup_error
+        return self.deliveries.get(self._normalize(email))
+
+    def get_requested_private_alpha_access(self, email: str) -> dict[str, object] | None:
+        if self.role != "requested" or self.disabled:
+            return None
+        return {
+            "email": self._normalize(email),
+            "role": self.role,
+            "language": self.language,
+            "disabled_at": None,
+        }
+
+    def complete_private_alpha_access_welcome(
+        self,
+        *,
+        email: str,
+        language: Language,
+        content_version: str,
+        subject: str,
+        provider_receipt: str,
+    ) -> bool:
+        self.events.append("complete")
+        if self.complete_error is not None:
+            raise self.complete_error
+        if self.complete_result is not None:
+            return self.complete_result
+
+        normalized = self._normalize(email)
+        delivery = self.deliveries.get(normalized)
+        if (
+            self.role not in {"requested", "user"}
+            or self.disabled
+            or language != self.language
+        ):
+            return False
+        if delivery is not None:
+            return (
+                delivery["language"] == language
+                and delivery["content_version"] == content_version
+                and delivery["subject"] == subject
+            )
+        if self.role == "user":
+            return False
+
+        self.deliveries[normalized] = {
+            "recipient_email": normalized,
+            "language": language,
+            "content_version": content_version,
+            "subject": subject,
+            "provider_receipt": provider_receipt,
+            "sent_at": "2026-08-12T14:27:17Z",
+        }
+        self.role = "user"
+        return True
+
+
 class _FakeSMTP:
     def __init__(
         self,
@@ -329,62 +412,124 @@ def test_access_welcome_html_escapes_the_signup_url() -> None:
     ) in content.html
 
 
-def test_internal_approval_sends_before_requested_to_user_cas(
+def test_internal_approval_two_requests_send_once_and_replay_durable_delivery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.routers import ops
 
-    events: list[str] = []
-    gateway = MagicMock()
-    gateway.get_requested_private_alpha_access.return_value = {
-        "email": "person@example.com",
-        "role": "requested",
-        "language": "es-419",
-        "disabled_at": None,
-    }
-    gateway.approve_requested_private_alpha_access.side_effect = (
-        lambda **kwargs: events.append("cas") or True
-    )
+    gateway = _StatefulApprovalGateway(language="es-419")
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example/")
-    monkeypatch.setenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD", "re_test_password")
+    send_count = 0
 
-    def _send(**kwargs: object) -> str:
-        events.append("send")
+    def _send(**kwargs: object) -> AccessWelcomeSendResult:
+        nonlocal send_count
+        send_count += 1
+        gateway.events.append("send")
         assert kwargs == {
             "recipient": "person@example.com",
             "language": "es-419",
             "signup_url": "https://app.example/?auth=signup",
         }
-        return "Queued. resend-message-id"
+        return AccessWelcomeSendResult(
+            subject="Bienvenido a Argus",
+            content_version="private-alpha-access-welcome/v1",
+            provider_receipt="synthetic-provider-receipt",
+        )
 
-    monkeypatch.setattr(ops, "send_access_approval_email", _send)
+    monkeypatch.setattr(ops, "send_access_welcome_email", _send)
+
+    first = client.post(
+        "/internal/access-requests/approve",
+        json={"email": " Person@Example.COM "},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+    second = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json() == {"approved": True}
+    assert send_count == 1
+    assert gateway.role == "user"
+    assert len(gateway.deliveries) == 1
+    assert gateway.events == ["send", "complete", "complete"]
+
+
+def test_internal_approval_recorded_replay_never_calls_smtp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = _StatefulApprovalGateway(role="user", language="en")
+    gateway.deliveries["person@example.com"] = {
+        "recipient_email": "person@example.com",
+        "language": "en",
+        "content_version": "private-alpha-access-welcome/v1",
+        "subject": "Welcome to Argus",
+        "provider_receipt": "synthetic-provider-receipt",
+        "sent_at": "2026-08-12T14:27:17Z",
+    }
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    sender = MagicMock()
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
 
     response = client.post(
         "/internal/access-requests/approve",
-        json={"email": " Person@Example.COM "},
+        json={"email": "person@example.com"},
         headers={"Authorization": "Bearer ops-token"},
     )
 
     assert response.status_code == 200
     assert response.json() == {"approved": True}
-    assert events == ["send", "cas"]
-    gateway.approve_requested_private_alpha_access.assert_called_once_with(
-        email="person@example.com"
+    sender.assert_not_called()
+    assert gateway.events == ["complete"]
+
+
+@pytest.mark.parametrize(
+    ("role", "disabled"),
+    [(None, False), ("requested", True), ("admin", False), ("developer", False)],
+)
+def test_internal_approval_delivery_cannot_approve_ineligible_allowlist_row(
+    monkeypatch: pytest.MonkeyPatch,
+    role: str | None,
+    disabled: bool,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = _StatefulApprovalGateway(role=role, disabled=disabled)
+    gateway.deliveries["person@example.com"] = {
+        "recipient_email": "person@example.com",
+        "language": "en",
+        "content_version": "private-alpha-access-welcome/v1",
+        "subject": "Welcome to Argus",
+        "provider_receipt": "synthetic-provider-receipt",
+        "sent_at": "2026-08-12T14:27:17Z",
+    }
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    sender = MagicMock()
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
+
+    response = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
     )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == ("Access request is not eligible for approval.")
+    sender.assert_not_called()
 
 
 def test_internal_approval_missing_smtp_secret_never_transitions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gateway = MagicMock()
-    gateway.get_requested_private_alpha_access.return_value = {
-        "email": "person@example.com",
-        "role": "requested",
-        "language": "en",
-        "disabled_at": None,
-    }
+    gateway = _StatefulApprovalGateway()
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example")
@@ -398,7 +543,7 @@ def test_internal_approval_missing_smtp_secret_never_transitions(
 
     assert response.status_code == 503
     assert "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD" not in response.text
-    gateway.approve_requested_private_alpha_access.assert_not_called()
+    assert "complete" not in gateway.events
 
 
 def test_internal_approval_smtp_failure_never_transitions(
@@ -406,20 +551,14 @@ def test_internal_approval_smtp_failure_never_transitions(
 ) -> None:
     from argus.api.routers import ops
 
-    gateway = MagicMock()
-    gateway.get_requested_private_alpha_access.return_value = {
-        "email": "person@example.com",
-        "role": "requested",
-        "language": "en",
-        "disabled_at": None,
-    }
+    gateway = _StatefulApprovalGateway()
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example")
     monkeypatch.setenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD", "re_test_password")
     monkeypatch.setattr(
         ops,
-        "send_access_approval_email",
+        "send_access_welcome_email",
         MagicMock(side_effect=RuntimeError("smtp unavailable")),
     )
 
@@ -431,7 +570,7 @@ def test_internal_approval_smtp_failure_never_transitions(
 
     assert response.status_code == 503
     assert "smtp unavailable" not in response.text
-    gateway.approve_requested_private_alpha_access.assert_not_called()
+    assert "complete" not in gateway.events
 
 
 def test_internal_approval_missing_app_origin_never_sends_or_transitions(
@@ -439,18 +578,12 @@ def test_internal_approval_missing_app_origin_never_sends_or_transitions(
 ) -> None:
     from argus.api.routers import ops
 
-    gateway = MagicMock()
-    gateway.get_requested_private_alpha_access.return_value = {
-        "email": "person@example.com",
-        "role": "requested",
-        "language": "en",
-        "disabled_at": None,
-    }
+    gateway = _StatefulApprovalGateway()
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     monkeypatch.delenv("ARGUS_APP_ORIGIN", raising=False)
     sender = MagicMock()
-    monkeypatch.setattr(ops, "send_access_approval_email", sender)
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
 
     response = client.post(
         "/internal/access-requests/approve",
@@ -460,7 +593,7 @@ def test_internal_approval_missing_app_origin_never_sends_or_transitions(
 
     assert response.status_code == 503
     sender.assert_not_called()
-    gateway.approve_requested_private_alpha_access.assert_not_called()
+    assert "complete" not in gateway.events
 
 
 def test_internal_approval_missing_or_disabled_request_does_not_send(
@@ -468,12 +601,11 @@ def test_internal_approval_missing_or_disabled_request_does_not_send(
 ) -> None:
     from argus.api.routers import ops
 
-    gateway = MagicMock()
-    gateway.get_requested_private_alpha_access.return_value = None
+    gateway = _StatefulApprovalGateway(role=None)
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     sender = MagicMock()
-    monkeypatch.setattr(ops, "send_access_approval_email", sender)
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
 
     response = client.post(
         "/internal/access-requests/approve",
@@ -483,27 +615,44 @@ def test_internal_approval_missing_or_disabled_request_does_not_send(
 
     assert response.status_code == 409
     sender.assert_not_called()
-    gateway.approve_requested_private_alpha_access.assert_not_called()
+    assert "complete" not in gateway.events
 
 
-def test_internal_approval_compare_and_set_miss_does_not_return_success(
+@pytest.mark.parametrize(
+    ("complete_result", "complete_error", "expected_status", "expected_detail"),
+    [
+        (False, None, 409, "Access request is not eligible for approval."),
+        (
+            None,
+            RuntimeError("synthetic provider detail"),
+            503,
+            "Approval is unavailable.",
+        ),
+    ],
+)
+def test_internal_approval_completion_failure_is_generic(
     monkeypatch: pytest.MonkeyPatch,
+    complete_result: bool | None,
+    complete_error: Exception | None,
+    expected_status: int,
+    expected_detail: str,
 ) -> None:
     from argus.api.routers import ops
 
-    gateway = MagicMock()
-    gateway.get_requested_private_alpha_access.return_value = {
-        "email": "person@example.com",
-        "role": "requested",
-        "language": "en",
-        "disabled_at": None,
-    }
-    gateway.approve_requested_private_alpha_access.return_value = False
+    gateway = _StatefulApprovalGateway()
+    gateway.complete_result = complete_result
+    gateway.complete_error = complete_error
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example")
-    sender = MagicMock(return_value="Queued. resend-message-id")
-    monkeypatch.setattr(ops, "send_access_approval_email", sender)
+    sender = MagicMock(
+        return_value=AccessWelcomeSendResult(
+            subject="Welcome to Argus",
+            content_version="private-alpha-access-welcome/v1",
+            provider_receipt="synthetic-provider-receipt",
+        )
+    )
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
 
     response = client.post(
         "/internal/access-requests/approve",
@@ -511,9 +660,35 @@ def test_internal_approval_compare_and_set_miss_does_not_return_success(
         headers={"Authorization": "Bearer ops-token"},
     )
 
-    assert response.status_code == 409
+    assert response.status_code == expected_status
+    assert response.json()["detail"] == expected_detail
+    assert "synthetic provider detail" not in response.text
     sender.assert_called_once()
-    gateway.approve_requested_private_alpha_access.assert_called_once()
+    assert gateway.events == ["complete"]
+
+
+def test_internal_approval_delivery_lookup_failure_is_generic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = _StatefulApprovalGateway()
+    gateway.delivery_lookup_error = RuntimeError("synthetic database detail")
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    sender = MagicMock()
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
+
+    response = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Approval is unavailable."
+    assert "synthetic database detail" not in response.text
+    sender.assert_not_called()
 
 
 def test_internal_approval_invalid_ops_token_is_route_indistinguishable_404(
@@ -584,7 +759,7 @@ def test_internal_approval_checks_ops_auth_before_parsing_any_body(
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
     sender = MagicMock()
-    monkeypatch.setattr(ops, "send_access_approval_email", sender)
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
     headers = {"Content-Type": "application/json"}
     if authorization is not None:
         headers["Authorization"] = authorization
@@ -597,5 +772,4 @@ def test_internal_approval_checks_ops_auth_before_parsing_any_body(
 
     assert response.status_code == 404
     gateway.get_requested_private_alpha_access.assert_not_called()
-    gateway.approve_requested_private_alpha_access.assert_not_called()
     sender.assert_not_called()
