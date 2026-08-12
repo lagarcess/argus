@@ -350,6 +350,73 @@ and DMARC at `_dmarc.get-argus.com` monitors strict alignment with aggregate
 reports sent to `support@get-argus.com`. Start DMARC at `p=none`; after one week
 of clean aggregate reports, moving it to `p=quarantine` is a founder decision.
 
+### Requested Access Promotion
+
+Promote an active `requested` row only through
+`POST /internal/access-requests/approve`. Never PATCH
+`private_alpha_allowlist.role` to `user` directly. The protected operation sends
+the localized access welcome, records the provider-accepted delivery, and then
+activates access through the database completion boundary. This is the only
+human promotion command:
+
+```bash
+source .github/argus-env.sh
+argus_load_root_env >/dev/null || true
+REQUESTED_EMAIL="<requested email>"
+OPS_CURL_CONFIG="$(mktemp)"
+APPROVAL_REQUEST="$(mktemp)"
+APPROVAL_RESPONSE="$(mktemp)"
+trap 'rm -f "$OPS_CURL_CONFIG" "$APPROVAL_REQUEST" "$APPROVAL_RESPONSE"' EXIT
+chmod 600 "$OPS_CURL_CONFIG" "$APPROVAL_REQUEST" "$APPROVAL_RESPONSE"
+printf 'header = "Authorization: Bearer %s"\n' "$ARGUS_OPS_TOKEN" > "$OPS_CURL_CONFIG"
+REQUESTED_EMAIL="$REQUESTED_EMAIL" python3 - "$APPROVAL_REQUEST" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+email = os.environ["REQUESTED_EMAIL"].strip().casefold()
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps({"email": email}, separators=(",", ":")),
+    encoding="utf-8",
+)
+PY
+curl --fail --silent --show-error \
+  --config "$OPS_CURL_CONFIG" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  --data-binary "@$APPROVAL_REQUEST" \
+  "${ARGUS_PRIVATE_LAUNCH_API_URL}/internal/access-requests/approve" \
+  > "$APPROVAL_RESPONSE"
+python3 - "$APPROVAL_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+if json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")) != {
+    "approved": True
+}:
+    raise SystemExit("access request promotion was not approved")
+PY
+```
+
+Success is exactly `{"approved":true}`. Missing or invalid ops authorization
+remains route-indistinguishable `404`. Missing configuration, ineligible state,
+email-provider failure, delivery persistence failure, and completion failure
+remain generic errors. Do not expose provider detail or infer approval from an
+error response.
+
+Support may read only the private
+`private_alpha_access_welcome_deliveries` record through existing privileged
+operational access. Its support-readable fields are `recipient_email`,
+`language`, `content_version`, `subject`, `provider_receipt`, `sent_at`, and
+`created_at`. Browser roles have no access to this table. The record is delivery
+evidence; the guarded completion operation remains access truth.
+
+**Consent scope: transactional only.** The requested access grant does not
+authorize product updates, tips, re-engagement, follow-up mail, broadcasts,
+campaigns, onboarding sequences, or any other marketing email.
+
 Keep true secrets manual in Render:
 
 - `DATABASE_URL`

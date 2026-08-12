@@ -17,6 +17,7 @@ API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"
 EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
 PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
 SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"
+ARGUS_OPS_TOKEN="${ARGUS_OPS_TOKEN:-}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
 LANGUAGE="${ARGUS_CANARY_LANGUAGE:-es-419}"
@@ -43,9 +44,11 @@ BROWSER_IDENTITY_HANDOFF="$(mktemp)"
 BROWSER_PHASE_OUTPUT="$(mktemp)"
 BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
+OPS_CURL_CONFIG="$(mktemp)"
 SIGNUP_AUTH_USERS_RESPONSE="$(mktemp)"
 SIGNUP_AUTH_USER_IDS="$(mktemp)"
 SIGNUP_ALLOWLIST_RESPONSE="$(mktemp)"
+SIGNUP_APPROVAL_REQUEST="$(mktemp)"
 API_JOB_RESPONSE="$(mktemp)"
 API_MESSAGES_RESPONSE="$(mktemp)"
 API_SEARCH_RESPONSE="$(mktemp)"
@@ -59,12 +62,16 @@ IDEA_VERSION_ROWS="$(mktemp)"
 RECEIPT_ROWS="$(mktemp)"
 chmod 600 "$BROWSER_IDENTITY_HANDOFF" "$BROWSER_PHASE_OUTPUT"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
+chmod 600 "$OPS_CURL_CONFIG"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
 chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
+chmod 600 "$SIGNUP_APPROVAL_REQUEST"
 printf 'header = "apikey: %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   > "$SERVICE_ROLE_CURL_CONFIG"
 printf 'header = "Authorization: Bearer %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   >> "$SERVICE_ROLE_CURL_CONFIG"
+printf 'header = "Authorization: Bearer %s"\n' "$ARGUS_OPS_TOKEN" \
+  > "$OPS_CURL_CONFIG"
 
 SIGNUP_IDENTITY_SETUP_ATTEMPTED="false"
 
@@ -79,6 +86,8 @@ cleanup() {
   rm -f "$BROWSER_IDENTITY_HANDOFF"
   rm -f "$BROWSER_PHASE_OUTPUT"
   rm -f "$BROWSER_AUTH_CURL_CONFIG"
+  rm -f "$OPS_CURL_CONFIG"
+  rm -f "$SIGNUP_APPROVAL_REQUEST"
   rm -f \
     "$SERVICE_ROLE_CURL_CONFIG" \
     "$SIGNUP_AUTH_USERS_RESPONSE" \
@@ -1325,33 +1334,39 @@ verify_no_signup_auth_identity() {
 }
 
 promote_requested_signup_allowlist() {
-  local encoded_email
-  if ! encoded_email="$(encoded_signup_email)"; then
-    return 1
-  fi
-  service_role_curl \
-    -X PATCH \
-    -H "Content-Type: application/json" \
-    -H "Prefer: return=representation" \
-    -d '{"role":"user"}' \
-    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.requested&disabled_at=is.null" \
-    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
-    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+  if ! CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_APPROVAL_REQUEST" <<'PY'
 import json
 import os
 import pathlib
 import sys
 
-rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
-if (
-    not isinstance(rows, list)
-    or len(rows) != 1
-    or rows[0].get("email") != target
-    or rows[0].get("role") != "user"
-    or rows[0].get("disabled_at") is not None
-):
-    raise SystemExit("requested signup identity promotion did not affect exactly one row")
+normalized_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps({"email": normalized_email}, separators=(",", ":")),
+    encoding="utf-8",
+)
+PY
+  then
+    return 1
+  fi
+  curl -fsS \
+    --config "$OPS_CURL_CONFIG" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    --data-binary "@$SIGNUP_APPROVAL_REQUEST" \
+    "${API_URL}/internal/access-requests/approve" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+try:
+    payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    raise SystemExit("requested signup promotion returned an invalid response") from exc
+if payload != {"approved": True}:
+    raise SystemExit("requested signup promotion was not approved")
 PY
 }
 
@@ -1554,6 +1569,9 @@ if [ -z "$EMAIL" ]; then
 fi
 if [ -z "$PASSWORD" ]; then
   fail_canary "auth" "missing_canary_password"
+fi
+if [ -z "$ARGUS_OPS_TOKEN" ]; then
+  fail_canary "auth" "missing_ops_token"
 fi
 if [ -z "$SIGNUP_EMAIL" ]; then
   fail_canary "auth" "missing_canary_signup_email"

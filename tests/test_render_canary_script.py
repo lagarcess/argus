@@ -184,14 +184,34 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
+    promotion_body = shell_source.split(
+        "promote_requested_signup_allowlist() {", 1
+    )[1].split("\n}", 1)[0]
 
     assert '"role": "requested"' in shell_source
     assert "run_requested_signup_denial_canary" in shell_source
     assert "verify_no_signup_auth_identity" in shell_source
     assert "promote_requested_signup_allowlist" in shell_source
-    assert "role=eq.requested" in shell_source
-    assert "disabled_at=is.null" in shell_source
-    assert '"role":"user"' in shell_source
+    assert 'OPS_CURL_CONFIG="$(mktemp)"' in shell_source
+    assert 'SIGNUP_APPROVAL_REQUEST="$(mktemp)"' in shell_source
+    assert 'chmod 600 "$OPS_CURL_CONFIG"' in shell_source
+    assert 'chmod 600 "$SIGNUP_APPROVAL_REQUEST"' in shell_source
+    assert 'rm -f "$OPS_CURL_CONFIG"' in shell_source
+    assert 'rm -f "$SIGNUP_APPROVAL_REQUEST"' in shell_source
+    assert 'fail_canary "auth" "missing_ops_token"' in shell_source
+    assert 'header = "Authorization: Bearer %s"' in shell_source
+    assert '"$ARGUS_OPS_TOKEN"' in shell_source
+    assert '--config "$OPS_CURL_CONFIG"' in promotion_body
+    assert '"${API_URL}/internal/access-requests/approve"' in promotion_body
+    assert 'CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in promotion_body
+    assert ".strip().casefold()" in promotion_body
+    assert '--data-binary "@$SIGNUP_APPROVAL_REQUEST"' in promotion_body
+    assert 'payload != {"approved": True}' in promotion_body
+    assert "service_role_curl" not in promotion_body
+    assert "-X PATCH" not in promotion_body
+    assert '"role":"user"' not in shell_source
+    assert "role=eq.requested" not in promotion_body
+    assert 'Authorization: Bearer ${ARGUS_OPS_TOKEN}' not in shell_source
 
     assert main_body.index("prepare_signup_identity") < main_body.index(
         "run_requested_signup_denial_canary"
