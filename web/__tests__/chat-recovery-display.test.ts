@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -401,13 +402,13 @@ describe("chat recovery display", () => {
     // The advisory option renders in Spanish without turning untyped symbol
     // output into the sentence subject.
     expect(es).not.toContain("SAMSUNG");
-    expect(es).toContain("esa regla");
+    assert.ok(es.includes("esa regla"));
     expect(es).toContain("Usar un símbolo de acción o cripto compatible");
     expect(es).not.toContain("Use a supported stock");
 
     const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
     expect(en).not.toContain("SAMSUNG");
-    expect(en).toContain("that rule");
+    assert.ok(en.includes("that rule"));
     expect(en).toContain("Use a supported stock or crypto symbol");
   });
 

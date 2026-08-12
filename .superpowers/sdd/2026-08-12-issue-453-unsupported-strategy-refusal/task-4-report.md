@@ -422,3 +422,51 @@ compiler evidence on this exact checkout measured 17.
 The only concern is the pre-existing branch-wide TypeScript baseline. This
 round reduces its measured diagnostic count and adds zero diagnostics in the
 new focused file.
+
+## Fix round 4: remove two lane-added Bun matcher diagnostics
+
+Final branch-wide review found that the unsupported-symbol test still used two
+lane-added Bun `expect(...).toContain` assertions. The behavior was correct,
+but the repository's known Bun matcher typing baseline attributed two TS2349
+diagnostics to those new assertions.
+
+### RED
+
+```text
+cd web && bun x tsc --noEmit 2>&1 | rg '__tests__/chat-recovery-display\.test\.ts\((404|410),'
+```
+
+Result: two TS2349 diagnostics, exactly at the Spanish `esa regla` and English
+`that rule` containment assertions.
+
+### GREEN
+
+The two assertions now use `node:assert/strict` with `assert.ok(value.includes())`,
+matching the zero-diagnostic pattern in the focused issue #453 test.
+
+```text
+cd web && bun x tsc --noEmit 2>&1 | awk '/error TS/{total += 1} /__tests__\/chat-recovery-display\.test\.ts.*error TS/{legacy += 1} /__tests__\/issue-453-chat-recovery-display\.test\.ts.*error TS/{focused += 1} END {print "total_errors=" total; print "chat_recovery_errors=" legacy; print "focused_issue_453_errors=" focused; exit(total > 0 ? 1 : 0)}'
+```
+
+Result: the known branch baseline remains red with 6,015 total diagnostics;
+the legacy recovery file is back to the integration count of 80 diagnostics;
+the focused issue #453 file remains at zero. Both targeted TS2349 diagnostics
+are gone, for a two-diagnostic reduction from fix round 3.
+
+```text
+bun test web/__tests__/chat-recovery-display.test.ts web/__tests__/issue-453-chat-recovery-display.test.ts
+cd web && bun run lint __tests__/chat-recovery-display.test.ts
+cd web && bun run test
+poetry run python scripts/check_modularity_budget.py
+poetry run pytest --no-cov tests/test_modularity_budget.py -q
+git diff --check
+```
+
+Result: focused recovery tests passed 35/35; targeted ESLint passed; the full
+frontend suite passed 1,475 tests with 0 failures and 11,115 Bun `expect`
+calls; modularity reported no violations and its suite passed 8/8; diff check
+passed.
+
+Only the assertion mechanism changed. Spanish and English generic-subject
+coverage remains byte-for-byte equivalent, and no production, locale, or other
+test file was modified.
