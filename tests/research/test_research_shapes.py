@@ -79,10 +79,40 @@ def _run(message: str, *, user: UserState = USER):
 
 
 MOVERS = agent_response(
-    text="NVIDIA leads today's gainers, up 4.2% to $198.40 as of 3:15pm ET.",
+    text="NVIDIA (NVDA) leads today's gainers, up 4.2% to $198.40 as of 3:15pm ET.",
     tickers=["NVDA"],
     lookup_rows=[("NVIDIA", "NVDA", "NVIDIA Corporation")],
 )
+
+
+def _web_sources_without_assets(*, text: str) -> dict[str, Any]:
+    document = agent_response(
+        text=text,
+        tickers=[],
+        sources=[],
+        invocations=0,
+        web_search_invocations=1,
+    )
+    finance_results = next(
+        item for item in document["output"] if item.get("type") == "finance_results"
+    )
+    finance_results["tickers"] = []
+    finance_results["results"] = []
+    document["output"].insert(
+        2,
+        {
+            "type": "search_results",
+            "results": [
+                {
+                    "url": f"https://publisher-{index}.example/movers",
+                    "title": f"Market source {index}",
+                    "date": "2026-08-12",
+                }
+                for index in range(5)
+            ],
+        },
+    )
+    return document
 
 
 def test_market_pulse_grounds_and_ends_runnable(monkeypatch) -> None:
@@ -102,6 +132,55 @@ def test_market_pulse_grounds_and_ends_runnable(monkeypatch) -> None:
     assert data_class_for(question_kind="market_pulse") == "movers"
 
 
+@pytest.mark.parametrize(
+    ("user", "provider_text", "expected"),
+    [
+        pytest.param(
+            USER,
+            "Treat these figures as general background. None of these assets qualify.",
+            "I found sources, but could not extract today's market movers from them.",
+            id="english",
+        ),
+        pytest.param(
+            SPANISH,
+            "Trátalas como referencia general. Ninguno de estos activos califica.",
+            "Encontré fuentes, pero no pude extraer de ellas los movimientos del mercado de hoy.",
+            id="es-419",
+        ),
+    ],
+)
+def test_retrieval_without_a_concrete_mover_has_one_precise_recovery(
+    monkeypatch,
+    user: UserState,
+    provider_text: str,
+    expected: str,
+) -> None:
+    _classify(
+        monkeypatch,
+        question_kind="market_pulse",
+        symbols=[],
+        period_start_date="2026-08-12",
+    )
+    transport = _wire(
+        monkeypatch,
+        [_web_sources_without_assets(text=provider_text)],
+    )
+
+    result = _run("What are today's market movers?", user=user)
+
+    assert result is not None
+    assert len(transport.requests) == 1, "web retrieval is retrieval, not a retry signal"
+    assert result.stage_patch["assistant_response"] == expected
+    assert result.stage_patch["research"]["degraded"] == {
+        "code": "survey_synthesis_incomplete"
+    }
+    assert len(result.stage_patch["research"]["sources"]) == 5
+    assert "next_experiments" not in result.stage_patch
+    answer = result.stage_patch["assistant_response"].lower()
+    assert "these figures" not in answer
+    assert "estos activos" not in answer
+
+
 def test_screening_carries_every_stated_condition_to_the_provider(
     monkeypatch,
 ) -> None:
@@ -115,7 +194,7 @@ def test_screening_carries_every_stated_condition_to_the_provider(
         monkeypatch,
         [
             agent_response(
-                text="Three names yield above 4%.",
+                text="Intel (INTC) yields above 4%.",
                 tickers=["INTC"],
                 lookup_rows=[("Intel", "INTC", "Intel Corporation")],
             )
@@ -144,7 +223,10 @@ def test_sector_radar_asks_for_analysis_not_a_list_of_names(monkeypatch) -> None
         monkeypatch,
         [
             agent_response(
-                text="Cybersecurity is up 6% this month on federal contracts.",
+                text=(
+                    "Microsoft (MSFT) is up 6% this month as federal "
+                    "contracts support cybersecurity demand."
+                ),
                 tickers=["MSFT"],
                 lookup_rows=[("Microsoft", "MSFT", "Microsoft Corporation")],
             )
@@ -181,6 +263,25 @@ def test_survey_shapes_degrade_honestly_when_the_provider_is_unavailable(
     # Honest, and never fabricated figures.
     assert "couldn't complete" in answer.lower()
     assert "%" not in answer
+    assert "none of these" not in answer.lower()
+    assert "next_experiments" not in result.stage_patch
+
+
+def test_survey_synthesis_requires_an_explicit_case_sensitive_ticker_token() -> None:
+    assets = [
+        {"symbol": "A", "name": "Agilent", "asset_class": "equity"},
+        {"symbol": "IT", "name": "Gartner", "asset_class": "equity"},
+    ]
+
+    assert (
+        grounded._named_verified_symbols(
+            "Subió a máximos. It rose with the market.", assets
+        )
+        == set()
+    )
+    assert grounded._named_verified_symbols(
+        "Agilent (A) and Gartner (IT) led the gainers.", assets
+    ) == {"A", "IT"}
 
 
 def test_survey_shapes_answer_natively_in_spanish(monkeypatch) -> None:
@@ -189,7 +290,7 @@ def test_survey_shapes_answer_natively_in_spanish(monkeypatch) -> None:
         monkeypatch,
         [
             agent_response(
-                text="La banca sube 3% este mes.",
+                text="Apple (AAPL) sube 3% este mes.",
                 tickers=["AAPL"],
                 lookup_rows=[("Apple", "AAPL", "Apple Inc.")],
             )
@@ -200,9 +301,7 @@ def test_survey_shapes_answer_natively_in_spanish(monkeypatch) -> None:
 
     assert result is not None
     assert "español latinoamericano" in _prompt_sent(transport)
-    assert result.stage_patch["next_experiments"]["rows"][0]["label"].startswith(
-        "Probar"
-    )
+    assert result.stage_patch["next_experiments"]["rows"][0]["label"].startswith("Probar")
 
 
 def test_a_bare_comparison_is_a_question_not_a_half_built_backtest(
@@ -336,13 +435,11 @@ def test_a_survey_that_never_called_the_tool_says_so(monkeypatch) -> None:
     result = _run("What's moving in the market?")
 
     assert result is not None
-    assert result.stage_patch["research"]["degraded"] == {
-        "code": "survey_not_grounded"
-    }
+    assert result.stage_patch["research"]["degraded"] == {"code": "survey_not_grounded"}
     answer = result.stage_patch["assistant_response"]
-    assert "could not confirm these figures" in answer
-    # Still ends somewhere runnable rather than dead-ending on the caveat.
-    assert result.stage_patch["next_experiments"]["rows"]
+    assert answer == "I couldn't retrieve today's market movers."
+    assert "these figures" not in answer.lower()
+    assert "next_experiments" not in result.stage_patch
 
 
 def test_survey_rows_may_come_from_the_results_not_only_a_lookup_table(
@@ -478,6 +575,4 @@ def test_a_survey_that_skips_the_tool_twice_stays_honest(monkeypatch) -> None:
 
     assert result is not None
     assert len(transport.requests) == 2, "the retry never loops"
-    assert result.stage_patch["research"]["degraded"] == {
-        "code": "survey_not_grounded"
-    }
+    assert result.stage_patch["research"]["degraded"] == {"code": "survey_not_grounded"}

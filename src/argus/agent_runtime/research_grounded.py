@@ -22,7 +22,8 @@ answer from Argus's own Kraken-backed data with an honest coverage note.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+import re
+from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -64,6 +65,7 @@ from argus.domain.research.contracts import (
     ResearchPacket,
     ResearchUnavailableError,
 )
+from argus.domain.research.source_selection import select_public_sources
 
 if TYPE_CHECKING:
     from argus.agent_runtime.research_answer import ResearchQueryExtraction
@@ -120,6 +122,8 @@ async def grounded_result(
     user: UserState,
 ) -> StageResult | None:
     spec = RESEARCH_CONFIG_SPECS[shape]
+    publisher_sources_required = requires_publisher_sources(query)
+    question_as_of_date = datetime.now(timezone.utc).date()
     capability_class = capability_class_for_shape(
         shape, screening=is_market_survey(query.question_kind)
     )
@@ -132,6 +136,7 @@ async def grounded_result(
         question_kind=query.question_kind,
         criteria=list(getattr(query, "screening_criteria", []) or []),
         sector=getattr(query, "sector_of_interest", None),
+        publisher_sources_required=publisher_sources_required,
     )
     key = _cache_key_for(
         query=query,
@@ -171,26 +176,42 @@ async def grounded_result(
                 user=user,
                 reason=exc.reason,
             )
-        if is_market_survey(query.question_kind) and packet.usage.invocations == 0:
+        retry_prompt: str | None = None
+        if is_market_survey(query.question_kind) and not _retrieval_happened(packet):
             # Asking again is deterministic escalation, not a second router:
             # a vague survey ("anything moving today?") lets the model answer
             # from memory however firmly the prompt asks for the tool, so the
             # retry states the concrete question the shape actually means.
             # One retry only; if it still skips the tool the answer says so.
+            retry_prompt = _survey_retry_prompt(
+                question_kind=query.question_kind,
+                message=state.current_user_message,
+                language=language,
+            )
+        if retry_prompt is not None:
             try:
                 retried = await asyncio.to_thread(
                     client.run_research,
-                    _survey_retry_prompt(
-                        question_kind=query.question_kind,
-                        message=state.current_user_message,
-                        language=language,
-                    ),
+                    retry_prompt,
                     spec,
                 )
             except ResearchUnavailableError:
                 retried = None
-            if retried is not None and retried.usage.invocations > 0:
+            if retried is not None and _retrieval_happened(retried):
                 packet = retried
+        if publisher_sources_required and not _packet_has_public_sources(
+            packet,
+            query=query,
+            question_as_of_date=question_as_of_date,
+        ):
+            return unavailable_result(
+                query=query,
+                subjects=subjects,
+                interpretation=interpretation,
+                state=state,
+                user=user,
+                reason="missing_public_sources",
+            )
         cache_put(
             key,
             packet,
@@ -199,6 +220,19 @@ async def grounded_result(
                 categories=packet.categories,
                 closed_period=query.period_is_closed_window,
             ),
+        )
+    if publisher_sources_required and not _packet_has_public_sources(
+        packet,
+        query=query,
+        question_as_of_date=question_as_of_date,
+    ):
+        return unavailable_result(
+            query=query,
+            subjects=subjects,
+            interpretation=interpretation,
+            state=state,
+            user=user,
+            reason="missing_public_sources",
         )
     return _packet_stage_result(
         packet=packet,
@@ -211,6 +245,8 @@ async def grounded_result(
         cache_status=cache_status,
         period_of_interest=query.period_of_interest,
         question_kind=query.question_kind,
+        period_start_date=_coerce_date(query.period_start_date),
+        question_as_of_date=question_as_of_date,
     )
 
 
@@ -226,6 +262,8 @@ def _packet_stage_result(
     cache_status: str,
     period_of_interest: str | None = None,
     question_kind: str | None = None,
+    period_start_date: date | None = None,
+    question_as_of_date: date | None = None,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
@@ -253,24 +291,41 @@ def _packet_stage_result(
         # is often untradable here; look past those before giving up.
         scan_limit=SURVEY_CANDIDATE_SCAN_LIMIT if survey else MAX_PEER_PAIRS,
     )
+    answer = packet.answer_markdown
+    degraded_code: str | None = None
+    if survey:
+        retrieved = _retrieval_happened(packet)
+        named_symbols = (
+            _named_verified_symbols(answer, [*subjects, *peers]) if retrieved else set()
+        )
+        if not retrieved or not named_symbols:
+            answer = _survey_recovery_note(
+                language,
+                question_kind=question_kind,
+                retrieval_happened=retrieved,
+            )
+            degraded_code = (
+                "survey_synthesis_incomplete" if retrieved else "survey_not_grounded"
+            )
+            subjects = []
+            peers = []
+        else:
+            subjects = [s for s in subjects if s["symbol"] in named_symbols]
+            peers = [p for p in peers if p["symbol"] in named_symbols]
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
         # first verified name keeps every answer one tap from a test.
         subjects = peers[:1]
         peers = peers[1:]
-    rows = research_next_experiment_rows(
-        subjects=subjects, peers=peers, language=language
+    rows = (
+        None
+        if degraded_code is not None
+        else research_next_experiment_rows(
+            subjects=subjects, peers=peers, language=language
+        )
     )
-    answer = packet.answer_markdown
-    # A survey that never called the tool answered from model knowledge, and
-    # the one thing a market survey must not do is present that as current.
-    ungrounded = survey and packet.usage.invocations == 0
-    if ungrounded:
-        answer = f"{answer}\n\n*{_ungrounded_survey_note(language)}*"
-    elif packet.usage.invocations > 0 and not packet.sources:
-        answer = f"{answer}\n\n*{unsourced_figures_note(language)}*"
-    if not rows:
+    if not rows and subjects:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     return research_stage_result(
         answer=answer,
@@ -284,7 +339,10 @@ def _packet_stage_result(
         subjects=subjects,
         cache_status=cache_status,
         period_of_interest=period_of_interest,
-        degraded_code="survey_not_grounded" if ungrounded else None,
+        degraded_code=degraded_code,
+        question_kind=question_kind,
+        period_start_date=period_start_date,
+        question_as_of_date=question_as_of_date,
     )
 
 
@@ -325,6 +383,9 @@ def thorough_job_result(
             user=user,
             cache_status="hit",
             period_of_interest=query.period_of_interest,
+            question_kind=query.question_kind,
+            period_start_date=_coerce_date(query.period_start_date),
+            question_as_of_date=datetime.now(timezone.utc).date(),
         )
     subject_labels = ", ".join(f"{s['name']} [{s['symbol']}]" for s in subjects[:3])
     if language == "es-419":
@@ -355,7 +416,10 @@ def thorough_job_result(
                 "subjects": subjects,
                 "period_of_interest": query.period_of_interest,
                 "period_is_closed_window": query.period_is_closed_window,
+                "period_start_date": query.period_start_date,
+                "question_as_of_date": datetime.now(timezone.utc).date().isoformat(),
                 "question_kind": query.question_kind,
+                "requires_publisher_sources": requires_publisher_sources(query),
                 # The exact key computed at classification time; completion
                 # paths store under it verbatim so later identical questions
                 # hit without recomputation drift.
@@ -402,18 +466,19 @@ async def off_coverage_result(
     rows = research_next_experiment_rows(
         subjects=focus or subjects, peers=peers, language=language
     )
-    if not rows:
+    if not rows and (focus or subjects):
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     packet = ResearchPacket(answer_markdown=answer)
+    shape = shape_for_query(query)
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
         user=user,
         capability_class=capability_class_for_shape(
-            shape_for_kind(query.question_kind),
+            shape,
             screening=is_market_survey(query.question_kind),
         ),
-        shape=shape_for_kind(query.question_kind),
+        shape=shape,
         packet=packet,
         peers=peers,
         rows=rows,
@@ -461,15 +526,16 @@ async def exhausted_result(
         answer = f"{answer}\n\n*{note}*"
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     packet = ResearchPacket(answer_markdown=answer)
+    shape = shape_for_query(query)
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
         user=user,
         capability_class=capability_class_for_shape(
-            shape_for_kind(query.question_kind),
+            shape,
             screening=is_market_survey(query.question_kind),
         ),
-        shape=shape_for_kind(query.question_kind),
+        shape=shape,
         packet=packet,
         peers=[],
         rows=rows,
@@ -491,20 +557,25 @@ def unavailable_result(
 ) -> StageResult | None:
     del state
     language = language_tag(user.language_preference)
-    note = _unavailable_note(language)
+    note = (
+        _missing_public_source_note(language)
+        if reason == "missing_public_sources"
+        else _unavailable_note(language)
+    )
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
-    if not rows:
+    if not rows and subjects:
         note = f"{note}\n\n{honest_no_next_line(language)}"
     packet = ResearchPacket(answer_markdown=note)
+    shape = shape_for_query(query)
     return research_stage_result(
         answer=note,
         interpretation=interpretation,
         user=user,
         capability_class=capability_class_for_shape(
-            shape_for_kind(query.question_kind),
+            shape,
             screening=is_market_survey(query.question_kind),
         ),
-        shape=shape_for_kind(query.question_kind),
+        shape=shape,
         packet=packet,
         peers=[],
         rows=rows,
@@ -521,6 +592,25 @@ def shape_for_kind(kind: str) -> QuestionShape:
     if kind in ("company_lookup", "etf_constituents") or is_market_survey(kind):
         return "balanced"
     return "thorough"
+
+
+def requires_publisher_sources(query: ResearchQueryExtraction) -> bool:
+    """Whether publishing the requested claim requires a public publisher.
+
+    Company reads are claim-shaped by definition. The explicit classifier bit
+    is the multilingual escape hatch for a mixed quote plus narrative request
+    that might otherwise retain the quote kind.
+    """
+    return bool(getattr(query, "requires_publisher_sources", False)) or (
+        query.question_kind == "company_lookup"
+    )
+
+
+def shape_for_query(query: ResearchQueryExtraction) -> QuestionShape:
+    shape = shape_for_kind(query.question_kind)
+    if shape == "fast" and requires_publisher_sources(query):
+        return "balanced"
+    return shape
 
 
 async def _latest_close(symbol: str, asset_class: str) -> dict[str, str] | None:
@@ -640,6 +730,32 @@ def _survey_retry_prompt(
     return "\n".join(line for line in lines if line)
 
 
+def _retrieval_happened(packet: ResearchPacket) -> bool:
+    usage = packet.usage
+    return bool(
+        packet.sources
+        or usage.finance_search_invocations
+        or usage.web_search_invocations
+        or usage.fetch_url_invocations
+    )
+
+
+def _packet_has_public_sources(
+    packet: ResearchPacket,
+    *,
+    query: ResearchQueryExtraction,
+    question_as_of_date: date,
+) -> bool:
+    return bool(
+        select_public_sources(
+            packet.sources,
+            question_kind=query.question_kind,
+            period_start=_coerce_date(query.period_start_date),
+            question_as_of=question_as_of_date,
+        )
+    )
+
+
 def is_market_survey(question_kind: str | None) -> bool:
     return str(question_kind or "") in _SURVEY_GUIDANCE
 
@@ -653,6 +769,7 @@ def _research_prompt(
     question_kind: str | None = None,
     criteria: list[str] | None = None,
     sector: str | None = None,
+    publisher_sources_required: bool = False,
 ) -> str:
     """Documented prompt guidance: business question first, then tickers and
     the time window; state the desired outcome, let the tool pick fields."""
@@ -671,6 +788,13 @@ def _research_prompt(
     if survey_guidance:
         lines.append(survey_guidance)
         lines.append(_SURVEY_TOOL_REQUIREMENT)
+    if publisher_sources_required:
+        lines.append(
+            "Ground every narrative or causal claim in at least one public "
+            "publisher, filing, investor-relations, or company page before "
+            "answering. If no such page is available, say only that the "
+            "claim could not be verified."
+        )
     lines.append(
         "Answer the question directly for a curious non-expert, leading with "
         "the answer. Use compact tables only where they genuinely help. State "
@@ -732,18 +856,80 @@ def _exhausted_note(language: str, *, guest_allowance: bool = False) -> str:
     )
 
 
-def _ungrounded_survey_note(language: str) -> str:
+def _named_verified_symbols(answer: str, assets: list[dict[str, str]]) -> set[str]:
+    """Verified subjects the answer concretely names.
+
+    Survey prompts require explicit tickers. Matching only resolver-verified
+    ticker tokens keeps this validation language-independent and prevents a
+    typed candidate hidden in provider metadata from becoming the subject of
+    user copy that never actually named it.
+    """
+    named: set[str] = set()
+    for asset in assets:
+        symbol = str(asset.get("symbol") or "").upper()
+        if not symbol:
+            continue
+        if re.search(rf"(?<![A-Z0-9]){re.escape(symbol)}(?![A-Z0-9])", answer):
+            named.add(symbol)
+    return named
+
+
+def _survey_recovery_note(
+    language: str,
+    *,
+    question_kind: str | None,
+    retrieval_happened: bool,
+) -> str:
+    kind = str(question_kind or "")
     if language == "es-419":
-        return (
-            "No pude confirmar estas cifras con datos de mercado en vivo en "
-            "este momento, así que trátalas como referencia general y no como "
-            "el estado actual del mercado."
-        )
-    return (
-        "I could not confirm these figures against live market data just now, "
-        "so treat them as general background rather than the current state of "
-        "the market."
-    )
+        if not retrieval_happened:
+            return {
+                "market_pulse": "No pude recuperar los movimientos del mercado de hoy.",
+                "screening": (
+                    "No pude recuperar datos actuales para aplicar las condiciones "
+                    "solicitadas."
+                ),
+                "sector_radar": (
+                    "No pude recuperar los líderes y rezagados actuales del sector."
+                ),
+            }.get(kind, "No pude recuperar los datos de mercado solicitados.")
+        return {
+            "market_pulse": (
+                "Encontré fuentes, pero no pude extraer de ellas los movimientos "
+                "del mercado de hoy."
+            ),
+            "screening": (
+                "Encontré fuentes, pero no pude extraer activos que cumplan las "
+                "condiciones solicitadas."
+            ),
+            "sector_radar": (
+                "Encontré fuentes, pero no pude extraer los líderes y rezagados "
+                "actuales del sector."
+            ),
+        }.get(kind, "Encontré fuentes, pero no pude extraer los activos solicitados.")
+    if not retrieval_happened:
+        return {
+            "market_pulse": "I couldn't retrieve today's market movers.",
+            "screening": (
+                "I couldn't retrieve current data to apply the requested conditions."
+            ),
+            "sector_radar": (
+                "I couldn't retrieve the sector's current leaders and laggards."
+            ),
+        }.get(kind, "I couldn't retrieve the requested market data.")
+    return {
+        "market_pulse": (
+            "I found sources, but could not extract today's market movers from them."
+        ),
+        "screening": (
+            "I found sources, but could not extract assets that satisfy the "
+            "requested conditions."
+        ),
+        "sector_radar": (
+            "I found sources, but could not extract the sector's current leaders "
+            "and laggards."
+        ),
+    }.get(kind, "I found sources, but could not extract the requested assets.")
 
 
 def _unavailable_note(language: str) -> str:
@@ -756,6 +942,18 @@ def _unavailable_note(language: str) -> str:
     return (
         "I couldn't complete the data lookup just now, so I won't quote live "
         "figures. Testing an idea against historical data is still available."
+    )
+
+
+def _missing_public_source_note(language: str) -> str:
+    if language == "es-419":
+        return (
+            "No pude verificar esa explicación con una fuente pública, así que "
+            "no la presentaré como un hecho."
+        )
+    return (
+        "I couldn't verify that explanation with a public source, so I won't "
+        "present it as fact."
     )
 
 
@@ -775,6 +973,8 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
         subjects=subjects,
         period=job_request.get("period_of_interest"),
         language=str(job_request.get("language") or "en"),
+        question_kind=str(job_request.get("question_kind") or "cross_company"),
+        publisher_sources_required=bool(job_request.get("requires_publisher_sources")),
     )
 
 
@@ -787,6 +987,13 @@ def store_research_packet_for_job(
     asked-about window is closed). Both completion paths call this."""
     key = str(job_request.get("cache_key") or "")
     if not key:
+        return
+    if job_request.get("requires_publisher_sources") and not typed_sources(
+        packet,
+        question_kind=str(job_request.get("question_kind") or "cross_company"),
+        period_start_date=job_request.get("period_start_date"),
+        question_as_of_date=job_request.get("question_as_of_date"),
+    ):
         return
     cache_put(
         key,
@@ -817,7 +1024,20 @@ def compose_completed_research(
         for s in job_request.get("subjects") or []
         if isinstance(s, dict) and s.get("symbol")
     ]
-    peers = verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
+    sources = typed_sources(
+        packet,
+        question_kind=str(job_request.get("question_kind") or "cross_company"),
+        period_start_date=job_request.get("period_start_date"),
+        question_as_of_date=job_request.get("question_as_of_date"),
+    )
+    missing_required_sources = bool(
+        job_request.get("requires_publisher_sources") and not sources
+    )
+    peers = (
+        []
+        if missing_required_sources
+        else verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
+    )
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
@@ -827,8 +1047,12 @@ def compose_completed_research(
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
-    answer = packet.answer_markdown
-    if not rows:
+    answer = (
+        _missing_public_source_note(language)
+        if missing_required_sources
+        else packet.answer_markdown
+    )
+    if not rows and subjects:
         answer = f"{answer}\n\n{honest_no_next_line(language)}"
     capability_class = str(job_request.get("capability_class") or "thorough_research")
     return {
@@ -836,7 +1060,7 @@ def compose_completed_research(
         "research": build_research_sidecar(
             capability_class=capability_class,
             shape="thorough",
-            sources=typed_sources(packet),
+            sources=sources,
             retrieved_at=packet.retrieved_at.isoformat(),
             subjects=subjects,
             peers=peers,
@@ -851,6 +1075,11 @@ def compose_completed_research(
             period_of_interest=(
                 str(job_request.get("period_of_interest"))
                 if job_request.get("period_of_interest")
+                else None
+            ),
+            degraded_code=(
+                "research_unavailable_missing_public_sources"
+                if missing_required_sources
                 else None
             ),
         ),
@@ -896,7 +1125,13 @@ def research_decision(
     )
 
 
-def typed_sources(packet: ResearchPacket) -> list[dict[str, Any]]:
+def typed_sources(
+    packet: ResearchPacket,
+    *,
+    question_kind: str | None = None,
+    period_start_date: date | str | None = None,
+    question_as_of_date: date | str | None = None,
+) -> list[dict[str, Any]]:
     """Sources in the one shape the typed panel renders.
 
     Same fields grounded discovery already emits, so one surface serves every
@@ -906,8 +1141,14 @@ def typed_sources(packet: ResearchPacket) -> list[dict[str, Any]]:
     """
     from urllib.parse import urlparse
 
+    selected = select_public_sources(
+        packet.sources,
+        question_kind=question_kind,
+        period_start=_coerce_date(period_start_date),
+        question_as_of=_coerce_date(question_as_of_date),
+    )
     entries: list[dict[str, Any]] = []
-    for source in packet.sources:
+    for source in selected:
         domain = urlparse(source.url).netloc.lower()
         if not domain:
             continue
@@ -925,22 +1166,15 @@ def typed_sources(packet: ResearchPacket) -> list[dict[str, Any]]:
     return entries
 
 
-def unsourced_figures_note(language: str) -> str:
-    """Said only when a grounded answer genuinely carries nothing to link.
-
-    A pure market-data answer cites figures, not articles, and for those the
-    line is true. It must never render when the packet did carry citations:
-    Argus asserting there is nothing to open, while holding publisher URLs
-    it discarded, is a worse failure than the sloppy prose it replaced."""
-    if language == "es-419":
-        return (
-            "Estas cifras vienen de datos de mercado, no de artículos, así "
-            "que no hay enlaces de fuentes para abrir."
-        )
-    return (
-        "These figures come from market data rather than linked articles, so "
-        "there are no source links to open."
-    )
+def _coerce_date(value: date | str | None) -> date | None:
+    if isinstance(value, date):
+        return value
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
 
 
 def research_follow_up_block(
@@ -1031,6 +1265,9 @@ def research_stage_result(
     cache_status: str,
     degraded_code: str | None = None,
     period_of_interest: str | None = None,
+    question_kind: str | None = None,
+    period_start_date: date | str | None = None,
+    question_as_of_date: date | str | None = None,
 ) -> StageResult:
     decision = research_decision(
         interpretation, user, f"research_answer_{capability_class}"
@@ -1040,7 +1277,12 @@ def research_stage_result(
         "research": build_research_sidecar(
             capability_class=capability_class,
             shape=shape,
-            sources=typed_sources(packet),
+            sources=typed_sources(
+                packet,
+                question_kind=question_kind,
+                period_start_date=period_start_date,
+                question_as_of_date=question_as_of_date,
+            ),
             retrieved_at=packet.retrieved_at.isoformat(),
             subjects=subjects,
             peers=peers,
