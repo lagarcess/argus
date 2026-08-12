@@ -16,6 +16,7 @@ import {
   type LogicalRange,
   type SeriesMarker,
   type Time,
+  type WhitespaceData,
 } from "lightweight-charts";
 import {
   deriveResultChartRanges,
@@ -105,6 +106,25 @@ export function paddedResultChartLogicalRange({
   };
 }
 
+function resultChartDataForWindow(
+  data: BaselineData<Time>[],
+  window: VisibleWindow,
+): Array<BaselineData<Time> | WhitespaceData<Time>> {
+  const lastIndex = data.length - 1;
+  const from = Math.min(
+    lastIndex,
+    Math.max(0, Math.floor(Math.min(window.from, window.to))),
+  );
+  const to = Math.min(
+    lastIndex,
+    Math.max(0, Math.ceil(Math.max(window.from, window.to))),
+  );
+  if (from === 0 && to === lastIndex) return data;
+  return data.map((datum, index) =>
+    index >= from && index <= to ? datum : { time: datum.time },
+  );
+}
+
 export default function ResultEquityChart({
   chart,
   appearanceOverride,
@@ -128,6 +148,7 @@ export default function ResultEquityChart({
   const lastChartGestureAtRef = useRef(Number.NEGATIVE_INFINITY);
   const chartPointerDownRef = useRef(false);
   const visibleWindowRef = useRef<VisibleWindow | null>(null);
+  const applySeriesWindowRef = useRef<(window: VisibleWindow) => void>(() => {});
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
     : resolvedTheme === "dark";
@@ -226,15 +247,17 @@ export default function ResultEquityChart({
       resetToAll();
       return;
     }
-    setVisualLogicalRange(option.startIndex, option.endIndex);
-    setSelection(option.key);
     const window = { from: option.startIndex, to: option.endIndex };
+    applySeriesWindowRef.current(window);
+    setVisualLogicalRange(window.from, window.to);
+    setSelection(option.key);
     visibleWindowRef.current = window;
     setVisibleWindow(window);
   };
 
   const resetToAll = () => {
     setCustomError(null);
+    applySeriesWindowRef.current(allWindow);
     setVisualLogicalRange(allWindow.from, allWindow.to);
     setSelection("ALL");
     visibleWindowRef.current = allWindow;
@@ -263,9 +286,10 @@ export default function ResultEquityChart({
     }
     setCustomError(null);
     setDetailsOpen(false);
-    setVisualLogicalRange(result.range.startIndex, result.range.endIndex);
-    setSelection("CUSTOM");
     const window = { from: result.range.startIndex, to: result.range.endIndex };
+    applySeriesWindowRef.current(window);
+    setVisualLogicalRange(window.from, window.to);
+    setSelection("CUSTOM");
     visibleWindowRef.current = window;
     setVisibleWindow(window);
   };
@@ -360,10 +384,21 @@ export default function ResultEquityChart({
       priceLineVisible: false,
       lastValueVisible: false,
     });
-    series.setData(data);
+    const timeScale = chartApi.timeScale();
+    timeScaleRef.current = timeScale;
+    let semanticDataWindow: VisibleWindow | null =
+      visibleWindowRef.current ?? allWindow;
+    series.setData(resultChartDataForWindow(data, semanticDataWindow));
+    const markerRange = (visibleRange: LogicalRange | null) =>
+      semanticDataWindow
+        ? ({
+            from: semanticDataWindow.from,
+            to: semanticDataWindow.to,
+          } as LogicalRange)
+        : visibleRange;
     const visibleMarkerInput = {
       markers: chart.markers ?? [],
-      visibleRange: chartApi.timeScale().getVisibleLogicalRange(),
+      visibleRange: markerRange(timeScale.getVisibleLogicalRange()),
       chartWidth: container.clientWidth,
       dataIndexByTime,
       restrained: isHeroDeltaEvidence,
@@ -373,13 +408,11 @@ export default function ResultEquityChart({
       series as ISeriesApi<"Baseline", Time>,
       buildVisibleSeriesMarkers(visibleMarkerInput),
     );
-    const timeScale = chartApi.timeScale();
-    timeScaleRef.current = timeScale;
     const updateVisibleMarkers = (visibleRange: LogicalRange | null) => {
       markersApi.setMarkers(
         buildVisibleSeriesMarkers({
           markers: chart.markers ?? [],
-          visibleRange,
+          visibleRange: markerRange(visibleRange),
           chartWidth: container.clientWidth,
           dataIndexByTime,
           restrained: isHeroDeltaEvidence,
@@ -387,6 +420,13 @@ export default function ResultEquityChart({
         }),
       );
     };
+    const applySeriesWindow = (window: VisibleWindow) => {
+      semanticDataWindow = window;
+      series.setData(resultChartDataForWindow(data, window));
+      updateVisibleMarkers(timeScale.getVisibleLogicalRange());
+      setTooltip(null);
+    };
+    applySeriesWindowRef.current = applySeriesWindow;
     timeScale.subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
     let semanticWindowWidth = container.clientWidth;
     const notifyVisibleWindow = (visibleRange: LogicalRange | null) => {
@@ -409,6 +449,15 @@ export default function ResultEquityChart({
     };
     timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
     const armChartGesture = () => {
+      // Programmatic ranges replace out-of-window observations with whitespace
+      // so their visual gutter cannot expose facts outside the stated period.
+      // A real pan or zoom starts free exploration, so restore the full series
+      // before the chart library processes that gesture.
+      if (semanticDataWindow) {
+        semanticDataWindow = null;
+        series.setData(data);
+        updateVisibleMarkers(timeScale.getVisibleLogicalRange());
+      }
       lastChartGestureAtRef.current = performance.now();
     };
     // Explicit gesture state: a press begins a potential drag; only pressed
@@ -454,6 +503,7 @@ export default function ResultEquityChart({
       if (chartWidth <= 0) return;
       lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
       semanticWindowWidth = chartWidth;
+      applySeriesWindow(restoredWindow);
       timeScale.setVisibleLogicalRange(
         paddedResultChartLogicalRange({
           from: restoredWindow.from,
@@ -509,6 +559,9 @@ export default function ResultEquityChart({
 
     return () => {
       setTooltip(null);
+      if (applySeriesWindowRef.current === applySeriesWindow) {
+        applySeriesWindowRef.current = () => {};
+      }
       semanticWindowResizeObserver.disconnect();
       if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       container.removeEventListener(

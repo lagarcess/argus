@@ -173,6 +173,37 @@ test("adaptive hourly result switches presets, custom range, pan, and reset with
   expect(watch.pageErrors).toEqual([]);
 });
 
+test("custom range gutters expose no observations outside the semantic window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openPlayground(page);
+  const card = page
+    .getByRole("region", { name: "Mobile width result card previews" })
+    .getByTestId("result-card-fixture-adaptive-intraday-result")
+    .first();
+  await card.scrollIntoViewIfNeeded();
+  await openRangeDetails(card);
+
+  await card.getByTestId("result-chart-custom-start").fill("2026-01-05");
+  await card.getByTestId("result-chart-custom-end").fill("2026-01-08");
+  await card.getByTestId("result-chart-custom-apply").click();
+  await expect(card.getByTestId("result-chart-visible-period")).toHaveCount(0);
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+
+  const chart = card.getByTestId("result-equity-chart");
+  const chartBox = await chart.boundingBox();
+  expect(chartBox).not.toBeNull();
+  if (!chartBox) return;
+
+  const tooltip = card.locator("div.pointer-events-none.absolute.z-10");
+  const centerY = chartBox.y + chartBox.height / 2;
+  for (const x of [chartBox.x + 2, chartBox.x + chartBox.width - 76]) {
+    await page.mouse.move(x, centerY);
+    await expect(tooltip).toHaveCount(0);
+  }
+});
+
 test("monthly recurring result suppresses sub-cycle presets and keeps metrics", async ({
   page,
 }) => {
