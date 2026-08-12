@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f4f4;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">{{ if eq .Data.language "es-419" }}El correo de tu cuenta de Argus cambió de {{ .OldEmail }} a {{ .Email }}.{{ else }}The email for your Argus account changed from {{ .OldEmail }} to {{ .Email }}.{{ end }}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f4;border-collapse:collapse;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #c9c9cd;border-radius:20px;border-collapse:separate;overflow:hidden;">
+            <tr>
+              <td style="background:#191c1f;padding:22px 28px;color:#ffffff;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td valign="middle" style="padding:0 12px 0 0;">
+                      <img src="https://arguschat.ai/icons/argus-192.png" width="36" height="36" alt="" style="display:block;width:36px;height:36px;border:0;outline:none;text-decoration:none;">
+                    </td>
+                    <td valign="middle" style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;font-size:21px;font-weight:700;letter-spacing:0.12em;line-height:1;color:#ffffff;">ARGUS</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 28px 28px;color:#191c1f;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;">
+                {{ if eq .Data.language "es-419" }}<h1 style="margin:0 0 16px;font-family:'Space Grotesk','Inter',Arial,Helvetica,sans-serif;font-size:28px;font-weight:500;letter-spacing:-0.01em;line-height:1.2;">Tu correo de Argus cambió</h1>
+<p style="margin:0 0 16px;">El correo de tu cuenta de Argus cambió de {{ .OldEmail }} a {{ .Email }}.</p>
+
+<p style="margin:0 0 8px;"><strong>Cuándo:</strong> El cambio se completó inmediatamente antes de enviar este correo. Tu aplicación de correo muestra la hora exacta de envío.</p>
+<p style="margin:16px 0 0;"><strong>Caducidad del enlace:</strong> La URL para revisar la cuenta no caduca.</p>
+<p style="margin:26px 0 20px;">
+  <a href="{{ .SiteURL }}" style="display:inline-block;background:#191c1f;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:9999px;">Revisar Argus</a>
+</p>
+<p style="margin:20px 0 6px;font-size:13px;color:#5f6368;">{{ if eq .Data.language "es-419" }}Si prefieres no usar el botón, copia y pega esta URL exacta:{{ else }}{{ end }}</p>
+<p style="margin:0;padding:12px;background:#f4f4f4;border-radius:10px;font-size:13px;line-height:1.45;word-break:break-all;"><a href="{{ .SiteURL }}" style="color:#3036b3;">{{ .SiteURL }}</a></p>
+<p style="margin:22px 0 0;"><strong>Este correo es solo una notificación. Ignorarlo no produce otro cambio.</strong> Si no hiciste este cambio, revisa tu cuenta y escribe de inmediato a support@get-argus.com.</p>{{ else }}<h1 style="margin:0 0 16px;font-family:'Space Grotesk','Inter',Arial,Helvetica,sans-serif;font-size:28px;font-weight:500;letter-spacing:-0.01em;line-height:1.2;">Your Argus email changed</h1>
+<p style="margin:0 0 16px;">The email for your Argus account changed from {{ .OldEmail }} to {{ .Email }}.</p>
+
+<p style="margin:0 0 8px;"><strong>When:</strong> The change completed immediately before this email was sent. Your email app shows the exact sent time.</p>
+<p style="margin:16px 0 0;"><strong>Link expiry:</strong> The account review URL below does not expire.</p>
+<p style="margin:26px 0 20px;">
+  <a href="{{ .SiteURL }}" style="display:inline-block;background:#191c1f;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:9999px;">Review Argus</a>
+</p>
+<p style="margin:20px 0 6px;font-size:13px;color:#5f6368;">{{ if eq .Data.language "es-419" }}{{ else }}If you prefer not to use the button, copy and paste this exact URL:{{ end }}</p>
+<p style="margin:0;padding:12px;background:#f4f4f4;border-radius:10px;font-size:13px;line-height:1.45;word-break:break-all;"><a href="{{ .SiteURL }}" style="color:#3036b3;">{{ .SiteURL }}</a></p>
+<p style="margin:22px 0 0;"><strong>This email is only a notification. Ignoring it does not make another change.</strong> If you did not make this change, review your account and contact support@get-argus.com immediately.</p>{{ end }}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 28px;border-top:1px solid #e1e1e4;color:#5f6368;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;">
+                {{ if eq .Data.language "es-419" }}Argus te ayuda a probar ideas de inversión con datos históricos. ¿Necesitas ayuda? Escribe a support@get-argus.com.{{ else }}Argus helps you test investing ideas with historical data. Need help? Email support@get-argus.com.{{ end }}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
