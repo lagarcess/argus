@@ -35,6 +35,7 @@ Supabase Postgres is the canonical state store.
 Supabase owns:
 
 - private-alpha access allowlist
+- private-alpha access-welcome delivery evidence
 - user profiles
 - preferences
 - conversations
@@ -58,6 +59,7 @@ Alpha MVP requires these primary entities:
 
 ```text
 private_alpha_allowlist
+private_alpha_access_welcome_deliveries
 profiles
 conversations
 messages
@@ -103,6 +105,8 @@ Optional or later:
 ```
 auth.users
    └── profiles
+private_alpha_allowlist
+   └── private_alpha_access_welcome_deliveries  # logical email identity, no FK
 profiles
    ├── conversations
    │      ├── messages
@@ -296,8 +300,12 @@ and login; it should not be exposed as a frontend product surface.
   never updates an existing requested, approved, privileged, or disabled row.
 - `requested` and unknown roles never grant permanent account access.
 - The ops approval action loads an active requested row and stored language,
-  sends the localized approval email first, and only then compare-and-sets
-  `requested` to `user` while `disabled_at` remains null.
+  sends the localized welcome email first, and then uses
+  `complete_private_alpha_access_welcome` to record the accepted delivery and
+  promote `requested` to `user` atomically while `disabled_at` remains null.
+- A before-update guard rejects any direct transition into an enabled `user`
+  state unless a matching welcome-delivery row already exists. It does not
+  alter inserts, admin/developer roles, disabling, or an already-active user.
 - There is no invite dashboard, referral system, public invite-code flow,
   pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
@@ -310,6 +318,45 @@ and login; it should not be exposed as a frontend product surface.
   validation with `403 private_alpha_access_required`.
 - The table may contain emails for existing Supabase Auth users; seeding the
   allowlist must not create auth users by itself.
+---
+
+## 6.1 private_alpha_access_welcome_deliveries
+
+Private, immutable evidence that Argus's single access-welcome message was
+accepted by the transactional email provider. This is operational support
+truth, not a browser-facing notification or marketing-email ledger.
+
+### Fields
+- `recipient_email`: `text` (Primary Key, normalized with
+  `lower(btrim(recipient_email))`)
+- `language`: `text` (`en` or `es-419`)
+- `content_version`: `text` (Fixed to
+  `private-alpha-access-welcome/v1`)
+- `subject`: `text` (1 to 200 characters)
+- `provider_receipt`: `text` (1 to 256 characters)
+- `sent_at`: `timestamptz` (Provider acceptance time, default database time)
+- `created_at`: `timestamptz`
+
+### Invariants and access
+- `recipient_email` permits at most one access-welcome delivery record. The
+  fixed content version and stored language, subject, and provider receipt are
+  durable evidence for support readback.
+- Records are append-only for application roles. RLS is enabled with no
+  policies. `PUBLIC`, `anon`, and `authenticated` have no table privileges;
+  `service_role` receives only `SELECT` and `INSERT`.
+- `complete_private_alpha_access_welcome(email, language, content_version,
+  subject, provider_receipt)` is the service-role-only, security-invoker
+  completion boundary. It locks the allowlist row, rejects missing, disabled,
+  privileged, or otherwise ineligible state, inserts the delivery once, and
+  promotes only an active `requested` row in the same transaction. A replay of
+  an already-active `user` returns success only when the delivery row exists;
+  conflicting language, content version, or subject is rejected.
+- `require_private_alpha_access_welcome_delivery` is a before-update trigger on
+  `private_alpha_allowlist`. A row becoming an enabled `user` from a non-user
+  or disabled state must already have a matching delivery record. Browser
+  roles cannot execute either function, and `service_role` may execute only
+  the completion RPC directly.
+
 ---
 
 # 7. conversations
@@ -1707,7 +1754,8 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   owns those operations.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
+- `private_alpha_allowlist`, `private_alpha_access_welcome_deliveries`,
+  `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
   `usage_counters`, `guest_workspaces`, `memory_settings`,
@@ -1732,8 +1780,10 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - No `anon` or `authenticated` role access is required.
 - All privileges remain revoked from `public`, `anon`, and `authenticated`;
   no client policy permits direct requested-row access.
-- Backend service-role access owns request capture, approval transition, and
-  access checks before auth signup/login.
+- Backend service-role access owns request capture, welcome completion, and
+  access checks before auth signup/login. The welcome-delivery table has no
+  client policy; service role can select/insert immutable delivery evidence and
+  execute the guarded completion RPC, but cannot update or delete the record.
 
 ---
 
