@@ -22,6 +22,9 @@ CapabilityClass = Literal[
 
 MAX_ANSWER_CHARS = 20_000
 MAX_SOURCES = 5
+# Parsing must retain enough citations for question-aware publisher selection
+# after retrieval. The public drawer still exposes at most MAX_SOURCES.
+MAX_PACKET_SOURCES = 64
 MAX_PEER_PAIRS = 12
 # Survey answers name many assets and lead with whatever moved most, which is
 # often untradable here; the packet keeps enough of them that the resolver can
@@ -46,8 +49,9 @@ class ResearchUnavailableError(Exception):
 class ResearchUsage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    # Compatibility name: existing grounding checks use finance_search
-    # invocations specifically, not the sum of every provider tool.
+    # Compatibility name for persisted/public evidence: finance_search only.
+    # Grounding checks use the explicit per-tool fields below so web or URL
+    # retrieval is not mistaken for model-only synthesis.
     invocations: int = Field(default=0, ge=0)
     finance_search_invocations: int = Field(default=0, ge=0)
     web_search_invocations: int = Field(default=0, ge=0)
