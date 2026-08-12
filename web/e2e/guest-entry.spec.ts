@@ -373,6 +373,49 @@ async function mockGuestJourney(
   return evidence;
 }
 
+async function readGuestEmptySurface(page: Page) {
+  const heading = page.getByRole("heading", { name: "argus" });
+  const starterActions = page
+    .getByTestId("starter-actions")
+    .getByRole("button");
+  await expect(heading).toBeVisible();
+  await expect(starterActions).toHaveCount(3);
+
+  return {
+    headingGroup: await heading.locator("..").innerText(),
+    placeholder: await page.getByTestId("chat-input").getAttribute("placeholder"),
+    starterLabels: await starterActions.allTextContents(),
+    headerTitle: (await page.locator("header h1").innerText()).trim(),
+  };
+}
+
+test("@guest-shell Start over reuses the guest landing surface", async ({
+  page,
+}) => {
+  const evidence = await mockGuestJourney(page, {
+    initiallyAuthenticated: true,
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const landingSurface = await readGuestEmptySurface(page);
+  expect(landingSurface.headerTitle).toBe("");
+
+  const composer = page.getByTestId("chat-input");
+  await composer.fill("Compare Apple with SPY");
+  await composer.press("Enter");
+  await expect(page.getByText("Let’s test that idea.")).toBeVisible();
+
+  await page.getByRole("button", { name: "New chat" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Start a new conversation?",
+  });
+  await dialog.getByRole("button", { name: "Start over" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`conversation=${CONVERSATION_ID}`));
+  expect(await readGuestEmptySurface(page)).toEqual(landingSurface);
+  expect(evidence.conversationCreateCalls).toBe(2);
+});
+
 test("@guest-shell keeps the neutral submission state until the first stream stage", async ({
   page,
 }) => {

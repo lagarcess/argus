@@ -52,6 +52,40 @@ Conversation identity is not empty-state truth. Message and load state must own
 the surface decision so every route into an empty conversation derives the same
 result.
 
+## Invariant fix
+
+One shared selector now derives the empty surface from message and load state.
+It deliberately has no conversation ID, account-kind, or entry-route input. A
+settled conversation with zero messages renders `EmptyChatSurface`; hydration
+and load-failure states continue to render their existing transcript feedback.
+
+`ChatInterface` uses that same decision for both the body and the conversation
+title. A valid replacement conversation ID therefore cannot select a second
+empty shell or leave a `New chat` title above the landing composition.
+
+## Post-fix finding
+
+The guest landing route and replacement-conversation route now render the same
+core empty surface in every requested locale and viewport.
+
+| Locale | Viewport | Landing and replacement surface |
+| --- | --- | --- |
+| `en` | `1440x1000` | `argus`, “Test an investing idea against history.”, composer, and all three starter chips |
+| `en` | `390x844` | `argus`, “Test an investing idea against history.”, composer, and all three starter chips |
+| `es-419` | `1440x1000` | `argus`, “Prueba una idea de inversión con datos históricos.”, composer, and all three starter chips |
+| `es-419` | `390x844` | `argus`, “Prueba una idea de inversión con datos históricos.”, composer, and all three starter chips |
+
+The replacement frame also retains the temporary-chat expiry once the guest
+session has been established. That is account metadata, not a separate empty
+surface. The focused browser regression starts with an established guest and
+asserts the rendered heading group, placeholder, starter labels, and empty
+header title are exactly equal before and after **Start over**.
+
+Every post-fix frame was checked against its rendered DOM text before capture.
+All four replacement frames had the localized heading and invitation, localized
+composer and legal text, all three localized starter chips, an empty transcript
+title, meaningful app content, and no framework error overlay.
+
 ## Pre-fix captures
 
 ### English desktop
@@ -93,3 +127,45 @@ Landing:
 After New chat:
 
 ![Spanish phone guest New chat defect](before/es-419-phone-new-chat.jpg)
+
+## Post-fix captures
+
+### English desktop
+
+Landing:
+
+![English desktop guest landing after fix](after/en-desktop-landing.jpg)
+
+After New chat:
+
+![English desktop guest New chat after fix](after/en-desktop-new-chat.jpg)
+
+### English phone
+
+Landing:
+
+![English phone guest landing after fix](after/en-phone-landing.jpg)
+
+After New chat:
+
+![English phone guest New chat after fix](after/en-phone-new-chat.jpg)
+
+### Spanish desktop
+
+Landing:
+
+![Spanish desktop guest landing after fix](after/es-419-desktop-landing.jpg)
+
+After New chat:
+
+![Spanish desktop guest New chat after fix](after/es-419-desktop-new-chat.jpg)
+
+### Spanish phone
+
+Landing:
+
+![Spanish phone guest landing after fix](after/es-419-phone-landing.jpg)
+
+After New chat:
+
+![Spanish phone guest New chat after fix](after/es-419-phone-new-chat.jpg)

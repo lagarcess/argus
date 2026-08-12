@@ -90,6 +90,7 @@ import {
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
+  shouldShowEmptyChatSurface,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import {
@@ -2038,7 +2039,12 @@ export default function ChatInterface() {
               : "chat.input_placeholder_prerail",
         )
       : t("chat.followup_placeholder", "Ask a follow-up...");
-  const showEmptyChatSurface = conversationId === null && messages.length === 0;
+  const showEmptyChatSurface = shouldShowEmptyChatSurface({
+    messages,
+    isHydratingConversation,
+    hasConversationLoadFailure:
+      failedConversationId !== null && failedConversationId === conversationId,
+  });
   const conversationComposerUnavailable =
     isStreamingResponse ||
     isHydratingConversation ||
@@ -2264,7 +2270,8 @@ export default function ChatInterface() {
             {/* Title (left-aligned; truncates before the action cluster) */}
             <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 tablet:text-[18px]">
               {currentView === "chat" &&
-                (conversationId !== null || messages.length > 0) && (
+                (conversationId !== null || messages.length > 0) &&
+                !showEmptyChatSurface && (
                   <ChatHeaderTitle
                     conversationId={conversationId}
                     title={headerConversationTitle}
