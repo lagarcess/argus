@@ -46,7 +46,7 @@ def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
 
 @pytest.mark.parametrize(
     ("language", "expected_generic_subject"),
-    [("en", "that rule"), ("es-419", "esa regla")],
+    [("en", "that rule"), ("es-419", "that rule")],
 )
 @pytest.mark.parametrize(
     "raw_value",

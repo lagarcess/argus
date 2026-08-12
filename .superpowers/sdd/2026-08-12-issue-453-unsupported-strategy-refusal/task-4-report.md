@@ -234,3 +234,96 @@ in the edited test, which was corrected manually before the repeated clean run.
 
 No new concerns were found. The previously recorded branch-wide TypeScript
 baseline classification is unchanged.
+
+## Fix round 2: keep backend fallback language neutral
+
+Full verification found that the backend fallback still contained runtime
+`es-419` branches and that older tests required raw ATR, momentum, and drawdown
+phrases in user-facing fallback copy. It also found that the six Task 4
+regressions had pushed the watched conversation-stage test module above its
+line budget.
+
+### RED
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_interpret_stage.py::test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery tests/agent_runtime/test_unsupported_fallback_honesty.py::test_momentum_generation_failure_fallback_is_capability_honest tests/agent_runtime/test_unsupported_fallback_honesty.py::test_other_unsupported_reasons_never_claim_rule_is_undefined tests/test_spine_guardrails.py::test_issue_154_migrated_surfaces_have_no_runtime_language_gates -q
+```
+
+Result: exit 1, 4 failed and 8 passed. The three stale expectations required
+raw unsupported prose, and the language guard found the runtime `es-419`
+branches in `clarification_contract.py`.
+
+After moving the six regressions into the focused module, the canonical backend
+copy regression isolated the production defect:
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_issue_453_cause_projection.py -q
+```
+
+Result: exit 1, 1 failed and 10 passed. The `es-419` input returned Spanish
+backend copy instead of the canonical fallback.
+
+### GREEN
+
+Focused projection, complete conversation-stage module, and named stale cases:
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_issue_453_cause_projection.py tests/agent_runtime/test_conversation_stages.py tests/agent_runtime/test_interpret_stage.py::test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery tests/agent_runtime/test_unsupported_fallback_honesty.py::test_momentum_generation_failure_fallback_is_capability_honest tests/agent_runtime/test_unsupported_fallback_honesty.py::test_news_sentiment_generation_failure_fallback_is_capability_honest tests/agent_runtime/test_unsupported_fallback_honesty.py::test_other_unsupported_reasons_never_claim_rule_is_undefined tests/agent_runtime/test_unsupported_fallback_honesty.py::test_future_and_granularity_fallbacks_are_unchanged -q
+```
+
+Result: exit 0, 97 passed.
+
+Task 4 exact commands:
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_validation_failure_copy.py tests/agent_runtime/test_conversation_stages.py -q -k 'issue_453 or raw_value or starting_capital'
+bun test web/__tests__/chat-recovery-display.test.ts
+```
+
+Result: backend exit 0 with 6 passed and 85 deselected; Bun exit 0 with
+35 passed and 106 assertions.
+
+Language guards and locale parity:
+
+```text
+poetry run pytest --no-cov tests/test_spine_guardrails.py::test_issue_154_migrated_surfaces_have_no_runtime_language_gates tests/agent_runtime/test_issue_154_s3_recovery_i18n_contract.py::test_s3_backend_surfaces_do_not_reintroduce_runtime_language_gates -q
+bun test web/__tests__/locales.test.ts web/__tests__/chat-recovery-display.test.ts
+```
+
+Result: language guards exit 0 with 10 passed; frontend locale and recovery
+tests exit 0 with 39 passed and 332 assertions.
+
+Static and structural checks:
+
+```text
+poetry run ruff format src/argus/agent_runtime/clarification_contract.py tests/agent_runtime/test_conversation_stages.py tests/agent_runtime/test_issue_453_cause_projection.py tests/agent_runtime/test_validation_failure_copy.py tests/agent_runtime/test_interpret_stage.py tests/agent_runtime/test_unsupported_fallback_honesty.py
+poetry run ruff check src/argus/agent_runtime/clarification_contract.py tests/agent_runtime/test_conversation_stages.py tests/agent_runtime/test_issue_453_cause_projection.py tests/agent_runtime/test_validation_failure_copy.py tests/agent_runtime/test_interpret_stage.py tests/agent_runtime/test_unsupported_fallback_honesty.py
+poetry run python scripts/check_modularity_budget.py
+git diff --check
+```
+
+Result: Ruff formatted one new test file and reported all checks passed;
+modularity reported no violations; diff check passed. The complete
+`test_conversation_stages.py` module is now 3,639 lines, below its 3,697-line
+limit.
+
+### Reasoning and self-review
+
+- Backend fallback now ignores language and emits one canonical English string;
+  localized rendering remains owned by the web typed-sidecar projection.
+- The shared starting-capital validator remains the only source for fallback,
+  sidecar, and clarifier bounds. Valid floor and range behavior is unchanged,
+  while reversed and non-finite pairs still fail closed.
+- Stale tests now prove raw ATR, momentum, and drawdown prose does not become a
+  sentence subject while typed capability copy, options, and symbols survive.
+- Dedicated typed timeframe raw value and sentiment/news reason behavior remain
+  covered and unchanged.
+- All six `test_issue_453_*` blocks were moved without duplication into
+  `test_issue_453_cause_projection.py`.
+- Locale catalogs were not modified in this fix round. English and es-419
+  catalog parity remains green, and every unrelated locale key was preserved.
+- Scope audit contains only the owned backend contract, owned backend tests,
+  the new focused test module, and this report.
+
+No new concerns were found. The prior branch-wide TypeScript baseline remains
+unchanged and was not rerun in this backend-only fix round.

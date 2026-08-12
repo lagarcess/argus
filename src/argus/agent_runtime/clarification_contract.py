@@ -200,7 +200,6 @@ def _unsupported_recovery_fallback(
         return "That bar size is not supported. Choose daily or 1-hour bars."
     if reason_code == "unsupported_starting_capital":
         return _starting_capital_bounds_fallback(
-            language=language,
             bounds=_unsupported_numeric_bounds(response_intent),
         )
     options = _option_labels(response_intent)
@@ -220,13 +219,6 @@ def _unsupported_recovery_fallback(
         return (
             f"What rule should I test{symbol_suffix}? "
             f"Which supported direction should I use: {joined_options}?"
-        )
-    if language == "es-419":
-        spanish_symbol_suffix = f" para {symbol}" if symbol else ""
-        return (
-            "Argus todavía no puede ejecutar esa regla directamente"
-            f"{spanish_symbol_suffix}. "
-            f"¿Qué camino quieres usar: {joined_options}?"
         )
     return (
         f"Argus can't run that rule directly yet{symbol_suffix}. "
@@ -344,7 +336,6 @@ def _finite_number(value: Any) -> float | None:
 
 def _starting_capital_bounds_fallback(
     *,
-    language: str | None,
     bounds: dict[str, float],
 ) -> str:
     minimum = bounds.get("minimum")
@@ -352,28 +343,16 @@ def _starting_capital_bounds_fallback(
     if minimum is not None and maximum is not None:
         minimum_text = _usd_amount(minimum)
         maximum_text = _usd_amount(maximum)
-        if language == "es-419":
-            return (
-                f"El capital inicial debe estar entre {minimum_text} y {maximum_text}. "
-                "¿Qué monto dentro de ese rango quieres usar?"
-            )
         return (
             f"Starting capital must be between {minimum_text} and {maximum_text}. "
             "What amount in that range should I use?"
         )
     if minimum is not None:
         minimum_text = _usd_amount(minimum)
-        if language == "es-419":
-            return (
-                f"El capital inicial debe ser de al menos {minimum_text}. "
-                "¿Qué monto quieres usar?"
-            )
         return (
             f"Starting capital must be at least {minimum_text}. "
             "What amount should I use?"
         )
-    if language == "es-419":
-        return "¿Qué monto de capital inicial quieres usar?"
     return "What starting capital amount should I use?"
 
 
