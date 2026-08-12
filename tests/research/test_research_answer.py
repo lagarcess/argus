@@ -216,18 +216,61 @@ def test_company_claims_fail_closed_when_no_publisher_source_survives(
         text="Advertising drove Netflix's growth.",
         sources=["https://www.perplexity.ai/finance/NFLX"],
     )
-    transport = _wire_client(monkeypatch, [provider_only])
+    transport = _wire_client(monkeypatch, [provider_only, provider_only])
 
     result = _run("What were Netflix's main growth drivers?")
 
     assert result is not None
-    assert len(transport.requests) == 1
+    assert len(transport.requests) == 2
     sidecar = result.stage_patch["research"]
     assert sidecar["sources"] == []
     assert sidecar["degraded"] == {"code": "research_unavailable_missing_public_sources"}
     answer = result.stage_patch["assistant_response"]
     assert "Advertising drove" not in answer
     assert answer.startswith("I couldn't verify that explanation with a public source")
+
+
+def test_company_claim_retries_without_the_provider_only_citation_channel(
+    monkeypatch,
+) -> None:
+    _classify(
+        monkeypatch,
+        question_kind="company_lookup",
+        symbols=["AAPL"],
+        requires_publisher_sources=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="iPhone sales drove Apple's growth.",
+                sources=["https://www.perplexity.ai/finance/AAPL"],
+            ),
+            agent_response(
+                text="iPhone sales drove Apple's growth.",
+                sources=["https://www.apple.com/newsroom/earnings/"],
+            ),
+        ],
+    )
+
+    result = _run("What were Apple's main growth drivers?")
+
+    assert result is not None
+    assert len(transport.requests) == 2
+    retry_body = __import__("json").loads(transport.requests[1].content.decode())
+    assert retry_body["tools"] == [
+        {"type": "web_search"},
+        {"type": "fetch_url"},
+    ]
+    assert result.stage_patch["research"]["sources"] == [
+        {
+            "title": "www.apple.com",
+            "domain": "www.apple.com",
+            "url": "https://www.apple.com/newsroom/earnings/",
+            "source_date": None,
+        }
+    ]
+    assert result.stage_patch["assistant_response"].startswith("iPhone sales drove")
 
 
 def test_cross_company_returns_a_background_job_request(monkeypatch) -> None:

@@ -204,6 +204,36 @@ async def grounded_result(
             query=query,
             question_as_of_date=question_as_of_date,
         ):
+            # A narrative turn can land on finance-only evidence even though
+            # balanced retrieval exposes public search. Retry once with that
+            # provider-only channel removed, then fail closed if no public
+            # publisher evidence survives.
+            public_spec = spec.model_copy(
+                update={
+                    "tools": tuple(
+                        tool for tool in spec.tools if tool != "finance_search"
+                    )
+                }
+            )
+            try:
+                retried = await asyncio.to_thread(
+                    client.run_research,
+                    _publisher_source_retry_prompt(prompt, language=language),
+                    public_spec,
+                )
+            except ResearchUnavailableError:
+                retried = None
+            if retried is not None and _packet_has_public_sources(
+                retried,
+                query=query,
+                question_as_of_date=question_as_of_date,
+            ):
+                packet = retried
+        if publisher_sources_required and not _packet_has_public_sources(
+            packet,
+            query=query,
+            question_as_of_date=question_as_of_date,
+        ):
             return unavailable_result(
                 query=query,
                 subjects=subjects,
@@ -728,6 +758,23 @@ def _survey_retry_prompt(
         else "Answer in English."
     )
     return "\n".join(line for line in lines if line)
+
+
+def _publisher_source_retry_prompt(prompt: str, *, language: str) -> str:
+    lines = [
+        prompt,
+        "Retry the same question. Ground every claim in a public publisher, "
+        "regulatory filing, investor-relations page, or company page. If no "
+        "such page is available, answer only that the claim could not be "
+        "verified. Do not write a sources or citations line and do not include "
+        "links.",
+        (
+            "Responde en español latinoamericano (es-419)."
+            if language == "es-419"
+            else "Answer in English."
+        ),
+    ]
+    return "\n".join(lines)
 
 
 def _retrieval_happened(packet: ResearchPacket) -> bool:

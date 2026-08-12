@@ -3055,7 +3055,9 @@ Contract rules:
   as requiring publisher evidence and can never use `fast`, even if it also
   asks for a current figure. Company reads require at least one public
   publisher, filing, investor-relations, or company page. If none survives
-  sanitization and question-aware selection, Argus emits
+  the first balanced attempt, Argus retries once without the provider-only
+  finance citation channel. If none survives sanitization and question-aware
+  selection after that retry, Argus emits
   `research_unavailable_missing_public_sources` and does not publish the
   unsupported claim.
 - Section 2's five shapes are one rail. Market pulse ("what's moving

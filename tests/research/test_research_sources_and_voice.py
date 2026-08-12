@@ -214,6 +214,13 @@ def test_no_rail_prompt_asks_the_model_for_sources_or_names_a_tool() -> None:
         assert tool not in retry
     assert "Do not write a sources line" in retry
 
+    publisher_retry = grounded._publisher_source_retry_prompt(
+        "Explain Apple's growth.", language="en"
+    )
+    for tool in declared_tool_names():
+        assert tool not in publisher_retry
+    assert "Do not write a sources or citations line" in publisher_retry
+
 
 @pytest.mark.parametrize(
     "prose",
