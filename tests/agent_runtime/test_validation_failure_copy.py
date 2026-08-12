@@ -44,13 +44,17 @@ def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
     assert "_" not in prose
 
 
-@pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.parametrize(
+    ("language", "expected_generic_subject"),
+    [("en", "that rule"), ("es-419", "esa regla")],
+)
 @pytest.mark.parametrize(
     "raw_value",
     ["User wants to invest $500", "MACD golden cross", "BTC_USDT"],
 )
 def test_issue_453_generic_raw_value_never_renders_as_subject(
     language: str,
+    expected_generic_subject: str,
     raw_value: str,
 ) -> None:
     prose = _unsupported_recovery_fallback(
@@ -61,7 +65,7 @@ def test_issue_453_generic_raw_value_never_renders_as_subject(
 
     assert prose is not None
     assert raw_value not in prose
-    assert "that rule" in prose
+    assert expected_generic_subject in prose
 
 
 def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> None:

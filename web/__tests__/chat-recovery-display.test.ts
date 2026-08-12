@@ -454,46 +454,46 @@ describe("chat recovery display", () => {
   ])(
     "issue 453 keeps generic raw value %s out of recovery sentence subjects",
     (rawValue) => {
-    const display = recoveryDisplayFromMetadata({
-      clarification: {
-        kind: "unsupported_recovery",
-        reason_code: "unsupported_strategy_logic",
-        prompt_source: "degraded_fallback",
-        requested_field: "unsupported_constraints",
-        semantic_needs: ["simplification_choice"],
-        payload: {
-          raw_value: rawValue,
-          strategy: {
-            asset_universe: ["TSLA"],
+      const display = recoveryDisplayFromMetadata({
+        clarification: {
+          kind: "unsupported_recovery",
+          reason_code: "unsupported_strategy_logic",
+          prompt_source: "degraded_fallback",
+          requested_field: "unsupported_constraints",
+          semantic_needs: ["simplification_choice"],
+          payload: {
+            raw_value: rawValue,
+            strategy: {
+              asset_universe: ["TSLA"],
+            },
           },
+          options: [
+            {
+              id: "rsi_threshold",
+              replacement_values: {
+                simplify_logic: "rsi_only",
+              },
+            },
+            {
+              id: "buy_and_hold",
+              replacement_values: {
+                strategy_type: "buy_and_hold",
+              },
+            },
+          ],
         },
-        options: [
-          {
-            id: "rsi_threshold",
-            replacement_values: {
-              simplify_logic: "rsi_only",
-            },
-          },
-          {
-            id: "buy_and_hold",
-            replacement_values: {
-              strategy_type: "buy_and_hold",
-            },
-          },
-        ],
-      },
-    });
+      });
 
-    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
-    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
-    expect(en).toBe(
-      "Argus can't run that rule directly yet for TSLA. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
-    );
-    expect(es).toBe(
-      "Argus todavía no puede ejecutar esa regla directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
-    );
-    expect(en).not.toContain(rawValue);
-    expect(es).not.toContain(rawValue);
+      const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
+      const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
+      expect(en).toBe(
+        "Argus can't run that rule directly yet for TSLA. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
+      );
+      expect(es).toBe(
+        "Argus todavía no puede ejecutar esa regla directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+      );
+      expect(en).not.toContain(rawValue);
+      expect(es).not.toContain(rawValue);
     },
   );
 
