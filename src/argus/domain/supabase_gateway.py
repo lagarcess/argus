@@ -1239,25 +1239,33 @@ class SupabaseGateway(
             payload["failure_detail"] = None
             payload["retryable"] = False
 
+        from argus.domain.backtest_job_lifecycle import (
+            job_result_attach_postgrest_filter,
+            job_success_write_postgrest_filter,
+        )
+
+        # Every result attach passes the lifecycle statement, with no
+        # caller able to opt out: a dead or unknown job refuses the link,
+        # and only a state a worker legitimately holds may also convert to
+        # succeeded. The filters are generated beside the card-restore
+        # classification so the two cannot drift; the success set is a
+        # subset of the attach set, so one filter carries both statements.
+        # A refused write returns the standing row and the caller derives
+        # publication from what actually landed.
         update_query = (
             self.client.table("backtest_jobs")
             .update(payload)
             .eq("user_id", user_id)
             .eq("id", job_id)
-        )
-        if mark_succeeded:
-            from argus.domain.backtest_job_lifecycle import (
-                job_success_write_postgrest_filter,
+            .or_(
+                job_success_write_postgrest_filter()
+                if mark_succeeded
+                else job_result_attach_postgrest_filter()
             )
-
-            # Success may only follow a state a worker legitimately holds;
-            # the filter is generated beside the card-restore
-            # classification so the two cannot drift. A refused write
-            # returns the standing row and the caller logs the refusal.
-            update_query = update_query.or_(job_success_write_postgrest_filter())
+        )
         updated = update_query.execute()
         row = _row_one(updated)
-        if row is None and mark_succeeded:
+        if row is None:
             standing = self.get_backtest_job(user_id=user_id, job_id=job_id)
             if standing is not None:
                 return dict(standing)
@@ -1588,6 +1596,21 @@ class SupabaseGateway(
                 }
             )
         return runs_by_id
+
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+        """Remove the full finalized tuple of a withheld run atomically.
+
+        One database function owns the removal (children first, run row
+        last, ideas with earlier versions repointed), so product reads
+        can never observe a partial tuple; both this gateway and the
+        workflow gateway call it. The refusal record on the job's
+        execution metadata and the turn's message is the audit trail.
+        """
+        result = self.client.rpc(
+            "delete_withheld_backtest_result",
+            {"p_user_id": user_id, "p_run_id": run_id},
+        ).execute()
+        return bool(result.data)
 
     def get_latest_completed_run_for_conversation(
         self, *, user_id: str, conversation_id: str

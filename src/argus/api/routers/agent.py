@@ -54,7 +54,6 @@ from argus.api.chat.artifacts import (
 )
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
-    link_shadow_backtest_job_result,
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
@@ -86,6 +85,7 @@ from argus.api.chat.research_evidence import (
     research_allowance_for_turn,
 )
 from argus.api.chat.result_actions import result_action_request_type
+from argus.api.chat.result_link import apply_result_link_outcome
 from argus.api.chat.retest import (
     complete_retest_turn,
     failed_retest_turn,
@@ -1143,28 +1143,24 @@ async def chat_stream(
                 if isinstance(recovery, dict):
                     metadata["recovery"] = dict(recovery)
                 if run is not None:
-                    link_shadow_backtest_job_result(
-                        user_id=user.id,
-                        run_id=run.id,
+                    # Publication derives from what the link write did; a
+                    # refused link withholds the result and settles the
+                    # turn on the run_result_withheld recovery.
+                    publication = apply_result_link_outcome(
+                        run=run,
+                        metadata=metadata,
+                        runtime_result=runtime_result,
                         gateway=api_state.supabase_gateway,
+                        user_id=user.id,
+                        language=runtime_user.language_preference,
                         dev_memory_fallback_enabled=dev_memory_fallback_enabled(),
                     )
-                    receipt_run_id = run.id
-                    result_card = run.conversation_result_card
-                    metadata["result_card"] = result_card
-                    runtime_result["result_card"] = result_card
-                    final_response_payload = runtime_result.get("final_response_payload")
-                    if isinstance(final_response_payload, dict):
-                        final_response_payload["result_card"] = result_card
-                    metadata["latest_run_id"] = run.id
-                    metadata["result_run_id"] = run.id
-                    metadata["result_strategy_id"] = run.strategy_id
-                    metadata["result_conversation_id"] = run.conversation_id
-                    metadata["result_fact_bank"] = result_fact_bank(run)
-                    context_packets = run.conversation_result_card.get("context_packets")
-                    if isinstance(context_packets, list):
-                        metadata["context_packets"] = context_packets
-                    runtime_result["run"] = run.model_dump(mode="json")
+                    if publication.publishable:
+                        receipt_run_id = run.id
+                        result_card = publication.result_card
+                    else:
+                        assistant_text = publication.assistant_text
+                        run = None
 
                 streamed_text = "".join(streamed_text_parts).strip()
                 if (

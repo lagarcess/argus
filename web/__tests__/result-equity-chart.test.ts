@@ -10,6 +10,7 @@ import {
   formatChartCurrency,
   formatChartDateLabel,
   markerBudgetForViewport,
+  paddedResultChartLogicalRange,
   resultChartMarkerDisplayLabel,
   resultChartAttributionLabel,
   selectVisibleTradeMarkers,
@@ -159,6 +160,37 @@ describe("ResultEquityChart marker disclosure", () => {
     expect(seriesMarkers.some((item) => item.color === "rgba(112, 163, 141, 0.42)")).toBe(true);
     expect(seriesMarkers.some((item) => item.color === "rgba(184, 92, 92, 0.38)")).toBe(true);
     expect(seriesMarkers.every((item) => item.size === 0.46)).toBe(true);
+  });
+});
+
+describe("ResultEquityChart logical edge room", () => {
+  test("adds a stable visual gutter around sparse and dense windows", () => {
+    for (const input of [
+      { from: 0, to: 6, chartWidth: 310 },
+      { from: 0, to: 499, chartWidth: 310 },
+      { from: 25, to: 75, chartWidth: 720 },
+      { from: 4, to: 4, chartWidth: 310 },
+    ]) {
+      const range = paddedResultChartLogicalRange(input);
+      const width = range.to - range.from;
+      const leadingPixels = ((input.from - range.from) / width) * input.chartWidth;
+      const trailingPixels = ((range.to - input.to) / width) * input.chartWidth;
+
+      expect(range.from).toBeLessThan(input.from);
+      expect(range.to).toBeGreaterThan(input.to);
+      expect(leadingPixels).toBeGreaterThanOrEqual(20);
+      expect(trailingPixels).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  test("keeps the semantic midpoint unchanged while adding visual room", () => {
+    const range = paddedResultChartLogicalRange({
+      from: 15,
+      to: 45,
+      chartWidth: 390,
+    });
+
+    expect((range.from + range.to) / 2).toBe(30);
   });
 });
 

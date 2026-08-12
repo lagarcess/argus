@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import i18next from "i18next";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -331,6 +332,43 @@ describe("private-alpha usage allowance", () => {
     for (const key of Object.keys(es)) {
       expect(en[key]).toBeDefined();
     }
+  });
+
+  test("uses singular Spanish agreement only for reachable count-one usage copy", async () => {
+    const resources = {
+      "es-419": { translation: readLocale("es-419") },
+    };
+    const i18n = i18next.createInstance();
+    await i18n.init({
+      lng: "es-419",
+      fallbackLng: false,
+      interpolation: { escapeValue: false },
+      resources,
+    });
+
+    expect(
+      i18n.t("settings.data.usage_panel.left_today", { count: 1 }),
+    ).toBe("Queda 1 hoy");
+    expect(
+      i18n.t("settings.data.usage_panel.left_today", { count: 2 }),
+    ).toBe("Quedan 2 hoy");
+    expect(
+      i18n.t("settings.data.usage_panel.hourly_available", {
+        count: 1,
+        time: "9:00",
+      }),
+    ).toBe("1 disponible esta hora · se restablece 9:00");
+    expect(
+      i18n.t("settings.data.usage_panel.hourly_available", {
+        count: 2,
+        time: "9:00",
+      }),
+    ).toBe("2 disponibles esta hora · se restablece 9:00");
+
+    const es = readLocale("es-419");
+    expect(es.command_palette.decision_note_count).toBe("{{count}} / {{max}}");
+    expect(es.feedback.attachments_with_count).toBe("Adjuntos ({{count}}/5)");
+    expect(es.chat.confirmation.asset_count).toBe("{{count}} activos");
   });
 
   test("presents a flat quiet gauge with one What counts disclosure", () => {

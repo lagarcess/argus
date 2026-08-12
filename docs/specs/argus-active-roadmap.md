@@ -66,15 +66,40 @@ standalone edit.
 
 ## The five
 
-### 1. Answer the first question — SHIPPED 2026-08-09
+### 1. Answer the first question — LIVE IN PRODUCTION 2026-08-11
 
 Merged as PR #396 at `ef08b25d`, 350 files. Closes #377 and #384.
 
+**Promoted to production 2026-08-11** at `d67cef92`, 451 commits, recorded in
+[`2026-08-11-main-production-promotion.md`](../release-manifests/2026-08-11-main-production-promotion.md).
+Argus answers an ordinary finance question in production, in both languages,
+without refusing. That was the point of the cycle.
+
+Three things came out of that promotion and none of them blocked it:
+
+- **The database was nine migrations behind at deploy**, because nothing
+  applies migrations and no gate checked. The rail was inert for roughly two
+  hours: production's constraint rejected `chat.research`, so the allowance
+  read failed closed and turns answered without research. Remediated during
+  the promotion; the missing gate is **#449**.
+- **Fast-classified research answers carry no citations** (**#451**). The
+  `fast` config has only `finance_search`, whose sole citation channel is the
+  provider's own hosts, which the filter correctly drops. The sources drawer
+  is built and gets nothing. A question with a narrative clause needs
+  `balanced`.
+- **The canary is red at a test that asserts Turnstile fails** (**#452**). Its
+  browser leg drives a headless browser through bot protection. Splitting the
+  release-coherence half from the browser half is filed.
+
+The release-coherence half earned its keep the same day: it caught
+`argus-backtests` running a week behind api and app before any paid journey
+ran.
+
 **Enabled 2026-08-10.** `ARGUS_RESEARCH_RAIL_ENABLED` and
 `NEXT_PUBLIC_RESEARCH_RAIL_ENABLED` are `true` in `render.yaml`,
-`.env.example`, `.github/argus-env.sh`, and the release profile, so the next
-promotion carries it live. Founder decision: answering the first question is
-the product, not an experiment, so it ships on rather than dark.
+`.env.example`, `.github/argus-env.sh`, and the release profile. Founder
+decision: answering the first question is the product, not an experiment, so
+it ships on rather than dark.
 
 That flip was made against the two conditions recorded in rail spec §13b,
 knowingly. Close #411 and #412 rather than treating the flip as having
@@ -150,33 +175,37 @@ remains, which is this item.
 Simplicity bar: someone who knows nothing about investing must understand the
 answer and the offered tests.
 
-### 2. Master editing — SHIPPED 2026-08-11, one half dark
+### 2. Master editing — COMPLETE 2026-08-11
 
-Merged as PR #431 at `522c6d9c`, 148 files, after seven review rounds and
-twelve findings. Also closes #433.
+Both halves are built, merged, and enabled. Closes #433, #437, #335.
 
-**The conversational half is on and unflagged.** Compound multi-parameter
-edits in one turn, the disclosure chain, scoped widening, the accepted-value
-envelope, and the card cut from five actions to three. That is the largest
-known reliability gap in the loop and it is closed.
+**The conversational half** merged as PR #431 at `522c6d9c`, 148 files, after
+seven review rounds. Compound multi-parameter edits in one turn, the disclosure
+chain, scoped widening, the accepted-value envelope, and the card cut from five
+actions to three. That was the largest known reliability gap in the loop and it
+went live with the same-day promotion.
 
-**The in-place drawers ship dark.** `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is
-`false` in all four release-contract files and gates both non-turn routes plus
-the `direct_edits` advertisement, so the frontend goes dark with no web
-change. **The flag flips only when #437 closes**, and it is not a preference:
-turning it on today ships a reachable defect.
+**The in-place drawers** merged as PR #443 at `512a52b7` after twelve more
+rounds, and `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is now `true` in all four
+release-contract files. They reach users at the next promotion, since production
+does not yet carry the guard code.
 
-Why, stated once so it is not relitigated. The drawers write to a card without
-spending a turn, which is a new write path, and protecting it turned out to
-depend on the run lifecycle being sound. It is not. A worker can flip a failed
-job to succeeded after the card was handed back, producing an editable card
-beside a finished result computed from different numbers. Three consecutive
-rounds found three different holes in that one leg. **Production runs
-`api-proof-shadow-on`**, which is the exact configuration the last hole lives
-in, so this is the configured mode rather than a corner case.
+**The twelve rounds are the story worth keeping.** The drawers write to a card
+without spending a turn, which is a new write path, and protecting it turned out
+to depend on the run lifecycle being sound. It was not. A worker could flip a
+failed job to succeeded after the card had been handed back, leaving an editable
+card beside a finished result computed from different numbers. Rounds 1 and 2
+guarded the message row, then the conversation. Round 4 moved liveness into the
+card as one oracle every reader derives from. Rounds 5 through 11 then found
+seven more holes, none of them in the original code and all of them in the fix.
 
-#335 stays open and moves behind #437: its surface is built and merged but not
-reachable. Do not sweep it into a bulk close.
+**A guard cannot be finished while the truth it checks is split across three
+stores.** That is why the flag existed: a pre-stated exit made stopping cheap
+when the third round hit the same leg, and the surface shipped dark for a day
+instead of shipping wrong. Round 12's finding was declined as pre-existing
+architecture and filed as #460 rather than left in a resolved thread.
+
+Spun out and still open: #439, #440, #450, #460. Declined with rationale: #432.
 
 The original scope, kept for the record. The confirmation card carries exactly
 three actions: **Run backtest**, **Change/edit assumptions**, **Cancel**.
@@ -558,6 +587,37 @@ how someone types would be the creepiest thing in the product. Guests have no
 profile and fall back to the nameless pool.
 
 ## Landed this cycle
+
+- **Production promotion** (PR #441, merged 2026-08-11 at `d67cef92`) — 451
+  commits, the first promotion in a month, recorded in
+  [`2026-08-11-main-production-promotion.md`](../release-manifests/2026-08-11-main-production-promotion.md).
+  Three findings came out of it and none blocked it: the database was nine
+  migrations behind because nothing applies them and no gate checked (**#449**),
+  the canary is red at a browser test that asserts Turnstile fails (**#452**),
+  and fast-classified research answers carry no citations (**#451**).
+
+  The lesson is about where verification lives. Every gate we had passed while
+  the flagship feature sat inert for two hours, because production's constraint
+  rejected `chat.research` and the rail failed closed exactly as designed. A
+  green deploy, coherent SHAs across three services, and a clean config audit
+  proved nothing about whether the product worked. The check that found it was
+  asking Argus a question.
+
+- **Run-consumption guard** (PR #443, merged 2026-08-11 at `512a52b7`) — pillar
+  2's second half. Recorded above.
+
+- **Breakpoint findings 2 through 8** (PR #447, merged 2026-08-11) — closes
+  #422. Seven defects the audit lane found, repaired at an unchanged
+  `maxDiffPixels: 100`. Finding 4 was never a breakpoint bug: the confirmation
+  card printed its symbol twice at every width, in both languages, in 60 of 176
+  captures, and survived #406 restyling that exact component. A visual audit
+  found a defect that reading the code had missed twice.
+
+- **Benchmark comparison localized** (PR #446, merged 2026-08-11) — closes
+  #435. `user_phrase` was removed from `BenchmarkComparison` rather than given a
+  language parameter, so the domain layer can no longer format prose in any
+  language, and a structural test pins the dataclass to exactly three typed
+  fields. The lane's own audit found seven consumers where the issue named five.
 
 - **Master editing** (PR #431, merged 2026-08-11 at `522c6d9c`) — pillar 2.
   Recorded above. The transferable lesson is about where a guard belongs.
