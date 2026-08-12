@@ -57,7 +57,7 @@ services:
       - key: ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED
         value: "false"
       - key: ARGUS_IN_PLACE_CARD_EDITS_ENABLED
-        value: "false"
+        value: "true"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKET_BUDGET_SECONDS
