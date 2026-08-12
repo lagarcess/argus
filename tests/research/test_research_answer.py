@@ -77,6 +77,44 @@ def test_flag_off_returns_none_before_any_classification(monkeypatch) -> None:
     assert _run("What is Apple at?") is None
 
 
+def test_classifier_contract_marks_narrative_clauses_in_any_language(
+    monkeypatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def classify(**kwargs: Any) -> ra.ResearchQueryExtraction:
+        captured.update(kwargs)
+        return ra.ResearchQueryExtraction(
+            question_kind="company_lookup",
+            symbols=["AAPL"],
+            requires_publisher_sources=True,
+        )
+
+    monkeypatch.setattr(ra, "invoke_openrouter_json_schema", classify)
+
+    extraction = asyncio.run(
+        ra._classify_research_question(
+            message="¿Qué impulsó el crecimiento de Apple?",
+            language="es-419",
+        )
+    )
+
+    assert extraction is not None
+    prompt = captured["messages"][0]["content"]
+    assert "growth drivers" in prompt
+    assert "not live_quote in any language" in prompt
+    assert "requires_publisher_sources" in prompt
+    assert "period_start_date" in prompt
+
+
+def test_classifier_rejects_a_malformed_period_start_date() -> None:
+    with pytest.raises(ValueError):
+        ra.ResearchQueryExtraction(
+            question_kind="company_lookup",
+            period_start_date="last quarter",
+        )
+
+
 def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
     _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
     transport = _wire_client(monkeypatch, [agent_response()])
@@ -96,6 +134,40 @@ def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
     assert result.stage_patch["next_experiments"]["rows"]
     assert sidecar["anchor_symbols"] == ["AAPL"]
     assert "research_peers" not in result.stage_patch
+
+
+def test_narrative_clause_can_never_use_the_fast_configuration(monkeypatch) -> None:
+    """The semantic classifier owns language. The typed narrative fact is
+    the deterministic guard if it ever returns a quote-shaped kind anyway."""
+    _classify(
+        monkeypatch,
+        question_kind="live_quote",
+        symbols=["AAPL"],
+        requires_publisher_sources=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Services and iPhone sales drove Apple's growth.",
+                sources=["https://www.apple.com/newsroom/earnings/"],
+            )
+        ],
+    )
+
+    result = _run("What were Apple's main growth drivers?")
+
+    assert result is not None
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["tools"] == [
+        {"type": "web_search"},
+        {"type": "finance_search"},
+        {"type": "fetch_url"},
+    ]
+    assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
+    assert result.stage_patch["research"]["shape"] == "balanced"
+    assert result.stage_patch["research"]["capability_class"] == "balanced_lookup"
+    assert result.stage_patch["research"]["sources"]
 
 
 def test_second_identical_question_serves_from_cache(monkeypatch) -> None:
@@ -121,7 +193,15 @@ def test_company_lookup_uses_the_balanced_configuration(monkeypatch) -> None:
         symbols=["NFLX"],
         period_of_interest="last fiscal year",
     )
-    transport = _wire_client(monkeypatch, [agent_response(text="Netflix revenue...")])
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Netflix revenue grew because membership and pricing rose.",
+                sources=["https://ir.netflix.net/financials/quarterly-earnings/"],
+            )
+        ],
+    )
 
     result = _run("How has Netflix's revenue changed?")
 
@@ -131,11 +211,83 @@ def test_company_lookup_uses_the_balanced_configuration(monkeypatch) -> None:
     assert result.stage_patch["research"]["capability_class"] == "balanced_lookup"
 
 
+def test_company_claims_fail_closed_when_no_publisher_source_survives(
+    monkeypatch,
+) -> None:
+    _classify(
+        monkeypatch,
+        question_kind="company_lookup",
+        symbols=["NFLX"],
+        requires_publisher_sources=True,
+    )
+    provider_only = agent_response(
+        text="Advertising drove Netflix's growth.",
+        sources=["https://www.perplexity.ai/finance/NFLX"],
+    )
+    transport = _wire_client(monkeypatch, [provider_only, provider_only])
+
+    result = _run("What were Netflix's main growth drivers?")
+
+    assert result is not None
+    assert len(transport.requests) == 2
+    sidecar = result.stage_patch["research"]
+    assert sidecar["sources"] == []
+    assert sidecar["degraded"] == {"code": "research_unavailable_missing_public_sources"}
+    answer = result.stage_patch["assistant_response"]
+    assert "Advertising drove" not in answer
+    assert answer.startswith("I couldn't verify that explanation with a public source")
+
+
+def test_company_claim_retries_without_the_provider_only_citation_channel(
+    monkeypatch,
+) -> None:
+    _classify(
+        monkeypatch,
+        question_kind="company_lookup",
+        symbols=["AAPL"],
+        requires_publisher_sources=True,
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="iPhone sales drove Apple's growth.",
+                sources=["https://www.perplexity.ai/finance/AAPL"],
+            ),
+            agent_response(
+                text="iPhone sales drove Apple's growth.",
+                sources=["https://www.apple.com/newsroom/earnings/"],
+            ),
+        ],
+    )
+
+    result = _run("What were Apple's main growth drivers?")
+
+    assert result is not None
+    assert len(transport.requests) == 2
+    retry_body = __import__("json").loads(transport.requests[1].content.decode())
+    assert retry_body["tools"] == [
+        {"type": "web_search"},
+        {"type": "fetch_url"},
+    ]
+    assert result.stage_patch["research"]["sources"] == [
+        {
+            "title": "www.apple.com",
+            "domain": "www.apple.com",
+            "url": "https://www.apple.com/newsroom/earnings/",
+            "source_date": None,
+        }
+    ]
+    assert result.stage_patch["assistant_response"].startswith("iPhone sales drove")
+
+
 def test_cross_company_returns_a_background_job_request(monkeypatch) -> None:
     _classify(
         monkeypatch,
         question_kind="cross_company",
         symbols=["NFLX", "AAPL"],
+        period_start_date="2023-08-12",
+        requires_publisher_sources=True,
     )
     transport = _wire_client(monkeypatch, [])
 
@@ -148,6 +300,8 @@ def test_cross_company_returns_a_background_job_request(monkeypatch) -> None:
     assert job_request["capability_class"] == "thorough_research"
     assert job_request["question"] == "Compare Netflix and Apple over three years"
     assert [s["symbol"] for s in job_request["subjects"]] == ["NFLX", "AAPL"]
+    assert job_request["period_start_date"] == "2023-08-12"
+    assert job_request["requires_publisher_sources"] is True
     # The key computed at classification time rides the request so completion
     # paths store the packet under the exact identity later turns look up.
     assert job_request["cache_key"]
@@ -210,7 +364,7 @@ def test_screening_grounds_instead_of_queueing_a_background_job(monkeypatch) -> 
         monkeypatch,
         [
             agent_response(
-                text="Three semiconductor names trade under a 20 P/E.",
+                text="Intel (INTC) trades under a 20 P/E.",
                 tickers=["INTC"],
                 lookup_rows=[("Intel", "INTC", "Intel Corporation")],
             )
@@ -363,9 +517,7 @@ def test_a_guest_who_spent_their_own_allowance_is_told_so(
 
     monkeypatch.setattr(ka, "_voiced_answer", voice)
 
-    result = _run(
-        "What is Apple at?", user=user, allowance=False, guest_exhausted=True
-    )
+    result = _run("What is Apple at?", user=user, allowance=False, guest_exhausted=True)
 
     assert result is not None
     answer = result.stage_patch["assistant_response"].lower()

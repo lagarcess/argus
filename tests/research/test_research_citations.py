@@ -17,6 +17,8 @@ import pytest
 from argus.agent_runtime.research_grounded import typed_sources
 from argus.domain.research.perplexity_agent import _packet_from_response
 
+from tests.research.conftest import agent_response
+
 PROBES = Path(__file__).resolve().parents[2] / "docs/reports/evidence/377/probes"
 
 
@@ -125,3 +127,26 @@ def test_a_run_where_web_search_never_fired_is_legitimately_empty() -> None:
         item.get("type") == "search_results" for item in document.get("output", [])
     )
     assert typed_sources(_packet_from_response(document, latency_ms=100)) == []
+
+
+def test_packet_retains_sources_beyond_the_public_drawer_cap() -> None:
+    """Selection happens after parsing, so early repeats from one publisher
+    cannot erase later outlets before publisher deduplication runs."""
+    document = agent_response(sources=[])
+    search_results = {
+        "type": "search_results",
+        "results": [
+            {
+                "url": f"https://publisher-{index}.example/story",
+                "title": f"Publisher {index}",
+                "date": "2026-08-12",
+            }
+            for index in range(7)
+        ],
+    }
+    document["output"].insert(1, search_results)
+
+    packet = _packet_from_response(document, latency_ms=10)
+
+    assert len(packet.sources) == 7
+    assert len(typed_sources(packet)) == 5
