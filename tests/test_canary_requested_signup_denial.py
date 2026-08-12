@@ -21,6 +21,7 @@ class _StubApi:
         self.payload = payload
         self.requests: list[dict[str, Any]] = []
         self.paths: list[str] = []
+        self.authorization_headers: list[str | None] = []
 
 
 def _serve(stub: _StubApi) -> Iterator[str]:
@@ -28,6 +29,7 @@ def _serve(stub: _StubApi) -> Iterator[str]:
         def do_POST(self) -> None:  # noqa: N802 -- BaseHTTPRequestHandler contract
             length = int(self.headers.get("Content-Length", "0"))
             stub.paths.append(self.path)
+            stub.authorization_headers.append(self.headers.get("Authorization"))
             stub.requests.append(json.loads(self.rfile.read(length) or b"{}"))
             body = json.dumps(stub.payload).encode("utf-8")
             self.send_response(stub.status)
@@ -70,7 +72,7 @@ def _run_probe(api_url: str | None) -> subprocess.CompletedProcess[str]:
     env = {
         "PATH": "/usr/bin:/bin",
         "CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL": SIGNUP_EMAIL,
-        "CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE": "es-419",
+        "CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN": "test-ops-token",
     }
     if api_url is not None:
         env["CANARY_REQUESTED_SIGNUP_DENIAL_API_URL"] = api_url
@@ -84,50 +86,38 @@ def _run_probe(api_url: str | None) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_probe_passes_when_the_api_denies_the_requested_signup(stub_api: Any) -> None:
-    stub, api_url = stub_api(400, {"code": "auth_signup_failed"})
+def test_probe_passes_when_policy_denies_the_disabled_email(stub_api: Any) -> None:
+    stub, api_url = stub_api(200, {"denied": True})
 
     result = _run_probe(api_url)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "result=passed" in result.stdout
-    assert stub.paths == ["/api/v1/auth/signup"]
+    assert stub.paths == ["/api/v1/internal/canary/requested-signup-denial"]
+    assert stub.authorization_headers == ["Bearer test-ops-token"]
     assert len(stub.requests) == 1
-    sent = stub.requests[0]
-    assert sent["email"] == SIGNUP_EMAIL
-    assert sent["language"] == "es-419"
-    assert sent["captcha_token"] == "argus-canary-denial-probe-unverified"
-    assert len(sent["password"]) >= 32
+    assert stub.requests[0] == {"email": SIGNUP_EMAIL}
 
 
-def test_probe_never_sends_a_reusable_password(stub_api: Any) -> None:
-    stub, api_url = stub_api(400, {"code": "auth_signup_failed"})
-
-    _run_probe(api_url)
-    _run_probe(api_url)
-
-    assert stub.requests[0]["password"] != stub.requests[1]["password"]
-
-
-def test_probe_fails_when_the_api_accepts_the_requested_signup(stub_api: Any) -> None:
-    stub, api_url = stub_api(200, {"user": {"email": SIGNUP_EMAIL}})
+def test_probe_fails_when_policy_allows_the_disabled_email(stub_api: Any) -> None:
+    stub, api_url = stub_api(200, {"denied": False})
 
     result = _run_probe(api_url)
 
     assert result.returncode == 1
-    assert "result=unexpected_response status=200" in result.stdout
-    # A live denial regression must be reported, never retried into ambiguity.
+    assert "result=unexpected_response status=200 denied=False" in result.stdout
+    # A live policy regression must be reported, never retried into ambiguity.
     assert len(stub.requests) == 1
 
 
-def test_probe_fails_when_the_denial_code_changes(stub_api: Any) -> None:
-    _, api_url = stub_api(400, {"code": "captcha_unavailable"})
+def test_probe_fails_when_the_policy_response_is_ambiguous(stub_api: Any) -> None:
+    _, api_url = stub_api(200, {"status": "ready"})
 
     result = _run_probe(api_url)
 
     assert result.returncode == 1
     assert "result=unexpected_response" in result.stdout
-    assert "'captcha_unavailable'" in result.stdout
+    assert "denied=None" in result.stdout
 
 
 def test_probe_fails_closed_without_configuration() -> None:
@@ -149,7 +139,7 @@ def test_probe_retries_transport_failures_then_fails() -> None:
 
 
 def test_probe_keeps_the_signup_address_out_of_its_own_output(stub_api: Any) -> None:
-    _, api_url = stub_api(400, {"code": "auth_signup_failed"})
+    _, api_url = stub_api(200, {"denied": True})
 
     result = _run_probe(api_url)
 

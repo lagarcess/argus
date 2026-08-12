@@ -14,10 +14,6 @@ argus_load_root_env >/dev/null || true
 API_SERVICE_ID="${ARGUS_RENDER_API_SERVICE_ID:-$ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID}"
 WEB_SERVICE_ID="${ARGUS_RENDER_WEB_SERVICE_ID:-$ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID}"
 WORKFLOW_SERVICE_ID="${ARGUS_RENDER_WORKFLOW_SERVICE_ID:-$ARGUS_RENDER_BACKTESTS_WORKFLOW_ID}"
-CRON_SERVICE_NAME="$ARGUS_RENDER_MAINTENANCE_SERVICE_NAME"
-CRON_SERVICE_ID_CACHE=""
-CRON_SERVICE_ID_RESOLVED=false
-CRON_SERVICE_LOOKUP_FAILED=false
 
 usage() {
   cat <<'USAGE'
@@ -25,7 +21,6 @@ Usage:
   .github/render-env-sync.sh api-status
   .github/render-env-sync.sh api-deploy-status
   .github/render-env-sync.sh web-deploy-status
-  .github/render-env-sync.sh cron-deploy-status
   .github/render-env-sync.sh api-safe-off
   .github/render-env-sync.sh api-proof-shadow-on
   .github/render-env-sync.sh api-real-workflow-on
@@ -40,7 +35,6 @@ Commands:
   api-status              Print redacted API workflow env status for argus-api.
   api-deploy-status       Print latest argus-api deploy status and commit.
   web-deploy-status       Print latest argus-app deploy status and commit.
-  cron-deploy-status      Print latest argus-maintenance deploy status and commit.
   api-safe-off            Disable API job dispatch/execution and blank its Render key.
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
@@ -97,6 +91,11 @@ release_profile_env_value() {
   python3 "$RELEASE_PROFILE_TOOL" env-value "$surface" "$key"
 }
 
+release_profile_auto_deploy_trigger() {
+  local surface="$1"
+  python3 "$RELEASE_PROFILE_TOOL" auto-deploy-trigger "$surface"
+}
+
 release_profile_required_present() {
   local surface="$1"
   python3 "$RELEASE_PROFILE_TOOL" required-present "$surface"
@@ -111,8 +110,8 @@ AUDIT_FAILURES=0
 AUDIT_FINGERPRINT_ROWS=()
 WORKFLOW_AUDIT_FAILURES=0
 WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
-CRON_AUDIT_FAILURES=0
-CRON_AUDIT_FINGERPRINT_ROWS=()
+AUTODEPLOY_AUDIT_FAILURES=0
+AUTODEPLOY_AUDIT_FINGERPRINT_ROWS=()
 
 require_local_env() {
   local name="$1"
@@ -174,6 +173,16 @@ render_env_json() {
     --header "Accept: application/json"
 }
 
+render_service_json() {
+  local service_id="$1"
+
+  curl -fsS \
+    --request GET \
+    --url "https://api.render.com/v1/services/${service_id}" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json"
+}
+
 render_workflow_json() {
   curl -fsS \
     --request GET \
@@ -190,47 +199,6 @@ render_service_deploy_json() {
     --url "https://api.render.com/v1/services/${service_id}/deploys?limit=1" \
     --header "Authorization: Bearer ${RENDER_API_KEY}" \
     --header "Accept: application/json"
-}
-
-# Empty means Render has no such service, so callers must report absent rather
-# than skip. A failed lookup is never absent: it returns nonzero, because one
-# 401 or timeout would otherwise hand a stale destructive cron a passing gate.
-cron_service_id() {
-  if [ "$CRON_SERVICE_ID_RESOLVED" = "true" ]; then
-    printf '%s' "$CRON_SERVICE_ID_CACHE"
-    [ "$CRON_SERVICE_LOOKUP_FAILED" = "true" ] && return 1
-    return 0
-  fi
-
-  local override="${ARGUS_RENDER_CRON_SERVICE_ID:-}"
-  local payload=""
-  local resolved=""
-  CRON_SERVICE_ID_RESOLVED=true
-  if [ -n "$override" ]; then
-    CRON_SERVICE_ID_CACHE="$override"
-    printf '%s' "$CRON_SERVICE_ID_CACHE"
-    return 0
-  fi
-  if ! payload="$(
-    curl -fsS \
-      --request GET \
-      --url "https://api.render.com/v1/services?name=${CRON_SERVICE_NAME}&type=cron_job&limit=20" \
-      --header "Authorization: Bearer ${RENDER_API_KEY}" \
-      --header "Accept: application/json"
-  )"; then
-    CRON_SERVICE_LOOKUP_FAILED=true
-    return 1
-  fi
-  if ! resolved="$(
-    printf '%s' "$payload" |
-      jq -r --arg name "$CRON_SERVICE_NAME" \
-        '[.[] | .service | select(.name == $name)] | .[0].id // ""'
-  )"; then
-    CRON_SERVICE_LOOKUP_FAILED=true
-    return 1
-  fi
-  CRON_SERVICE_ID_CACHE="$resolved"
-  printf '%s' "$CRON_SERVICE_ID_CACHE"
 }
 
 print_api_status() {
@@ -295,29 +263,6 @@ print_web_deploy_status() {
   print_deploy_status "$WEB_SERVICE_ID" "argus-app"
 }
 
-print_cron_deploy_status() {
-  require_local_env RENDER_API_KEY
-  local service_id=""
-
-  if ! service_id="$(cron_service_id)"; then
-    echo "service=$CRON_SERVICE_NAME"
-    echo "deploy_id=<unknown>"
-    echo "status=lookup_failed"
-    echo "commit=<unknown>"
-    echo "commit_short=<unknown>"
-    return 1
-  fi
-  if [ -z "$service_id" ]; then
-    echo "service=$CRON_SERVICE_NAME"
-    echo "deploy_id=<absent>"
-    echo "status=absent"
-    echo "commit=<absent>"
-    echo "commit_short=<absent>"
-    return 0
-  fi
-  print_deploy_status "$service_id" "$CRON_SERVICE_NAME"
-}
-
 latest_workflow_version_json() {
   render workflows versions list "$WORKFLOW_SERVICE_ID" -o json |
     jq '
@@ -339,31 +284,18 @@ latest_workflow_version_json() {
 
 print_workflow_version_status() {
   require_local_env RENDER_API_KEY
-  local workflow_env_json
   local version_json
-  local release_commit
-  local expected_version_id
 
-  workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
   version_json="$(latest_workflow_version_json)"
-  release_commit="$(
-    render_env_raw_value "$workflow_env_json" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT
-  )"
-  expected_version_id="$(
-    render_env_raw_value "$workflow_env_json" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID
-  )"
 
   jq -r \
     --arg workflow_id "$WORKFLOW_SERVICE_ID" \
-    --arg release_commit "${release_commit:-<missing>}" \
-    --arg expected_version_id "${expected_version_id:-<missing>}" \
     '
       "service=argus-backtests",
       "workflow_id=\($workflow_id)",
       "workflow_version_id=\(.id // "<missing>")",
       "status=\(.status // "<missing>")",
-      "commit=\($release_commit)",
-      "expected_workflow_version_id=\($expected_version_id)",
+      "commit=\(.name // "<missing>")",
       "created_at=\(.createdAt // .created_at // "<missing>")"
     ' <<< "$version_json"
 }
@@ -430,10 +362,6 @@ record_audit_row() {
     WORKFLOW_AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
     return
   fi
-  if [ "$service" = "$CRON_SERVICE_NAME" ]; then
-    CRON_AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
-    return
-  fi
   AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
 }
 
@@ -443,9 +371,6 @@ record_audit_failure() {
   AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
   if [ "$service" = "argus-backtests" ]; then
     WORKFLOW_AUDIT_FAILURES=$((WORKFLOW_AUDIT_FAILURES + 1))
-  fi
-  if [ "$service" = "$CRON_SERVICE_NAME" ]; then
-    CRON_AUDIT_FAILURES=$((CRON_AUDIT_FAILURES + 1))
   fi
 }
 
@@ -687,8 +612,31 @@ workflow_env_fingerprint() {
   fingerprint_rows "${WORKFLOW_AUDIT_FINGERPRINT_ROWS[@]}"
 }
 
-cron_env_fingerprint() {
-  fingerprint_rows "${CRON_AUDIT_FINGERPRINT_ROWS[@]}"
+autodeploy_fingerprint() {
+  fingerprint_rows "${AUTODEPLOY_AUDIT_FINGERPRINT_ROWS[@]}"
+}
+
+audit_render_auto_deploy_trigger() {
+  local config_json="$1"
+  local service_name="$2"
+  local expected="$3"
+  local actual
+
+  actual="$(
+    jq -r \
+      '.autoDeployTrigger // .service.autoDeployTrigger // "<missing>"' \
+      <<< "$config_json"
+  )"
+  AUTODEPLOY_AUDIT_FINGERPRINT_ROWS+=(
+    "${service_name}:autoDeployTrigger=${actual}"
+  )
+  if [ "$actual" = "$expected" ]; then
+    echo "ok ${service_name}:autoDeployTrigger=${actual}"
+    return 0
+  fi
+  echo "drift ${service_name}:autoDeployTrigger expected=${expected} actual=${actual}"
+  AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
+  AUTODEPLOY_AUDIT_FAILURES=$((AUTODEPLOY_AUDIT_FAILURES + 1))
 }
 
 audit_release_config() {
@@ -734,29 +682,22 @@ audit_release_config() {
   AUDIT_FINGERPRINT_ROWS=()
   WORKFLOW_AUDIT_FAILURES=0
   WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
-  CRON_AUDIT_FAILURES=0
-  CRON_AUDIT_FINGERPRINT_ROWS=()
+  AUTODEPLOY_AUDIT_FAILURES=0
+  AUTODEPLOY_AUDIT_FINGERPRINT_ROWS=()
 
   local api_env_json web_env_json workflow_env_json workflow_task real_workflow_task fingerprint workflow_fingerprint
-  local cron_env_json cron_fingerprint cron_service_id_value cron_lookup_ok
+  local api_service_json web_service_json workflow_service_json autodeploy_fingerprint_value
+  local api_autodeploy_trigger web_autodeploy_trigger workflow_autodeploy_trigger
   local mode_pairs=()
   local mode_pair
   local workflow_pairs=()
   local api_profile_pairs=()
   local web_profile_pairs=()
   local workflow_profile_pairs=()
-  local cron_profile_pairs=()
   local api_allowed_keys=()
   local web_allowed_keys=()
   local workflow_allowed_keys=()
-  local cron_allowed_keys=()
   local audit_workflow_env=false
-  while IFS= read -r mode_pair; do
-    cron_profile_pairs+=("$mode_pair")
-  done < <(release_profile_expected_pairs cron "$expected_mode")
-  while IFS= read -r mode_pair; do
-    cron_allowed_keys+=("$mode_pair")
-  done < <(release_profile_allowed_keys cron)
   while IFS= read -r mode_pair; do
     mode_pairs+=("$mode_pair")
   done < <(expected_api_mode_pairs "$expected_mode")
@@ -786,22 +727,17 @@ audit_release_config() {
   fi
   api_env_json="$(render_env_json "$API_SERVICE_ID")"
   web_env_json="$(render_env_json "$WEB_SERVICE_ID")"
+  api_service_json="$(render_service_json "$API_SERVICE_ID")"
+  web_service_json="$(render_service_json "$WEB_SERVICE_ID")"
+  workflow_service_json="$(render_workflow_json)"
+  api_autodeploy_trigger="$(release_profile_auto_deploy_trigger api)"
+  web_autodeploy_trigger="$(release_profile_auto_deploy_trigger web)"
+  workflow_autodeploy_trigger="$(release_profile_auto_deploy_trigger workflow)"
   if [ "$audit_workflow_env" = "true" ]; then
     workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
   else
     workflow_env_json="[]"
   fi
-  cron_lookup_ok=true
-  if ! cron_service_id_value="$(cron_service_id)"; then
-    cron_lookup_ok=false
-    cron_service_id_value=""
-  fi
-  if [ -n "$cron_service_id_value" ]; then
-    cron_env_json="$(render_env_json "$cron_service_id_value")"
-  else
-    cron_env_json="[]"
-  fi
-
   echo "Argus release config audit"
   echo "expected_mode=$expected_mode"
   echo "release_profile_status=ready"
@@ -813,6 +749,18 @@ audit_release_config() {
   audit_render_service_config "$api_env_json" "argus-api" "${api_profile_pairs[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${mode_pairs[@]}"
   audit_render_service_config "$web_env_json" "argus-app" "${web_profile_pairs[@]}"
+  audit_render_auto_deploy_trigger \
+    "$api_service_json" \
+    "argus-api" \
+    "$api_autodeploy_trigger"
+  audit_render_auto_deploy_trigger \
+    "$web_service_json" \
+    "argus-app" \
+    "$web_autodeploy_trigger"
+  audit_render_auto_deploy_trigger \
+    "$workflow_service_json" \
+    "argus-backtests" \
+    "$workflow_autodeploy_trigger"
   if [ "$audit_workflow_env" = "true" ]; then
     audit_forbidden_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
     audit_unexpected_render_env_keys \
@@ -822,24 +770,6 @@ audit_release_config() {
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_profile_pairs[@]}"
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
   fi
-  if [ "$cron_lookup_ok" != "true" ]; then
-    echo "drift $CRON_SERVICE_NAME:service_lookup_failed"
-    record_audit_failure "$CRON_SERVICE_NAME"
-  elif [ -n "$cron_service_id_value" ]; then
-    audit_forbidden_render_env_keys \
-      "$cron_env_json" \
-      "$CRON_SERVICE_NAME" \
-      "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
-    audit_unexpected_render_env_keys \
-      "$cron_env_json" \
-      "$CRON_SERVICE_NAME" \
-      "${cron_allowed_keys[@]}"
-    audit_render_service_config \
-      "$cron_env_json" \
-      "$CRON_SERVICE_NAME" \
-      "${cron_profile_pairs[@]}"
-  fi
-
   workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_WORKFLOW_TASK)"
   real_workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_REAL_WORKFLOW_TASK)"
   fingerprint="$(render_env_fingerprint)"
@@ -848,18 +778,12 @@ audit_release_config() {
   else
     workflow_fingerprint="<skipped>"
   fi
-  if [ "$cron_lookup_ok" != "true" ]; then
-    cron_fingerprint="<unknown>"
-  elif [ -n "$cron_service_id_value" ]; then
-    cron_fingerprint="$(cron_env_fingerprint)"
-  else
-    cron_fingerprint="<absent>"
-  fi
-
+  autodeploy_fingerprint_value="$(autodeploy_fingerprint)"
   echo "workflow_task=$workflow_task"
   echo "real_workflow_task=$real_workflow_task"
   echo "env_fingerprint=$fingerprint"
   echo "workflow_env_fingerprint=$workflow_fingerprint"
+  echo "autodeploy_fingerprint=$autodeploy_fingerprint_value"
   if [ "$audit_workflow_env" != "true" ]; then
     echo "workflow_env_status=skipped"
   elif [ "$WORKFLOW_AUDIT_FAILURES" -eq 0 ]; then
@@ -867,17 +791,10 @@ audit_release_config() {
   else
     echo "workflow_env_status=drift"
   fi
-  echo "cron_env_fingerprint=$cron_fingerprint"
-  # absent is read back from Render, so it states the janitor is not deployed
-  # rather than that the audit declined to look, or could not.
-  if [ "$cron_lookup_ok" != "true" ]; then
-    echo "cron_env_status=lookup_failed"
-  elif [ -z "$cron_service_id_value" ]; then
-    echo "cron_env_status=absent"
-  elif [ "$CRON_AUDIT_FAILURES" -eq 0 ]; then
-    echo "cron_env_status=ready"
+  if [ "$AUTODEPLOY_AUDIT_FAILURES" -eq 0 ]; then
+    echo "autodeploy_status=ready"
   else
-    echo "cron_env_status=drift"
+    echo "autodeploy_status=drift"
   fi
   if [ "$AUDIT_FAILURES" -eq 0 ]; then
     echo "status=ready"
@@ -991,17 +908,20 @@ sync_workflow_runtime() {
   require_local_env RENDER_API_KEY
   local current_workflow
   local update_payload
+  local auto_deploy_trigger
 
   current_workflow="$(render_workflow_json)"
+  auto_deploy_trigger="$(release_profile_auto_deploy_trigger workflow)"
   update_payload="$(
     jq -nc \
       --argjson workflow "$current_workflow" \
       --arg build_command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
       --arg run_command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
+      --arg auto_deploy_trigger "$auto_deploy_trigger" \
       '{
         buildConfig: ($workflow.buildConfig + {buildCommand: $build_command}),
         runCommand: $run_command,
-        autoDeployTrigger: "off"
+        autoDeployTrigger: $auto_deploy_trigger
       }'
   )"
 
@@ -1035,11 +955,9 @@ sync_workflow_release() {
     echo "Unable to determine released workflow version id for ${WORKFLOW_SERVICE_ID}."
     return 1
   fi
-  # Write both proof markers only after the release succeeded and the version id
-  # resolved, so a failed release cannot leave the commit marker pointing at a new
-  # SHA while the version id still references the previous ready version.
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT "$commit"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID "$version_id"
+  # Render names a Git-backed Workflow version with the deployed commit prefix.
+  # workflow-version-status reads that version-owned proof for both manual and
+  # checks-passing releases, so no mutable env marker can go stale.
   echo "workflow_release_commit=$commit"
   echo "workflow_release_version_id=$version_id"
 }
@@ -1054,9 +972,6 @@ case "$command" in
     ;;
   web-deploy-status)
     print_web_deploy_status
-    ;;
-  cron-deploy-status)
-    print_cron_deploy_status
     ;;
   api-safe-off)
     sync_api_safe_off
