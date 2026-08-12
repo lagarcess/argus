@@ -1634,7 +1634,7 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   { "accepted": true }
   ```
   The accepted status is `202`. For a valid email-shaped request,
-  `captcha_token` is required, contains 1 to 4,096 characters, and is passed to
+  `captcha_token` is required, contains 1 to 4,096 bytes, and is passed to
   Supabase Auth without logging or persistence. A malformed email receives the
   same enumeration-safe `202` without provider work. Malformed JSON or an
   invalid CAPTCHA token returns `400`; a
