@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 
 
@@ -26,6 +27,14 @@ def _require(condition: bool, reason: str) -> None:
         raise ValueError(reason)
 
 
+def _workflow_commit_matches(full_sha: str, workflow_sha: str) -> bool:
+    return bool(
+        re.fullmatch(r"[0-9a-f]{40}", full_sha)
+        and re.fullmatch(r"[0-9a-f]{7,40}", workflow_sha)
+        and full_sha.startswith(workflow_sha)
+    )
+
+
 def resolve_deployed_sha(
     *, api_status: str, web_status: str, workflow_status: str
 ) -> str:
@@ -38,17 +47,16 @@ def resolve_deployed_sha(
     _require(_value(workflow, "status") == "ready", "workflow_version_not_ready")
 
     workflow_version_id = _value(workflow, "workflow_version_id")
-    _require(
-        workflow_version_id
-        and workflow_version_id == _value(workflow, "expected_workflow_version_id"),
-        "workflow_version_id_mismatch",
-    )
+    _require(bool(workflow_version_id), "workflow_version_id_missing")
 
     api_sha = _value(api, "commit")
     web_sha = _value(web, "commit")
     workflow_sha = _value(workflow, "commit")
     _require(api_sha and api_sha == web_sha, "api_web_deploy_sha_mismatch")
-    _require(api_sha == workflow_sha, "workflow_commit_mismatch")
+    _require(
+        _workflow_commit_matches(api_sha, workflow_sha),
+        "workflow_commit_mismatch",
+    )
     return api_sha
 
 

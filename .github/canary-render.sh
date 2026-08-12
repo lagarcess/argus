@@ -124,7 +124,6 @@ WEB_DEPLOY_STATUS=""
 WORKFLOW_VERSION_COMMIT=""
 WORKFLOW_VERSION_ID=""
 WORKFLOW_VERSION_STATUS=""
-WORKFLOW_EXPECTED_VERSION_ID=""
 USER_ID=""
 BROWSER_ACCESS_TOKEN=""
 CONVERSATION_ID=""
@@ -220,6 +219,15 @@ extract_status_value() {
   local status="$1"
   local key="$2"
   awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2); found=1; exit } END { if (!found) exit 1 }' <<< "$status"
+}
+
+workflow_commit_matches_candidate() {
+  local workflow_commit="$1"
+  local candidate_commit="$2"
+
+  [[ "$candidate_commit" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ "$workflow_commit" =~ ^[0-9a-f]{7,40}$ ]] || return 1
+  [[ "$candidate_commit" == "$workflow_commit"* ]]
 }
 
 build_release_evidence_json() {
@@ -589,7 +597,6 @@ run_deploy_status_probe() {
   WORKFLOW_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" workflow_version_id || true)"
   WORKFLOW_VERSION_STATUS="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" status || true)"
   WORKFLOW_VERSION_COMMIT="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" commit || true)"
-  WORKFLOW_EXPECTED_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" expected_workflow_version_id || true)"
 
   if [ "$API_DEPLOY_STATUS" != "live" ]; then
     fail_canary "deploy_status" "api_deploy_not_live"
@@ -606,11 +613,11 @@ run_deploy_status_probe() {
   if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
     fail_canary "deploy_status" "workflow_version_not_ready"
   fi
-  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
+  if ! workflow_commit_matches_candidate "$WORKFLOW_VERSION_COMMIT" "$CANDIDATE_SHA"; then
     fail_canary "deploy_status" "workflow_version_commit_mismatch"
   fi
-  if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
-    fail_canary "deploy_status" "workflow_version_id_mismatch"
+  if [ -z "$WORKFLOW_VERSION_ID" ]; then
+    fail_canary "deploy_status" "workflow_version_id_missing"
   fi
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"

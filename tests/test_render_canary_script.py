@@ -86,7 +86,8 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert 'fail_canary "deploy_status" "api_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "web_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "workflow_version_commit_mismatch"' in source
-    assert 'fail_canary "deploy_status" "workflow_version_id_mismatch"' in source
+    assert 'fail_canary "deploy_status" "workflow_version_id_missing"' in source
+    assert "workflow_commit_matches_candidate" in source
     assert 'fail_canary "release_profile" "release_profile_hash_mismatch"' in source
     assert "extract_warmup_value env_fingerprint" in source
     assert "extract_warmup_value workflow_env_fingerprint" in source

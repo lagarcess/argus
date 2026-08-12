@@ -129,6 +129,12 @@ enforces the same deployed SHA/status check with `ARGUS_CANARY_SHA`, and its
 resolver compares all three, which is what caught the workflow service running
 behind on 2026-08-11.
 
+For `argus-backtests`, Render exposes the deployed Git commit as the ready
+Workflow version name, currently a seven-character SHA prefix. The status and
+canary resolvers require that prefix to match the exact API/web commit. They do
+not trust mutable workflow env markers, so checks-passing and manual releases
+use the same version-owned proof.
+
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
    stale queued/running job scan:

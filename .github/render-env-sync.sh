@@ -284,31 +284,18 @@ latest_workflow_version_json() {
 
 print_workflow_version_status() {
   require_local_env RENDER_API_KEY
-  local workflow_env_json
   local version_json
-  local release_commit
-  local expected_version_id
 
-  workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
   version_json="$(latest_workflow_version_json)"
-  release_commit="$(
-    render_env_raw_value "$workflow_env_json" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT
-  )"
-  expected_version_id="$(
-    render_env_raw_value "$workflow_env_json" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID
-  )"
 
   jq -r \
     --arg workflow_id "$WORKFLOW_SERVICE_ID" \
-    --arg release_commit "${release_commit:-<missing>}" \
-    --arg expected_version_id "${expected_version_id:-<missing>}" \
     '
       "service=argus-backtests",
       "workflow_id=\($workflow_id)",
       "workflow_version_id=\(.id // "<missing>")",
       "status=\(.status // "<missing>")",
-      "commit=\($release_commit)",
-      "expected_workflow_version_id=\($expected_version_id)",
+      "commit=\(.name // "<missing>")",
       "created_at=\(.createdAt // .created_at // "<missing>")"
     ' <<< "$version_json"
 }
@@ -968,11 +955,9 @@ sync_workflow_release() {
     echo "Unable to determine released workflow version id for ${WORKFLOW_SERVICE_ID}."
     return 1
   fi
-  # Write both proof markers only after the release succeeded and the version id
-  # resolved, so a failed release cannot leave the commit marker pointing at a new
-  # SHA while the version id still references the previous ready version.
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT "$commit"
-  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID "$version_id"
+  # Render names a Git-backed Workflow version with the deployed commit prefix.
+  # workflow-version-status reads that version-owned proof for both manual and
+  # checks-passing releases, so no mutable env marker can go stale.
   echo "workflow_release_commit=$commit"
   echo "workflow_release_version_id=$version_id"
 }

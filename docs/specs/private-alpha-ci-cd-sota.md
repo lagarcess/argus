@@ -149,6 +149,8 @@ services. `argus-backtests` is therefore guaranteed by the explicit workflow
 runtime sync, release, and version-status checks in
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`. All three Git-linked services use
 `checksPass` autodeploy. Enabling only API and web would increase workflow skew.
+Workflow deploy proof comes from the ready Render version id and its Git commit
+prefix, not from mutable env markers that an automatic release cannot refresh.
 
 Guest retention and stale-job reconciliation remain operator-run jobs through
 `scripts/ops/scheduled_maintenance.py`. They are not a fourth deployed release
@@ -628,7 +630,9 @@ The current checkout and private-alpha deploy evidence show:
 - `codex/private-alpha-next` is the active integration lane.
 - Render services are configured with branch `main` and `checksPass`
   autodeploy. The workflow is not Blueprint-managed, so its matching trigger is
-  enforced by the release profile, runtime sync, and live audit.
+  enforced by the release profile, runtime sync, and live audit. Its ready
+  version name supplies the deployed Git prefix used by the three-service SHA
+  resolver for both automatic and manual releases.
 - The live API is in `real-workflow` mode now, but the effective env contract
   should still be audited before each invite.
 - The intended pre-deploy check is a local ephemeral stack, not a second live

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -80,6 +82,56 @@ def test_release_contract_enables_checks_passing_autodeploy_for_all_three() -> N
     assert "argus-api" in runbook
     assert "argus-app" in runbook
     assert "argus-backtests" in runbook
+
+
+def test_workflow_version_status_derives_proof_from_ready_version(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_render = bin_dir / "render"
+    fake_render.write_text(
+        "#!/bin/bash\n"
+        "printf '%s' '[{\"createdAt\":\"2026-08-12T15:00:00Z\","
+        "\"id\":\"wfv-current\",\"name\":\"d67cef9\","
+        "\"status\":\"ready\",\"workflowId\":\"wfl-test\"}]'\n",
+        encoding="utf-8",
+    )
+    fake_render.chmod(0o755)
+    fake_curl = bin_dir / "curl"
+    fake_curl.write_text(
+        "#!/bin/bash\n"
+        "printf '%s' '[{\"envVar\":{\"key\":"
+        "\"ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT\",\"value\":\"stale000\"}},"
+        "{\"envVar\":{\"key\":\"ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID\","
+        "\"value\":\"wfv-stale\"}}]'\n",
+        encoding="utf-8",
+    )
+    fake_curl.chmod(0o755)
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "RENDER_API_KEY": "fake-render-token",
+            "ARGUS_RENDER_WORKFLOW_SERVICE_ID": "wfl-test",
+        }
+    )
+
+    result = subprocess.run(
+        [str(ROOT / ".github" / "render-env-sync.sh"), "workflow-version-status"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "workflow_version_id=wfv-current" in result.stdout
+    assert "status=ready" in result.stdout
+    assert "commit=d67cef9" in result.stdout
+    assert "stale000" not in result.stdout
+    assert "expected_workflow_version_id" not in result.stdout
 
 
 def test_render_env_sync_audit_fails_when_one_autodeploy_surface_is_off(
