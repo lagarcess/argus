@@ -872,6 +872,7 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "ok argus-backtests:ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>" in (
         result.stdout
     )
+    assert "ok argus-api:ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in result.stdout
     assert "workflow_env_status=ready" in result.stdout
     assert "autodeploy_status=ready" in result.stdout
     assert "status=ready" in result.stdout

@@ -65,16 +65,42 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert "bearer " not in serialized
     assert "sk-" not in serialized
     assert "ARGUS_GUEST_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
-    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
+    assert (
+        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
+        == "true"
+    )
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED" not in profile["services"]["web"]["env"]
 
 
-def test_guest_kill_switches_are_documented_on_without_opening_public_accounts() -> None:
+def test_public_account_access_is_open_in_every_release_contract() -> None:
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    render_config = yaml.safe_load((ROOT / "render.yaml").read_text(encoding="utf-8"))
+    render_api = next(
+        service
+        for service in render_config["services"]
+        if service["name"] == "argus-api"
+    )
+    render_api_env = {
+        item["key"]: item.get("value") for item in render_api["envVars"]
+    }
+    env_contract = (ROOT / ".github" / "argus-env.sh").read_text(encoding="utf-8")
+    backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert render_api_env["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
+    assert (
+        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
+        == "true"
+    )
+    assert "  ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED\n" in env_contract
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
+
+
+def test_guest_and_public_account_access_are_documented_open() -> None:
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     web_example = (ROOT / "web" / ".env.local.example").read_text(encoding="utf-8")
 
     assert "ARGUS_GUEST_ACCESS_ENABLED=true" in backend_example
-    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false" in backend_example
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true" in backend_example
     assert "ARGUS_VISITOR_KEY_SECRET=replace_with_a_unique_random_secret" in (
         backend_example
