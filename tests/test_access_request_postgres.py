@@ -42,6 +42,54 @@ def _cleanup_access_rows(email: str) -> None:
             )
 
 
+def _insert_allowlist_row(
+    cursor: psycopg.Cursor[tuple[object, ...]],
+    *,
+    email: str,
+    role: str,
+    language: str = "en",
+    disabled: bool = False,
+) -> None:
+    cursor.execute(
+        """
+        insert into public.private_alpha_allowlist (
+          email,
+          role,
+          language,
+          disabled_at
+        )
+        values (%s, %s, %s, case when %s then now() else null end)
+        """,
+        (email, role, language, disabled),
+    )
+
+
+def _complete_welcome(
+    cursor: psycopg.Cursor[tuple[object, ...]],
+    *,
+    email: str,
+    language: str = "en",
+    content_version: str = WELCOME_CONTENT_VERSION,
+    subject: str = WELCOME_SUBJECT,
+    provider_receipt: str = WELCOME_RECEIPT,
+) -> tuple[bool]:
+    cursor.execute("set role service_role")
+    try:
+        cursor.execute(
+            """
+            select public.complete_private_alpha_access_welcome(
+              %s, %s, %s, %s, %s
+            )
+            """,
+            (email, language, content_version, subject, provider_receipt),
+        )
+        result = cursor.fetchone()
+        assert result is not None
+        return result
+    finally:
+        cursor.execute("reset role")
+
+
 def test_access_request_constraints_and_rls_are_service_role_only() -> None:
     with psycopg.connect(DSN, autocommit=True) as connection:
         with connection.cursor() as cursor:
@@ -139,6 +187,244 @@ def test_direct_requested_user_activation_without_delivery_is_rejected() -> None
                     (email, email),
                 )
                 assert cursor.fetchone() == ("requested", 0)
+    finally:
+        _cleanup_access_rows(email)
+
+
+@pytest.mark.parametrize(
+    (
+        "role",
+        "stored_language",
+        "disabled",
+        "request_language",
+        "expected_allowlist_row",
+    ),
+    [
+        pytest.param(None, "en", False, "en", None, id="missing"),
+        pytest.param(
+            "requested",
+            "en",
+            True,
+            "en",
+            ("requested", "en", True),
+            id="disabled",
+        ),
+        pytest.param("admin", "en", False, "en", ("admin", "en", False), id="admin"),
+        pytest.param(
+            "developer",
+            "en",
+            False,
+            "en",
+            ("developer", "en", False),
+            id="developer",
+        ),
+        pytest.param(
+            "requested",
+            "es-419",
+            False,
+            "en",
+            ("requested", "es-419", False),
+            id="language-mismatch",
+        ),
+        pytest.param(
+            "user",
+            "en",
+            False,
+            "en",
+            ("user", "en", False),
+            id="active-user-without-delivery",
+        ),
+    ],
+)
+def test_completion_rejects_ineligible_allowlist_state_without_delivery(
+    role: str | None,
+    stored_language: str,
+    disabled: bool,
+    request_language: str,
+    expected_allowlist_row: tuple[str, str, bool] | None,
+) -> None:
+    email = _random_email()
+    try:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                if role is not None:
+                    _insert_allowlist_row(
+                        cursor,
+                        email=email,
+                        role=role,
+                        language=stored_language,
+                        disabled=disabled,
+                    )
+
+                assert _complete_welcome(
+                    cursor,
+                    email=email,
+                    language=request_language,
+                ) == (False,)
+
+                cursor.execute(
+                    """
+                    select role, language, disabled_at is not null
+                    from public.private_alpha_allowlist
+                    where email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == expected_allowlist_row
+                cursor.execute(
+                    """
+                    select count(*)
+                    from public.private_alpha_access_welcome_deliveries
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == (0,)
+    finally:
+        _cleanup_access_rows(email)
+
+
+@pytest.mark.parametrize(
+    (
+        "stored_language",
+        "stored_content_version",
+        "stored_subject",
+        "request_language",
+        "request_content_version",
+        "request_subject",
+    ),
+    [
+        pytest.param(
+            "es-419",
+            WELCOME_CONTENT_VERSION,
+            WELCOME_SUBJECT,
+            "en",
+            WELCOME_CONTENT_VERSION,
+            WELCOME_SUBJECT,
+            id="language",
+        ),
+        pytest.param(
+            "en",
+            WELCOME_CONTENT_VERSION,
+            WELCOME_SUBJECT,
+            "en",
+            "private-alpha-access-welcome/v2",
+            WELCOME_SUBJECT,
+            id="content-version",
+        ),
+        pytest.param(
+            "en",
+            WELCOME_CONTENT_VERSION,
+            "Existing welcome subject",
+            "en",
+            WELCOME_CONTENT_VERSION,
+            WELCOME_SUBJECT,
+            id="subject",
+        ),
+    ],
+)
+def test_completion_rejects_conflicting_delivery_without_promotion(
+    stored_language: str,
+    stored_content_version: str,
+    stored_subject: str,
+    request_language: str,
+    request_content_version: str,
+    request_subject: str,
+) -> None:
+    email = _random_email()
+    try:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                _insert_allowlist_row(cursor, email=email, role="requested")
+                cursor.execute(
+                    """
+                    insert into public.private_alpha_access_welcome_deliveries (
+                      recipient_email,
+                      language,
+                      content_version,
+                      subject,
+                      provider_receipt
+                    )
+                    values (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        email,
+                        stored_language,
+                        stored_content_version,
+                        stored_subject,
+                        WELCOME_RECEIPT,
+                    ),
+                )
+
+                assert _complete_welcome(
+                    cursor,
+                    email=email,
+                    language=request_language,
+                    content_version=request_content_version,
+                    subject=request_subject,
+                ) == (False,)
+
+                cursor.execute(
+                    """
+                    select role, language, disabled_at
+                    from public.private_alpha_allowlist
+                    where email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == ("requested", "en", None)
+                cursor.execute(
+                    """
+                    select language, content_version, subject, provider_receipt
+                    from public.private_alpha_access_welcome_deliveries
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchall() == [
+                    (
+                        stored_language,
+                        stored_content_version,
+                        stored_subject,
+                        "resend-email-id-461",
+                    )
+                ]
+    finally:
+        _cleanup_access_rows(email)
+
+
+def test_completion_constraint_failure_rolls_back_new_delivery_and_promotion() -> None:
+    email = _random_email()
+    try:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                _insert_allowlist_row(cursor, email=email, role="requested")
+
+                with pytest.raises(psycopg.errors.CheckViolation):
+                    _complete_welcome(
+                        cursor,
+                        email=email,
+                        subject="",
+                    )
+
+                cursor.execute(
+                    """
+                    select role, language, disabled_at
+                    from public.private_alpha_allowlist
+                    where email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == ("requested", "en", None)
+                cursor.execute(
+                    """
+                    select count(*)
+                    from public.private_alpha_access_welcome_deliveries
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == (0,)
     finally:
         _cleanup_access_rows(email)
 

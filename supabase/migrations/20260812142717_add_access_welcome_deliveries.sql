@@ -55,7 +55,25 @@ begin
     return false;
   end if;
 
-  if v_role = 'requested' then
+  select language, content_version, subject
+    into v_delivery_language, v_delivery_content_version, v_delivery_subject
+  from public.private_alpha_access_welcome_deliveries
+  where recipient_email = v_email;
+
+  if found
+    and (
+      v_delivery_language is distinct from p_language
+      or v_delivery_content_version is distinct from p_content_version
+      or v_delivery_subject is distinct from p_subject
+    ) then
+    return false;
+  end if;
+
+  if not found and v_role = 'user' then
+    return false;
+  end if;
+
+  if not found then
     insert into public.private_alpha_access_welcome_deliveries (
       recipient_email,
       language,
@@ -71,12 +89,12 @@ begin
       p_provider_receipt
     )
     on conflict (recipient_email) do nothing;
-  end if;
 
-  select language, content_version, subject
-    into v_delivery_language, v_delivery_content_version, v_delivery_subject
-  from public.private_alpha_access_welcome_deliveries
-  where recipient_email = v_email;
+    select language, content_version, subject
+      into v_delivery_language, v_delivery_content_version, v_delivery_subject
+    from public.private_alpha_access_welcome_deliveries
+    where recipient_email = v_email;
+  end if;
 
   if not found
     or v_delivery_language is distinct from p_language

@@ -34,3 +34,21 @@ def test_access_welcome_delivery_migration_guards_direct_activation() -> None:
     assert "require_private_alpha_access_welcome_delivery" in sql
     assert "new.role = 'user'" in sql
     assert "new.disabled_at is null" in sql
+
+
+def test_completion_preflights_existing_delivery_before_insert() -> None:
+    sql = _normalized_sql()
+    function_start = sql.index(
+        "create or replace function public.complete_private_alpha_access_welcome"
+    )
+    function_end = sql.index("revoke all on function", function_start)
+    function_sql = sql[function_start:function_end]
+    delivery_lookup = (
+        "select language, content_version, subject into v_delivery_language, "
+        "v_delivery_content_version, v_delivery_subject from "
+        "public.private_alpha_access_welcome_deliveries"
+    )
+
+    assert function_sql.index(delivery_lookup) < function_sql.index(
+        "insert into public.private_alpha_access_welcome_deliveries"
+    )
