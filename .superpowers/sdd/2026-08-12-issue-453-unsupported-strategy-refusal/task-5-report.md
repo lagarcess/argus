@@ -15,16 +15,16 @@
   deterministic fallback copy.
 - Documented separate routes for unsupported strategy capability, incomplete or
   unparseable extraction, and starting-capital bounds.
-- Documented finite typed starting-capital bounds and fail-closed handling for
-  malformed, reversed, missing, or non-finite pairs.
+- Documented finite typed starting-capital bounds: a finite minimum alone is a
+  valid floor, while a present maximum requires a finite ordered pair.
 - Preserved the typed bar-size exception for
   `unsupported_time_granularity` without reopening generic raw-value display.
 - Kept the API change additive and clarifying. No JSON shape was removed or
   changed.
 
-## Commands and results
+## Prior intermediate commands and results
 
-Verification head: `55a11cdc992eb622d98c862f171c5dc7c6d85b4b`.
+Prior command execution head: `55a11cdc992eb622d98c862f171c5dc7c6d85b4b`.
 
 ```bash
 ARGUS_RUN_LIVE_EVALS=0 ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false \
@@ -64,10 +64,34 @@ was extracted from the working tree and the exact base
 - Kept `baseline.md` intact so Task 1's original RED evidence remains durable.
 - Did not create an environment file, run a live eval, or expose credentials.
 
-## Concerns
+## Historical concern
 
-The current focused suite is not fully green because 12 shared tests still
+The prior focused-suite run was not fully green because 12 shared tests still
 expect the model-authored refusal prose that issue #453 deliberately suppresses.
-Their runtime-test owner should update the obsolete expectation before release
-readiness. The release controller must refresh the focused-suite evidence after
-that reconciliation. Task 5 makes no code or test changes.
+Task 3 later reconciled the obsolete expectations. This concern is retained as
+historical intermediate evidence. Task 5 makes no code or test changes.
+
+## Fix round 1
+
+Provenance roles are explicit in `docs/reports/evidence/453/verification.md`:
+the historical RED base is `8025672924d1c74eb80cc926c72b5d8574b613d7`, the
+Task 5 diff and prior execution base is
+`55a11cdc992eb622d98c862f171c5dc7c6d85b4b`, the first Task 5 evidence commit
+is `82e6e59350b07290d9e8ef7cdc070781e4c81cf9`, and the refreshed execution
+head is `53e35890ae3173a9a5eedb13d7afd6e14ef10f1c`.
+
+The refreshed focused backend command passed `217` tests in `6.18s`. The exact
+free mocked eval command passed `72` tests in `18.83s`. Both runs used
+process-local `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` with
+live evals and workflow execution disabled.
+
+The starting-capital contract now states the actual projection rule: a finite
+minimum can provide floor copy by itself; a present maximum is accepted only as
+a finite ordered pair. Missing minimum, malformed, non-finite, or reversed
+values fail closed.
+
+The `### Research Responses` section and all following bytes still hash to
+`d5d1193f1af725bd8aad1b9ab352942affc8ddff1768f5c03c3c18f59ff39d80` against
+the historical RED base. The refreshed deterministic checks remain
+non-terminal: branch reconciliation, browser proof, and release gates are
+separate evidence surfaces.

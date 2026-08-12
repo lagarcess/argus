@@ -2948,10 +2948,11 @@ copy. A generic capability recovery instead speaks about the typed capability
 and its supported options.
 
 For `unsupported_starting_capital`, `payload.minimum` is a typed finite number
-and `payload.maximum` is an optional typed finite number. The projection emits
-these fields only when both bounds are present, finite, and ordered with
-`minimum <= maximum`; missing, malformed, non-finite, or reversed pairs fail
-closed by omitting both values and using the generic starting-capital prompt.
+and `payload.maximum` is an optional typed finite number. A finite minimum
+alone is a valid floor projection. When a maximum is present, the projection
+emits both bounds only if both are finite and ordered with `minimum <= maximum`;
+missing minimum, malformed, non-finite, or reversed pairs fail closed by
+omitting the numeric bounds and using the generic starting-capital prompt.
 
 `unsupported_time_granularity` is the dedicated typed exception. Its typed bar
 size may be supplied to the clarifier and displayed in the bar-size recovery,
