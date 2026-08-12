@@ -2,14 +2,14 @@
   "evidence_class": "controlled",
   "live_api_or_llm_called": false,
   "phase": "after",
-  "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+  "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
   "generated_at": "2026-08-12",
   "receipts": [
     {
       "scenario": "raw-summary",
       "locale": "en",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "Use $500 for a Netflix idea.",
       "visible_assistant_text": "Argus can't run that rule directly yet for NFLX. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
       "forbidden_string_assertions": [
@@ -48,7 +48,7 @@
       "scenario": "supported-dca",
       "locale": "en",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "What if I had bought Coca-Cola every month for five years?",
       "visible_assistant_text": "How much would you like to invest in Coca-Cola each month?",
       "forbidden_string_assertions": [
@@ -91,7 +91,7 @@
       "scenario": "capital-bounds",
       "locale": "en",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "Buy and hold NFLX with $500 starting capital in 2024.",
       "visible_assistant_text": "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?",
       "forbidden_string_assertions": [
@@ -134,7 +134,7 @@
       "scenario": "premature-acknowledgment",
       "locale": "en",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "$500",
       "visible_assistant_text": "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?",
       "forbidden_string_assertions": [
@@ -177,7 +177,7 @@
       "scenario": "raw-summary",
       "locale": "es-419",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "Usa $500 para una idea de Netflix.",
       "visible_assistant_text": "Argus todavía no puede ejecutar esa regla directamente para NFLX. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
       "forbidden_string_assertions": [
@@ -216,7 +216,7 @@
       "scenario": "supported-dca",
       "locale": "es-419",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?",
       "visible_assistant_text": "¿Cuánto quieres invertir en Coca-Cola cada mes?",
       "forbidden_string_assertions": [
@@ -259,7 +259,7 @@
       "scenario": "capital-bounds",
       "locale": "es-419",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "Compra y mantén NFLX con $500 de capital inicial durante 2024.",
       "visible_assistant_text": "El capital inicial debe estar entre $1,000 y $100,000,000. ¿Qué monto dentro de ese rango quieres usar?",
       "forbidden_string_assertions": [
@@ -302,7 +302,7 @@
       "scenario": "premature-acknowledgment",
       "locale": "es-419",
       "phase": "after",
-      "sha": "5db64459c24b3afc07c702ff6323f25ceaaf5049",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
       "request_text": "$500",
       "visible_assistant_text": "El capital inicial debe estar entre $1,000 y $100,000,000. ¿Qué monto dentro de ese rango quieres usar?",
       "forbidden_string_assertions": [

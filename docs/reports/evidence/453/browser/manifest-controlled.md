@@ -5,7 +5,9 @@ Date: 2026-08-12
 Evidence class: **controlled**
 
 - Historical base: `8025672924d1c74eb80cc926c72b5d8574b613d7`
-- Implementation candidate: `5db64459c24b3afc07c702ff6323f25ceaaf5049`
+- Reviewed product source: `d87d5d6524e0af89d99dab26cc3e4b6f56c24742`
+- Evidence storage commit: recorded in the follow-up metadata commit after the
+  refreshed artifacts are committed
 - Browser path: the real Next.js guest `/chat` shell at each SHA
 - Browser: repository-pinned Playwright Chromium
 - Viewport: `1440x1000`, desktop, light color scheme
@@ -38,8 +40,9 @@ five-year rolling window in its sidecar.
 ## Commands
 
 The exact base ran from an isolated detached worktree. Its temporary
-`node_modules` symlink points to the repository installation and is not part of
-the evidence commit.
+`node_modules` symlink pointed to the repository installation and was not part
+of the evidence commit. That temporary worktree was removed after the baseline
+capture.
 
 ```bash
 git worktree add --detach /private/tmp/argus-453-browser-proof/base \
@@ -65,7 +68,7 @@ Result: `8 passed`.
 
 ```bash
 EVIDENCE_PHASE=after \
-EVIDENCE_SHA=5db64459c24b3afc07c702ff6323f25ceaaf5049 \
+EVIDENCE_SHA=d87d5d6524e0af89d99dab26cc3e4b6f56c24742 \
 EVIDENCE_OUTPUT_ROOT=/Users/garces/.codex/worktrees/3842/private-alpha-next/docs/reports/evidence/453/browser \
 EVIDENCE_APP_WEB_DIR=/Users/garces/.codex/worktrees/3842/private-alpha-next/web \
 EVIDENCE_PORT=3454 \
@@ -73,10 +76,13 @@ web/node_modules/.bin/playwright test \
   --config=web/temp/issue-453-browser-proof/playwright.config.ts
 ```
 
-Result: `8 passed`.
+Final-head refresh result: `8 passed`.
 
-The final candidate command was rerun after matching the injected hidden
-acknowledgment metadata to each locale. Result: `8 passed`.
+The eight PNG files were recaptured at the reviewed product source. Their bytes
+match the prior deterministic captures, so Git records no PNG content delta.
+The refreshed candidate receipt records the new product-source SHA. All eight
+guest, visible-copy, forbidden-copy, console-error, and page-error assertions
+ran again and passed.
 
 ## Assertion summary
 
@@ -100,6 +106,9 @@ Before every screenshot, the harness asserted all of the following:
 All 16 PNG files are non-empty and report `1440x1000` dimensions. The runner
 printed Node deprecation and color-mode warnings only. Those are local tooling
 warnings and did not enter the browser console or page.
+
+The ignored helper directory `web/temp/issue-453-browser-proof/` was deleted
+after this refresh. No helper or local result artifact remains.
 
 ## Artifact inventory
 

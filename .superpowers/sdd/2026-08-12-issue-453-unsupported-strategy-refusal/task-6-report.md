@@ -8,7 +8,9 @@ two rendered-text receipt files with 8 records each, and one controlled-evidence
 manifest.
 
 - Exact historical base: `8025672924d1c74eb80cc926c72b5d8574b613d7`
-- Exact implementation candidate: `5db64459c24b3afc07c702ff6323f25ceaaf5049`
+- Reviewed product source: `d87d5d6524e0af89d99dab26cc3e4b6f56c24742`
+- Evidence storage commit: recorded in the follow-up metadata commit after the
+  refreshed artifacts are committed
 - Exact route: `/chat`
 - Account contract: `account_kind: "guest"`
 - Evidence class: controlled, not live
@@ -78,7 +80,7 @@ Candidate capture:
 
 ```bash
 EVIDENCE_PHASE=after \
-EVIDENCE_SHA=5db64459c24b3afc07c702ff6323f25ceaaf5049 \
+EVIDENCE_SHA=d87d5d6524e0af89d99dab26cc3e4b6f56c24742 \
 EVIDENCE_OUTPUT_ROOT=/Users/garces/.codex/worktrees/3842/private-alpha-next/docs/reports/evidence/453/browser \
 EVIDENCE_APP_WEB_DIR=/Users/garces/.codex/worktrees/3842/private-alpha-next/web \
 EVIDENCE_PORT=3454 \
@@ -86,9 +88,13 @@ web/node_modules/.bin/playwright test \
   --config=web/temp/issue-453-browser-proof/playwright.config.ts
 ```
 
-Final candidate result: `8 passed`. The final command was rerun after the
-hidden acknowledgment metadata was matched to each locale. It remained
-`8 passed`.
+Final-head refresh result: `8 passed`.
+
+All eight candidate PNGs were recaptured at the reviewed product source. Their
+bytes match the prior deterministic captures, so Git records no PNG content
+delta. The refreshed receipt carries the new product-source SHA, and all guest,
+visible-copy, forbidden-copy, console-error, and page-error assertions ran
+again.
 
 Artifact verification:
 
@@ -161,11 +167,11 @@ in `docs/reports/evidence/453/baseline.md`.
 
 ## Temporary helpers
 
-The reusable harness remains ignored and untracked under
-`web/temp/issue-453-browser-proof/`. It includes its Playwright config, spec,
-and local result diagnostics. It is not staged or committed. No environment
-file was created or edited. The exact-base temporary worktree directory was
-removed after capture and its Git worktree metadata was pruned.
+The exact ignored helper directory
+`web/temp/issue-453-browser-proof/` was deleted after the final-head refresh.
+Its Playwright config, spec, and local result diagnostics no longer exist. No
+environment file was created or edited. The exact-base temporary worktree
+directory had already been removed and its Git worktree metadata was pruned.
 
 ## Self-review
 
@@ -180,6 +186,9 @@ removed after capture and its Git worktree metadata was pruned.
   every screenshot.
 - Candidate forbidden strings are checked against the complete rendered page.
 - The final scope audit contains only the two assigned tracked paths.
+- The final post-commit audit compares the evidence commit with
+  `d87d5d6524e0af89d99dab26cc3e4b6f56c24742` while excluding the assigned
+  evidence and report paths. It must return no product-source path.
 
 ## Concerns
 
