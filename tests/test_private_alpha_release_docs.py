@@ -42,6 +42,46 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "approver" in runbook
 
 
+def test_production_migration_gate_is_executable_and_precedes_service_deploy() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    release_contract = _source("docs/specs/private-alpha-ci-cd-sota.md")
+    manifest = _source("docs/release-manifests/TEMPLATE.md")
+    command = "scripts/ops/production_migration_gate.py"
+
+    promotion_path = release_contract.split("### Promotion Path", 1)[1].split(
+        "## Implementation Phases",
+        1,
+    )[0]
+    tester_gate = runbook.split("## Before Tester Sessions", 1)[1].split(
+        "## Backtest Workflow Modes",
+        1,
+    )[0]
+
+    for source in (promotion_path, tester_gate):
+        normalized = " ".join(source.split())
+        assert command in source
+        assert "ARGUS_PRODUCTION_DATABASE_URL" in source
+        assert "status=pass" in source
+        assert "never applies migrations" in normalized
+        assert "human" in normalized.lower()
+
+    promotion_gate_index = promotion_path.index(command)
+    assert promotion_gate_index < promotion_path.index("Merge the approved slice")
+    assert promotion_gate_index < promotion_path.index(
+        "Update the release/config contract"
+    )
+    assert promotion_gate_index < promotion_path.index("Promote the live environment")
+    runbook_gate_index = tester_gate.index(command)
+    assert runbook_gate_index < tester_gate.index("sync the Blueprint")
+    assert runbook_gate_index < tester_gate.index("api-real-workflow-on")
+    assert runbook_gate_index < tester_gate.index("Deploy **all three live services**")
+    assert "Production Migration Gate" in manifest
+    assert "Candidate migrations" in manifest
+    assert "Applied production migrations" in manifest
+    assert "Missing migrations" in manifest
+    assert "Safety classifications" in manifest
+
+
 def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     evidence = _source("docs/release-evidence/public-alpha-readiness.md")
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")

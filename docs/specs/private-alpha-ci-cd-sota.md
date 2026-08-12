@@ -15,10 +15,10 @@ For current product sequencing, use
 relevant details and addenda in
 `docs/specs/private-alpha-next-decision-memo.md`.
 
-Implementation note: the release gate now centers on local smoke, Render
-release-config audit, live API/web deploy SHA checks, workflow version and env
-parity proof, an authoritative Spanish release canary, and a per-candidate
-release manifest.
+Implementation note: the release gate now centers on local smoke, exact-candidate
+production migration parity before deploy, Render release-config audit, live
+API/web deploy SHA checks, workflow version and env parity proof, an
+authoritative Spanish release canary, and a per-candidate release manifest.
 The Spanish journey proves the real workflow, finalized evidence/result metadata,
 decision-note hydration, Omnisearch provenance, and deployed signup/login UI.
 Keep this document as the release gate contract whenever a candidate is
@@ -192,12 +192,13 @@ permissions.
 
 ### Contract Layers
 
-Release readiness should be checked at four layers together:
+Release readiness should be checked at five layers together:
 
 1. Commit layer: what SHA is deployed?
-2. Runtime layer: what mode is the service actually running in?
-3. Locale/feature layer: what user-visible surfaces are enabled?
-4. Behavior layer: do canaries and reloads preserve the right artifact lifecycle?
+2. Schema layer: does production's migration ledger match that exact candidate?
+3. Runtime layer: what mode is the service actually running in?
+4. Locale/feature layer: what user-visible surfaces are enabled?
+5. Behavior layer: do canaries and reloads preserve the right artifact lifecycle?
 
 ### Ownership Rules
 
@@ -219,14 +220,37 @@ Use the following progression when moving from integration to `main`:
 
 1. Develop on a focused `codex/private-alpha-next` slice.
 2. Validate on the staging/private-alpha surface with the proof workflow task.
-3. Record the release manifest, including the workflow task selection and env
-   fingerprint.
-4. Merge the approved slice to `main`.
-5. Update the release/config contract for the target environment.
-6. Promote the live environment so `argus-backtests` runs the intended task
+3. Select and record the target environment and intended config contract
+   without syncing or changing the live environment.
+4. Run the read-only production migration gate against the exact candidate
+   before any service deploy. Supply the production Postgres URL explicitly
+   from the operator secret store; the gate does not discover dotenv files.
+
+   ```bash
+   export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
+   ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
+   poetry run python scripts/ops/production_migration_gate.py \
+     --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+     --output temp/release-evidence/production-migration-gate.json
+   ```
+
+   Inspect the report's full candidate, applied, missing, unexpected, and
+   name-drift lists. `status=pass` is required. Any missing migration or other
+   mismatch is a stop, including an additive migration. The gate never applies
+   migrations. A human reviews pending SQL and its additive,
+   contract-replacing, or destructive classification against the live objects;
+   ambiguous automated classifications fail toward `contract-replacing`. The
+   human applies only the approved files out of band and in repository order,
+   reads back the ledger and affected objects, then reruns this same gate.
+   Attach the final report to the release manifest as durable evidence.
+5. Record the release manifest, including the migration-gate report, workflow
+   task selection, and env fingerprint.
+6. Merge the approved slice to `main` only after the migration gate passes.
+7. Update the release/config contract for the target environment.
+8. Promote the live environment so `argus-backtests` runs the intended task
    (`workflow_proof` for proof validation or `run_backtest_job` for real
    execution).
-7. Re-run warmup and canaries against the exact deployed SHA and env
+9. Re-run warmup and canaries against the exact deployed SHA and env
    fingerprint.
 
 When the backtest service moves between proof and real workflow modes, the
@@ -578,6 +602,8 @@ The system is ready only when all of the following are true:
 - The live deploy’s effective runtime env matches the documented contract.
 - The candidate passes a local ephemeral smoke stack before any internet-
   reachable canary or deploy.
+- The read-only production migration gate reports exact parity before any
+  config sync, merge, or service action that can deploy the candidate.
 - The canary asserts both commit and runtime mode.
 - `main` is the promotion target, not a surprise prerequisite.
 - Public tester exposure only happens after the release gate passes.

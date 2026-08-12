@@ -56,15 +56,59 @@ Local preflight doctrine:
 1. Confirm the local checkout is the candidate commit you intend to promote:
 
 ```bash
-git status --short
+git status --short --untracked-files=no
 git rev-parse HEAD
 ```
+
+The status command must show no tracked changes, and the SHA must be the exact
+candidate. The migration gate enforces both before it opens a database
+connection.
 
 2. Run the local predeploy smoke gate before any internet-facing canary:
 
 ```bash
 .github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
 ```
+
+3. After selecting production as the target and recording the intended config
+   and deploy mode without changing it, run the production migration gate
+   before any operation that can deploy a service, including a Blueprint sync
+   or a change to autodeploy configuration. Export the production direct or
+   session-pooler URL from the operator secret store under the gate-only name
+   below. Do not put it on the command line or rely on a dotenv file.
+
+```bash
+export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
+ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
+poetry run python scripts/ops/production_migration_gate.py \
+  --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+  --output temp/release-evidence/production-migration-gate.json
+```
+
+The gate reads every migration from the exact candidate Git tree, verifies the
+production Supabase project, opens a read-only database session, and compares
+the full candidate list with `supabase_migrations.schema_migrations`. Read the
+candidate, applied, missing, unexpected, and name-drift lists in the JSON.
+`status=pass` is required before continuing. A missing migration is a stop even
+when its safety classification is additive. An unreadable ledger, unexpected
+production migration, duplicate version, or name mismatch is also a stop.
+
+The gate never applies migrations. If it reports a gap, stop the promotion. A
+human reviews the exact pinned SQL and classification. The automated
+classification is conservative: ambiguous top-level SQL becomes
+`contract-replacing`, and the report does not replace inspection of the live
+objects the migration will touch. Use these requirements:
+
+- `additive` may be considered for live application after rollback review;
+- `contract-replacing` needs an expand/contract compatibility plan or a
+  maintenance window;
+- `destructive` needs a maintenance window, backup/readback plan, and explicit
+  founder approval.
+
+Apply only approved files out of band, in repository order. Record the file
+hash, ledger before and after, and affected-object readback in the release
+manifest. Then rerun the same gate. Do not deploy until the rerun reports
+`status=pass`, and attach its JSON as durable release evidence.
 
 > [!WARNING]
 > **A Blueprint sync enables autodeploy after #470.** The repository declares
@@ -76,11 +120,11 @@ git rev-parse HEAD
 > API sync reads the same target from the release profile and turns it on for
 > `argus-backtests`. The normal three-service configuration sync can therefore
 > enable autodeploy for all three as a side effect of syncing configuration,
-> not as the result of a fresh deployment decision. Before step 3, obtain an
+> not as the result of a fresh deployment decision. Before step 4, obtain an
 > explicit founder decision to enable autodeploy. Without that decision, keep
 > all three live triggers manual and deploy all three services explicitly.
 
-3. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
+4. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
    `argus-app` config drift needs reconciliation. Render Blueprints cannot
    declare the `argus-backtests` Workflow service. Its release contract is held
    in four separate places that must agree:
@@ -89,20 +133,20 @@ git rev-parse HEAD
    - `.github/render-env-sync.sh workflow-runtime` applies that target through
      the Render Workflow API;
    - `release-config-audit` reads the live Workflow configuration back;
-   - steps 8 and 9 deploy `argus-backtests` and prove its ready version matches
+   - steps 9 and 10 deploy `argus-backtests` and prove its ready version matches
      the same candidate as the API and app.
 
    If any one of these four controls drifts, `argus-backtests` can stay stale
    even while the API and app advance, which is the failure caught on
    2026-08-11.
-4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
+5. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-5. Confirm the live deploy mode matches the deliberate founder decision and is
+6. Confirm the live deploy mode matches the deliberate founder decision and is
    uniform across `argus-api`, `argus-app`, and the Git-linked
    `argus-backtests` Workflow: either all three are manual (`off`) or all three
    use `checksPass`. Never enable autodeploy for only a subset of the three.
    The repository target is not proof that live enablement was approved.
-6. Export local ops and canary secrets, or keep these in the root `.env` file
+7. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
 ```bash
@@ -118,7 +162,7 @@ For local founder/operator runs, `.github/canary-render.sh` also accepts
 `SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
 remain the preferred GitHub Actions secret names.
 
-7. Confirm the API is in real-workflow private-alpha validation mode. This mode
+8. Confirm the API is in real-workflow private-alpha validation mode. This mode
    keeps the API lean and sends `Run backtest` through the durable Render
    Workflow job path:
 
@@ -128,7 +172,7 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Deploy **all three live services** from the candidate commit:
+9. Deploy **all three live services** from the candidate commit:
    `argus-api`, then `argus-app`, then **`argus-backtests`**.
 
    When all three live triggers use `checksPass`, a commit on the configured
@@ -144,7 +188,7 @@ Restart `argus-api` after changing Render env values.
    every time, and never let a promotion finish with the three on different
    commits.
 
-9. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
+10. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
    commits match the candidate commit you intend to test and that their latest
    versions are ready:
 
@@ -167,7 +211,7 @@ canary resolvers require that prefix to match the exact API/web commit. They do
 not trust mutable workflow env markers, so checks-passing and manual releases
 use the same version-owned proof.
 
-10. Run the product warmup script and verify the API stayed in real workflow
+11. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
    stale queued/running job scan:
 
@@ -182,7 +226,7 @@ Local and dev-agent work runs backtests in-process on local compute; the mode
 scripts pin dispatch off (dev hard-off, QA default-off with explicit
 pre-export opt-in).
 
-11. Run the authoritative Spanish release journey with privacy-safe evidence.
+12. Run the authoritative Spanish release journey with privacy-safe evidence.
 This is the only release canary: it checks the exact deployed SHA, the real
 Render workflow, finalized evidence identity, explicit decision capture, reload
 hydration, Omnisearch provenance, and the deployed Spanish signup/login browser

@@ -17,19 +17,21 @@ service deploy. A runbook reminder alone is not sufficient.
 
 ## Locked behavior
 
-1. The operator supplies an exact 40-character candidate commit SHA.
+1. The operator supplies an exact 40-character candidate commit SHA. Checkout
+   `HEAD` and the tracked working tree must match that candidate.
 2. The gate reads `supabase/migrations` from that Git commit, not from the
    mutable working tree.
 3. The database connection is supplied explicitly through
    `ARGUS_PRODUCTION_DATABASE_URL`. Dotenv discovery is forbidden.
-4. A small checked-in gate contract owns the production Supabase project ref.
-   The gate verifies that ref against the connection host or pooler username
-   before connecting. It never prints credentials.
+4. The exact candidate's existing `render.yaml` `argus-api` `SUPABASE_URL` owns
+   the production Supabase project ref. The gate derives that ref and verifies
+   it against the connection host or pooler username before connecting. It
+   never prints credentials or creates a second target config.
 5. The database session is read-only. The only product query reads
    `supabase_migrations.schema_migrations` in version order.
 6. The JSON report records the exact candidate SHA, sanitized database target,
-   every candidate migration, every applied migration, missing migrations,
-   unexpected applied migrations, and name drift.
+   every candidate migration, every applied migration, the latest applied
+   version, missing migrations, unexpected applied migrations, and name drift.
 7. Each missing migration receives a conservative safety classification:
    `additive`, `contract-replacing`, or `destructive`, plus the corresponding
    live-database requirement. Unknown SQL is never called additive.
@@ -80,7 +82,6 @@ in both `docs/specs/private-alpha-ci-cd-sota.md` and
 
 - `scripts/ops/production_migration_gate.py`
 - `scripts/ops/tests/test_production_migration_gate.py`
-- `.github/production-migration-gate.json`
 - `tests/test_private_alpha_release_docs.py`
 - `docs/specs/private-alpha-ci-cd-sota.md`
 - `docs/PRIVATE_LAUNCH_RUNBOOK.md`

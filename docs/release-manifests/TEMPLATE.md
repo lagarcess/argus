@@ -1,12 +1,13 @@
 # Private Alpha Release Manifest Template
 
-Use one manifest per validated candidate checkpoint or promoted candidate. Fill
-this after the release gate passes and before sending tester links. A validated
-private-alpha checkpoint records technical evidence only; it does not itself
-authorize a `main` merge, production deployment, automatic production
-deployment, tester invitation, or tester exposure. Do not include raw
-conversation, user, run, or job ids; use the privacy-safe labels from canary
-evidence.
+Use one manifest per validated candidate checkpoint or promoted candidate.
+Start it before promotion, record the production migration gate before any
+deploy-capable action, and finish it after the release gate passes and before
+sending tester links. A validated private-alpha checkpoint records technical
+evidence only; it does not itself authorize a `main` merge, production
+deployment, automatic production deployment, tester invitation, or tester
+exposure. Do not include raw conversation, user, run, or job ids; use the
+privacy-safe labels from canary evidence.
 
 ## Candidate
 
@@ -19,6 +20,30 @@ evidence.
 - Approver:
 - Rollback target:
 - Decision record:
+
+## Production Migration Gate
+
+- Gate command: `scripts/ops/production_migration_gate.py`
+- Gate report durable attachment or committed path:
+- Gate checked at:
+- Gate candidate SHA:
+- Sanitized production project and database host:
+- Candidate migrations, with version, name, and SHA-256:
+- Applied production migrations, with version and name:
+- Latest applied production migration:
+- Missing migrations:
+- Unexpected applied migrations:
+- Migration name drift:
+- Safety classifications and live requirements for every missing migration:
+- Classification basis and human live-schema review:
+- Gate result: `status=pass` required before service deploy
+- Gate human-approval state:
+- Gate apply result: `not_performed_by_gate`
+- Gate ledger readback:
+- Human apply performed: no / yes, by:
+- If applied, repository order and ledger before/after:
+- If applied, affected-object readback:
+- Confirm the gate never applies migrations:
 
 ## Deploy Proof
 
