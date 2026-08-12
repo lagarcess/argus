@@ -96,6 +96,10 @@ def _session_calendar(
     return fetch
 
 
+def _no_equity_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
+    raise AssertionError("continuous markets must not request an equity calendar")
+
+
 def test_exact_equity_session_boundaries_have_no_adjustment_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -268,9 +272,6 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
         (requested_start + timedelta(days=offset)).isoformat() for offset in range(4)
     )
 
-    def no_equity_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
-        raise AssertionError("continuous markets must not request an equity calendar")
-
     exact = prepare_market_data(
         {
             **_config("ETH"),
@@ -282,7 +283,7 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
         fetch_ohlcv_func=_fetcher(
             {"ETH": _bars(*complete_days), "BTC": _bars(*complete_days)}
         ),
-        fetch_market_calendar_func=no_equity_calendar,
+        fetch_market_calendar_func=_no_equity_calendar,
     )
     latest_complete_alignment = prepare_market_data(
         {
@@ -299,7 +300,7 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
         fetch_ohlcv_func=_fetcher(
             {"ETH": _bars(*complete_days), "BTC": _bars(*complete_days)}
         ),
-        fetch_market_calendar_func=no_equity_calendar,
+        fetch_market_calendar_func=_no_equity_calendar,
     )
     provider_truncated = prepare_market_data(
         {
@@ -315,7 +316,7 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
                 "BTC": _bars(*complete_days),
             }
         ),
-        fetch_market_calendar_func=no_equity_calendar,
+        fetch_market_calendar_func=_no_equity_calendar,
     )
 
     assert exact.adjustment_reason == "none"
@@ -927,9 +928,28 @@ def _august_config(**overrides: object) -> dict[str, object]:
         **_config("KO"),
         "start_date": "2026-08-05",
         "end_date": "2026-08-12",
-        "requested_date_range": {"start": "2026-08-05", "end": "2026-08-12"},
     }
     config.update(overrides)
+    config.setdefault(
+        "requested_date_range",
+        {"start": str(config["start_date"]), "end": str(config["end_date"])},
+    )
+    return config
+
+
+def _crypto_config(**overrides: object) -> dict[str, object]:
+    config = {
+        **_config("ETH"),
+        "asset_class": "crypto",
+        "benchmark_symbol": "BTC",
+        "start_date": "2026-08-05",
+        "end_date": "2026-08-10",
+    }
+    config.update(overrides)
+    config.setdefault(
+        "requested_date_range",
+        {"start": str(config["start_date"]), "end": str(config["end_date"])},
+    )
     return config
 
 
@@ -978,13 +998,15 @@ def test_equity_window_ending_today_mid_session_clamps_to_last_completed_session
 @pytest.mark.parametrize(
     ("now_utc", "expected_end"),
     [
-        # 17:34 ET: the close has passed but after-hours can still move the bar.
+        # 17:34 ET: after the close, corrections can still change the bar.
         ("2026-08-12T21:34:00+00:00", "2026-08-11"),
-        # 20:01 ET: after-hours are over, the session's bar is final.
-        ("2026-08-13T00:01:00+00:00", "2026-08-12"),
+        # 20:01 ET: after-hours over, but the session's Eastern date remains.
+        ("2026-08-13T00:01:00+00:00", "2026-08-11"),
+        # 00:01 ET the next day: the session's date has passed, its bar is final.
+        ("2026-08-13T04:01:00+00:00", "2026-08-12"),
     ],
 )
-def test_equity_completion_boundary_is_after_hours_close(
+def test_equity_completion_boundary_is_eastern_midnight(
     monkeypatch: pytest.MonkeyPatch,
     now_utc: str,
     expected_end: str,
@@ -1002,45 +1024,46 @@ def test_equity_completion_boundary_is_after_hours_close(
     assert prepared.effective_date_range.model_dump()["end"] == expected_end
 
 
-def test_equity_window_ending_on_weekend_clamps_to_friday(
+@pytest.mark.parametrize(
+    ("session_days", "window_start", "window_end", "now_utc", "expected_end"),
+    [
+        # Weekend: Saturday resolves to Friday's session.
+        (
+            (*_AUGUST_SESSION_DAYS, "2026-08-12", "2026-08-13", "2026-08-14"),
+            "2026-08-05",
+            "2026-08-15",
+            "2026-08-15T18:00:00+00:00",
+            "2026-08-14",
+        ),
+        # Labor Day: the holiday Monday resolves past the weekend to Friday.
+        (
+            ("2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04"),
+            "2026-08-31",
+            "2026-09-07",
+            "2026-09-07T15:00:00+00:00",
+            "2026-09-04",
+        ),
+    ],
+)
+def test_equity_window_ending_on_closed_days_resolves_to_prior_session(
     monkeypatch: pytest.MonkeyPatch,
+    session_days: tuple[str, ...],
+    window_start: str,
+    window_end: str,
+    now_utc: str,
+    expected_end: str,
 ) -> None:
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
-    session_days = (*_AUGUST_SESSION_DAYS, "2026-08-12", "2026-08-13", "2026-08-14")
     bars = _bars(*session_days)
 
     prepared = prepare_market_data(
-        _august_config(
-            end_date="2026-08-15",
-            requested_date_range={"start": "2026-08-05", "end": "2026-08-15"},
-        ),
+        _august_config(start_date=window_start, end_date=window_end),
         fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
         fetch_market_calendar_func=_realistic_calendar(),
-        now=datetime.fromisoformat("2026-08-15T18:00:00+00:00"),
+        now=datetime.fromisoformat(now_utc),
     )
 
-    assert prepared.effective_date_range.model_dump()["end"] == "2026-08-14"
-
-
-def test_equity_window_ending_on_a_market_holiday_clamps_past_it(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
-    session_days = ("2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04")
-    bars = _bars(*session_days)
-
-    prepared = prepare_market_data(
-        _august_config(
-            start_date="2026-08-31",
-            end_date="2026-09-07",
-            requested_date_range={"start": "2026-08-31", "end": "2026-09-07"},
-        ),
-        fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
-        fetch_market_calendar_func=_realistic_calendar(),
-        now=datetime.fromisoformat("2026-09-07T15:00:00+00:00"),
-    )
-
-    assert prepared.effective_date_range.model_dump()["end"] == "2026-09-04"
+    assert prepared.effective_date_range.model_dump()["end"] == expected_end
 
 
 def test_historical_window_is_untouched_by_the_completion_clamp(
@@ -1052,11 +1075,7 @@ def test_historical_window_is_untouched_by_the_completion_clamp(
     calendar_calls: list[tuple[date, date]] = []
 
     prepared = prepare_market_data(
-        _august_config(
-            start_date="2026-07-13",
-            end_date="2026-07-17",
-            requested_date_range={"start": "2026-07-13", "end": "2026-07-17"},
-        ),
+        _august_config(start_date="2026-07-13", end_date="2026-07-17"),
         fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
         fetch_market_calendar_func=_realistic_calendar(calendar_calls),
         now=_INCIDENT_NOW,
@@ -1109,14 +1128,14 @@ def test_worker_reclamp_is_a_noop_across_the_completion_boundary(
         config,
         fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
         fetch_market_calendar_func=_realistic_calendar(),
-        now=datetime.fromisoformat("2026-08-12T23:59:00+00:00"),
+        now=datetime.fromisoformat("2026-08-13T03:59:00+00:00"),
     )
     worker = prepare_market_data(
         apply_coverage_to_config(config, preflight),
         fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
         fetch_market_calendar_func=_realistic_calendar(),
         approved_coverage=_approved_payload(preflight),
-        now=datetime.fromisoformat("2026-08-13T00:01:00+00:00"),
+        now=datetime.fromisoformat("2026-08-13T04:01:00+00:00"),
     )
 
     assert preflight.effective_date_range.model_dump()["end"] == "2026-08-11"
@@ -1124,24 +1143,10 @@ def test_worker_reclamp_is_a_noop_across_the_completion_boundary(
     assert worker.dataset_id == preflight.dataset_id
 
 
-def _crypto_config(**overrides: object) -> dict[str, object]:
-    config = {
-        **_config("ETH"),
-        "asset_class": "crypto",
-        "benchmark_symbol": "BTC",
-        "start_date": "2026-08-05",
-        "end_date": "2026-08-10",
-        "requested_date_range": {"start": "2026-08-05", "end": "2026-08-10"},
-    }
-    config.update(overrides)
-    return config
-
-
-def _no_equity_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
-    raise AssertionError("continuous markets must not request an equity calendar")
-
-
-def test_crypto_window_ending_today_clamps_to_previous_utc_day() -> None:
+def test_crypto_window_ending_today_clamps_to_previous_utc_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     days = tuple(f"2026-08-{day:02d}" for day in range(5, 11))
     bars = _bars(*days)
 
@@ -1157,15 +1162,15 @@ def test_crypto_window_ending_today_clamps_to_previous_utc_day() -> None:
     assert prepared.adjustment_reason == "calendar_alignment"
 
 
-def test_crypto_window_ending_yesterday_is_untouched_after_utc_midnight() -> None:
+def test_crypto_window_ending_yesterday_is_untouched_after_utc_midnight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     days = tuple(f"2026-08-{day:02d}" for day in range(5, 13))
     bars = _bars(*days)
 
     prepared = prepare_market_data(
-        _crypto_config(
-            end_date="2026-08-12",
-            requested_date_range={"start": "2026-08-05", "end": "2026-08-12"},
-        ),
+        _crypto_config(end_date="2026-08-12"),
         fetch_ohlcv_func=_fetcher({"ETH": bars, "BTC": bars}),
         fetch_market_calendar_func=_no_equity_calendar,
         now=datetime.fromisoformat("2026-08-13T00:30:00+00:00"),
@@ -1175,7 +1180,10 @@ def test_crypto_window_ending_yesterday_is_untouched_after_utc_midnight() -> Non
     assert prepared.effective_date_range.model_dump()["end"] == "2026-08-12"
 
 
-def test_currency_pair_weekend_end_resolves_to_friday_bar() -> None:
+def test_currency_pair_weekend_end_resolves_to_friday_bar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     weekday_days = (
         "2026-08-10",
         "2026-08-11",
@@ -1192,7 +1200,6 @@ def test_currency_pair_weekend_end_resolves_to_friday_bar() -> None:
             benchmark_symbol="EURUSD",
             start_date="2026-08-10",
             end_date="2026-08-16",
-            requested_date_range={"start": "2026-08-10", "end": "2026-08-16"},
         ),
         fetch_ohlcv_func=_fetcher({"EURUSD": bars}),
         fetch_market_calendar_func=_no_equity_calendar,
@@ -1202,16 +1209,15 @@ def test_currency_pair_weekend_end_resolves_to_friday_bar() -> None:
     assert prepared.effective_date_range.model_dump()["end"] == "2026-08-14"
 
 
-def test_window_entirely_inside_the_forming_day_is_rejected_with_typed_code() -> None:
+def test_window_entirely_inside_the_forming_day_is_rejected_with_typed_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     bars = _bars("2026-08-12")
 
     with pytest.raises(MarketDataCoverageError) as excinfo:
         prepare_market_data(
-            _crypto_config(
-                start_date="2026-08-12",
-                end_date="2026-08-12",
-                requested_date_range={"start": "2026-08-12", "end": "2026-08-12"},
-            ),
+            _crypto_config(start_date="2026-08-12", end_date="2026-08-12"),
             fetch_ohlcv_func=_fetcher({"ETH": bars, "BTC": bars}),
             fetch_market_calendar_func=_no_equity_calendar,
             now=datetime.fromisoformat("2026-08-12T15:56:00+00:00"),
@@ -1220,12 +1226,49 @@ def test_window_entirely_inside_the_forming_day_is_rejected_with_typed_code() ->
     assert excinfo.value.code == "no_common_data_window"
 
 
+def test_synthetic_fixture_mode_bypasses_the_completion_clamp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    bars = _bars(*_AUGUST_SESSION_DAYS, "2026-08-12")
+
+    prepared = prepare_market_data(
+        _august_config(),
+        fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
+        fetch_market_calendar_func=_no_equity_calendar,
+        now=_INCIDENT_NOW,
+    )
+
+    assert prepared.outcome == "full_coverage"
+    assert prepared.effective_date_range.model_dump()["end"] == "2026-08-12"
+
+
+def test_calendar_failure_fails_closed_for_live_current_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    bars = _bars(*_AUGUST_SESSION_DAYS, "2026-08-12")
+
+    def broken_calendar(**_: object) -> tuple[EquityMarketSession, ...]:
+        raise RuntimeError("calendar down")
+
+    with pytest.raises(MarketDataCoverageError) as excinfo:
+        prepare_market_data(
+            _august_config(),
+            fetch_ohlcv_func=_fetcher({"KO": bars, "SPY": bars}),
+            fetch_market_calendar_func=broken_calendar,
+            now=_INCIDENT_NOW,
+        )
+
+    assert excinfo.value.code == "market_data_unavailable"
+
+
 def test_approved_window_hash_guard_still_rejects_changed_final_bars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     config = _august_config()
-    now = datetime.fromisoformat("2026-08-13T00:01:00+00:00")
+    now = datetime.fromisoformat("2026-08-13T05:00:00+00:00")
     original = _bars(*_AUGUST_SESSION_DAYS, "2026-08-12")
     revised = original.copy(deep=True)
     revised.iloc[-1, revised.columns.get_loc("close")] += 0.5
@@ -1256,7 +1299,7 @@ def test_approved_window_rejection_names_the_mismatched_clause(
 
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     config = _august_config()
-    now = datetime.fromisoformat("2026-08-13T00:01:00+00:00")
+    now = datetime.fromisoformat("2026-08-13T05:00:00+00:00")
     bars = _bars(*_AUGUST_SESSION_DAYS, "2026-08-12")
 
     preflight = prepare_market_data(
