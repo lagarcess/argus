@@ -17,6 +17,7 @@ symbol, strategy, action, or ask.
 
 from __future__ import annotations
 
+from datetime import date, datetime, timezone
 from typing import Literal
 
 from loguru import logger
@@ -73,6 +74,8 @@ class ResearchQueryExtraction(BaseModel):
     asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = None
     period_of_interest: str | None = None
     period_is_closed_window: bool = False
+    period_start_date: date | None = None
+    requires_publisher_sources: bool = False
     date_range_raw_text: str | None = None
     discovery_category: str | None = None
     screening_criteria: list[str] = Field(default_factory=list)
@@ -231,7 +234,7 @@ async def _dispatch(
             state=state,
             user=user,
         )
-    shape = grounded.shape_for_kind(query.question_kind)
+    shape = grounded.shape_for_query(query)
     if shape == "thorough":
         return grounded.thorough_job_result(
             query=query,
@@ -271,15 +274,19 @@ async def _classify_research_question(
     message: str,
     language: str | None,
 ) -> ResearchQueryExtraction | None:
+    today = datetime.now(timezone.utc).date().isoformat()
     prompt = (
         "Classify the user's message for answering, not for execution.\n"
-        "- live_quote: asks for a current or latest price, quote, level, "
+        "- live_quote: asks only for a current or latest price, quote, level, "
         "market cap, valuation multiple, or pre/after-hours figure of a "
-        "tradable asset right now.\n"
+        "tradable asset right now. A request that also asks why, what "
+        "changed, what drove a result, growth drivers, or any other "
+        "explanation is not live_quote in any language.\n"
         "- company_lookup: asks about one company's history, financial "
         "statements, fundamentals, segments, earnings, filings, peers, "
         "business model, or how that specific company works or makes "
-        "money.\n"
+        "money. This includes every one-company narrative or causal clause, "
+        "even when the same message also asks for a current figure.\n"
         "- cross_company: compares two or more companies, sectors, or funds "
         "as a question, or asks multi-year trend analysis across them, and "
         "the user has named every asset involved.\n"
@@ -319,9 +326,16 @@ async def _classify_research_question(
         "symbols: provider tickers for the assets discussed; map well-known "
         "indexes to their liquid proxy (S&P 500 -> SPY). asset_class_hint: "
         "the asset class the user is asking about, when clear. "
-        "period_of_interest: the time window exactly as the user phrased "
-        "it, if any. period_is_closed_window: true only when that window is "
-        "entirely in the past, like a named year or a finished quarter. "
+        "requires_publisher_sources: true when the requested answer contains "
+        "a narrative, causal, explanatory, or other claim that needs a "
+        "publisher page; false for a pure quote or market-data number. A "
+        "true value can never be live_quote. period_of_interest: the time "
+        "window exactly as the user phrased it, if any. "
+        "period_is_closed_window: true only when that window is entirely in "
+        "the past, like a named year or a finished quarter. "
+        f"Today is {today} UTC. period_start_date: the earliest ISO date "
+        "implied by the user's period, including relative periods such as "
+        "today, in any language; null when no period is asked. "
         "date_range_raw_text: same as period_of_interest.\n"
         f"User message ({language or 'unknown'}): {message}"
     )

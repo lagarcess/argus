@@ -3020,8 +3020,8 @@ final payload and persisted metadata:
 {
   "research": {
     "schema_version": "argus_research/v1",
-    "capability_class": "fast_quote",
-    "shape": "fast",
+    "capability_class": "balanced_lookup",
+    "shape": "balanced",
     "sources": [
       {
         "title": "Netflix Q2 2026 shareholder letter",
@@ -3041,9 +3041,8 @@ final payload and persisted metadata:
       "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
       "comparison_set": [],
       "peer_suggestions": ["DIS"],
-      "open_thread": {"shape": "fast", "period_of_interest": null}
-    },
-    "degraded": {"code": "asset_class_not_covered"}
+      "open_thread": {"shape": "balanced", "period_of_interest": null}
+    }
   }
 }
 ```
@@ -3061,27 +3060,52 @@ Contract rules:
   describes the work, not the configuration tier it ran on: a market survey
   is `screening` whether it grounded on the balanced tier or the thorough
   one, so retuning a shape never moves its metering.
+- A pure quote or market-data number may use `fast`; its public source list may
+  be empty because provider provenance belongs to the route receipt rather
+  than a publisher link. A narrative, causal, or explanatory clause is typed
+  as requiring publisher evidence and can never use `fast`, even if it also
+  asks for a current figure. Company reads require at least one public
+  publisher, filing, investor-relations, or company page. If none survives
+  the first balanced attempt, Argus retries once without the provider-only
+  finance citation channel. If none survives sanitization and question-aware
+  selection after that retry, Argus emits
+  `research_unavailable_missing_public_sources` and does not publish the
+  unsupported claim.
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
-  radar ("what's happening in cybersecurity") ground through
-  `finance_search` on the balanced tier and cache as `movers`. Screening
+  radar ("what's happening in cybersecurity") use the balanced tier and
+  cache as `movers`. Screening
   carries every stated condition into the provider call and the answer names
   which condition each asset satisfies; a screen that silently drops the
   user's threshold is a defect, not a simplification. Sector radar answers
   with sector analysis, not a list of company descriptions. These shapes name
-  no subject, so their runnable rows come from the assets the answer itself
-  found, each passed through provider-backed resolution first.
-- A survey that returns zero `finance_search` invocations answered from model
-  knowledge. It carries `degraded.code = "survey_not_grounded"` and says so
-  in prose rather than presenting itself as the current state of the market.
+  no subject, so their runnable rows come from resolver-verified tickers the
+  answer itself names. One- and two-character tickers count only when their
+  notation is unambiguous, such as a cashtag, parentheses, a table cell, or
+  the resolved company name on the same line.
+- Survey grounding counts finance, web, and URL retrieval independently. A
+  survey with no retrieval carries `degraded.code = "survey_not_grounded"`
+  and replaces unsupported prose with the precise retrieval failure. A survey
+  that retrieved but names no resolver-verified ticker carries
+  `degraded.code = "survey_synthesis_incomplete"` and says that sources were
+  found but the requested assets could not be extracted. Neither failure
+  renders subject-dependent figure or asset copy, and neither emits a
+  runnable row.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
   (`{title, domain, url, source_date}`), and every rail shape renders through
   that one panel. The model never authors a citation line: prompts forbid
   source lines and links, and only URLs the packet returned can enter the
-  typed path. A grounded answer with no linkable sources says so, because
-  market data arrives as figures rather than articles.
+  typed path. Provider-owned hosts remain excluded. Parsing retains a bounded
+  internal citation pool; the public selection step then drops an explicitly
+  dated source published before the period implied by the question, keeps at
+  most one page per publisher, and caps the drawer at five. An undated live
+  page remains eligible because it can plausibly describe the current period.
+  When a current market pulse, screen, or sector radar has no explicit period,
+  the question date is its freshness lower bound. Classifier-supplied period
+  lower bounds are ISO-date typed; a malformed value is rejected instead of
+  turning a bounded question into an unbounded one.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around
