@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+import pytest
 from argus.domain.research.contracts import ResearchPacket, ResearchSource
 from argus.domain.research.source_selection import select_public_sources
 
@@ -53,7 +54,13 @@ def test_today_drops_sources_that_cannot_describe_today() -> None:
     ]
 
 
-def test_market_pulse_uses_the_question_date_when_the_classifier_omits_a_period() -> None:
+@pytest.mark.parametrize(
+    "question_kind",
+    ["market_pulse", "screening", "sector_radar"],
+)
+def test_current_survey_uses_the_question_date_when_classifier_omits_a_period(
+    question_kind: str,
+) -> None:
     packet = _packet(
         ResearchSource(
             url="https://www.cnbc.com/2026/08/11/yesterdays-movers.html",
@@ -67,7 +74,7 @@ def test_market_pulse_uses_the_question_date_when_the_classifier_omits_a_period(
 
     selected = select_public_sources(
         packet.sources,
-        question_kind="market_pulse",
+        question_kind=question_kind,
         question_as_of=date(2026, 8, 12),
     )
 

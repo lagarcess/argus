@@ -916,9 +916,39 @@ def _named_verified_symbols(answer: str, assets: list[dict[str, str]]) -> set[st
         symbol = str(asset.get("symbol") or "").upper()
         if not symbol:
             continue
-        if re.search(rf"(?<![A-Z0-9]){re.escape(symbol)}(?![A-Z0-9])", answer):
+        token_pattern = rf"(?<![A-Za-z0-9]){re.escape(symbol)}(?![A-Za-z0-9])"
+        if not re.search(token_pattern, answer):
+            continue
+        if len(symbol) > 2 or _short_symbol_is_unambiguous(
+            answer,
+            symbol=symbol,
+            asset_name=str(asset.get("name") or ""),
+        ):
             named.add(symbol)
     return named
+
+
+def _short_symbol_is_unambiguous(
+    answer: str,
+    *,
+    symbol: str,
+    asset_name: str,
+) -> bool:
+    escaped = re.escape(symbol)
+    if re.search(rf"\${escaped}(?![A-Za-z0-9])", answer):
+        return True
+    if re.search(rf"\(\s*{escaped}\s*\)", answer):
+        return True
+    if re.search(rf"\|\s*{escaped}\s*\|", answer):
+        return True
+    if not asset_name:
+        return False
+    token_pattern = rf"(?<![A-Za-z0-9]){escaped}(?![A-Za-z0-9])"
+    folded_name = asset_name.casefold()
+    return any(
+        folded_name in line.casefold() and re.search(token_pattern, line)
+        for line in answer.splitlines()
+    )
 
 
 def _survey_recovery_note(

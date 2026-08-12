@@ -14,6 +14,8 @@ from urllib.parse import urlparse
 
 from argus.domain.research.contracts import MAX_SOURCES, ResearchSource
 
+_CURRENT_SURVEY_KINDS = frozenset({"market_pulse", "screening", "sector_radar"})
+
 
 def select_public_sources(
     sources: Iterable[ResearchSource],
@@ -31,7 +33,7 @@ def select_public_sources(
     freshness bound.
     """
     effective_start = period_start
-    if effective_start is None and question_kind == "market_pulse":
+    if effective_start is None and question_kind in _CURRENT_SURVEY_KINDS:
         effective_start = question_as_of
 
     selected: list[ResearchSource] = []

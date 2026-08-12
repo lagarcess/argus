@@ -267,7 +267,7 @@ def test_survey_shapes_degrade_honestly_when_the_provider_is_unavailable(
     assert "next_experiments" not in result.stage_patch
 
 
-def test_survey_synthesis_requires_an_explicit_case_sensitive_ticker_token() -> None:
+def test_survey_synthesis_requires_an_unambiguous_short_ticker_token() -> None:
     assets = [
         {"symbol": "A", "name": "Agilent", "asset_class": "equity"},
         {"symbol": "IT", "name": "Gartner", "asset_class": "equity"},
@@ -279,8 +279,29 @@ def test_survey_synthesis_requires_an_explicit_case_sensitive_ticker_token() -> 
         )
         == set()
     )
+    assert (
+        grounded._named_verified_symbols(
+            "A rally followed earnings. IT spending increased.", assets
+        )
+        == set()
+    )
+    assert (
+        grounded._named_verified_symbols(
+            "Agilent reported results.\nA rally followed earnings.\n"
+            "Gartner published a forecast.\nIT spending increased.",
+            assets,
+        )
+        == set()
+    )
     assert grounded._named_verified_symbols(
         "Agilent (A) and Gartner (IT) led the gainers.", assets
+    ) == {"A", "IT"}
+    assert grounded._named_verified_symbols(
+        "Agilent A led the gainers. Gartner IT lagged.", assets
+    ) == {"A", "IT"}
+    assert grounded._named_verified_symbols(
+        "| TICKER | COMPANY |\n| --- | --- |\n| A | Agilent |\n| IT | Gartner |",
+        assets,
     ) == {"A", "IT"}
 
 

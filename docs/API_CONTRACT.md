@@ -3069,7 +3069,9 @@ Contract rules:
   user's threshold is a defect, not a simplification. Sector radar answers
   with sector analysis, not a list of company descriptions. These shapes name
   no subject, so their runnable rows come from resolver-verified tickers the
-  answer itself names.
+  answer itself names. One- and two-character tickers count only when their
+  notation is unambiguous, such as a cashtag, parentheses, a table cell, or
+  the resolved company name on the same line.
 - Survey grounding counts finance, web, and URL retrieval independently. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
@@ -3089,6 +3091,8 @@ Contract rules:
   dated source published before the period implied by the question, keeps at
   most one page per publisher, and caps the drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
+  When a current market pulse, screen, or sector radar has no explicit period,
+  the question date is its freshness lower bound.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around
