@@ -94,8 +94,8 @@ retirement (#154, PRs #174-177), Argus keeps no parallel English/Spanish copy
 tables in the runtime:
 
 - LLM-authored prose (result summaries, clarifications, explanations) is written
-  in the detected turn language from a typed fact bank. The backend supplies
-  typed facts; the model supplies the words.
+  in the workspace language from a typed fact bank. The backend supplies typed
+  facts; the model supplies the words.
 - Degraded and recovery copy renders from typed codes, not per-language strings.
   When the LLM path is unavailable, the runtime maps a typed recovery/degraded
   code to localized surface text at the presentation boundary, never a runtime
@@ -103,11 +103,27 @@ tables in the runtime:
 - Result-card chrome (labels, headings, chips) renders from typed keys the
   frontend localizes, not from backend-baked language strings.
 
-The invariant: prose follows the detected turn language everywhere, English and
+The invariant: prose follows the workspace language everywhere, English and
 Spanish parity is proven by the eval harness (not hardcoded copy), and no runtime
 module carries per-language copy tables, localized stop-word lists, or
 display-label token matching for semantic choice selection. This is the runtime
 expression of the P2.0 guardrail against per-language copy.
+
+**Input language and output language are separate, and that is deliberate
+(founder-locked 2026-08-11).** A user may write in any language and Argus
+proceeds correctly: that is the language-agnostic spine, and it must never
+gate, refuse, or degrade on the language of a message. The language of the
+*response* is bound to the workspace setting, which is what the setting is for.
+Binding output to the setting removes ambiguity about delivery and guarantees a
+predictable flow, while leaving the user free to speak however they like.
+
+So an English question in a Spanish workspace correctly returns a Spanish
+answer. That is not a defect. Verified in production on 2026-08-11 and accepted.
+
+Do not build per-message language resolution. Reconciling a workspace setting
+against per-message intent reintroduces exactly the ambiguity the setting
+exists to remove. #378 is closed to that reading; see its 2026-08-11 comment
+before acting on its title.
 
 ## Active Layers
 

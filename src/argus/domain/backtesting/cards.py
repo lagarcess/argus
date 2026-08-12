@@ -7,7 +7,10 @@ from argus.domain.backtesting.execution import _execution_realism_settings
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
-from argus.domain.engine_launch.display import format_date_range_label
+from argus.domain.engine_launch.display import (
+    format_benchmark_comparison_phrase,
+    format_date_range_label,
+)
 
 
 def _format_money(value: float) -> str:
@@ -82,6 +85,10 @@ def build_result_card(
     if is_dca:
         assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
 
+    benchmark_comparison = benchmark_comparison_from_delta(
+        performance["delta_vs_benchmark_pct"]
+    )
+
     rows = [
         {
             "key": "cash_value",
@@ -100,9 +107,11 @@ def build_result_card(
                 if is_es
                 else f"Compared with {config['benchmark_symbol']}"
             ),
-            "value": benchmark_comparison_from_delta(
-                performance["delta_vs_benchmark_pct"]
-            ).user_phrase,
+            "value": format_benchmark_comparison_phrase(
+                benchmark_comparison.claim,
+                benchmark_comparison.magnitude_points,
+                language=language,
+            ),
         },
         {
             "key": "max_drawdown_pct",

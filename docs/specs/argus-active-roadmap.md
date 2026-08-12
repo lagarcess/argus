@@ -66,15 +66,40 @@ standalone edit.
 
 ## The five
 
-### 1. Answer the first question — SHIPPED 2026-08-09
+### 1. Answer the first question — LIVE IN PRODUCTION 2026-08-11
 
 Merged as PR #396 at `ef08b25d`, 350 files. Closes #377 and #384.
 
+**Promoted to production 2026-08-11** at `d67cef92`, 451 commits, recorded in
+[`2026-08-11-main-production-promotion.md`](../release-manifests/2026-08-11-main-production-promotion.md).
+Argus answers an ordinary finance question in production, in both languages,
+without refusing. That was the point of the cycle.
+
+Three things came out of that promotion and none of them blocked it:
+
+- **The database was nine migrations behind at deploy**, because nothing
+  applies migrations and no gate checked. The rail was inert for roughly two
+  hours: production's constraint rejected `chat.research`, so the allowance
+  read failed closed and turns answered without research. Remediated during
+  the promotion; the missing gate is **#449**.
+- **Fast-classified research answers carry no citations** (**#451**). The
+  `fast` config has only `finance_search`, whose sole citation channel is the
+  provider's own hosts, which the filter correctly drops. The sources drawer
+  is built and gets nothing. A question with a narrative clause needs
+  `balanced`.
+- **The canary is red at a test that asserts Turnstile fails** (**#452**). Its
+  browser leg drives a headless browser through bot protection. Splitting the
+  release-coherence half from the browser half is filed.
+
+The release-coherence half earned its keep the same day: it caught
+`argus-backtests` running a week behind api and app before any paid journey
+ran.
+
 **Enabled 2026-08-10.** `ARGUS_RESEARCH_RAIL_ENABLED` and
 `NEXT_PUBLIC_RESEARCH_RAIL_ENABLED` are `true` in `render.yaml`,
-`.env.example`, `.github/argus-env.sh`, and the release profile, so the next
-promotion carries it live. Founder decision: answering the first question is
-the product, not an experiment, so it ships on rather than dark.
+`.env.example`, `.github/argus-env.sh`, and the release profile. Founder
+decision: answering the first question is the product, not an experiment, so
+it ships on rather than dark.
 
 That flip was made against the two conditions recorded in rail spec §13b,
 knowingly. Close #411 and #412 rather than treating the flip as having
