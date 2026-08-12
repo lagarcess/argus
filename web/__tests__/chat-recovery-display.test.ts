@@ -449,56 +449,6 @@ describe("chat recovery display", () => {
     expect(text).not.toContain("can't run");
   });
 
-  test.each([
-    "User wants to invest $500",
-    "MACD golden cross",
-    "BTC_USDT",
-  ])(
-    "issue 453 keeps generic raw value %s out of recovery sentence subjects",
-    (rawValue) => {
-      const display = recoveryDisplayFromMetadata({
-        clarification: {
-          kind: "unsupported_recovery",
-          reason_code: "unsupported_strategy_logic",
-          prompt_source: "degraded_fallback",
-          requested_field: "unsupported_constraints",
-          semantic_needs: ["simplification_choice"],
-          payload: {
-            raw_value: rawValue,
-            strategy: {
-              asset_universe: ["TSLA"],
-            },
-          },
-          options: [
-            {
-              id: "rsi_threshold",
-              replacement_values: {
-                simplify_logic: "rsi_only",
-              },
-            },
-            {
-              id: "buy_and_hold",
-              replacement_values: {
-                strategy_type: "buy_and_hold",
-              },
-            },
-          ],
-        },
-      });
-
-      const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
-      const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
-      expect(en).toBe(
-        "Argus can't run that rule directly yet for TSLA. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
-      );
-      expect(es).toBe(
-        "Argus todavía no puede ejecutar esa regla directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
-      );
-      expect(en).not.toContain(rawValue);
-      expect(es).not.toContain(rawValue);
-    },
-  );
-
   test("renders degraded timeframe recovery truthfully in English and Spanish", () => {
     const display = recoveryDisplayFromMetadata({
       clarification: {
@@ -647,76 +597,6 @@ describe("chat recovery display", () => {
     expect(es).not.toContain("a momentum breakout strategy");
     expect(es).not.toContain("no define");
   });
-
-  test("issue 453 renders starting capital only from typed numeric bounds", () => {
-    const display = recoveryDisplayFromMetadata({
-      clarification: {
-        kind: "unsupported_recovery",
-        reason_code: "unsupported_starting_capital",
-        prompt_source: "degraded_fallback",
-        requested_field: "capital_amount",
-        semantic_needs: ["simplification_choice"],
-        payload: {
-          raw_value: "User wants to invest $500",
-          minimum: 1000,
-          maximum: 100000000,
-          strategy: { asset_universe: ["NFLX"] },
-        },
-        options: [
-          {
-            id: "option_0",
-            replacement_values: { capital_amount: 10000 },
-          },
-        ],
-      },
-    });
-
-    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
-    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
-
-    expect(en).toBe(
-      "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?",
-    );
-    expect(es).toBe(
-      "El capital inicial debe estar entre $1,000 y $100,000,000. ¿Qué monto dentro de ese rango quieres usar?",
-    );
-    expect(en).not.toContain("User wants to invest $500");
-    expect(es).not.toContain("User wants to invest $500");
-  });
-
-  test.each([
-    { minimum: 100000000, maximum: 1000 },
-    { minimum: Number.NaN, maximum: 100000000 },
-    { minimum: 1000, maximum: Number.POSITIVE_INFINITY },
-  ])(
-    "issue 453 rejects malformed starting-capital bound pair $minimum to $maximum",
-    ({ minimum, maximum }) => {
-      const display = recoveryDisplayFromMetadata({
-        clarification: {
-          kind: "unsupported_recovery",
-          reason_code: "unsupported_starting_capital",
-          prompt_source: "degraded_fallback",
-          requested_field: "capital_amount",
-          semantic_needs: ["simplification_choice"],
-          payload: {
-            raw_value: "User wants to invest $500",
-            minimum,
-            maximum,
-            strategy: { asset_universe: ["NFLX"] },
-          },
-          options: [
-            {
-              id: "option_0",
-              replacement_values: { capital_amount: 10000 },
-            },
-          ],
-        },
-      });
-
-      expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe("");
-      expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe("");
-    },
-  );
 
   test("renders provider-neutral coverage recovery in English and Spanish", () => {
     const metadata = {

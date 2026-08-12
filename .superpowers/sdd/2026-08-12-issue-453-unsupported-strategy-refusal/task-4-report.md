@@ -337,3 +337,88 @@ The first fix-round commit accidentally retained whole-file Ruff formatting in
 `33f4c3ad787620f039aae331e30b1128b1cf6261` was used to restore every unrelated
 line while keeping only the intended ATR raw-prose assertions. This cleanup is
 recorded as a separate commit without amending the first fix-round commit.
+
+## Fix round 3: split focused web recovery regressions
+
+Terminal verification found that `chat-recovery-display.test.ts` had crossed
+the repository's 1,000-line modularity capture threshold. This round moved only
+the issue #453 generic raw-value, typed starting-capital, and malformed-bound
+cases into a focused TypeScript-clean module.
+
+### RED
+
+```text
+wc -l web/__tests__/chat-recovery-display.test.ts
+poetry run python scripts/check_modularity_budget.py
+poetry run pytest --no-cov tests/test_modularity_budget.py -q
+```
+
+Result: the existing test was 1,036 lines. The modularity report itself had no
+watched-file violation, but the structural capture suite exited 1 with 1 failed
+and 7 passed because the newly large test file was not in the watched baseline.
+
+The TypeScript baseline was captured from `web/` before extraction:
+
+```text
+bun x tsc --noEmit 2>&1 | awk '/error TS/{total += 1} /__tests__\/chat-recovery-display\.test\.ts.*error TS/{original += 1} /__tests__\/issue-453-chat-recovery-display\.test\.ts.*error TS/{focused += 1} END {print "total_errors=" total; print "chat_recovery_errors=" original; print "focused_issue_453_errors=" focused; exit(total > 0 ? 1 : 0)}'
+```
+
+Result: exit 1 with 6,034 total diagnostics, 99 diagnostics attributed to
+`chat-recovery-display.test.ts`, and no focused issue #453 file yet.
+
+### GREEN
+
+Focused behavior and structural capture:
+
+```text
+wc -l web/__tests__/chat-recovery-display.test.ts web/__tests__/issue-453-chat-recovery-display.test.ts
+bun test web/__tests__/chat-recovery-display.test.ts web/__tests__/issue-453-chat-recovery-display.test.ts
+poetry run pytest --no-cov tests/test_modularity_budget.py -q
+```
+
+Result: the original file is 916 lines and the focused file is 154 lines. Bun
+passed all 35 tests across both files with 0 failures. The modularity suite
+passed all 8 tests.
+
+Full frontend and static checks:
+
+```text
+cd web && bun run lint __tests__/chat-recovery-display.test.ts __tests__/issue-453-chat-recovery-display.test.ts
+cd web && bun run test
+poetry run python scripts/check_modularity_budget.py
+git diff --check
+```
+
+Result: targeted ESLint passed; the full frontend suite passed 1,475 tests with
+0 failures and 11,117 Bun `expect` calls; modularity reported no violations;
+diff check passed.
+
+The TypeScript comparison was rerun with the same counter:
+
+```text
+bun x tsc --noEmit 2>&1 | awk '/error TS/{total += 1} /__tests__\/chat-recovery-display\.test\.ts.*error TS/{original += 1} /__tests__\/issue-453-chat-recovery-display\.test\.ts.*error TS/{focused += 1} END {print "total_errors=" total; print "chat_recovery_errors=" original; print "focused_issue_453_errors=" focused; exit(total > 0 ? 1 : 0)}'
+```
+
+Result: the known branch baseline remains red with 6,017 total diagnostics.
+The original file now has 82 diagnostics and the new focused file has zero.
+The measured lane delta is therefore minus 17 overall and minus 17 in the
+original file, with no diagnostic moved into or added by the focused module.
+The review prompt estimated 18 moved-case diagnostics; the before-and-after
+compiler evidence on this exact checkout measured 17.
+
+### Reasoning and self-review
+
+- The seven behavioral cases remain individually named: three generic raw
+  values, one canonical numeric range, and three malformed numeric pairs.
+- The new file uses simple Bun `test` callbacks, `node:assert/strict`, and one
+  minimal catalog translator cast to the exact `TFunction` boundary. It avoids
+  the repository's baseline-red Bun matcher and `test.each` types.
+- The pre-existing unsupported-symbol and degraded-momentum tests remain in the
+  original file with their changed expectations intact.
+- Search confirms no issue #453 case remains duplicated in the original file.
+- Product source, locale catalogs, browser evidence, environment files, and all
+  other tests were not modified.
+
+The only concern is the pre-existing branch-wide TypeScript baseline. This
+round reduces its measured diagnostic count and adds zero diagnostics in the
+new focused file.
