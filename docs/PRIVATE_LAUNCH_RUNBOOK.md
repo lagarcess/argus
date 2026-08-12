@@ -364,6 +364,12 @@ SPF; DKIM at `resend._domainkey.get-argus.com` authenticates Resend's signature;
 and DMARC at `_dmarc.get-argus.com` monitors strict alignment with aggregate
 reports sent to `support@get-argus.com`. Start DMARC at `p=none`; after one week
 of clean aggregate reports, moving it to `p=quarantine` is a founder decision.
+Supabase Authentication URL Configuration must set Site URL to
+`https://arguschat.ai` and allow the exact recovery redirects
+`https://arguschat.ai/auth/recovery` and
+`https://argus-app-suz5.onrender.com/auth/recovery`; keep the Render origin
+during the transition, because an unlisted redirect silently falls back to Site
+URL instead of returning an error.
 
 Keep true secrets manual in Render:
 
