@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { loginWithEmail, signupWithEmail } from "../lib/argus-api";
+import { requestPasswordRecovery } from "../lib/auth-security";
 
 const root = join(import.meta.dir, "..");
 const originalFetch = globalThis.fetch;
@@ -94,6 +95,21 @@ describe("password auth CAPTCHA and confirmation contract", () => {
     });
   });
 
+  test("password recovery acquires a CAPTCHA token at the shared browser boundary", async () => {
+    let body: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (_input, init) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({ accepted: true }), { status: 202 });
+    }) as typeof globalThis.fetch;
+
+    await requestPasswordRecovery("alpha@example.com");
+
+    expect(body).toEqual({
+      email: "alpha@example.com",
+      captcha_token: "argus-local-browser-qa",
+    });
+  });
+
   test("CAPTCHA acquisition failure is safe and classified before fetch", async () => {
     process.env.NODE_ENV = "production";
     let fetchCalls = 0;
@@ -114,6 +130,50 @@ describe("password auth CAPTCHA and confirmation contract", () => {
     );
     expect((error as Error).message).not.toContain("Turnstile");
     expect((error as Error).message).not.toContain("Guest");
+  });
+
+  test("recovery CAPTCHA failure stops before the request is sent", async () => {
+    process.env.NODE_ENV = "production";
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      return new Response(JSON.stringify({ accepted: true }), { status: 202 });
+    }) as typeof globalThis.fetch;
+
+    const error = await requestPasswordRecovery("alpha@example.com").catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(fetchCalls).toBe(0);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error & { code?: string }).code).toBe(
+      "captcha_unavailable",
+    );
+  });
+
+  test("the recovery form surfaces a rejected request", () => {
+    const recoveryForm = readFileSync(
+      join(root, "app/auth/forgot-password/page.tsx"),
+      "utf-8",
+    );
+
+    expect(recoveryForm).toContain('setStatus("error")');
+    expect(recoveryForm).toContain('role="alert"');
+    expect(recoveryForm).toContain('"auth.recovery.request_error"');
+  });
+
+  test("the direct real-auth recovery QA sends the shared local CAPTCHA token", () => {
+    const qaHelper = readFileSync(
+      join(root, "e2e/qa-248/helpers.ts"),
+      "utf-8",
+    );
+
+    expect(qaHelper).toContain(
+      'import { LOCAL_QA_CAPTCHA_TOKEN } from "../../lib/guest-captcha";',
+    );
+    expect(qaHelper).toContain(
+      "data: { email, captcha_token: LOCAL_QA_CAPTCHA_TOKEN }",
+    );
   });
 
   test("the existing auth form owns localized check-email and CAPTCHA errors", () => {

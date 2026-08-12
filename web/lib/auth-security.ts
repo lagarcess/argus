@@ -1,4 +1,5 @@
 import { clearArgusSessionCookies } from "./argus-api";
+import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
 import { getSupabaseClient } from "./supabase-client";
 
 export type AuthSecurityPort = {
@@ -136,11 +137,12 @@ export function getAuthSecurityActions() {
 }
 
 export async function requestPasswordRecovery(email: string): Promise<void> {
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
   const response = await fetch("/api/auth/recovery", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, captcha_token: captchaToken }),
   });
   if (!response.ok) {
     throw new Error("Recovery request failed.");
