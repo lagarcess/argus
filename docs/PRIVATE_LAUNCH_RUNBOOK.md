@@ -192,12 +192,12 @@ path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
 The disabled-email denial check runs at the API layer, not in the browser.
 Before the check, the canary creates a `user` allowlist row with `disabled_at`
 set. `.github/canary-requested-signup-denial.py` sends that address to the
-ops-authenticated `POST /api/v1/internal/canary/requested-signup-denial`
-policy endpoint and requires `200 {"denied": true}`. This proves the disabled
-row is blocked with public access on and with the allowlist-only emergency
-rollback. The probe never calls the signup provider or CAPTCHA, so it cannot
-create an auth identity. `verify_no_signup_auth_identity` asserts that none
-exists before the canary stages the same row as an active `requested` row and
+ops-authenticated route owned by `REQUESTED_SIGNUP_DENIAL_PATH` in
+`src/argus/api/ops_contract.py` and requires `200 {"denied": true}`. This proves
+the disabled row is blocked with public access on and with the allowlist-only
+emergency rollback. The probe never calls the signup provider or CAPTCHA, so it
+cannot create an auth identity. `verify_no_signup_auth_identity` asserts that
+none exists before the canary stages the same row as an active `requested` row and
 calls the protected access-approval operation. That operation sends the real
 localized welcome, writes its immutable delivery record, and promotes the row
 to `user` atomically before browser signup. A unique generated address forces

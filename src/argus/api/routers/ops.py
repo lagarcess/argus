@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from argus.api import state as api_state
 from argus.api.guest_access import permanent_account_access_allowed
+from argus.api.ops_contract import REQUESTED_SIGNUP_DENIAL_PATH
 from argus.api.schemas import AccessApprovalRequest, AccessApprovalResponse, Language
 from argus.domain.access_approval_email import (
     ACCESS_WELCOME_CONTENT_VERSION,
@@ -149,7 +150,7 @@ async def readiness(
 
 
 @router.post(
-    "/internal/canary/requested-signup-denial",
+    REQUESTED_SIGNUP_DENIAL_PATH,
     dependencies=[Depends(_require_ops_authorization)],
 )
 async def requested_signup_denial(request: Request) -> dict[str, bool]:
