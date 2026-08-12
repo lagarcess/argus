@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pandas as pd
 import pytest
 from argus.agent_runtime.artifacts import ArtifactPatch, apply_artifact_patch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.clarification_contract import offline_clarification_fallback
 from argus.agent_runtime.coverage_recovery import (
     PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
 )
@@ -177,6 +179,51 @@ def test_issue_453_starting_capital_bounds_recover_without_confirmation_card(
 
     assert "$1,000" in clarification.patch["assistant_prompt"]
     assert "unsupported" not in clarification.patch["assistant_prompt"].lower()
+    sidecar_payload = clarification.patch["clarification"]["payload"]
+    assert sidecar_payload["minimum"] == MIN_STARTING_CAPITAL
+    assert sidecar_payload["maximum"] == MAX_STARTING_CAPITAL
+
+
+def test_issue_453_starting_capital_bounds_use_bilingual_range_copy() -> None:
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "facts": {
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_starting_capital",
+                    "raw_value": "$500",
+                    "minimum": MIN_STARTING_CAPITAL,
+                    "maximum": MAX_STARTING_CAPITAL,
+                }
+            ]
+        },
+        "options": [
+            {
+                "label": "Choose a different amount",
+                "replacement_values": {"requested_field": "capital_amount"},
+            }
+        ],
+    }
+
+    english = offline_clarification_fallback(
+        language="en",
+        response_intent=response_intent,
+    )
+    spanish = offline_clarification_fallback(
+        language="es-419",
+        response_intent=response_intent,
+    )
+
+    assert english == (
+        "Starting capital must be between $1,000 and $100,000,000. "
+        "What amount in that range should I use?"
+    )
+    assert spanish == (
+        "El capital inicial debe estar entre $1,000 y $100,000,000. "
+        "¿Qué monto dentro de ese rango quieres usar?"
+    )
+    assert "$500" not in english
+    assert "$500" not in spanish
 
 
 def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
@@ -572,7 +619,8 @@ def test_clarify_unsupported_recovery_llm_failure_uses_structured_fallback() -> 
     assert result.outcome == "await_user_reply"
     assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
     assert "could not phrase" not in prompt
-    assert "ATR 14" in prompt
+    assert "ATR 14" not in prompt
+    assert "that rule" in prompt
     assert "TSLA" in prompt
     assert "Use a supported RSI threshold rule" in prompt
     assert "Compare with buy and hold" in prompt
@@ -639,9 +687,7 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
         "buy_and_hold",
         "moving_average_crossover",
     ]
-    assert [
-        option["id"] for option in result.patch["response_intent"]["options"]
-    ] == [
+    assert [option["id"] for option in result.patch["response_intent"]["options"]] == [
         "rsi_threshold",
         "buy_and_hold",
         "moving_average_crossover",
@@ -1003,9 +1049,10 @@ def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -
         "slippage": 0.0005,
         "timeframe": "5m",
     }
-    assert [
-        option["id"] for option in result.patch["response_intent"]["options"]
-    ] == ["option_0", "option_1"]
+    assert [option["id"] for option in result.patch["response_intent"]["options"]] == [
+        "option_0",
+        "option_1",
+    ]
     assert result.patch["clarification"] == {
         "kind": "unsupported_recovery",
         "reason_code": "unsupported_time_granularity",
@@ -1085,9 +1132,9 @@ def test_clarify_unsupported_timeframe_degraded_fallback_is_typed_and_truthful(
     assert result.patch["clarification"]["reason_code"] == (
         "unsupported_time_granularity"
     )
-    assert [
-        option["id"] for option in result.patch["response_intent"]["options"]
-    ] == [option["id"] for option in result.patch["clarification"]["options"]]
+    assert [option["id"] for option in result.patch["response_intent"]["options"]] == [
+        option["id"] for option in result.patch["clarification"]["options"]
+    ]
 
 
 def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None:
@@ -1252,13 +1299,75 @@ def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
         response_intent={
             "kind": "unsupported_recovery",
             "facts": {
+                "strategy": {
+                    "strategy_thesis": "Use sentiment as the entry signal for Apple.",
+                    "asset_universe": ["AAPL"],
+                    "date_range": "past year",
+                    "entry_logic": "news sentiment turns positive",
+                },
                 "unsupported_constraints": [
                     {
                         "category": "unsupported_strategy_logic",
                         "raw_value": "news sentiment turns positive",
-                        "explanation": (
-                            "Sentiment/news signals are not executable yet."
-                        ),
+                        "explanation": ("Sentiment/news signals are not executable yet."),
+                    }
+                ],
+            },
+        },
+    )
+
+    messages = clarifier._messages(request)
+    system_prompt = messages[0].content
+    context = json.loads(messages[1].content)
+
+    assert "unsupported_recovery" in system_prompt
+    assert "typed capability cause" in system_prompt
+    assert "simplification_options" in system_prompt
+    assert "Do not claim the unsupported part is executable" in system_prompt
+    assert context["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
+    assert "strategy_thesis" not in context["candidate_strategy_draft"]
+    assert "entry_logic" not in context["candidate_strategy_draft"]
+    assert "strategy_thesis" not in context["response_intent"]["facts"]["strategy"]
+    assert "entry_logic" not in context["response_intent"]["facts"]["strategy"]
+    assert context["unsupported_constraints"][0] == {
+        "category": "unsupported_strategy_logic",
+        "simplification_options": [
+            {"label": "Use a supported RSI threshold rule"},
+            {"label": "Compare with buy and hold"},
+        ],
+    }
+    assert context["response_intent"]["facts"]["unsupported_constraints"] == [
+        {"category": "unsupported_strategy_logic"}
+    ]
+
+
+def test_issue_453_clarifier_routes_starting_capital_as_typed_range_rule() -> None:
+    clarifier = OpenRouterClarificationGenerator()
+    request = clarifier.request_model(
+        current_user_message="Buy and hold NFLX with $500 starting capital.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["NFLX"],
+            capital_amount=500,
+        ),
+        unsupported_constraints=[
+            {
+                "category": "unsupported_starting_capital",
+                "raw_value": "$500",
+                "minimum": MIN_STARTING_CAPITAL,
+                "maximum": MAX_STARTING_CAPITAL,
+                "explanation": "The requested capital is out of range.",
+            }
+        ],
+        response_intent={
+            "kind": "unsupported_recovery",
+            "facts": {
+                "unsupported_constraints": [
+                    {
+                        "category": "unsupported_starting_capital",
+                        "raw_value": "$500",
+                        "minimum": MIN_STARTING_CAPITAL,
+                        "maximum": MAX_STARTING_CAPITAL,
                     }
                 ]
             },
@@ -1267,15 +1376,43 @@ def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
 
     messages = clarifier._messages(request)
     system_prompt = messages[0].content
-    context = messages[1].content
+    context = json.loads(messages[1].content)
 
-    assert "unsupported_recovery" in system_prompt
-    assert "asset, period, and unsupported rule" in system_prompt
-    assert "simplification_options" in system_prompt
-    assert "Do not claim the unsupported part is executable" in system_prompt
-    assert "AAPL" in context
-    assert "news sentiment turns positive" in context
-    assert "Sentiment/news signals are not executable yet." not in context
+    assert "validation range, not a strategy capability limit" in system_prompt
+    constraint = context["unsupported_constraints"][0]
+    assert constraint == {
+        "category": "unsupported_starting_capital",
+        "maximum": MAX_STARTING_CAPITAL,
+        "minimum": MIN_STARTING_CAPITAL,
+    }
+    assert context["response_intent"]["facts"]["unsupported_constraints"] == [constraint]
+
+
+def test_issue_453_clarifier_preserves_typed_time_granularity_value() -> None:
+    clarifier = OpenRouterClarificationGenerator()
+    constraint = {
+        "category": "unsupported_time_granularity",
+        "raw_value": "5m",
+        "explanation": "Choose a supported timeframe.",
+    }
+    request = clarifier.request_model(
+        current_user_message="Use five-minute bars.",
+        candidate_strategy_draft=StrategySummary(timeframe="5m"),
+        unsupported_constraints=[constraint],
+        response_intent={
+            "kind": "unsupported_recovery",
+            "facts": {"unsupported_constraints": [constraint]},
+        },
+    )
+
+    context = json.loads(clarifier._messages(request)[1].content)
+
+    assert context["unsupported_constraints"] == [
+        {"category": "unsupported_time_granularity", "raw_value": "5m"}
+    ]
+    assert context["response_intent"]["facts"]["unsupported_constraints"] == [
+        {"category": "unsupported_time_granularity", "raw_value": "5m"}
+    ]
 
 
 def test_clarifier_system_prompt_keeps_vague_ideas_on_supported_proxies() -> None:

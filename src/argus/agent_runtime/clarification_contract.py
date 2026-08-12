@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any, Literal
 
 from argus.agent_runtime.recovery_messages import recovery_message
@@ -66,18 +67,22 @@ def typed_clarification_contract(
         if not options:
             return None
         semantic_needs = _semantic_needs(response_intent)
+        reason_code = _unsupported_reason_code(response_intent)
+        payload: dict[str, Any] = {
+            "strategy": _strategy_payload(response_intent, strategy),
+            "raw_value": _unsupported_raw_value(response_intent),
+        }
+        if reason_code == "unsupported_starting_capital":
+            payload.update(_unsupported_numeric_bounds(response_intent))
         return {
             "kind": "unsupported_recovery",
-            "reason_code": _unsupported_reason_code(response_intent),
+            "reason_code": reason_code,
             "prompt_source": prompt_source,
             "requested_field": requested_field or "unsupported_constraints",
             "requested_fields": _requested_fields(response_intent)
             or ["unsupported_constraints"],
             "semantic_needs": semantic_needs,
-            "payload": {
-                "strategy": _strategy_payload(response_intent, strategy),
-                "raw_value": _unsupported_raw_value(response_intent),
-            },
+            "payload": payload,
             "options": options,
         }
     if kind != "clarification":
@@ -193,10 +198,14 @@ def _unsupported_recovery_fallback(
                 "Choose daily or 1-hour bars."
             )
         return "That bar size is not supported. Choose daily or 1-hour bars."
+    if reason_code == "unsupported_starting_capital":
+        return _starting_capital_bounds_fallback(
+            language=language,
+            bounds=_unsupported_numeric_bounds(response_intent),
+        )
     options = _option_labels(response_intent)
     if not options:
         return None
-    raw_value = _unsupported_raw_value(response_intent)
     symbol = _primary_symbol(strategy)
     joined_options = _join_options(options)
     symbol_suffix = f" for {symbol}" if symbol else ""
@@ -212,9 +221,15 @@ def _unsupported_recovery_fallback(
             f"What rule should I test{symbol_suffix}? "
             f"Which supported direction should I use: {joined_options}?"
         )
-    subject = raw_value or "that rule"
+    if language == "es-419":
+        spanish_symbol_suffix = f" para {symbol}" if symbol else ""
+        return (
+            "Argus todavía no puede ejecutar esa regla directamente"
+            f"{spanish_symbol_suffix}. "
+            f"¿Qué camino quieres usar: {joined_options}?"
+        )
     return (
-        f"Argus can't run {subject} directly yet{symbol_suffix}. "
+        f"Argus can't run that rule directly yet{symbol_suffix}. "
         f"Which supported direction should I use: {joined_options}?"
     )
 
@@ -288,6 +303,68 @@ def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
         if value and not _looks_like_internal_code(value):
             return value
     return None
+
+
+def _unsupported_numeric_bounds(response_intent: dict[str, Any]) -> dict[str, float]:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return {}
+    constraints = facts.get("unsupported_constraints")
+    if not isinstance(constraints, list):
+        return {}
+    for constraint in constraints:
+        if not isinstance(constraint, dict):
+            continue
+        if constraint.get("category") != "unsupported_starting_capital":
+            continue
+        bounds: dict[str, float] = {}
+        for key in ("minimum", "maximum"):
+            value = constraint.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                numeric_value = float(value)
+                if isfinite(numeric_value):
+                    bounds[key] = numeric_value
+        return bounds
+    return {}
+
+
+def _starting_capital_bounds_fallback(
+    *,
+    language: str | None,
+    bounds: dict[str, float],
+) -> str:
+    minimum = bounds.get("minimum")
+    maximum = bounds.get("maximum")
+    if minimum is not None and maximum is not None:
+        minimum_text = _usd_amount(minimum)
+        maximum_text = _usd_amount(maximum)
+        if language == "es-419":
+            return (
+                f"El capital inicial debe estar entre {minimum_text} y {maximum_text}. "
+                "¿Qué monto dentro de ese rango quieres usar?"
+            )
+        return (
+            f"Starting capital must be between {minimum_text} and {maximum_text}. "
+            "What amount in that range should I use?"
+        )
+    if minimum is not None:
+        minimum_text = _usd_amount(minimum)
+        if language == "es-419":
+            return (
+                f"El capital inicial debe ser de al menos {minimum_text}. "
+                "¿Qué monto quieres usar?"
+            )
+        return (
+            f"Starting capital must be at least {minimum_text}. "
+            "What amount should I use?"
+        )
+    if language == "es-419":
+        return "¿Qué monto de capital inicial quieres usar?"
+    return "What starting capital amount should I use?"
+
+
+def _usd_amount(value: float) -> str:
+    return f"${value:,.0f}"
 
 
 def _unsupported_reason_code(response_intent: dict[str, Any]) -> str:
