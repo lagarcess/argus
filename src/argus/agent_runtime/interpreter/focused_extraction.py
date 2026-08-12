@@ -197,6 +197,7 @@ def _focused_extraction_field_provenance(
     *,
     extraction: FocusedStrategyExtraction,
     current_message: str,
+    resolved_strategy_type: str | None,
 ) -> dict[str, str]:
     provenance = _comparison_baseline_provenance(
         extraction.comparison_baseline,
@@ -213,7 +214,7 @@ def _focused_extraction_field_provenance(
         provenance["recurring_contribution"] = "explicit_user"
         provenance["capital_amount"] = "recurring_contribution"
     elif extraction.capital_amount is not None:
-        if canonical_strategy_type(extraction.strategy_type) == "dca_accumulation":
+        if canonical_strategy_type(resolved_strategy_type) == "dca_accumulation":
             provenance["capital_amount"] = "recurring_contribution"
         else:
             provenance["capital_amount"] = "starting_capital"
@@ -498,6 +499,7 @@ def response_from_focused_strategy_extraction(
                 field_provenance=_focused_extraction_field_provenance(
                     extraction=extraction,
                     current_message=request.current_user_message,
+                    resolved_strategy_type=strategy_type,
                 ),
                 extra_parameters={
                     "raw_strategy_type": extraction.strategy_type,
@@ -562,6 +564,7 @@ def response_from_focused_strategy_extraction(
             field_provenance=_focused_extraction_field_provenance(
                 extraction=extraction,
                 current_message=request.current_user_message,
+                resolved_strategy_type=strategy_type,
             ),
         ),
         missing_required_fields=list(extraction.missing_required_fields),

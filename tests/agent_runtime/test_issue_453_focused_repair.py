@@ -216,3 +216,62 @@ async def test_issue_453_pending_capital_answer_repairs_without_acknowledgment(
     assert draft.asset_universe == ["NFLX"]
     assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
     assert draft.capital_amount == 500
+
+
+def test_issue_453_pending_dca_amount_inherits_recurring_contribution_role() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    pending_draft = LLMStrategyDraft(
+        raw_user_phrasing="Buy Coca-Cola every month.",
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy Coca-Cola every month.",
+        asset_universe=["KO"],
+        asset_class="equity",
+        date_range={"start": "2021-01-01", "end": "2025-12-31"},
+        cadence="monthly",
+    )
+    request = InterpretationRequest(
+        current_user_message="$200 each month",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary.model_validate(
+                pending_draft.model_dump(mode="python")
+            )
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "capital_amount",
+            "missing_required_fields": ["capital_amount"],
+        },
+        user=UserState(user_id="u1", language_preference="en"),
+    )
+
+    response = interpreter_module._response_from_focused_strategy_extraction(
+        extraction=interpreter_module.FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            requires_clarification=False,
+            user_goal_summary="Invest $200 in Coca-Cola each month.",
+            language="en",
+            capital_amount=200,
+            confidence=0.95,
+            evidence_spans={"capital_amount": "$200"},
+        ),
+        request=request,
+        base_response=LLMInterpretationResponse(
+            intent="unsupported_or_out_of_scope",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="Invest $200 in Coca-Cola each month.",
+            candidate_strategy_draft=pending_draft,
+            semantic_turn_act="unsupported_request",
+        ),
+    )
+
+    assert response.intent == "backtest_execution"
+    assert response.missing_required_fields == []
+    assert response.candidate_strategy_draft.strategy_type == "dca_accumulation"
+    assert response.candidate_strategy_draft.capital_amount == 200
+    assert (
+        response.candidate_strategy_draft.field_provenance["capital_amount"]
+        == "recurring_contribution"
+    )
