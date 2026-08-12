@@ -28,9 +28,10 @@ evidence.
 - Web service: `argus-app`
 - Web deploy status:
 - Web deployed SHA:
-- Cron service: `argus-maintenance`
-- Cron deploy status (`live`, or `absent` if the blueprint is not applied yet):
-- Cron deployed SHA:
+- Workflow service: `argus-backtests`
+- Workflow version status:
+- Workflow released SHA:
+- Workflow version id:
 - Checked at:
 
 ## Environment Proof
@@ -41,8 +42,6 @@ evidence.
 - api_web_env_fingerprint:
 - workflow_env_fingerprint:
 - workflow_env_status:
-- cron_env_fingerprint:
-- cron_env_status:
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -69,8 +68,8 @@ evidence.
   - provider anonymous-user rate limit:
   - Argus per-IP guest-attempt limit:
 - Guest cleanup:
-  - command and schedule:
-  - owner / alert destination:
+  - operator-run command:
+  - explicit target:
   - dry-run selected:
   - real selected/deleted/preserved/failed:
   - cleanup lag:

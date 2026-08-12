@@ -28,10 +28,23 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     serialized = json.dumps(profile).lower()
 
     assert profile["release_mode"] == "real-workflow"
+    assert set(profile["services"]) == {"api", "web", "workflow"}
     assert profile["services"]["api"]["name"] == "argus-api"
     assert profile["services"]["web"]["name"] == "argus-app"
-    assert profile["services"]["cron"]["name"] == "argus-maintenance"
     assert profile["services"]["workflow"]["name"] == "argus-backtests"
+    assert profile["services"]["api"]["env"]["ARGUS_APP_ORIGIN"] == (
+        "https://arguschat.ai"
+    )
+    assert profile["services"]["api"]["env"]["ARGUS_CORS_ALLOW_ORIGINS"] == (
+        "https://argus-app-suz5.onrender.com,https://arguschat.ai,"
+        "https://www.arguschat.ai"
+    )
+    assert "ARGUS_CORS_ALLOW_ORIGINS" not in profile["services"]["api"][
+        "required_present"
+    ]
+    assert profile["services"]["web"]["env"]["ARGUS_APP_ORIGIN"] == (
+        "https://arguschat.ai"
+    )
     assert profile["workflow"]["real_task"] == "argus-backtests/run_backtest_job"
     assert profile["locales"]["supported"] == ["en", "es-419"]
     assert "chat.history.pinned" in profile["locales"]["required_static_keys"]
@@ -124,7 +137,7 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
         for service in render_blueprint["services"]
     }
 
-    for surface in ("api", "web", "cron"):
+    for surface in ("api", "web"):
         service_profile = profile["services"][surface]
         rendered_env = render_services[service_profile["name"]]
         expected_keys = set(service_profile["env"])

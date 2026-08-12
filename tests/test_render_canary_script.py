@@ -23,7 +23,7 @@ def test_canary_defaults_to_private_launch_urls() -> None:
     assert 'APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"' in source
     assert 'API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"' in source
     assert (
-        'ARGUS_PRIVATE_LAUNCH_APP_URL="https://argus-app-suz5.onrender.com"' in env_source
+        'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
     )
     assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"' in env_source
 
@@ -83,14 +83,10 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert '"$SCRIPT_DIR/render-env-sync.sh" api-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" web-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" workflow-version-status' in source
-    assert '"$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status' in source
     assert 'fail_canary "deploy_status" "api_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "web_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "workflow_version_commit_mismatch"' in source
     assert 'fail_canary "deploy_status" "workflow_version_id_mismatch"' in source
-    assert 'fail_canary "deploy_status" "cron_status_unavailable"' in source
-    assert 'fail_canary "deploy_status" "cron_deploy_not_live"' in source
-    assert 'fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"' in source
     assert 'fail_canary "release_profile" "release_profile_hash_mismatch"' in source
     assert "extract_warmup_value env_fingerprint" in source
     assert "extract_warmup_value workflow_env_fingerprint" in source
@@ -98,8 +94,8 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert "extract_warmup_value workflow_runtime_proof" in source
     assert "canary_expected_sha=$CANDIDATE_SHA" in source
     assert "canary_checked_out_sha=$CHECKED_OUT_SHA" in source
-    assert "canary_cron_deploy_status=$CRON_DEPLOY_STATUS" in source
-    assert "canary_cron_deploy_sha=$CRON_DEPLOY_SHA" in source
+    assert "cron-deploy-status" not in source
+    assert "canary_cron_deploy" not in source
 
 
 def test_canary_language_and_inputs_are_profile_owned() -> None:

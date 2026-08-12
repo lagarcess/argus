@@ -20,8 +20,9 @@ This runbook is for the first trusted-user internet tests on Render.
 
 ## Launch URLs
 
-- App: `https://argus-app-suz5.onrender.com`
-- API: `https://argus-ohr5.onrender.com`
+- App: `https://arguschat.ai`
+- API: `https://argus-ohr5.onrender.com` (current hostname; a custom API
+  hostname requires a separate founder decision)
 
 ## Before Tester Sessions
 
@@ -59,11 +60,13 @@ git rev-parse HEAD
 .github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
 ```
 
-3. In Render, sync the Blueprint from `render.yaml` only when service config
-   drift needs reconciliation.
+3. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
+   `argus-app` config drift needs reconciliation. Render Blueprints cannot
+   declare the `argus-backtests` Workflow service.
 4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-5. Confirm both services still have manual deploys enabled.
+5. Confirm the existing `argus-backtests` Workflow is Git-linked to this
+   repository and still has manual releases enabled.
 6. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
@@ -102,19 +105,15 @@ Restart `argus-api` after changing Render env values.
    every time, and never let a promotion finish with the three on different
    commits.
 
-   Do not create or deploy `argus-maintenance`. The cron remains deliberately
-   absent until a separate founder decision applies the blueprint.
-
 9. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
-   commits match the candidate commit you intend to test and that the latest
-   deploys are `live`. Also confirm the deliberately unapplied cron is still
-   absent:
+   commits match the candidate commit you intend to test and that their latest
+   versions are ready:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh api-deploy-status
 .github/render-env-sync.sh web-deploy-status
-.github/render-env-sync.sh cron-deploy-status
+.github/render-env-sync.sh workflow-version-status
 ```
 
 If any of the three deployed commits is not `ARGUS_RELEASE_SHA`, stop and deploy
@@ -122,11 +121,6 @@ that stale service before running the strict canaries. The canary script
 enforces the same deployed SHA/status check with `ARGUS_CANARY_SHA`, and its
 resolver compares all three, which is what caught the workflow service running
 behind on 2026-08-11.
-
-For the current promotion, `cron-deploy-status` must report `status=absent`. Any
-other cron status is a finding and a stop: do not deploy it as part of this
-promotion. A failed Render lookup is also a real failure, never proof of
-absence.
 
 10. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -210,9 +204,10 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-local smoke, warmup, the authoritative Spanish release canary, and the release
-manifest all pass against the intended candidate commit. If either deploy-status
-reports a different commit, deploy the candidate branch before continuing. If
+workflow version status, local smoke, warmup, the authoritative Spanish release
+canary, and the release manifest all pass against the intended candidate commit.
+If any service reports a different commit, deploy the candidate branch before
+continuing. If
 warmup fails, do not invite testers yet. Check Render service status and redeploy
 only if the service is stuck. If warmup passes but the canary fails, treat it as
 an Argus product-path regression and inspect the failed-capture replay, API logs,
@@ -289,10 +284,8 @@ name the candidate SHA, deployed API/web SHAs, `workflow_task`,
 `real_workflow_task`, backtest service mode, workflow-service proof for
 `argus-backtests`, canary evidence, rollback target, and approver.
 
-The stale job scan is a manual step today. The `argus-maintenance` cron service
-that would run it every fifteen minutes is declared in `render.yaml` and
-deliberately not created (see Scheduled Maintenance), so nothing runs this scan
-automatically.
+The stale job scan is an operator-run step. It is not a deployed release
+surface, and nothing runs it automatically.
 
 **Destructive ops jobs refuse to guess their target.** `DATABASE_URL`,
 `SUPABASE_URL` (or `SUPABASE_PROJECT_URL`), and `SUPABASE_SERVICE_ROLE_KEY`
@@ -391,50 +384,20 @@ profiles.
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
 
-## Scheduled Maintenance
+## Operator-Run Maintenance
 
-**The `argus-maintenance` service is declared but deliberately not created.**
-At current scale there is no accumulated guest data to delete and no stranded
-job to rescue, so an always-on paid service would buy nothing. Until it is
-created, every recurring janitor runs when an operator runs it, and the
-retention windows documented in `DATA_MODEL.md` hold exactly that often.
-
-Create it when running the scripts by hand becomes impractical, which is a
-guest-volume question rather than a date. Everything below describes the service
-as defined, so it is accurate the moment a blueprint sync creates it.
-
-It is declared in `render.yaml` and runs one entry point:
+Maintenance is not a Render service and is not part of the deployed release
+topology. An operator runs the retained entry point from a laptop against an
+explicit target:
 
 ```bash
 poetry run python scripts/ops/scheduled_maintenance.py
 ```
 
-That pass runs guest workspace retention first, then stale and stranded backtest
-job reconciliation, in that order. Every job runs even when an earlier one
-fails, so one failure never hides another.
-
-| Field | Value |
-| --- | --- |
-| Service | `argus-maintenance` (Render cron, `region: virginia`, `plan: starter`) |
-| Schedule | `*/15 * * * *`, UTC |
-| Owner | Render workspace owner for `lagarcess/argus` |
-| Alert destination | `support@get-argus.com`, via Render service notifications for `argus-maintenance` set to notify on failure |
-| Env contract | `ARGUS_RENDER_CRON_ENV` in `.github/argus-env.sh`, cron surface of `.github/private-alpha-release-profile.json` |
-
-Every fifteen minutes, not daily, because the reconciler's own stale thresholds
-are fifteen minutes (`DEFAULT_STALE_QUEUED_SECONDS` and
-`DEFAULT_STALE_RUNNING_SECONDS`). A slower schedule would mean a user whose job
-was stranded by a deploy waits the threshold plus the schedule gap. The same
-cadence raises the retention ceiling from one bounded batch per day to ninety
-six, so the seven-day guest window in `DATA_MODEL.md` holds under load instead
-of only at low volume. Both jobs are no-ops on an empty window and safe to run
-twice, so a retry costs a few cheap Supabase queries.
-
-This runs on Render, not as a GitHub Actions cron, because the job deletes
-production rows. Actions would put a production service-role key in a CI runner
-and make write access to a workflow file equal to production delete access.
-Render keeps the destructive step inside the boundary where that key already
-lives.
+That pass runs guest workspace retention first, then stale and stranded
+backtest job reconciliation. Every job runs even when an earlier one fails, so
+one failure never hides another. The retention windows in `DATA_MODEL.md` hold
+only as often as an operator runs this command.
 
 The pass exits nonzero if any job fails, and prints a final JSON summary line
 with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
@@ -442,24 +405,11 @@ with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
 `selected`/`auth_deleted`/`auth_delete_failed`/`purge_failed` counts, and the
 reconciler prints its scan report.
 
-Secrets stay manual on this service, same as `argus-api`: `DATABASE_URL`,
-`SUPABASE_SERVICE_ROLE_KEY`, `RENDER_API_KEY`, and `POSTHOG_PROJECT_TOKEN` are
-`sync: false` and must be set in Render before the first run. `RENDER_API_KEY`
-is what lets the reconciler read terminal task runs; without it the stale scan
-reports errors instead of reconciling.
-
-For the current promotion, the cron is deliberately absent and is not deployed.
-Both the canary and `release-config-audit` verify that absence:
-`cron-deploy-status` must report `status=absent`, and `cron_env_status` must be
-`absent`. Those values are read back from the Render API rather than assumed.
-
-If a later founder decision applies the blueprint and creates the service, it
-becomes a deployed release surface. From that point onward, promotions must
-verify its candidate SHA, live deploy state, and ready environment contract. To
-close such a later promotion, record one real scheduled run: the run timestamp,
-the summary line, and either nonzero selected/purged counts or documented zeros
-on an empty window. While the service remains absent, record the two absent
-statuses and the manual operator-job evidence instead.
+Provide `DATABASE_URL`, `SUPABASE_URL` or `SUPABASE_PROJECT_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, and `RENDER_API_KEY` only in the operator process.
+Do not copy production deletion credentials into CI. Record the command target,
+timestamp, final summary line, and selected or purged counts in operator
+evidence.
 
 ## Runtime Tuning Flags
 
@@ -522,13 +472,8 @@ site key, non-loopback production preserves the auth landing rather than
 beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
 as part of a code promotion.
 
-Guest cleanup is a manual step today. The `argus-maintenance` cron service that
-would run a bounded batch every fifteen minutes is declared in `render.yaml` but
-deliberately not created at current scale, so nothing runs this deletion
-automatically. Its owner, schedule, and alert destination are recorded under
-Scheduled Maintenance and take effect the moment the service is created.
-
-Until then the at-least-daily floor is an operator's responsibility, and the
+Guest cleanup is an operator-run step, and nothing runs this deletion
+automatically. The at-least-daily floor is an operator's responsibility, and the
 retention windows in `DATA_MODEL.md` hold exactly as often as someone runs the
 command below.
 

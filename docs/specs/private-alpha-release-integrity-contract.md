@@ -212,10 +212,9 @@ applied to successive candidates without editing policy.
 
 Release tooling validates the profile and computes a SHA-256 hash of its checked-
 in bytes. The candidate release manifest records that hash, environment
-fingerprints, the deployed SHA for API/web/workflow/cron, and behavioral
-evidence. All four deployed surfaces must resolve to the candidate SHA before
-the canary can pass. The cron surface is exempt only while the Render API
-reports no such service, because nothing destructive is then deployed.
+fingerprints, the deployed SHA for API/web/workflow, and behavioral
+evidence. All three deployed surfaces must resolve to the candidate SHA before
+the canary can pass.
 
 The profile is the desired non-secret release configuration. Release tooling
 must fail when `render.yaml`, the live Render service configuration, or the
