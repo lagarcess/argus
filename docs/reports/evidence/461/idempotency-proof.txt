@@ -47,7 +47,7 @@ Nearby exact-head proof:
 
 Earlier CI context supplied by the release captain:
 - Head 281ff6e8 ran 294 real-PostgreSQL tests with zero skips.
-- That run predates this final-candidate route-plus-real-gateway proof and does not satisfy the pending gate above.
+- That run did not satisfy this gate; the exact-head run above does.
 
 Release boundaries:
 - Hosted migration application remains unproven.
