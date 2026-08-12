@@ -446,7 +446,11 @@ def thorough_job_result(
                 "subjects": subjects,
                 "period_of_interest": query.period_of_interest,
                 "period_is_closed_window": query.period_is_closed_window,
-                "period_start_date": query.period_start_date,
+                "period_start_date": (
+                    query.period_start_date.isoformat()
+                    if query.period_start_date is not None
+                    else None
+                ),
                 "question_as_of_date": datetime.now(timezone.utc).date().isoformat(),
                 "question_kind": query.question_kind,
                 "requires_publisher_sources": requires_publisher_sources(query),

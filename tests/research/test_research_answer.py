@@ -107,6 +107,14 @@ def test_classifier_contract_marks_narrative_clauses_in_any_language(
     assert "period_start_date" in prompt
 
 
+def test_classifier_rejects_a_malformed_period_start_date() -> None:
+    with pytest.raises(ValueError):
+        ra.ResearchQueryExtraction(
+            question_kind="company_lookup",
+            period_start_date="last quarter",
+        )
+
+
 def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
     _classify(monkeypatch, question_kind="live_quote", symbols=["AAPL"])
     transport = _wire_client(monkeypatch, [agent_response()])

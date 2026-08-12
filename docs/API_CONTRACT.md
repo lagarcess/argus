@@ -3092,7 +3092,9 @@ Contract rules:
   most one page per publisher, and caps the drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
   When a current market pulse, screen, or sector radar has no explicit period,
-  the question date is its freshness lower bound.
+  the question date is its freshness lower bound. Classifier-supplied period
+  lower bounds are ISO-date typed; a malformed value is rejected instead of
+  turning a bounded question into an unbounded one.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around

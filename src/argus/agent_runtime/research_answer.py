@@ -17,7 +17,7 @@ symbol, strategy, action, or ask.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Literal
 
 from loguru import logger
@@ -74,7 +74,7 @@ class ResearchQueryExtraction(BaseModel):
     asset_class_hint: Literal["equity", "crypto", "currency_pair"] | None = None
     period_of_interest: str | None = None
     period_is_closed_window: bool = False
-    period_start_date: str | None = None
+    period_start_date: date | None = None
     requires_publisher_sources: bool = False
     date_range_raw_text: str | None = None
     discovery_category: str | None = None
