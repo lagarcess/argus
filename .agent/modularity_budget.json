@@ -115,6 +115,7 @@
     "tests/memory/test_postgres_store_controls.py": 1066,
     "src/argus/agent_runtime/stages/interpret_actions.py": 1062,
     "web/__tests__/use-conversation-activity.test.tsx": 1059,
+    "tests/test_render_canary_script.py": 1042,
     "src/argus/api/chat/backtest_jobs.py": 1037,
     "tests/agent_runtime/test_future_performance_admission.py": 1028,
     "tests/agent_runtime/test_refine_action_edit_routing.py": 1026,
