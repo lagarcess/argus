@@ -128,6 +128,8 @@ def _launch_validation_failure(
                 {
                     "category": "unsupported_starting_capital",
                     "raw_value": raw_value or error_code,
+                    "minimum": MIN_STARTING_CAPITAL,
+                    "maximum": MAX_STARTING_CAPITAL,
                     "explanation": (
                         "The backtest engine accepts starting capital between "
                         f"${MIN_STARTING_CAPITAL:,.0f} and "
