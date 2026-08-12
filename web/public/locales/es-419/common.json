@@ -1045,9 +1045,13 @@
         "messages": "Mensajes",
         "simulations": "Simulaciones",
         "left_today": "Quedan {{count}} hoy",
+        "left_today_one": "Queda {{count}} hoy",
+        "left_today_other": "Quedan {{count}} hoy",
         "used_of_limit": "{{used}} de {{limit}} usados hoy",
         "resets": "Se restablece {{time}}",
         "hourly_available": "{{count}} disponibles esta hora · se restablece {{time}}",
+        "hourly_available_one": "{{count}} disponible esta hora · se restablece {{time}}",
+        "hourly_available_other": "{{count}} disponibles esta hora · se restablece {{time}}",
         "what_counts": "¿Qué cuenta?",
         "loading": "Cargando uso…",
         "load_error": "No se pudo cargar el uso.",
@@ -1300,11 +1304,11 @@
     },
     "login": {
       "brand": "argus",
-      "subtitle": "Inicia sesion para continuar",
-      "email_placeholder": "Correo electronico",
-      "password_placeholder": "Contrasena",
+      "subtitle": "Inicia sesión para continuar",
+      "email_placeholder": "Correo electrónico",
+      "password_placeholder": "Contraseña",
       "submit": "Iniciar sesión",
-      "loading": "Iniciando sesion...",
+      "loading": "Iniciando sesión...",
       "errors": {
         "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
       }
@@ -1323,8 +1327,8 @@
       "continuing_prefix": "Al continuar, aceptas nuestros"
     },
     "password": {
-      "show": "Mostrar contrasena",
-      "hide": "Ocultar contrasena"
+      "show": "Mostrar contraseña",
+      "hide": "Ocultar contraseña"
     },
     "recovery": {
       "forgot": "¿Olvidaste tu contraseña?",

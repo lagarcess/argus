@@ -10,11 +10,13 @@ import {
   createChart,
   createSeriesMarkers,
   type BaselineData,
+  type IRange,
   type ISeriesApi,
   type ITimeScaleApi,
   type LogicalRange,
   type SeriesMarker,
   type Time,
+  type WhitespaceData,
 } from "lightweight-charts";
 import {
   deriveResultChartRanges,
@@ -78,6 +80,50 @@ export const RESULT_CHART_ATTRIBUTION_FOOTER_CLASS =
   "border-t border-black/[0.04] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.06] dark:text-white/45";
 const RESULT_CHART_ATTRIBUTION_HERO_FOOTER_CLASS =
   "border-t border-black/[0.035] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.055] dark:text-white/45";
+const RESULT_CHART_EDGE_GUTTER_PX = 24;
+
+export function paddedResultChartLogicalRange({
+  from,
+  to,
+  chartWidth,
+}: {
+  from: number;
+  to: number;
+  chartWidth: number;
+}): IRange<number> {
+  const orderedFrom = Math.min(from, to);
+  const orderedTo = Math.max(from, to);
+  const span = Math.max(1, orderedTo - orderedFrom);
+  const pixelDerivedPadding =
+    chartWidth > RESULT_CHART_EDGE_GUTTER_PX * 2
+      ? (span * RESULT_CHART_EDGE_GUTTER_PX) /
+        (chartWidth - RESULT_CHART_EDGE_GUTTER_PX * 2)
+      : 0.5;
+  const logicalPadding = Math.max(0.5, pixelDerivedPadding);
+  return {
+    from: orderedFrom - logicalPadding,
+    to: orderedTo + logicalPadding,
+  };
+}
+
+function resultChartDataForWindow(
+  data: BaselineData<Time>[],
+  window: VisibleWindow,
+): Array<BaselineData<Time> | WhitespaceData<Time>> {
+  const lastIndex = data.length - 1;
+  const from = Math.min(
+    lastIndex,
+    Math.max(0, Math.floor(Math.min(window.from, window.to))),
+  );
+  const to = Math.min(
+    lastIndex,
+    Math.max(0, Math.ceil(Math.max(window.from, window.to))),
+  );
+  if (from === 0 && to === lastIndex) return data;
+  return data.map((datum, index) =>
+    index >= from && index <= to ? datum : { time: datum.time },
+  );
+}
 
 export default function ResultEquityChart({
   chart,
@@ -102,6 +148,7 @@ export default function ResultEquityChart({
   const lastChartGestureAtRef = useRef(Number.NEGATIVE_INFINITY);
   const chartPointerDownRef = useRef(false);
   const visibleWindowRef = useRef<VisibleWindow | null>(null);
+  const applySeriesWindowRef = useRef<(window: VisibleWindow) => void>(() => {});
   const isDark = appearanceOverride
     ? appearanceOverride === "dark"
     : resolvedTheme === "dark";
@@ -184,25 +231,34 @@ export default function ResultEquityChart({
     setCustomError(null);
   }, [chart]);
 
+  const setVisualLogicalRange = (from: number, to: number) => {
+    const timeScale = timeScaleRef.current;
+    const chartWidth = containerRef.current?.clientWidth ?? 0;
+    if (!timeScale || chartWidth <= 0) return;
+    lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
+    timeScale.setVisibleLogicalRange(
+      paddedResultChartLogicalRange({ from, to, chartWidth }),
+    );
+  };
+
   const selectRange = (option: ResultChartRangeOption) => {
     setCustomError(null);
     if (option.key === "ALL") {
       resetToAll();
       return;
     }
-    timeScaleRef.current?.setVisibleLogicalRange({
-      from: option.startIndex,
-      to: option.endIndex,
-    });
-    setSelection(option.key);
     const window = { from: option.startIndex, to: option.endIndex };
+    applySeriesWindowRef.current(window);
+    setVisualLogicalRange(window.from, window.to);
+    setSelection(option.key);
     visibleWindowRef.current = window;
     setVisibleWindow(window);
   };
 
   const resetToAll = () => {
     setCustomError(null);
-    timeScaleRef.current?.fitContent();
+    applySeriesWindowRef.current(allWindow);
+    setVisualLogicalRange(allWindow.from, allWindow.to);
     setSelection("ALL");
     visibleWindowRef.current = allWindow;
     setVisibleWindow(allWindow);
@@ -230,12 +286,10 @@ export default function ResultEquityChart({
     }
     setCustomError(null);
     setDetailsOpen(false);
-    timeScaleRef.current?.setVisibleLogicalRange({
-      from: result.range.startIndex,
-      to: result.range.endIndex,
-    });
-    setSelection("CUSTOM");
     const window = { from: result.range.startIndex, to: result.range.endIndex };
+    applySeriesWindowRef.current(window);
+    setVisualLogicalRange(window.from, window.to);
+    setSelection("CUSTOM");
     visibleWindowRef.current = window;
     setVisibleWindow(window);
   };
@@ -330,10 +384,21 @@ export default function ResultEquityChart({
       priceLineVisible: false,
       lastValueVisible: false,
     });
-    series.setData(data);
+    const timeScale = chartApi.timeScale();
+    timeScaleRef.current = timeScale;
+    let semanticDataWindow: VisibleWindow | null =
+      visibleWindowRef.current ?? allWindow;
+    series.setData(resultChartDataForWindow(data, semanticDataWindow));
+    const markerRange = (visibleRange: LogicalRange | null) =>
+      semanticDataWindow
+        ? ({
+            from: semanticDataWindow.from,
+            to: semanticDataWindow.to,
+          } as LogicalRange)
+        : visibleRange;
     const visibleMarkerInput = {
       markers: chart.markers ?? [],
-      visibleRange: chartApi.timeScale().getVisibleLogicalRange(),
+      visibleRange: markerRange(timeScale.getVisibleLogicalRange()),
       chartWidth: container.clientWidth,
       dataIndexByTime,
       restrained: isHeroDeltaEvidence,
@@ -343,13 +408,11 @@ export default function ResultEquityChart({
       series as ISeriesApi<"Baseline", Time>,
       buildVisibleSeriesMarkers(visibleMarkerInput),
     );
-    const timeScale = chartApi.timeScale();
-    timeScaleRef.current = timeScale;
     const updateVisibleMarkers = (visibleRange: LogicalRange | null) => {
       markersApi.setMarkers(
         buildVisibleSeriesMarkers({
           markers: chart.markers ?? [],
-          visibleRange,
+          visibleRange: markerRange(visibleRange),
           chartWidth: container.clientWidth,
           dataIndexByTime,
           restrained: isHeroDeltaEvidence,
@@ -357,27 +420,44 @@ export default function ResultEquityChart({
         }),
       );
     };
+    const applySeriesWindow = (window: VisibleWindow) => {
+      semanticDataWindow = window;
+      series.setData(resultChartDataForWindow(data, window));
+      updateVisibleMarkers(timeScale.getVisibleLogicalRange());
+      setTooltip(null);
+    };
+    applySeriesWindowRef.current = applySeriesWindow;
     timeScale.subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
+    let semanticWindowWidth = container.clientWidth;
     const notifyVisibleWindow = (visibleRange: LogicalRange | null) => {
       if (!visibleRange || data.length === 0) return;
+      const manualGesture =
+        performance.now() - lastChartGestureAtRef.current < 1500;
+      // Autosize can publish a contracted logical range before our resize
+      // observer reapplies the selected semantic window. A range notification
+      // only belongs to the gesture while the chart is still at the width that
+      // produced that semantic selection.
+      const semanticWidthStillApplies =
+        Math.abs(container.clientWidth - semanticWindowWidth) < 0.5;
+      if (!manualGesture || !semanticWidthStillApplies) return;
       const lastIndex = data.length - 1;
       const from = Math.min(lastIndex, Math.max(0, Math.floor(visibleRange.from)));
       const to = Math.min(lastIndex, Math.max(0, Math.ceil(visibleRange.to)));
       visibleWindowRef.current = { from, to };
       setVisibleWindow({ from, to });
-      setSelection((previous) => {
-        if (previous === "CUSTOM" || rangeOptions.length === 0) return previous;
-        const expected = rangeOptions.find((option) => option.key === previous);
-        if (expected && expected.startIndex === from && expected.endIndex === to) {
-          return previous;
-        }
-        const manualGesture =
-          performance.now() - lastChartGestureAtRef.current < 1500;
-        return manualGesture ? "CUSTOM" : previous;
-      });
+      setSelection("CUSTOM");
     };
     timeScale.subscribeVisibleLogicalRangeChange(notifyVisibleWindow);
     const armChartGesture = () => {
+      // Programmatic ranges replace out-of-window observations with whitespace
+      // so their visual gutter cannot expose facts outside the stated period.
+      // A real pan or zoom starts free exploration, so restore the full series
+      // before the chart library processes that gesture.
+      if (semanticDataWindow) {
+        semanticDataWindow = null;
+        series.setData(data);
+        updateVisibleMarkers(timeScale.getVisibleLogicalRange());
+      }
       lastChartGestureAtRef.current = performance.now();
     };
     // Explicit gesture state: a press begins a potential drag; only pressed
@@ -414,17 +494,44 @@ export default function ResultEquityChart({
       releaseChartPress,
       gestureListenerOptions,
     );
-    // Recreations for theme/locale/size keep the explored viewport; only a new
-    // immutable chart payload resets it (see the chart-change effect above).
-    const restoredWindow = visibleWindowRef.current;
-    if (restoredWindow) {
-      timeScale.setVisibleLogicalRange({
-        from: restoredWindow.from,
-        to: restoredWindow.to,
+    const applySemanticWindow = () => {
+      // Recreations and responsive resizes keep the selected semantic window.
+      // Visual padding is recalculated from the current width so autosize
+      // cannot shrink the gutter or turn a passive resize into Custom.
+      const restoredWindow = visibleWindowRef.current ?? allWindow;
+      const chartWidth = container.clientWidth;
+      if (chartWidth <= 0) return;
+      lastChartGestureAtRef.current = Number.NEGATIVE_INFINITY;
+      semanticWindowWidth = chartWidth;
+      applySeriesWindow(restoredWindow);
+      timeScale.setVisibleLogicalRange(
+        paddedResultChartLogicalRange({
+          from: restoredWindow.from,
+          to: restoredWindow.to,
+          chartWidth,
+        }),
+      );
+    };
+    applySemanticWindow();
+    let resizeFrame: number | null = null;
+    const semanticWindowResizeObserver = new ResizeObserver((entries) => {
+      const latestEntry = entries[entries.length - 1];
+      const nextWidth = latestEntry?.contentRect.width ?? container.clientWidth;
+      if (
+        nextWidth <= 0 ||
+        Math.abs(nextWidth - semanticWindowWidth) < 0.5
+      ) {
+        return;
+      }
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      // Lightweight Charts autosizes synchronously in its ResizeObserver.
+      // Reapply after that observer so the final frame owns the new gutter.
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        applySemanticWindow();
       });
-    } else {
-      timeScale.fitContent();
-    }
+    });
+    semanticWindowResizeObserver.observe(container);
 
     chartApi.subscribeCrosshairMove((param) => {
       if (!param.point || param.time == null) {
@@ -452,6 +559,11 @@ export default function ResultEquityChart({
 
     return () => {
       setTooltip(null);
+      if (applySeriesWindowRef.current === applySeriesWindow) {
+        applySeriesWindowRef.current = () => {};
+      }
+      semanticWindowResizeObserver.disconnect();
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       container.removeEventListener(
         "pointerdown",
         beginChartPress,
@@ -484,6 +596,7 @@ export default function ResultEquityChart({
     };
   }, [
     chart,
+    allWindow,
     chartHeight,
     chartLocale,
     currencyFormatter,

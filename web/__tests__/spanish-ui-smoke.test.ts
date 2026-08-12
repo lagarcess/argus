@@ -80,6 +80,12 @@ describe("Spanish UI Smoke Harness", () => {
   ];
 
   const requiredSpanishStaticValues = {
+    "auth.login.email_placeholder": "Correo electrónico",
+    "auth.login.password_placeholder": "Contraseña",
+    "auth.login.subtitle": "Inicia sesión para continuar",
+    "auth.login.loading": "Iniciando sesión...",
+    "auth.password.show": "Mostrar contraseña",
+    "auth.password.hide": "Ocultar contraseña",
     "chat.strategy_type.buy_and_hold": "Comprar y mantener",
     "chat.history.pinned": "Anclados",
     "settings.sidebar.title": "Preferencia de barra lateral",
