@@ -40,19 +40,14 @@ operation that rewrites product ownership.
 
 ## API Flow
 
-### `POST /api/v1/auth/guest/signup`
+### `POST /api/v1/auth/guest/handoffs`
 
-The request combines ordinary signup fields with the guest source and optional
-typed pending action:
+Before account creation, the active guest prepares the durable transfer:
 
 ```json
 {
+  "handoff_kind": "new_account_signup",
   "email": "person@example.com",
-  "password": "strong-password",
-  "captcha_token": "fresh-turnstile-token",
-  "language": "en",
-  "display_name": "Alex",
-  "username": null,
   "source_conversation_id": "conversation-uuid",
   "pending_action": {
     "reason": "keep_history",
@@ -62,18 +57,40 @@ typed pending action:
 }
 ```
 
-The endpoint requires the current verified guest session and the same
-permanent-account access policy as ordinary signup. It serializes the normalized
-email and optional username, prepares or reuses one signup handoff, then calls
-Supabase password signup with a server-only one-time handoff proof.
+The response sets the existing handoff id and opaque-secret cookies before any
+provider mutation. A dropped signup response therefore cannot strand the new
+Auth user without the browser's claim ticket. The existing-account sign-in flow
+uses the same endpoint with its default `existing_account` kind.
+
+### `POST /api/v1/auth/guest/signup`
+
+The second request contains only ordinary signup fields:
+
+```json
+{
+  "email": "person@example.com",
+  "password": "strong-password",
+  "captcha_token": "fresh-turnstile-token",
+  "language": "en",
+  "display_name": "Alex",
+  "username": null
+}
+```
+
+The endpoint requires the current verified guest session, matching prepared
+handoff cookies, and the same permanent-account access policy as ordinary
+signup. It serializes the normalized email and optional username, validates the
+prepared signup handoff, then calls Supabase password signup with a server-only
+one-time handoff proof.
 
 The response uses the existing Auth response shape. `session: null` means the
 existing localized check-your-email state. An immediate session also carries
 the existing additive `guest_claim` object.
 
 The old `POST /api/v1/auth/guest/link` endpoint and anonymous-user update are
-removed. Expired guests use ordinary signup because their expired work is not
-recoverable.
+removed. The database finalizer for already-started legacy links remains for
+deployment compatibility, but the new runtime has no producer for it. Expired
+guests use ordinary signup because their expired work is not recoverable.
 
 ## Durable Handoff State
 
@@ -131,10 +148,12 @@ advisory lock before calling Supabase signup.
 - A provider response that is not bound by the trigger is treated as an
   existing-email conflict, never as a new account.
 
-An abandoned signup therefore leaves one source workspace, one pending
-handoff, and at most one destination Auth user. A retry inside the workspace's
-fixed seven-day lifetime resumes that state. No request silently merges into an
-account proved only by email.
+An abandoned signup therefore leaves one source workspace, one pending handoff,
+and at most one destination Auth user. If the first response is lost after Auth
+creation, the browser already holds the prepared handoff cookie; a same-email
+retry rotates that cookie, recognizes the bound unconfirmed UUID, and resends
+confirmation. A retry inside the workspace's fixed seven-day lifetime resumes
+that state. No request silently merges into an account proved only by email.
 
 ## Ownership and Evidence
 

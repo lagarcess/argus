@@ -1703,27 +1703,33 @@ defaults to `true` and controls presentation only. The independent
   guests remain usable until conversion, fixed expiry, or cleanup.
 - `POST /api/v1/auth/guest/signup` creates a new permanent Supabase Auth user
   through ordinary password signup. It never adds email/password credentials to
-  the anonymous Auth user. The request includes the source conversation and an
-  optional typed pending action, requires a fresh CAPTCHA token, and uses
+  the anonymous Auth user. It requires a fresh CAPTCHA token, a prepared
+  `new_account_signup` handoff cookie, and
   `permanent_account_access_allowed` as its permanent-account gate. When public
   account access is disabled, only active allowlisted roles may register; when
   enabled, any email not explicitly disabled may register.
-- Before provider signup, the guest signup route prepares or reuses one
-  cookie-bound `new_account_signup` handoff whose expiry equals the fixed guest
-  workspace expiry. A server-only proof in signup metadata lets a database
-  trigger bind the newly inserted Auth UUID to that handoff atomically and
-  remove the proof in the same transaction. If email confirmation is required,
-  the guest workspace remains active until first verified login claims it. If
-  signup returns a session immediately, the route claims it before returning.
+- Before provider signup, the client calls `POST /api/v1/auth/guest/handoffs`
+  with `handoff_kind=new_account_signup`, the source conversation, and optional
+  typed pending action. That response first sets the HttpOnly claim cookies for
+  a handoff whose expiry equals the fixed guest workspace expiry. The signup
+  route validates that prepared handoff. A server-only proof in signup metadata
+  lets a database trigger bind the newly inserted Auth UUID to the handoff
+  atomically and remove the proof in the same transaction. If email
+  confirmation is required, the guest workspace remains active until first
+  verified login claims it. If signup returns a session immediately, the route
+  claims it before returning.
 - Retrying the same unconfirmed guest signup resends the signup confirmation
   without changing the password or creating another Auth user. An email owned
   by any other permanent identity returns `409 account_exists_use_login` before
   provider mutation; transfer to an existing account still requires login.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
-  pending action to a ten-minute handoff without resolving whether that account
-  exists. The response exposes only the handoff id and expiry; the id and opaque
-  secret used for reconciliation exist in Secure/SameSite/HttpOnly cookies.
+  pending action without resolving whether that account exists. Its optional
+  `handoff_kind` defaults to `existing_account`, which expires in ten minutes;
+  `new_account_signup` expires with the fixed guest workspace. The response
+  exposes only the handoff id and expiry; the id and opaque secret used for
+  reconciliation exist in Secure/SameSite/HttpOnly cookies before any signup
+  provider mutation.
 - `POST /api/v1/auth/login` consumes a cookie-bound handoff before returning
   the permanent session. Its optional `guest_claim` contains the original
   conversation id and verified typed pending action. Retrying the same login
@@ -1866,20 +1872,15 @@ workspace through the existing handoff transaction.
   "captcha_token": "bounded-turnstile-token",
   "display_name": "Alex",
   "username": "alex",
-  "language": "es-419",
-  "source_conversation_id": "uuid",
-  "pending_action": {
-    "reason": "keep_history",
-    "conversation_id": "uuid",
-    "action_id": "opaque-action-id"
-  }
+  "language": "es-419"
 }
 ```
 
-The authenticated caller must be the active anonymous owner of
-`source_conversation_id`. `pending_action` is optional and follows the existing
-typed guest-handoff contract. CAPTCHA, language, username, and permanent-account
-access rules match ordinary signup.
+The authenticated caller must be the active anonymous owner recorded by a
+prepared `new_account_signup` handoff. Its HttpOnly cookies must match the
+request's normalized email. The handoff preparation request owns
+`source_conversation_id` and the optional typed `pending_action`. CAPTCHA,
+language, username, and permanent-account access rules match ordinary signup.
 
 **Confirmation-required response:**
 ```json
@@ -1889,10 +1890,11 @@ access rules match ordinary signup.
 }
 ```
 
-The response sets Secure/SameSite/HttpOnly handoff cookies through the guest
-workspace expiry. It does not replace the active guest session. The client shows
-the localized check-your-email state and must not refresh registered-account
-surfaces until confirmation and login complete the claim.
+The already prepared Secure/SameSite/HttpOnly handoff cookies remain valid
+through the guest workspace expiry. The response does not replace the active
+guest session. The client shows the localized check-your-email state and must
+not refresh registered-account surfaces until confirmation and login complete
+the claim.
 
 **Immediate-session response:**
 ```json

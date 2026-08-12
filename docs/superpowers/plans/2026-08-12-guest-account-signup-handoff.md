@@ -4,7 +4,7 @@
 
 **Goal:** Replace anonymous identity mutation with real account signup while preserving the complete guest workspace through an idempotent handoff.
 
-**Architecture:** A guest-only signup endpoint prepares a workspace-lifetime handoff, invokes ordinary Supabase password signup, and lets a database trigger bind the newly inserted Auth UUID atomically. The existing email-bound claim transaction remains the sole product-owner rewrite and runs immediately when signup returns a session or on first login after email confirmation.
+**Architecture:** The browser first prepares a workspace-lifetime handoff and receives its HttpOnly claim cookies. A guest-only signup endpoint then invokes ordinary Supabase password signup, and a database trigger binds the newly inserted Auth UUID atomically. The existing email-bound claim transaction remains the sole product-owner rewrite and runs immediately when signup returns a session or on first login after email confirmation.
 
 **Tech Stack:** FastAPI, Pydantic, Supabase Auth, PostgreSQL/PLpgSQL, React/Next.js, TypeScript, pytest, Vitest, Playwright.
 
@@ -55,10 +55,11 @@ not exist.
 - [ ] **Step 3: Add the minimal forward migration**
 
 Add `handoff_kind`, replace the expiry and destination foreign-key constraints,
-add the locked prepare RPC plus service-role-only wrapper, add the Auth insert
-binding trigger, and drop the legacy `finalize_linked_guest_identity`
-trigger/function. Keep transactions short and acquire handoff/workspace locks in
-the same order as claim.
+add the locked prepare RPC plus service-role-only wrapper, and add the Auth
+insert binding trigger. Retain the legacy `finalize_linked_guest_identity`
+trigger temporarily so email-change confirmations already in flight at deploy
+can finish, while removing its only runtime producer. Keep transactions short
+and acquire handoff/workspace locks in the same order as claim.
 
 - [ ] **Step 4: Apply to the disposable local database and run GREEN**
 
@@ -86,15 +87,16 @@ git commit -m "fix(auth): bind guest signup handoffs atomically"
 - Test: `tests/test_guest_auth_local_supabase.py`
 
 **Interfaces:**
-- Consumes: `public.prepare_guest_signup_handoff`, the existing claim RPC, and ordinary `SupabaseGateway.signup`.
-- Produces: `GuestAccountSignupRequest`, `serialized_guest_signup`, `create_guest_signup_handoff`, `get_auth_user_by_id`, `resend_signup_confirmation`, and `POST /api/v1/auth/guest/signup`.
+- Consumes: `public.prepare_guest_signup_handoff`, a prepared handoff cookie, the existing claim RPC, and ordinary `SupabaseGateway.signup`.
+- Produces: `GuestAccountSignupRequest`, `GuestHandoffKind`, `serialized_guest_signup`, `get_guest_signup_handoff`, `get_auth_user_by_id`, `resend_signup_confirmation`, and `POST /api/v1/auth/guest/signup`.
 
 - [ ] **Step 1: Replace old link tests with failing signup tests**
 
-Exercise the real route behavior: a fresh signup passes a nested proof to
-Supabase, confirmation-required responses retain the guest session and set the
-handoff cookies, immediate sessions claim the graph, bound unconfirmed retries
-resend without another signup call, and foreign existing emails return
+Exercise the real route behavior: signup requires a prepared matching handoff,
+a fresh signup passes its nested proof to Supabase, confirmation-required
+responses retain the guest session and pre-existing handoff cookies, immediate
+sessions claim the graph, bound unconfirmed retries resend without another
+signup call, and foreign existing emails return
 `409 account_exists_use_login` before provider mutation.
 
 - [ ] **Step 2: Run focused backend tests and observe RED**
@@ -112,7 +114,7 @@ The route branch order is:
 
 ```python
 with serialized_guest_signup(database_url, email, username) as prevalidation:
-    handoff = gateway.create_guest_signup_handoff(...)
+    handoff = gateway.get_guest_signup_handoff(prepared_cookie, ...)
     if prevalidation.auth_user_id:
         reconcile_only_if_same_bound_destination()
     else:
@@ -157,8 +159,9 @@ git commit -m "fix(auth): create permanent accounts for guest signup"
 
 - [ ] **Step 1: Add failing web behavior tests**
 
-Assert that active guest signup sends the current conversation and typed pending
-action to the guest signup route with a fresh CAPTCHA token. Assert that
+Assert that active guest signup first prepares a `new_account_signup` handoff
+with the current conversation and typed pending action, then sends ordinary
+signup fields with a fresh CAPTCHA token to the guest signup route. Assert that
 `session: null` returns `email_confirmation_required` without refreshing or
 closing, while an immediate session verifies `guest_claim` before refreshing
 account and Recents. Assert expired guests use ordinary signup and show the
@@ -175,10 +178,11 @@ do not exist.
 
 - [ ] **Step 3: Implement the web flow**
 
-Replace `linkGuestIdentity` with `registerGuestAccount`, acquire a new password
-CAPTCHA token, call the guest signup endpoint through authenticated `apiFetch`,
-and persist only a returned permanent session. Keep the modal open in the
-localized check-email state when confirmation is required.
+Replace `linkGuestIdentity` with `registerGuestAccount`, prepare the signup
+handoff before acquiring a new password CAPTCHA token, call the guest signup
+endpoint through authenticated `apiFetch`, and persist only a returned
+permanent session. Keep the modal open in the localized check-email state when
+confirmation is required.
 
 - [ ] **Step 4: Run focused web tests GREEN**
 
