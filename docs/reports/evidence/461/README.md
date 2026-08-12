@@ -1,6 +1,6 @@
 # Issue #461 access welcome evidence
 
-Status: historical deterministic, browser, external-message, and isolated-database evidence retained for issue #461. This file is not a terminal exact-head claim for the current PR #476 head.
+Status: historical deterministic, external-message, and isolated-database evidence plus current canonical-shell browser evidence for issue #461. This file is not a terminal exact-head claim for the current PR #476 head.
 
 ## Candidate identity
 
@@ -9,7 +9,7 @@ Status: historical deterministic, browser, external-message, and isolated-databa
 - Historical proven head: `1014c41db50250b22f3bae26fe105f62f17a3ebf`.
 - Historical GitHub Actions run: [31618243334](https://github.com/lagarcess/argus/actions/runs/31618243334), terminal success for that head.
 - Required isolated-database job: `guest-release-gates` job `94186292441`, terminal success.
-- Email implementation and code-owned HTML source head: `30f2830cad5ce08315c421289252bb7203d4afae`.
+- Canonical-shell implementation and screenshot-source head: `7ec58687a7f1bf0c1d6cf12472e0023caa25c7b1`.
 - Branch: `codex/issue-461-welcome-email`.
 - Content version: `private-alpha-access-welcome/v1`.
 - No hosted migration, production deploy, live canary, hosted application API call, or real application SMTP call occurred in Task 5. The original delivery migration was later applied to the PR preview, which is why the durable claim fix uses a new forward migration.
@@ -68,29 +68,32 @@ The eighth failure was candidate-specific but outside Task 5 ownership: `tests/t
 
 ## Browser rendering proof
 
-The screenshots are generated from `build_access_welcome_email` at source head `30f2830c`, using `https://argus.example/?auth=signup` as a non-production origin. The temporary EN and `es-419` files were the exact, unmodified builder HTML bytes. The server supplied `Content-Type: text/html; charset=utf-8`; the fixed viewport was set only through Playwright. No wrapper, `<head>`, `<meta>`, product copy, or style was added to the document.
+The screenshots are generated from `build_access_welcome_email` at source head `7ec58687`, using `https://argus.example/?auth=signup` as a non-production origin. That head changes only the HTML shell and its focused regression test. Subjects, plain text, bilingual product copy, first action, CTA destination, support copy, SMTP behavior, claim behavior, and content version are unchanged. The temporary EN and `es-419` files were the exact, unmodified builder HTML bytes. The server supplied `Content-Type: text/html; charset=utf-8`; the fixed viewport was set only through Playwright. No wrapper, `<head>`, `<meta>`, product copy, or style was added to the document.
 
 Before capture, the served response bodies compared byte-for-byte equal to the generated builder files. The exact screenshot-source HTML hashes were:
 
-- EN: `05cfb6b657d2e7b7c7ff2c2d239f5d9e3bc62875230db46622951f308c692226`.
-- `es-419`: `94d173aab4c75cc922b1cad9f2fd39697c0ef49f984460d038f59895e6e78ee4`.
+- EN: `88da4c1610694901491df99ff7a30869efd4b94dc534a52bcfbba7bcec39156b`.
+- `es-419`: `ffa09af4fb7b1c0a49aff4b5e80ae250d3819164e8d6504c64e82f82b006bef6`.
 
 Final Playwright captures used separate fresh contexts at the same fixed `602 x 900` mobile-friendly viewport. Each context explicitly reset horizontal and vertical scroll to zero. For both languages:
 
 - `document.characterSet` was `UTF-8`;
 - `document.head.innerHTML` was empty;
 - `scrollWidth` equaled the 602px viewport width;
-- the 560px email table occupied integer coordinates `x=21` through `x=581`;
+- the responsive 600px-max card occupied `x=16` through `x=586`, stayed inside the viewport, and had the canonical `#c9c9cd` border with a 20px radius;
+- the dark header loaded the canonical 192px Argus source image at a rendered 36px size, and the visible `ARGUS` wordmark used `letter-spacing:0.12em`;
+- the body and heading computed the canonical Inter and Space Grotesk fallback stacks;
 - the full CTA, fallback link, and support line were inside the capture;
 - the CTA target was `https://argus.example/?auth=signup`;
 - the computed CTA background was `rgb(25, 28, 31)` and radius was `9999px`.
+- the fallback URL computed to `rgb(48, 54, 179)` and the support footer had the canonical top border.
 
 | Evidence | SHA-256 | Inspection |
 | --- | --- | --- |
-| `welcome-email-en.png` | `6ece87cae32ab226b047274ecd89cbbb7c447b12c6070d88779ea79999937e13` | Full English copy, button, link, and support line visible |
-| `welcome-email-es-419.png` | `fd5a39da5d8270507fabc1742a23b225fa471eced183a03b5e5ce93e835c6fa0` | Full Spanish copy and accents visible, including `inversión`, `histórica`, `botón`, and `¿Tienes` |
+| `welcome-email-en.png` | `3b73852805a56d77e249e8381e02bae6aab492c10168fecbe59736d2825f7418` | Full canonical shell and English copy visible |
+| `welcome-email-es-419.png` | `2c887ebe95b9117efc40f242dffe844439e0455ef037ec6f4a6807ecab338435` | Full canonical shell and Spanish copy visible, including `inversión`, `histórica`, `botón`, and `¿Tienes` |
 
-The first Spanish capture was rejected because the temporary server did not declare UTF-8 and rendered mojibake. A later 430px capture also clipped the 560px email canvas. The English capture retained stale horizontal state during one retry. All rejected frames were overwritten. The final frames above serve exact builder bytes with UTF-8 supplied only by HTTP, use an integer-centered canvas and fresh zero-scroll contexts, and add nothing to the document. Standalone image inspection confirmed both corrected PNGs.
+The earlier bare-canvas screenshots were superseded because they did not match the live Supabase Auth shell. The final frames above serve exact builder bytes with UTF-8 supplied only by HTTP, use separate fresh zero-scroll contexts, and add nothing to the document. Standalone original-resolution inspection confirmed both corrected PNGs. An image-viewer cache showed a stale cropped Spanish raster on the first path reuse, so the current `2c887ebe` bytes were also inspected through a unique copy and showed the complete frame.
 
 ## External delivery proof
 
@@ -98,7 +101,7 @@ The release captain generated the exact English content from source head `30f283
 
 Fresh sanitized Gmail RAW evidence in `raw-header-proof.txt` confirms SPF, DKIM, and DMARC pass plus `multipart/alternative`, with `text/plain; charset=utf-8` and `text/html; charset=utf-8` child parts. The matching message was in Inbox, excluded Spam and Trash, and had no Spam match.
 
-The release captain compared both decoded Gmail MIME parts to builder output generated with that configured signup URL:
+The release captain compared both decoded Gmail MIME parts to the builder output generated with that configured signup URL at the historical pre-shell source head `30f2830c`:
 
 - builder plain SHA-256: `4185d5cfdf2075302f65f27ae1be57280e6a0736acdba85771d256e57f0ec742`;
 - decoded Gmail plain SHA-256 after CRLF-to-LF canonicalization: the same hash, equality true;
@@ -107,17 +110,17 @@ The release captain compared both decoded Gmail MIME parts to builder output gen
 
 Plain-text canonicalization removed transport CRLF differences only. It did not change content.
 
-This is connector-owned external delivery proof. It does not claim that the connector executed `send_access_welcome_email` or the hosted application's SMTP path. Deterministic production SMTP tests separately prove that the code emits `Argus <noreply@get-argus.com>` and preserves its multipart, idempotency-key, and acceptance behavior.
+This is connector-owned external delivery and transport-authentication proof for the unchanged sender and SMTP path. Its HTML body predates the canonical-shell correction and is not current visual or byte-equality proof for head `7ec58687`. It does not claim that the connector executed `send_access_welcome_email` or the hosted application's SMTP path. Deterministic production SMTP tests separately prove that the current code emits `Argus <noreply@get-argus.com>` and preserves its multipart, idempotency-key, and acceptance behavior.
 
 ## Retained artifact classification
 
-- `welcome-email-en.png` and `welcome-email-es-419.png` are retained visual and
-  copy evidence from the recorded builder heads. The durable-claim and canary
-  fixes do not change email copy, HTML, CTA styling, or signup URL construction,
-  so the captures remain relevant historical evidence and were not recaptured.
+- `welcome-email-en.png` and `welcome-email-es-419.png` are current visual and
+  copy evidence from canonical-shell source head `7ec58687`. The following
+  evidence-only commit changes the PNG files and this report, not the builder.
 - `raw-header-proof.txt` is retained historical external-delivery evidence for
-  the message content and transport-authentication result. It does not prove
-  the current protected route, claim RPC, new migration, or PR head.
+  the unchanged sender and transport-authentication result. Its HTML body uses
+  the superseded pre-shell layout, so it does not prove the current render,
+  protected route, claim RPC, new migration, or PR head.
 - `idempotency-proof.txt` is retained as historical route and isolated-database
   evidence at `1014c41d`. Its terminal-head classification is superseded. The
   new pre-send claim, crash-window, privilege, rollback, and canary behavior
