@@ -20,7 +20,6 @@ from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
 )
-from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
 from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
@@ -233,8 +232,7 @@ def _merge_focused_repair_with_base(
             for key, value in getattr(base, channel).items()
             if not _llm_value_is_empty(value)
             and not (
-                channel == "extra_parameters"
-                and key in _REPAIR_MERGE_CLASSIFICATION_KEYS
+                channel == "extra_parameters" and key in _REPAIR_MERGE_CLASSIFICATION_KEYS
             )
         }
         for key, value in getattr(draft, channel).items():
@@ -397,6 +395,16 @@ def response_from_focused_strategy_extraction(
     base_response: LLMInterpretationResponse | None = None,
     resolve_asset_candidate: ResolveAssetCandidate,
 ) -> LLMInterpretationResponse:
+    snapshot = request.latest_task_snapshot
+    is_pending_strategy_answer = bool(
+        snapshot
+        and (
+            snapshot.pending_strategy_summary
+            or snapshot.confirmed_strategy_summary
+            or snapshot.active_confirmation_reference
+        )
+        and str(request.selected_thread_metadata.get("requested_field") or "").strip()
+    )
     strategy_type = executable_strategy_type_from_extracted_fields(
         extraction.model_dump(mode="python")
     )
@@ -483,7 +491,7 @@ def response_from_focused_strategy_extraction(
         intent="strategy_drafting"
         if extraction.requires_clarification
         else "backtest_execution",
-        task_relation="new_task",
+        task_relation="continue" if is_pending_strategy_answer else "new_task",
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
         candidate_strategy_draft=LLMStrategyDraft(
@@ -520,7 +528,9 @@ def response_from_focused_strategy_extraction(
         assistant_response=extraction.assistant_response,
         confidence=extraction.confidence,
         reason_codes=["focused_strategy_extraction_repair"],
-        semantic_turn_act="new_idea",
+        semantic_turn_act=(
+            "answer_pending_need" if is_pending_strategy_answer else "new_idea"
+        ),
     )
     response = _merge_focused_repair_with_base(
         response=response,
@@ -567,26 +577,19 @@ def strategy_extraction_repair_is_allowed(
             "conversation_followup",
         }:
             return False
+        has_active_context = has_active_strategy_context(request)
+        has_material_evidence = current_turn_has_material_execution_evidence(request)
+        if has_active_context and (
+            not str(request.selected_thread_metadata.get("requested_field") or "").strip()
+            or not has_material_evidence
+        ):
+            return False
         if not response.unsupported_constraints:
-            # Extraction must not invent a strategy frame for a turn whose own
-            # draft shows nothing to run (a statistics question naming an
-            # asset). A stated thesis or execution field is the model asserting
-            # there is an idea to extract; a verbatim echo of the message is not.
-            draft = response.candidate_strategy_draft
-            thesis = str(draft.strategy_thesis or "").strip()
-            return strategy_has_execution_evidence(draft) or (
-                bool(thesis)
-                and thesis != str(draft.raw_user_phrasing or "").strip()
-                and thesis != request.current_user_message.strip()
-            )
+            return has_material_evidence
         if not any(
             item.category == "unsupported_strategy_logic"
             for item in response.unsupported_constraints
         ):
-            return False
-        if has_active_strategy_context(
-            request
-        ) and not current_turn_has_material_execution_evidence(request):
             return False
         return bool(
             response.candidate_strategy_draft.raw_user_phrasing
