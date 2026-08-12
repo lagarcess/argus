@@ -12,14 +12,12 @@ import os
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Literal
-from zoneinfo import ZoneInfo
 
 from argus.domain.market_data.capabilities import (
+    EASTERN,
     EquityMarketSession,
     fetch_alpaca_market_calendar,
 )
-
-EASTERN = ZoneInfo("America/New_York")
 
 # Extended-hours bounds for US equities, Eastern. The regular open and close
 # come from the calendar per session, because half days move them.
