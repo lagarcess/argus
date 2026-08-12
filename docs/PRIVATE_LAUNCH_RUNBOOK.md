@@ -21,17 +21,22 @@ This runbook is for the first trusted-user internet tests on Render.
 ## Launch URLs
 
 - App: `https://arguschat.ai`
-- API: `https://argus-ohr5.onrender.com` (current hostname; a custom API
-  hostname requires a separate founder decision)
+- API: `https://argus-ohr5.onrender.com`. Founder decision, 2026-08-11: keep
+  this hostname for the active promotion and revisit a custom API hostname
+  deliberately later. Users do not see the API hostname. Moving to a host such
+  as `api.arguschat.ai` requires an `argus-app` rebuild because
+  `NEXT_PUBLIC_ARGUS_API_URL` is baked into the web bundle at build time.
 
 ## Before Tester Sessions
 
 The promotion target is `main`, but `codex/private-alpha-next` remains the
 integration staging branch until the founder approves promotion. Do not merge
 to `main` or open a release PR before that approval. After the approved commit
-lands on the configured deployment branch, `checksPass` autodeploy waits for
-its checks and promotion still follows the gate below. Every candidate needs a
-release manifest before testers are invited; start from
+lands on the configured deployment branch, use the live Render deploy mode the
+founder deliberately approved. Manual deployment remains valid until the
+founder explicitly enables `checksPass` for all three services. Every candidate
+still follows the gate below and needs a release manifest before testers are
+invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
 API/web env fingerprint, workflow-service proof, canary evidence, rollback
 target, autodeploy proof for all three services, and approver.
@@ -61,16 +66,42 @@ git rev-parse HEAD
 .github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
 ```
 
+> [!WARNING]
+> **A Blueprint sync enables autodeploy after #470.** The repository declares
+> `autoDeployTrigger: checksPass`, but live Render was returned to manual
+> (`off`) for `argus-api`, `argus-app`, and `argus-backtests` on 2026-08-12
+> while the active promotion completes. After #470 is promoted, a Blueprint
+> sync directly turns `checksPass` on for the API and app even if the operator
+> intended only to reconcile unrelated configuration. The companion Workflow
+> API sync reads the same target from the release profile and turns it on for
+> `argus-backtests`. The normal three-service configuration sync can therefore
+> enable autodeploy for all three as a side effect of syncing configuration,
+> not as the result of a fresh deployment decision. Before step 3, obtain an
+> explicit founder decision to enable autodeploy. Without that decision, keep
+> all three live triggers manual and deploy all three services explicitly.
+
 3. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
    `argus-app` config drift needs reconciliation. Render Blueprints cannot
-   declare the `argus-backtests` Workflow service, so
-   `.github/render-env-sync.sh workflow-runtime` owns its matching runtime
-   configuration.
+   declare the `argus-backtests` Workflow service. Its release contract is held
+   in four separate places that must agree:
+
+   - the release profile declares the Workflow runtime and deploy target;
+   - `.github/render-env-sync.sh workflow-runtime` applies that target through
+     the Render Workflow API;
+   - `release-config-audit` reads the live Workflow configuration back;
+   - steps 8 and 9 deploy `argus-backtests` and prove its ready version matches
+     the same candidate as the API and app.
+
+   If any one of these four controls drifts, `argus-backtests` can stay stale
+   even while the API and app advance, which is the failure caught on
+   2026-08-11.
 4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-5. Confirm `argus-api`, `argus-app`, and the Git-linked `argus-backtests`
-   Workflow each use `checksPass` autodeploy. Do not enable autodeploy for only
-   a subset of the three.
+5. Confirm the live deploy mode matches the deliberate founder decision and is
+   uniform across `argus-api`, `argus-app`, and the Git-linked
+   `argus-backtests` Workflow: either all three are manual (`off`) or all three
+   use `checksPass`. Never enable autodeploy for only a subset of the three.
+   The repository target is not proof that live enablement was approved.
 6. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
@@ -100,8 +131,9 @@ Restart `argus-api` after changing Render env values.
 8. Deploy **all three live services** from the candidate commit:
    `argus-api`, then `argus-app`, then **`argus-backtests`**.
 
-   A commit on the configured deployment branch deploys after its checks pass.
-   For a manually deployed candidate, use the same three-service order.
+   When all three live triggers use `checksPass`, a commit on the configured
+   deployment branch deploys after its checks pass. In manual mode, explicitly
+   deploy the candidate using the same three-service order.
 
    **`argus-backtests` is the easiest one to forget and the one that breaks the
    canary.** It is the Render Workflow service that actually runs backtests, it
