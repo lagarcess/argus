@@ -7,7 +7,7 @@ services:
     rootDir: .
     region: virginia
     plan: standard
-    autoDeployTrigger: off
+    autoDeployTrigger: checksPass
     buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
     startCommand: poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -149,7 +149,7 @@ services:
     rootDir: web
     region: virginia
     plan: starter
-    autoDeployTrigger: off
+    autoDeployTrigger: checksPass
     buildCommand: npm install -g bun && bun install --frozen-lockfile && bun run build
     startCommand: bun run start -- -p $PORT
     envVars:

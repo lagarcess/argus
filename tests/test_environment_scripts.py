@@ -106,6 +106,9 @@ def _run_render_release_audit(
     api_env_json: str,
     web_env_json: str,
     workflow_env_json: str | None = None,
+    api_service_json: str | None = None,
+    web_service_json: str | None = None,
+    workflow_service_json: str | None = None,
     expect_mode: str = "safe-off",
     isolate: bool = False,
 ) -> subprocess.CompletedProcess[str]:
@@ -117,15 +120,18 @@ def _run_render_release_audit(
         """#!/bin/bash
 printf "%s\\n" "$*" >> "$FAKE_CURL_REQUEST_LOG"
 case "$*" in
-  *"$FAKE_API_SERVICE_ID"*)
+  *"/services/$FAKE_API_SERVICE_ID/env-vars"*)
     printf "%s" "$FAKE_API_ENV_JSON"
     ;;
-  *"$FAKE_WEB_SERVICE_ID"*)
+  *"/services/$FAKE_WEB_SERVICE_ID/env-vars"*)
     printf "%s" "$FAKE_WEB_ENV_JSON"
     ;;
-  *"$FAKE_WORKFLOW_SERVICE_ID"*)
+  *"/services/$FAKE_WORKFLOW_SERVICE_ID/env-vars"*)
     printf "%s" "$FAKE_WORKFLOW_ENV_JSON"
     ;;
+  *"/services/$FAKE_API_SERVICE_ID"*) printf "%s" "$FAKE_API_SERVICE_JSON" ;;
+  *"/services/$FAKE_WEB_SERVICE_ID"*) printf "%s" "$FAKE_WEB_SERVICE_JSON" ;;
+  *"/workflows/$FAKE_WORKFLOW_SERVICE_ID"*) printf "%s" "$FAKE_WORKFLOW_SERVICE_JSON" ;;
   *)
     echo "unexpected curl request: $*" >&2
     exit 9
@@ -147,6 +153,12 @@ esac
             "FAKE_API_ENV_JSON": api_env_json,
             "FAKE_WEB_ENV_JSON": web_env_json,
             "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
+            "FAKE_API_SERVICE_JSON": api_service_json
+            or json.dumps({"autoDeployTrigger": "checksPass"}),
+            "FAKE_WEB_SERVICE_JSON": web_service_json
+            or json.dumps({"autoDeployTrigger": "checksPass"}),
+            "FAKE_WORKFLOW_SERVICE_JSON": workflow_service_json
+            or json.dumps({"autoDeployTrigger": "checksPass"}),
             "FAKE_CURL_REQUEST_LOG": str(request_log),
         }
     )
@@ -632,6 +644,28 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
+    assert "release_profile_auto_deploy_trigger workflow" in source
+    assert "autoDeployTrigger: $auto_deploy_trigger" in source
+    assert 'autoDeployTrigger: "off"' not in source
+
+
+def test_release_contract_enables_checks_passing_autodeploy_for_all_three() -> None:
+    profile = json.loads(
+        _source(".github/private-alpha-release-profile.json")
+    )
+    render_config = yaml.safe_load(_source("render.yaml"))
+    render_by_name = {service["name"]: service for service in render_config["services"]}
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+
+    for surface in ("api", "web", "workflow"):
+        assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
+    assert render_by_name["argus-api"]["autoDeployTrigger"] == "checksPass"
+    assert render_by_name["argus-app"]["autoDeployTrigger"] == "checksPass"
+    assert "argus-backtests" not in render_by_name
+    assert "checksPass" in runbook
+    assert "argus-api" in runbook
+    assert "argus-app" in runbook
+    assert "argus-backtests" in runbook
 
 
 def test_render_env_sync_workflow_proof_uses_the_profile_live_provider_mode() -> None:
@@ -886,8 +920,30 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
         result.stdout
     )
     assert "workflow_env_status=ready" in result.stdout
+    assert "autodeploy_status=ready" in result.stdout
     assert "status=ready" in result.stdout
     assert "postgres://workflow-db.example/argus" not in result.stdout
+
+
+def test_render_env_sync_audit_fails_when_one_autodeploy_surface_is_off(
+    tmp_path: Path,
+) -> None:
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="real-workflow",
+        api_env_json=_real_workflow_api_env_payload(),
+        web_env_json=_render_env_payload("argus-app"),
+        workflow_env_json=_workflow_env_payload(),
+        workflow_service_json=json.dumps({"autoDeployTrigger": "off"}),
+    )
+
+    assert result.returncode == 1
+    assert (
+        "drift argus-backtests:autoDeployTrigger "
+        "expected=checksPass actual=off" in result.stdout
+    )
+    assert "autodeploy_status=drift" in result.stdout
+    assert "status=drift" in result.stdout
 
 
 def test_render_env_sync_audit_compares_the_transition_cors_allowlist(

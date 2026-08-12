@@ -220,6 +220,8 @@ The profile is the desired non-secret release configuration. Release tooling
 must fail when `render.yaml`, the live Render service configuration, or the
 effective API/web/workflow modes disagree with it; secrets remain in the
 deployment control plane and are checked only by presence/fingerprint.
+The same audit verifies that API, web, and workflow each use `checksPass`
+autodeploy. A two-of-three configuration is drift.
 
 ### 5.2 Validation modes
 

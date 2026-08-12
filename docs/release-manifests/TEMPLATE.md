@@ -42,6 +42,9 @@ evidence.
 - api_web_env_fingerprint:
 - workflow_env_fingerprint:
 - workflow_env_status:
+- autodeploy_fingerprint:
+- autodeploy_status:
+- all three services use `checksPass`:
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -50,6 +53,7 @@ evidence.
 - Backtest service mode:
 - Workflow service proof:
   - `argus-backtests` latest deploy/status:
+  - workflow autodeploy verified: `checksPass`
   - workflow provider mode verified: `live_provider`
   - effective runtime provider mode verified: `live_provider`
   - effective runtime proof status:

@@ -27,13 +27,14 @@ This runbook is for the first trusted-user internet tests on Render.
 ## Before Tester Sessions
 
 The promotion target is `main`, but `codex/private-alpha-next` remains the
-integration staging branch until the founder approves promotion. Do not merge to
-`main`, open a release PR, or deploy production automatically; after founder
-approval, promotion still follows the gate below. Every candidate needs a
+integration staging branch until the founder approves promotion. Do not merge
+to `main` or open a release PR before that approval. After the approved commit
+lands on the configured deployment branch, `checksPass` autodeploy waits for
+its checks and promotion still follows the gate below. Every candidate needs a
 release manifest before testers are invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
 API/web env fingerprint, workflow-service proof, canary evidence, rollback
-target, and approver.
+target, autodeploy proof for all three services, and approver.
 
 Local preflight doctrine:
 
@@ -62,11 +63,14 @@ git rev-parse HEAD
 
 3. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
    `argus-app` config drift needs reconciliation. Render Blueprints cannot
-   declare the `argus-backtests` Workflow service.
+   declare the `argus-backtests` Workflow service, so
+   `.github/render-env-sync.sh workflow-runtime` owns its matching runtime
+   configuration.
 4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-5. Confirm the existing `argus-backtests` Workflow is Git-linked to this
-   repository and still has manual releases enabled.
+5. Confirm `argus-api`, `argus-app`, and the Git-linked `argus-backtests`
+   Workflow each use `checksPass` autodeploy. Do not enable autodeploy for only
+   a subset of the three.
 6. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
@@ -93,8 +97,11 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Manually deploy **all three live services** from the candidate commit:
+8. Deploy **all three live services** from the candidate commit:
    `argus-api`, then `argus-app`, then **`argus-backtests`**.
+
+   A commit on the configured deployment branch deploys after its checks pass.
+   For a manually deployed candidate, use the same three-service order.
 
    **`argus-backtests` is the easiest one to forget and the one that breaks the
    canary.** It is the Render Workflow service that actually runs backtests, it

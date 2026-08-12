@@ -80,6 +80,10 @@ def validate_profile(profile: dict[str, Any]) -> None:
         service = _require_mapping(services.get(surface), f"services.{surface}")
         if service.get("name") != expected_name:
             raise ProfileValidationError(f"services.{surface}.name must be {expected_name}")
+        if service.get("auto_deploy_trigger") != "checksPass":
+            raise ProfileValidationError(
+                f"services.{surface}.auto_deploy_trigger must be checksPass"
+            )
         env = _require_mapping(service.get("env"), f"services.{surface}.env")
         if not env or not all(isinstance(key, str) and isinstance(value, str) for key, value in env.items()):
             raise ProfileValidationError(f"services.{surface}.env must contain string pairs")
@@ -199,6 +203,15 @@ def env_value(profile: dict[str, Any], surface: str, key: str) -> str:
         ) from exc
 
 
+def auto_deploy_trigger(profile: dict[str, Any], surface: str) -> str:
+    value = profile["services"][surface].get("auto_deploy_trigger")
+    if not isinstance(value, str) or not value:
+        raise ProfileValidationError(
+            f"services.{surface}.auto_deploy_trigger must be a string"
+        )
+    return value
+
+
 def _nested_value(payload: dict[str, Any], path: str) -> str:
     current: object = payload
     for part in path.split("."):
@@ -243,6 +256,8 @@ def main() -> int:
     env_value_parser = subparsers.add_parser("env-value")
     env_value_parser.add_argument("surface", choices=SURFACES)
     env_value_parser.add_argument("key")
+    autodeploy_parser = subparsers.add_parser("auto-deploy-trigger")
+    autodeploy_parser.add_argument("surface", choices=SURFACES)
     present_parser = subparsers.add_parser("required-present")
     present_parser.add_argument("surface", choices=SURFACES)
     allowed_parser = subparsers.add_parser("allowed-keys")
@@ -274,6 +289,8 @@ def main() -> int:
             print("\n".join(env_pairs(profile, args.surface)))
         elif args.command == "env-value":
             print(env_value(profile, args.surface, args.key))
+        elif args.command == "auto-deploy-trigger":
+            print(auto_deploy_trigger(profile, args.surface))
         elif args.command == "required-present":
             print("\n".join(required_present(profile, args.surface)))
         elif args.command == "allowed-keys":

@@ -32,6 +32,8 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert profile["services"]["api"]["name"] == "argus-api"
     assert profile["services"]["web"]["name"] == "argus-app"
     assert profile["services"]["workflow"]["name"] == "argus-backtests"
+    for surface in ("api", "web", "workflow"):
+        assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
     assert profile["services"]["api"]["env"]["ARGUS_APP_ORIGIN"] == (
         "https://arguschat.ai"
     )
@@ -109,6 +111,10 @@ def test_profile_utility_validates_hashes_and_emits_expected_pairs() -> None:
     assert allowed_keys.returncode == 0, allowed_keys.stderr
     assert "NEXT_PUBLIC_POSTHOG_KEY" in allowed_keys.stdout
 
+    workflow_autodeploy = _profile_utility("auto-deploy-trigger", "workflow")
+    assert workflow_autodeploy.returncode == 0, workflow_autodeploy.stderr
+    assert workflow_autodeploy.stdout.strip() == "checksPass"
+
 
 def test_profile_utility_resolves_required_spanish_static_key_values() -> None:
     result = _profile_utility("static-key-values", "es-419")
@@ -139,6 +145,14 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
 
     for surface in ("api", "web"):
         service_profile = profile["services"][surface]
+        rendered_service = next(
+            service
+            for service in render_blueprint["services"]
+            if service["name"] == service_profile["name"]
+        )
+        assert rendered_service["autoDeployTrigger"] == service_profile[
+            "auto_deploy_trigger"
+        ]
         rendered_env = render_services[service_profile["name"]]
         expected_keys = set(service_profile["env"])
         expected_keys.update(service_profile["required_present"])

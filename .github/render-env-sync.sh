@@ -91,6 +91,11 @@ release_profile_env_value() {
   python3 "$RELEASE_PROFILE_TOOL" env-value "$surface" "$key"
 }
 
+release_profile_auto_deploy_trigger() {
+  local surface="$1"
+  python3 "$RELEASE_PROFILE_TOOL" auto-deploy-trigger "$surface"
+}
+
 release_profile_required_present() {
   local surface="$1"
   python3 "$RELEASE_PROFILE_TOOL" required-present "$surface"
@@ -105,6 +110,8 @@ AUDIT_FAILURES=0
 AUDIT_FINGERPRINT_ROWS=()
 WORKFLOW_AUDIT_FAILURES=0
 WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
+AUTODEPLOY_AUDIT_FAILURES=0
+AUTODEPLOY_AUDIT_FINGERPRINT_ROWS=()
 
 require_local_env() {
   local name="$1"
@@ -162,6 +169,16 @@ render_env_json() {
   curl -fsS \
     --request GET \
     --url "https://api.render.com/v1/services/${service_id}/env-vars?limit=100" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json"
+}
+
+render_service_json() {
+  local service_id="$1"
+
+  curl -fsS \
+    --request GET \
+    --url "https://api.render.com/v1/services/${service_id}" \
     --header "Authorization: Bearer ${RENDER_API_KEY}" \
     --header "Accept: application/json"
 }
@@ -608,6 +625,33 @@ workflow_env_fingerprint() {
   fingerprint_rows "${WORKFLOW_AUDIT_FINGERPRINT_ROWS[@]}"
 }
 
+autodeploy_fingerprint() {
+  fingerprint_rows "${AUTODEPLOY_AUDIT_FINGERPRINT_ROWS[@]}"
+}
+
+audit_render_auto_deploy_trigger() {
+  local config_json="$1"
+  local service_name="$2"
+  local expected="$3"
+  local actual
+
+  actual="$(
+    jq -r \
+      '.autoDeployTrigger // .service.autoDeployTrigger // "<missing>"' \
+      <<< "$config_json"
+  )"
+  AUTODEPLOY_AUDIT_FINGERPRINT_ROWS+=(
+    "${service_name}:autoDeployTrigger=${actual}"
+  )
+  if [ "$actual" = "$expected" ]; then
+    echo "ok ${service_name}:autoDeployTrigger=${actual}"
+    return 0
+  fi
+  echo "drift ${service_name}:autoDeployTrigger expected=${expected} actual=${actual}"
+  AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
+  AUTODEPLOY_AUDIT_FAILURES=$((AUTODEPLOY_AUDIT_FAILURES + 1))
+}
+
 audit_release_config() {
   local expected_mode=""
   while [ "$#" -gt 0 ]; do
@@ -651,8 +695,12 @@ audit_release_config() {
   AUDIT_FINGERPRINT_ROWS=()
   WORKFLOW_AUDIT_FAILURES=0
   WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
+  AUTODEPLOY_AUDIT_FAILURES=0
+  AUTODEPLOY_AUDIT_FINGERPRINT_ROWS=()
 
   local api_env_json web_env_json workflow_env_json workflow_task real_workflow_task fingerprint workflow_fingerprint
+  local api_service_json web_service_json workflow_service_json autodeploy_fingerprint_value
+  local api_autodeploy_trigger web_autodeploy_trigger workflow_autodeploy_trigger
   local mode_pairs=()
   local mode_pair
   local workflow_pairs=()
@@ -692,6 +740,12 @@ audit_release_config() {
   fi
   api_env_json="$(render_env_json "$API_SERVICE_ID")"
   web_env_json="$(render_env_json "$WEB_SERVICE_ID")"
+  api_service_json="$(render_service_json "$API_SERVICE_ID")"
+  web_service_json="$(render_service_json "$WEB_SERVICE_ID")"
+  workflow_service_json="$(render_workflow_json)"
+  api_autodeploy_trigger="$(release_profile_auto_deploy_trigger api)"
+  web_autodeploy_trigger="$(release_profile_auto_deploy_trigger web)"
+  workflow_autodeploy_trigger="$(release_profile_auto_deploy_trigger workflow)"
   if [ "$audit_workflow_env" = "true" ]; then
     workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
   else
@@ -708,6 +762,18 @@ audit_release_config() {
   audit_render_service_config "$api_env_json" "argus-api" "${api_profile_pairs[@]}"
   audit_render_service_config "$api_env_json" "argus-api" "${mode_pairs[@]}"
   audit_render_service_config "$web_env_json" "argus-app" "${web_profile_pairs[@]}"
+  audit_render_auto_deploy_trigger \
+    "$api_service_json" \
+    "argus-api" \
+    "$api_autodeploy_trigger"
+  audit_render_auto_deploy_trigger \
+    "$web_service_json" \
+    "argus-app" \
+    "$web_autodeploy_trigger"
+  audit_render_auto_deploy_trigger \
+    "$workflow_service_json" \
+    "argus-backtests" \
+    "$workflow_autodeploy_trigger"
   if [ "$audit_workflow_env" = "true" ]; then
     audit_forbidden_render_env_keys "$workflow_env_json" "argus-backtests" "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
     audit_unexpected_render_env_keys \
@@ -725,16 +791,23 @@ audit_release_config() {
   else
     workflow_fingerprint="<skipped>"
   fi
+  autodeploy_fingerprint_value="$(autodeploy_fingerprint)"
   echo "workflow_task=$workflow_task"
   echo "real_workflow_task=$real_workflow_task"
   echo "env_fingerprint=$fingerprint"
   echo "workflow_env_fingerprint=$workflow_fingerprint"
+  echo "autodeploy_fingerprint=$autodeploy_fingerprint_value"
   if [ "$audit_workflow_env" != "true" ]; then
     echo "workflow_env_status=skipped"
   elif [ "$WORKFLOW_AUDIT_FAILURES" -eq 0 ]; then
     echo "workflow_env_status=ready"
   else
     echo "workflow_env_status=drift"
+  fi
+  if [ "$AUTODEPLOY_AUDIT_FAILURES" -eq 0 ]; then
+    echo "autodeploy_status=ready"
+  else
+    echo "autodeploy_status=drift"
   fi
   if [ "$AUDIT_FAILURES" -eq 0 ]; then
     echo "status=ready"
@@ -848,17 +921,20 @@ sync_workflow_runtime() {
   require_local_env RENDER_API_KEY
   local current_workflow
   local update_payload
+  local auto_deploy_trigger
 
   current_workflow="$(render_workflow_json)"
+  auto_deploy_trigger="$(release_profile_auto_deploy_trigger workflow)"
   update_payload="$(
     jq -nc \
       --argjson workflow "$current_workflow" \
       --arg build_command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
       --arg run_command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
+      --arg auto_deploy_trigger "$auto_deploy_trigger" \
       '{
         buildConfig: ($workflow.buildConfig + {buildCommand: $build_command}),
         runCommand: $run_command,
-        autoDeployTrigger: "off"
+        autoDeployTrigger: $auto_deploy_trigger
       }'
   )"
 
