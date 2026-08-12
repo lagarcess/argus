@@ -83,3 +83,57 @@ Result: all passed.
 The final clarification-copy assertion in the focused command remains RED
 until the Task 4 clarification/projection work teaches its fallback to render
 the typed capital bounds. No clarification or projection code was changed here.
+
+## Fix round 1: stale shared admission tests
+
+### Scope
+
+- `tests/agent_runtime/test_options_semantic_admission.py`
+- This report
+
+The parameterized readiness/admission test had a stale public-patch assertion.
+Its pre-admission assertion remains intentionally unchanged: the readied
+interpreter response may retain diagnostic refusal prose while the non-promoted
+typed verdict is being audited. The post-admission assertion now verifies the
+shared issue #453 boundary: `assistant_response` is `None` after unsupported
+admission.
+
+### RED
+
+```bash
+poetry run pytest --no-cov tests/agent_runtime/test_options_semantic_admission.py -q -k 'prose_bearing_contradiction_keeps_verdict_through_readiness_and_admission'
+```
+
+Result: `12 failed, 23 deselected`. Each parameter combination expected the
+unvalidated `REFUSAL_PROSE_EN` to cross the admission boundary, but received
+`None`.
+
+### GREEN
+
+```bash
+poetry run pytest --no-cov tests/agent_runtime/test_options_semantic_admission.py -q -k 'prose_bearing_contradiction_keeps_verdict_and_suppresses_prose_at_admission or issue_453_unsupported_request_turn_act_contradiction'
+```
+
+Result: `13 passed, 22 deselected`.
+
+```bash
+ARGUS_RUN_LIVE_EVALS=0 ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture poetry run pytest --no-cov tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py tests/agent_runtime/test_options_semantic_admission.py tests/agent_runtime/test_validation_failure_copy.py tests/agent_runtime/test_conversation_stages.py -q
+```
+
+Result: `217 passed in 6.19s`.
+
+```bash
+poetry run ruff format --check tests/agent_runtime/test_options_semantic_admission.py
+poetry run ruff check tests/agent_runtime/test_options_semantic_admission.py
+git diff --check
+```
+
+Result: all passed.
+
+### Self-review
+
+- The test continues to prove that readiness does not promote a failed or
+  low-confidence capability audit.
+- It now separately proves admission suppresses unvalidated interpreter prose
+  in all 12 verdict-and-audit combinations.
+- No production, projection, locale, or clarifier surface changed.
