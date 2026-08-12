@@ -64,6 +64,7 @@ def _tagged_launch_validation_failure(
     *,
     raw_value: Any | None = None,
     optional_parameter_status: dict[str, Any] | None = None,
+    capital_role: str | None = None,
 ) -> dict[str, Any]:
     """Every launch validation failure names its code in the patch, so the
     typed edit endpoints can answer with the exact refusal instead of a
@@ -72,6 +73,7 @@ def _tagged_launch_validation_failure(
         error_code,
         raw_value=raw_value,
         optional_parameter_status=optional_parameter_status,
+        capital_role=capital_role,
     )
     failure["launch_validation_code"] = error_code
     return failure
@@ -82,6 +84,7 @@ def _launch_validation_failure(
     *,
     raw_value: Any | None = None,
     optional_parameter_status: dict[str, Any] | None = None,
+    capital_role: str | None = None,
 ) -> dict[str, Any]:
     if error_code == "unsupported_timeframe":
         return {
@@ -117,6 +120,29 @@ def _launch_validation_failure(
             MAX_STARTING_CAPITAL,
             MIN_STARTING_CAPITAL,
         )
+
+        if capital_role == "recurring_contribution":
+            status = dict(optional_parameter_status or {})
+            raw_constraints = status.get("unsupported_constraints", [])
+            constraints = []
+            if isinstance(raw_constraints, list):
+                constraints = [
+                    item
+                    for item in raw_constraints
+                    if isinstance(item, dict)
+                    and item.get("category") != "unsupported_starting_capital"
+                ]
+            if constraints:
+                status["unsupported_constraints"] = constraints
+            else:
+                status.pop("unsupported_constraints", None)
+            return {
+                "outcome": "needs_clarification",
+                "missing_required_fields": ["capital_amount"],
+                "requested_field": "capital_amount",
+                "assistant_prompt": None,
+                "optional_parameter_status": status,
+            }
 
         return {
             "outcome": "needs_clarification",

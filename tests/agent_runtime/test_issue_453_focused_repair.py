@@ -141,15 +141,16 @@ async def test_issue_453_pending_capital_answer_repairs_without_acknowledgment(
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
         if schema_name == "FocusedStrategyExtraction":
+            focused_context = "\n".join(
+                message["content"] for message in kwargs["messages"]
+            )
+            assert '"strategy_type": "buy_and_hold"' in focused_context
+            assert '"requested_field": "capital_amount"' in focused_context
             return interpreter_module.FocusedStrategyExtraction(
                 is_testable_strategy=True,
                 requires_clarification=False,
                 user_goal_summary="El usuario eligió $500 de capital inicial para NFLX.",
                 language="es-419",
-                strategy_type="buy_and_hold",
-                strategy_thesis="Comprar y mantener NFLX.",
-                asset_universe=["NFLX"],
-                asset_class="equity",
                 capital_amount=500,
                 confidence=0.95,
                 evidence_spans={"capital_amount": "$500"},
@@ -186,6 +187,10 @@ async def test_issue_453_pending_capital_answer_repairs_without_acknowledgment(
             task_relation="continue",
             user_goal_summary="User wants to invest $500",
             assistant_response=acknowledgment,
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="$500",
+                capital_amount=500,
+            ),
             semantic_turn_act="unsupported_request",
         ),
         preferred_model="test-model",
@@ -206,4 +211,8 @@ async def test_issue_453_pending_capital_answer_repairs_without_acknowledgment(
     assert ready_response.semantic_turn_act == "answer_pending_need"
     assert ready_response.assistant_response is None
     assert ready_response.unsupported_constraints == []
-    assert ready_response.candidate_strategy_draft.capital_amount == 500
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["NFLX"]
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert draft.capital_amount == 500

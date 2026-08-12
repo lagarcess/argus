@@ -2951,6 +2951,9 @@ both the recovery route and the facts available to deterministic fallback copy:
 - `unsupported_starting_capital` is a launch-validation range outcome, not a
   strategy-capability refusal. It asks for a starting-capital amount before a
   confirmation card or acknowledgement is emitted.
+- `capital_amount` remains role-sensitive at launch validation. For DCA it is
+  the recurring contribution, so an invalid DCA contribution routes to the
+  normal sizing clarification and never inherits the one-time bankroll floor.
 
 `raw_value` may remain in runtime records as opaque diagnostic or interpreter
 evidence. It is never a generic display subject and is not included in the

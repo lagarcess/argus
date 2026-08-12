@@ -78,6 +78,70 @@ def test_issue_453_starting_capital_bounds_recover_without_confirmation_card(
     assert sidecar_payload["maximum"] == MAX_STARTING_CAPITAL
 
 
+@pytest.mark.parametrize("contribution", [0, MAX_STARTING_CAPITAL + 1])
+def test_issue_453_invalid_dca_contribution_uses_generic_amount_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+    contribution: float,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+
+    monkeypatch.setattr(
+        confirm_module,
+        "_strategy_with_latest_complete_data_adjustment",
+        lambda strategy: strategy,
+    )
+    state = RunState.new(
+        current_user_message="Buy Coca-Cola every month in 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["KO"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=contribution,
+        cadence="monthly",
+        extra_parameters={
+            "recurring_contribution": contribution,
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "recurring_contribution": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+        },
+    )
+
+    confirmation = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert confirmation.outcome == "needs_clarification"
+    assert "confirmation_payload" not in confirmation.patch
+    assert confirmation.patch["requested_field"] == "capital_amount"
+    assert (
+        confirmation.patch["optional_parameter_status"].get("unsupported_constraints", [])
+        == []
+    )
+
+    state.requested_field = confirmation.patch["requested_field"]
+    state.missing_required_fields = confirmation.patch["missing_required_fields"]
+    state.optional_parameter_status = confirmation.patch["optional_parameter_status"]
+    clarification = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=RecordingClarifier(None),
+        language="en",
+    )
+
+    assert clarification.patch["response_intent"]["kind"] == "clarification"
+    assert clarification.patch["clarification"]["reason_code"] == (
+        "missing_sizing_amount"
+    )
+    assert "$1,000" not in clarification.patch["assistant_prompt"]
+    assert "can't run" not in clarification.patch["assistant_prompt"]
+
+
 @pytest.mark.parametrize("language", ["en", "es-419"])
 def test_issue_453_starting_capital_bounds_use_canonical_backend_copy(
     language: str,

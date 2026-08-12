@@ -4,6 +4,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
@@ -45,7 +46,7 @@ ResolveAssetCandidate = Callable[..., Any]
 def _focused_strategy_extraction_messages(
     request: InterpretationRequest,
 ) -> list[BaseMessage]:
-    return [
+    messages: list[BaseMessage] = [
         SystemMessage(
             content=(
                 "Focused strategy extraction repair. The general interpreter under-filled "
@@ -150,9 +151,37 @@ def _focused_strategy_extraction_messages(
                 "date_range_intent when present. Do not route recurring fixed-amount "
                 "buys to unsupported recovery when those executable fields are stated."
             )
-        ),
-        HumanMessage(content=request.current_user_message),
+        )
     ]
+    snapshot = request.latest_task_snapshot
+    prior_strategy = (
+        snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+        if snapshot is not None
+        else None
+    )
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).strip()
+    if prior_strategy is not None and requested_field:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "The current turn answers one requested field for an existing "
+                    "strategy. Preserve the prior strategy family and unchanged "
+                    "facts as context, but do not claim they were stated again in "
+                    "the current message. Pending strategy context: "
+                    + json.dumps(
+                        {
+                            "requested_field": requested_field,
+                            "prior_strategy": prior_strategy.model_dump(mode="json"),
+                        },
+                        sort_keys=True,
+                    )
+                )
+            )
+        )
+    messages.append(HumanMessage(content=request.current_user_message))
+    return messages
 
 
 def _comparison_baseline_provenance(
@@ -409,6 +438,16 @@ def response_from_focused_strategy_extraction(
     strategy_type = executable_strategy_type_from_extracted_fields(
         extraction.model_dump(mode="python")
     )
+    if (
+        strategy_type is None
+        and is_pending_strategy_answer
+        and base_response is not None
+        and not base_response.unsupported_constraints
+        and _llm_value_is_empty(extraction.strategy_type)
+    ):
+        strategy_type = executable_strategy_type_from_extracted_fields(
+            base_response.candidate_strategy_draft.model_dump(mode="python")
+        )
     entry_logic = extraction.entry_logic or moving_average_crossover_text(
         extraction.entry_rule
     )

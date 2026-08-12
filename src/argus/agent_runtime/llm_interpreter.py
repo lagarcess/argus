@@ -4825,7 +4825,6 @@ def _structured_interpretation_has_required_shape(
         and _selected_requested_field_base(request)
         and _request_current_turn_has_material_execution_evidence(request)
         and not response.unsupported_constraints
-        and not strategy_has_execution_evidence(response.candidate_strategy_draft)
     ):
         return False
     if (
