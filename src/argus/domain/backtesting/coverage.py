@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from math import ceil
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 import pandas as pd
 from loguru import logger
@@ -17,12 +17,75 @@ from argus.domain.market_data import fetch_ohlcv as _DEFAULT_FETCH_OHLC
 from argus.domain.market_data.capabilities import (
     EASTERN,
     PROVIDER_TIMEFRAME_MINUTES,
+    AssetClass,
     EquityMarketSession,
     expected_candle_count,
 )
 
 _MIN_OBSERVATION_COVERAGE = 0.8
 _EQUITY_SESSION_MINUTES = 390
+_CALENDAR_DAYS_PER_YEAR = 365.2425
+_EQUITY_SESSIONS_PER_YEAR = 252.0
+
+
+@dataclass(frozen=True)
+class MetricTimeBasis:
+    asset_class: AssetClass
+    timeframe: str
+    effective_timestamps: tuple[pd.Timestamp, ...]
+    equity_market_sessions: tuple[EquityMarketSession, ...] | None
+    periods_per_year: float
+    elapsed_years: float | None
+    source: str
+
+
+def build_metric_time_basis(
+    *,
+    asset_class: str,
+    timeframe: str,
+    effective_index: pd.Index,
+    equity_market_sessions: Sequence[EquityMarketSession] | None = None,
+) -> MetricTimeBasis:
+    normalized_asset_class = _metric_asset_class(asset_class)
+    normalized_timeframe = _normalized_timeframe(timeframe)
+    timestamps = pd.DatetimeIndex(effective_index).unique().sort_values()
+    effective_timestamps = tuple(pd.Timestamp(value) for value in timestamps)
+    sessions: tuple[EquityMarketSession, ...] | None = None
+    if normalized_asset_class == "equity" and equity_market_sessions is not None:
+        sessions = tuple(equity_market_sessions)
+        if effective_timestamps:
+            first_effective_date = effective_timestamps[0].date()
+            last_effective_date = effective_timestamps[-1].date()
+            sessions = tuple(
+                session
+                for session in sessions
+                if first_effective_date <= session.session_date <= last_effective_date
+            )
+            if not sessions:
+                raise ValueError("market_calendar_unavailable")
+    periods_per_year, source = _metric_periods_per_year(
+        asset_class=normalized_asset_class,
+        timeframe=normalized_timeframe,
+        equity_market_sessions=sessions,
+    )
+    elapsed_years: float | None = None
+    if len(effective_timestamps) > 1:
+        elapsed_seconds = (
+            effective_timestamps[-1] - effective_timestamps[0]
+        ).total_seconds()
+        if elapsed_seconds > 0:
+            elapsed_years = elapsed_seconds / (
+                _CALENDAR_DAYS_PER_YEAR * 24.0 * 60.0 * 60.0
+            )
+    return MetricTimeBasis(
+        asset_class=normalized_asset_class,
+        timeframe=normalized_timeframe,
+        effective_timestamps=effective_timestamps,
+        equity_market_sessions=sessions,
+        periods_per_year=periods_per_year,
+        elapsed_years=elapsed_years,
+        source=source,
+    )
 
 
 class CoverageDateRange(BaseModel):
@@ -45,6 +108,7 @@ class PreparedMarketData:
     dataset_id: str
     bars_by_symbol: dict[str, pd.DataFrame]
     observations_by_symbol: dict[str, int]
+    equity_market_sessions: tuple[EquityMarketSession, ...] | None = None
 
     def bars_for(self, symbol: str) -> pd.DataFrame:
         try:
@@ -55,6 +119,20 @@ class PreparedMarketData:
 
     def price_series_for(self, symbol: str) -> pd.Series:
         return self.bars_for(symbol)["close"].copy()
+
+    def metric_time_basis_for(
+        self,
+        *,
+        asset_class: str,
+        timeframe: str,
+        effective_index: pd.Index,
+    ) -> MetricTimeBasis:
+        return build_metric_time_basis(
+            asset_class=asset_class,
+            timeframe=timeframe,
+            effective_index=effective_index,
+            equity_market_sessions=self.equity_market_sessions,
+        )
 
     def coverage_payload(self) -> dict[str, Any]:
         payload = {
@@ -194,6 +272,7 @@ def prepare_market_data(
         dataset_id=dataset_id,
         bars_by_symbol=trimmed,
         observations_by_symbol=observations,
+        equity_market_sessions=equity_market_sessions,
     )
 
 
@@ -512,6 +591,57 @@ def _calendar_expected_equity_observations(
             ),
         )
         for session in unique_sessions.values()
+    )
+
+
+def _metric_asset_class(value: str) -> AssetClass:
+    normalized = value.strip().lower()
+    if normalized not in {"equity", "crypto", "currency_pair"}:
+        raise ValueError("unsupported_asset_class")
+    return cast(AssetClass, normalized)
+
+
+def _metric_periods_per_year(
+    *,
+    asset_class: AssetClass,
+    timeframe: str,
+    equity_market_sessions: Sequence[EquityMarketSession] | None,
+) -> tuple[float, str]:
+    interval_minutes = PROVIDER_TIMEFRAME_MINUTES.get(timeframe)
+    if interval_minutes is None:
+        raise ValueError("unsupported_timeframe")
+    if asset_class != "equity":
+        periods = _CALENDAR_DAYS_PER_YEAR * 24.0 * 60.0 / float(interval_minutes)
+        return periods, "continuous_market_calendar"
+
+    session_periods: list[float] = []
+    if equity_market_sessions:
+        for session in equity_market_sessions:
+            duration_minutes = (
+                session.closes_at - session.opens_at
+            ).total_seconds() / 60.0
+            if duration_minutes <= 0:
+                raise ValueError("market_calendar_unavailable")
+            session_periods.append(
+                1.0
+                if timeframe == "1D"
+                else max(1.0, duration_minutes / float(interval_minutes))
+            )
+    if session_periods:
+        periods_per_session = sum(session_periods) / len(session_periods)
+        return (
+            _EQUITY_SESSIONS_PER_YEAR * periods_per_session,
+            "equity_market_calendar",
+        )
+
+    periods_per_session = (
+        1.0
+        if timeframe == "1D"
+        else max(1.0, _EQUITY_SESSION_MINUTES / float(interval_minutes))
+    )
+    return (
+        _EQUITY_SESSIONS_PER_YEAR * periods_per_session,
+        "equity_session_fallback",
     )
 
 

@@ -1447,6 +1447,40 @@ Metrics are grouped into categories.
 }
 ```
 
+`win_rate` and `profit_factor` are nullable closed-trade metrics. A completed
+trade is one canonical long-only position with an executed open fill and an
+executed close fill. Open positions do not enter either metric. `win_rate` is
+winning completed trades divided by all completed trades, so a breakeven trade
+is closed but is not a win. `profit_factor` is gross positive realized P&L
+divided by absolute gross negative realized P&L after modeled fees and
+slippage. It is `null` when there are no completed trades or no losing trade,
+and it is `0.0` when completed trades lose money without any winning trade.
+`total_trades` retains its existing executed-fill meaning; it is not a count of
+completed positions. If a close and a new open share one timestamp, the
+canonical ledger applies the close before the open. The same ordered fills own
+both portfolio equity and closed-trade P&L.
+
+For example, an open buy-and-hold position persists:
+
+```json
+{
+  "win_rate": null,
+  "total_trades": 1,
+  "profit_factor": null
+}
+```
+
+Annual return uses the elapsed calendar time between the first and last
+effective market-data timestamps, with 365.2425 calendar days per year.
+Irregular gaps therefore remain elapsed time instead of being compressed into
+adjacent observations. Volatility and Sharpe use one asset-aware observation
+frequency owned by the market-data coverage boundary: crypto uses continuous
+24/7 time, currency pairs use the current provider's continuous calendar, and
+equities use 252 sessions plus the real session durations supplied by the same
+market calendar, including early closes. Daily equity uses 252 observations per
+year. This time-basis correction does not redefine DCA contribution-return
+semantics; that remains a separate metric-contract decision.
+
 ## Benchmark Defaults
 - **equity** -> `SPY`
 - **crypto** -> `BTC`
