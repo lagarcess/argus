@@ -88,29 +88,48 @@ def build_access_welcome_email(
     rich = (
         "<!doctype html>"
         f'<html lang="{html_language}">'
-        '<body style="margin: 0; padding: 0; background-color: #ffffff; '
-        'color: #191c1f;">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        'style="background-color: #ffffff;">'
-        '<tr><td align="center" style="padding: 32px 16px;">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        'style="max-width: 560px; font-family: Arial, sans-serif; font-size: 16px; '
-        'line-height: 1.5; color: #191c1f;">'
-        f'<tr><td><p style="margin: 0 0 24px;">{welcome_line}</p>'
-        f'<p style="margin: 0 0 24px;">{product_line}</p>'
-        f'<p style="margin: 0 0 24px;">{first_action}</p>'
-        '<table role="presentation" cellpadding="0" cellspacing="0" '
-        'style="margin: 0 0 24px;">'
-        '<tr><td style="background-color: #191c1f; border-radius: 9999px;">'
-        f'<a href="{safe_url}" style="display: inline-block; background-color: '
-        "#191c1f; border-radius: 9999px; color: #ffffff; padding: 14px 32px; "
-        f'text-decoration: none;">{button_label}</a>'
-        "</td></tr></table>"
-        f'<p style="margin: 0 0 24px;">{fallback_line}<br>'
-        f'<a href="{safe_url}" style="color: #191c1f;">{safe_url}</a></p>'
-        f'<p style="margin: 0;">{support_line}</p>'
-        "</td></tr></table>"
-        "</td></tr></table>"
+        '<body style="margin:0;padding:0;background:#f4f4f4;">'
+        f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;'
+        f'color:transparent;">{welcome_line}</div>'
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" '
+        'style="background:#f4f4f4;border-collapse:collapse;">'
+        '<tr><td align="center" style="padding:32px 16px;">'
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" '
+        'style="max-width:600px;background:#ffffff;border:1px solid #c9c9cd;'
+        'border-radius:20px;border-collapse:separate;overflow:hidden;">'
+        '<tr><td style="background:#191c1f;padding:22px 28px;color:#ffffff;">'
+        '<table role="presentation" cellspacing="0" cellpadding="0" border="0" '
+        'style="border-collapse:collapse;"><tr>'
+        '<td valign="middle" style="padding:0 12px 0 0;">'
+        '<img src="https://arguschat.ai/icons/argus-192.png" width="36" '
+        'height="36" alt="" style="display:block;width:36px;height:36px;'
+        'border:0;outline:none;text-decoration:none;"></td>'
+        '<td valign="middle" style="font-family:\'Space Grotesk\',Arial,Helvetica,'
+        "sans-serif;font-size:21px;font-weight:700;letter-spacing:0.12em;"
+        'line-height:1;color:#ffffff;">ARGUS</td>'
+        "</tr></table></td></tr>"
+        '<tr><td style="padding:32px 28px 28px;color:#191c1f;'
+        "font-family:'Inter',Arial,Helvetica,sans-serif;font-size:16px;"
+        'line-height:1.55;">'
+        "<h1 style=\"margin:0 0 16px;font-family:'Space Grotesk','Inter',"
+        "Arial,Helvetica,sans-serif;font-size:28px;font-weight:500;"
+        f'letter-spacing:-0.01em;line-height:1.2;">{welcome_line}</h1>'
+        f'<p style="margin:0 0 16px;">{product_line}</p>'
+        f'<p style="margin:0 0 16px;">{first_action}</p>'
+        '<p style="margin:26px 0 20px;">'
+        f'<a href="{safe_url}" style="display:inline-block;background:#191c1f;'
+        "color:#ffffff;text-decoration:none;font-weight:700;padding:13px 22px;"
+        f'border-radius:9999px;">{button_label}</a></p>'
+        '<p style="margin:20px 0 6px;font-size:13px;color:#5f6368;">'
+        f"{fallback_line}</p>"
+        '<p style="margin:0;padding:12px;background:#f4f4f4;border-radius:10px;'
+        'font-size:13px;line-height:1.45;word-break:break-all;">'
+        f'<a href="{safe_url}" style="color:#3036b3;">{safe_url}</a></p>'
+        "</td></tr>"
+        '<tr><td style="padding:20px 28px;border-top:1px solid #e1e1e4;'
+        "color:#5f6368;font-family:'Inter',Arial,Helvetica,sans-serif;"
+        f'font-size:13px;line-height:1.5;">{support_line}</td></tr>'
+        "</table></td></tr></table>"
         "</body></html>"
     )
     return AccessWelcomeEmailContent(

@@ -268,6 +268,43 @@ def test_access_welcome_content_is_literal_bilingual_and_transactional(
     assert "\u2014" not in combined
 
 
+def test_access_welcome_html_uses_canonical_auth_email_shell() -> None:
+    content = build_access_welcome_email(
+        language="en",
+        signup_url="https://app.example/?auth=signup",
+    )
+
+    canonical_fragments = (
+        '<body style="margin:0;padding:0;background:#f4f4f4;">',
+        'style="background:#f4f4f4;border-collapse:collapse;"',
+        "max-width:600px;background:#ffffff;border:1px solid #c9c9cd;"
+        "border-radius:20px;border-collapse:separate;overflow:hidden;",
+        'style="background:#191c1f;padding:22px 28px;color:#ffffff;"',
+        '<img src="https://arguschat.ai/icons/argus-192.png" width="36" '
+        'height="36" alt="" style="display:block;width:36px;height:36px;'
+        'border:0;outline:none;text-decoration:none;">',
+        "font-family:'Space Grotesk',Arial,Helvetica,sans-serif;font-size:21px;"
+        "font-weight:700;letter-spacing:0.12em;line-height:1;color:#ffffff;",
+        "padding:32px 28px 28px;color:#191c1f;font-family:'Inter',Arial,"
+        "Helvetica,sans-serif;font-size:16px;line-height:1.55;",
+        "font-family:'Space Grotesk','Inter',Arial,Helvetica,sans-serif;"
+        "font-size:28px;font-weight:500;letter-spacing:-0.01em;line-height:1.2;",
+        "display:inline-block;background:#191c1f;color:#ffffff;"
+        "text-decoration:none;font-weight:700;padding:13px 22px;"
+        "border-radius:9999px;",
+        '<a href="https://app.example/?auth=signup" style="color:#3036b3;">',
+        "padding:20px 28px;border-top:1px solid #e1e1e4;color:#5f6368;"
+        "font-family:'Inter',Arial,Helvetica,sans-serif;font-size:13px;"
+        "line-height:1.5;",
+    )
+    for fragment in canonical_fragments:
+        assert fragment in content.html
+
+    assert content.html.index("Questions? Contact support@get-argus.com.") > (
+        content.html.index("border-top:1px solid #e1e1e4")
+    )
+
+
 @pytest.mark.parametrize(
     ("language", "subject", "product_line", "first_action"),
     [
@@ -357,8 +394,8 @@ def test_access_welcome_sender_preserves_smtp_and_multipart_contract(
     assert payloads["text/html"].count(first_action) == 1
     assert "support@get-argus.com" in payloads["text/plain"]
     assert "support@get-argus.com" in payloads["text/html"]
-    assert "background-color: #191c1f" in payloads["text/html"]
-    assert "border-radius: 9999px" in payloads["text/html"]
+    assert "background:#191c1f" in payloads["text/html"]
+    assert "border-radius:9999px" in payloads["text/html"]
     assert "https://app.example/?auth=signup" in payloads["text/plain"]
     assert "https://app.example/?auth=signup" in payloads["text/html"]
     assert "\u2014" not in payloads["text/plain"] + payloads["text/html"]
