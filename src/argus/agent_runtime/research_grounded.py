@@ -920,7 +920,7 @@ def _named_verified_symbols(answer: str, assets: list[dict[str, str]]) -> set[st
         symbol = str(asset.get("symbol") or "").upper()
         if not symbol:
             continue
-        token_pattern = rf"(?<![A-Za-z0-9]){re.escape(symbol)}(?![A-Za-z0-9])"
+        token_pattern = rf"(?<!\w){re.escape(symbol)}(?!\w)"
         if not re.search(token_pattern, answer):
             continue
         if len(symbol) > 2 or _short_symbol_is_unambiguous(
@@ -939,7 +939,7 @@ def _short_symbol_is_unambiguous(
     asset_name: str,
 ) -> bool:
     escaped = re.escape(symbol)
-    if re.search(rf"\${escaped}(?![A-Za-z0-9])", answer):
+    if re.search(rf"\${escaped}(?!\w)", answer):
         return True
     if re.search(rf"\(\s*{escaped}\s*\)", answer):
         return True
@@ -947,7 +947,7 @@ def _short_symbol_is_unambiguous(
         return True
     if not asset_name:
         return False
-    token_pattern = rf"(?<![A-Za-z0-9]){escaped}(?![A-Za-z0-9])"
+    token_pattern = rf"(?<!\w){escaped}(?!\w)"
     folded_name = asset_name.casefold()
     return any(
         folded_name in line.casefold() and re.search(token_pattern, line)

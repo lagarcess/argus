@@ -293,6 +293,12 @@ def test_survey_synthesis_requires_an_unambiguous_short_ticker_token() -> None:
         )
         == set()
     )
+    assert (
+        grounded._named_verified_symbols(
+            "Agilent subió durante AÑOS. Gartner también lideró.", assets
+        )
+        == set()
+    )
     assert grounded._named_verified_symbols(
         "Agilent (A) and Gartner (IT) led the gainers.", assets
     ) == {"A", "IT"}
