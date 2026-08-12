@@ -100,6 +100,7 @@ def prepare_market_data(
     fetch_start = date.fromisoformat(str(config["start_date"]))
     fetch_end = _completed_data_end(
         asset_class=str(config["asset_class"]),
+        timeframe=str(config["timeframe"]),
         fetch_end=date.fromisoformat(str(config["end_date"])),
         fetch_calendar=fetch_calendar,
         now=now,
@@ -399,17 +400,22 @@ _COMPLETED_SESSION_LOOKBACK_DAYS = 13
 def _completed_data_end(
     *,
     asset_class: str,
+    timeframe: str,
     fetch_end: date,
     fetch_calendar: FetchMarketCalendar | None,
     now: datetime | None,
 ) -> date:
     """A bar may enter coverage only once its trading day can no longer change.
 
-    Continuous markets finalize a bar when its UTC day ends; an equity
+    Continuous markets finalize a daily bar when its UTC day ends; an equity
     session's bar can still receive corrections after hours, so its day is
-    complete only once its Eastern date has passed.
+    complete only once its Eastern date has passed. Intraday timeframes keep
+    the current day: their completed candles are valid data, and completion
+    for them is a per-bar boundary, not a day boundary.
     """
     if _provider_mode_is_synthetic():
+        return fetch_end
+    if _normalized_timeframe(timeframe) != "1D":
         return fetch_end
     at = now if now is not None else datetime.now(timezone.utc)
     if at.tzinfo is None:

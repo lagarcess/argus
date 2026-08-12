@@ -1332,3 +1332,64 @@ def test_approved_window_rejection_names_the_mismatched_clause(
     assert "dataset_id" in mismatch_lines[-1]
     assert "sha256:000000" in mismatch_lines[-1]
     assert preflight.dataset_id[:14] in mismatch_lines[-1]
+
+
+def test_intraday_timeframes_keep_the_current_days_completed_candles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    hours = pd.date_range(
+        start="2026-08-11T13:00:00Z", end="2026-08-12T15:00:00Z", freq="1h"
+    )
+    frame = pd.DataFrame(
+        {
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.5,
+            "volume": 1_000.0,
+        },
+        index=hours,
+    )
+
+    prepared = prepare_market_data(
+        _august_config(timeframe="1h", start_date="2026-08-11"),
+        fetch_ohlcv_func=_fetcher({"KO": frame, "SPY": frame}),
+        fetch_market_calendar_func=_realistic_calendar(),
+        now=_INCIDENT_NOW,
+    )
+
+    assert prepared.effective_date_range.model_dump()["end"] == "2026-08-12"
+
+
+def test_same_day_intraday_crypto_window_keeps_density_owned_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    hours = pd.date_range(
+        start="2026-08-12T00:00:00Z", end="2026-08-12T14:00:00Z", freq="1h"
+    )
+    frame = pd.DataFrame(
+        {
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.5,
+            "volume": 1_000.0,
+        },
+        index=hours,
+    )
+
+    with pytest.raises(MarketDataCoverageError) as excinfo:
+        prepare_market_data(
+            _crypto_config(
+                timeframe="1h", start_date="2026-08-12", end_date="2026-08-12"
+            ),
+            fetch_ohlcv_func=_fetcher({"ETH": frame, "BTC": frame}),
+            fetch_market_calendar_func=_no_equity_calendar,
+            now=datetime.fromisoformat("2026-08-12T15:56:00+00:00"),
+        )
+
+    # Density owns this rejection exactly as before the completion clamp; the
+    # clamp must not pre-empt it with no_common_data_window.
+    assert excinfo.value.code == "insufficient_common_data"
