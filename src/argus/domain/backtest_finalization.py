@@ -308,6 +308,70 @@ def cache_finalized_backtest(
             raise
 
 
+def evict_cached_backtest_result(
+    store: AlphaStore,
+    *,
+    user_id: str,
+    run_id: str,
+) -> None:
+    """Remove a withheld run's cached tuple from the process cache.
+
+    ``cache_finalized_backtest`` above is the only writer of these
+    entries, so this eviction mirrors its shape exactly: the run, the
+    minted version, its evidence, and an idea left versionless leave
+    together, and an idea keeping earlier versions is repointed to its
+    latest remaining one, matching the authoritative removal in
+    ``public.delete_withheld_backtest_result``. Without this, a fallback
+    reader that scans the process cache after an authoritative empty read
+    could resurrect the result the turn reported as withheld.
+    """
+    with store.backtest_finalization_lock:
+        if store.backtest_run_owners.get(run_id) not in (None, user_id):
+            return
+        version_ids = [
+            version_id
+            for version_id, version in store.idea_versions.items()
+            if version.source_run_id == run_id
+            and store.idea_version_owners.get(version_id) == user_id
+        ]
+        evidence_ids = [
+            evidence_id
+            for evidence_id, artifact in store.evidence_artifacts.items()
+            if artifact.source_run_id == run_id
+            and store.evidence_artifact_owners.get(evidence_id) == user_id
+        ]
+        idea_ids = {
+            store.idea_versions[version_id].idea_id for version_id in version_ids
+        }
+        for version_id in version_ids:
+            store.idea_versions.pop(version_id, None)
+            store.idea_version_owners.pop(version_id, None)
+        for evidence_id in evidence_ids:
+            store.evidence_artifacts.pop(evidence_id, None)
+            store.evidence_artifact_owners.pop(evidence_id, None)
+        for idea_id in idea_ids:
+            remaining = [
+                version
+                for version in store.idea_versions.values()
+                if version.idea_id == idea_id
+            ]
+            idea = store.ideas.get(idea_id)
+            if idea is None:
+                continue
+            if not remaining:
+                store.ideas.pop(idea_id, None)
+                store.idea_owners.pop(idea_id, None)
+            elif idea.active_version_id not in {
+                version.id for version in remaining
+            }:
+                latest = max(remaining, key=lambda version: version.created_at)
+                store.ideas[idea_id] = idea.model_copy(
+                    update={"active_version_id": latest.id}
+                )
+        store.backtest_runs.pop(run_id, None)
+        store.backtest_run_owners.pop(run_id, None)
+
+
 def _prepare_finalization(
     finalization: BacktestFinalizationInput,
 ) -> PreparedBacktestFinalization:

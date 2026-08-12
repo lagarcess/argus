@@ -9,9 +9,9 @@ from argus.api.chat.backtest_jobs import (
     RenderWorkflowDispatcher,
     ShadowBacktestJobTool,
     backtest_job_shadow_context,
-    link_shadow_backtest_job_result,
     payload_hash,
 )
+from argus.api.chat.result_link import link_shadow_backtest_job_result
 
 
 class _DelegateTool:
@@ -33,11 +33,13 @@ class _Gateway:
         should_raise: bool = False,
         create_result: dict[str, object] | None = None,
         backpressure_counts: dict[tuple[str, str | None], int] | None = None,
+        link_result: dict[str, object] | None = None,
     ) -> None:
         self.events = events
         self.should_raise = should_raise
         self.create_result = create_result
         self.backpressure_counts = backpressure_counts or {}
+        self.link_result = link_result
         self.jobs: list[dict[str, object]] = []
         self.metadata_updates: list[dict[str, object]] = []
         self.result_links: list[dict[str, object]] = []
@@ -78,7 +80,11 @@ class _Gateway:
 
     def link_backtest_job_result(self, **payload: object) -> dict[str, object]:
         self.events.append("link")
+        if self.should_raise:
+            raise RuntimeError("link failed")
         self.result_links.append(payload)
+        if self.link_result is not None:
+            return dict(self.link_result)
         return {"id": payload["job_id"], **payload}
 
     def count_backtest_jobs(
@@ -820,7 +826,7 @@ def test_link_shadow_backtest_job_result_marks_succeeded_without_dispatch() -> N
     context.created_job_id = "job-1"
 
     with backtest_job_shadow_context(context):
-        link_shadow_backtest_job_result(
+        outcome = link_shadow_backtest_job_result(
             user_id="user-1",
             run_id="run-1",
             gateway=gateway,
@@ -828,6 +834,8 @@ def test_link_shadow_backtest_job_result_marks_succeeded_without_dispatch() -> N
         )
 
     assert events == ["link"]
+    assert outcome.publishable is True
+    assert outcome.reason == "linked"
     assert gateway.result_links == [
         {
             "user_id": "user-1",
@@ -856,7 +864,7 @@ def test_link_shadow_backtest_job_result_leaves_lifecycle_to_dispatch() -> None:
     context.workflow_task_run_id = "task-run-1"
 
     with backtest_job_shadow_context(context):
-        link_shadow_backtest_job_result(
+        outcome = link_shadow_backtest_job_result(
             user_id="user-1",
             run_id="run-1",
             gateway=gateway,
@@ -865,6 +873,8 @@ def test_link_shadow_backtest_job_result_leaves_lifecycle_to_dispatch() -> None:
 
     link = gateway.result_links[0]
     assert events == ["link"]
+    assert outcome.publishable is True
+    assert outcome.reason == "linked"
     assert link["result_run_id"] == "run-1"
     assert link["mark_succeeded"] is False
     assert link["execution_metadata"]["workflow_dispatch"]["task_run_id"] == "task-run-1"
@@ -882,7 +892,7 @@ def test_link_shadow_backtest_job_result_leaves_result_link_to_real_workflow(
     context.workflow_task_run_id = "task-run-1"
 
     with backtest_job_shadow_context(context):
-        link_shadow_backtest_job_result(
+        outcome = link_shadow_backtest_job_result(
             user_id="user-1",
             run_id="run-1",
             gateway=gateway,
@@ -890,6 +900,8 @@ def test_link_shadow_backtest_job_result_leaves_result_link_to_real_workflow(
         )
 
     assert events == ["metadata"]
+    assert outcome.publishable is True
+    assert outcome.reason == "metadata_only"
     assert gateway.result_links == []
     metadata = gateway.metadata_updates[0]["execution_metadata"]
     assert metadata["api_in_process_result"]["result_run_id"] == "run-1"
