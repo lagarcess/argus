@@ -23,10 +23,11 @@ export async function POST(request: Request) {
     environment: process.env.NODE_ENV,
     limiter,
     globalLimiter,
-    async sendRecovery(email, redirectTo) {
+    async sendRecovery(email, redirectTo, captchaToken) {
       const supabase = await createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
+        captchaToken,
       });
       if (error) throw error;
     },

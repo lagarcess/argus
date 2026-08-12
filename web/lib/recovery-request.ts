@@ -7,9 +7,10 @@ const LOCAL_RECOVERY_ORIGINS = new Set([
   "http://127.0.0.1:3001",
 ]);
 const MAX_TRACKED_RECOVERY_KEYS = 2_048;
-const MAX_RECOVERY_BODY_BYTES = 4_096;
+const MAX_RECOVERY_BODY_BYTES = 8_192;
 const MAX_RECOVERY_EMAIL_LENGTH = 254;
 const MAX_CLIENT_ADDRESS_LENGTH = 45;
+const MAX_CAPTCHA_TOKEN_LENGTH = 4_096;
 
 function exactOrigin(value: string | undefined): string | null {
   if (!value) return null;
@@ -146,7 +147,11 @@ type RecoveryRequestDependencies = {
   environment: string | undefined;
   limiter: RecoveryAttemptLimiter;
   globalLimiter: RecoveryAttemptLimiter;
-  sendRecovery: (email: string, redirectTo: string) => Promise<void>;
+  sendRecovery: (
+    email: string,
+    redirectTo: string,
+    captchaToken: string,
+  ) => Promise<void>;
 };
 
 const noStoreHeaders = {
@@ -178,7 +183,10 @@ function clientAddress(request: Request): string | null {
 
 async function readRecoveryBody(
   request: Request,
-): Promise<{ body: { email?: unknown } } | { status: 400 | 413 | 415 }> {
+): Promise<
+  | { body: { email?: unknown; captcha_token?: unknown } }
+  | { status: 400 | 413 | 415 }
+> {
   const contentType = request.headers
     .get("content-type")
     ?.split(";", 1)[0]
@@ -216,7 +224,9 @@ async function readRecoveryBody(
     if (typeof body !== "object" || body === null || Array.isArray(body)) {
       return { status: 400 };
     }
-    return { body: body as { email?: unknown } };
+    return {
+      body: body as { email?: unknown; captcha_token?: unknown },
+    };
   } catch {
     return { status: 400 };
   }
@@ -271,6 +281,11 @@ export async function handleRecoveryRequest(
   ) {
     return jsonResponse({ accepted: true }, 202);
   }
+  const captchaToken =
+    typeof body.captcha_token === "string" ? body.captcha_token.trim() : "";
+  if (!captchaToken || captchaToken.length > MAX_CAPTCHA_TOKEN_LENGTH) {
+    return jsonResponse({ accepted: false }, 400);
+  }
 
   const retryAfterMs = dependencies.limiter.retryAfterMs([
     `email:${email}`,
@@ -281,9 +296,9 @@ export async function handleRecoveryRequest(
   if (globalRetryAfterMs > 0) return rateLimitResponse(globalRetryAfterMs);
 
   try {
-    await dependencies.sendRecovery(email, redirectTo);
+    await dependencies.sendRecovery(email, redirectTo, captchaToken);
   } catch {
-    // Account existence and provider state never change the public response.
+    return jsonResponse({ accepted: false }, 502);
   }
   return jsonResponse({ accepted: true }, 202);
 }
