@@ -28,6 +28,7 @@ declare global {
 const TURNSTILE_SCRIPT_ID = "argus-guest-turnstile-script";
 const TURNSTILE_SCRIPT_URL =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+export const LOCAL_QA_CAPTCHA_TOKEN = "argus-local-browser-qa";
 export const CAPTCHA_ACQUISITION_TIMEOUT_MS = 15_000;
 export const CAPTCHA_INTERACTIVE_TIMEOUT_MS = 300_000;
 let turnstileScriptPromise: Promise<TurnstileApi> | null = null;
@@ -58,7 +59,7 @@ export function guestCaptchaTokenForEnvironment(input: {
   const browserToken = input.browserCaptchaToken?.trim() ?? "";
   if (browserToken) return browserToken;
   if (input.nodeEnv !== "production") {
-    return "argus-local-browser-qa";
+    return LOCAL_QA_CAPTCHA_TOKEN;
   }
   const token = input.localQaToken?.trim() ?? "";
   if (!token) return null;
