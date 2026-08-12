@@ -338,6 +338,18 @@ redirects; the API uses it for approval signup links. It must never use a
 `NEXT_PUBLIC_` name. Local development may use the documented localhost
 origins; production must not use HTTP.
 
+### Auth Email Deliverability
+
+Supabase Auth sends transactional email as `noreply@get-argus.com` through
+Resend. Cloudflare DNS must keep one SPF record at the root,
+`v=spf1 include:_spf.mx.cloudflare.net ~all`, for inbound
+`support@get-argus.com` forwarding, while Resend's verified custom MAIL FROM
+uses `send.get-argus.com` with `v=spf1 include:amazonses.com ~all` for outbound
+SPF; DKIM at `resend._domainkey.get-argus.com` authenticates Resend's signature;
+and DMARC at `_dmarc.get-argus.com` monitors strict alignment with aggregate
+reports sent to `support@get-argus.com`. Start DMARC at `p=none`; after one week
+of clean aggregate reports, moving it to `p=quarantine` is a founder decision.
+
 Keep true secrets manual in Render:
 
 - `DATABASE_URL`

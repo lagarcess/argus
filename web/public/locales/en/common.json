@@ -367,6 +367,7 @@
         "benchmark": "benchmark data",
         "market": "market data"
       },
+      "run_result_withheld": "This run stopped before its result could be saved, so there is no result to show. You can run the idea again from the confirmation card, or describe it again and I will prepare a fresh one.",
       "discovery_unavailable": "Current source-backed discovery is not available for this request, and I will not guess from memory. Name a symbol or company you already have in mind and I can test it. Everything in this chat is unchanged.",
       "discovery_search_failed": "I could not complete a source-backed lookup just now, and I will not guess names from memory. Everything in this chat is unchanged; ask again in a moment or name a symbol and I can test it.",
       "discovery_no_verified_candidates": "I could not verify any tradable match for that request. Name a symbol or company you have in mind and I can test it; everything in this chat is unchanged.",

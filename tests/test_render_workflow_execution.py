@@ -30,6 +30,9 @@ class FakeBacktestJobGateway:
         self.fail_finalization_after_commit_once = False
         self.fail_result_link_once = False
         self.fail_result_link_after_commit_once = False
+        self.refuse_result_link_once = False
+        self.fail_run_cleanup_once = False
+        self.deleted_runs: list[str] = []
         self.running_started_at_arguments: list[str | None] = []
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
@@ -102,6 +105,14 @@ class FakeBacktestJobGateway:
         if self.fail_result_link_once:
             self.fail_result_link_once = False
             raise RuntimeError("job result link unavailable")
+        if self.refuse_result_link_once:
+            # The lifecycle statement refused the attach: the standing
+            # terminal row comes back without the requested result.
+            self.refuse_result_link_once = False
+            self.row["status"] = "canceled"
+            self.row["retryable"] = False
+            self.row["result_run_id"] = None
+            return dict(self.row)
         self.transitions.append("succeeded")
         metadata = dict(self.row.get("execution_metadata") or {})
         metadata.update(execution_metadata or {})
@@ -116,6 +127,14 @@ class FakeBacktestJobGateway:
             self.fail_result_link_after_commit_once = False
             raise RuntimeError("job result link response lost")
         return dict(self.row)
+
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+        assert self.row["user_id"] == user_id
+        if self.fail_run_cleanup_once:
+            self.fail_run_cleanup_once = False
+            raise RuntimeError("cleanup unavailable")
+        self.deleted_runs.append(run_id)
+        return True
 
     def mark_backtest_job_failed(
         self,

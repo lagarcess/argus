@@ -64,6 +64,29 @@ def _emit_product_event(kind: str, **kwargs: object) -> None:
     loop.run_in_executor(None, _run)
 
 
+def emit_evidence_capture_withdrawn(
+    *,
+    user_id: str,
+    conversation_id: str | None,
+    run_id: str,
+) -> None:
+    """Typed retraction for a capture whose result was withheld.
+
+    The completion event has already been appended by the time the link
+    outcome is known, so the withdrawal rides the same event kind with
+    ``status="withdrawn"`` and the same run id, letting evidence-funnel
+    queries pair and subtract instead of permanently counting a capture
+    the product removed.
+    """
+    _emit_product_event(
+        "evidence_capture",
+        user_id=user_id,
+        conversation_id=conversation_id,
+        backtest_run_id=run_id,
+        status="withdrawn",
+    )
+
+
 class EvidenceArtifactNotFoundError(LookupError):
     """Raised when an evidence artifact is absent or not owned by the user."""
 

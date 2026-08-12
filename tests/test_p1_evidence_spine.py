@@ -446,3 +446,100 @@ def test_completed_backtest_capture_reuses_durable_sidecar_after_restart(
         == existing.evidence_artifact.id
     )
     assert len(api_state.store.evidence_artifacts) == 1
+
+
+def test_evicting_a_withheld_run_removes_the_cached_tuple() -> None:
+    """The eviction mirrors cache_finalized_backtest exactly: run, minted
+    version, evidence, and a versionless idea leave together, so fallback
+    readers cannot resurrect a result the turn reported as withheld."""
+    from argus.domain.backtest_finalization import (
+        FinalizedBacktest,
+        cache_finalized_backtest,
+        evict_cached_backtest_result,
+    )
+
+    store = AlphaStore()
+    run = _run()
+    captured = build_backtest_evidence_capture(
+        run=run,
+        idea_id="idea-evict",
+        idea_version_id="version-evict",
+        evidence_artifact_id="evidence-evict",
+        now=utcnow(),
+    )
+    cache_finalized_backtest(
+        store,
+        user_id="user-1",
+        finalized=FinalizedBacktest(run=run, captured=captured),
+    )
+    assert store.backtest_runs and store.ideas and store.evidence_artifacts
+
+    evict_cached_backtest_result(store, user_id="user-1", run_id=run.id)
+
+    assert store.backtest_runs == {}
+    assert store.backtest_run_owners == {}
+    assert store.idea_versions == {}
+    assert store.idea_version_owners == {}
+    assert store.evidence_artifacts == {}
+    assert store.evidence_artifact_owners == {}
+    assert store.ideas == {}
+    assert store.idea_owners == {}
+
+
+def test_evicting_a_withheld_run_repoints_an_idea_with_earlier_versions() -> None:
+    """An idea holding a previously published version survives the
+    eviction and its active pointer moves to the latest remaining
+    version, matching the authoritative removal function."""
+    from argus.domain.backtest_finalization import (
+        FinalizedBacktest,
+        cache_finalized_backtest,
+        evict_cached_backtest_result,
+    )
+
+    store = AlphaStore()
+    published_run = _run()
+    published = build_backtest_evidence_capture(
+        run=published_run,
+        idea_id="idea-shared",
+        idea_version_id="version-published",
+        evidence_artifact_id="evidence-published",
+        now=utcnow(),
+    )
+    cache_finalized_backtest(
+        store,
+        user_id="user-1",
+        finalized=FinalizedBacktest(run=published_run, captured=published),
+    )
+
+    withheld_run = _run().model_copy(update={"id": "run-withheld"})
+    withheld_version = published.idea_version.model_copy(
+        update={
+            "id": "version-withheld",
+            "source_run_id": "run-withheld",
+            "created_at": utcnow(),
+        }
+    )
+    withheld_evidence = published.evidence_artifact.model_copy(
+        update={
+            "id": "evidence-withheld",
+            "idea_version_id": "version-withheld",
+            "source_run_id": "run-withheld",
+        }
+    )
+    store.backtest_runs[withheld_run.id] = withheld_run
+    store.backtest_run_owners[withheld_run.id] = "user-1"
+    store.idea_versions[withheld_version.id] = withheld_version
+    store.idea_version_owners[withheld_version.id] = "user-1"
+    store.evidence_artifacts[withheld_evidence.id] = withheld_evidence
+    store.evidence_artifact_owners[withheld_evidence.id] = "user-1"
+    store.ideas["idea-shared"] = store.ideas["idea-shared"].model_copy(
+        update={"active_version_id": withheld_version.id}
+    )
+
+    evict_cached_backtest_result(store, user_id="user-1", run_id="run-withheld")
+
+    assert "run-withheld" not in store.backtest_runs
+    assert "version-withheld" not in store.idea_versions
+    assert "evidence-withheld" not in store.evidence_artifacts
+    assert "idea-shared" in store.ideas
+    assert store.ideas["idea-shared"].active_version_id == "version-published"

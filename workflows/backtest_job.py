@@ -19,6 +19,7 @@ from argus.domain.backtest_finalization import (
     finalize_backtest_completion,
     stable_backtest_run_id,
 )
+from argus.domain.backtest_job_lifecycle import RESULT_CLEANUP_PENDING_KEY
 from argus.domain.evidence import CapturedEvidence
 from argus.llm.openrouter_key_policy import (
     OpenRouterTrafficClass,
@@ -60,6 +61,13 @@ class WorkflowCapacityTimeout(WorkflowBacktestJobError):
     """Raised when a queued workflow cannot claim a bounded running slot."""
 
 
+class WithheldCleanupError(WorkflowBacktestJobError):
+    """A refused link's tuple removal failed after the durable pending
+    marker was written. The task run fails so the Render retry re-enters
+    the entry reconciler; the job's standing terminal state is never
+    overwritten on the way out."""
+
+
 class BacktestJobGateway(Protocol):
     def fetch_job(self, job_id: str) -> dict[str, Any] | None:
         """Return one backtest job row by id."""
@@ -91,6 +99,9 @@ class BacktestJobGateway(Protocol):
         mark_succeeded: bool = False,
     ) -> dict[str, Any]:
         """Link a successful job to its canonical run."""
+
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+        """Remove a run row whose publication the link write refused."""
 
     def mark_backtest_job_failed(
         self,
@@ -161,6 +172,23 @@ def run_backtest_job(
     timings.record_elapsed("job_fetch", phase_started)
     if row is None:
         raise WorkflowBacktestJobError(f"Backtest job {job_id} was not found.")
+
+    # Before any startability assertion: the retry of a task that failed
+    # its withheld-tuple removal carries a terminal job (often canceled),
+    # and its only remaining work is finishing that removal.
+    pending_cleanup = _job_metadata(row).get(RESULT_CLEANUP_PENDING_KEY)
+    if (
+        isinstance(pending_cleanup, dict)
+        and pending_cleanup.get("run_id")
+        and not pending_cleanup.get("completed_at")
+    ):
+        return _reconcile_withheld_cleanup(
+            gateway,
+            row=row,
+            job_id=job_id,
+            pending=pending_cleanup,
+            workflow_run_id=workflow_run_id,
+        )
     _assert_real_job(row)
 
     if row.get("status") == "succeeded" and row.get("result_run_id"):
@@ -414,6 +442,38 @@ def run_backtest_job(
             mark_succeeded=True,
         )
         timings.record_elapsed("link_result", phase_started)
+        link_refused = str(succeeded.get("result_run_id") or "") != result_run_id
+        if link_refused:
+            # The lifecycle statement refused the attach: the job's terminal
+            # state stands and its card may already be restored. Completed
+            # run rows are product-readable regardless of link state, so
+            # the just-committed tuple leaves the result tables. A removal
+            # failure persists a durable pending marker and fails the task
+            # run: the Render retry re-enters the entry reconciler, and the
+            # generic failure handler, which would overwrite the job's
+            # standing terminal state, is bypassed.
+            if not _delete_withheld_run(gateway, user_id=user_id, run_id=result_run_id):
+                _persist_cleanup_pending_marker(
+                    gateway,
+                    row=succeeded,
+                    user_id=user_id,
+                    job_id=job_id,
+                    run_id=result_run_id,
+                )
+                raise WithheldCleanupError(
+                    f"Withheld-result cleanup failed for job {job_id}; "
+                    "re-running the task reconciles it."
+                )
+            # The task return is ephemeral; the job row carries the
+            # contract's durable refusal record so hydration and operators
+            # can tell a cleaned withheld result from a plain cancellation.
+            succeeded = _persist_refusal_audit_record(
+                gateway,
+                row=succeeded,
+                user_id=user_id,
+                job_id=job_id,
+                run_id=result_run_id,
+            )
         succeeded = _persist_final_workflow_timings(
             gateway,
             user_id=user_id,
@@ -424,7 +484,8 @@ def run_backtest_job(
         return {
             "job_id": str(succeeded.get("id") or job_id),
             "status": succeeded.get("status") or "succeeded",
-            "result_run_id": result_run_id,
+            "result_run_id": None if link_refused else result_run_id,
+            **({"result_link_refused": True} if link_refused else {}),
             "workflow_run_id": workflow_run_id,
             **({"result_readout": result_readout.text} if result_readout.text else {}),
             "result_readout_source": result_readout.source,
@@ -438,6 +499,11 @@ def run_backtest_job(
                 succeeded.get("execution_metadata") or succeeded_metadata
             ),
         }
+    except WithheldCleanupError:
+        # The pending marker is already durable; failing the task run is
+        # the retry mechanism, and the job's standing terminal state must
+        # not be overwritten with a re-claimable failure.
+        raise
     except Exception as exc:
         latest = gateway.fetch_job(job_id) or running
         if (
@@ -466,6 +532,150 @@ def run_backtest_job(
             source_error=exc,
             timings=timings,
         )
+
+
+def _delete_withheld_run(gateway: Any, *, user_id: str, run_id: str) -> bool:
+    """Returns whether the tuple is gone. The caller turns a failure into
+    the durable pending marker plus a failed task run, whose retry is the
+    reconciliation mechanism."""
+    delete_run = getattr(gateway, "delete_withheld_backtest_result", None)
+    if delete_run is None:
+        return True
+    try:
+        delete_run(user_id=user_id, run_id=run_id)
+        return True
+    except Exception:  # noqa: BLE001
+        logger.opt(exception=True).warning(
+            "Withheld result tuple could not be removed",
+            user_id=user_id,
+            run_id=run_id,
+        )
+        return False
+
+
+def _persist_cleanup_pending_marker(
+    gateway: Any,
+    *,
+    row: Mapping[str, Any],
+    user_id: str,
+    job_id: str,
+    run_id: str,
+) -> None:
+    """Durable record of the leak, written with bounded retries because
+    the entry reconciler keys on it: even if the task retry never lands,
+    the marker is queryable on the job row and names the exact tuple an
+    operator must remove. This gateway's metadata write replaces the
+    whole object, so the marker is merged onto the standing row's
+    metadata rather than sent alone."""
+    metadata = _job_metadata(row)
+    metadata[RESULT_CLEANUP_PENDING_KEY] = {
+        "run_id": run_id,
+        "failed_at": utcnow_iso(),
+    }
+    for attempt in (1, 2, 3):
+        try:
+            gateway.merge_backtest_job_execution_metadata(
+                user_id=user_id,
+                job_id=job_id,
+                execution_metadata=metadata,
+            )
+            return
+        except Exception:  # noqa: BLE001
+            if attempt == 3:
+                logger.opt(exception=True).warning(
+                    "Withheld-cleanup pending marker could not be persisted "
+                    "after retries; the leak is visible only in logs until "
+                    "an operator intervenes",
+                    user_id=user_id,
+                    job_id=job_id,
+                    run_id=run_id,
+                )
+                return
+            time.sleep(0.2 * attempt)
+
+
+def _persist_refusal_audit_record(
+    gateway: Any,
+    *,
+    row: Mapping[str, Any],
+    user_id: str,
+    job_id: str,
+    run_id: str,
+) -> dict[str, Any]:
+    """The contract's durable refusal record for a cleaned withheld
+    result, merged onto the standing metadata because this gateway's
+    write replaces the whole object. Best effort: the refusal is also in
+    the task output and logs, so a failed audit write degrades loudly
+    without failing the task."""
+    metadata = _job_metadata(row)
+    metadata["result_link_refused"] = {
+        "run_id": run_id,
+        "cleaned_at": utcnow_iso(),
+    }
+    try:
+        updated = gateway.merge_backtest_job_execution_metadata(
+            user_id=user_id,
+            job_id=job_id,
+            execution_metadata=metadata,
+        )
+        return dict(updated) if isinstance(updated, dict) else dict(row)
+    except Exception:  # noqa: BLE001
+        logger.opt(exception=True).warning(
+            "Refused-link audit record could not be persisted",
+            user_id=user_id,
+            job_id=job_id,
+            run_id=run_id,
+        )
+        return dict(row)
+
+
+def _reconcile_withheld_cleanup(
+    gateway: Any,
+    *,
+    row: Mapping[str, Any],
+    job_id: str,
+    pending: dict[str, Any],
+    workflow_run_id: str | None,
+) -> dict[str, Any]:
+    """Finish a previously failed withheld-tuple removal before anything
+    else runs: the retry of the failed task run lands here, and a job
+    carrying the marker must not be treated as startable work."""
+    user_id = _required_str(row, "user_id")
+    run_id = str(pending.get("run_id") or "")
+    if not _delete_withheld_run(gateway, user_id=user_id, run_id=run_id):
+        raise WithheldCleanupError(
+            f"Withheld-result cleanup is still failing for job {job_id}."
+        )
+    # This gateway's metadata write replaces the whole object, so the
+    # completed marker and the contract's refusal record are merged onto
+    # the standing row's metadata.
+    completed_metadata = _job_metadata(row)
+    completed_metadata[RESULT_CLEANUP_PENDING_KEY] = {
+        **pending,
+        "completed_at": utcnow_iso(),
+    }
+    completed_metadata.setdefault(
+        "result_link_refused",
+        {"run_id": run_id, "cleaned_at": utcnow_iso()},
+    )
+    metadata = gateway.merge_backtest_job_execution_metadata(
+        user_id=user_id,
+        job_id=job_id,
+        execution_metadata=completed_metadata,
+    )
+    return {
+        "job_id": job_id,
+        "status": str(row.get("status") or ""),
+        "result_run_id": None,
+        "result_link_refused": True,
+        "result_cleanup_reconciled": True,
+        "workflow_run_id": workflow_run_id,
+        "execution_metadata": _json_safe(
+            metadata.get("execution_metadata")
+            if isinstance(metadata, dict)
+            else completed_metadata
+        ),
+    }
 
 
 def _already_succeeded_result(
@@ -1444,16 +1654,19 @@ class PostgresBacktestJobGateway:
         mark_succeeded: bool = False,
     ) -> dict[str, Any]:
         from argus.domain.backtest_job_lifecycle import (
+            job_result_attach_sql_predicate,
             job_success_write_sql_predicate,
         )
         from psycopg.types.json import Jsonb
 
         status = "succeeded" if mark_succeeded else None
         finished_at = utcnow_iso() if mark_succeeded else None
-        # Success may only follow a state a worker legitimately holds. The
-        # predicate is generated beside the card-restore classification so
-        # the two sides of the consumption design cannot drift: a state the
-        # card was restored from can never be converted into a result.
+        # Every result attach passes the lifecycle statement, and success
+        # may only follow a state a worker legitimately holds. Both
+        # predicates are generated beside the card-restore classification
+        # so the sides of the consumption design cannot drift: a state the
+        # card was restored from can never gain a result, whether or not
+        # the write also converts status.
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -1478,6 +1691,7 @@ class PostgresBacktestJobGateway:
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
                       and user_id = %(user_id)s
+                      and {job_result_attach_sql_predicate()}
                       and (
                         %(status)s is distinct from 'succeeded'
                         or {job_success_write_sql_predicate()}
@@ -1508,20 +1722,38 @@ class PostgresBacktestJobGateway:
                         raise WorkflowBacktestJobError(
                             f"Backtest job {job_id} not found."
                         )
-                    # The success write was refused: the job reached a state
-                    # no worker legitimately holds, its card may already be
-                    # restored, and that terminal state stands. The computed
-                    # run row remains for audit, unlinked.
+                    # The attach was refused: the job reached a state no
+                    # future write may turn into a result, its card may
+                    # already be restored, and that terminal state stands.
+                    # The caller removes the computed finalized tuple,
+                    # because every part of it is product-readable.
                     logger.warning(
-                        "Success finalization refused; the job's terminal "
-                        "state stands and its card consequence is owned by "
-                        "the writer that won it",
+                        "Result link refused; the job's terminal state "
+                        "stands and its card consequence is owned by the "
+                        "writer that won it",
                         job_id=job_id,
                         standing_status=str(standing.get("status") or ""),
                         mark_succeeded=mark_succeeded,
                     )
                     return _json_safe(standing)
         return _json_safe(row)
+
+    def delete_withheld_backtest_result(self, *, user_id: str, run_id: str) -> bool:
+        """Remove the full finalized tuple of a withheld run atomically.
+
+        The database function is the one owner of the removal (children
+        first, run row last, ideas with earlier versions repointed), so
+        this gateway and the API gateway cannot drift apart and product
+        reads can never observe a partial tuple."""
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select public.delete_withheld_backtest_result("
+                    "%(user_id)s, %(run_id)s) as deleted",
+                    {"run_id": run_id, "user_id": user_id},
+                )
+                row = cur.fetchone()
+        return bool(row and row.get("deleted"))
 
     def mark_backtest_job_failed(
         self,
