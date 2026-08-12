@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import ssl
 from email import message_from_string
@@ -8,7 +9,13 @@ from unittest.mock import MagicMock
 import pytest
 from argus.api import state as api_state
 from argus.api.main import app
-from argus.domain.access_approval_email import send_access_approval_email
+from argus.api.schemas import Language
+from argus.domain.access_approval_email import (
+    ACCESS_WELCOME_CONTENT_VERSION,
+    AccessWelcomeSendResult,
+    build_access_welcome_email,
+    send_access_welcome_email,
+)
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -31,6 +38,7 @@ class _FakeSMTP:
         self.mail_from: str | None = None
         self.recipient: str | None = None
         self.message: str | None = None
+        self.data_receipt = b"Queued. resend-message-id"
 
     def __enter__(self) -> "_FakeSMTP":
         return self
@@ -51,21 +59,120 @@ class _FakeSMTP:
 
     def data(self, message: str) -> tuple[int, bytes]:
         self.message = message
-        return 250, b"Queued. resend-message-id"
+        return 250, self.data_receipt
 
 
 @pytest.mark.parametrize(
-    ("language", "subject_fragment", "body_fragment"),
+    (
+        "language",
+        "subject",
+        "welcome_line",
+        "product_line",
+        "first_action",
+        "cta_line",
+        "button_label",
+        "fallback_line",
+        "support_line",
+    ),
     [
-        ("en", "Argus access is approved", "create your Argus account"),
-        ("es-419", "acceso a Argus fue aprobado", "crear tu cuenta de Argus"),
+        (
+            "en",
+            "Welcome to Argus",
+            "Welcome to Argus. Your access has been granted.",
+            "Argus is AI-powered investing and trading idea validation for everyone.",
+            "Start by describing an investing idea in plain language and running "
+            "your first historical test.",
+            "Create your Argus account:",
+            "Create your Argus account",
+            "If the button does not work, open this link:",
+            "Questions? Contact support@get-argus.com.",
+        ),
+        (
+            "es-419",
+            "Bienvenido a Argus",
+            "Bienvenido a Argus. Tu acceso fue aprobado.",
+            "Argus usa IA para validar ideas de inversión y trading para todos.",
+            "Empieza por describir una idea de inversión en lenguaje sencillo y "
+            "realizar tu primera prueba histórica.",
+            "Crea tu cuenta de Argus:",
+            "Crea tu cuenta de Argus",
+            "Si el botón no funciona, abre este enlace:",
+            "¿Tienes preguntas? Escribe a support@get-argus.com.",
+        ),
     ],
 )
-def test_approval_email_uses_locked_smtp_and_localized_multipart_contract(
+def test_access_welcome_content_is_literal_bilingual_and_transactional(
+    language: Language,
+    subject: str,
+    welcome_line: str,
+    product_line: str,
+    first_action: str,
+    cta_line: str,
+    button_label: str,
+    fallback_line: str,
+    support_line: str,
+) -> None:
+    signup_url = "https://app.example/?auth=signup"
+
+    content = build_access_welcome_email(
+        language=language,
+        signup_url=signup_url,
+    )
+
+    assert content.subject == subject
+    assert content.plain_text == (
+        f"{welcome_line}\n\n"
+        f"{product_line}\n\n"
+        f"{first_action}\n\n"
+        f"{cta_line}\n"
+        f"{signup_url}\n\n"
+        f"{support_line}"
+    )
+    for literal in (
+        welcome_line,
+        product_line,
+        first_action,
+        button_label,
+        fallback_line,
+        signup_url,
+        support_line,
+    ):
+        assert literal in content.html
+    assert content.plain_text.count(first_action) == 1
+    assert content.html.count(first_action) == 1
+    combined = f"{content.plain_text}\n{content.html}".lower()
+    assert "unsubscribe" not in combined
+    assert "cancelar la suscripción" not in combined
+    assert "confirm your email" not in combined
+    assert "confirma tu correo" not in combined
+    assert "\u2014" not in combined
+
+
+@pytest.mark.parametrize(
+    ("language", "subject", "product_line", "first_action"),
+    [
+        (
+            "en",
+            "Welcome to Argus",
+            "Argus is AI-powered investing and trading idea validation for everyone.",
+            "Start by describing an investing idea in plain language and running "
+            "your first historical test.",
+        ),
+        (
+            "es-419",
+            "Bienvenido a Argus",
+            "Argus usa IA para validar ideas de inversión y trading para todos.",
+            "Empieza por describir una idea de inversión en lenguaje sencillo y "
+            "realizar tu primera prueba histórica.",
+        ),
+    ],
+)
+def test_access_welcome_sender_preserves_smtp_and_multipart_contract(
     monkeypatch: pytest.MonkeyPatch,
-    language: str,
-    subject_fragment: str,
-    body_fragment: str,
+    language: Language,
+    subject: str,
+    product_line: str,
+    first_action: str,
 ) -> None:
     instances: list[_FakeSMTP] = []
 
@@ -86,13 +193,18 @@ def test_approval_email_uses_locked_smtp_and_localized_multipart_contract(
         _smtp,
     )
 
-    receipt = send_access_approval_email(
-        recipient="person@example.com",
-        language=language,  # type: ignore[arg-type]
+    result = send_access_welcome_email(
+        recipient=" Person@Example.COM ",
+        language=language,
         signup_url="https://app.example/?auth=signup",
     )
 
-    assert receipt == "Queued. resend-message-id"
+    assert result == AccessWelcomeSendResult(
+        subject=subject,
+        content_version="private-alpha-access-welcome/v1",
+        provider_receipt="Queued. resend-message-id",
+    )
+    assert result.content_version == ACCESS_WELCOME_CONTENT_VERSION
     assert len(instances) == 1
     smtp = instances[0]
     assert (smtp.host, smtp.port) == ("smtp.resend.com", 465)
@@ -106,7 +218,7 @@ def test_approval_email_uses_locked_smtp_and_localized_multipart_contract(
     message = message_from_string(smtp.message)
     assert message["From"] == "Argus <noreply@get-argus.com>"
     assert message["To"] == "person@example.com"
-    assert subject_fragment in str(message["Subject"])
+    assert str(message["Subject"]) == subject
     assert message["Resend-Idempotency-Key"].startswith("sha256:")
     assert "person@example.com" not in message["Resend-Idempotency-Key"]
     assert message.get_content_type() == "multipart/alternative"
@@ -117,13 +229,21 @@ def test_approval_email_uses_locked_smtp_and_localized_multipart_contract(
         for part in message.walk()
         if part.get_content_maintype() != "multipart"
     }
-    assert body_fragment in payloads["text/plain"]
-    assert body_fragment in payloads["text/html"]
+    assert set(payloads) == {"text/plain", "text/html"}
+    assert product_line in payloads["text/plain"]
+    assert product_line in payloads["text/html"]
+    assert payloads["text/plain"].count(first_action) == 1
+    assert payloads["text/html"].count(first_action) == 1
+    assert "support@get-argus.com" in payloads["text/plain"]
+    assert "support@get-argus.com" in payloads["text/html"]
+    assert "background-color: #191c1f" in payloads["text/html"]
+    assert "border-radius: 9999px" in payloads["text/html"]
     assert "https://app.example/?auth=signup" in payloads["text/plain"]
     assert "https://app.example/?auth=signup" in payloads["text/html"]
+    assert "\u2014" not in payloads["text/plain"] + payloads["text/html"]
 
 
-def test_approval_email_hash_is_deterministic_for_normalized_recipient(
+def test_access_welcome_hash_uses_versioned_namespace_and_normalized_recipient(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     instances: list[_FakeSMTP] = []
@@ -146,7 +266,7 @@ def test_approval_email_hash_is_deterministic_for_normalized_recipient(
     )
 
     for recipient in ("Person@Example.com", " person@example.COM "):
-        send_access_approval_email(
+        send_access_welcome_email(
             recipient=recipient,
             language="en",
             signup_url="https://app.example/?auth=signup",
@@ -157,6 +277,56 @@ def test_approval_email_hash_is_deterministic_for_normalized_recipient(
         for instance in instances
     ]
     assert keys[0] == keys[1]
+    material = "\n".join(
+        (
+            "argus-access-welcome/v1",
+            "person@example.com",
+            "en",
+            "https://app.example/?auth=signup",
+        )
+    )
+    assert keys[0] == f"sha256:{hashlib.sha256(material.encode('utf-8')).hexdigest()}"
+
+
+def test_access_welcome_receipt_is_bounded_to_256_characters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _smtp(
+        host: str,
+        port: int,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+    ) -> _FakeSMTP:
+        instance = _FakeSMTP(host, port, timeout=timeout, context=context)
+        instance.data_receipt = b"x" * 300
+        return instance
+
+    monkeypatch.setenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD", "re_test_password")
+    monkeypatch.setattr(
+        "argus.domain.access_approval_email.smtplib.SMTP_SSL",
+        _smtp,
+    )
+
+    result = send_access_welcome_email(
+        recipient="person@example.com",
+        language="en",
+        signup_url="https://app.example/?auth=signup",
+    )
+
+    assert result.provider_receipt == "x" * 256
+
+
+def test_access_welcome_html_escapes_the_signup_url() -> None:
+    unsafe_url = 'https://app.example/?next="><script>alert(1)</script>&auth=signup'
+
+    content = build_access_welcome_email(language="en", signup_url=unsafe_url)
+
+    assert "<script>alert(1)</script>" not in content.html
+    assert (
+        "https://app.example/?next=&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
+        "&amp;auth=signup"
+    ) in content.html
 
 
 def test_internal_approval_sends_before_requested_to_user_cas(
