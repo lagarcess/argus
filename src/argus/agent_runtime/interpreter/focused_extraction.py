@@ -569,6 +569,13 @@ def strategy_extraction_repair_is_allowed(
     if response.semantic_turn_act == "retry_failed_action":
         return not has_failed_action_launch_payload(request)
     if response.semantic_turn_act == "unsupported_request":
+        has_active_context = has_active_strategy_context(request)
+        has_material_evidence = current_turn_has_material_execution_evidence(request)
+        if has_active_context and (
+            not str(request.selected_thread_metadata.get("requested_field") or "").strip()
+            or not has_material_evidence
+        ):
+            return False
         if noncanonical_text_needs_repair(response=response, request=request):
             return True
         if response.intent not in {
@@ -576,13 +583,6 @@ def strategy_extraction_repair_is_allowed(
             "beginner_guidance",
             "conversation_followup",
         }:
-            return False
-        has_active_context = has_active_strategy_context(request)
-        has_material_evidence = current_turn_has_material_execution_evidence(request)
-        if has_active_context and (
-            not str(request.selected_thread_metadata.get("requested_field") or "").strip()
-            or not has_material_evidence
-        ):
             return False
         if not response.unsupported_constraints:
             return has_material_evidence

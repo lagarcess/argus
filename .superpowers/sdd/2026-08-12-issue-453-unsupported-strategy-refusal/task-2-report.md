@@ -76,3 +76,43 @@ or custom strategy logic.
 
 None for Task 2. Full backend and browser coverage belong to the parent issue
 lane and were not run in this focused subtask.
+
+## Fix round 1: active context continuity gate
+
+### RED
+
+Command:
+
+```bash
+poetry run pytest --no-cov tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py -q -k 'active_context_without_requested_field'
+```
+
+Result: `1 failed, 80 deselected in 1.43s`.
+
+The noncanonical-text early return admitted a focused repair when an active
+strategy snapshot lacked `requested_field`.
+
+### GREEN
+
+Commands:
+
+```bash
+poetry run pytest --no-cov tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py -q -k 'active_context_without_requested_field'
+poetry run pytest --no-cov tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py -q -k 'issue_453 or supported_strategy_capability'
+poetry run ruff format src/argus/agent_runtime/interpreter/focused_extraction.py src/argus/agent_runtime/llm_interpreter.py tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py
+poetry run ruff check src/argus/agent_runtime/interpreter/focused_extraction.py src/argus/agent_runtime/llm_interpreter.py tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py
+git diff --check
+```
+
+Results: `1 passed, 80 deselected in 0.97s`; `9 passed, 72 deselected in
+2.34s`; `1 file reformatted, 2 files left unchanged`; `All checks passed!`;
+`git diff --check` was clean.
+
+### Design and self-review
+
+The active-context gate now runs before the noncanonical early return, so every
+unsupported-request repair requires a real `requested_field` and material
+current-turn evidence when an active strategy exists. Fresh no-context DCA
+repair and typed capability-conflict behavior remain unchanged. The new
+regression asserts the exact predicate is false for an active snapshot without
+`requested_field`. No parsing, locale, or response-copy behavior was added.

@@ -3479,6 +3479,47 @@ async def test_issue_453_bare_unsupported_dca_starter_repairs_to_amount_clarific
     assert draft.date_range is not None
 
 
+def test_issue_453_active_context_without_requested_field_blocks_noncanonical_repair() -> (
+    None
+):
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="The user wants to invest $500 in NFLX.",
+        assistant_response="That request is not supported.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="$500",
+            strategy_thesis="The user wants to invest $500 in NFLX.",
+        ),
+        semantic_turn_act="unsupported_request",
+    )
+    request = InterpretationRequest(
+        current_user_message="$500",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold NFLX.",
+                asset_universe=["NFLX"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            )
+        ),
+        user=UserState(user_id="u1", language_preference="en"),
+    )
+
+    assert (
+        interpreter_module._strategy_extraction_repair_is_allowed(
+            response,
+            request=request,
+        )
+        is False
+    )
+
+
 @pytest.mark.asyncio
 async def test_issue_453_pending_capital_answer_repairs_without_acknowledgment(
     monkeypatch,
