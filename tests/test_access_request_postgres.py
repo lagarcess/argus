@@ -848,7 +848,7 @@ def test_protected_approval_replay_uses_real_gateway_and_sends_once(
             self.port = port
             self.timeout = timeout
             self.context = context
-            self.message: str | None = None
+            self.accepted_messages: list[str] = []
 
         def __enter__(self) -> "_RecordingSMTP":
             return self
@@ -869,7 +869,7 @@ def test_protected_approval_replay_uses_real_gateway_and_sends_once(
             return 250, b"recipient accepted"
 
         def data(self, message: str) -> tuple[int, bytes]:
-            self.message = message
+            self.accepted_messages.append(message)
             return 250, b"Queued. isolated-gateway-proof"
 
     email = _random_email()
@@ -932,9 +932,13 @@ def test_protected_approval_replay_uses_real_gateway_and_sends_once(
 
         assert first.status_code == second.status_code == 200
         assert first.json() == second.json() == {"approved": True}
-        assert len(smtp_instances) == 1
-        assert smtp_instances[0].message is not None
-        accepted_message = message_from_string(smtp_instances[0].message or "")
+        accepted_messages = [
+            message
+            for instance in smtp_instances
+            for message in instance.accepted_messages
+        ]
+        assert len(accepted_messages) == 1
+        accepted_message = message_from_string(accepted_messages[0])
         assert accepted_message.get_content_type() == "multipart/alternative"
         assert accepted_message["To"] == email
 

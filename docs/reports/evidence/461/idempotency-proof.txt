@@ -3,11 +3,14 @@ Issue #461 double-promotion proof
 
 Status: PENDING final-candidate non-skipped CI
 
-Code-under-test source head:
+Email implementation source head:
 30f2830cad5ce08315c421289252bb7203d4afae
 
-Current candidate before the Task 5 evidence commit:
-b4b4c747b565513c75ff498b08470e0da1ef7d7e
+First Task 5 evidence commit and initial CI target:
+41d189285b18a864d1749cea0a3203cfdf374264
+
+Current proof-tightening working tree:
+Based on 41d18928. Its successor exact-head CI target is pending until this fix is committed.
 
 Local collection evidence:
 - Command: poetry run pytest tests/test_access_request_postgres.py::test_protected_approval_replay_uses_real_gateway_and_sends_once -vv --no-cov
@@ -21,10 +24,10 @@ CI proof prepared:
 - Database: ARGUS_DISPOSABLE_DATABASE_URL, isolated CI PostgreSQL.
 - Gateway: SupabaseGateway through ARGUS_LOCAL_SUPABASE_URL and the isolated CI service-role key.
 - Route: two protected TestClient POST requests to /internal/access-requests/approve.
-- Sender boundary: one recording SMTP test double that accepts one multipart/alternative MIME message.
+- Sender boundary: recording SMTP doubles retain every accepted DATA message across all connections; exactly one accepted multipart/alternative MIME message is required.
 - Randomization: Faker-generated recipient, ops token, and test-only SMTP password.
 - Cleanup: deletes only the generated recipient's delivery and allowlist rows.
-- Required assertions: two HTTP 200 responses; one sender acceptance; one durable delivery row; final allowlist role user; stored language es-419; content version private-alpha-access-welcome/v1.
+- Required assertions: two HTTP 200 responses; exactly one accepted MIME message; one durable delivery row; final allowlist role user; stored language es-419; content version private-alpha-access-welcome/v1.
 
 Earlier CI context supplied by the release captain:
 - Head 281ff6e8 ran 294 real-PostgreSQL tests with zero skips.
