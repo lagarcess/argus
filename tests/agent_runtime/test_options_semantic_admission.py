@@ -174,7 +174,7 @@ def test_unsupported_intent_options_contradiction_blocks_es(
     _assert_blocked_unsupported_admission(result, symbol="AAPL")
 
 
-def test_unsupported_request_turn_act_contradiction_blocks_and_keeps_prose(
+def test_issue_453_unsupported_request_turn_act_contradiction_blocks_without_prose(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _stub_equity_asset_resolution(monkeypatch)
@@ -189,7 +189,7 @@ def test_unsupported_request_turn_act_contradiction_blocks_and_keeps_prose(
         ),
     )
     _assert_blocked_unsupported_admission(result, symbol="TSLA")
-    assert result.patch.get("assistant_response") == refusal
+    assert result.patch.get("assistant_response") is None
 
 
 def test_supported_intent_with_unsupported_request_act_blocks(

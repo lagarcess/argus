@@ -6,6 +6,7 @@ copy (Response Voice Contract violation) attached to strategy-rule options
 for what is actually a date problem.
 """
 
+import pytest
 from argus.agent_runtime.clarification_contract import _unsupported_recovery_fallback
 from argus.agent_runtime.stages.confirm import _launch_validation_failure
 from argus.agent_runtime.state.models import StrategySummary
@@ -43,15 +44,24 @@ def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
     assert "_" not in prose
 
 
-def test_user_phrase_raw_value_still_renders_as_subject() -> None:
+@pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.parametrize(
+    "raw_value",
+    ["User wants to invest $500", "MACD golden cross", "BTC_USDT"],
+)
+def test_issue_453_generic_raw_value_never_renders_as_subject(
+    language: str,
+    raw_value: str,
+) -> None:
     prose = _unsupported_recovery_fallback(
-        language="en",
-        response_intent=_response_intent_with_raw_value("MACD golden cross"),
+        language=language,
+        response_intent=_response_intent_with_raw_value(raw_value),
         strategy=StrategySummary(asset_universe=["NVDA"]),
     )
 
     assert prose is not None
-    assert "MACD golden cross" in prose
+    assert raw_value not in prose
+    assert "that rule" in prose
 
 
 def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> None:
@@ -92,20 +102,6 @@ def test_explanation_sentence_never_renders_as_subject() -> None:
     assert prose is not None
     assert "needs clarification" not in prose
     assert "that rule" in prose
-
-
-def test_uppercase_underscore_symbol_still_renders_as_subject() -> None:
-    """User-typed pair symbols such as BTC_USDT are their own words, not
-    internal reason codes, and must keep rendering in the clarifier prose."""
-
-    prose = _unsupported_recovery_fallback(
-        language="en",
-        response_intent=_response_intent_with_raw_value("BTC_USDT"),
-        strategy=StrategySummary(asset_universe=["NVDA"]),
-    )
-
-    assert prose is not None
-    assert "BTC_USDT" in prose
 
 
 def test_chronological_validation_failure_reasks_dates_not_strategy_rule() -> None:

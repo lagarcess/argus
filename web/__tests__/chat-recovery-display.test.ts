@@ -447,7 +447,13 @@ describe("chat recovery display", () => {
     expect(text).not.toContain("can't run");
   });
 
-  test("renders unsupported recovery from typed clarification sidecars", () => {
+  test.each([
+    "User wants to invest $500",
+    "MACD golden cross",
+    "BTC_USDT",
+  ])(
+    "issue 453 keeps generic raw value %s out of recovery sentence subjects",
+    (rawValue) => {
     const display = recoveryDisplayFromMetadata({
       clarification: {
         kind: "unsupported_recovery",
@@ -456,7 +462,7 @@ describe("chat recovery display", () => {
         requested_field: "unsupported_constraints",
         semantic_needs: ["simplification_choice"],
         payload: {
-          raw_value: "ATR 14",
+          raw_value: rawValue,
           strategy: {
             asset_universe: ["TSLA"],
           },
@@ -478,10 +484,18 @@ describe("chat recovery display", () => {
       },
     });
 
-    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
-      "Argus todavía no puede ejecutar ATR 14 directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+    const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
+    const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
+    expect(en).toBe(
+      "Argus can't run that rule directly yet for TSLA. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
     );
-  });
+    expect(es).toBe(
+      "Argus todavía no puede ejecutar esa regla directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+    );
+    expect(en).not.toContain(rawValue);
+    expect(es).not.toContain(rawValue);
+    },
+  );
 
   test("renders degraded timeframe recovery truthfully in English and Spanish", () => {
     const display = recoveryDisplayFromMetadata({

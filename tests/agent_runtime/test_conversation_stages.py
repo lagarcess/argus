@@ -19,6 +19,7 @@ from argus.agent_runtime.llm_clarifier import (
 from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.state.models import RunState, StrategySummary
+from argus.domain.backtesting.config import MAX_STARTING_CAPITAL, MIN_STARTING_CAPITAL
 from argus.llm import openrouter
 
 
@@ -126,6 +127,56 @@ def test_clarify_offline_fallback_uses_product_language() -> None:
     assert clarification["semantic_needs"] == ["period"]
     assert clarification["payload"]["strategy"]["asset_universe"] == ["AAPL"]
     assert clarification["options"] == []
+
+
+def test_issue_453_starting_capital_bounds_recover_without_confirmation_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+
+    monkeypatch.setattr(
+        confirm_module,
+        "_strategy_with_latest_complete_data_adjustment",
+        lambda strategy: strategy,
+    )
+    state = RunState.new(
+        current_user_message="Buy and hold NFLX with $500 starting capital in 2024.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        asset_universe=["NFLX"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=500,
+    )
+
+    confirmation = confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert confirmation.outcome == "needs_clarification"
+    assert "confirmation_payload" not in confirmation.patch
+    constraint = confirmation.patch["optional_parameter_status"][
+        "unsupported_constraints"
+    ][0]
+    assert constraint["category"] == "unsupported_starting_capital"
+    assert constraint["minimum"] == MIN_STARTING_CAPITAL
+    assert constraint["maximum"] == MAX_STARTING_CAPITAL
+
+    state.requested_field = confirmation.patch["requested_field"]
+    state.missing_required_fields = confirmation.patch["missing_required_fields"]
+    state.optional_parameter_status = confirmation.patch["optional_parameter_status"]
+    clarification = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=RecordingClarifier(None),
+        language="en",
+    )
+
+    assert "$1,000" in clarification.patch["assistant_prompt"]
+    assert "unsupported" not in clarification.patch["assistant_prompt"].lower()
 
 
 def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
