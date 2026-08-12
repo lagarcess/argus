@@ -53,8 +53,12 @@ clarification section, UI-state owner, locale, or focused test.
 - Live eval: intentionally not run; it remains controller-owned.
 
 The six sandbox failures were one process-inspection node and five canary nodes
-that reached a loopback bind. Running the full canary module plus the process
-node outside the sandbox proved all eight affected nodes green.
+that reached a loopback bind. The outside-sandbox command intentionally ran the
+whole seven-test canary module plus the process node, so its `8 passed` result
+contains the five failing canary nodes, two canary nodes that had already passed
+in the sandbox, and the failing process node. All six sandbox-failing nodes were
+therefore green outside the sandbox; the report does not claim eight sandbox
+failures.
 
 ### Web
 
