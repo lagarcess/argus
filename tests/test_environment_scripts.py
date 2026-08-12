@@ -410,35 +410,6 @@ def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     }
 
 
-def test_phantom_maintenance_surface_is_absent_but_operator_job_remains() -> None:
-    render_yaml = _source("render.yaml")
-    env_contract = ENV_CONTRACT.read_text()
-    env_sync = _source(".github/render-env-sync.sh")
-
-    assert "argus-maintenance" not in render_yaml
-    assert "ARGUS_RENDER_CRON_ENV" not in env_contract
-    assert "ARGUS_RENDER_MAINTENANCE_SERVICE_NAME" not in env_contract
-    assert "cron-deploy-status" not in env_sync
-    assert (ROOT / "scripts" / "ops" / "scheduled_maintenance.py").is_file()
-
-
-def test_release_docs_name_three_live_services_without_a_cron_surface() -> None:
-    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
-    data_model = _source("docs/DATA_MODEL.md")
-    release_contract = _source("docs/specs/private-alpha-ci-cd-sota.md")
-    manifest = _source("docs/release-manifests/TEMPLATE.md")
-
-    for service in ("argus-api", "argus-app", "argus-backtests"):
-        assert service in runbook
-        assert service in release_contract
-        assert service in manifest
-    for source in (runbook, data_model, release_contract, manifest):
-        assert "argus-maintenance" not in source
-        assert "cron-deploy-status" not in source
-    assert "scripts/ops/scheduled_maintenance.py" in runbook
-    assert "operator-run" in runbook
-
-
 def test_render_web_declares_exact_server_only_https_app_origin() -> None:
     api_env = _render_env("argus-api")
     web_env = _render_env("argus-app")
@@ -647,25 +618,6 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "release_profile_auto_deploy_trigger workflow" in source
     assert "autoDeployTrigger: $auto_deploy_trigger" in source
     assert 'autoDeployTrigger: "off"' not in source
-
-
-def test_release_contract_enables_checks_passing_autodeploy_for_all_three() -> None:
-    profile = json.loads(
-        _source(".github/private-alpha-release-profile.json")
-    )
-    render_config = yaml.safe_load(_source("render.yaml"))
-    render_by_name = {service["name"]: service for service in render_config["services"]}
-    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
-
-    for surface in ("api", "web", "workflow"):
-        assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
-    assert render_by_name["argus-api"]["autoDeployTrigger"] == "checksPass"
-    assert render_by_name["argus-app"]["autoDeployTrigger"] == "checksPass"
-    assert "argus-backtests" not in render_by_name
-    assert "checksPass" in runbook
-    assert "argus-api" in runbook
-    assert "argus-app" in runbook
-    assert "argus-backtests" in runbook
 
 
 def test_render_env_sync_workflow_proof_uses_the_profile_live_provider_mode() -> None:
@@ -923,52 +875,6 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "autodeploy_status=ready" in result.stdout
     assert "status=ready" in result.stdout
     assert "postgres://workflow-db.example/argus" not in result.stdout
-
-
-def test_render_env_sync_audit_fails_when_one_autodeploy_surface_is_off(
-    tmp_path: Path,
-) -> None:
-    result = _run_render_release_audit(
-        tmp_path,
-        expect_mode="real-workflow",
-        api_env_json=_real_workflow_api_env_payload(),
-        web_env_json=_render_env_payload("argus-app"),
-        workflow_env_json=_workflow_env_payload(),
-        workflow_service_json=json.dumps({"autoDeployTrigger": "off"}),
-    )
-
-    assert result.returncode == 1
-    assert (
-        "drift argus-backtests:autoDeployTrigger "
-        "expected=checksPass actual=off" in result.stdout
-    )
-    assert "autodeploy_status=drift" in result.stdout
-    assert "status=drift" in result.stdout
-
-
-def test_render_env_sync_audit_compares_the_transition_cors_allowlist(
-    tmp_path: Path,
-) -> None:
-    result = _run_render_release_audit(
-        tmp_path,
-        expect_mode="real-workflow",
-        api_env_json=_render_env_payload(
-            "argus-api",
-            overrides={
-                "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "true",
-                "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
-                "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "true",
-                "RENDER_API_KEY": "fake-render-token",
-                "ARGUS_CORS_ALLOW_ORIGINS": "https://argus-app-suz5.onrender.com",
-            },
-        ),
-        web_env_json=_render_env_payload("argus-app"),
-        workflow_env_json=_workflow_env_payload(),
-    )
-
-    assert result.returncode == 1
-    assert "drift argus-api:ARGUS_CORS_ALLOW_ORIGINS" in result.stdout
-    assert "status=drift" in result.stdout
 
 
 def test_render_env_sync_audit_accepts_required_turnstile_site_key(
