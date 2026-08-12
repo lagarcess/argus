@@ -2906,8 +2906,7 @@ Example unsupported-recovery clarification payload:
       "strategy": {
         "asset_universe": ["TSLA"],
         "asset_class": "equity"
-      },
-      "raw_value": "ATR 14"
+      }
     },
     "options": [
       {
@@ -2926,6 +2925,39 @@ Example unsupported-recovery clarification payload:
   }
 }
 ```
+
+### Cause-aware unsupported recovery
+
+`unsupported_recovery` is an additive typed projection. Its cause determines
+both the recovery route and the facts available to deterministic fallback copy:
+
+- A surviving `unsupported_strategy_logic` capability constraint may use
+  `unsupported_recovery` with supported simplification options. Only this
+  capability route may say that Argus cannot run a strategy.
+- Incomplete or unparseable extraction is a normal clarification outcome. It
+  asks for the missing executable detail and must not be represented as a
+  strategy-capability refusal.
+- `unsupported_starting_capital` is a launch-validation range outcome, not a
+  strategy-capability refusal. It asks for a starting-capital amount before a
+  confirmation card or acknowledgement is emitted.
+
+`raw_value` may remain in runtime records as opaque diagnostic or interpreter
+evidence. It is never a generic display subject and is not included in the
+generic clarifier voice input, `assistant_prompt`, or deterministic fallback
+copy. A generic capability recovery instead speaks about the typed capability
+and its supported options.
+
+For `unsupported_starting_capital`, `payload.minimum` is a typed finite number
+and `payload.maximum` is an optional typed finite number. The projection emits
+these fields only when both bounds are present, finite, and ordered with
+`minimum <= maximum`; missing, malformed, non-finite, or reversed pairs fail
+closed by omitting both values and using the generic starting-capital prompt.
+
+`unsupported_time_granularity` is the dedicated typed exception. Its typed bar
+size may be supplied to the clarifier and displayed in the bar-size recovery,
+because it names the specific timeframe field rather than a generic strategy
+or interpretation value. This exception does not permit other `raw_value`
+fields to become clarifier voice input or display text.
 
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
