@@ -9,14 +9,14 @@ languages and both production question shapes from issues #451, #457, and
 
 | Journey | Question | Result | Source-drawer proof |
 | --- | --- | --- | --- |
-| English fundamentals | `What were Apple's main growth drivers?` | Argus synthesized the drivers and rendered five public sources. | Five distinct publishers; no provider-owned host. |
+| English fundamentals | `What were Apple's main growth drivers?` | Argus synthesized the drivers and rendered two public sources. | Two distinct publishers; no provider-owned host. |
 | Spanish fundamentals | `¿Cuáles fueron los principales impulsores del crecimiento de Apple?` | Argus synthesized the drivers in Spanish and rendered five public sources. | Five distinct publishers; no provider-owned host. |
-| English market movers | `What are today's biggest market movers?` | Retrieval returned five current sources but no resolver-verified mover. Argus rendered only `I found sources, but could not extract today's market movers from them.` and emitted no subject rows. | Five distinct publishers, all dated 2026-08-12. |
-| Spanish market movers | `¿Cuáles son los mayores movimientos del mercado de hoy?` | Argus named current movers, including EROC, HRB, CRWV, and NBIS, and emitted rows only for tickers named in the answer. | Five distinct publishers, all dated 2026-08-12. |
+| English market movers | `What are today's biggest market movers?` | Argus named current movers, including BOXL, MVIS, XHLD, and EROC, and emitted rows only for tickers named in the answer. | Five distinct publishers, all dated 2026-08-12. |
+| Spanish market movers | `¿Cuáles son los mayores movimientos del mercado de hoy?` | Retrieval returned five current sources but no resolver-verified mover. Argus rendered only `Encontré fuentes, pero no pude extraer de ellas los movimientos del mercado de hoy.` and emitted no subject rows. | Five distinct publishers, all dated 2026-08-12. |
 
-The English movers result is an accepted, explicit synthesis-recovery outcome.
+The Spanish movers result is an accepted, explicit synthesis-recovery outcome.
 It demonstrates that successful retrieval cannot produce generic figure or
-asset disclaimers when no typed subject exists. The Spanish result demonstrates
+asset disclaimers when no typed subject exists. The English result demonstrates
 the successful synthesis branch of the same contract.
 
 ## Assertions exercised by the browser harness

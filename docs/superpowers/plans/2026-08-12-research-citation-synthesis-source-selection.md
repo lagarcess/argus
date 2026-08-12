@@ -96,16 +96,16 @@ poetry run pytest tests/research -q --no-cov
 
 **Files:**
 - Create: `docs/reports/evidence/451-457-407/README.md`
-- Create: durable browser screenshots and sanitized turn receipts under `docs/reports/evidence/451-457-407/`
+- Create: durable browser screenshots under `docs/reports/evidence/451-457-407/`
 
 - [x] Drive English and es-419 narrative fundamentals turns through the real browser/API path and prove each answer carries at least one public publisher source.
 - [x] Drive English and es-419 market-movers turns and prove each answer either names verified movers or gives the precise synthesis failure.
 - [x] Inspect every displayed source's URL, publisher, and date against the asked period. Record the exact commit SHA and avoid storing credentials or private user data.
-- [ ] Re-run affected acceptance if any later code change moves the head.
+- [x] Re-run affected acceptance after the publisher-source retry moved the behavioral head.
 
 ### Task 6: Reconcile, publish, and exhaust review
 
-- [ ] Fetch `origin/codex/private-alpha-next`, record its current SHA, compare semantic overlap, and merge it one-way if it advanced. Never rebase the evidenced branch.
+- [x] Fetch `origin/codex/private-alpha-next`, record its current SHA, compare semantic overlap, and merge it one-way if it advanced. Never rebase the evidenced branch.
 - [ ] Run the merged-tree modularity budget and all affected exact-head checks after reconciliation.
 - [ ] Commit with Conventional Commits, push the worker branch, and open a ready PR against `codex/private-alpha-next` with issues #451, #457, and #407 linked and existing labels applied.
 - [ ] Wait for terminal CI, request Codex review only on the exact green head, resolve every actionable thread proportionally, and repeat only for the latest fix delta until one clean pass and zero unresolved threads.
