@@ -364,7 +364,7 @@ def test_access_welcome_sender_preserves_smtp_and_multipart_contract(
     assert "\u2014" not in payloads["text/plain"] + payloads["text/html"]
 
 
-def test_access_welcome_hash_uses_versioned_namespace_and_normalized_recipient(
+def test_access_welcome_hash_uses_only_stable_namespace_and_claim_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     instances: list[_FakeSMTP] = []
@@ -386,12 +386,25 @@ def test_access_welcome_hash_uses_versioned_namespace_and_normalized_recipient(
         _smtp,
     )
 
-    for recipient in ("Person@Example.com", " person@example.COM "):
+    for recipient, language, signup_url, claim_token in (
+        (
+            "Person@Example.com",
+            "en",
+            "https://app.example/?auth=signup",
+            "11111111-1111-4111-8111-abcdefabcdef",
+        ),
+        (
+            " person@example.COM ",
+            "es-419",
+            "https://new.example/?auth=signup",
+            " 11111111-1111-4111-8111-ABCDEFABCDEF ",
+        ),
+    ):
         send_access_welcome_email(
             recipient=recipient,
-            language="en",
-            signup_url="https://app.example/?auth=signup",
-            claim_token="11111111-1111-4111-8111-111111111111",
+            language=language,
+            signup_url=signup_url,
+            claim_token=claim_token,
         )
     send_access_welcome_email(
         recipient="person@example.com",
@@ -408,11 +421,8 @@ def test_access_welcome_hash_uses_versioned_namespace_and_normalized_recipient(
     assert keys[2] != keys[0]
     material = "\n".join(
         (
-            "argus-access-welcome/v1",
-            "person@example.com",
-            "en",
-            "https://app.example/?auth=signup",
-            "11111111-1111-4111-8111-111111111111",
+            "argus-access-welcome",
+            "11111111-1111-4111-8111-abcdefabcdef",
         )
     )
     assert keys[0] == f"sha256:{hashlib.sha256(material.encode('utf-8')).hexdigest()}"

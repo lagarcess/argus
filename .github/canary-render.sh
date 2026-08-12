@@ -18,7 +18,8 @@ EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
 PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
 SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"
 SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"
-SIGNUP_EMAIL="delivered+argus-${SIGNUP_RUN_ID}-${SIGNUP_RUN_ATTEMPT}@resend.dev"
+SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"
+SIGNUP_EMAIL=""
 ARGUS_OPS_TOKEN="${ARGUS_OPS_TOKEN:-}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
@@ -1168,11 +1169,43 @@ service_role_curl() {
   curl -fsS --config "$SERVICE_ROLE_CURL_CONFIG" "$@"
 }
 
+resolve_signup_identity() {
+  CANARY_SIGNUP_RUN_ID="$SIGNUP_RUN_ID" \
+    CANARY_SIGNUP_RUN_ATTEMPT="$SIGNUP_RUN_ATTEMPT" \
+    CANARY_SIGNUP_LOCAL_NONCE="$SIGNUP_LOCAL_NONCE" \
+    python3 - <<'PY'
+import os
+import re
+
+run_id = os.environ["CANARY_SIGNUP_RUN_ID"]
+run_attempt = os.environ["CANARY_SIGNUP_RUN_ATTEMPT"]
+local_nonce = os.environ["CANARY_SIGNUP_LOCAL_NONCE"]
+safe_local_nonce = re.fullmatch(
+    r"[a-z0-9](?:[a-z0-9-]{6,40}[a-z0-9])",
+    local_nonce,
+)
+if run_id and run_attempt and not local_nonce:
+    if not (
+        run_id.isdecimal()
+        and int(run_id) > 0
+        and run_attempt.isdecimal()
+        and int(run_attempt) > 0
+    ):
+        raise SystemExit(1)
+    print(f"delivered+argus-{run_id}-{run_attempt}@resend.dev")
+elif not run_id and not run_attempt and safe_local_nonce:
+    print(f"delivered+argus-local-{local_nonce}@resend.dev")
+else:
+    raise SystemExit(1)
+PY
+}
+
 signup_identity_is_safe() {
   CANARY_LOGIN_EMAIL="$EMAIL" \
     CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
     CANARY_SIGNUP_RUN_ID="$SIGNUP_RUN_ID" \
     CANARY_SIGNUP_RUN_ATTEMPT="$SIGNUP_RUN_ATTEMPT" \
+    CANARY_SIGNUP_LOCAL_NONCE="$SIGNUP_LOCAL_NONCE" \
     python3 - <<'PY'
 import os
 import re
@@ -1181,17 +1214,30 @@ login_email = os.environ["CANARY_LOGIN_EMAIL"].strip().casefold()
 signup_email = os.environ["CANARY_SIGNUP_EMAIL"]
 run_id = os.environ["CANARY_SIGNUP_RUN_ID"]
 run_attempt = os.environ["CANARY_SIGNUP_RUN_ATTEMPT"]
-expected_signup_email = f"delivered+argus-{run_id}-{run_attempt}@resend.dev"
-safe_signup_pattern = r"delivered\+argus-[1-9][0-9]*-[1-9][0-9]*@resend\.dev"
+local_nonce = os.environ["CANARY_SIGNUP_LOCAL_NONCE"]
+safe_local_nonce = re.fullmatch(
+    r"[a-z0-9](?:[a-z0-9-]{6,40}[a-z0-9])",
+    local_nonce,
+)
+if run_id and run_attempt and not local_nonce:
+    expected_signup_email = f"delivered+argus-{run_id}-{run_attempt}@resend.dev"
+    mode_is_safe = (
+        run_id.isdecimal()
+        and int(run_id) > 0
+        and run_attempt.isdecimal()
+        and int(run_attempt) > 0
+    )
+elif not run_id and not run_attempt and safe_local_nonce:
+    expected_signup_email = f"delivered+argus-local-{local_nonce}@resend.dev"
+    mode_is_safe = True
+else:
+    expected_signup_email = ""
+    mode_is_safe = False
 raise SystemExit(
     0
     if login_email
-    and run_id.isdecimal()
-    and int(run_id) > 0
-    and run_attempt.isdecimal()
-    and int(run_attempt) > 0
+    and mode_is_safe
     and signup_email == expected_signup_email
-    and re.fullmatch(safe_signup_pattern, signup_email)
     and login_email != signup_email.casefold()
     else 1
 )
@@ -1591,6 +1637,9 @@ if [ -z "$PASSWORD" ]; then
 fi
 if [ -z "$ARGUS_OPS_TOKEN" ]; then
   fail_canary "auth" "missing_ops_token"
+fi
+if ! SIGNUP_EMAIL="$(resolve_signup_identity)"; then
+  fail_canary "auth" "canary_signup_identity_not_safe"
 fi
 if [ -z "$SIGNUP_EMAIL" ]; then
   fail_canary "auth" "missing_canary_signup_email"

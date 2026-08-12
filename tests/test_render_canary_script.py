@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts.ops.canary_capture_replay import replay_capture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,10 +55,8 @@ def test_canary_requires_auth_and_verifier_inputs_without_echoing_secrets() -> N
     assert 'PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"' in source
     assert 'SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"' in source
     assert 'SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"' in source
-    assert (
-        'SIGNUP_EMAIL="delivered+argus-${SIGNUP_RUN_ID}-${SIGNUP_RUN_ATTEMPT}'
-        '@resend.dev"' in source
-    )
+    assert 'SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"' in source
+    assert "resolve_signup_identity" in source
     assert "ARGUS_CANARY_SIGNUP_EMAIL:-" not in source
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
     assert 'fail_canary "auth" "missing_canary_email"' in source
@@ -171,10 +171,8 @@ def test_canary_prepares_and_always_cleans_a_unique_signup_identity() -> None:
 
     assert 'SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"' in shell_source
     assert 'SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"' in shell_source
-    assert (
-        'SIGNUP_EMAIL="delivered+argus-${SIGNUP_RUN_ID}-${SIGNUP_RUN_ATTEMPT}'
-        '@resend.dev"' in shell_source
-    )
+    assert 'SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"' in shell_source
+    assert "resolve_signup_identity" in shell_source
     assert 'ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in shell_source
     assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-}"' in runner_source
     assert 'ARGUS_CANARY_BROWSER_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in runner_source
@@ -323,6 +321,15 @@ def test_runbook_promotion_recipe_is_fail_fast_and_subshell_scoped() -> None:
     assert 'payload["approved"] is not True' in recipe
 
 
+def test_runbook_generates_a_fresh_local_canary_nonce() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    command = runbook.split("mkdir -p temp/release-evidence", 1)[1].split("```", 1)[0]
+
+    assert 'ARGUS_CANARY_LOCAL_RUN_NONCE="$(poetry run python -c' in command
+    assert "secrets.token_hex" in command
+    assert "ARGUS_CANARY_SIGNUP_EMAIL" not in command
+
+
 def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None:
     shell_source = _source(".github/canary-render.sh")
     denial_body = shell_source.split("run_requested_signup_denial_canary() {", 1)[
@@ -339,7 +346,65 @@ def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None
     assert "access-denial" not in shell_source
 
 
-def test_canary_rejects_non_unique_signup_identity_before_destructive_setup() -> None:
+@pytest.mark.parametrize(
+    ("run_id", "run_attempt", "local_nonce", "expected"),
+    [
+        ("123456", "2", "", "delivered+argus-123456-2@resend.dev"),
+        ("", "", "review-abc123", "delivered+argus-local-review-abc123@resend.dev"),
+        ("", "", "a", None),
+        ("", "", "a" * 43, None),
+    ],
+)
+def test_canary_resolves_ci_and_local_signup_identities(
+    run_id: str, run_attempt: str, local_nonce: str, expected: str | None
+) -> None:
+    shell_source = _source(".github/canary-render.sh")
+    function_body = shell_source.split("resolve_signup_identity() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
+    result = subprocess.run(
+        [sys.executable, "-c", python_source],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "CANARY_SIGNUP_RUN_ID": run_id,
+            "CANARY_SIGNUP_RUN_ATTEMPT": run_attempt,
+            "CANARY_SIGNUP_LOCAL_NONCE": local_nonce,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == (0 if expected else 1)
+    assert result.stdout.strip() == (expected or "")
+
+
+@pytest.mark.parametrize(
+    ("run_id", "run_attempt", "local_nonce", "signup_email", "expected"),
+    [
+        ("123456", "2", "", "delivered+argus-123456-2@resend.dev", 0),
+        ("", "", "review-abc123", "delivered+argus-local-review-abc123@resend.dev", 0),
+        ("", "", "", "", 1),
+        ("123456", "", "", "", 1),
+        ("", "2", "", "", 1),
+        ("123456", "2", "review-abc123", "", 1),
+        ("", "", "Review", "", 1),
+        ("", "", "review_1", "", 1),
+        ("", "", "-review", "", 1),
+        ("", "", "review-", "", 1),
+        ("", "", "a", "delivered+argus-local-a@resend.dev", 1),
+        ("", "", "review-1", "arbitrary@example.com", 1),
+    ],
+)
+def test_canary_rejects_unsafe_signup_identity_modes_before_destructive_setup(
+    run_id: str,
+    run_attempt: str,
+    local_nonce: str,
+    signup_email: str,
+    expected: int,
+) -> None:
     shell_source = _source(".github/canary-render.sh")
     function_body = shell_source.split("signup_identity_is_safe() {", 1)[1].split(
         "\n}", 1
@@ -350,8 +415,7 @@ def test_canary_rejects_non_unique_signup_identity_before_destructive_setup() ->
         *,
         login_email: str,
         signup_email: str,
-        run_id: str,
-        run_attempt: str,
+        local_nonce: str,
     ) -> int:
         env = os.environ.copy()
         env.update(
@@ -360,6 +424,7 @@ def test_canary_rejects_non_unique_signup_identity_before_destructive_setup() ->
                 "CANARY_SIGNUP_EMAIL": signup_email,
                 "CANARY_SIGNUP_RUN_ID": run_id,
                 "CANARY_SIGNUP_RUN_ATTEMPT": run_attempt,
+                "CANARY_SIGNUP_LOCAL_NONCE": local_nonce,
             }
         )
         return subprocess.run(
@@ -374,38 +439,20 @@ def test_canary_rejects_non_unique_signup_identity_before_destructive_setup() ->
     assert (
         run_safety_check(
             login_email="confirmed@example.com",
-            signup_email="delivered+argus-123456-2@resend.dev",
-            run_id="123456",
-            run_attempt="2",
+            signup_email=signup_email,
+            local_nonce=local_nonce,
         )
-        == 0
+        == expected
     )
-    for signup_email, run_id, run_attempt in (
-        ("delivered@resend.dev", "123456", "2"),
-        ("delivered+other-123456-2@resend.dev", "123456", "2"),
-        ("delivered+argus-123456-3@resend.dev", "123456", "2"),
-        ("arbitrary@example.com", "123456", "2"),
-        ("delivered+argus--2@resend.dev", "", "2"),
-        ("delivered+argus-123456-@resend.dev", "123456", ""),
-    ):
+    if expected == 0:
         assert (
             run_safety_check(
-                login_email="confirmed@example.com",
+                login_email=signup_email,
                 signup_email=signup_email,
-                run_id=run_id,
-                run_attempt=run_attempt,
+                local_nonce=local_nonce,
             )
-            != 0
+            == 1
         )
-    assert (
-        run_safety_check(
-            login_email="delivered+argus-123456-2@resend.dev",
-            signup_email="delivered+argus-123456-2@resend.dev",
-            run_id="123456",
-            run_attempt="2",
-        )
-        != 0
-    )
 
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
     safety_gate = main_body.index("signup_identity_is_safe")

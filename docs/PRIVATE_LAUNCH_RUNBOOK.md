@@ -151,8 +151,8 @@ path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
 `MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` aliases.
 
 The requested-access denial check runs at the API layer, not in the browser.
-`.github/canary-requested-signup-denial.py` posts the pinned signup address to
-`POST /api/v1/auth/signup` with a placeholder captcha token and requires
+`.github/canary-requested-signup-denial.py` posts the generated safe signup
+address to `POST /api/v1/auth/signup` with a placeholder captcha token and requires
 `400 auth_signup_failed`. The deployed handler rejects a requested-role email
 before it consults the captcha, so the probe proves the denial without a
 solvable challenge, and `verify_no_signup_auth_identity` still proves through
@@ -161,10 +161,16 @@ into Playwright and do not weaken Turnstile anywhere deployed: Cloudflare
 refuses tokens to headless automation by design, and that refusal is the
 control working.
 
+For a local founder/operator run, generate a fresh non-secret nonce for every
+attempt. Local mode is available only when both GitHub run identity variables
+are absent. Do not combine the local nonce with GitHub identity variables or
+override the generated signup email.
+
 ```bash
 cd web && bun install --frozen-lockfile && bunx playwright install chromium
 cd ..
 mkdir -p temp/release-evidence
+ARGUS_CANARY_LOCAL_RUN_NONCE="$(poetry run python -c 'import secrets; print(secrets.token_hex(12))')" \
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
 ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
 ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json \

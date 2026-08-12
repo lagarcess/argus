@@ -18,7 +18,7 @@ _SMTP_TIMEOUT_SECONDS = 10.0
 _SENDER_ADDRESS = "noreply@get-argus.com"
 _SENDER_HEADER = "Argus <noreply@get-argus.com>"
 _MAX_RECEIPT_LENGTH = 256
-_IDEMPOTENCY_NAMESPACE = "argus-access-welcome/v1"
+_IDEMPOTENCY_NAMESPACE = "argus-access-welcome"
 
 ACCESS_WELCOME_CONTENT_VERSION = "private-alpha-access-welcome/v1"
 
@@ -122,20 +122,9 @@ def build_access_welcome_email(
 
 def _idempotency_key(
     *,
-    recipient: str,
-    language: Language,
-    signup_url: str,
     claim_token: str,
 ) -> str:
-    material = "\n".join(
-        (
-            _IDEMPOTENCY_NAMESPACE,
-            recipient,
-            language,
-            signup_url,
-            claim_token,
-        )
-    )
+    material = "\n".join((_IDEMPOTENCY_NAMESPACE, claim_token))
     return f"sha256:{hashlib.sha256(material.encode('utf-8')).hexdigest()}"
 
 
@@ -158,7 +147,7 @@ def send_access_welcome_email(
     normalized_recipient = recipient.strip().lower()
     if not normalized_recipient:
         raise ValueError("Access welcome email recipient is required.")
-    normalized_claim_token = claim_token.strip()
+    normalized_claim_token = claim_token.strip().casefold()
     if not normalized_claim_token:
         raise ValueError("Access welcome email claim token is required.")
     content = build_access_welcome_email(language=language, signup_url=signup_url)
@@ -168,9 +157,6 @@ def send_access_welcome_email(
     message["To"] = normalized_recipient
     message["Subject"] = content.subject
     message["Resend-Idempotency-Key"] = _idempotency_key(
-        recipient=normalized_recipient,
-        language=language,
-        signup_url=signup_url,
         claim_token=normalized_claim_token,
     )
     message.attach(MIMEText(content.plain_text, "plain", "utf-8"))
