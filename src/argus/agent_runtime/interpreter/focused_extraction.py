@@ -20,6 +20,7 @@ from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
 )
+from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
 from argus.agent_runtime.interpreter.shared import _llm_value_is_empty
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
@@ -585,7 +586,17 @@ def strategy_extraction_repair_is_allowed(
         }:
             return False
         if not response.unsupported_constraints:
-            return has_material_evidence
+            draft = response.candidate_strategy_draft
+            thesis = str(draft.strategy_thesis or "").strip()
+            return (
+                has_material_evidence
+                or strategy_has_execution_evidence(draft)
+                or (
+                    bool(thesis)
+                    and thesis != str(draft.raw_user_phrasing or "").strip()
+                    and thesis != request.current_user_message.strip()
+                )
+            )
         if not any(
             item.category == "unsupported_strategy_logic"
             for item in response.unsupported_constraints

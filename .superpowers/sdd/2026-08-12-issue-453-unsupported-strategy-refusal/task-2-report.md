@@ -116,3 +116,55 @@ current-turn evidence when an active strategy exists. Fresh no-context DCA
 repair and typed capability-conflict behavior remain unchanged. The new
 regression asserts the exact predicate is false for an active snapshot without
 `requested_field`. No parsing, locale, or response-copy behavior was added.
+
+## Fix round 2: retain semantic extraction evidence and isolate tests
+
+### RED
+
+Commands:
+
+```bash
+poetry run pytest --no-cov tests/agent_runtime -q -k 'test_extraction_cannot_invent_a_strategy_from_an_echo or test_default_interpreter_repairs_empty_unsupported_request_into_contract_recovery'
+poetry run pytest --no-cov tests/test_openrouter_policy.py -q -k 'test_default_interpreter_repairs_empty_unsupported_request_into_contract_recovery'
+```
+
+Results: the first command selected the echo regression and failed with
+`1 failed, 1631 deselected in 1.96s`; the OpenRouter contract recovery failed
+with `1 failed, 96 deselected in 0.73s`.
+
+The constraint-free predicate had retained only material current-turn evidence,
+discarding the existing semantic-draft evidence that permits a distinct model
+thesis while still rejecting a verbatim echo.
+
+### GREEN
+
+Commands:
+
+```bash
+poetry run pytest --no-cov tests/agent_runtime/test_graded_interpretation_routing.py -q -k 'test_extraction_cannot_invent_a_strategy_from_an_echo'
+poetry run pytest --no-cov tests/test_openrouter_policy.py -q -k 'test_default_interpreter_repairs_empty_unsupported_request_into_contract_recovery'
+poetry run pytest --no-cov tests/agent_runtime/test_issue_453_focused_repair.py -q
+poetry run pytest --no-cov tests/agent_runtime/test_llm_interpreter_artifact_capability_repairs.py -q
+```
+
+Results: `1 passed, 5 deselected in 0.62s`; `1 passed, 96 deselected in
+0.64s`; `3 passed in 1.45s`; and `78 passed in 2.74s`.
+
+### Design and self-review
+
+Constraint-free unsupported recovery now accepts the union of material
+current-turn execution evidence, typed draft execution evidence, and a model
+thesis distinct from both the raw phrasing and current message. The active
+strategy-context requested-field and material-evidence gate remains before all
+unsupported-request early returns. That preserves the no-context DCA repair,
+keeps the echo rejection, and retains true typed capability-conflict handling.
+
+The three Task 2 issue-453 tests now live only in
+`tests/agent_runtime/test_issue_453_focused_repair.py`, using the same shared
+interpreter fixtures. The watched artifact-capability module is back to its
+5,738-line baseline.
+
+Ruff format/check passed for all owned files, and `git diff --check` passed.
+`poetry run python scripts/check_modularity_budget.py` still reports an
+unrelated existing violation in `tests/agent_runtime/test_conversation_stages.py`
+at 201 lines over its limit; the Task 2 watched module is within budget.
