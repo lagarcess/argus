@@ -37,6 +37,9 @@ class _StatefulApprovalGateway:
         self.complete_result: bool | None = None
         self.complete_error: Exception | None = None
         self.delivery_lookup_error: Exception | None = None
+        self.claim_error: Exception | None = None
+        self.claim_send_allowed = True
+        self.claims: dict[str, dict[str, object]] = {}
 
     @staticmethod
     def _normalize(email: str) -> str:
@@ -60,6 +63,34 @@ class _StatefulApprovalGateway:
             "disabled_at": None,
         }
 
+    def claim_private_alpha_access_welcome(
+        self,
+        *,
+        email: str,
+        language: Language,
+        content_version: str,
+        subject: str,
+    ) -> dict[str, object] | None:
+        self.events.append("claim")
+        if self.claim_error is not None:
+            raise self.claim_error
+        if self.role != "requested" or self.disabled or language != self.language:
+            return None
+        normalized = self._normalize(email)
+        claim = self.claims.setdefault(
+            normalized,
+            {
+                "recipient_email": normalized,
+                "language": language,
+                "content_version": content_version,
+                "subject": subject,
+                "claim_token": "11111111-1111-4111-8111-111111111111",
+                "claimed_at": "2026-08-12T14:27:17Z",
+                "send_allowed": self.claim_send_allowed,
+            },
+        )
+        return claim
+
     def complete_private_alpha_access_welcome(
         self,
         *,
@@ -68,6 +99,7 @@ class _StatefulApprovalGateway:
         content_version: str,
         subject: str,
         provider_receipt: str,
+        claim_token: str | None,
     ) -> bool:
         self.events.append("complete")
         if self.complete_error is not None:
@@ -92,6 +124,10 @@ class _StatefulApprovalGateway:
         if self.role == "user":
             return False
 
+        claim = self.claims.get(normalized)
+        if claim is None or claim["claim_token"] != claim_token:
+            return False
+
         self.deliveries[normalized] = {
             "recipient_email": normalized,
             "language": language,
@@ -100,6 +136,7 @@ class _StatefulApprovalGateway:
             "provider_receipt": provider_receipt,
             "sent_at": "2026-08-12T14:27:17Z",
         }
+        self.claims.pop(normalized)
         self.role = "user"
         return True
 
@@ -280,6 +317,7 @@ def test_access_welcome_sender_preserves_smtp_and_multipart_contract(
         recipient=" Person@Example.COM ",
         language=language,
         signup_url="https://app.example/?auth=signup",
+        claim_token="11111111-1111-4111-8111-111111111111",
     )
 
     assert result == AccessWelcomeSendResult(
@@ -353,19 +391,28 @@ def test_access_welcome_hash_uses_versioned_namespace_and_normalized_recipient(
             recipient=recipient,
             language="en",
             signup_url="https://app.example/?auth=signup",
+            claim_token="11111111-1111-4111-8111-111111111111",
         )
+    send_access_welcome_email(
+        recipient="person@example.com",
+        language="en",
+        signup_url="https://app.example/?auth=signup",
+        claim_token="22222222-2222-4222-8222-222222222222",
+    )
 
     keys = [
         message_from_string(instance.message or "")["Resend-Idempotency-Key"]
         for instance in instances
     ]
     assert keys[0] == keys[1]
+    assert keys[2] != keys[0]
     material = "\n".join(
         (
             "argus-access-welcome/v1",
             "person@example.com",
             "en",
             "https://app.example/?auth=signup",
+            "11111111-1111-4111-8111-111111111111",
         )
     )
     assert keys[0] == f"sha256:{hashlib.sha256(material.encode('utf-8')).hexdigest()}"
@@ -395,6 +442,7 @@ def test_access_welcome_receipt_is_bounded_to_256_characters(
         recipient="person@example.com",
         language="en",
         signup_url="https://app.example/?auth=signup",
+        claim_token="11111111-1111-4111-8111-111111111111",
     )
 
     assert result.provider_receipt == "x" * 256
@@ -431,6 +479,7 @@ def test_internal_approval_two_requests_send_once_and_replay_durable_delivery(
             "recipient": "person@example.com",
             "language": "es-419",
             "signup_url": "https://app.example/?auth=signup",
+            "claim_token": "11111111-1111-4111-8111-111111111111",
         }
         return AccessWelcomeSendResult(
             subject="Bienvenido a Argus",
@@ -456,7 +505,112 @@ def test_internal_approval_two_requests_send_once_and_replay_durable_delivery(
     assert send_count == 1
     assert gateway.role == "user"
     assert len(gateway.deliveries) == 1
-    assert gateway.events == ["send", "complete", "complete"]
+    assert gateway.events == ["claim", "send", "complete", "complete"]
+
+
+def test_internal_approval_crash_window_reuses_claim_and_idempotency_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = _StatefulApprovalGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example")
+    observed_claim_tokens: list[object] = []
+
+    def _send(**kwargs: object) -> AccessWelcomeSendResult:
+        gateway.events.append("send")
+        observed_claim_tokens.append(kwargs["claim_token"])
+        if len(observed_claim_tokens) == 1:
+            raise RuntimeError("synthetic crash-window failure")
+        return AccessWelcomeSendResult(
+            subject="Welcome to Argus",
+            content_version="private-alpha-access-welcome/v1",
+            provider_receipt="synthetic-provider-receipt",
+        )
+
+    monkeypatch.setattr(ops, "send_access_welcome_email", _send)
+
+    first = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+    second = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert first.status_code == 503
+    assert second.status_code == 200
+    assert second.json() == {"approved": True}
+    assert observed_claim_tokens == [
+        "11111111-1111-4111-8111-111111111111",
+        "11111111-1111-4111-8111-111111111111",
+    ]
+    assert gateway.events == ["claim", "send", "claim", "send", "complete"]
+    assert len(gateway.deliveries) == 1
+
+
+def test_internal_approval_expired_pending_claim_fails_closed_without_smtp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = _StatefulApprovalGateway()
+    gateway.claim_send_allowed = False
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example")
+    sender = MagicMock()
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
+
+    response = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Access request is not eligible for approval."
+    sender.assert_not_called()
+    assert gateway.events == ["claim"]
+
+
+@pytest.mark.parametrize(
+    ("claim_error", "expected_status"),
+    [(None, 409), (RuntimeError("synthetic claim detail"), 503)],
+)
+def test_internal_approval_claim_revalidation_failure_never_sends(
+    monkeypatch: pytest.MonkeyPatch,
+    claim_error: Exception | None,
+    expected_status: int,
+) -> None:
+    from argus.api.routers import ops
+
+    gateway = _StatefulApprovalGateway()
+    if claim_error is None:
+        gateway.claim_private_alpha_access_welcome = MagicMock(return_value=None)
+    else:
+        gateway.claim_error = claim_error
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://app.example")
+    sender = MagicMock()
+    monkeypatch.setattr(ops, "send_access_welcome_email", sender)
+
+    response = client.post(
+        "/internal/access-requests/approve",
+        json={"email": "person@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert response.status_code == expected_status
+    assert "synthetic claim detail" not in response.text
+    sender.assert_not_called()
+    assert "complete" not in gateway.events
 
 
 def test_internal_approval_recorded_replay_never_calls_smtp(
@@ -664,7 +818,7 @@ def test_internal_approval_completion_failure_is_generic(
     assert response.json()["detail"] == expected_detail
     assert "synthetic provider detail" not in response.text
     sender.assert_called_once()
-    assert gateway.events == ["complete"]
+    assert gateway.events == ["claim", "complete"]
 
 
 def test_internal_approval_delivery_lookup_failure_is_generic(

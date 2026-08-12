@@ -382,6 +382,25 @@ class SupabaseGateway(
         )
         return _row_one(rows)
 
+    def claim_private_alpha_access_welcome(
+        self,
+        *,
+        email: str,
+        language: Language,
+        content_version: str,
+        subject: str,
+    ) -> dict[str, Any] | None:
+        result = self.client.rpc(
+            "claim_private_alpha_access_welcome",
+            {
+                "p_email": _normalize_email(email),
+                "p_language": language,
+                "p_content_version": content_version,
+                "p_subject": subject,
+            },
+        ).execute()
+        return _row_one(result)
+
     def complete_private_alpha_access_welcome(
         self,
         *,
@@ -390,6 +409,7 @@ class SupabaseGateway(
         content_version: str,
         subject: str,
         provider_receipt: str,
+        claim_token: str | None,
     ) -> bool:
         result = self.client.rpc(
             "complete_private_alpha_access_welcome",
@@ -399,6 +419,7 @@ class SupabaseGateway(
                 "p_content_version": content_version,
                 "p_subject": subject,
                 "p_provider_receipt": provider_receipt,
+                "p_claim_token": claim_token,
             },
         ).execute()
         return result.data is True

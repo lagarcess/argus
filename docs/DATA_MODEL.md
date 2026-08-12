@@ -35,7 +35,7 @@ Supabase Postgres is the canonical state store.
 Supabase owns:
 
 - private-alpha access allowlist
-- private-alpha access-welcome delivery evidence
+- private-alpha access-welcome claims and delivery evidence
 - user profiles
 - preferences
 - conversations
@@ -59,6 +59,7 @@ Alpha MVP requires these primary entities:
 
 ```text
 private_alpha_allowlist
+private_alpha_access_welcome_claims
 private_alpha_access_welcome_deliveries
 profiles
 conversations
@@ -106,6 +107,7 @@ Optional or later:
 auth.users
    └── profiles
 private_alpha_allowlist
+   ├── private_alpha_access_welcome_claims      # logical email identity, no FK
    └── private_alpha_access_welcome_deliveries  # logical email identity, no FK
 profiles
    ├── conversations
@@ -299,10 +301,11 @@ and login; it should not be exposed as a frontend product surface.
 - The public access-request endpoint may insert a missing `requested` row. It
   never updates an existing requested, approved, privileged, or disabled row.
 - `requested` and unknown roles never grant permanent account access.
-- The ops approval action loads an active requested row and stored language,
-  sends the localized welcome email first, and then uses
-  `complete_private_alpha_access_welcome` to record the accepted delivery and
-  promote `requested` to `user` atomically while `disabled_at` remains null.
+- The ops approval action uses `claim_private_alpha_access_welcome` to lock and
+  revalidate the active requested row before SMTP. It then sends the localized
+  welcome and uses `complete_private_alpha_access_welcome` to consume the claim,
+  record the accepted delivery, and promote `requested` to `user` atomically
+  while `disabled_at` remains null.
 - A before-update guard rejects any direct transition into an enabled `user`
   state unless a matching welcome-delivery row already exists. It does not
   alter inserts, admin/developer roles, disabling, or an already-active user.
@@ -343,19 +346,49 @@ truth, not a browser-facing notification or marketing-email ledger.
   durable evidence for support readback.
 - Records are append-only for application roles. RLS is enabled with no
   policies. `PUBLIC`, `anon`, and `authenticated` have no table privileges;
-  `service_role` receives only `SELECT` and `INSERT`.
+  `service_role` receives only `SELECT`. Delivery insertion belongs to the
+  completion RPC.
 - `complete_private_alpha_access_welcome(email, language, content_version,
-  subject, provider_receipt)` is the service-role-only, security-invoker
-  completion boundary. It locks the allowlist row, rejects missing, disabled,
-  privileged, or otherwise ineligible state, inserts the delivery once, and
-  promotes only an active `requested` row in the same transaction. A replay of
-  an already-active `user` returns success only when the delivery row exists;
-  conflicting language, content version, or subject is rejected.
+  subject, provider_receipt, claim_token)` is the service-role-only,
+  security-definer completion boundary with an empty search path. A first
+  completion validates and consumes the matching claim, inserts the delivery,
+  and promotes only an active `requested` row in the same transaction. A replay
+  of an already-active `user` needs no claim and returns success only when the
+  delivery row exists; conflicting language, content version, or subject is
+  rejected.
 - `require_private_alpha_access_welcome_delivery` is a before-update trigger on
   `private_alpha_allowlist`. A row becoming an enabled `user` from a non-user
   or disabled state must already have a matching delivery record. Browser
   roles cannot execute either function, and `service_role` may execute only
-  the completion RPC directly.
+  the claim and completion RPCs directly.
+
+## 6.2 private_alpha_access_welcome_claims
+
+Private pre-send state for the single access-welcome operation. It closes the
+crash window between SMTP acceptance and immutable delivery evidence without a
+queue, scheduler, or general mail system.
+
+### Fields
+- `recipient_email`: `text` (Primary Key, normalized)
+- `language`: `text` (`en` or `es-419`)
+- `content_version`: `text` (Fixed to
+  `private-alpha-access-welcome/v1`)
+- `subject`: `text` (1 to 200 characters)
+- `claim_token`: `uuid` (Unique opaque send identity)
+- `claimed_at`: `timestamptz`
+- `consumed_at`: `timestamptz` (Nullable until atomic completion)
+
+### Invariants and access
+- The claim RPC row-locks the allowlist row and accepts only the exact active
+  `requested` language and fixed content contract. A compatible retry before
+  24 hours reuses the same token. At or after 24 hours, an unconsumed claim
+  remains durable but cannot authorize SMTP again.
+- An unconsumed claim freezes recipient, role, language, and disabled state on
+  the matching allowlist row. Completion consumes the claim before promoting
+  the row, inside the same transaction.
+- RLS is enabled with no policies. All table privileges are revoked from
+  browser and service API roles. `service_role` can reach claim state only
+  through the tightly granted security-definer claim and completion RPCs.
 
 ---
 
@@ -1754,7 +1787,8 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   owns those operations.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `private_alpha_access_welcome_deliveries`,
+- `private_alpha_allowlist`, `private_alpha_access_welcome_claims`,
+  `private_alpha_access_welcome_deliveries`,
   `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
@@ -1780,10 +1814,11 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - No `anon` or `authenticated` role access is required.
 - All privileges remain revoked from `public`, `anon`, and `authenticated`;
   no client policy permits direct requested-row access.
-- Backend service-role access owns request capture, welcome completion, and
-  access checks before auth signup/login. The welcome-delivery table has no
-  client policy; service role can select/insert immutable delivery evidence and
-  execute the guarded completion RPC, but cannot update or delete the record.
+- Backend service-role access owns request capture, welcome claim/completion,
+  and access checks before auth signup/login. The claim and delivery tables
+  have no client policies. Service role can select immutable delivery evidence
+  and execute the guarded claim/completion RPCs, but it has no direct claim
+  table access and cannot insert, update, or delete delivery records.
 
 ---
 

@@ -22,28 +22,31 @@ one transactional message because it is caused by an Argus access decision.
 
 ## 2. Locked decisions
 
-1. Upgrade the existing `send_access_approval_email` path. There will be one
+1. Use the existing `send_access_welcome_email` path. There will be one
    sender, one message category, and one promotion operation. No second mail
    client or parallel approval path may be added.
 2. The only eligible transition is an active `private_alpha_allowlist` row with
    `role = 'requested'` becoming `role = 'user'`. Admin, developer, disabled,
    missing, and already-active rows do not cause a new send.
 3. The protected `POST /internal/access-requests/approve` operation remains the
-   application boundary. It loads the stored request language, sends the
-   welcome message, records the accepted delivery, and completes the promotion.
+   application boundary. Before SMTP it durably claims a row-locked,
+   revalidated active request. After provider acceptance it consumes that
+   claim, records delivery, and completes promotion in one transaction.
 4. The database must reject a direct `requested -> user` transition that lacks
    the welcome delivery record. Operational code and the release canary must
    use the protected approval operation instead of patching the role directly.
-5. A single-purpose private delivery table records the normalized recipient,
-   language, fixed content version, subject, Resend acceptance receipt, and
-   accepted timestamp. Browser roles have no privileges or policies on it.
+5. A single-purpose private claim table records the normalized recipient,
+   language, fixed content version, subject, opaque claim token, and claim time
+   before SMTP. A separate delivery table records the normalized recipient,
+   same content identity, Resend acceptance receipt, and accepted timestamp.
+   Browser roles have no privileges or policies on either table.
 6. A recipient can have at most one access-welcome delivery record. A repeated
    approval that finds the existing record completes any unfinished promotion
    without sending again and returns the same successful approval shape.
-7. The existing stable Resend SMTP idempotency header remains a second guard for
-   concurrent or ambiguous retries. The durable database record is the
-   long-lived idempotency authority because Resend retains provider keys for a
-   bounded period.
+7. The Resend SMTP idempotency header is derived from the opaque durable claim.
+   Compatible retries inside Resend's 24-hour window reuse that claim and key.
+   An unconsumed claim at or beyond 24 hours blocks SMTP and requires manual
+   provider reconciliation rather than creating a new claim.
 8. The email is multipart with plain-text and HTML alternatives in English and
    `es-419`. Its subject is the existing product phrase "Welcome to Argus" or
    "Bienvenido a Argus."
@@ -76,8 +79,9 @@ one transactional message because it is caused by an Argus access decision.
   the stop condition that would justify a later capability design.
 - Marketing consent, unsubscribe, suppression, bounce, complaint, and
   preference-center machinery: no marketing email is authorized in this lane.
-- Retries, a scheduler, a queue, or a general outbox worker: Resend idempotency
-  plus the single durable delivery record protect this synchronous operation.
+- A scheduler, queue, or general outbox worker: the durable claim permits only
+  bounded same-claim retries inside Resend's provider window and otherwise
+  fails closed for manual reconciliation.
 - Supabase Auth templates: issue #459 owns those snapshots and hosted settings.
 - Production-domain reconciliation: another lane owns the release contract.
 - A frontend admin or support dashboard: support may use the private database
@@ -89,14 +93,15 @@ one transactional message because it is caused by an Argus access decision.
 - `docs/API_CONTRACT.md`: document idempotent replay, delivery persistence, and
   the rule that the protected operation is the sole requested-user promotion
   boundary.
-- `docs/DATA_MODEL.md`: add the single-purpose delivery table, uniqueness,
-  private access, immutable record fields, and transition guard.
-- `supabase/migrations/`: create the delivery table, RLS and grants, the atomic
-  record-plus-promotion function, and the bypass guard.
+- `docs/DATA_MODEL.md`: add the single-purpose claim and delivery tables,
+  uniqueness, private access, immutable record fields, and transition guards.
+- `supabase/migrations/`: create the claim state, RLS and grants, the row-locked
+  claim RPC, atomic claim-consume-record-promote RPC, and bypass guards.
 - `docs/PRIVATE_LAUNCH_RUNBOOK.md`: replace direct promotion instructions with
   the protected operation and add the support readback fields.
-- `.github/canary-render.sh`: stop directly patching requested rows and prove
-  the same operation used for real promotions.
+- `.github/canary-render.sh`: stop directly patching requested rows, generate a
+  unique `delivered+argus-<run>-<attempt>@resend.dev` identity, and prove the
+  same operation used for real promotions.
 - `docs/reports/evidence/461/`: commit secret-free exact-head proof and the two
   rendered language screenshots.
 - `docs/api/openapi.yaml`: no shape change is expected because the existing
@@ -161,6 +166,7 @@ one transactional message because it is caused by an Argus access decision.
 
 - <https://resend.com/docs/send-with-smtp>
 - <https://resend.com/docs/dashboard/emails/idempotency-keys>
+- <https://resend.com/docs/dashboard/emails/send-test-emails>
 - <https://supabase.com/docs/guides/database/postgres/row-level-security>
 
 ### Inference

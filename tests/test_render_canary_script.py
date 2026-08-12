@@ -17,7 +17,7 @@ def _source(path: str) -> str:
 
 
 def _approval_validator_source(container: str, response_file: str) -> str:
-    marker = f'python3 - "${response_file}" <<\'PY\''
+    marker = f"python3 - \"${response_file}\" <<'PY'"
     return container.split(marker, 1)[1].split("\nPY", 1)[0]
 
 
@@ -51,10 +51,13 @@ def test_canary_requires_auth_and_verifier_inputs_without_echoing_secrets() -> N
 
     assert 'EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"' in source
     assert 'PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"' in source
+    assert 'SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"' in source
+    assert 'SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"' in source
     assert (
-        'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"'
-        in source
+        'SIGNUP_EMAIL="delivered+argus-${SIGNUP_RUN_ID}-${SIGNUP_RUN_ATTEMPT}'
+        '@resend.dev"' in source
     )
+    assert "ARGUS_CANARY_SIGNUP_EMAIL:-" not in source
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
     assert 'fail_canary "auth" "missing_canary_email"' in source
     assert 'fail_canary "auth" "missing_canary_password"' in source
@@ -148,7 +151,9 @@ def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
     assert "expect(signupResponse.status()).toBe(200)" in browser_source
     assert 'page.getByTestId("auth-check-email")' in browser_source
     assert "signupResponsePayload.session !== null" in browser_source
-    assert "Fresh signup response did not preserve its dedicated identity" in browser_source
+    assert (
+        "Fresh signup response did not preserve its dedicated identity" in browser_source
+    )
     assert 'page.goto("/?auth=login"' in browser_source
     assert "loginRequestPayload.captcha_token" in browser_source
     assert "Login CAPTCHA token was missing or unbounded" in browser_source
@@ -156,18 +161,22 @@ def test_browser_preserves_the_spanish_signup_and_login_release_gate() -> None:
     assert "Spanish signup request omitted the canonical language" in browser_source
     assert "toBeFocused()" in browser_source
     assert "page).not.toHaveURL(/\\/chat" in browser_source
-    assert "record(loginPayload.session, \"login session\")" in browser_source
+    assert 'record(loginPayload.session, "login session")' in browser_source
     assert "page.waitForURL(/\\/chat" in browser_source
 
 
-def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
+def test_canary_prepares_and_always_cleans_a_unique_signup_identity() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
 
-    assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"' in (
-        shell_source
+    assert 'SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"' in shell_source
+    assert 'SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"' in shell_source
+    assert (
+        'SIGNUP_EMAIL="delivered+argus-${SIGNUP_RUN_ID}-${SIGNUP_RUN_ATTEMPT}'
+        '@resend.dev"' in shell_source
     )
     assert 'ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in shell_source
+    assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-}"' in runner_source
     assert 'ARGUS_CANARY_BROWSER_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in runner_source
     assert "signup_identity_is_safe" in shell_source
     assert "prepare_signup_identity" in shell_source
@@ -202,9 +211,9 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
-    promotion_body = shell_source.split(
-        "promote_requested_signup_allowlist() {", 1
-    )[1].split("\n}", 1)[0]
+    promotion_body = shell_source.split("promote_requested_signup_allowlist() {", 1)[
+        1
+    ].split("\n}", 1)[0]
 
     assert '"role": "requested"' in shell_source
     assert "run_requested_signup_denial_canary" in shell_source
@@ -234,13 +243,15 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     assert "-X PATCH" not in promotion_body
     assert '"role":"user"' not in shell_source
     assert "role=eq.requested" not in promotion_body
-    assert 'Authorization: Bearer ${ARGUS_OPS_TOKEN}' not in shell_source
+    assert "Authorization: Bearer ${ARGUS_OPS_TOKEN}" not in shell_source
 
-    assert main_body.index("prepare_signup_identity") < main_body.index(
-        "run_requested_signup_denial_canary"
-    ) < main_body.index("verify_no_signup_auth_identity") < main_body.index(
-        "promote_requested_signup_allowlist"
-    ) < main_body.index("run_browser_canary")
+    assert (
+        main_body.index("prepare_signup_identity")
+        < main_body.index("run_requested_signup_denial_canary")
+        < main_body.index("verify_no_signup_auth_identity")
+        < main_body.index("promote_requested_signup_allowlist")
+        < main_body.index("run_browser_canary")
+    )
 
     assert "ARGUS_CANARY_BROWSER_PHASE" in runner_source
     assert "full" in runner_source
@@ -255,9 +266,9 @@ def test_approval_response_validators_require_exact_boolean_shape(
     tmp_path: Path,
 ) -> None:
     shell_source = _source(".github/canary-render.sh")
-    promotion_body = shell_source.split(
-        "promote_requested_signup_allowlist() {", 1
-    )[1].split("\n}", 1)[0]
+    promotion_body = shell_source.split("promote_requested_signup_allowlist() {", 1)[
+        1
+    ].split("\n}", 1)[0]
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
     promotion_section = runbook.split("### Requested Access Promotion", 1)[1]
     validators = (
@@ -305,8 +316,8 @@ def test_runbook_promotion_recipe_is_fail_fast_and_subshell_scoped() -> None:
     assert recipe.endswith("\n)")
     assert curl_line.startswith("curl -q ")
     assert (
-        "trap 'rm -f \"$OPS_CURL_CONFIG\" \"$APPROVAL_REQUEST\" "
-        "\"$APPROVAL_RESPONSE\"' EXIT"
+        'trap \'rm -f "$OPS_CURL_CONFIG" "$APPROVAL_REQUEST" '
+        '"$APPROVAL_RESPONSE"\' EXIT'
     ) in recipe
     assert 'set(payload) != {"approved"}' in recipe
     assert 'payload["approved"] is not True' in recipe
@@ -328,21 +339,27 @@ def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None
     assert "access-denial" not in shell_source
 
 
-def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:
+def test_canary_rejects_non_unique_signup_identity_before_destructive_setup() -> None:
     shell_source = _source(".github/canary-render.sh")
     function_body = shell_source.split("signup_identity_is_safe() {", 1)[1].split(
         "\n}", 1
     )[0]
-    python_source = function_body.split("python3 - <<'PY'", 1)[1].split(
-        "\nPY", 1
-    )[0]
+    python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
 
-    def run_safety_check(*, login_email: str, signup_email: str) -> int:
+    def run_safety_check(
+        *,
+        login_email: str,
+        signup_email: str,
+        run_id: str,
+        run_attempt: str,
+    ) -> int:
         env = os.environ.copy()
         env.update(
             {
                 "CANARY_LOGIN_EMAIL": login_email,
                 "CANARY_SIGNUP_EMAIL": signup_email,
+                "CANARY_SIGNUP_RUN_ID": run_id,
+                "CANARY_SIGNUP_RUN_ATTEMPT": run_attempt,
             }
         )
         return subprocess.run(
@@ -357,21 +374,35 @@ def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None
     assert (
         run_safety_check(
             login_email="confirmed@example.com",
-            signup_email=" delivered@RESEND.dev ",
+            signup_email="delivered+argus-123456-2@resend.dev",
+            run_id="123456",
+            run_attempt="2",
         )
         == 0
     )
-    assert (
-        run_safety_check(
-            login_email="confirmed@example.com",
-            signup_email="arbitrary@example.com",
+    for signup_email, run_id, run_attempt in (
+        ("delivered@resend.dev", "123456", "2"),
+        ("delivered+other-123456-2@resend.dev", "123456", "2"),
+        ("delivered+argus-123456-3@resend.dev", "123456", "2"),
+        ("arbitrary@example.com", "123456", "2"),
+        ("delivered+argus--2@resend.dev", "", "2"),
+        ("delivered+argus-123456-@resend.dev", "123456", ""),
+    ):
+        assert (
+            run_safety_check(
+                login_email="confirmed@example.com",
+                signup_email=signup_email,
+                run_id=run_id,
+                run_attempt=run_attempt,
+            )
+            != 0
         )
-        != 0
-    )
     assert (
         run_safety_check(
-            login_email="delivered@resend.dev",
-            signup_email="delivered@resend.dev",
+            login_email="delivered+argus-123456-2@resend.dev",
+            signup_email="delivered+argus-123456-2@resend.dev",
+            run_id="123456",
+            run_attempt="2",
         )
         != 0
     )
@@ -435,9 +466,7 @@ def test_browser_checkpoints_private_identity_for_first_run_failure_capture() ->
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
     conversation_checkpoint = browser_source.index('status: "conversation_created"')
-    run_click = browser_source.index(
-        'label("chat.confirmation.actions.run_backtest")'
-    )
+    run_click = browser_source.index('label("chat.confirmation.actions.run_backtest")')
     result_checkpoint = browser_source.index('status: "result_captured"')
     decision_click = browser_source.index('label("chat.result_card.add_decision")')
     complete_checkpoint = browser_source.index('status: "complete"')
@@ -467,7 +496,7 @@ def test_browser_exports_private_identity_handoff_and_shell_deletes_it() -> None
     assert "schema_version: 1" in browser_source
     assert "access_token: accessToken" in browser_source
     assert '"access_token"' in shell_source
-    assert 'BROWSER_ACCESS_TOKEN \\' in shell_source
+    assert "BROWSER_ACCESS_TOKEN \\" in shell_source
     assert "BROWSER_IDENTITY_HANDOFF" not in workflow
 
 
@@ -604,8 +633,7 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     assert "route.fulfill" in browser_source
     assert '"Access-Control-Allow-Origin": new URL(page.url()).origin' in browser_source
     assert (
-        '"authorization, content-type, idempotency-key, x-request-id"'
-        in browser_source
+        '"authorization, content-type, idempotency-key, x-request-id"' in browser_source
     )
     conversations_mock = browser_source.split(
         'await page.route("**/api/v1/conversations"', 1
@@ -613,9 +641,9 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     assert conversations_mock.index('route.request().method() === "OPTIONS"') < (
         conversations_mock.index('route.request().method() !== "POST"')
     )
-    chat_mock = browser_source.split(
-        'await page.route("**/api/v1/chat/stream"', 1
-    )[1].split('await page.getByTestId("chat-input")', 1)[0]
+    chat_mock = browser_source.split('await page.route("**/api/v1/chat/stream"', 1)[
+        1
+    ].split('await page.getByTestId("chat-input")', 1)[0]
     assert chat_mock.index('route.request().method() === "OPTIONS"') < (
         chat_mock.index("route.request().postDataJSON()")
     )
@@ -679,8 +707,9 @@ def test_canary_capture_remains_sanitized_and_replay_compatible() -> None:
     assert "assert_sanitized_capture" in capture_body
     assert 'CANARY_MESSAGES_FILE="$API_MESSAGES_RESPONSE"' in capture_body
     assert '"launch_payload": launch_payload' in capture_body
-    assert '"final_response_payload": message_artifacts.get("final_response_payload")' in (
-        capture_body
+    assert (
+        '"final_response_payload": message_artifacts.get("final_response_payload")'
+        in (capture_body)
     )
     assert '"route_receipt": receipt_summary(receipt_payload)' in capture_body
 
@@ -834,9 +863,7 @@ def test_cleanup_redacts_browser_artifacts_before_the_job_uploads_them() -> None
 
 def test_browser_artifact_redaction_masks_canary_credentials(tmp_path: Path) -> None:
     source = _source(".github/canary-render.sh")
-    function_body = source.split("redact_browser_artifacts() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    function_body = source.split("redact_browser_artifacts() {", 1)[1].split("\n}", 1)[0]
     python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
     results = tmp_path / "playwright-results" / "case"
     results.mkdir(parents=True)
@@ -883,9 +910,7 @@ def test_browser_artifact_redaction_leaves_no_marker_without_a_results_dir(
     tmp_path: Path,
 ) -> None:
     source = _source(".github/canary-render.sh")
-    function_body = source.split("redact_browser_artifacts() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    function_body = source.split("redact_browser_artifacts() {", 1)[1].split("\n}", 1)[0]
     python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
     results_dir = tmp_path / "playwright-results"
     results_dir.mkdir()
@@ -1003,8 +1028,7 @@ def test_workflow_runs_browser_canary_and_uploads_only_sanitized_artifacts() -> 
     assert "cd web && bun test __tests__/spanish-ui-smoke.test.ts" in workflow
     assert "ARGUS_CANARY_EVIDENCE_PATH=temp/canary-evidence/es-419.json" in workflow
     assert (
-        "ARGUS_CANARY_CAPTURE_PATH=temp/canary-evidence/es-419-capture.json"
-        in workflow
+        "ARGUS_CANARY_CAPTURE_PATH=temp/canary-evidence/es-419-capture.json" in workflow
     )
     assert "temp/canary-evidence/*" not in workflow
     assert "temp/canary-evidence/es-419.json" in workflow

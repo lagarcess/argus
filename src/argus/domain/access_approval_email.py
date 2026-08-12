@@ -125,6 +125,7 @@ def _idempotency_key(
     recipient: str,
     language: Language,
     signup_url: str,
+    claim_token: str,
 ) -> str:
     material = "\n".join(
         (
@@ -132,6 +133,7 @@ def _idempotency_key(
             recipient,
             language,
             signup_url,
+            claim_token,
         )
     )
     return f"sha256:{hashlib.sha256(material.encode('utf-8')).hexdigest()}"
@@ -147,6 +149,7 @@ def send_access_welcome_email(
     recipient: str,
     language: Language,
     signup_url: str,
+    claim_token: str,
 ) -> AccessWelcomeSendResult:
     password = (os.getenv("ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD") or "").strip()
     if not password:
@@ -155,6 +158,9 @@ def send_access_welcome_email(
     normalized_recipient = recipient.strip().lower()
     if not normalized_recipient:
         raise ValueError("Access welcome email recipient is required.")
+    normalized_claim_token = claim_token.strip()
+    if not normalized_claim_token:
+        raise ValueError("Access welcome email claim token is required.")
     content = build_access_welcome_email(language=language, signup_url=signup_url)
 
     message = MIMEMultipart("alternative")
@@ -165,6 +171,7 @@ def send_access_welcome_email(
         recipient=normalized_recipient,
         language=language,
         signup_url=signup_url,
+        claim_token=normalized_claim_token,
     )
     message.attach(MIMEText(content.plain_text, "plain", "utf-8"))
     message.attach(MIMEText(content.html, "html", "utf-8"))

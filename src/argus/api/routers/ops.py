@@ -13,7 +13,11 @@ from pydantic import ValidationError
 from argus.api import state as api_state
 from argus.api.guest_access import permanent_account_access_allowed
 from argus.api.schemas import AccessApprovalRequest, AccessApprovalResponse, Language
-from argus.domain.access_approval_email import send_access_welcome_email
+from argus.domain.access_approval_email import (
+    ACCESS_WELCOME_CONTENT_VERSION,
+    build_access_welcome_email,
+    send_access_welcome_email,
+)
 from argus.domain.market_data import warm_asset_universe
 
 router = APIRouter(tags=["ops"])
@@ -170,6 +174,33 @@ def _approval_signup_url() -> str:
     return f"{origin}/?auth=signup"
 
 
+def _complete_recorded_access_welcome(email: str) -> bool:
+    if api_state.supabase_gateway is None:
+        return False
+    try:
+        existing = api_state.supabase_gateway.get_private_alpha_access_welcome_delivery(
+            email
+        )
+        if existing is None:
+            return False
+        completed = api_state.supabase_gateway.complete_private_alpha_access_welcome(
+            email=email,
+            language=existing["language"],
+            content_version=existing["content_version"],
+            subject=existing["subject"],
+            provider_receipt=existing["provider_receipt"],
+            claim_token=None,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=_APPROVAL_UNAVAILABLE_DETAIL,
+        ) from None
+    if not completed:
+        raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
+    return True
+
+
 @router.post(
     "/internal/access-requests/approve",
     response_model=AccessApprovalResponse,
@@ -182,32 +213,8 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
         raise HTTPException(status_code=422, detail="Invalid request body.") from None
     if api_state.supabase_gateway is None:
         raise HTTPException(status_code=503, detail=_APPROVAL_UNAVAILABLE_DETAIL)
-    try:
-        existing = api_state.supabase_gateway.get_private_alpha_access_welcome_delivery(
-            body.email
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=_APPROVAL_UNAVAILABLE_DETAIL,
-        ) from None
-    if existing is not None:
-        try:
-            completed = api_state.supabase_gateway.complete_private_alpha_access_welcome(
-                email=body.email,
-                language=existing["language"],
-                content_version=existing["content_version"],
-                subject=existing["subject"],
-                provider_receipt=existing["provider_receipt"],
-            )
-        except Exception:
-            raise HTTPException(
-                status_code=503,
-                detail=_APPROVAL_UNAVAILABLE_DETAIL,
-            ) from None
-        if completed:
-            return AccessApprovalResponse()
-        raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
+    if _complete_recorded_access_welcome(body.email):
+        return AccessApprovalResponse()
 
     try:
         requested = api_state.supabase_gateway.get_requested_private_alpha_access(
@@ -219,15 +226,42 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
             detail=_APPROVAL_UNAVAILABLE_DETAIL,
         ) from None
     if requested is None:
+        if _complete_recorded_access_welcome(body.email):
+            return AccessApprovalResponse()
         raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
 
     language: Language = "es-419" if requested.get("language") == "es-419" else "en"
     try:
         signup_url = _approval_signup_url()
+        content = build_access_welcome_email(
+            language=language,
+            signup_url=signup_url,
+        )
+        claim = api_state.supabase_gateway.claim_private_alpha_access_welcome(
+            email=body.email,
+            language=language,
+            content_version=ACCESS_WELCOME_CONTENT_VERSION,
+            subject=content.subject,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=_APPROVAL_UNAVAILABLE_DETAIL,
+        ) from None
+    if claim is None:
+        if _complete_recorded_access_welcome(body.email):
+            return AccessApprovalResponse()
+        raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
+    claim_token = claim.get("claim_token")
+    if claim.get("send_allowed") is not True or not isinstance(claim_token, str):
+        raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
+
+    try:
         result = send_access_welcome_email(
             recipient=body.email,
             language=language,
             signup_url=signup_url,
+            claim_token=claim_token,
         )
     except Exception:
         raise HTTPException(
@@ -242,6 +276,7 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
             content_version=result.content_version,
             subject=result.subject,
             provider_receipt=result.provider_receipt,
+            claim_token=claim_token,
         )
     except Exception:
         raise HTTPException(

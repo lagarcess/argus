@@ -13,9 +13,7 @@ from faker import Faker
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
-LOCAL_SERVICE_KEY = os.getenv(
-    "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", ""
-).strip()
+LOCAL_SERVICE_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", "").strip()
 pytestmark = pytest.mark.skipif(
     not DSN,
     reason="ARGUS_DISPOSABLE_DATABASE_URL is not configured",
@@ -26,6 +24,7 @@ fake = Faker()
 WELCOME_CONTENT_VERSION = "private-alpha-access-welcome/v1"
 WELCOME_SUBJECT = "Welcome to Argus"
 WELCOME_RECEIPT = "resend-email-id-461"
+UNKNOWN_CLAIM_TOKEN = "00000000-0000-4000-8000-000000000000"
 
 
 def _random_email() -> str:
@@ -35,6 +34,13 @@ def _random_email() -> str:
 def _cleanup_access_rows(email: str) -> None:
     with psycopg.connect(DSN, autocommit=True) as connection:
         with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                delete from public.private_alpha_access_welcome_claims
+                where recipient_email = %s
+                """,
+                (email,),
+            )
             cursor.execute(
                 """
                 delete from public.private_alpha_access_welcome_deliveries
@@ -78,22 +84,73 @@ def _complete_welcome(
     content_version: str = WELCOME_CONTENT_VERSION,
     subject: str = WELCOME_SUBJECT,
     provider_receipt: str = WELCOME_RECEIPT,
+    claim_token: str | None = UNKNOWN_CLAIM_TOKEN,
 ) -> tuple[bool]:
     cursor.execute("set role service_role")
     try:
         cursor.execute(
             """
             select public.complete_private_alpha_access_welcome(
-              %s, %s, %s, %s, %s
+              %s, %s, %s, %s, %s, %s
             )
             """,
-            (email, language, content_version, subject, provider_receipt),
+            (
+                email,
+                language,
+                content_version,
+                subject,
+                provider_receipt,
+                claim_token,
+            ),
         )
         result = cursor.fetchone()
         assert result is not None
         return result
     finally:
         cursor.execute("reset role")
+
+
+def _claim_welcome(
+    cursor: psycopg.Cursor[tuple[object, ...]],
+    *,
+    email: str,
+    language: str = "en",
+    content_version: str = WELCOME_CONTENT_VERSION,
+    subject: str = WELCOME_SUBJECT,
+) -> tuple[object, ...] | None:
+    cursor.execute("set role service_role")
+    try:
+        cursor.execute(
+            """
+            select recipient_email, language, content_version, subject,
+                   claim_token::text, claimed_at, send_allowed
+            from public.claim_private_alpha_access_welcome(%s, %s, %s, %s)
+            """,
+            (email, language, content_version, subject),
+        )
+        return cursor.fetchone()
+    finally:
+        cursor.execute("reset role")
+
+
+def _claim_token(
+    cursor: psycopg.Cursor[tuple[object, ...]],
+    *,
+    email: str,
+    language: str = "en",
+    subject: str = WELCOME_SUBJECT,
+) -> str:
+    claim = _claim_welcome(
+        cursor,
+        email=email,
+        language=language,
+        subject=subject,
+    )
+    assert claim is not None
+    assert claim[-1] is True
+    token = claim[4]
+    assert isinstance(token, str)
+    return token
 
 
 def test_access_request_constraints_and_rls_are_service_role_only() -> None:
@@ -193,6 +250,66 @@ def test_direct_requested_user_activation_without_delivery_is_rejected() -> None
                     (email, email),
                 )
                 assert cursor.fetchone() == ("requested", 0)
+    finally:
+        _cleanup_access_rows(email)
+
+
+def test_pending_claim_reuses_token_inside_window_and_blocks_after_expiry() -> None:
+    email = _random_email()
+    try:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                _insert_allowlist_row(cursor, email=email, role="requested")
+
+                first = _claim_welcome(cursor, email=email)
+                second = _claim_welcome(cursor, email=email)
+                assert first is not None
+                assert second is not None
+                assert first[4] == second[4]
+                assert first[-1] is second[-1] is True
+
+                cursor.execute(
+                    """
+                    update public.private_alpha_access_welcome_claims
+                    set claimed_at = now() - interval '24 hours'
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+
+                expired = _claim_welcome(cursor, email=email)
+                assert expired is not None
+                assert expired[4] == first[4]
+                assert expired[-1] is False
+    finally:
+        _cleanup_access_rows(email)
+
+
+def test_pending_claim_freezes_eligibility_until_completion() -> None:
+    email = _random_email()
+    try:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                _insert_allowlist_row(cursor, email=email, role="requested")
+                claim_token = _claim_token(cursor, email=email)
+
+                cursor.execute("set role service_role")
+                for statement in (
+                    "update public.private_alpha_allowlist set language = 'es-419' "
+                    "where email = %s",
+                    "update public.private_alpha_allowlist set disabled_at = now() "
+                    "where email = %s",
+                    "delete from public.private_alpha_allowlist where email = %s",
+                ):
+                    with pytest.raises(psycopg.errors.CheckViolation):
+                        cursor.execute(statement, (email,))
+                cursor.execute("reset role")
+
+                assert _complete_welcome(
+                    cursor,
+                    email=email,
+                    claim_token=claim_token,
+                ) == (True,)
     finally:
         _cleanup_access_rows(email)
 
@@ -405,12 +522,14 @@ def test_completion_constraint_failure_rolls_back_new_delivery_and_promotion() -
         with psycopg.connect(DSN, autocommit=True) as connection:
             with connection.cursor() as cursor:
                 _insert_allowlist_row(cursor, email=email, role="requested")
+                claim_token = _claim_token(cursor, email=email)
 
                 with pytest.raises(psycopg.errors.CheckViolation):
                     _complete_welcome(
                         cursor,
                         email=email,
-                        subject="",
+                        provider_receipt="",
+                        claim_token=claim_token,
                     )
 
                 cursor.execute(
@@ -431,6 +550,15 @@ def test_completion_constraint_failure_rolls_back_new_delivery_and_promotion() -
                     (email,),
                 )
                 assert cursor.fetchone() == (0,)
+                cursor.execute(
+                    """
+                    select consumed_at is null
+                    from public.private_alpha_access_welcome_claims
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == (True,)
     finally:
         _cleanup_access_rows(email)
 
@@ -448,22 +576,12 @@ def test_completion_records_delivery_and_promotes_atomically() -> None:
                     (email,),
                 )
 
-                cursor.execute("set role service_role")
-                cursor.execute(
-                    """
-                    select public.complete_private_alpha_access_welcome(
-                      %s, 'en', %s, %s, %s
-                    )
-                    """,
-                    (
-                        email,
-                        WELCOME_CONTENT_VERSION,
-                        WELCOME_SUBJECT,
-                        WELCOME_RECEIPT,
-                    ),
-                )
-                assert cursor.fetchone() == (True,)
-                cursor.execute("reset role")
+                claim_token = _claim_token(cursor, email=email)
+                assert _complete_welcome(
+                    cursor,
+                    email=email,
+                    claim_token=claim_token,
+                ) == (True,)
 
                 cursor.execute(
                     """
@@ -493,6 +611,15 @@ def test_completion_records_delivery_and_promotes_atomically() -> None:
                     True,
                     True,
                 )
+                cursor.execute(
+                    """
+                    select consumed_at is not null
+                    from public.private_alpha_access_welcome_claims
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == (True,)
     finally:
         _cleanup_access_rows(email)
 
@@ -509,27 +636,21 @@ def test_completion_replay_returns_true_with_one_delivery_row() -> None:
                     """,
                     (email,),
                 )
-                cursor.execute("set role service_role")
-
-                results = []
-                for _ in range(2):
-                    cursor.execute(
-                        """
-                        select public.complete_private_alpha_access_welcome(
-                          %s, 'en', %s, %s, %s
-                        )
-                        """,
-                        (
-                            email,
-                            WELCOME_CONTENT_VERSION,
-                            WELCOME_SUBJECT,
-                            WELCOME_RECEIPT,
-                        ),
-                    )
-                    results.append(cursor.fetchone())
+                claim_token = _claim_token(cursor, email=email)
+                results = [
+                    _complete_welcome(
+                        cursor,
+                        email=email,
+                        claim_token=claim_token,
+                    ),
+                    _complete_welcome(
+                        cursor,
+                        email=email,
+                        claim_token=None,
+                    ),
+                ]
 
                 assert results == [(True,), (True,)]
-                cursor.execute("reset role")
                 cursor.execute(
                     """
                     select a.role, count(d.recipient_email)
@@ -612,6 +733,54 @@ def test_concurrent_service_requests_create_exactly_one_requested_row() -> None:
                 )
 
 
+def test_concurrent_claims_reuse_one_durable_send_identity() -> None:
+    email = _random_email()
+    worker_count = 4
+    barrier = Barrier(worker_count)
+
+    with psycopg.connect(DSN, autocommit=True) as connection:
+        with connection.cursor() as cursor:
+            _insert_allowlist_row(cursor, email=email, role="requested")
+
+    def claim_access_welcome() -> tuple[object, ...] | None:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("set role service_role")
+                barrier.wait(timeout=10)
+                cursor.execute(
+                    """
+                    select claim_token::text, send_allowed
+                    from public.claim_private_alpha_access_welcome(
+                      %s, 'en', %s, %s
+                    )
+                    """,
+                    (email, WELCOME_CONTENT_VERSION, WELCOME_SUBJECT),
+                )
+                return cursor.fetchone()
+
+    try:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            results = list(
+                executor.map(lambda _: claim_access_welcome(), range(worker_count))
+            )
+
+        assert all(result is not None and result[1] is True for result in results)
+        assert len({result[0] for result in results if result is not None}) == 1
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    select count(*), bool_and(consumed_at is null)
+                    from public.private_alpha_access_welcome_claims
+                    where recipient_email = %s
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == (1, True)
+    finally:
+        _cleanup_access_rows(email)
+
+
 def test_concurrent_completion_has_one_delivery_and_one_active_row() -> None:
     email = _random_email()
     worker_count = 4
@@ -626,6 +795,12 @@ def test_concurrent_completion_has_one_delivery_and_one_active_row() -> None:
                 """,
                 (email,),
             )
+            claim_token = _claim_token(
+                cursor,
+                email=email,
+                language="es-419",
+                subject="Bienvenido a Argus",
+            )
 
     def complete_access_welcome() -> tuple[bool]:
         with psycopg.connect(DSN, autocommit=True) as connection:
@@ -635,10 +810,15 @@ def test_concurrent_completion_has_one_delivery_and_one_active_row() -> None:
                 cursor.execute(
                     """
                     select public.complete_private_alpha_access_welcome(
-                      %s, 'es-419', %s, 'Bienvenido a Argus', %s
+                      %s, 'es-419', %s, 'Bienvenido a Argus', %s, %s
                     )
                     """,
-                    (email, WELCOME_CONTENT_VERSION, WELCOME_RECEIPT),
+                    (
+                        email,
+                        WELCOME_CONTENT_VERSION,
+                        WELCOME_RECEIPT,
+                        claim_token,
+                    ),
                 )
                 return cursor.fetchone()
 
@@ -668,56 +848,71 @@ def test_concurrent_completion_has_one_delivery_and_one_active_row() -> None:
         _cleanup_access_rows(email)
 
 
-def test_browser_roles_cannot_read_or_mutate_delivery_rows() -> None:
+def test_browser_roles_cannot_reach_claim_or_delivery_state_machine() -> None:
     email = _random_email()
     try:
         with psycopg.connect(DSN, autocommit=True) as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    insert into public.private_alpha_allowlist (email, role, language)
-                    values (%s, 'requested', 'en')
-                    """,
-                    (email,),
-                )
-                cursor.execute("set role service_role")
-                cursor.execute(
-                    """
-                    select public.complete_private_alpha_access_welcome(
-                      %s, 'en', %s, %s, %s
-                    )
-                    """,
-                    (
-                        email,
-                        WELCOME_CONTENT_VERSION,
-                        WELCOME_SUBJECT,
-                        WELCOME_RECEIPT,
-                    ),
-                )
-                assert cursor.fetchone() == (True,)
-                cursor.execute("reset role")
+                _insert_allowlist_row(cursor, email=email, role="requested")
+                claim_token = _claim_token(cursor, email=email)
+                assert _complete_welcome(
+                    cursor,
+                    email=email,
+                    claim_token=claim_token,
+                ) == (True,)
 
                 cursor.execute(
                     """
                     select
+                      (
+                        select relrowsecurity
+                        from pg_class
+                        where oid =
+                          'public.private_alpha_access_welcome_claims'::regclass
+                      ),
                       has_table_privilege(
                         'anon',
-                        'public.private_alpha_access_welcome_deliveries',
+                        'public.private_alpha_access_welcome_claims',
                         'select,insert,update,delete'
                       ),
                       has_table_privilege(
                         'authenticated',
-                        'public.private_alpha_access_welcome_deliveries',
+                        'public.private_alpha_access_welcome_claims',
+                        'select,insert,update,delete'
+                      ),
+                      has_table_privilege(
+                        'service_role',
+                        'public.private_alpha_access_welcome_claims',
                         'select,insert,update,delete'
                       ),
                       has_function_privilege(
                         'anon',
-                        'public.complete_private_alpha_access_welcome(text,text,text,text,text)',
+                        'public.claim_private_alpha_access_welcome(text,text,text,text)',
                         'execute'
                       ),
                       has_function_privilege(
                         'authenticated',
-                        'public.complete_private_alpha_access_welcome(text,text,text,text,text)',
+                        'public.claim_private_alpha_access_welcome(text,text,text,text)',
+                        'execute'
+                      ),
+                      has_function_privilege(
+                        'anon',
+                        'public.complete_private_alpha_access_welcome(text,text,text,text,text,uuid)',
+                        'execute'
+                      ),
+                      has_function_privilege(
+                        'authenticated',
+                        'public.complete_private_alpha_access_welcome(text,text,text,text,text,uuid)',
+                        'execute'
+                      ),
+                      has_function_privilege(
+                        'service_role',
+                        'public.claim_private_alpha_access_welcome(text,text,text,text)',
+                        'execute'
+                      ),
+                      has_function_privilege(
+                        'service_role',
+                        'public.complete_private_alpha_access_welcome(text,text,text,text,text,uuid)',
                         'execute'
                       ),
                       has_table_privilege(
@@ -728,47 +923,36 @@ def test_browser_roles_cannot_read_or_mutate_delivery_rows() -> None:
                       has_table_privilege(
                         'service_role',
                         'public.private_alpha_access_welcome_deliveries',
-                        'insert'
+                        'insert,update,delete'
                       ),
-                      has_table_privilege(
-                        'service_role',
-                        'public.private_alpha_access_welcome_deliveries',
-                        'update'
-                      ),
-                      has_table_privilege(
-                        'service_role',
-                        'public.private_alpha_access_welcome_deliveries',
-                        'delete'
-                      ),
-                      has_function_privilege(
-                        'service_role',
-                        'public.complete_private_alpha_access_welcome(text,text,text,text,text)',
-                        'execute'
-                      ),
-                      has_function_privilege(
-                        'service_role',
-                        'public.require_private_alpha_access_welcome_delivery()',
-                        'execute'
-                      ),
+                      to_regprocedure(
+                        'public.complete_private_alpha_access_welcome(text,text,text,text,text)'
+                      ) is null,
                       (
                         select count(*)
                         from pg_policies
                         where schemaname = 'public'
-                          and tablename = 'private_alpha_access_welcome_deliveries'
+                          and tablename in (
+                            'private_alpha_access_welcome_claims',
+                            'private_alpha_access_welcome_deliveries'
+                          )
                       )
                     """
                 )
                 assert cursor.fetchone() == (
+                    True,
+                    False,
+                    False,
+                    False,
                     False,
                     False,
                     False,
                     False,
                     True,
                     True,
-                    False,
-                    False,
                     True,
                     False,
+                    True,
                     0,
                 )
 
@@ -777,8 +961,8 @@ def test_browser_roles_cannot_read_or_mutate_delivery_rows() -> None:
                     with pytest.raises(psycopg.errors.InsufficientPrivilege):
                         cursor.execute(
                             """
-                            select recipient_email
-                            from public.private_alpha_access_welcome_deliveries
+                            select claim_token
+                            from public.private_alpha_access_welcome_claims
                             where recipient_email = %s
                             """,
                             (email,),
@@ -786,27 +970,22 @@ def test_browser_roles_cannot_read_or_mutate_delivery_rows() -> None:
                     with pytest.raises(psycopg.errors.InsufficientPrivilege):
                         cursor.execute(
                             """
-                            insert into public.private_alpha_access_welcome_deliveries (
-                              recipient_email,
-                              language,
-                              content_version,
-                              subject,
-                              provider_receipt
+                            select *
+                            from public.claim_private_alpha_access_welcome(
+                              %s, 'en', %s, %s
                             )
-                            values (%s, 'en', %s, %s, %s)
                             """,
                             (
-                                _random_email(),
+                                email,
                                 WELCOME_CONTENT_VERSION,
                                 WELCOME_SUBJECT,
-                                WELCOME_RECEIPT,
                             ),
                         )
                     with pytest.raises(psycopg.errors.InsufficientPrivilege):
                         cursor.execute(
                             """
                             select public.complete_private_alpha_access_welcome(
-                              %s, 'en', %s, %s, %s
+                              %s, 'en', %s, %s, %s, null
                             )
                             """,
                             (
@@ -817,6 +996,28 @@ def test_browser_roles_cannot_read_or_mutate_delivery_rows() -> None:
                             ),
                         )
                     cursor.execute("reset role")
+
+                cursor.execute("set role service_role")
+                with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                    cursor.execute(
+                        """
+                        insert into public.private_alpha_access_welcome_deliveries (
+                          recipient_email,
+                          language,
+                          content_version,
+                          subject,
+                          provider_receipt
+                        )
+                        values (%s, 'en', %s, %s, %s)
+                        """,
+                        (
+                            _random_email(),
+                            WELCOME_CONTENT_VERSION,
+                            WELCOME_SUBJECT,
+                            WELCOME_RECEIPT,
+                        ),
+                    )
+                cursor.execute("reset role")
     finally:
         _cleanup_access_rows(email)
 
@@ -902,9 +1103,7 @@ def test_protected_approval_replay_uses_real_gateway_and_sends_once(
                     language="es-419",
                 )
 
-        real_gateway = SupabaseGateway(
-            client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY)
-        )
+        real_gateway = SupabaseGateway(client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY))
         monkeypatch.setattr(api_state, "supabase_gateway", real_gateway)
         monkeypatch.setenv("ARGUS_OPS_TOKEN", ops_token)
         monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://argus.example")

@@ -149,6 +149,45 @@ def test_gateway_loads_access_welcome_delivery_with_normalized_email() -> None:
     query.limit.assert_called_once_with(1)
 
 
+@pytest.mark.parametrize("send_allowed", [True, False])
+def test_gateway_claims_access_welcome_before_send(
+    send_allowed: bool,
+) -> None:
+    claim = {
+        "recipient_email": "person@example.com",
+        "language": "es-419",
+        "content_version": "private-alpha-access-welcome/v1",
+        "subject": "Bienvenido a Argus",
+        "claim_token": "11111111-1111-4111-8111-111111111111",
+        "claimed_at": "2026-08-12T14:27:17Z",
+        "send_allowed": send_allowed,
+    }
+    rpc = MagicMock()
+    rpc.execute.return_value.data = [claim]
+    client = MagicMock()
+    client.rpc.return_value = rpc
+    gateway = SupabaseGateway(client=client)
+
+    result = gateway.claim_private_alpha_access_welcome(
+        email=" Person@Example.COM ",
+        language="es-419",
+        content_version="private-alpha-access-welcome/v1",
+        subject="Bienvenido a Argus",
+    )
+
+    assert result == claim
+    client.rpc.assert_called_once_with(
+        "claim_private_alpha_access_welcome",
+        {
+            "p_email": "person@example.com",
+            "p_language": "es-419",
+            "p_content_version": "private-alpha-access-welcome/v1",
+            "p_subject": "Bienvenido a Argus",
+        },
+    )
+    rpc.execute.assert_called_once_with()
+
+
 @pytest.mark.parametrize(("database_result", "expected"), [(True, True), (False, False)])
 def test_gateway_completes_access_welcome_through_rpc(
     database_result: bool,
@@ -166,6 +205,7 @@ def test_gateway_completes_access_welcome_through_rpc(
         content_version="private-alpha-access-welcome/v1",
         subject="Bienvenido a Argus",
         provider_receipt="synthetic-provider-receipt",
+        claim_token="11111111-1111-4111-8111-111111111111",
     )
 
     assert completed is expected
@@ -177,6 +217,7 @@ def test_gateway_completes_access_welcome_through_rpc(
             "p_content_version": "private-alpha-access-welcome/v1",
             "p_subject": "Bienvenido a Argus",
             "p_provider_receipt": "synthetic-provider-receipt",
+            "p_claim_token": "11111111-1111-4111-8111-111111111111",
         },
     )
     rpc.execute.assert_called_once_with()

@@ -1583,18 +1583,29 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   roles do not grant permanent access.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
-  method and path. For a new approval, it loads one active requested row and
-  its language, sends one localized welcome email linking to
-  `${ARGUS_APP_ORIGIN}/?auth=signup`, then calls the database completion RPC.
-  That RPC records the provider-accepted delivery before activating access and
-  promotes `role=requested AND disabled_at IS NULL` to `role=user` in the same
-  transaction. The protected operation and its completion RPC are the sole
+  method and path. For a new approval, it loads the requested language only to
+  prepare the candidate content, then calls the service-only claim RPC. The
+  claim RPC row-locks and revalidates the normalized active `requested` row and
+  durably stores the recipient, language, fixed content version, subject,
+  opaque claim token, and claim time before SMTP. Only an eligible claim inside
+  the provider's 24-hour idempotency window may send the localized welcome to
+  `${ARGUS_APP_ORIGIN}/?auth=signup`.
+- Compatible retries inside that window reuse the same durable claim token and
+  therefore the same SMTP idempotency key. An unconsumed claim at or beyond 24
+  hours fails closed without SMTP and requires manual provider reconciliation;
+  the operation does not create a fresh claim automatically. While a claim is
+  unconsumed, relevant allowlist eligibility fields cannot change.
+- The completion RPC validates and consumes the claim, records the
+  provider-accepted delivery, and promotes
+  `role=requested AND disabled_at IS NULL` to `role=user` in one transaction.
+  The protected operation plus its claim and completion RPCs are the sole
   `requested`-to-`user` promotion boundary; operational callers must not patch
   that role directly.
 - The normalized recipient has at most one durable access-welcome delivery
   record. A repeated approval that finds the record calls the same completion
-  RPC without calling SMTP, so it can finish an interrupted promotion and
-  returns the unchanged `{"approved":true}` response. Delivery existence alone
+  RPC without a claim and without calling SMTP, so it can finish an interrupted
+  promotion and returns the unchanged `{"approved":true}` response. Delivery
+  existence alone
   never grants access: the RPC still rejects missing, disabled, privileged, or
   otherwise ineligible allowlist rows. Missing configuration, missing or
   disabled state, SMTP failure, database failure, and a completion miss do not

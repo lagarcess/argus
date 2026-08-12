@@ -1,20 +1,21 @@
 # Issue #461 access welcome evidence
 
-Status: terminal exact-head deterministic, browser, external-message, and isolated-database evidence for issue #461.
+Status: historical deterministic, browser, external-message, and isolated-database evidence retained for issue #461. This file is not a terminal exact-head claim for the current PR #476 head.
 
 ## Candidate identity
 
 - Integration base: `80256729`.
 - First Task 5 evidence commit and initial CI target: `41d189285b18a864d1749cea0a3203cfdf374264`.
-- Proven exact head: `1014c41db50250b22f3bae26fe105f62f17a3ebf`.
-- GitHub Actions run: [31618243334](https://github.com/lagarcess/argus/actions/runs/31618243334), terminal success.
+- Historical proven head: `1014c41db50250b22f3bae26fe105f62f17a3ebf`.
+- Historical GitHub Actions run: [31618243334](https://github.com/lagarcess/argus/actions/runs/31618243334), terminal success for that head.
 - Required isolated-database job: `guest-release-gates` job `94186292441`, terminal success.
 - Email implementation and code-owned HTML source head: `30f2830cad5ce08315c421289252bb7203d4afae`.
 - Branch: `codex/issue-461-welcome-email`.
 - Content version: `private-alpha-access-welcome/v1`.
-- No hosted migration, production deploy, live canary, hosted application API call, or real application SMTP call occurred in Task 5.
+- No hosted migration, production deploy, live canary, hosted application API call, or real application SMTP call occurred in Task 5. The original delivery migration was later applied to the PR preview, which is why the durable claim fix uses a new forward migration.
+- Terminal exact-head revalidation is recorded externally on PR #476 after the final review. A committed report cannot truthfully name the commit that contains itself.
 
-## Deterministic verification
+## Historical deterministic verification
 
 All commands ran from the issue branch working tree on 2026-08-12.
 
@@ -33,7 +34,7 @@ All commands ran from the issue branch working tree on 2026-08-12.
 
 The 19 focused skips are the real-PostgreSQL access-request file. Local Docker is unavailable, `supabase/config.toml` names the shared `argus-qa` project, and the required disposable Supabase variables are absent. The shared project was not started, reset, or mutated.
 
-## Exact-head isolated Supabase proof
+## Historical isolated Supabase proof
 
 At exact head `1014c41db50250b22f3bae26fe105f62f17a3ebf`, GitHub Actions run [31618243334](https://github.com/lagarcess/argus/actions/runs/31618243334) completed successfully. Its `guest-release-gates` job `94186292441` started and reset the isolated Supabase stack successfully.
 
@@ -63,7 +64,7 @@ Seven failures were reproduced at untouched base `80256729`:
 
 An allowed out-of-sandbox rerun made the RSS probe and all five loopback tests pass. The OpenRouter traceback-origin failure remained and is baseline-reproduced.
 
-The eighth failure was candidate-specific but outside Task 5 ownership: `tests/test_render_canary_script.py` grew to 1,042 lines and crossed the 1,000-line modularity watch threshold without being listed in `.agent/modularity_budget.json`. Commit `b4b4c747` added the file to the watched budget. The exact failing structural test now passes. The release captain directed against repeating the broad local sweep; exact-head CI remains the terminal truth.
+The eighth failure was candidate-specific but outside Task 5 ownership: `tests/test_render_canary_script.py` grew to 1,042 lines and crossed the 1,000-line modularity watch threshold without being listed in `.agent/modularity_budget.json`. Commit `b4b4c747` added the file to the watched budget. The exact failing structural test now passes. The release captain directed against repeating the broad local sweep. That CI result remains historical proof for `1014c41d`, not terminal proof for the current head.
 
 ## Browser rendering proof
 
@@ -108,7 +109,24 @@ Plain-text canonicalization removed transport CRLF differences only. It did not 
 
 This is connector-owned external delivery proof. It does not claim that the connector executed `send_access_welcome_email` or the hosted application's SMTP path. Deterministic production SMTP tests separately prove that the code emits `Argus <noreply@get-argus.com>` and preserves its multipart, idempotency-key, and acceptance behavior.
 
+## Retained artifact classification
+
+- `welcome-email-en.png` and `welcome-email-es-419.png` are retained visual and
+  copy evidence from the recorded builder heads. The durable-claim and canary
+  fixes do not change email copy, HTML, CTA styling, or signup URL construction,
+  so the captures remain relevant historical evidence and were not recaptured.
+- `raw-header-proof.txt` is retained historical external-delivery evidence for
+  the message content and transport-authentication result. It does not prove
+  the current protected route, claim RPC, new migration, or PR head.
+- `idempotency-proof.txt` is retained as historical route and isolated-database
+  evidence at `1014c41d`. Its terminal-head classification is superseded. The
+  new pre-send claim, crash-window, privilege, rollback, and canary behavior
+  require current-head deterministic and isolated-Postgres revalidation.
+
 ## Release boundaries
 
-- Hosted migration application, hosted deployment, live canary, and production application SMTP execution remain unproven and did not occur in this task.
+- The original delivery migration reached the PR preview after Task 5. This
+  review fix does not apply the new durable-claim migration to any hosted
+  environment and does not deploy, run a live canary, or execute production
+  application SMTP.
 - No recipient address, credential, ops token, provider key, raw message body, or unredacted Message-ID is retained here.
