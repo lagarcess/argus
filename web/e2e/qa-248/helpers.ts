@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 
+import { LOCAL_QA_CAPTCHA_TOKEN } from "../../lib/guest-captcha";
+
 export const ROOT = path.resolve(__dirname, "../../..");
 export const EVIDENCE_DIR = path.join(ROOT, "temp", "qa-evidence-248");
 export const SHOTS_DIR = path.join(EVIDENCE_DIR, "shots");
@@ -269,7 +271,7 @@ export async function requestRecoveryViaApi(
   forwardedFor?: string,
 ) {
   return context.request.post("http://localhost:3000/api/auth/recovery", {
-    data: { email },
+    data: { email, captcha_token: LOCAL_QA_CAPTCHA_TOKEN },
     headers: {
       "Content-Type": "application/json",
       Origin: "http://localhost:3000",
@@ -277,4 +279,3 @@ export async function requestRecoveryViaApi(
     },
   });
 }
-
