@@ -1349,7 +1349,7 @@ PY
   then
     return 1
   fi
-  curl -fsS \
+  curl -q -fsS \
     --config "$OPS_CURL_CONFIG" \
     -X POST \
     -H "Content-Type: application/json" \
@@ -1365,7 +1365,11 @@ try:
     payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
 except (OSError, json.JSONDecodeError) as exc:
     raise SystemExit("requested signup promotion returned an invalid response") from exc
-if payload != {"approved": True}:
+if (
+    not isinstance(payload, dict)
+    or set(payload) != {"approved"}
+    or payload["approved"] is not True
+):
     raise SystemExit("requested signup promotion was not approved")
 PY
 }

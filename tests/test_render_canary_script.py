@@ -16,6 +16,24 @@ def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def _approval_validator_source(container: str, response_file: str) -> str:
+    marker = f'python3 - "${response_file}" <<\'PY\''
+    return container.split(marker, 1)[1].split("\nPY", 1)[0]
+
+
+def _approval_validator_result(
+    validator_source: str, response_path: Path, payload: object
+) -> subprocess.CompletedProcess[str]:
+    response_path.write_text(json.dumps(payload), encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, "-c", validator_source, str(response_path)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def test_canary_defaults_to_private_launch_urls() -> None:
     source = _source(".github/canary-render.sh")
     env_source = _source(".github/argus-env.sh")
@@ -201,12 +219,17 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     assert 'fail_canary "auth" "missing_ops_token"' in shell_source
     assert 'header = "Authorization: Bearer %s"' in shell_source
     assert '"$ARGUS_OPS_TOKEN"' in shell_source
+    promotion_curl_line = next(
+        line.strip() for line in promotion_body.splitlines() if "curl " in line
+    )
+    assert promotion_curl_line.startswith("curl -q ")
     assert '--config "$OPS_CURL_CONFIG"' in promotion_body
     assert '"${API_URL}/internal/access-requests/approve"' in promotion_body
     assert 'CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in promotion_body
     assert ".strip().casefold()" in promotion_body
     assert '--data-binary "@$SIGNUP_APPROVAL_REQUEST"' in promotion_body
-    assert 'payload != {"approved": True}' in promotion_body
+    assert 'set(payload) != {"approved"}' in promotion_body
+    assert 'payload["approved"] is not True' in promotion_body
     assert "service_role_curl" not in promotion_body
     assert "-X PATCH" not in promotion_body
     assert '"role":"user"' not in shell_source
@@ -226,6 +249,67 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     assert 'ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="' not in runner_source
     assert "if ! env -u SUPABASE_SERVICE_ROLE_KEY" in shell_source
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
+
+
+def test_approval_response_validators_require_exact_boolean_shape(
+    tmp_path: Path,
+) -> None:
+    shell_source = _source(".github/canary-render.sh")
+    promotion_body = shell_source.split(
+        "promote_requested_signup_allowlist() {", 1
+    )[1].split("\n}", 1)[0]
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    promotion_section = runbook.split("### Requested Access Promotion", 1)[1]
+    validators = (
+        _approval_validator_source(
+            promotion_body,
+            "SIGNUP_ALLOWLIST_RESPONSE",
+        ),
+        _approval_validator_source(promotion_section, "APPROVAL_RESPONSE"),
+    )
+    response_path = tmp_path / "approval-response.json"
+
+    for validator_source in validators:
+        assert (
+            _approval_validator_result(
+                validator_source,
+                response_path,
+                {"approved": True},
+            ).returncode
+            == 0
+        )
+        for invalid_payload in (
+            {"approved": 1},
+            {"approved": 1.0},
+            {"approved": True, "unexpected": "field"},
+            {"approved": False},
+            {},
+        ):
+            assert (
+                _approval_validator_result(
+                    validator_source,
+                    response_path,
+                    invalid_payload,
+                ).returncode
+                != 0
+            )
+
+
+def test_runbook_promotion_recipe_is_fail_fast_and_subshell_scoped() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    promotion_section = runbook.split("### Requested Access Promotion", 1)[1]
+    recipe = promotion_section.split("```bash", 1)[1].split("```", 1)[0].strip()
+    curl_line = next(line.strip() for line in recipe.splitlines() if "curl " in line)
+
+    assert recipe.startswith("(\nset -euo pipefail\n")
+    assert recipe.endswith("\n)")
+    assert curl_line.startswith("curl -q ")
+    assert (
+        "trap 'rm -f \"$OPS_CURL_CONFIG\" \"$APPROVAL_REQUEST\" "
+        "\"$APPROVAL_RESPONSE\"' EXIT"
+    ) in recipe
+    assert 'set(payload) != {"approved"}' in recipe
+    assert 'payload["approved"] is not True' in recipe
 
 
 def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None:

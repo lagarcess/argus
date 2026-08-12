@@ -360,6 +360,8 @@ activates access through the database completion boundary. This is the only
 human promotion command:
 
 ```bash
+(
+set -euo pipefail
 source .github/argus-env.sh
 argus_load_root_env >/dev/null || true
 REQUESTED_EMAIL="<requested email>"
@@ -381,7 +383,7 @@ pathlib.Path(sys.argv[1]).write_text(
     encoding="utf-8",
 )
 PY
-curl --fail --silent --show-error \
+curl -q --fail --silent --show-error \
   --config "$OPS_CURL_CONFIG" \
   -X POST \
   -H "Content-Type: application/json" \
@@ -393,11 +395,18 @@ import json
 import pathlib
 import sys
 
-if json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")) != {
-    "approved": True
-}:
+try:
+    payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    raise SystemExit("access request promotion returned an invalid response") from exc
+if (
+    not isinstance(payload, dict)
+    or set(payload) != {"approved"}
+    or payload["approved"] is not True
+):
     raise SystemExit("access request promotion was not approved")
 PY
+)
 ```
 
 Success is exactly `{"approved":true}`. Missing or invalid ops authorization
