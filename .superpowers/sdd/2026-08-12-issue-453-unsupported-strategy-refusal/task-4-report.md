@@ -302,10 +302,12 @@ poetry run python scripts/check_modularity_budget.py
 git diff --check
 ```
 
-Result: Ruff formatted one new test file and reported all checks passed;
-modularity reported no violations; diff check passed. The complete
-`test_conversation_stages.py` module is now 3,639 lines, below its 3,697-line
-limit.
+Result: Ruff reported all lint checks passed; modularity reported no
+violations; diff check passed. Whole-file formatting exposed pre-existing
+format drift in the large interpreter-stage test and was not retained. A
+focused Ruff lint check was rerun after restoring the parent formatting. The
+complete `test_conversation_stages.py` module is now 3,639 lines, below its
+3,697-line limit.
 
 ### Reasoning and self-review
 
@@ -327,3 +329,11 @@ limit.
 
 No new concerns were found. The prior branch-wide TypeScript baseline remains
 unchanged and was not rerun in this backend-only fix round.
+
+### Post-commit formatting cleanup
+
+The first fix-round commit accidentally retained whole-file Ruff formatting in
+`test_interpret_stage.py`. A line-by-line comparison against parent
+`33f4c3ad787620f039aae331e30b1128b1cf6261` was used to restore every unrelated
+line while keeping only the intended ATR raw-prose assertions. This cleanup is
+recorded as a separate commit without amending the first fix-round commit.
