@@ -1,0 +1,117 @@
+# Production Migration Gate Design
+
+**Issue:** #449  
+**Integration base:** `f9acfa61311786803721268854685fd94f3f1899`  
+**Owner:** promotion path and private-launch runbook  
+**Scope:** read-only release control; no hosted mutation
+
+## Why this lane exists
+
+The 2026-08-11 production promotion deployed code while nine checked-in
+migrations were absent from production. Service health, SHA coherence, and
+configuration checks all passed, but the research path could not use the schema
+it required.
+
+The promotion path therefore needs an executable schema-parity gate before any
+service deploy. A runbook reminder alone is not sufficient.
+
+## Locked behavior
+
+1. The operator supplies an exact 40-character candidate commit SHA.
+2. The gate reads `supabase/migrations` from that Git commit, not from the
+   mutable working tree.
+3. The database connection is supplied explicitly through
+   `ARGUS_PRODUCTION_DATABASE_URL`. Dotenv discovery is forbidden.
+4. A small checked-in gate contract owns the production Supabase project ref.
+   The gate verifies that ref against the connection host or pooler username
+   before connecting. It never prints credentials.
+5. The database session is read-only. The only product query reads
+   `supabase_migrations.schema_migrations` in version order.
+6. The JSON report records the exact candidate SHA, sanitized database target,
+   every candidate migration, every applied migration, missing migrations,
+   unexpected applied migrations, and name drift.
+7. Each missing migration receives a conservative safety classification:
+   `additive`, `contract-replacing`, or `destructive`, plus the corresponding
+   live-database requirement. Unknown SQL is never called additive.
+8. Any missing, unexpected, mismatched, unreadable, malformed, or duplicate
+   migration blocks promotion. Exact parity is the only passing state.
+9. The gate never applies SQL. A human reviews and applies approved migrations
+   out of band, in repository order, then reruns the gate for readback proof.
+10. The report is written as durable release evidence before service deploy.
+
+Classification is advisory about *how* a human may apply a pending migration;
+it never weakens the parity stop. Additive migrations still block service deploy
+until production records them as applied.
+
+## Safety classification
+
+The classifier strips comments, quoted values, and dollar-quoted function
+bodies before examining top-level statements. It uses a strict additive
+allowlist. Data deletion, truncation, or object removal is destructive.
+Replacement, permission removal, data rewrites, and other non-additive or
+unrecognized statements are contract-replacing. This biases ambiguous SQL
+toward a safer operator review.
+
+The report maps classifications to requirements:
+
+- `additive`: may be reviewed for live application, with normal rollback proof.
+- `contract-replacing`: requires an expand/contract compatibility plan or a
+  maintenance window.
+- `destructive`: requires a maintenance window, backup/readback plan, and
+  founder approval.
+
+## Promotion-path contract
+
+The order is fixed:
+
+1. Resolve the exact candidate and promotion target.
+2. Run the production migration gate and save its JSON report.
+3. If the report is blocked, stop. A human may apply approved migrations and
+   rerun step 2.
+4. Only a passing parity report allows deployment of `argus-api`, `argus-app`,
+   and `argus-backtests`.
+5. Continue with exact-SHA deploy, warmup, canary, and manifest evidence.
+
+Structural tests must pin the executable gate before all three service deploys
+in both `docs/specs/private-alpha-ci-cd-sota.md` and
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+
+## Owned files
+
+- `scripts/ops/production_migration_gate.py`
+- `scripts/ops/tests/test_production_migration_gate.py`
+- `.github/production-migration-gate.json`
+- `tests/test_private_alpha_release_docs.py`
+- `docs/specs/private-alpha-ci-cd-sota.md`
+- `docs/PRIVATE_LAUNCH_RUNBOOK.md`
+- `docs/release-manifests/TEMPLATE.md`
+
+## No-touch and stop conditions
+
+- Do not change `render.yaml` or `.github/private-alpha-release-profile.json`.
+- Do not add a pre-deploy or release command that applies migrations.
+- Do not change application runtime, API, data model, RLS, or migration SQL.
+- Do not connect to production during implementation verification.
+- Stop if the gate cannot prove the target, read the ledger, or produce exact
+  parity.
+- Stop after the issue PR has a clean review verdict and zero unresolved review
+  threads. The founder owns merge and deployment.
+
+## Verification
+
+- Red-first unit tests cover exact candidate enumeration, sanitized target
+  validation, read-only ledger access, parity, missing/unexpected/name-drift
+  stops, and all three safety classes.
+- Structural documentation tests prove the gate precedes service deployment.
+- Focused pytest, Ruff, `git diff --check`, scope audit, and the repository
+  modularity guard run at the final PR head.
+- The PR targets `codex/private-alpha-next` and reports its exact head.
+
+## Source evidence
+
+- `docs/release-manifests/2026-08-12-main-production-promotion.md` records the
+  manual ledger census, one approved apply, and post-apply object readback.
+- `docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`
+  records the no-gap path from an empty candidate migration diff.
+- PR #470, merged as the lane base, owns the three-service release contract and
+  remains unchanged by this lane.
