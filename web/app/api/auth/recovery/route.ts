@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase-server";
 import {
   handleRecoveryRequest,
+  RecoveryCaptchaRejectedError,
   RecoveryAttemptLimiter,
 } from "@/lib/recovery-request";
 
@@ -29,7 +30,9 @@ export async function POST(request: Request) {
         redirectTo,
         captchaToken,
       });
-      if (error) throw error;
+      if (error?.code === "captcha_failed") {
+        throw new RecoveryCaptchaRejectedError();
+      }
     },
   });
 }

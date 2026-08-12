@@ -10,6 +10,7 @@ import {
 import { synchronizeCurrentBrowserLogout } from "../lib/argus-api";
 import {
   handleRecoveryRequest,
+  RecoveryCaptchaRejectedError,
   RecoveryAttemptLimiter,
   recoveryRedirectTarget,
 } from "../lib/recovery-request";
@@ -491,7 +492,7 @@ describe("recovery request safety", () => {
     expect(attempts.size).toBe(2);
   });
 
-  test("provider rejection is generic but no longer reported as accepted", async () => {
+  test("account-dependent provider rejection matches the accepted response", async () => {
     const request = () =>
       new Request("https://app.argus.example/api/auth/recovery", {
         method: "POST",
@@ -534,8 +535,39 @@ describe("recovery request safety", () => {
 
     expect(accepted.status).toBe(202);
     expect(await accepted.json()).toEqual({ accepted: true });
-    expect(rejected.status).toBe(502);
-    expect(await rejected.json()).toEqual({ accepted: false });
+    expect(rejected.status).toBe(accepted.status);
+    expect(await rejected.json()).toEqual({ accepted: true });
+  });
+
+  test("classified CAPTCHA rejection is surfaced without provider detail", async () => {
+    const response = await handleRecoveryRequest(
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+        },
+        body: JSON.stringify({
+          email: "person@example.com",
+          captcha_token: "captcha-proof",
+        }),
+      }),
+      {
+        configuredAppOrigin: "https://app.argus.example",
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({
+          limit: 100,
+          windowMs: 60_000,
+        }),
+        async sendRecovery() {
+          throw new RecoveryCaptchaRejectedError();
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ accepted: false });
   });
 
   test("recovery forwards one bounded CAPTCHA token to the provider", async () => {

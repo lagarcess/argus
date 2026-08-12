@@ -12,6 +12,13 @@ const MAX_RECOVERY_EMAIL_LENGTH = 254;
 const MAX_CLIENT_ADDRESS_LENGTH = 45;
 const MAX_CAPTCHA_TOKEN_LENGTH = 4_096;
 
+export class RecoveryCaptchaRejectedError extends Error {
+  constructor() {
+    super("Recovery CAPTCHA rejected");
+    this.name = "RecoveryCaptchaRejectedError";
+  }
+}
+
 function exactOrigin(value: string | undefined): string | null {
   if (!value) return null;
   try {
@@ -297,8 +304,11 @@ export async function handleRecoveryRequest(
 
   try {
     await dependencies.sendRecovery(email, redirectTo, captchaToken);
-  } catch {
-    return jsonResponse({ accepted: false }, 502);
+  } catch (error) {
+    if (error instanceof RecoveryCaptchaRejectedError) {
+      return jsonResponse({ accepted: false }, 502);
+    }
+    return jsonResponse({ accepted: true }, 202);
   }
   return jsonResponse({ accepted: true }, 202);
 }

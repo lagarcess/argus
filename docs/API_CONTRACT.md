@@ -1633,17 +1633,21 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   ```json
   { "accepted": true }
   ```
-  The accepted status is `202`. `captcha_token` is required, contains 1 to
-  4,096 characters, and is passed to Supabase Auth without logging or
-  persistence. Malformed JSON or an invalid CAPTCHA token returns `400`; a
+  The accepted status is `202`. For a valid email-shaped request,
+  `captcha_token` is required, contains 1 to 4,096 characters, and is passed to
+  Supabase Auth without logging or persistence. A malformed email receives the
+  same enumeration-safe `202` without provider work. Malformed JSON or an
+  invalid CAPTCHA token returns `400`; a
   declared or streamed request body larger than 8,192 bytes returns
   `413 Payload Too Large`;
   a request whose media type is not `application/json` returns
   `415 Unsupported Media Type`; an unapproved browser origin returns `403`;
   missing production origin configuration returns `503`; and a local rate-limit
-  returns `429` with `Retry-After`. A provider rejection returns a generic `502`
-  so the form reports failure instead of claiming that email was sent. These
-  failures do not vary based on account existence.
+  returns `429` with `Retry-After`. A specifically classified provider CAPTCHA
+  rejection returns a generic `502` so the form reports failure. Delivery,
+  account-specific rate-limit, and unclassified provider failures retain the
+  enumeration-safe `202`; public responses do not vary based on account
+  existence.
 - The recovery destination is the fixed `/auth/recovery` path on the configured
   Argus app origin. The request must not accept a client-supplied redirect URL;
   production uses one exact configured origin while local development allows
