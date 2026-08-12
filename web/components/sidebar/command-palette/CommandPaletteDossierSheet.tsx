@@ -34,6 +34,7 @@ export default function CommandPaletteDossierSheet({
       isOpen
       height="full"
       title={preview.title}
+      titleHidden
       closeLabel={t("command_palette.close_dossier", "Close dossier")}
       onClose={onClose}
       footer={

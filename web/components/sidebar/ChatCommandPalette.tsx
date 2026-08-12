@@ -1610,7 +1610,7 @@ export default function ChatCommandPalette({
                               }`}
                             >
                               <div className="min-w-0 flex-1 pr-24 max-desktop:pr-0 max-desktop:self-center">
-                                <div className="flex min-w-0 items-center gap-2">
+                                <div className="flex min-w-0 items-center gap-2 max-tablet:flex-wrap max-tablet:gap-y-1">
                                   {isEditing ? (
                                     <input
                                       autoFocus
@@ -1640,14 +1640,14 @@ export default function ChatCommandPalette({
                                           cancelRename();
                                         }
                                       }}
-                                      className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1 font-display text-[14px] font-medium text-black outline-none focus:border-black/30 dark:border-white/10 dark:bg-[#24272b] dark:text-white dark:focus:border-white/30"
+                                      className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1 font-display text-[14px] font-medium text-black outline-none focus:border-black/30 max-tablet:w-full max-tablet:flex-none dark:border-white/10 dark:bg-[#24272b] dark:text-white dark:focus:border-white/30"
                                       aria-label={t(
                                         "command_palette.rename_conversation",
                                         "Rename conversation",
                                       )}
                                     />
                                   ) : (
-                                    <span className="truncate font-display text-[14px] font-medium text-black dark:text-white">
+                                    <span className="truncate font-display text-[14px] font-medium text-black max-tablet:w-full max-tablet:shrink-0 dark:text-white">
                                       <SearchHighlight
                                         text={item.title}
                                         query={query}
@@ -1672,6 +1672,15 @@ export default function ChatCommandPalette({
                                         {t(statusLabelKey, statusFallback)}
                                       </span>
                                     )}
+                                  {rowActionVariant === "menu" && (
+                                    <span className="ml-auto me-2 shrink-0 whitespace-nowrap text-[11px] text-black/30 dark:text-white/30">
+                                      {formatRelativeDate(
+                                        item.updatedAt,
+                                        t,
+                                        i18n.language,
+                                      )}
+                                    </span>
+                                  )}
                                 </div>
                                 {item.snippet && (
                                   <div className="mt-0.5 flex items-center gap-2">
@@ -1692,19 +1701,17 @@ export default function ChatCommandPalette({
                                   </div>
                                 )}
                               </div>
-                              <span
-                                className={
-                                  rowActionVariant === "menu"
-                                    ? "shrink-0 self-center whitespace-nowrap text-[11px] text-black/30 dark:text-white/30"
-                                    : `absolute top-3 text-[11px] text-black/30 dark:text-white/30 ${pointerAffordances.hoverLayoutDate}`
-                                }
-                              >
-                                {formatRelativeDate(
-                                  item.updatedAt,
-                                  t,
-                                  i18n.language,
-                                )}
-                              </span>
+                              {rowActionVariant !== "menu" && (
+                                <span
+                                  className={`absolute top-3 text-[11px] text-black/30 dark:text-white/30 ${pointerAffordances.hoverLayoutDate}`}
+                                >
+                                  {formatRelativeDate(
+                                    item.updatedAt,
+                                    t,
+                                    i18n.language,
+                                  )}
+                                </span>
+                              )}
                               {!isEditing && (
                                 <CommandPaletteRowActions
                                   variant={rowActionVariant}

@@ -1,0 +1,30 @@
+Apple vs SPY, twelve months
+Current
+Conversation
+Apple vs SPY, twelve months
+
+Aug 1
+
+Backtest
+Aug 1, 2026, 8:00 AM
+Retest with current data
+Apple buy and hold
+
+AAPL · Buy and hold · 1d · Aug 1, 2025 – Aug 1, 2026
+
+Apple outperformed SPY across the tested window.
+
+TOTAL RETURN
++18.4%
+BENCHMARK RETURN
++11.2%
+WORST DROP
+-9.1%
+VOLATILITY
+21.7%
+
+No decision saved
+
+Decision history
+0 of 1 decided
+Open conversation

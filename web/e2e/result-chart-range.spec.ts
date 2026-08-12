@@ -173,6 +173,37 @@ test("adaptive hourly result switches presets, custom range, pan, and reset with
   expect(watch.pageErrors).toEqual([]);
 });
 
+test("custom range gutters expose no observations outside the semantic window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openPlayground(page);
+  const card = page
+    .getByRole("region", { name: "Mobile width result card previews" })
+    .getByTestId("result-card-fixture-adaptive-intraday-result")
+    .first();
+  await card.scrollIntoViewIfNeeded();
+  await openRangeDetails(card);
+
+  await card.getByTestId("result-chart-custom-start").fill("2026-01-05");
+  await card.getByTestId("result-chart-custom-end").fill("2026-01-08");
+  await card.getByTestId("result-chart-custom-apply").click();
+  await expect(card.getByTestId("result-chart-visible-period")).toHaveCount(0);
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+
+  const chart = card.getByTestId("result-equity-chart");
+  const chartBox = await chart.boundingBox();
+  expect(chartBox).not.toBeNull();
+  if (!chartBox) return;
+
+  const tooltip = card.locator("div.pointer-events-none.absolute.z-10");
+  const centerY = chartBox.y + chartBox.height / 2;
+  for (const x of [chartBox.x + 2, chartBox.x + chartBox.width - 76]) {
+    await page.mouse.move(x, centerY);
+    await expect(tooltip).toHaveCount(0);
+  }
+});
+
 test("monthly recurring result suppresses sub-cycle presets and keeps metrics", async ({
   page,
 }) => {
@@ -328,6 +359,107 @@ test("visible evidence tracks the viewport with separate sampling disclosures", 
   );
   expect(watch.featureRequests).toEqual([]);
   expect(watch.pageErrors).toEqual([]);
+});
+
+test("responsive resize reapplies the semantic chart window and edge gutter", async ({
+  context,
+}) => {
+  const referencePage = await context.newPage();
+  await referencePage.setViewportSize({ width: 390, height: 844 });
+  await openPlayground(referencePage);
+  const referenceChart = adaptiveCard(referencePage).getByTestId(
+    "result-equity-chart",
+  );
+  await referenceChart.scrollIntoViewIfNeeded();
+  const referenceWidth = await referenceChart.evaluate(
+    (element) => element.clientWidth,
+  );
+
+  const resizedPage = await context.newPage();
+  await resizedPage.setViewportSize({ width: 1280, height: 900 });
+  await openPlayground(resizedPage);
+  const resizedCard = adaptiveCard(resizedPage);
+  const resizedChart = resizedCard.getByTestId("result-equity-chart");
+  await resizedChart.scrollIntoViewIfNeeded();
+  await resizedCard.evaluate((element) => {
+    element.style.width = "324px";
+    element.style.maxWidth = "324px";
+  });
+  await expect
+    .poll(() => resizedChart.evaluate((element) => element.clientWidth))
+    .toBe(referenceWidth);
+  await resizedChart.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  await expect(
+    resizedCard.getByTestId("result-chart-range-ALL"),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    resizedCard.getByTestId("result-chart-custom-indicator"),
+  ).toHaveCount(0);
+  const resizedFrame = await resizedChart.screenshot({
+    animations: "disabled",
+  });
+
+  expect(resizedFrame).toMatchSnapshot("result-chart-responsive-resize.png", {
+    threshold: 0.2,
+    maxDiffPixels: 100,
+  });
+  await referencePage.close();
+  await resizedPage.close();
+});
+
+test("immediate resize preserves a gesture-defined Custom window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openPlayground(page);
+  const card = adaptiveCard(page);
+  const chart = card.getByTestId("result-equity-chart");
+  await chart.scrollIntoViewIfNeeded();
+  await openRangeDetails(card);
+
+  const chartBox = await chart.boundingBox();
+  expect(chartBox).not.toBeNull();
+  if (chartBox) {
+    await page.mouse.move(
+      chartBox.x + chartBox.width / 2,
+      chartBox.y + chartBox.height / 2,
+    );
+    await page.mouse.wheel(0, -240);
+  }
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  const customPeriod = await card
+    .getByTestId("result-chart-visible-period")
+    .textContent();
+  const customEventCount = await card
+    .getByTestId("result-chart-event-count")
+    .textContent();
+
+  await card.evaluate((element) => {
+    element.style.width = "324px";
+    element.style.maxWidth = "324px";
+  });
+  await expect
+    .poll(() => chart.evaluate((element) => element.clientWidth))
+    .toBe(296);
+  await chart.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+
+  await expect(card.getByTestId("result-chart-custom-indicator")).toBeVisible();
+  await expect(card.getByTestId("result-chart-visible-period")).toHaveText(
+    customPeriod ?? "",
+  );
+  await expect(card.getByTestId("result-chart-event-count")).toHaveText(
+    customEventCount ?? "",
+  );
 });
 
 test("hover and resize never fabricate a Custom selection", async ({

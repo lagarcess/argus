@@ -154,6 +154,11 @@ def run_workflow_proof(
         execution_metadata=metadata,
         started_at=started_at,
     )
+    if str(running.get("status") or "") != "running":
+        # The transition was refused: another finalizer already owns the
+        # job's terminal state, and the proof reports it rather than
+        # overwriting it.
+        return _proof_result(running, job_id=job_id, nonce=nonce, workflow_run_id=workflow_run_id)
 
     finished_at = utcnow_iso()
     completed_metadata = _job_metadata(running)
@@ -167,18 +172,27 @@ def run_workflow_proof(
         finished_at=finished_at,
     )
     readback = gateway.fetch_job(job_id) or succeeded
+    return _proof_result(readback, job_id=job_id, nonce=nonce, workflow_run_id=workflow_run_id)
 
+
+def _proof_result(
+    row: Mapping[str, Any],
+    *,
+    job_id: str,
+    nonce: str,
+    workflow_run_id: str | None,
+) -> dict[str, Any]:
     return {
-        "job_id": str(readback["id"]),
-        "status": readback["status"],
+        "job_id": str(row.get("id") or job_id),
+        "status": row.get("status"),
         "nonce": nonce,
         "workflow_run_id": workflow_run_id,
         "runtime_facts": _json_safe(
-            (readback.get("execution_metadata") or {})
+            (row.get("execution_metadata") or {})
             .get("workflow_proof", {})
             .get("runtime_facts", {})
         ),
-        "execution_metadata": _json_safe(readback.get("execution_metadata") or {}),
+        "execution_metadata": _json_safe(row.get("execution_metadata") or {}),
     }
 
 
@@ -220,12 +234,21 @@ class PostgresProofJobGateway:
         started_at: str | None = None,
         finished_at: str | None = None,
     ) -> dict[str, Any]:
+        from argus.domain.backtest_job_lifecycle import (
+            job_success_write_sql_predicate,
+        )
         from psycopg.types.json import Jsonb
 
+        # The proof's running and succeeded transitions are success-lifecycle
+        # movements, valid only while the job may still succeed. The predicate
+        # is generated beside the card-restore classification, so a state the
+        # card was restored from can never be converted back into a live or
+        # successful job by the proof machinery. A refused write returns the
+        # standing row and the proof reports it instead of overwriting it.
         with self._connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     update public.backtest_jobs
                     set status = %(status)s,
                         started_at = coalesce(started_at, %(started_at)s),
@@ -237,6 +260,7 @@ class PostgresProofJobGateway:
                         execution_metadata = %(execution_metadata)s,
                         updated_at = %(updated_at)s
                     where id = %(job_id)s
+                      and {job_success_write_sql_predicate()}
                     returning *
                     """,
                     {
@@ -250,7 +274,21 @@ class PostgresProofJobGateway:
                 )
                 row = cur.fetchone()
                 if row is None:
-                    raise WorkflowProofError(f"Backtest job {job_id} was not found.")
+                    standing = self.fetch_job(job_id)
+                    if standing is None:
+                        raise WorkflowProofError(f"Backtest job {job_id} was not found.")
+                    print(  # noqa: T201 - workflow task output surface
+                        json.dumps(
+                            {
+                                "event": "proof_status_write_refused",
+                                "job_id": job_id,
+                                "requested_status": status,
+                                "standing_status": str(standing.get("status") or ""),
+                            }
+                        ),
+                        file=sys.stderr,
+                    )
+                    return standing
         return _json_safe(row)
 
     def ensure_proof_profile(self, *, user_id: str, email: str) -> None:

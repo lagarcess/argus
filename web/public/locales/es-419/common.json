@@ -367,6 +367,7 @@
         "benchmark": "datos de referencia",
         "market": "datos de mercado"
       },
+      "run_result_withheld": "Esta simulación se detuvo antes de poder guardar su resultado, así que no hay un resultado para mostrar. Puedes ejecutar la idea otra vez desde la tarjeta de confirmación, o describirla de nuevo y prepararé una confirmación nueva.",
       "discovery_unavailable": "La búsqueda actual respaldada por fuentes no está disponible para esta solicitud, y no voy a adivinar de memoria. Dime un símbolo o una empresa que tengas en mente y puedo probarla. Todo en este chat sigue igual.",
       "discovery_search_failed": "No pude completar la búsqueda respaldada por fuentes en este momento, y no voy a adivinar nombres de memoria. Todo en este chat sigue igual; intenta de nuevo en un momento o dime un símbolo y puedo probarlo.",
       "discovery_no_verified_candidates": "No pude verificar ninguna coincidencia operable para esa búsqueda. Dime un símbolo o una empresa que tengas en mente y puedo probarla; todo en este chat sigue igual.",
@@ -1044,9 +1045,13 @@
         "messages": "Mensajes",
         "simulations": "Simulaciones",
         "left_today": "Quedan {{count}} hoy",
+        "left_today_one": "Queda {{count}} hoy",
+        "left_today_other": "Quedan {{count}} hoy",
         "used_of_limit": "{{used}} de {{limit}} usados hoy",
         "resets": "Se restablece {{time}}",
         "hourly_available": "{{count}} disponibles esta hora · se restablece {{time}}",
+        "hourly_available_one": "{{count}} disponible esta hora · se restablece {{time}}",
+        "hourly_available_other": "{{count}} disponibles esta hora · se restablece {{time}}",
         "what_counts": "¿Qué cuenta?",
         "loading": "Cargando uso…",
         "load_error": "No se pudo cargar el uso.",
@@ -1299,11 +1304,11 @@
     },
     "login": {
       "brand": "argus",
-      "subtitle": "Inicia sesion para continuar",
-      "email_placeholder": "Correo electronico",
-      "password_placeholder": "Contrasena",
+      "subtitle": "Inicia sesión para continuar",
+      "email_placeholder": "Correo electrónico",
+      "password_placeholder": "Contraseña",
       "submit": "Iniciar sesión",
-      "loading": "Iniciando sesion...",
+      "loading": "Iniciando sesión...",
       "errors": {
         "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
       }
@@ -1322,8 +1327,8 @@
       "continuing_prefix": "Al continuar, aceptas nuestros"
     },
     "password": {
-      "show": "Mostrar contrasena",
-      "hide": "Ocultar contrasena"
+      "show": "Mostrar contraseña",
+      "hide": "Ocultar contraseña"
     },
     "recovery": {
       "forgot": "¿Olvidaste tu contraseña?",
