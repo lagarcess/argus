@@ -350,6 +350,8 @@ def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None
     ("run_id", "run_attempt", "local_nonce", "expected"),
     [
         ("123456", "2", "", "delivered+argus-123456-2@resend.dev"),
+        ("١٢٣", "2", "", None),
+        ("123", "٢", "", None),
         ("", "", "review-abc123", "delivered+argus-local-review-abc123@resend.dev"),
         ("", "", "a", None),
         ("", "", "a" * 43, None),
@@ -385,6 +387,8 @@ def test_canary_resolves_ci_and_local_signup_identities(
     ("run_id", "run_attempt", "local_nonce", "signup_email", "expected"),
     [
         ("123456", "2", "", "delivered+argus-123456-2@resend.dev", 0),
+        ("١٢٣", "2", "", "delivered+argus-١٢٣-2@resend.dev", 1),
+        ("123", "٢", "", "delivered+argus-123-٢@resend.dev", 1),
         ("", "", "review-abc123", "delivered+argus-local-review-abc123@resend.dev", 0),
         ("", "", "", "", 1),
         ("123456", "", "", "", 1),

@@ -1184,13 +1184,10 @@ safe_local_nonce = re.fullmatch(
     r"[a-z0-9](?:[a-z0-9-]{6,40}[a-z0-9])",
     local_nonce,
 )
+safe_run_id = re.fullmatch(r"[1-9][0-9]*", run_id)
+safe_run_attempt = re.fullmatch(r"[1-9][0-9]*", run_attempt)
 if run_id and run_attempt and not local_nonce:
-    if not (
-        run_id.isdecimal()
-        and int(run_id) > 0
-        and run_attempt.isdecimal()
-        and int(run_attempt) > 0
-    ):
+    if not (safe_run_id and safe_run_attempt):
         raise SystemExit(1)
     print(f"delivered+argus-{run_id}-{run_attempt}@resend.dev")
 elif not run_id and not run_attempt and safe_local_nonce:
@@ -1219,14 +1216,11 @@ safe_local_nonce = re.fullmatch(
     r"[a-z0-9](?:[a-z0-9-]{6,40}[a-z0-9])",
     local_nonce,
 )
+safe_run_id = re.fullmatch(r"[1-9][0-9]*", run_id)
+safe_run_attempt = re.fullmatch(r"[1-9][0-9]*", run_attempt)
 if run_id and run_attempt and not local_nonce:
     expected_signup_email = f"delivered+argus-{run_id}-{run_attempt}@resend.dev"
-    mode_is_safe = (
-        run_id.isdecimal()
-        and int(run_id) > 0
-        and run_attempt.isdecimal()
-        and int(run_attempt) > 0
-    )
+    mode_is_safe = bool(safe_run_id and safe_run_attempt)
 elif not run_id and not run_attempt and safe_local_nonce:
     expected_signup_email = f"delivered+argus-local-{local_nonce}@resend.dev"
     mode_is_safe = True
