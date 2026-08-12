@@ -9,8 +9,8 @@ Email implementation source head:
 First Task 5 evidence commit and initial CI target:
 41d189285b18a864d1749cea0a3203cfdf374264
 
-Current proof-tightening working tree:
-Based on 41d18928. Its successor exact-head CI target is pending until this fix is committed.
+Required next exact-head CI target:
+The proof-tightening commit containing this file. Record its exact SHA and terminal run in GitHub checks or PR evidence after publication.
 
 Local collection evidence:
 - Command: poetry run pytest tests/test_access_request_postgres.py::test_protected_approval_replay_uses_real_gateway_and_sends_once -vv --no-cov

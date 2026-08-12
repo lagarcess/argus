@@ -6,7 +6,7 @@ Status: preliminary exact-source evidence. Final-candidate CI is still required 
 
 - Integration base: `80256729`.
 - First Task 5 evidence commit and initial CI target: `41d189285b18a864d1749cea0a3203cfdf374264`.
-- This proof-tightening working tree is based on `41d18928`; its successor exact-head CI target remains pending until this fix is committed.
+- The proof-tightening commit containing these files is the required next exact-head CI target. Record its exact SHA and terminal run in GitHub checks or PR evidence after publication.
 - Email implementation and code-owned HTML source head: `30f2830cad5ce08315c421289252bb7203d4afae`.
 - Branch: `codex/issue-461-welcome-email`.
 - Content version: `private-alpha-access-welcome/v1`.
