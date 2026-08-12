@@ -392,6 +392,41 @@ def test_internal_canary_denial_signal_requires_ops_token(
     gateway.private_alpha_email_allowed.assert_called_once_with("person@example.com")
 
 
+@pytest.mark.parametrize("public_access_enabled", [True, False])
+def test_internal_canary_denies_disabled_email_in_public_and_rollback_modes(
+    monkeypatch: pytest.MonkeyPatch,
+    public_access_enabled: bool,
+) -> None:
+    gateway = MagicMock()
+    gateway.private_alpha_email_disabled.return_value = True
+    gateway.private_alpha_email_allowed.return_value = False
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "ops-token")
+    monkeypatch.setenv(
+        "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED",
+        "true" if public_access_enabled else "false",
+    )
+
+    response = client.post(
+        "/internal/canary/requested-signup-denial",
+        json={"email": "disabled@example.com"},
+        headers={"Authorization": "Bearer ops-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"denied": True}
+    if public_access_enabled:
+        gateway.private_alpha_email_disabled.assert_called_once_with(
+            "disabled@example.com"
+        )
+        gateway.private_alpha_email_allowed.assert_not_called()
+    else:
+        gateway.private_alpha_email_allowed.assert_called_once_with(
+            "disabled@example.com"
+        )
+        gateway.private_alpha_email_disabled.assert_not_called()
+
+
 @pytest.mark.parametrize("authorization", [None, "Bearer wrong-token"])
 @pytest.mark.parametrize(
     "body",

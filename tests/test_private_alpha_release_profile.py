@@ -28,10 +28,25 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     serialized = json.dumps(profile).lower()
 
     assert profile["release_mode"] == "real-workflow"
+    assert set(profile["services"]) == {"api", "web", "workflow"}
     assert profile["services"]["api"]["name"] == "argus-api"
     assert profile["services"]["web"]["name"] == "argus-app"
-    assert profile["services"]["cron"]["name"] == "argus-maintenance"
     assert profile["services"]["workflow"]["name"] == "argus-backtests"
+    for surface in ("api", "web", "workflow"):
+        assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
+    assert profile["services"]["api"]["env"]["ARGUS_APP_ORIGIN"] == (
+        "https://arguschat.ai"
+    )
+    assert profile["services"]["api"]["env"]["ARGUS_CORS_ALLOW_ORIGINS"] == (
+        "https://argus-app-suz5.onrender.com,https://arguschat.ai,"
+        "https://www.arguschat.ai"
+    )
+    assert "ARGUS_CORS_ALLOW_ORIGINS" not in profile["services"]["api"][
+        "required_present"
+    ]
+    assert profile["services"]["web"]["env"]["ARGUS_APP_ORIGIN"] == (
+        "https://arguschat.ai"
+    )
     assert profile["workflow"]["real_task"] == "argus-backtests/run_backtest_job"
     assert profile["locales"]["supported"] == ["en", "es-419"]
     assert "chat.history.pinned" in profile["locales"]["required_static_keys"]
@@ -50,16 +65,42 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     assert "bearer " not in serialized
     assert "sk-" not in serialized
     assert "ARGUS_GUEST_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
-    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
+    assert (
+        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
+        == "true"
+    )
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED" not in profile["services"]["web"]["env"]
 
 
-def test_guest_kill_switches_are_documented_on_without_opening_public_accounts() -> None:
+def test_public_account_access_is_open_in_every_release_contract() -> None:
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    render_config = yaml.safe_load((ROOT / "render.yaml").read_text(encoding="utf-8"))
+    render_api = next(
+        service
+        for service in render_config["services"]
+        if service["name"] == "argus-api"
+    )
+    render_api_env = {
+        item["key"]: item.get("value") for item in render_api["envVars"]
+    }
+    env_contract = (ROOT / ".github" / "argus-env.sh").read_text(encoding="utf-8")
+    backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert render_api_env["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
+    assert (
+        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
+        == "true"
+    )
+    assert "  ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED\n" in env_contract
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
+
+
+def test_guest_and_public_account_access_are_documented_open() -> None:
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     web_example = (ROOT / "web" / ".env.local.example").read_text(encoding="utf-8")
 
     assert "ARGUS_GUEST_ACCESS_ENABLED=true" in backend_example
-    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false" in backend_example
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true" in backend_example
     assert "ARGUS_VISITOR_KEY_SECRET=replace_with_a_unique_random_secret" in (
         backend_example
@@ -96,6 +137,10 @@ def test_profile_utility_validates_hashes_and_emits_expected_pairs() -> None:
     assert allowed_keys.returncode == 0, allowed_keys.stderr
     assert "NEXT_PUBLIC_POSTHOG_KEY" in allowed_keys.stdout
 
+    workflow_autodeploy = _profile_utility("auto-deploy-trigger", "workflow")
+    assert workflow_autodeploy.returncode == 0, workflow_autodeploy.stderr
+    assert workflow_autodeploy.stdout.strip() == "checksPass"
+
 
 def test_profile_utility_resolves_required_spanish_static_key_values() -> None:
     result = _profile_utility("static-key-values", "es-419")
@@ -124,8 +169,16 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
         for service in render_blueprint["services"]
     }
 
-    for surface in ("api", "web", "cron"):
+    for surface in ("api", "web"):
         service_profile = profile["services"][surface]
+        rendered_service = next(
+            service
+            for service in render_blueprint["services"]
+            if service["name"] == service_profile["name"]
+        )
+        assert rendered_service["autoDeployTrigger"] == service_profile[
+            "auto_deploy_trigger"
+        ]
         rendered_env = render_services[service_profile["name"]]
         expected_keys = set(service_profile["env"])
         expected_keys.update(service_profile["required_present"])

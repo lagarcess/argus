@@ -16,9 +16,9 @@ relevant details and addenda in
 `docs/specs/private-alpha-next-decision-memo.md`.
 
 Implementation note: the release gate now centers on local smoke, Render
-release-config audit, live API/web/cron deploy SHA checks, workflow env parity
-proof, cron env parity proof, an authoritative Spanish release canary, and a
-per-candidate release manifest.
+release-config audit, live API/web deploy SHA checks, workflow version and env
+parity proof, an authoritative Spanish release canary, and a per-candidate
+release manifest.
 The Spanish journey proves the real workflow, finalized evidence/result metadata,
 decision-note hydration, Omnisearch provenance, and deployed signup/login UI.
 Keep this document as the release gate contract whenever a candidate is
@@ -138,30 +138,23 @@ contracts.
 
 ### Current Service Topology
 
-The stable target topology is four surfaces:
+The stable target topology is three live services:
 
 - `argus-app`: web surface
 - `argus-api`: chat/runtime/orchestration surface
 - `argus-backtests`: workflow execution surface
-- `argus-maintenance`: scheduled retention and job reconciliation surface
 
-`argus-maintenance` is a Render cron service. It runs destructive maintenance
-with the service-role key, so it is promoted and verified with the other three,
-never treated as a side service. See Scheduled Maintenance in
-`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+Render Blueprints declare the API and web services, but do not support Workflow
+services. `argus-backtests` is therefore guaranteed by the explicit workflow
+runtime sync, release, and version-status checks in
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`. All three Git-linked services use
+`checksPass` autodeploy. Enabling only API and web would increase workflow skew.
+Workflow deploy proof comes from the ready Render version id and its Git commit
+prefix, not from mutable env markers that an automatic release cannot refresh.
 
-**It is declared in `render.yaml` and deliberately not created, so today
-nothing runs on a schedule.** At current scale there is no guest data to
-delete and no stranded job to rescue, so guest retention and stale-job
-reconciliation are run by hand with `scripts/ops/scheduled_maintenance.py`,
-and #412's stranded-job condition is settled by an operator rather than by a
-schedule.
-
-It stays in this list precisely because it is absent: every gate above checks
-it, `cron-deploy-status` must report `status=absent` for the current
-promotion, any other status is a finding, and a failed Render lookup is a real
-failure rather than proof of absence. Dropping it to three surfaces would
-delete that check.
+Guest retention and stale-job reconciliation remain operator-run jobs through
+`scripts/ops/scheduled_maintenance.py`. They are not a fourth deployed release
+surface.
 
 The workflow surface has two explicit tasks, not two separate services:
 
@@ -635,8 +628,11 @@ decision authorizes it. A local Block 4 pass is not “public ready.”
 The current checkout and private-alpha deploy evidence show:
 
 - `codex/private-alpha-next` is the active integration lane.
-- Render services are still configured with branch `main`, while the private
-  alpha flow relies on manual deploys and env sync helpers.
+- Render services are configured with branch `main` and `checksPass`
+  autodeploy. The workflow is not Blueprint-managed, so its matching trigger is
+  enforced by the release profile, runtime sync, and live audit. Its ready
+  version name supplies the deployed Git prefix used by the three-service SHA
+  resolver for both automatic and manual releases.
 - The live API is in `real-workflow` mode now, but the effective env contract
   should still be audited before each invite.
 - The intended pre-deploy check is a local ephemeral stack, not a second live
