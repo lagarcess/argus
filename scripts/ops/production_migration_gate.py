@@ -605,11 +605,7 @@ def _dollar_tag_at(source: str, index: int) -> str | None:
 def _is_destructive(statement: str) -> bool:
     return bool(
         re.search(r"\b(?:truncate|delete\s+from)\b", statement)
-        or re.search(
-            r"\bdrop\s+(?:table|schema|type|database|extension|owned)\b",
-            statement,
-        )
-        or re.search(r"\bdrop\s+column\b", statement)
+        or re.search(r"\bdrop\b", statement)
     )
 
 
@@ -635,8 +631,39 @@ def _is_additive(statement: str) -> bool:
     if statement.startswith(additive_prefixes):
         return True
     if statement.startswith("alter table "):
-        return bool(re.search(r"\badd\b", statement))
+        return _alter_table_actions_are_additive(statement)
     return False
+
+
+def _alter_table_actions_are_additive(statement: str) -> bool:
+    match = re.fullmatch(
+        r"alter table (?:if exists )?(?:only )?\S+(?: \*)? (?P<actions>.+)",
+        statement,
+    )
+    if match is None:
+        return False
+    actions = _split_top_level_commas(match.group("actions"))
+    return bool(actions) and all(action.startswith("add ") for action in actions)
+
+
+def _split_top_level_commas(value: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    for index, character in enumerate(value):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth < 0:
+                return []
+        elif character == "," and depth == 0:
+            parts.append(value[start:index].strip())
+            start = index + 1
+    if depth != 0:
+        return []
+    parts.append(value[start:].strip())
+    return parts if all(parts) else []
 
 
 def _verify_candidate_sha(repo_root: Path, candidate_sha: str) -> None:

@@ -1,8 +1,11 @@
 # Production Migration Gate Design
 
-**Issue:** #449  
-**Integration base:** `f9acfa61311786803721268854685fd94f3f1899`  
-**Owner:** promotion path and private-launch runbook  
+**Issue:** #449
+
+**Integration base:** `f9acfa61311786803721268854685fd94f3f1899`
+
+**Owner:** promotion path and private-launch runbook
+
 **Scope:** read-only release control; no hosted mutation
 
 ## Why this lane exists

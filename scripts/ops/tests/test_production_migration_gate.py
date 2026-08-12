@@ -185,8 +185,8 @@ def test_classifier_is_conservative_and_ignores_function_body_deletes() -> None:
         "maintenance_backup_and_founder_approval_required",
     )
     assert classify_migration("drop function public.old_contract();") == (
-        "contract-replacing",
-        "expand_contract_or_maintenance_required",
+        "destructive",
+        "maintenance_backup_and_founder_approval_required",
     )
     assert classify_migration(
         "with old_rows as (select id from public.rows) "
@@ -199,6 +199,59 @@ def test_classifier_is_conservative_and_ignores_function_body_deletes() -> None:
         "contract-replacing",
         "expand_contract_or_maintenance_required",
     )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "drop view public.old_view;",
+        "drop policy old_policy on public.rows;",
+        "alter table public.rows drop constraint rows_legacy_key;",
+        (
+            "alter table public.rows "
+            "add column replacement text, drop constraint rows_legacy_key;"
+        ),
+    ],
+)
+def test_classifier_marks_top_level_object_removal_destructive(source: str) -> None:
+    assert classify_migration(source) == (
+        "destructive",
+        "maintenance_backup_and_founder_approval_required",
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "classification"),
+    [
+        (
+            "alter table public.rows "
+            "add column replacement text, add constraint replacement_present "
+            "check (replacement is not null);",
+            "additive",
+        ),
+        (
+            "alter table public.rows add column replacement text, "
+            "alter column existing set not null;",
+            "contract-replacing",
+        ),
+        (
+            "alter table public.rows add column replacement text, "
+            "rename column existing to legacy;",
+            "contract-replacing",
+        ),
+    ],
+)
+def test_classifier_only_accepts_pure_alter_table_add_actions(
+    source: str,
+    classification: str,
+) -> None:
+    expected_requirement = (
+        "human_review_and_live_readback"
+        if classification == "additive"
+        else "expand_contract_or_maintenance_required"
+    )
+
+    assert classify_migration(source) == (classification, expected_requirement)
 
 
 def test_candidate_and_contract_are_read_from_exact_git_commit(
