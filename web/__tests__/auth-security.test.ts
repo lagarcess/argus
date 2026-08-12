@@ -10,6 +10,7 @@ import {
 import { synchronizeCurrentBrowserLogout } from "../lib/argus-api";
 import {
   handleRecoveryRequest,
+  RecoveryCaptchaRejectedError,
   RecoveryAttemptLimiter,
   recoveryRedirectTarget,
 } from "../lib/recovery-request";
@@ -491,7 +492,7 @@ describe("recovery request safety", () => {
     expect(attempts.size).toBe(2);
   });
 
-  test("provider success and failure return the same enumeration-safe response", async () => {
+  test("account-dependent provider rejection matches the accepted response", async () => {
     const request = () =>
       new Request("https://app.argus.example/api/auth/recovery", {
         method: "POST",
@@ -499,9 +500,18 @@ describe("recovery request safety", () => {
           "Content-Type": "application/json",
           Origin: "https://app.argus.example",
         },
-        body: JSON.stringify({ email: "person@example.com" }),
+        body: JSON.stringify({
+          email: "person@example.com",
+          captcha_token: "captcha-proof",
+        }),
       });
-    const dependencies = (sendRecovery: (email: string, redirectTo: string) => Promise<void>) => ({
+    const dependencies = (
+      sendRecovery: (
+        email: string,
+        redirectTo: string,
+        captchaToken: string,
+      ) => Promise<void>,
+    ) => ({
       configuredAppOrigin: "https://app.argus.example",
       environment: "production",
       limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
@@ -524,8 +534,113 @@ describe("recovery request safety", () => {
     );
 
     expect(accepted.status).toBe(202);
-    expect(rejected.status).toBe(202);
-    expect(await accepted.json()).toEqual(await rejected.json());
+    expect(await accepted.json()).toEqual({ accepted: true });
+    expect(rejected.status).toBe(accepted.status);
+    expect(await rejected.json()).toEqual({ accepted: true });
+  });
+
+  test("classified CAPTCHA rejection is surfaced without provider detail", async () => {
+    const response = await handleRecoveryRequest(
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+        },
+        body: JSON.stringify({
+          email: "person@example.com",
+          captcha_token: "captcha-proof",
+        }),
+      }),
+      {
+        configuredAppOrigin: "https://app.argus.example",
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({
+          limit: 100,
+          windowMs: 60_000,
+        }),
+        async sendRecovery() {
+          throw new RecoveryCaptchaRejectedError();
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ accepted: false });
+  });
+
+  test("recovery forwards one bounded CAPTCHA token to the provider", async () => {
+    let providerToken = "";
+    const response = await handleRecoveryRequest(
+      new Request("https://app.argus.example/api/auth/recovery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://app.argus.example",
+        },
+        body: JSON.stringify({
+          email: "person@example.com",
+          captcha_token: "captcha-proof",
+        }),
+      }),
+      {
+        configuredAppOrigin: "https://app.argus.example",
+        environment: "production",
+        limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+        globalLimiter: new RecoveryAttemptLimiter({
+          limit: 100,
+          windowMs: 60_000,
+        }),
+        async sendRecovery(_email, _redirectTo, captchaToken) {
+          providerToken = captchaToken;
+        },
+      },
+    );
+    const routeSource = readFileSync(
+      join(import.meta.dir, "../app/api/auth/recovery/route.ts"),
+      "utf-8",
+    );
+
+    expect(response.status).toBe(202);
+    expect(providerToken).toBe("captcha-proof");
+    expect(routeSource).toContain("captchaToken");
+    expect(routeSource).toContain("captchaToken,");
+  });
+
+  test("recovery rejects missing or invalid CAPTCHA tokens before provider work", async () => {
+    const captchaValues: unknown[] = [undefined, null, 42, "", "   ", "x".repeat(4_097)];
+
+    for (const captchaToken of captchaValues) {
+      let providerCalls = 0;
+      const body: Record<string, unknown> = { email: "person@example.com" };
+      if (captchaToken !== undefined) body.captcha_token = captchaToken;
+      const response = await handleRecoveryRequest(
+        new Request("https://app.argus.example/api/auth/recovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://app.argus.example",
+          },
+          body: JSON.stringify(body),
+        }),
+        {
+          configuredAppOrigin: "https://app.argus.example",
+          environment: "production",
+          limiter: new RecoveryAttemptLimiter({ limit: 5, windowMs: 60_000 }),
+          globalLimiter: new RecoveryAttemptLimiter({
+            limit: 100,
+            windowMs: 60_000,
+          }),
+          async sendRecovery() {
+            providerCalls += 1;
+          },
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(providerCalls).toBe(0);
+    }
   });
 
   test("recovery ignores a body-supplied redirect", async () => {
@@ -539,6 +654,7 @@ describe("recovery request safety", () => {
         },
         body: JSON.stringify({
           email: "person@example.com",
+          captcha_token: "captcha-proof",
           redirectTo: "https://attacker.example/steal",
         }),
       }),
@@ -605,7 +721,7 @@ describe("recovery request safety", () => {
             "Content-Type": "application/json",
             Origin: "https://app.argus.example",
           },
-          body: JSON.stringify({ padding: "x".repeat(5_000) }),
+          body: JSON.stringify({ padding: "x".repeat(9_000) }),
         }),
         status: 413,
       },
@@ -723,7 +839,7 @@ describe("recovery request safety", () => {
           "Content-Type": "application/json",
           Origin: "https://app.argus.example",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captcha_token: "captcha-proof" }),
       });
 
     expect((await handleRecoveryRequest(request("one@example.com"), dependencies)).status).toBe(202);
@@ -757,7 +873,10 @@ describe("recovery request safety", () => {
           Origin: "https://app.argus.example",
           "X-Forwarded-For": address,
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          ...(email.includes("@") ? { captcha_token: "captcha-proof" } : {}),
+        }),
       });
 
     expect(
@@ -790,7 +909,7 @@ describe("recovery request safety", () => {
           Origin: "https://app.argus.example",
           "X-Forwarded-For": address,
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captcha_token: "captcha-proof" }),
       });
 
     expect(
