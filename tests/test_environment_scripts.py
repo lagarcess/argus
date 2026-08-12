@@ -106,9 +106,9 @@ def _run_render_release_audit(
     api_env_json: str,
     web_env_json: str,
     workflow_env_json: str | None = None,
-    cron_env_json: str | None = None,
-    cron_service_id: str | None = "srv-fake-maintenance",
-    cron_lookup_fails: bool = False,
+    api_service_json: str | None = None,
+    web_service_json: str | None = None,
+    workflow_service_json: str | None = None,
     expect_mode: str = "safe-off",
     isolate: bool = False,
 ) -> subprocess.CompletedProcess[str]:
@@ -120,17 +120,18 @@ def _run_render_release_audit(
         """#!/bin/bash
 printf "%s\\n" "$*" >> "$FAKE_CURL_REQUEST_LOG"
 case "$*" in
-  *"$FAKE_API_SERVICE_ID"*)
+  *"/services/$FAKE_API_SERVICE_ID/env-vars"*)
     printf "%s" "$FAKE_API_ENV_JSON"
     ;;
-  *"$FAKE_WEB_SERVICE_ID"*)
+  *"/services/$FAKE_WEB_SERVICE_ID/env-vars"*)
     printf "%s" "$FAKE_WEB_ENV_JSON"
     ;;
-  *"$FAKE_WORKFLOW_SERVICE_ID"*)
+  *"/services/$FAKE_WORKFLOW_SERVICE_ID/env-vars"*)
     printf "%s" "$FAKE_WORKFLOW_ENV_JSON"
     ;;
-  *type=cron_job*) [ -n "$FAKE_CRON_LOOKUP_FAIL" ] && exit 22; printf "%s" "$FAKE_CRON_LOOKUP_JSON" ;;
-  *env-vars*) printf "%s" "$FAKE_CRON_ENV_JSON" ;;
+  *"/services/$FAKE_API_SERVICE_ID"*) printf "%s" "$FAKE_API_SERVICE_JSON" ;;
+  *"/services/$FAKE_WEB_SERVICE_ID"*) printf "%s" "$FAKE_WEB_SERVICE_JSON" ;;
+  *"/workflows/$FAKE_WORKFLOW_SERVICE_ID"*) printf "%s" "$FAKE_WORKFLOW_SERVICE_JSON" ;;
   *)
     echo "unexpected curl request: $*" >&2
     exit 9
@@ -140,7 +141,6 @@ esac
     )
     fake_curl.chmod(0o755)
 
-    cron_row = {"service": {"id": cron_service_id, "name": "argus-maintenance"}}
     env = os.environ.copy()
     env.update(
         {
@@ -153,10 +153,12 @@ esac
             "FAKE_API_ENV_JSON": api_env_json,
             "FAKE_WEB_ENV_JSON": web_env_json,
             "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
-            "FAKE_CRON_LOOKUP_JSON": json.dumps([cron_row] if cron_service_id else []),
-            "FAKE_CRON_LOOKUP_FAIL": "1" if cron_lookup_fails else "",
-            "FAKE_CRON_ENV_JSON": cron_env_json
-            or _render_env_payload("argus-maintenance"),
+            "FAKE_API_SERVICE_JSON": api_service_json
+            or json.dumps({"autoDeployTrigger": "checksPass"}),
+            "FAKE_WEB_SERVICE_JSON": web_service_json
+            or json.dumps({"autoDeployTrigger": "checksPass"}),
+            "FAKE_WORKFLOW_SERVICE_JSON": workflow_service_json
+            or json.dumps({"autoDeployTrigger": "checksPass"}),
             "FAKE_CURL_REQUEST_LOG": str(request_log),
         }
     )
@@ -401,81 +403,35 @@ def test_env_example_declares_render_api_key_once() -> None:
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
-    assert set(_contract_array("ARGUS_RENDER_CRON_ENV")) == set(
-        _render_env("argus-maintenance")
-    )
-
-
-def _cron_service() -> dict[str, object]:
     render_config = yaml.safe_load(_source("render.yaml"))
-    for service in render_config["services"]:
-        if service["name"] == "argus-maintenance":
-            return service
-    raise AssertionError("argus-maintenance cron service missing from render.yaml")
-
-
-def test_render_blueprint_schedules_maintenance_on_the_contract_cadence() -> None:
-    service = _cron_service()
-    env_contract = ENV_CONTRACT.read_text()
-
-    assert service["type"] == "cron"
-    assert service["schedule"] == "*/15 * * * *"
-    assert service["autoDeployTrigger"] is False
-    assert 'ARGUS_RENDER_CRON_SCHEDULE="*/15 * * * *"' in env_contract
-    assert (
-        'ARGUS_RENDER_CRON_START_COMMAND="poetry run python '
-        'scripts/ops/scheduled_maintenance.py"'
-    ) in env_contract
-    assert service["startCommand"] == (
-        "poetry run python scripts/ops/scheduled_maintenance.py"
-    )
-
-
-def test_maintenance_cron_builds_exactly_like_the_api_it_imports() -> None:
-    service = _cron_service()
-    api_service = next(
-        entry
-        for entry in yaml.safe_load(_source("render.yaml"))["services"]
-        if entry["name"] == "argus-api"
-    )
-    env_contract = ENV_CONTRACT.read_text()
-
-    assert service["buildCommand"] == api_service["buildCommand"]
-    assert 'ARGUS_RENDER_CRON_BUILD_COMMAND="$ARGUS_RENDER_API_BUILD_COMMAND"' in (
-        env_contract
-    )
-
-
-def test_maintenance_cron_keeps_deleting_credentials_manual() -> None:
-    cron_env = _render_env("argus-maintenance")
-
-    for key in (
-        "DATABASE_URL",
-        "SUPABASE_SERVICE_ROLE_KEY",
-        "RENDER_API_KEY",
-        "POSTHOG_PROJECT_TOKEN",
-    ):
-        assert cron_env[key] == {"key": key, "sync": False}
-    assert "SUPABASE_JWT_SECRET" not in cron_env
-    assert "ARGUS_OPS_TOKEN" not in cron_env
-
-
-def test_scheduled_maintenance_env_contract_is_documented_in_env_example() -> None:
-    env_example = _source(".env.example")
-
-    assert "scripts/ops/scheduled_maintenance.py" in env_example
-    assert "ARGUS_RENDER_CRON_ENV" in env_example
-    for key in _contract_array("ARGUS_RENDER_CRON_ENV"):
-        assert key in env_example
+    assert {service["name"] for service in render_config["services"]} == {
+        "argus-api",
+        "argus-app",
+    }
 
 
 def test_render_web_declares_exact_server_only_https_app_origin() -> None:
+    api_env = _render_env("argus-api")
     web_env = _render_env("argus-app")
     env_contract = ENV_CONTRACT.read_text()
 
-    assert web_env["ARGUS_APP_ORIGIN"]["value"] == ("https://argus-app-suz5.onrender.com")
+    transition_origins = (
+        "https://argus-app-suz5.onrender.com,https://arguschat.ai,"
+        "https://www.arguschat.ai"
+    )
+    assert api_env["ARGUS_APP_ORIGIN"]["value"] == "https://arguschat.ai"
+    assert api_env["ARGUS_CORS_ALLOW_ORIGINS"]["value"] == transition_origins
+    assert web_env["ARGUS_APP_ORIGIN"]["value"] == "https://arguschat.ai"
+    assert web_env["NEXT_PUBLIC_ARGUS_API_URL"]["value"] == (
+        "https://argus-ohr5.onrender.com/api/v1"
+    )
     assert "ARGUS_APP_ORIGIN" in _contract_array("ARGUS_RENDER_WEB_ENV")
-    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://' in env_contract
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_contract
+    assert (
+        'ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"'
+        in env_contract
+    )
+    assert f'ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="{transition_origins}"' in env_contract
     assert "NEXT_PUBLIC_ARGUS_APP_ORIGIN" not in env_contract
 
 
@@ -647,8 +603,9 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "print_workflow_version_status()" in source
     assert 'render workflows versions release "$WORKFLOW_SERVICE_ID"' in source
     assert 'render workflows versions list "$WORKFLOW_SERVICE_ID"' in source
-    assert "ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT" in source
-    assert "ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID" in source
+    assert "ARGUS_RENDER_WORKFLOW_RELEASE_COMMIT" not in source
+    assert "ARGUS_RENDER_WORKFLOW_RELEASE_VERSION_ID" not in source
+    assert '"commit=\\(.name // "<missing>")"' in source
     assert "--wait" in source
     assert "--confirm" in source
     assert 'for key in "${ARGUS_RENDER_WORKFLOW_PROOF_ENV[@]}"; do' in source
@@ -659,6 +616,9 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
+    assert "release_profile_auto_deploy_trigger workflow" in source
+    assert "autoDeployTrigger: $auto_deploy_trigger" in source
+    assert 'autoDeployTrigger: "off"' not in source
 
 
 def test_render_env_sync_workflow_proof_uses_the_profile_live_provider_mode() -> None:
@@ -912,7 +872,9 @@ def test_render_env_sync_audit_includes_workflow_env_parity(
     assert "ok argus-backtests:ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>" in (
         result.stdout
     )
+    assert "ok argus-api:ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in result.stdout
     assert "workflow_env_status=ready" in result.stdout
+    assert "autodeploy_status=ready" in result.stdout
     assert "status=ready" in result.stdout
     assert "postgres://workflow-db.example/argus" not in result.stdout
 
@@ -1137,7 +1099,7 @@ def test_warmup_script_defaults_to_private_launch_render_urls() -> None:
     warmup = _source(".github/warmup-render.sh")
     env_contract = ENV_CONTRACT.read_text()
 
-    assert "https://argus-app-suz5.onrender.com" in env_contract
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_contract
     assert "https://argus-ohr5.onrender.com" in env_contract
     assert "ARGUS_PRIVATE_LAUNCH_APP_URL" in warmup
     assert "ARGUS_PRIVATE_LAUNCH_API_URL" in warmup
@@ -1209,10 +1171,20 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/render-env-sync.sh api-real-workflow-on" in before_sessions
     assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
     assert ".github/render-env-sync.sh web-deploy-status" in before_sessions
+    assert ".github/render-env-sync.sh workflow-version-status" in before_sessions
+    assert "argus-api" in before_sessions
+    assert "argus-app" in before_sessions
+    assert "argus-backtests" in before_sessions
+    assert "`argus-api`, then `argus-app`, then **`argus-backtests`**" in (
+        before_sessions
+    )
+    assert "workflow_commit_mismatch" in before_sessions
+    assert "argus-maintenance" not in runbook
+    assert "cron-deploy-status" not in runbook
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert (
-        "API deploy-status, app deploy-status, local smoke, warmup, the "
+        "API deploy-status, app deploy-status, workflow version status, local smoke, warmup, the "
         "authoritative Spanish release canary, and the release manifest"
         in normalized_before_sessions
     )

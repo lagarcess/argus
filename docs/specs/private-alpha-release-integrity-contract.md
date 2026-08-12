@@ -212,15 +212,20 @@ applied to successive candidates without editing policy.
 
 Release tooling validates the profile and computes a SHA-256 hash of its checked-
 in bytes. The candidate release manifest records that hash, environment
-fingerprints, the deployed SHA for API/web/workflow/cron, and behavioral
-evidence. All four deployed surfaces must resolve to the candidate SHA before
-the canary can pass. The cron surface is exempt only while the Render API
-reports no such service, because nothing destructive is then deployed.
+fingerprints, the deployed SHA for API/web/workflow, and behavioral
+evidence. All three deployed surfaces must resolve to the candidate SHA before
+the canary can pass. API and web expose the full commit. Render exposes the
+ready Workflow version's Git commit as its version name, so the resolver
+requires that SHA prefix to match the exact API/web commit. Mutable workflow env
+markers are not release proof because checks-passing autodeploy cannot refresh
+them.
 
 The profile is the desired non-secret release configuration. Release tooling
 must fail when `render.yaml`, the live Render service configuration, or the
 effective API/web/workflow modes disagree with it; secrets remain in the
 deployment control plane and are checked only by presence/fingerprint.
+The same audit verifies that API, web, and workflow each use `checksPass`
+autodeploy. A two-of-three configuration is drift.
 
 ### 5.2 Validation modes
 

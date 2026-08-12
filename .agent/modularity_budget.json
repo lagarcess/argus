@@ -123,6 +123,7 @@
     "src/argus/agent_runtime/interpreter/strategy_builder.py": 1022,
     "tests/agent_runtime/test_result_followups.py": 1020,
     "src/argus/llm/openrouter.py": 1015,
+    "tests/test_access_approval_email.py": 1011,
     "tests/domain/test_market_data_coverage.py": 1395
   }
 }

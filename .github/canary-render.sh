@@ -20,9 +20,9 @@ SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"
 SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"
 SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"
 SIGNUP_EMAIL=""
-ARGUS_OPS_TOKEN="${ARGUS_OPS_TOKEN:-}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
+OPS_TOKEN="${ARGUS_OPS_TOKEN:-}"
 LANGUAGE="${ARGUS_CANARY_LANGUAGE:-es-419}"
 EXPECT_MODE="${ARGUS_CANARY_EXPECT_MODE:-${ARGUS_WARMUP_EXPECT_MODE:-real-workflow}}"
 EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"
@@ -73,7 +73,7 @@ printf 'header = "apikey: %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   > "$SERVICE_ROLE_CURL_CONFIG"
 printf 'header = "Authorization: Bearer %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   >> "$SERVICE_ROLE_CURL_CONFIG"
-printf 'header = "Authorization: Bearer %s"\n' "$ARGUS_OPS_TOKEN" \
+printf 'header = "Authorization: Bearer %s"\n' "$OPS_TOKEN" \
   > "$OPS_CURL_CONFIG"
 
 SIGNUP_IDENTITY_SETUP_ATTEMPTED="false"
@@ -121,9 +121,6 @@ WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
 WORKFLOW_VERSION_STATUS_OUTPUT=""
-CRON_DEPLOY_STATUS_OUTPUT=""
-CRON_DEPLOY_STATUS=""
-CRON_DEPLOY_SHA=""
 ENV_FINGERPRINT=""
 RELEASE_PROFILE_HASH=""
 WORKFLOW_ENV_FINGERPRINT=""
@@ -139,7 +136,6 @@ WEB_DEPLOY_STATUS=""
 WORKFLOW_VERSION_COMMIT=""
 WORKFLOW_VERSION_ID=""
 WORKFLOW_VERSION_STATUS=""
-WORKFLOW_EXPECTED_VERSION_ID=""
 USER_ID=""
 BROWSER_ACCESS_TOKEN=""
 CONVERSATION_ID=""
@@ -235,6 +231,15 @@ extract_status_value() {
   local status="$1"
   local key="$2"
   awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2); found=1; exit } END { if (!found) exit 1 }' <<< "$status"
+}
+
+workflow_commit_matches_candidate() {
+  local workflow_commit="$1"
+  local candidate_commit="$2"
+
+  [[ "$candidate_commit" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ "$workflow_commit" =~ ^[0-9a-f]{7,40}$ ]] || return 1
+  [[ "$candidate_commit" == "$workflow_commit"* ]]
 }
 
 build_release_evidence_json() {
@@ -597,12 +602,6 @@ run_deploy_status_probe() {
   if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
     fail_canary "deploy_status" "workflow_version_status_failed"
   fi
-  if ! CRON_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status)"; then
-    fail_canary "deploy_status" "cron_deploy_status_failed"
-  fi
-
-  CRON_DEPLOY_STATUS="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" status || true)"
-  CRON_DEPLOY_SHA="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
@@ -610,7 +609,6 @@ run_deploy_status_probe() {
   WORKFLOW_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" workflow_version_id || true)"
   WORKFLOW_VERSION_STATUS="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" status || true)"
   WORKFLOW_VERSION_COMMIT="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" commit || true)"
-  WORKFLOW_EXPECTED_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" expected_workflow_version_id || true)"
 
   if [ "$API_DEPLOY_STATUS" != "live" ]; then
     fail_canary "deploy_status" "api_deploy_not_live"
@@ -627,33 +625,16 @@ run_deploy_status_probe() {
   if [ "$WORKFLOW_VERSION_STATUS" != "ready" ]; then
     fail_canary "deploy_status" "workflow_version_not_ready"
   fi
-  if [ "$WORKFLOW_VERSION_COMMIT" != "$CANDIDATE_SHA" ]; then
+  if ! workflow_commit_matches_candidate "$WORKFLOW_VERSION_COMMIT" "$CANDIDATE_SHA"; then
     fail_canary "deploy_status" "workflow_version_commit_mismatch"
   fi
-  if [ -z "$WORKFLOW_VERSION_ID" ] || [ "$WORKFLOW_EXPECTED_VERSION_ID" != "$WORKFLOW_VERSION_ID" ]; then
-    fail_canary "deploy_status" "workflow_version_id_mismatch"
+  if [ -z "$WORKFLOW_VERSION_ID" ]; then
+    fail_canary "deploy_status" "workflow_version_id_missing"
   fi
-  # Integration owns the maintenance release surface. No service is a valid,
-  # explicit state for this promotion; a failed lookup or a deployed janitor
-  # on another commit is not.
-  if [ -z "$CRON_DEPLOY_STATUS" ] || [ "$CRON_DEPLOY_STATUS" = "lookup_failed" ]; then
-    fail_canary "deploy_status" "cron_status_unavailable"
-  fi
-  if [ "$CRON_DEPLOY_STATUS" != "absent" ]; then
-    if [ "$CRON_DEPLOY_STATUS" != "live" ]; then
-      fail_canary "deploy_status" "cron_deploy_not_live"
-    fi
-    if [ "$API_DEPLOY_SHA" != "$CRON_DEPLOY_SHA" ]; then
-      fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"
-    fi
-  fi
-
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
   echo "canary_web_deploy_sha=$WEB_DEPLOY_SHA"
-  echo "canary_cron_deploy_status=$CRON_DEPLOY_STATUS"
-  echo "canary_cron_deploy_sha=$CRON_DEPLOY_SHA"
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
   echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
@@ -795,12 +776,13 @@ for path in sorted(directory.rglob("*")):
 PY
 }
 
-run_requested_signup_denial_canary() {
-  env -u SUPABASE_SERVICE_ROLE_KEY \
+run_disabled_signup_denial_canary() {
+  env -u ARGUS_OPS_TOKEN \
+    -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
     CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
     CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN="$OPS_TOKEN" \
     python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
 }
 
@@ -1339,9 +1321,10 @@ delete_signup_allowlist() {
     >/dev/null
 }
 
-insert_requested_signup_allowlist() {
+insert_disabled_signup_allowlist() {
   local signup_body
   if ! signup_body="$(CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
+from datetime import datetime, timezone
 import json
 import os
 
@@ -1349,8 +1332,9 @@ print(
     json.dumps(
         {
             "email": os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold(),
-            "role": "requested",
+            "role": "user",
             "language": os.environ["CANARY_LANGUAGE"],
+            "disabled_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 )
@@ -1377,10 +1361,10 @@ if (
     not isinstance(rows, list)
     or len(rows) != 1
     or rows[0].get("email") != target
-    or rows[0].get("role") != "requested"
-    or rows[0].get("disabled_at") is not None
+    or rows[0].get("role") != "user"
+    or rows[0].get("disabled_at") is None
 ):
-    raise SystemExit("requested signup identity was not created exactly once")
+    raise SystemExit("disabled signup identity was not created exactly once")
 PY
 }
 
@@ -1388,7 +1372,38 @@ verify_no_signup_auth_identity() {
   collect_signup_auth_user_ids && [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
 }
 
-promote_requested_signup_allowlist() {
+stage_requested_signup_allowlist() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=representation" \
+    -d '{"role":"requested","disabled_at":null}' \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.user&disabled_at=not.is.null" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+if (
+    not isinstance(rows, list)
+    or len(rows) != 1
+    or rows[0].get("email") != target
+    or rows[0].get("role") != "requested"
+    or rows[0].get("disabled_at") is not None
+):
+    raise SystemExit("disabled signup identity was not staged for approval")
+PY
+}
+
+approve_requested_signup_allowlist() {
   if ! CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_APPROVAL_REQUEST" <<'PY'
 import json
 import os
@@ -1433,7 +1448,7 @@ prepare_signup_identity() {
   SIGNUP_IDENTITY_SETUP_ATTEMPTED="true"
   delete_signup_auth_identity &&
     delete_signup_allowlist &&
-    insert_requested_signup_allowlist
+    insert_disabled_signup_allowlist
 }
 
 cleanup_signup_identity() {
@@ -1629,9 +1644,6 @@ fi
 if [ -z "$PASSWORD" ]; then
   fail_canary "auth" "missing_canary_password"
 fi
-if [ -z "$ARGUS_OPS_TOKEN" ]; then
-  fail_canary "auth" "missing_ops_token"
-fi
 if ! SIGNUP_EMAIL="$(resolve_signup_identity)"; then
   fail_canary "auth" "canary_signup_identity_not_safe"
 fi
@@ -1644,20 +1656,26 @@ fi
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
 fi
+if [ -z "$OPS_TOKEN" ]; then
+  fail_canary "auth" "missing_ops_token"
+fi
 
 prepare_capture_destination
 validate_release_evidence_contract
 if ! prepare_signup_identity; then
   fail_canary "auth" "canary_signup_identity_setup_failed"
 fi
-if ! run_requested_signup_denial_canary; then
-  fail_canary "auth" "requested_signup_was_not_denied"
+if ! run_disabled_signup_denial_canary; then
+  fail_canary "auth" "disabled_signup_was_not_denied"
 fi
 if ! verify_no_signup_auth_identity; then
-  fail_canary "auth" "requested_signup_created_auth_identity"
+  fail_canary "auth" "disabled_signup_has_auth_identity"
 fi
-if ! promote_requested_signup_allowlist; then
-  fail_canary "auth" "requested_signup_promotion_failed"
+if ! stage_requested_signup_allowlist; then
+  fail_canary "auth" "disabled_signup_approval_staging_failed"
+fi
+if ! approve_requested_signup_allowlist; then
+  fail_canary "auth" "requested_signup_approval_failed"
 fi
 
 if ! run_browser_canary; then
