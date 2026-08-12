@@ -19,4 +19,9 @@ Task 7: completed at 77f868d808f847203dab130954eb19d63aca43d8
   Source and test head: 4321f1999e8b3d870428cc90c83419d977db6adc
   Review: read-only terminal verification found no lane-only deterministic
   blocker; remaining reds are exact-integration or sandbox classified
-Task 8: in progress
+Task 8: deterministic reconciliation complete at
+  aeb0a12e6f6b978821d47152485f5ffd7995fcb1
+  Final integration: 716221f07ca50c3fdb1ad8de5314b07072bfe815
+  Review: local latest-delta verdict clean
+  Remaining gate: exact-head paid live interpreter rerun requires explicit
+  user authorization; branch is not READY while that gate is unresolved

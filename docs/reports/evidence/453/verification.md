@@ -87,7 +87,7 @@ changed only the clarification contract text before that heading.
 - Remaining boundary: these deterministic checks do not replace later branch
   reconciliation, browser proof, or release-gate evidence.
 
-# Task 7 terminal deterministic verification
+# Task 7 intermediate deterministic verification
 
 ## Exact-head provenance
 
@@ -225,12 +225,134 @@ is two.
   byte-identical, the previously accepted bilingual controlled-browser evidence
   is retained rather than recaptured.
 
-## Terminal classification
+## Historical classification
 
 The issue #453 deterministic lane is clean at execution head
 `4321f1999e8b3d870428cc90c83419d977db6adc`: no lane-only backend, frontend,
 locale, modularity, build, contract, secret, or forbidden-surface failure
 remains. Repository-wide Ruff formatting, TypeScript debt, and the OpenRouter
 origin assertion remain explicitly classified against current integration.
-This terminal deterministic result does not claim the separately controlled
-live eval or hosted release proof.
+This deterministic result was later superseded by the reconciled Task 8 run
+below. It does not claim the separately controlled live eval or hosted release
+proof.
+
+# Task 8 reconciled verification
+
+## Final deterministic provenance
+
+- Historical integration base:
+  `8025672924d1c74eb80cc926c72b5d8574b613d7`.
+- First fetched integration and failure-comparison base:
+  `c3a9aca181ea43770a81c13ec2fb5f02f85af293`.
+- First one-way reconciliation merge:
+  `b585d429fee633751d5aa19b6668db79165944f9`.
+- Final fetched integration:
+  `716221f07ca50c3fdb1ad8de5314b07072bfe815`.
+- Final one-way reconciliation merge and deterministic execution head:
+  `aeb0a12e6f6b978821d47152485f5ffd7995fcb1`.
+- Retained controlled-browser product source:
+  `d87d5d6524e0af89d99dab26cc3e4b6f56c24742`.
+- Last issue-owned test-only fix before reconciliation:
+  `9df5cb1b16bc5174a820d69bdb17e30b78f114e2`.
+
+Integration advanced through the password-recovery CAPTCHA lane and the
+market-hours completion-clamp lane. The only shared authored file was
+`docs/API_CONTRACT.md`: integration changed Account recovery while issue #453
+changed Cause-aware unsupported recovery. Git preserved both sections without
+conflict. Integration did not change the issue-owned interpreter,
+clarification, confirmation, locale, or recovery-display files. The completion
+clamp does affect broad market-calendar evaluation, so pre-reconciliation live
+results are not promoted as exact-head acceptance evidence.
+
+## Reconciled deterministic gates
+
+| Gate | Result |
+| --- | --- |
+| Python runtime | PASS, `3.10.20` |
+| Branch ownership | PASS, no policy for this branch |
+| Ruff lint | PASS |
+| Ruff format check | Baseline RED, `141` files would reformat versus `143` at exact final integration; no formatter ran in write mode |
+| Full backend suite | `5075 passed, 495 skipped, 7 failed`, configured coverage `87%` |
+| Permission-sensitive backend rerun | PASS, `8 passed` outside the sandbox |
+| Mocked interpreter evaluation | PASS, `72 passed` |
+| Focused issue and locale suite | PASS, `33 passed` |
+| Modularity script | PASS, no violations |
+| Modularity tests | PASS, `8 passed` |
+| Full web suite | PASS, `1482 passed`, `0 failed` |
+| Web lint | PASS, `0` errors and `8` integration warnings |
+| Web production build | PASS, all `12` static pages generated |
+| TypeScript no-emit | Existing baseline RED, `6034` diagnostics on both exact integration and this lane |
+
+The seven full-backend failures remain fully classified. Six are sandbox
+permission failures: one process-tree inspection and five loopback-server
+cases. Running the whole seven-test canary module plus the process node outside
+the sandbox returned `8 passed`. The seventh failure is the OpenRouter
+error-origin assertion already reproduced on the first integration base. Its
+production file and test are byte-identical between final integration and this
+lane.
+
+The TypeScript comparison used a detached worktree at exact integration
+`716221f07ca50c3fdb1ad8de5314b07072bfe815`. Both trees report `6034` total
+diagnostics and `80` diagnostics in the existing
+`web/__tests__/chat-recovery-display.test.ts`. The new focused
+`web/__tests__/issue-453-chat-recovery-display.test.ts` reports zero. The lane
+therefore adds no TypeScript diagnostic.
+
+## Retained guest browser proof
+
+The ten browser-evidenced product files are byte-identical from product source
+`d87d5d6524e0af89d99dab26cc3e4b6f56c24742` through reconciled head
+`aeb0a12e6f6b978821d47152485f5ffd7995fcb1`. The accepted controlled matrix is
+therefore retained:
+
+- eight historical base captures and eight after captures;
+- all four issue scenarios in English and `es-419` on the real Guest `/chat`
+  shell;
+- Guest account and `/me` assertions in every after receipt;
+- zero console errors and zero page errors;
+- sixteen non-empty `1440x1000` PNGs.
+
+This is controlled, provider-free browser evidence, not a hosted transcript
+replay. The manifest and receipts preserve that boundary explicitly.
+
+## Live interpreter diagnostics and outstanding gate
+
+Two initial runs used a non-live market-data mode and are configuration
+diagnostics only. Their local scorecards recorded `23 failed / 23 passed` and
+`25 failed / 21 passed`; the calendar-aware environment regression proved that
+the suite requires an explicit `ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider`
+override for this protected environment file.
+
+The corrected real-provider run executed outside the sandbox at issue-owned
+head `9df5cb1b16bc5174a820d69bdb17e30b78f114e2`. Its local scorecard is
+`argus-eval-scorecard-20260812T182943Z.json`, SHA-256
+`d1987e80c3b425e0a80684b6244c7aeb46141daebb02f86eb0d27d0ee16142d5`.
+It recorded `33 passed / 13 failed`. Failures were spread across pre-existing
+asset-edit, discovery, options, and prose-judge cases; the deterministic issue
+#453 regressions remained green. This scorecard is diagnostic, not acceptance:
+the broad live gate was red, and the later market-hours integration merge can
+affect date-window outcomes.
+
+The one policy-allowed paid rerun at the reconciled head was not executed. The
+tooling approval boundary rejected external credential-backed provider traffic
+without explicit user authorization. No workaround, third sample, paid Render
+workflow, deployment, or environment-file change was attempted. Exact-head
+live interpreter acceptance therefore remains pending and no READY or promotion
+claim is made from this document.
+
+## Final integrity audit
+
+- The `### Research Responses` section and every byte after it still hash to
+  `d5d1193f1af725bd8aad1b9ab352942affc8ddff1768f5c03c3c18f59ff39d80`.
+- PR #471 remains open, so its research-only API-contract hunk was not present
+  in final integration and was not copied into this lane.
+- Forbidden release and local-environment surfaces are unchanged from the
+  historical base: `render.yaml`, `.env.example`, `.github/argus-env.sh`,
+  `.env`, `web/.env.local`, and the release profile.
+- `git diff --check` passed and the worktree remained clean after verification.
+- No language-specific parser or gate, API or database schema change, release
+  configuration change, paid Render dispatch, merge to integration, or deploy
+  was performed by this lane.
+
+The reconciled deterministic and controlled-browser acceptance surfaces are
+clean. Exact-head live interpreter acceptance remains the only unresolved gate.
