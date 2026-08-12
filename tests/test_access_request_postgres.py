@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import os
+import ssl
 from concurrent.futures import ThreadPoolExecutor
+from email import message_from_string
 from threading import Barrier
 
 import pytest
 from faker import Faker
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
+LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
+LOCAL_SERVICE_KEY = os.getenv(
+    "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", ""
+).strip()
 pytestmark = pytest.mark.skipif(
     not DSN,
     reason="ARGUS_DISPOSABLE_DATABASE_URL is not configured",
@@ -811,5 +817,147 @@ def test_browser_roles_cannot_read_or_mutate_delivery_rows() -> None:
                             ),
                         )
                     cursor.execute("reset role")
+    finally:
+        _cleanup_access_rows(email)
+
+
+@pytest.mark.skipif(
+    not (LOCAL_URL and LOCAL_SERVICE_KEY),
+    reason="disposable local Supabase gateway is not configured",
+)
+def test_protected_approval_replay_uses_real_gateway_and_sends_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.main import app
+    from argus.domain.supabase_gateway import SupabaseGateway
+    from fastapi.testclient import TestClient
+
+    from supabase import create_client
+
+    class _RecordingSMTP:
+        def __init__(
+            self,
+            host: str,
+            port: int,
+            *,
+            timeout: float,
+            context: ssl.SSLContext,
+        ) -> None:
+            self.host = host
+            self.port = port
+            self.timeout = timeout
+            self.context = context
+            self.message: str | None = None
+
+        def __enter__(self) -> "_RecordingSMTP":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def login(self, username: str, password: str) -> None:
+            assert username == "resend"
+            assert password
+
+        def mail(self, sender: str) -> tuple[int, bytes]:
+            assert sender == "noreply@get-argus.com"
+            return 250, b"sender accepted"
+
+        def rcpt(self, recipient: str) -> tuple[int, bytes]:
+            assert recipient == email
+            return 250, b"recipient accepted"
+
+        def data(self, message: str) -> tuple[int, bytes]:
+            self.message = message
+            return 250, b"Queued. isolated-gateway-proof"
+
+    email = _random_email()
+    ops_token = fake.uuid4()
+    smtp_instances: list[_RecordingSMTP] = []
+
+    def _smtp(
+        host: str,
+        port: int,
+        *,
+        timeout: float,
+        context: ssl.SSLContext,
+    ) -> _RecordingSMTP:
+        instance = _RecordingSMTP(
+            host,
+            port,
+            timeout=timeout,
+            context=context,
+        )
+        smtp_instances.append(instance)
+        return instance
+
+    try:
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                _insert_allowlist_row(
+                    cursor,
+                    email=email,
+                    role="requested",
+                    language="es-419",
+                )
+
+        real_gateway = SupabaseGateway(
+            client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY)
+        )
+        monkeypatch.setattr(api_state, "supabase_gateway", real_gateway)
+        monkeypatch.setenv("ARGUS_OPS_TOKEN", ops_token)
+        monkeypatch.setenv("ARGUS_APP_ORIGIN", "https://argus.example")
+        monkeypatch.setenv(
+            "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
+            fake.password(),
+        )
+        monkeypatch.setattr(
+            "argus.domain.access_approval_email.smtplib.SMTP_SSL",
+            _smtp,
+        )
+
+        client = TestClient(app)
+        headers = {"Authorization": f"Bearer {ops_token}"}
+        first = client.post(
+            "/internal/access-requests/approve",
+            json={"email": email},
+            headers=headers,
+        )
+        second = client.post(
+            "/internal/access-requests/approve",
+            json={"email": email},
+            headers=headers,
+        )
+
+        assert first.status_code == second.status_code == 200
+        assert first.json() == second.json() == {"approved": True}
+        assert len(smtp_instances) == 1
+        assert smtp_instances[0].message is not None
+        accepted_message = message_from_string(smtp_instances[0].message or "")
+        assert accepted_message.get_content_type() == "multipart/alternative"
+        assert accepted_message["To"] == email
+
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    select a.role, count(d.recipient_email), min(d.language),
+                           min(d.content_version), min(d.subject)
+                    from public.private_alpha_allowlist as a
+                    left join public.private_alpha_access_welcome_deliveries as d
+                      on d.recipient_email = a.email
+                    where a.email = %s
+                    group by a.role
+                    """,
+                    (email,),
+                )
+                assert cursor.fetchone() == (
+                    "user",
+                    1,
+                    "es-419",
+                    WELCOME_CONTENT_VERSION,
+                    "Bienvenido a Argus",
+                )
     finally:
         _cleanup_access_rows(email)

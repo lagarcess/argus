@@ -1,0 +1,33 @@
+Issue #461 double-promotion proof
+=================================
+
+Status: PENDING final-candidate non-skipped CI
+
+Code-under-test source head:
+30f2830cad5ce08315c421289252bb7203d4afae
+
+Current candidate before the Task 5 evidence commit:
+b4b4c747b565513c75ff498b08470e0da1ef7d7e
+
+Local collection evidence:
+- Command: poetry run pytest tests/test_access_request_postgres.py::test_protected_approval_replay_uses_real_gateway_and_sends_once -vv --no-cov
+- Result: 1 collected, 1 skipped.
+- Skip reason: the disposable local Supabase gateway environment is not configured.
+- Docker is unavailable and supabase/config.toml names shared project argus-qa, so no local stack was started or reset.
+- This local result proves collection and skip gating only. It is not real-database proof.
+
+CI proof prepared:
+- Test: test_protected_approval_replay_uses_real_gateway_and_sends_once
+- Database: ARGUS_DISPOSABLE_DATABASE_URL, isolated CI PostgreSQL.
+- Gateway: SupabaseGateway through ARGUS_LOCAL_SUPABASE_URL and the isolated CI service-role key.
+- Route: two protected TestClient POST requests to /internal/access-requests/approve.
+- Sender boundary: one recording SMTP test double that accepts one multipart/alternative MIME message.
+- Randomization: Faker-generated recipient, ops token, and test-only SMTP password.
+- Cleanup: deletes only the generated recipient's delivery and allowlist rows.
+- Required assertions: two HTTP 200 responses; one sender acceptance; one durable delivery row; final allowlist role user; stored language es-419; content version private-alpha-access-welcome/v1.
+
+Earlier CI context supplied by the release captain:
+- Head 281ff6e8 ran 294 real-PostgreSQL tests with zero skips.
+- That run predates this final-candidate route-plus-real-gateway proof and does not satisfy the pending gate above.
+
+No real-database double-promotion result is claimed until the prepared test runs non-skipped in final-candidate CI.

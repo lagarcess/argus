@@ -1,0 +1,14 @@
+Authentication-Results: mx.google.com; dkim=pass header.i=@get-argus.com header.s=resend header.b=DGx0a4eU; dkim=pass header.i=@amazonses.com header.s=224i4yxa5dv7c2xz3womw6peuasteono header.b=cxF02P4E; spf=pass (google.com: domain of 0100019ff6ae8f6a-db4fc9b9-c9a0-4833-972d-1d53c7bde629-000000@send.get-argus.com designates 54.240.9.7 as permitted sender) smtp.mailfrom=0100019ff6ae8f6a-db4fc9b9-c9a0-4833-972d-1d53c7bde629-000000@send.get-argus.com; dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=get-argus.com
+Content-Type: multipart/alternative; boundary="--_NmP-316b9132443930bc-Part_1"
+From: noreply@get-argus.com
+Subject: Welcome to Argus
+Date: Wed, 12 Aug 2026 15:54:22 +0000
+Message-ID: [redacted]
+
+Assertions:
+spf=pass
+dkim=pass
+dmarc=pass
+multipart/alternative=yes
+Inbox=yes
+Spam=no
