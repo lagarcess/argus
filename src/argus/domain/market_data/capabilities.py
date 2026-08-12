@@ -4,8 +4,11 @@ import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
+
+EASTERN = ZoneInfo("America/New_York")
 
 ALPACA_EQUITY_HISTORY_START = date(2016, 1, 1)
 KRAKEN_MAX_OHLC_CANDLES = 720
@@ -196,11 +199,18 @@ def _latest_complete_equity_date(
     today: date,
     clock: MarketClockSnapshot | None,
 ) -> date:
+    if timeframe == "1D":
+        # A session's daily bar can still change until its Eastern date has
+        # passed; the clock's own timestamp names that date without a wall read.
+        reference = today
+        if clock is not None and clock.timestamp.tzinfo is not None:
+            reference = clock.timestamp.astimezone(EASTERN).date()
+        return _previous_equity_session_date(reference)
     if clock is None:
         return _previous_equity_session_date(today)
     if clock.is_market_day is False:
         return _previous_equity_session_date(today)
-    if clock.is_open and timeframe != "1D":
+    if clock.is_open:
         return today
     if clock.next_open is not None and clock.next_open.date() == today:
         return _previous_equity_session_date(today)

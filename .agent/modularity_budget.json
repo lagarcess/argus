@@ -120,6 +120,7 @@
     "tests/agent_runtime/test_refine_action_edit_routing.py": 1026,
     "src/argus/agent_runtime/interpreter/strategy_builder.py": 1022,
     "tests/agent_runtime/test_result_followups.py": 1020,
-    "src/argus/llm/openrouter.py": 1015
+    "src/argus/llm/openrouter.py": 1015,
+    "tests/domain/test_market_data_coverage.py": 1395
   }
 }

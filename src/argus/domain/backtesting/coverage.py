@@ -4,16 +4,18 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from math import ceil
 from typing import Any, Callable, Sequence
 
 import pandas as pd
+from loguru import logger
 from pydantic import BaseModel
 
 from argus.domain.backtesting.types import CoverageAdjustmentReason
 from argus.domain.market_data import fetch_ohlcv as _DEFAULT_FETCH_OHLC
 from argus.domain.market_data.capabilities import (
+    EASTERN,
     PROVIDER_TIMEFRAME_MINUTES,
     EquityMarketSession,
     expected_candle_count,
@@ -81,6 +83,7 @@ def prepare_market_data(
     fetch_market_calendar_func: FetchMarketCalendar | None = None,
     approved_coverage: dict[str, Any] | None = None,
     approved_adjustment_reason: CoverageAdjustmentReason | None = None,
+    now: datetime | None = None,
 ) -> PreparedMarketData:
     uses_default_market_data_provider = fetch_ohlcv_func is _DEFAULT_FETCH_OHLC
     if fetch_ohlcv_func is None:
@@ -89,9 +92,21 @@ def prepare_market_data(
         fetch_ohlcv_func = fetch_ohlcv
         uses_default_market_data_provider = fetch_ohlcv_func is _DEFAULT_FETCH_OHLC
 
+    fetch_calendar = _calendar_fetcher(
+        fetch_market_calendar_func,
+        uses_default_market_data_provider=uses_default_market_data_provider,
+    )
     requested = _requested_date_range(config)
     fetch_start = date.fromisoformat(str(config["start_date"]))
-    fetch_end = date.fromisoformat(str(config["end_date"]))
+    fetch_end = _completed_data_end(
+        asset_class=str(config["asset_class"]),
+        timeframe=str(config["timeframe"]),
+        fetch_end=date.fromisoformat(str(config["end_date"])),
+        fetch_calendar=fetch_calendar,
+        now=now,
+    )
+    if fetch_end < fetch_start:
+        raise MarketDataCoverageError("no_common_data_window")
     symbols = _required_symbols(config)
     frames: dict[str, pd.DataFrame] = {}
     for symbol in symbols:
@@ -136,8 +151,7 @@ def prepare_market_data(
         asset_class=str(config["asset_class"]),
         start_date=fetch_start,
         end_date=fetch_end,
-        fetch_market_calendar_func=fetch_market_calendar_func,
-        uses_default_market_data_provider=uses_default_market_data_provider,
+        fetch_calendar=fetch_calendar,
     )
     _validate_observation_density(
         trimmed,
@@ -357,26 +371,92 @@ def _minimum_observations_for_window(
     return max(2, ceil(expected * _MIN_OBSERVATION_COVERAGE))
 
 
+def _provider_mode_is_synthetic() -> bool:
+    provider_mode = (
+        (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip().lower()
+    )
+    return provider_mode == "synthetic_unit_fixture"
+
+
+def _calendar_fetcher(
+    fetch_market_calendar_func: FetchMarketCalendar | None,
+    *,
+    uses_default_market_data_provider: bool,
+) -> FetchMarketCalendar | None:
+    if _provider_mode_is_synthetic():
+        return None
+    if fetch_market_calendar_func is not None:
+        return fetch_market_calendar_func
+    if uses_default_market_data_provider:
+        from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
+
+        return fetch_alpaca_market_calendar
+    return None
+
+
+_COMPLETED_SESSION_LOOKBACK_DAYS = 13
+
+
+def _completed_data_end(
+    *,
+    asset_class: str,
+    timeframe: str,
+    fetch_end: date,
+    fetch_calendar: FetchMarketCalendar | None,
+    now: datetime | None,
+) -> date:
+    """A bar may enter coverage only once its trading day can no longer change.
+
+    Continuous markets finalize a daily bar when its UTC day ends; an equity
+    session's bar can still receive corrections after hours, so its day is
+    complete only once its Eastern date has passed. Intraday timeframes keep
+    the current day: their completed candles are valid data, and completion
+    for them is a per-bar boundary, not a day boundary.
+    """
+    if _provider_mode_is_synthetic():
+        return fetch_end
+    if _normalized_timeframe(timeframe) != "1D":
+        return fetch_end
+    at = now if now is not None else datetime.now(timezone.utc)
+    if at.tzinfo is None:
+        raise ValueError("completed_data_end_requires_aware_datetime")
+    if asset_class != "equity":
+        today_utc = at.astimezone(timezone.utc).date()
+        return min(fetch_end, today_utc - timedelta(days=1))
+    today_eastern = at.astimezone(EASTERN).date()
+    if fetch_end < today_eastern:
+        # Historical windows need no calendar round-trip.
+        return fetch_end
+    completed_cap = today_eastern - timedelta(days=1)
+    if fetch_calendar is None:
+        return min(fetch_end, completed_cap)
+    lookback_start = completed_cap - timedelta(days=_COMPLETED_SESSION_LOOKBACK_DAYS)
+    try:
+        completed_session_dates = [
+            session.session_date
+            for session in fetch_calendar(
+                start_date=lookback_start, end_date=completed_cap
+            )
+            if lookback_start <= session.session_date <= completed_cap
+        ]
+        if not completed_session_dates:
+            raise ValueError("market_calendar_window_empty")
+    except MarketDataCoverageError:
+        raise
+    except Exception as exc:
+        raise MarketDataCoverageError("market_data_unavailable") from exc
+    return min(fetch_end, max(completed_session_dates))
+
+
 def _equity_market_sessions_for_window(
     *,
     asset_class: str,
     start_date: date,
     end_date: date,
-    fetch_market_calendar_func: FetchMarketCalendar | None,
-    uses_default_market_data_provider: bool,
+    fetch_calendar: FetchMarketCalendar | None,
 ) -> tuple[EquityMarketSession, ...] | None:
     if asset_class != "equity":
         return None
-    provider_mode = (
-        (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip().lower()
-    )
-    if provider_mode == "synthetic_unit_fixture":
-        return None
-    fetch_calendar = fetch_market_calendar_func
-    if fetch_calendar is None and uses_default_market_data_provider:
-        from argus.domain.market_data.capabilities import fetch_alpaca_market_calendar
-
-        fetch_calendar = fetch_alpaca_market_calendar
     if fetch_calendar is None:
         return None
     try:
@@ -469,13 +549,33 @@ def _validate_approved_window(
         )
         approved_preflight_id = approved["preflight_id"]
     except (KeyError, TypeError, ValueError) as exc:
+        logger.warning(
+            "Approved data window rejected: malformed approval payload error={error}",
+            error=str(exc),
+        )
         raise MarketDataCoverageError("approved_data_window_unavailable") from exc
-    if (
-        approved_requested != requested
-        or approved_effective != effective
-        or not isinstance(approved_preflight_id, str)
-        or approved_preflight_id != dataset_id
-    ):
+    mismatches: list[str] = []
+    if approved_requested != requested:
+        mismatches.append(
+            "requested_range approved="
+            f"{approved_requested.start}..{approved_requested.end}"
+            f" current={requested.start}..{requested.end}"
+        )
+    if approved_effective != effective:
+        mismatches.append(
+            "effective_range approved="
+            f"{approved_effective.start}..{approved_effective.end}"
+            f" current={effective.start}..{effective.end}"
+        )
+    if not isinstance(approved_preflight_id, str) or approved_preflight_id != dataset_id:
+        mismatches.append(
+            f"dataset_id approved={approved_preflight_id} current={dataset_id}"
+        )
+    if mismatches:
+        logger.warning(
+            "Approved data window rejected: {mismatches}",
+            mismatches="; ".join(mismatches),
+        )
         raise MarketDataCoverageError("approved_data_window_unavailable")
 
 
