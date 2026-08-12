@@ -19,6 +19,7 @@ PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
 SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
+OPS_TOKEN="${ARGUS_OPS_TOKEN:-}"
 LANGUAGE="${ARGUS_CANARY_LANGUAGE:-es-419}"
 EXPECT_MODE="${ARGUS_CANARY_EXPECT_MODE:-${ARGUS_WARMUP_EXPECT_MODE:-real-workflow}}"
 EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"
@@ -764,12 +765,13 @@ for path in sorted(directory.rglob("*")):
 PY
 }
 
-run_requested_signup_denial_canary() {
-  env -u SUPABASE_SERVICE_ROLE_KEY \
+run_disabled_signup_denial_canary() {
+  env -u ARGUS_OPS_TOKEN \
+    -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
     CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL" \
     CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL" \
-    CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE" \
+    CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN="$OPS_TOKEN" \
     python3 "$SCRIPT_DIR/canary-requested-signup-denial.py"
 }
 
@@ -1256,9 +1258,10 @@ delete_signup_allowlist() {
     >/dev/null
 }
 
-insert_requested_signup_allowlist() {
+insert_disabled_signup_allowlist() {
   local signup_body
   if ! signup_body="$(CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" CANARY_LANGUAGE="$LANGUAGE" python3 - <<'PY'
+from datetime import datetime, timezone
 import json
 import os
 
@@ -1266,8 +1269,9 @@ print(
     json.dumps(
         {
             "email": os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold(),
-            "role": "requested",
+            "role": "user",
             "language": os.environ["CANARY_LANGUAGE"],
+            "disabled_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 )
@@ -1294,10 +1298,10 @@ if (
     not isinstance(rows, list)
     or len(rows) != 1
     or rows[0].get("email") != target
-    or rows[0].get("role") != "requested"
-    or rows[0].get("disabled_at") is not None
+    or rows[0].get("role") != "user"
+    or rows[0].get("disabled_at") is None
 ):
-    raise SystemExit("requested signup identity was not created exactly once")
+    raise SystemExit("disabled signup identity was not created exactly once")
 PY
 }
 
@@ -1305,7 +1309,7 @@ verify_no_signup_auth_identity() {
   collect_signup_auth_user_ids && [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
 }
 
-promote_requested_signup_allowlist() {
+enable_disabled_signup_allowlist() {
   local encoded_email
   if ! encoded_email="$(encoded_signup_email)"; then
     return 1
@@ -1314,8 +1318,8 @@ promote_requested_signup_allowlist() {
     -X PATCH \
     -H "Content-Type: application/json" \
     -H "Prefer: return=representation" \
-    -d '{"role":"user"}' \
-    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.requested&disabled_at=is.null" \
+    -d '{"disabled_at":null}' \
+    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.user&disabled_at=not.is.null" \
     > "$SIGNUP_ALLOWLIST_RESPONSE" &&
     CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
 import json
@@ -1332,7 +1336,7 @@ if (
     or rows[0].get("role") != "user"
     or rows[0].get("disabled_at") is not None
 ):
-    raise SystemExit("requested signup identity promotion did not affect exactly one row")
+    raise SystemExit("disabled signup identity enablement did not affect exactly one row")
 PY
 }
 
@@ -1340,7 +1344,7 @@ prepare_signup_identity() {
   SIGNUP_IDENTITY_SETUP_ATTEMPTED="true"
   delete_signup_auth_identity &&
     delete_signup_allowlist &&
-    insert_requested_signup_allowlist
+    insert_disabled_signup_allowlist
 }
 
 cleanup_signup_identity() {
@@ -1545,20 +1549,23 @@ fi
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
   fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
 fi
+if [ -z "$OPS_TOKEN" ]; then
+  fail_canary "auth" "missing_ops_token"
+fi
 
 prepare_capture_destination
 validate_release_evidence_contract
 if ! prepare_signup_identity; then
   fail_canary "auth" "canary_signup_identity_setup_failed"
 fi
-if ! run_requested_signup_denial_canary; then
-  fail_canary "auth" "requested_signup_was_not_denied"
+if ! run_disabled_signup_denial_canary; then
+  fail_canary "auth" "disabled_signup_was_not_denied"
 fi
 if ! verify_no_signup_auth_identity; then
-  fail_canary "auth" "requested_signup_created_auth_identity"
+  fail_canary "auth" "disabled_signup_has_auth_identity"
 fi
-if ! promote_requested_signup_allowlist; then
-  fail_canary "auth" "requested_signup_promotion_failed"
+if ! enable_disabled_signup_allowlist; then
+  fail_canary "auth" "disabled_signup_enablement_failed"
 fi
 
 if ! run_browser_canary; then

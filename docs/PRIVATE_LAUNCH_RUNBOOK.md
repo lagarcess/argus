@@ -189,16 +189,18 @@ hydration, Omnisearch provenance, and the deployed Spanish signup/login browser
 path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
 `MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` aliases.
 
-The requested-access denial check runs at the API layer, not in the browser.
-`.github/canary-requested-signup-denial.py` posts the pinned signup address to
-`POST /api/v1/auth/signup` with a placeholder captcha token and requires
-`400 auth_signup_failed`. The deployed handler rejects a requested-role email
-before it consults the captcha, so the probe proves the denial without a
-solvable challenge, and `verify_no_signup_auth_identity` still proves through
-the service role that no auth identity was created. Do not move this check back
-into Playwright and do not weaken Turnstile anywhere deployed: Cloudflare
-refuses tokens to headless automation by design, and that refusal is the
-control working.
+The disabled-email denial check runs at the API layer, not in the browser.
+Before the check, the canary creates a `user` allowlist row with `disabled_at`
+set. `.github/canary-requested-signup-denial.py` sends that address to the
+ops-authenticated `POST /api/v1/internal/canary/requested-signup-denial`
+policy endpoint and requires `200 {"denied": true}`. This proves the disabled
+row is blocked with public access on and with the allowlist-only emergency
+rollback. The probe never calls the signup provider or CAPTCHA, so it cannot
+create an auth identity. `verify_no_signup_auth_identity` asserts that none
+exists before the canary clears `disabled_at` and runs the browser signup.
+The exit trap deletes any resulting auth identity and allowlist row, then
+reads back that no matching auth identity remains. Do not move this check back
+into Playwright and do not weaken Turnstile anywhere deployed.
 
 ```bash
 cd web && bun install --frozen-lockfile && bunx playwright install chromium
