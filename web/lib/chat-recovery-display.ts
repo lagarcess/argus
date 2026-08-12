@@ -664,13 +664,19 @@ function unsupportedNumericBounds(
     boundsSource = constraint;
   }
   const minimum = finiteNumberOrNull(boundsSource.minimum);
+  if (minimum === null) {
+    return {};
+  }
+  if (!Object.hasOwn(boundsSource, "maximum")) {
+    return { minimum };
+  }
   const maximum = finiteNumberOrNull(boundsSource.maximum);
-  if (minimum !== null && maximum !== null && minimum > maximum) {
+  if (maximum === null || minimum > maximum) {
     return {};
   }
   return {
-    ...(minimum !== null ? { minimum } : {}),
-    ...(maximum !== null ? { maximum } : {}),
+    minimum,
+    maximum,
   };
 }
 

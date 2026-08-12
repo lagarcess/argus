@@ -8,7 +8,10 @@ import pandas as pd
 import pytest
 from argus.agent_runtime.artifacts import ArtifactPatch, apply_artifact_patch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.clarification_contract import offline_clarification_fallback
+from argus.agent_runtime.clarification_contract import (
+    offline_clarification_fallback,
+    typed_clarification_contract,
+)
 from argus.agent_runtime.coverage_recovery import (
     PRESERVED_OPTIONAL_PARAMETER_STATUS_FACT,
 )
@@ -224,6 +227,50 @@ def test_issue_453_starting_capital_bounds_use_bilingual_range_copy() -> None:
     )
     assert "$500" not in english
     assert "$500" not in spanish
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum"),
+    [
+        (MAX_STARTING_CAPITAL, MIN_STARTING_CAPITAL),
+        (float("nan"), MAX_STARTING_CAPITAL),
+        (MIN_STARTING_CAPITAL, float("inf")),
+    ],
+)
+def test_issue_453_invalid_starting_capital_bounds_fail_closed_in_backend_projection(
+    minimum: float,
+    maximum: float,
+) -> None:
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "facts": {
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_starting_capital",
+                    "raw_value": "$500",
+                    "minimum": minimum,
+                    "maximum": maximum,
+                }
+            ]
+        },
+        "options": [
+            {
+                "label": "Choose a different amount",
+                "replacement_values": {"requested_field": "capital_amount"},
+            }
+        ],
+    }
+
+    fallback = offline_clarification_fallback(
+        language="en",
+        response_intent=response_intent,
+    )
+    sidecar = typed_clarification_contract(response_intent=response_intent)
+
+    assert fallback == "What starting capital amount should I use?"
+    assert sidecar is not None
+    assert "minimum" not in sidecar["payload"]
+    assert "maximum" not in sidecar["payload"]
 
 
 def test_clarify_empty_llm_response_uses_intent_fallback() -> None:
@@ -1386,6 +1433,47 @@ def test_issue_453_clarifier_routes_starting_capital_as_typed_range_rule() -> No
         "minimum": MIN_STARTING_CAPITAL,
     }
     assert context["response_intent"]["facts"]["unsupported_constraints"] == [constraint]
+
+
+@pytest.mark.parametrize(
+    ("minimum", "maximum"),
+    [
+        (MAX_STARTING_CAPITAL, MIN_STARTING_CAPITAL),
+        (float("nan"), MAX_STARTING_CAPITAL),
+        (MIN_STARTING_CAPITAL, float("inf")),
+    ],
+)
+def test_issue_453_clarifier_drops_invalid_starting_capital_bound_pairs(
+    minimum: float,
+    maximum: float,
+) -> None:
+    clarifier = OpenRouterClarificationGenerator()
+    constraint = {
+        "category": "unsupported_starting_capital",
+        "raw_value": "$500",
+        "minimum": minimum,
+        "maximum": maximum,
+        "explanation": "The requested capital is out of range.",
+    }
+    request = clarifier.request_model(
+        current_user_message="Buy and hold NFLX with $500 starting capital.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["NFLX"],
+            capital_amount=500,
+        ),
+        unsupported_constraints=[constraint],
+        response_intent={
+            "kind": "unsupported_recovery",
+            "facts": {"unsupported_constraints": [constraint]},
+        },
+    )
+
+    context = json.loads(clarifier._messages(request)[1].content)
+
+    expected = [{"category": "unsupported_starting_capital"}]
+    assert context["unsupported_constraints"] == expected
+    assert context["response_intent"]["facts"]["unsupported_constraints"] == expected
 
 
 def test_issue_453_clarifier_preserves_typed_time_granularity_value() -> None:

@@ -154,3 +154,83 @@ inspection showed no error in the production file
 `web/lib/chat-recovery-display.ts`; errors naming the owned test file are the
 same existing Bun test-harness typing pattern. Targeted ESLint and the real Bun
 test both pass.
+
+## Fix round 1: fail closed on malformed bound pairs
+
+Review found that backend finiteness checks did not reject reversed pairs and
+could retain the valid half of a non-finite pair. The clarifier voice projection
+also copied both numbers independently. This could persist or voice a misleading
+capital range.
+
+### RED
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_conversation_stages.py -q -k 'invalid_starting_capital_bounds or clarifier_drops_invalid_starting_capital_bound_pairs'
+```
+
+Result: exit 1, 6 failed, 85 deselected. Reversed bounds rendered and persisted;
+non-finite pairs retained one bound; all three malformed pairs reached clarifier
+context.
+
+```text
+bun test web/__tests__/chat-recovery-display.test.ts --test-name-pattern 'malformed starting-capital'
+```
+
+Result: exit 1, 2 passed, 1 failed. The non-finite maximum was incorrectly
+degraded into valid floor copy.
+
+### GREEN
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_conversation_stages.py -q -k 'invalid_starting_capital_bounds or clarifier_drops_invalid_starting_capital_bound_pairs'
+```
+
+Result: exit 0, 6 passed, 85 deselected.
+
+```text
+bun test web/__tests__/chat-recovery-display.test.ts --test-name-pattern 'malformed starting-capital'
+```
+
+Result: exit 0, 3 passed, 32 filtered out, 6 assertions.
+
+Final required commands:
+
+```text
+poetry run pytest --no-cov tests/agent_runtime/test_validation_failure_copy.py tests/agent_runtime/test_conversation_stages.py -q -k 'issue_453 or raw_value or starting_capital'
+bun test web/__tests__/chat-recovery-display.test.ts
+```
+
+Result: backend exit 0 with 16 passed and 85 deselected; Bun exit 0 with
+35 passed and 106 assertions.
+
+```text
+poetry run pytest --no-cov tests/test_i18n_coverage.py -q
+poetry run ruff format --check src/argus/agent_runtime/clarification_contract.py src/argus/agent_runtime/llm_clarifier.py tests/agent_runtime/test_conversation_stages.py
+poetry run ruff check src/argus/agent_runtime/clarification_contract.py src/argus/agent_runtime/llm_clarifier.py tests/agent_runtime/test_conversation_stages.py
+cd web && bun run lint lib/chat-recovery-display.ts __tests__/chat-recovery-display.test.ts
+git diff --check
+```
+
+Result: locale parity 4 passed; Ruff format and check passed; targeted ESLint
+passed; diff check passed. The first Ruff check found only an import-order issue
+in the edited test, which was corrected manually before the repeated clean run.
+
+### Reasoning and self-review
+
+- One backend `validated_starting_capital_bounds` function now owns finite,
+  complete, and ordered bound projection for sidecars, fallback copy, and LLM
+  voice context.
+- A finite minimum with no maximum remains a valid floor. If a maximum is
+  present, both values must be finite and `minimum <= maximum`; otherwise the
+  entire pair is dropped.
+- Web hydration follows the same whole-pair rule and no longer turns an invalid
+  maximum into apparently valid floor copy.
+- Canonical `$1,000` to `$100,000,000` range copy, typed floor copy, timeframe
+  raw-value preservation, and generic raw-value suppression remain unchanged.
+- Locale catalogs were not modified in this fix round; parity was rerun and
+  remains green.
+- Scope audit contains only the two backend owners, backend test, web projection,
+  web test, and this report.
+
+No new concerns were found. The previously recorded branch-wide TypeScript
+baseline classification is unchanged.

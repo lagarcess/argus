@@ -684,6 +684,40 @@ describe("chat recovery display", () => {
     expect(es).not.toContain("User wants to invest $500");
   });
 
+  test.each([
+    { minimum: 100000000, maximum: 1000 },
+    { minimum: Number.NaN, maximum: 100000000 },
+    { minimum: 1000, maximum: Number.POSITIVE_INFINITY },
+  ])(
+    "issue 453 rejects malformed starting-capital bound pair $minimum to $maximum",
+    ({ minimum, maximum }) => {
+      const display = recoveryDisplayFromMetadata({
+        clarification: {
+          kind: "unsupported_recovery",
+          reason_code: "unsupported_starting_capital",
+          prompt_source: "degraded_fallback",
+          requested_field: "capital_amount",
+          semantic_needs: ["simplification_choice"],
+          payload: {
+            raw_value: "User wants to invest $500",
+            minimum,
+            maximum,
+            strategy: { asset_universe: ["NFLX"] },
+          },
+          options: [
+            {
+              id: "option_0",
+              replacement_values: { capital_amount: 10000 },
+            },
+          ],
+        },
+      });
+
+      expect(recoveryDisplayText(display, tFromCatalog(enCatalog))).toBe("");
+      expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe("");
+    },
+  );
+
   test("renders provider-neutral coverage recovery in English and Spanish", () => {
     const metadata = {
       clarification: {

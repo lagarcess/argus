@@ -8,6 +8,9 @@ from typing import Any, Literal
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
+from argus.agent_runtime.clarification_contract import (
+    validated_starting_capital_bounds,
+)
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.state.models import (
     ConversationMessage,
@@ -301,12 +304,15 @@ def _unsupported_constraints_for_voice(
 
     sanitized: list[dict[str, Any]] = []
     for constraint in constraints:
+        category = constraint.get("category")
         projected = {
             key: value
             for key, value in constraint.items()
-            if key not in {"explanation", "raw_value"}
+            if key not in {"explanation", "raw_value", "minimum", "maximum"}
         }
-        if constraint.get("category") == "unsupported_time_granularity":
+        if category == "unsupported_starting_capital":
+            projected.update(validated_starting_capital_bounds(constraint))
+        if category == "unsupported_time_granularity":
             raw_value = constraint.get("raw_value")
             if isinstance(raw_value, str) and raw_value.strip():
                 projected["raw_value"] = raw_value.strip()

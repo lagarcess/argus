@@ -317,15 +317,29 @@ def _unsupported_numeric_bounds(response_intent: dict[str, Any]) -> dict[str, fl
             continue
         if constraint.get("category") != "unsupported_starting_capital":
             continue
-        bounds: dict[str, float] = {}
-        for key in ("minimum", "maximum"):
-            value = constraint.get(key)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                numeric_value = float(value)
-                if isfinite(numeric_value):
-                    bounds[key] = numeric_value
-        return bounds
+        return validated_starting_capital_bounds(constraint)
     return {}
+
+
+def validated_starting_capital_bounds(
+    constraint: dict[str, Any],
+) -> dict[str, float]:
+    minimum = _finite_number(constraint.get("minimum"))
+    if minimum is None:
+        return {}
+    if "maximum" not in constraint:
+        return {"minimum": minimum}
+    maximum = _finite_number(constraint.get("maximum"))
+    if maximum is None or minimum > maximum:
+        return {}
+    return {"minimum": minimum, "maximum": maximum}
+
+
+def _finite_number(value: Any) -> float | None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    numeric_value = float(value)
+    return numeric_value if isfinite(numeric_value) else None
 
 
 def _starting_capital_bounds_fallback(
