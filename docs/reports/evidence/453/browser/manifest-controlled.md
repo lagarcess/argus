@@ -6,8 +6,8 @@ Evidence class: **controlled**
 
 - Historical base: `8025672924d1c74eb80cc926c72b5d8574b613d7`
 - Reviewed product source: `d87d5d6524e0af89d99dab26cc3e4b6f56c24742`
-- Evidence storage commit: recorded in the follow-up metadata commit after the
-  refreshed artifacts are committed
+- Evidence storage commit:
+  `d5b0d6ecbde32f0bdf94945f99a9dce4b925057e`
 - Browser path: the real Next.js guest `/chat` shell at each SHA
 - Browser: repository-pinned Playwright Chromium
 - Viewport: `1440x1000`, desktop, light color scheme
@@ -109,6 +109,11 @@ warnings and did not enter the browser console or page.
 
 The ignored helper directory `web/temp/issue-453-browser-proof/` was deleted
 after this refresh. No helper or local result artifact remains.
+
+After the evidence storage commit, a path-excluded diff against reviewed
+product source `d87d5d6524e0af89d99dab26cc3e4b6f56c24742` returned no product-source
+path. This manifest line is stored in a follow-up provenance-only commit, so
+the source SHA and evidence commit remain separate and inspectable.
 
 ## Artifact inventory
 

@@ -9,8 +9,8 @@ manifest.
 
 - Exact historical base: `8025672924d1c74eb80cc926c72b5d8574b613d7`
 - Reviewed product source: `d87d5d6524e0af89d99dab26cc3e4b6f56c24742`
-- Evidence storage commit: recorded in the follow-up metadata commit after the
-  refreshed artifacts are committed
+- Evidence storage commit:
+  `d5b0d6ecbde32f0bdf94945f99a9dce4b925057e`
 - Exact route: `/chat`
 - Account contract: `account_kind: "guest"`
 - Evidence class: controlled, not live
@@ -188,7 +188,9 @@ directory had already been removed and its Git worktree metadata was pruned.
 - The final scope audit contains only the two assigned tracked paths.
 - The final post-commit audit compares the evidence commit with
   `d87d5d6524e0af89d99dab26cc3e4b6f56c24742` while excluding the assigned
-  evidence and report paths. It must return no product-source path.
+  evidence and report paths. It returned no product-source path after the
+  evidence storage commit. The same check is repeated after this
+  provenance-only follow-up commit.
 
 ## Concerns
 
