@@ -236,8 +236,8 @@ Server-owned policy record for one temporary anonymous identity.
 
 ## 5.2 guest_workspace_handoffs
 
-Server-owned, short-lived claim record for moving one anonymous workspace into
-one existing permanent account.
+Server-owned claim record for moving one anonymous workspace into one permanent
+account created by signup or verified by login.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -245,20 +245,29 @@ one existing permanent account.
 - `source_user_id`: `uuid` (References the anonymous `profiles.id`)
 - `destination_email_hash`: `text` (SHA-256 of the normalized destination
   email; required)
-- `destination_user_id`: `uuid` (Nullable until verified login resolves the
-  permanent `profiles.id`; cleared if that account is deleted)
+- `destination_user_id`: `uuid` (Nullable until a signup insert trigger or
+  verified login resolves the permanent `auth.users.id`; cleared if that Auth
+  user is deleted)
 - `source_conversation_id`: `uuid` (References the one guest conversation)
 - `pending_action`: `jsonb` (Nullable typed reason, conversation, action id, and
   decision artifact id when applicable)
+- `handoff_kind`: `existing_account` or `new_account_signup`
 - `status`: `pending`, `consumed`, or `revoked`
 - `created_at`: `timestamptz`
-- `expires_at`: `timestamptz` (Exactly ten minutes after creation)
+- `expires_at`: `timestamptz` (Exactly ten minutes after creation for an
+  existing-account handoff; the fixed guest workspace expiry for signup)
 - `consumed_at`: `timestamptz` (Nullable)
 
 ### Invariants
 - Browser roles cannot read or execute against this table. Only the service
   role may create or claim a handoff.
 - A pending source workspace has at most one handoff.
+- Preparing a signup handoff locks the source state, reuses the same pending row
+  for a same-email retry, rotates its opaque-secret hash, and refuses to change
+  the email after a destination Auth UUID is bound.
+- A server-only proof in password-signup metadata binds the newly inserted
+  non-anonymous Auth UUID in the same database transaction, then is removed
+  from Auth metadata. A signup handoff never outlives its source workspace.
 - Claim locks the handoff and complete source product graph, resolves the
   destination only from verified Auth email truth, verifies every foreign
   owner, and transfers all mutable product rows in one transaction.
