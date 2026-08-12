@@ -1,12 +1,14 @@
 # Issue #461 access welcome evidence
 
-Status: preliminary exact-source evidence. Final-candidate CI is still required for the new real-gateway double-promotion proof.
+Status: terminal exact-head deterministic, browser, external-message, and isolated-database evidence for issue #461.
 
 ## Candidate identity
 
 - Integration base: `80256729`.
 - First Task 5 evidence commit and initial CI target: `41d189285b18a864d1749cea0a3203cfdf374264`.
-- The proof-tightening commit containing these files is the required next exact-head CI target. Record its exact SHA and terminal run in GitHub checks or PR evidence after publication.
+- Proven exact head: `1014c41db50250b22f3bae26fe105f62f17a3ebf`.
+- GitHub Actions run: [31618243334](https://github.com/lagarcess/argus/actions/runs/31618243334), terminal success.
+- Required isolated-database job: `guest-release-gates` job `94186292441`, terminal success.
 - Email implementation and code-owned HTML source head: `30f2830cad5ce08315c421289252bb7203d4afae`.
 - Branch: `codex/issue-461-welcome-email`.
 - Content version: `private-alpha-access-welcome/v1`.
@@ -30,6 +32,24 @@ All commands ran from the issue branch working tree on 2026-08-12.
 | `shellcheck .github/canary-render.sh` | Not run because shellcheck is unavailable locally |
 
 The 19 focused skips are the real-PostgreSQL access-request file. Local Docker is unavailable, `supabase/config.toml` names the shared `argus-qa` project, and the required disposable Supabase variables are absent. The shared project was not started, reset, or mutated.
+
+## Exact-head isolated Supabase proof
+
+At exact head `1014c41db50250b22f3bae26fe105f62f17a3ebf`, GitHub Actions run [31618243334](https://github.com/lagarcess/argus/actions/runs/31618243334) completed successfully. Its `guest-release-gates` job `94186292441` started and reset the isolated Supabase stack successfully.
+
+The required real-PostgreSQL matrix collected 295 tests and passed all 295 in 209.32 seconds, with zero skips. `scripts/qa/assert_pytest_gate.py` passed. `tests/test_access_request_postgres.py` rendered 19 dots, so `test_protected_approval_replay_uses_real_gateway_and_sends_once` ran non-skipped alongside the other 18 access tests.
+
+That test guarantees the observable double-promotion result:
+
+- two protected approval requests returned HTTP 200 with `{"approved": true}`;
+- exactly one SMTP `DATA` MIME message was accepted across all recording connections;
+- the sole accepted message was `multipart/alternative`;
+- exactly one durable welcome-delivery row remained;
+- the final allowlist role was `user`;
+- the stored language was `es-419`;
+- the stored content version was `private-alpha-access-welcome/v1`.
+
+The same job's local anonymous Auth matrix passed 14 tests with zero skips. Backend, frontend, ownership, and aggregate `ci` jobs were also terminal success.
 
 ## Proportional backend sweep
 
@@ -88,8 +108,7 @@ Plain-text canonicalization removed transport CRLF differences only. It did not 
 
 This is connector-owned external delivery proof. It does not claim that the connector executed `send_access_welcome_email` or the hosted application's SMTP path. Deterministic production SMTP tests separately prove that the code emits `Argus <noreply@get-argus.com>` and preserves its multipart, idempotency-key, and acceptance behavior.
 
-## Pending proof and release boundaries
+## Release boundaries
 
-- `idempotency-proof.txt` remains explicitly pending final-candidate, non-skipped CI for the new real-PostgreSQL plus real local Supabase gateway/TestClient test.
 - Hosted migration application, hosted deployment, live canary, and production application SMTP execution remain unproven and did not occur in this task.
 - No recipient address, credential, ops token, provider key, raw message body, or unredacted Message-ID is retained here.

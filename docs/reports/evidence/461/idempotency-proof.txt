@@ -1,7 +1,7 @@
 Issue #461 double-promotion proof
 =================================
 
-Status: PENDING final-candidate non-skipped CI
+Status: PASS at exact head 1014c41db50250b22f3bae26fe105f62f17a3ebf
 
 Email implementation source head:
 30f2830cad5ce08315c421289252bb7203d4afae
@@ -9,8 +9,16 @@ Email implementation source head:
 First Task 5 evidence commit and initial CI target:
 41d189285b18a864d1749cea0a3203cfdf374264
 
-Required next exact-head CI target:
-The proof-tightening commit containing this file. Record its exact SHA and terminal run in GitHub checks or PR evidence after publication.
+Proven exact head:
+1014c41db50250b22f3bae26fe105f62f17a3ebf
+
+GitHub Actions run:
+https://github.com/lagarcess/argus/actions/runs/31618243334
+Terminal status: success
+
+Required isolated-database job:
+guest-release-gates job 94186292441
+Terminal status: success
 
 Local collection evidence:
 - Command: poetry run pytest tests/test_access_request_postgres.py::test_protected_approval_replay_uses_real_gateway_and_sends_once -vv --no-cov
@@ -19,7 +27,11 @@ Local collection evidence:
 - Docker is unavailable and supabase/config.toml names shared project argus-qa, so no local stack was started or reset.
 - This local result proves collection and skip gating only. It is not real-database proof.
 
-CI proof prepared:
+CI proof executed:
+- Isolated Supabase start and reset: succeeded.
+- Real-PostgreSQL matrix: 295 collected, 295 passed in 209.32 seconds, zero skips.
+- Required gate assertion: passed.
+- tests/test_access_request_postgres.py: 19 tests passed non-skipped, including the new real-gateway double-promotion test.
 - Test: test_protected_approval_replay_uses_real_gateway_and_sends_once
 - Database: ARGUS_DISPOSABLE_DATABASE_URL, isolated CI PostgreSQL.
 - Gateway: SupabaseGateway through ARGUS_LOCAL_SUPABASE_URL and the isolated CI service-role key.
@@ -27,10 +39,18 @@ CI proof prepared:
 - Sender boundary: recording SMTP doubles retain every accepted DATA message across all connections; exactly one accepted multipart/alternative MIME message is required.
 - Randomization: Faker-generated recipient, ops token, and test-only SMTP password.
 - Cleanup: deletes only the generated recipient's delivery and allowlist rows.
-- Required assertions: two HTTP 200 responses; exactly one accepted MIME message; one durable delivery row; final allowlist role user; stored language es-419; content version private-alpha-access-welcome/v1.
+- Proven assertions: two HTTP 200 responses; exactly one accepted DATA MIME message; accepted message is multipart/alternative; one durable delivery row; final allowlist role user; stored language es-419; content version private-alpha-access-welcome/v1.
+
+Nearby exact-head proof:
+- Local anonymous Auth matrix: 14 passed, zero skips.
+- Backend, frontend, ownership, and aggregate ci jobs: terminal success.
 
 Earlier CI context supplied by the release captain:
 - Head 281ff6e8 ran 294 real-PostgreSQL tests with zero skips.
 - That run predates this final-candidate route-plus-real-gateway proof and does not satisfy the pending gate above.
 
-No real-database double-promotion result is claimed until the prepared test runs non-skipped in final-candidate CI.
+Release boundaries:
+- Hosted migration application remains unproven.
+- Hosted deploy remains unproven.
+- Live canary remains unproven.
+- Hosted application SMTP execution remains unproven.
