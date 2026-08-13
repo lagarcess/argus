@@ -592,11 +592,8 @@ def _assert_main_promotion_live_eval_evidence(
     assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
     assert totals.get("unexpected_pass") == 0
 
-    # A promotion asks "is this worse than what users have now", which a suite
-    # scored against frozen expectations cannot answer on its own. So a red
-    # candidate needs a baseline run at the deployed SHA, and the comparison is
-    # the gate. Founder-locked 2026-08-13; see the runbook section
-    # "Live eval is a comparison, not a scoreboard".
+    # A red candidate is gated by comparison against the deployed build, never
+    # by its own score. Runbook: "Live eval is a comparison, not a scoreboard".
     if totals.get("failed"):
         _assert_main_promotion_baseline_comparison(
             manifest,
@@ -631,11 +628,8 @@ def _assert_main_promotion_baseline_comparison(
         f"{manifest_path.name}: baseline eval scorecard does not exist"
     )
     baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
-    # The provenance block ships with the candidate harness, so the first
-    # baseline taken from a production build that predates it is schema v1 and
-    # cannot self-identify. Bind provenance the moment the deployed build can
-    # produce it, and until then require the deployed SHA in the filename so
-    # the evidence still names what it measured.
+    # A deployed build predating the provenance harness emits schema v1 and
+    # cannot self-identify; bind provenance as soon as it can.
     if baseline.get("schema_version", 1) >= 2:
         baseline_provenance = baseline.get("provenance", {})
         assert baseline_provenance.get("candidate_sha") == rollback_match.group(1), (
@@ -664,10 +658,8 @@ def _assert_main_promotion_baseline_comparison(
         f"({len(baseline_failed)}). That is a regression."
     )
 
-    # A favourable total can still hide a real regression behind an offsetting
-    # flip, and this suite's noise floor is several checks. So every case that
-    # passes deployed and fails on the candidate must be named in the manifest
-    # rather than absorbed into the count.
+    # A favourable total can hide a regression behind an offsetting flip, so
+    # every case that passes deployed and fails here is named, not absorbed.
     for case_id in sorted(candidate_failed - baseline_failed):
         assert case_id in manifest, (
             f"{manifest_path.name}: {case_id} passes on the deployed build and "
