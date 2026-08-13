@@ -3491,9 +3491,11 @@ nothing.
   can never violate run-time validation.
 - A recurring card advertises its two money roles instead of the shared
   bankroll band: `starting_capital.min`/`.max` (floor `0`, because `$0` is the
-  seed's default) and `contribution.min`/`.max` plus `contribution.periods`,
-  the periods that fit this card's own window at least once. `capital.min` is
-  absent on a recurring card because the bankroll floor is not its rule.
+  seed's default) and `contribution.max` plus `contribution.periods`, the
+  periods that fit this card's own window at least once. Neither `capital.min`
+  nor `contribution.min` appears on a recurring card: the bankroll floor is not
+  the plan's rule, and the contribution's rule is "some money" rather than a
+  number a client could restate.
 - The direct-edit request names the roles it is editing. `capital` is the
   one-time starting capital of a non-recurring plan; `starting_capital`,
   `recurring_contribution`, and `contribution_period` belong to a recurring

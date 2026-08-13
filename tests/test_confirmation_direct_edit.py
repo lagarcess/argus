@@ -271,8 +271,11 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
     assert contribution_rows and contribution_rows[0]["value"] == "$250 weekly"
     constraints = card["capabilities"]["edit_constraints"]
     assert constraints["starting_capital"]["min"] == 0.0
-    assert "min" not in constraints["capital"]
     assert constraints["contribution"]["periods"]
+    # Neither money floor is restated on a recurring card: the bankroll band is
+    # not the plan's rule, and "some money" is not a number a client can hold.
+    assert "min" not in constraints["capital"]
+    assert "min" not in constraints["contribution"]
 
 
 def test_direct_edit_matches_the_conversational_edit_artifact() -> None:

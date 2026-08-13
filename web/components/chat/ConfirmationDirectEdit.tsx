@@ -63,7 +63,7 @@ function directEditErrorText(
     case "invalid_recurring_contribution":
       return t("chat.confirmation.direct_edit.errors.invalid_contribution", {
         defaultValue: "Each contribution must be between {{min}} and {{max}}.",
-        min: money(constraints?.contribution?.min, "$0.01"),
+        min: money(constraints?.contribution?.min, "$0"),
         max: money(constraints?.contribution?.max, "$100,000,000"),
       });
     case "dca_requires_starting_capital_or_contribution":

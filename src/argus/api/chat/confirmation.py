@@ -349,16 +349,15 @@ def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
     # floor because $0 is its default, and the offered periods are only the
     # ones that fit the card's own window, so the picker can never present a
     # pair the engine would refuse.
+    # The contribution advertises no floor for the same reason the seed's is
+    # zero: the plan's rule is "some money", not "at least this much", and
+    # restating it as a number here would be a second, stricter rule.
     constraints["starting_capital"] = {"min": 0.0, "max": MAX_STARTING_CAPITAL}
     constraints["contribution"] = {
-        "min": _MIN_DCA_CONTRIBUTION,
         "max": MAX_STARTING_CAPITAL,
         "periods": _contribution_periods_for_strategy(strategy),
     }
     return constraints
-
-
-_MIN_DCA_CONTRIBUTION = 0.01
 
 
 def _contribution_periods_for_strategy(strategy: dict[str, Any]) -> list[str]:
