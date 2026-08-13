@@ -82,12 +82,24 @@ _PREDICATIVE = re.compile(
     r"(?!(?:a|an|the)\b)(?:\w+\s+)?$",
     re.IGNORECASE,
 )
-# "not open" asserts the other state. "not only open" asserts this one, so the
-# additive and emphatic forms are excluded rather than read as negation.
+# "not open" asserts the other state, however far the negator sits from it, so
+# this looks anywhere earlier in the same clause rather than counting words.
+# "not only open" asserts this state, so the additive and emphatic forms are
+# excluded rather than read as negation.
 _NEGATION = re.compile(
-    r"\b(?:not|never|no longer|cannot|without)\s+"
-    r"(?!(?:only|merely|just|simply)\b)(?:\w+\s+){0,2}$"
+    r"\b(?:not|never|no longer|cannot|without)\b(?!\s+(?:only|merely|just|simply)\b)",
+    re.IGNORECASE,
 )
+# One clause is the unit a claim lives in. Splitting here lets a state word be
+# read whether it sits before or after the account phrase, while keeping a
+# neighbouring flag's value or an unrelated subject out of this claim.
+_CLAUSE_BREAK = re.compile(
+    r",\s+|;\s+|:\s+|\s+(?:and|but|or|so|because|although|though|whereas)\s+",
+    re.IGNORECASE,
+)
+# Another environment variable ends this flag's value: a stale value after one of
+# these belongs to that variable, not to ours.
+_OTHER_ENV_VAR = re.compile(r"\b(?:ARGUS|NEXT_PUBLIC|SUPABASE|OPENROUTER|ALPACA)_\w+")
 # Self-identifying: this term means the gate is shut, whatever the subject.
 _GATE_SHUT_TERM = "allowlist-gated"
 
@@ -157,23 +169,55 @@ def _declares(position: int | None, scope_at: int | None) -> bool:
     return position is not None and not (scope_at is not None and scope_at < position)
 
 
-def _gate_state_claim(lowered: str, stale_state: re.Pattern[str]) -> int | None:
-    """Where a sentence asserts the stale gate state in words, if it does.
+def _clauses(sentence: str) -> Iterator[tuple[int, str]]:
+    """Yield (offset, clause) for each clause of `sentence`."""
+    start = 0
+    for gap in _CLAUSE_BREAK.finditer(sentence):
+        if gap.start() > start:
+            yield start, sentence[start : gap.start()]
+        start = gap.end()
+    if start < len(sentence):
+        yield start, sentence[start:]
 
-    Requires a public-account subject, then asks how each state word is used: a
-    copula before it makes it predicative and a claim about the gate, while
-    modifying the noun after it makes it a description of that noun instead.
+
+def _flag_value_claim(clause: str, stale_words: tuple[str, ...]) -> int | None:
+    """Where the clause gives this flag the stale value, if it does.
+
+    Only text after the flag name counts, and another environment variable ends
+    the window, so a neighbouring flag's value is never read as this one's.
     """
-    subject = _GATE_SUBJECT.search(lowered)
-    if not subject:
+    named = clause.find(PUBLIC_ACCOUNT_ACCESS_FLAG.lower())
+    if named < 0:
         return None
-    for match in stale_state.finditer(lowered, subject.end()):
-        before = lowered[: match.start()]
+    window_end = len(clause)
+    if other := _OTHER_ENV_VAR.search(clause, named + len(PUBLIC_ACCOUNT_ACCESS_FLAG)):
+        window_end = other.start()
+    return min(
+        (
+            match.start()
+            for word in stale_words
+            if (match := re.compile(rf"\b{word}\b").search(clause, named, window_end))
+        ),
+        default=None,
+    )
+
+
+def _gate_state_claim(clause: str, stale_state: re.Pattern[str]) -> int | None:
+    """Where the clause asserts the stale gate state in words, if it does.
+
+    The clause must be about the gate, in either word order, then each state word
+    is judged by how it is used: a copula before it makes it predicative and a
+    claim about the gate, while modifying the noun after it describes that noun.
+    """
+    if not _GATE_SUBJECT.search(clause):
+        return None
+    for match in stale_state.finditer(clause):
+        before = clause[: match.start()]
         if _NEGATION.search(before):
             continue
         if _PREDICATIVE.search(before):
             return match.start()
-        if _ATTRIBUTIVE.match(lowered, match.end()):
+        if _ATTRIBUTIVE.match(clause, match.end()):
             continue
         return match.start()
     return None
@@ -182,7 +226,7 @@ def _gate_state_claim(lowered: str, stale_state: re.Pattern[str]) -> int | None:
 def _access_claim_contradictions(text: str, declared: str) -> list[str]:
     """Claims in `text` that a reader would take as the wrong flag value.
 
-    Sentences are read whether or not they name the variable, because prose that
+    Clauses are read whether or not they name the variable, because prose that
     describes the policy in words is how most of this drift survived.
     """
     stale = "false" if declared == "true" else "true"
@@ -192,33 +236,40 @@ def _access_claim_contradictions(text: str, declared: str) -> list[str]:
     found: list[str] = []
     for sentence in _claim_sentences(text):
         lowered = sentence.lower()
-        scoped = _SUBORDINATING.search(lowered)
-        scope_at = scoped.start() if scoped else None
 
-        claimed: int | None = None
-        if PUBLIC_ACCOUNT_ACCESS_FLAG in sentence:
-            # Earliest stale word wins, so a later scoped clause cannot excuse
-            # an unscoped one before it. An assignment such as `FLAG=false` is
-            # read here rather than banned outright, so conditional and
-            # procedural off-state guidance stays writable.
-            claimed = min(
-                (
-                    match.start()
-                    for word in stale_words
-                    if (match := re.search(rf"\b{word}\b", lowered))
-                ),
-                default=None,
-            )
-        if not _declares(claimed, scope_at):
+        # The named flag keeps its value across a whole sentence, because "remains
+        # a separate policy and stays `false`" carries the subject over the
+        # conjunction. Binding the value to the name is what keeps a neighbouring
+        # flag out, so this needs no clause split.
+        sentence_scope = _SUBORDINATING.search(lowered)
+        if _declares(
+            _flag_value_claim(lowered, stale_words),
+            sentence_scope.start() if sentence_scope else None,
+        ):
+            found.append(sentence)
+            continue
+
+        # Prose is read one clause at a time instead, so a state word counts
+        # whether it sits before or after the account phrase, and an unrelated
+        # subject in a neighbouring clause is not dragged in.
+        for offset, clause in _clauses(lowered):
+            # A subordinating conjunction earlier in the sentence scopes this
+            # clause too, so splitting cannot strip an off-case description of
+            # the condition that made it honest.
+            inherited = _SUBORDINATING.search(lowered[:offset])
+            local = _SUBORDINATING.search(clause)
+            scope_at = -1 if inherited else (local.start() if local else None)
+
             # Runs in both directions: after a rollback to `false`, prose still
             # calling registration open is the same defect mirrored.
-            if declared == "true" and _GATE_SHUT_TERM in lowered:
-                claimed = lowered.index(_GATE_SHUT_TERM)
+            if declared == "true" and _GATE_SHUT_TERM in clause:
+                claimed = clause.index(_GATE_SHUT_TERM)
             else:
-                claimed = _gate_state_claim(lowered, stale_state)
+                claimed = _gate_state_claim(clause, stale_state)
 
-        if _declares(claimed, scope_at):
-            found.append(sentence)
+            if _declares(claimed, scope_at):
+                found.append(sentence)
+                break
     return found
 
 
@@ -229,6 +280,10 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         f"The independent `{PUBLIC_ACCOUNT_ACCESS_FLAG}` policy remains false.",
         f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` defaults off and controls accounts.",
         f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` stays false unless the founder agrees.",
+        # The named flag keeps its value across a conjunction, so reading prose
+        # clause by clause must not sever the value from the name.
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` remains a separate policy and stays "
+        "`false` until explicitly approved.",
         "Public account creation is still allowlist-gated.",
         "Standing mitigations: allowlist-gated account creation, and Turnstile.",
         # Shapes that never name the variable, which is how four sites survived
@@ -249,6 +304,8 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Public signup is disabled pending review.",
         "Public account access is off limits.",
         "Public account creation is disabled indefinitely.",
+        # The state word may sit before the account phrase, not only after it.
+        "Registration is disabled for public accounts.",
         # A fenced block declares one value per line.
         f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
     )
@@ -279,6 +336,12 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         # it, so this is one denied account rather than the gate.
         "Public registration is open, so the only refusal is a disabled "
         "allowlist entry.",
+        # A neighbouring flag's value is not this flag's, even in one sentence.
+        f"Set `ARGUS_GUEST_ACCESS_ENABLED=false` but keep "
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true`.",
+        # Negation holds however far it sits from the state word.
+        "Public signup is not expected to be open.",
+        "Public registration is not currently expected to remain open.",
         # The founder-owned precondition in API_CONTRACT.md must never read as a
         # stale claim, or a later round deletes it to get the suite green.
         "Before that flag may be enabled, founder-approved evidence must prove "
@@ -306,6 +369,8 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Public signup is open for new accounts.",
         # Additive "not only" asserts the state rather than negating it.
         "Public signup is not only open; it is unrestricted.",
+        # Mirror of the before-the-phrase case in the rollback direction.
+        "Registration remains open for public accounts.",
     ):
         assert _access_claim_contradictions(
             claim, "false"
