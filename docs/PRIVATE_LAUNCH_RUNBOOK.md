@@ -592,7 +592,9 @@ frontend flag controls presentation only and the API remains authoritative.
 Public-account access is open as of 2026-08-12: permanent signup and login
 admit any email without an explicitly disabled allowlist row, the guest surface
 offers account creation, and existing admin/developer behavior is unchanged
-because opening the gate grants no role.
+because opening the gate grants no role. That third flag is the one that fails
+closed when unset, so it must be set explicitly on every service that reads it;
+omitting it denies registration rather than opening it.
 
 Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,

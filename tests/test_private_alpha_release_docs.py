@@ -39,6 +39,21 @@ _STATE_WORDS = {
 _SUBORDINATING = re.compile(r"\b(?:if|when|whenever|while|once)\b", re.IGNORECASE)
 _BLOCK_BREAK = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#|```|\|)")
 
+# Prose names this policy without naming the variable, which is how four sites
+# escaped the first pass. A sentence must be about the gate before its state
+# words are read as a claim about the gate.
+_GATE_SUBJECT = re.compile(
+    r"public[-\s]?(?:account|permanent|registration|signup|login)"
+    r"|permanent[-\s]?account access",
+    re.IGNORECASE,
+)
+# Generic words for "shut", read only close to the subject so an unrelated
+# "disabled allowlist row" later in the sentence is not a claim about the gate.
+_CLOSED_STATE = re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE)
+_SUBJECT_STATE_WINDOW = 60
+# Self-identifying: this term means the gate is shut, whatever the subject.
+_GATE_SHUT_TERM = "allowlist-gated"
+
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
@@ -52,7 +67,11 @@ def _release_profile_value(key: str) -> str:
 def _standing_doc_paths() -> list[Path]:
     """Every Markdown file whose claims are supposed to be true right now."""
     candidates = sorted(
-        {*(ROOT / "docs").rglob("*.md"), *ROOT.glob("*.md"), *(ROOT / ".agent").rglob("*.md")}
+        {
+            *(ROOT / "docs").rglob("*.md"),
+            *ROOT.glob("*.md"),
+            *(ROOT / ".agent").rglob("*.md"),
+        }
     )
     return [
         path
@@ -82,26 +101,36 @@ def _claim_sentences(text: str) -> Iterator[str]:
         block.append(line)
 
 
+def _declares(position: int | None, scope_at: int | None) -> bool:
+    """Whether a value at `position` states the gate's standing posture.
+
+    A subordinating conjunction opening before it scopes the value to a case
+    instead, which is how a doc keeps describing the off state honestly.
+    """
+    return position is not None and not (scope_at is not None and scope_at < position)
+
+
 def _access_claim_contradictions(text: str, declared: str) -> list[str]:
     """Claims in `text` that a reader would take as the wrong flag value.
 
-    Every standing doc is scanned whole, not only the parts naming the flag: the
-    posture claim below is the shape that drifted without ever naming it.
+    Sentences are read whether or not they name the variable, because prose that
+    describes the policy in words is how most of this drift survived.
     """
     stale_words = _STATE_WORDS["false" if declared == "true" else "true"]
-    stale_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={stale_words[0]}"
 
     found: list[str] = []
-    if stale_assignment in text:
-        found.append(f"declares `{stale_assignment}`")
-
     for sentence in _claim_sentences(text):
         lowered = sentence.lower()
         scoped = _SUBORDINATING.search(lowered)
+        scope_at = scoped.start() if scoped else None
+
+        claimed: int | None = None
         if PUBLIC_ACCOUNT_ACCESS_FLAG in sentence:
             # Earliest stale word wins, so a later scoped clause cannot excuse
-            # an unscoped one before it.
-            stale_at = min(
+            # an unscoped one before it. An assignment such as `FLAG=false` is
+            # read here rather than banned outright, so conditional and
+            # procedural off-state guidance stays writable.
+            claimed = min(
                 (
                     match.start()
                     for word in stale_words
@@ -109,12 +138,17 @@ def _access_claim_contradictions(text: str, declared: str) -> list[str]:
                 ),
                 default=None,
             )
-            if stale_at is not None and not (scoped and scoped.start() < stale_at):
-                found.append(sentence)
-        if declared == "true" and "allowlist-gated" in lowered:
-            gate = lowered.index("allowlist-gated")
-            if not (scoped and scoped.start() < gate):
-                found.append(sentence)
+        if declared == "true" and not _declares(claimed, scope_at):
+            if _GATE_SHUT_TERM in lowered:
+                claimed = lowered.index(_GATE_SHUT_TERM)
+            elif subject := _GATE_SUBJECT.search(lowered):
+                shut = _CLOSED_STATE.search(
+                    lowered, subject.end(), subject.end() + _SUBJECT_STATE_WINDOW
+                )
+                claimed = shut.start() if shut else None
+
+        if _declares(claimed, scope_at):
+            found.append(sentence)
     return found
 
 
@@ -127,10 +161,25 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` stays false unless the founder agrees.",
         "Public account creation is still allowlist-gated.",
         "Standing mitigations: allowlist-gated account creation, and Turnstile.",
+        # Shapes that never name the variable, which is how four sites survived
+        # the first pass: DESIGN.md and private-alpha-next-integration.md.
+        "Public account access remains explicitly disabled and founder owned.",
+        "Guest defaults on with rollback; public-account access remains off.",
+        "Rollback is flags first: keep public-account access false.",
+        "Public permanent accounts are disabled, so guest chrome hides signup.",
     )
     must_allow = (
         f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}` is off, signup is allowlist-gated.",
         f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` has been live since 2026-08-12.",
+        # Conditional and procedural off-state guidance stays writable, which is
+        # why the assignment is parsed rather than banned as a substring.
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}=false`, only allowlisted roles enter.",
+        f"When rolling back, set `{PUBLIC_ACCOUNT_ACCESS_FLAG}=false` and redeploy.",
+        # A disabled allowlist row is not a claim that the gate is shut.
+        "Public registration is open. The server turns away only an email "
+        "carrying an explicitly disabled allowlist row.",
+        "Public-account access is an independent gate that fails closed when "
+        "unset, so a deployment omitting the variable denies registration.",
         # The founder-owned precondition in API_CONTRACT.md must never read as a
         # stale claim, or a later round deletes it to get the suite green.
         "Before that flag may be enabled, founder-approved evidence must prove "

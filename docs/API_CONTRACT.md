@@ -1732,7 +1732,9 @@ Guest access is additive and server-authoritative.
 emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
 defaults to `true` and controls presentation only. The independent
 `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` policy has been open in production
-since 2026-08-12, so guests may create permanent accounts.
+since 2026-08-12, so guests may create permanent accounts. That policy is the
+one flag here that fails closed when unset, so an environment omitting it denies
+permanent accounts rather than allowing them.
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
@@ -1862,9 +1864,10 @@ the existing localized check-your-email state and must not redirect to chat.
 
 **Private-alpha blocked response:** signup intentionally returns the same
 generic `400 auth_signup_failed` shape used for provider signup failures, while
-still checking the allowlist before calling Supabase Auth signup. Public signup
-attempts must not distinguish unlisted/disabled private-alpha emails from
-listed emails that fail provider signup.
+still checking the allowlist before calling Supabase Auth signup. A caller must
+not be able to tell a denied email from a listed email that failed provider
+signup. Denial means an explicitly disabled row while the public gate is open,
+and an unlisted email as well when it is closed.
 
 When an optional username is supplied, the server trims and case-folds it and
 serializes same-email and same-username signup attempts before checking profile
@@ -1913,9 +1916,10 @@ Supabase Auth without logging or persistence.
 ```
 
 **Private-alpha blocked response:** login intentionally returns the same generic
-`401 unauthorized` shape used for invalid credentials, so public login attempts
-cannot distinguish unlisted/disabled private-alpha emails from listed emails
-with wrong passwords.
+`401 unauthorized` shape used for invalid credentials, so a caller cannot tell a
+denied email from a listed email with a wrong password. Denial means an
+explicitly disabled row while the public gate is open, and an unlisted email as
+well when it is closed.
 
 ```json
 {

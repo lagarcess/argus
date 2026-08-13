@@ -511,12 +511,15 @@ The checked-in policy opens guest entry and permanent accounts alike:
 - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true`
 
 The frontend presentation flag cannot grant access. The server remains
-authoritative. All three flags default on; explicit `false` is their emergency
-rollback kill switch. Public-account access stays an independent gate, and the
-founder opened it in production on 2026-08-12. Public registration is now open:
-anyone may create a permanent account, only an explicitly disabled allowlist row
-blocks signup or login, and the guest surface offers account creation alongside
-**Sign in**. When that gate is off instead, permanent signup and login are
+authoritative. The two Guest flags default on when unset; explicit `false` is
+their emergency rollback kill switch. Public-account access is an independent
+gate that fails closed when unset, so the checked-in `true` above is what opens
+it and a deployment that omits the variable denies registration. The founder
+opened it in production on 2026-08-12. Public registration is now open. Anyone
+may create a permanent account, and the guest surface offers account creation
+alongside **Sign in**. The only email the server turns away is one carrying an
+explicitly disabled allowlist row. When that gate is off instead, permanent
+signup and login are
 limited to active allowlist roles and guests are offered an access request
 rather than account creation. Existing admin and developer roles are unchanged
 either way, because opening the gate grants access without granting a role.
