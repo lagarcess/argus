@@ -32,6 +32,7 @@ _REMOTE_BRANCH_REF = re.compile(
     r"(?P<branch>[A-Za-z0-9][A-Za-z0-9._/-]*)$"
 )
 _RENDER_PATH = "render.yaml"
+_MIGRATION_APPLY = "never"
 
 
 class MigrationGateError(RuntimeError):
@@ -295,7 +296,7 @@ def read_applied_migrations(
     ssl_root_cert: str,
     connect_factory: ConnectFactory | None = None,
 ) -> list[AppliedMigration]:
-    """Read production's migration ledger through a read-only session."""
+    """Read production's migration ledger in one verified read-only transaction."""
 
     if connect_factory is None:
         from psycopg import connect
@@ -309,22 +310,19 @@ def read_applied_migrations(
             autocommit=True,
             connect_timeout=10,
             gssencmode="disable",
-            options="-c default_transaction_read_only=on",
             sslmode="verify-full",
             sslrootcert=ssl_root_cert,
         )
         with connection.cursor() as cursor:
-            cursor.execute("show transaction_read_only")
-            read_only = cursor.fetchone()
-            if read_only is None or str(read_only[0]).lower() != "on":
-                raise MigrationGateError(
-                    "production database session did not enter read-only mode"
+            _begin_read_only_transaction(cursor)
+            try:
+                cursor.execute(
+                    "select version, coalesce(name, ''), statements "
+                    "from supabase_migrations.schema_migrations order by version"
                 )
-            cursor.execute(
-                "select version, coalesce(name, ''), statements "
-                "from supabase_migrations.schema_migrations order by version"
-            )
-            rows = cursor.fetchall()
+                rows = cursor.fetchall()
+            finally:
+                cursor.execute("rollback")
         if any(len(row) < 3 for row in rows):
             raise MigrationGateError(
                 "production migration ledger returned a malformed row"
@@ -349,6 +347,22 @@ def read_applied_migrations(
             except Exception:
                 pass
     return applied
+
+
+def _begin_read_only_transaction(cursor: DatabaseCursor) -> None:
+    """Open and verify the transaction that contains the production read."""
+
+    cursor.execute("begin transaction read only")
+    try:
+        cursor.execute("show transaction_read_only")
+        read_only = cursor.fetchone()
+        if read_only is None or str(read_only[0]).lower() != "on":
+            raise MigrationGateError(
+                "production database transaction did not enter read-only mode"
+            )
+    except Exception:
+        cursor.execute("rollback")
+        raise
 
 
 def classify_migration(
@@ -414,18 +428,19 @@ def build_migration_report(
         and candidate.statements != applied_by_version[version].statements
     ]
     stop_reasons: list[str] = []
+    advisories: list[str] = []
     if missing:
         stop_reasons.append("missing_candidate_migrations")
     if unexpected:
-        stop_reasons.append("unexpected_applied_migrations")
+        advisories.append("untracked_applied_migrations")
     if name_drift:
         stop_reasons.append("applied_migration_name_drift")
     if content_drift:
         stop_reasons.append("applied_migration_content_drift")
-    parity_verified = not stop_reasons
+    candidate_coverage_verified = not stop_reasons
     return {
         "schema_version": "argus.production_migration_gate.v1",
-        "status": "pass" if parity_verified else "blocked",
+        "status": "pass" if candidate_coverage_verified else "blocked",
         "candidate_sha": candidate_sha,
         "production_target": {
             "project_ref": target.project_ref,
@@ -440,10 +455,12 @@ def build_migration_report(
         "name_drift": name_drift,
         "content_drift": content_drift,
         "stop_reasons": stop_reasons,
+        "advisories": advisories,
+        "latest_candidate_version": max(candidate_by_version, default=None),
         "latest_applied_version": max(applied_by_version, default=None),
         "human_approval": (
             "not_required_no_gap"
-            if parity_verified
+            if candidate_coverage_verified
             else (
                 "required_before_out_of_band_apply"
                 if missing
@@ -452,8 +469,12 @@ def build_migration_report(
         ),
         "apply_result": "not_performed_by_gate",
         "readback": (
-            "migration_ledger_parity_verified"
-            if parity_verified
+            (
+                "candidate_migration_coverage_verified_with_untracked_applied"
+                if unexpected
+                else "migration_ledger_parity_verified"
+            )
+            if candidate_coverage_verified
             else "blocked_pending_schema_parity"
         ),
         "counts": {
@@ -466,7 +487,7 @@ def build_migration_report(
         },
         "database_access": "read_only",
         "database_transport": "tls_verify_full",
-        "migration_apply": "never",
+        "migration_apply": _MIGRATION_APPLY,
     }
 
 
@@ -561,7 +582,7 @@ def main(
             "candidate_sha": args.candidate_sha,
             "database_access": "read_only",
             "database_transport": "tls_verify_full",
-            "migration_apply": "never",
+            "migration_apply": _MIGRATION_APPLY,
             "stop_reasons": ["gate_execution_failed"],
             "error": str(exc),
         }

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+import scripts.ops.production_migration_gate as migration_gate
 from scripts.ops.production_migration_gate import (
     AppliedMigration,
     CandidateMigration,
@@ -99,7 +101,7 @@ def test_exact_version_and_name_parity_passes() -> None:
     ]
 
 
-def test_unexpected_applied_migration_and_name_drift_both_block() -> None:
+def test_name_drift_blocks_while_untracked_applied_rows_are_reported() -> None:
     candidate = CandidateMigration.from_source(
         "supabase/migrations/20260812000000_add_release_marker.sql",
         "create table public.release_marker (id uuid primary key);",
@@ -127,10 +129,8 @@ def test_unexpected_applied_migration_and_name_drift_both_block() -> None:
     )
 
     assert report["status"] == "blocked"
-    assert report["stop_reasons"] == [
-        "unexpected_applied_migrations",
-        "applied_migration_name_drift",
-    ]
+    assert report["stop_reasons"] == ["applied_migration_name_drift"]
+    assert report["advisories"] == ["untracked_applied_migrations"]
     assert report["unexpected_applied_migrations"] == [
         {
             "version": "20260813000000",
@@ -151,6 +151,73 @@ def test_unexpected_applied_migration_and_name_drift_both_block() -> None:
         }
     ]
     assert report["human_approval"] == "required_for_migration_drift_reconciliation"
+
+
+def test_untracked_production_history_is_visible_without_blocking_coverage() -> None:
+    candidates = [
+        CandidateMigration.from_source(
+            f"supabase/migrations/20260701{index:06d}_tracked_{index}.sql",
+            f"create table public.tracked_{index} (id uuid primary key);",
+        )
+        for index in range(60)
+    ]
+    latest = CandidateMigration.from_source(
+        "supabase/migrations/20260811210000_delete_withheld_backtest_result.sql",
+        "create table public.delete_withheld_backtest_result (id uuid primary key);",
+    )
+    candidates.append(latest)
+    applied = [
+        AppliedMigration(
+            version="20260601000000",
+            name="promotion_one_manual_repair",
+            statements=("select 1",),
+        ),
+        AppliedMigration(
+            version="20260602000000",
+            name="promotion_one_manual_readback",
+            statements=("select 2",),
+        ),
+        *[
+            AppliedMigration(
+                version=candidate.version,
+                name=candidate.name,
+                statements=candidate.statements,
+            )
+            for candidate in candidates
+        ],
+    ]
+
+    report = build_migration_report(
+        candidate_sha="d" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=candidates,
+        applied_migrations=applied,
+    )
+
+    assert report["status"] == "pass"
+    assert report["stop_reasons"] == []
+    assert report["advisories"] == ["untracked_applied_migrations"]
+    assert report["latest_candidate_version"] == "20260811210000"
+    assert report["latest_applied_version"] == "20260811210000"
+    assert report["missing_migrations"] == []
+    assert [
+        migration["version"] for migration in report["unexpected_applied_migrations"]
+    ] == ["20260601000000", "20260602000000"]
+    assert report["readback"] == (
+        "candidate_migration_coverage_verified_with_untracked_applied"
+    )
+    assert report["counts"] == {
+        "candidate": 61,
+        "applied": 63,
+        "missing": 0,
+        "unexpected": 2,
+        "name_drift": 0,
+        "content_drift": 0,
+    }
+    assert report["migration_apply"] == "never"
 
 
 def test_blank_applied_migration_name_blocks_as_drift() -> None:
@@ -539,7 +606,7 @@ def test_production_target_rejects_uri_target_overrides(suffix: str) -> None:
         resolve_production_target(database_url, expected_project_ref=project_ref)
 
 
-def test_applied_migrations_are_read_in_a_read_only_session() -> None:
+def test_applied_migrations_are_read_in_one_verified_read_only_transaction() -> None:
     calls: dict[str, Any] = {}
 
     class FakeCursor:
@@ -605,18 +672,68 @@ def test_applied_migrations_are_read_in_a_read_only_session() -> None:
         "autocommit": True,
         "connect_timeout": 10,
         "gssencmode": "disable",
-        "options": "-c default_transaction_read_only=on",
         "sslmode": "verify-full",
         "sslrootcert": "/operator/production-supabase-ca.crt",
     }
     assert connection.cursor_instance.queries == [
+        "begin transaction read only",
         "show transaction_read_only",
         (
             "select version, coalesce(name, ''), statements "
             "from supabase_migrations.schema_migrations order by version"
         ),
+        "rollback",
     ]
     assert connection.closed is True
+
+
+def test_applied_migrations_fail_closed_when_read_only_is_not_established() -> None:
+    class ReadWriteCursor:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def __enter__(self) -> ReadWriteCursor:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def execute(self, query: str) -> None:
+            self.queries.append(query)
+
+        def fetchone(self) -> tuple[str]:
+            return ("off",)
+
+        def fetchall(self) -> list[tuple[object, ...]]:
+            pytest.fail("the ledger must not be read without read-only proof")
+
+    class ReadWriteConnection:
+        def __init__(self) -> None:
+            self.cursor_instance = ReadWriteCursor()
+
+        def cursor(self) -> ReadWriteCursor:
+            return self.cursor_instance
+
+        def close(self) -> None:
+            return None
+
+    connection = ReadWriteConnection()
+
+    with pytest.raises(
+        MigrationGateError,
+        match="production database transaction did not enter read-only mode",
+    ):
+        read_applied_migrations(
+            "postgresql://postgres:do-not-print@db.example.test/postgres",
+            ssl_root_cert="/operator/production-supabase-ca.crt",
+            connect_factory=lambda *_args, **_kwargs: connection,
+        )
+
+    assert connection.cursor_instance.queries == [
+        "begin transaction read only",
+        "show transaction_read_only",
+        "rollback",
+    ]
 
 
 def test_applied_migrations_reject_malformed_statement_history() -> None:
@@ -630,6 +747,111 @@ def test_applied_migrations_reject_malformed_statement_history() -> None:
             ssl_root_cert="/operator/production-supabase-ca.crt",
             connect_factory=lambda *_args, **_kwargs: connection,
         )
+
+
+def test_migration_apply_is_never_for_pass_block_and_advisory_reports() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        "create table public.release_marker (id uuid primary key);",
+    )
+    target = ProductionDatabaseTarget(
+        project_ref="production-ref",
+        database_host="pooler.supabase.test",
+    )
+    reports = [
+        build_migration_report(
+            candidate_sha="a" * 40,
+            target=target,
+            candidate_migrations=[candidate],
+            applied_migrations=[],
+        ),
+        build_migration_report(
+            candidate_sha="b" * 40,
+            target=target,
+            candidate_migrations=[candidate],
+            applied_migrations=[
+                AppliedMigration(
+                    version=candidate.version,
+                    name=candidate.name,
+                    statements=candidate.statements,
+                )
+            ],
+        ),
+        build_migration_report(
+            candidate_sha="c" * 40,
+            target=target,
+            candidate_migrations=[candidate],
+            applied_migrations=[
+                AppliedMigration(
+                    version="20260811000000",
+                    name="manual_repair",
+                    statements=("select 1",),
+                ),
+                AppliedMigration(
+                    version=candidate.version,
+                    name=candidate.name,
+                    statements=candidate.statements,
+                ),
+            ],
+        ),
+    ]
+
+    assert {report["status"] for report in reports} == {"blocked", "pass"}
+    assert {report["migration_apply"] for report in reports} == {"never"}
+
+
+@pytest.mark.skipif(
+    not os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip(),
+    reason="disposable PostgreSQL is not configured",
+)
+def test_gate_read_only_transaction_rejects_a_real_postgres_write() -> None:
+    import psycopg
+
+    connection = psycopg.connect(
+        os.environ["ARGUS_DISPOSABLE_DATABASE_URL"],
+        autocommit=True,
+    )
+    try:
+        with connection.cursor() as cursor:
+            migration_gate._begin_read_only_transaction(cursor)
+            try:
+                with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+                    cursor.execute(
+                        "create table public.argus_migration_gate_write_probe "
+                        "(id integer)"
+                    )
+            finally:
+                cursor.execute("rollback")
+    finally:
+        connection.close()
+
+
+@pytest.mark.skipif(
+    not os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip(),
+    reason="disposable PostgreSQL is not configured",
+)
+def test_gate_fails_closed_when_real_postgres_cannot_begin_read_only() -> None:
+    import psycopg
+
+    connection = psycopg.connect(
+        os.environ["ARGUS_DISPOSABLE_DATABASE_URL"],
+        autocommit=False,
+    )
+    with connection.cursor() as cursor:
+        with pytest.raises(psycopg.errors.UndefinedTable):
+            cursor.execute("select * from public.argus_migration_gate_missing_fixture")
+
+    with pytest.raises(
+        MigrationGateError,
+        match="production migration ledger read failed",
+    ) as error:
+        read_applied_migrations(
+            "postgresql://postgres:do-not-print@db.example.test/postgres",
+            ssl_root_cert="/operator/production-supabase-ca.crt",
+            connect_factory=lambda *_args, **_kwargs: connection,
+        )
+
+    assert isinstance(error.value.__cause__, psycopg.errors.InFailedSqlTransaction)
 
 
 def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
@@ -904,6 +1126,7 @@ def test_cli_redacts_database_failures_and_writes_a_blocked_report(
     assert report["status"] == "blocked"
     assert report["stop_reasons"] == ["gate_execution_failed"]
     assert report["error"] == "production migration ledger read failed"
+    assert report["migration_apply"] == "never"
     assert "do-not-print" not in rendered
     assert output_path.read_text(encoding="utf-8") == rendered
 
