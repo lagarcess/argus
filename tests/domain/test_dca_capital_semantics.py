@@ -694,3 +694,95 @@ def test_a_card_never_offers_a_period_the_request_model_refuses(
         accepted.add(period)
 
     assert offered == accepted, f"{reason}: card offers {offered}, engine takes {accepted}"
+
+
+def test_a_card_never_offers_a_money_bound_the_request_model_refuses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same agreement rule as the periods, for the two money bands.
+
+    A card advertises a band the drawer pre-checks against. Probing just inside
+    and just outside each advertised bound closes the class the period
+    disagreement belonged to, rather than the one instance of it.
+    """
+    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+    window = {"start": "2024-01-01", "end": "2024-12-31"}
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "confirmation_id": "confirmation-bands",
+                "strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "cadence": "monthly",
+                    "capital_amount": 200.0,
+                    "date_range": dict(window),
+                },
+                "optional_parameters": {},
+                "launch_payload": {"sizing_mode": "capital_amount"},
+            },
+        }
+    )
+    constraints = card["capabilities"]["edit_constraints"]
+
+    def accepts(*, seed: float, contribution: float) -> bool:
+        try:
+            LaunchBacktestRequest(
+                strategy_type="dca_accumulation",
+                symbol="AAPL",
+                timeframe="1D",
+                date_range=window,
+                sizing_mode="capital_amount",
+                capital_amount=contribution,
+                starting_capital=seed,
+                cadence="monthly",
+                parameters={},
+                risk_rules=[],
+                benchmark_symbol="SPY",
+            )
+        except ValidationError:
+            return False
+        from argus.agent_runtime.stages.launch_validation_recovery import (
+            _validate_launch_envelope,
+        )
+
+        request = LaunchBacktestRequest(
+            strategy_type="dca_accumulation",
+            symbol="AAPL",
+            timeframe="1D",
+            date_range=window,
+            sizing_mode="capital_amount",
+            capital_amount=contribution,
+            starting_capital=seed,
+            cadence="monthly",
+            parameters={},
+            risk_rules=[],
+            benchmark_symbol="SPY",
+        )
+        try:
+            _validate_launch_envelope(request)
+        except ValueError:
+            return False
+        return True
+
+    seed_band = constraints["starting_capital"]
+    contribution_band = constraints["contribution"]
+
+    # Every advertised bound is honoured, and a step outside each is refused.
+    assert accepts(seed=seed_band["min"], contribution=200.0)
+    assert accepts(seed=seed_band["max"], contribution=200.0)
+    assert not accepts(seed=seed_band["min"] - 1.0, contribution=200.0)
+    assert not accepts(seed=seed_band["max"] + 1.0, contribution=200.0)
+    assert accepts(seed=0.0, contribution=contribution_band["max"])
+    assert not accepts(seed=0.0, contribution=contribution_band["max"] + 1.0)
+    # No floor is advertised for either role, and the plan's own rule is the
+    # only thing between "some money" and none.
+    assert "min" not in contribution_band
+    assert not accepts(seed=0.0, contribution=0.0)
