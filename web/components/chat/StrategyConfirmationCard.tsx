@@ -25,6 +25,8 @@ import {
 } from "@/lib/artifact-status-tones";
 import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
+import { contributionPhrase } from "@/lib/contribution-period-display";
+import { formatCurrency } from "@/lib/result-card-display";
 import {
   retestEffectiveDurationLabel,
   retestPeriodFromValue,
@@ -318,7 +320,7 @@ function confirmationCardViewModel(
 ) {
   const rows = confirmation.rows.map((row) => ({
     key: confirmationRowKey(row),
-    row,
+    row: displayConfirmationRowValue(row, confirmation, t, language),
   }));
   const assetRow = rowForKey(rows, "assets");
   const strategyRow = rowForKey(rows, "strategy");
@@ -408,6 +410,33 @@ function RetestPeriodDisclosure({
       </p>
     </div>
   );
+}
+
+/** Money rows are composed from typed facts, so the amount carries the
+ * viewer's separators and the period reads in the viewer's language. Row
+ * strings stay the fallback for cards persisted before the facts existed. */
+function displayConfirmationRowValue(
+  row: StrategyConfirmationPayload["rows"][number],
+  confirmation: StrategyConfirmationPayload,
+  t: TFunction,
+  language: string,
+): StrategyConfirmationPayload["rows"][number] {
+  const key = confirmationRowKey(row);
+  const facts = confirmation.display_facts;
+  if (key === "contribution" && typeof facts?.recurring_contribution === "number") {
+    return {
+      ...row,
+      value: contributionPhrase(
+        formatCurrency(facts.recurring_contribution, language),
+        facts.contribution_period,
+        t,
+      ),
+    };
+  }
+  if (key === "starting_capital" && typeof facts?.starting_capital === "number") {
+    return { ...row, value: formatCurrency(facts.starting_capital, language) };
+  }
+  return row;
 }
 
 function isConfirmationRow(

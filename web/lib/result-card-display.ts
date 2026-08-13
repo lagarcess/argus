@@ -786,7 +786,7 @@ function benchmarkDisplayValue(
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number, locale = "en-US", currency = "USD") {
+export function formatCurrency(value: number, locale = "en-US", currency = "USD") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,

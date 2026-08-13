@@ -350,7 +350,7 @@ export function ConfirmationDirectEditControls({
   const contributionField = (
     <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
       {capitalFieldLabel}
-      <span className="flex items-center gap-1.5">
+      <span className="flex flex-wrap items-center gap-1.5">
         <span aria-hidden="true" className="text-[13px] text-[#8d969e]">
           $
         </span>
@@ -362,7 +362,7 @@ export function ConfirmationDirectEditControls({
           onChange={(event) => setCapitalDraft(event.target.value)}
           onKeyDown={onFieldKeyDown}
           data-testid="direct-edit-capital-input"
-          className={`${inlineEditFieldClassName} w-36 tablet:w-28`}
+          className={`${inlineEditFieldClassName} w-24 tablet:w-28`}
         />
         {isRecurring && periodOptions.length > 0 && (
           <select

@@ -1,0 +1,132 @@
+{
+  "actions": [
+    {
+      "id": "adjust-assumptions",
+      "label": "Change assumptions",
+      "labelKey": "chat.confirmation.actions.adjust_assumptions",
+      "payload": {
+        "artifact_id": "confirmation-455-dca",
+        "confirmation_id": "confirmation-455-dca",
+        "launch_payload_hash": null
+      },
+      "presentation": "confirmation",
+      "type": "adjust_assumptions"
+    },
+    {
+      "id": "cancel-confirmation",
+      "label": "Cancel",
+      "labelKey": "chat.confirmation.actions.cancel",
+      "payload": {
+        "artifact_id": "confirmation-455-dca",
+        "confirmation_id": "confirmation-455-dca",
+        "launch_payload_hash": null
+      },
+      "presentation": "confirmation",
+      "type": "cancel_confirmation"
+    }
+  ],
+  "asset_class": "equity",
+  "assumptions": [
+    "$0 starting capital",
+    "$200 monthly contribution",
+    "Daily data",
+    "No fees",
+    "No slippage",
+    "Benchmark: SPY"
+  ],
+  "canonical_launch_payload_hash": null,
+  "capabilities": {
+    "direct_edits": [
+      "capital",
+      "dates",
+      "costs"
+    ],
+    "edit_constraints": {
+      "capital": {
+        "max": 100000000.0
+      },
+      "contribution": {
+        "max": 100000000.0,
+        "min": 0.01,
+        "periods": [
+          "daily",
+          "weekly",
+          "biweekly",
+          "monthly",
+          "quarterly"
+        ]
+      },
+      "date_window": {
+        "max_end": "2026-08-13",
+        "min_start": "2016-01-01"
+      },
+      "fees": {
+        "max": 0.05,
+        "min": 0.0
+      },
+      "slippage": {
+        "max": 0.05,
+        "min": 0.0
+      },
+      "starting_capital": {
+        "max": 100000000.0,
+        "min": 0.0
+      }
+    },
+    "execution_costs_editable": true
+  },
+  "confirmation_id": "confirmation-455-dca",
+  "confirmation_state": "active",
+  "date_range": {
+    "display": "January 2, 2020 - December 31, 2024",
+    "end": "2024-12-31",
+    "start": "2020-01-02"
+  },
+  "display_facts": {
+    "benchmark_symbol": "SPY",
+    "contribution_period": "monthly",
+    "fees": 0.0,
+    "recurring_contribution": 200.0,
+    "slippage": 0.0,
+    "starting_capital": 0.0,
+    "timeframe": "1D"
+  },
+  "launch_payload_hash": null,
+  "rows": [
+    {
+      "key": "strategy",
+      "label": "Strategy",
+      "labelKey": "chat.confirmation.rows.strategy",
+      "value": "Recurring Buys"
+    },
+    {
+      "key": "assets",
+      "label": "Assets",
+      "labelKey": "chat.confirmation.rows.assets",
+      "value": "KO"
+    },
+    {
+      "key": "period",
+      "label": "Period",
+      "labelKey": "chat.confirmation.rows.period",
+      "value": "January 2, 2020 - December 31, 2024"
+    },
+    {
+      "key": "starting_capital",
+      "label": "Starting capital",
+      "labelKey": "chat.confirmation.rows.starting_capital",
+      "value": "$0"
+    },
+    {
+      "key": "contribution",
+      "label": "Contribution",
+      "labelKey": "chat.confirmation.rows.contribution",
+      "value": "$200 monthly"
+    }
+  ],
+  "status": "needs_change",
+  "statusLabel": "Needs change",
+  "strategy_type": "dca_accumulation",
+  "summary": "Ready to test recurring buys for KO over January 2, 2020 - December 31, 2024.",
+  "title": "KO recurring buys"
+}
