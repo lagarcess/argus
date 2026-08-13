@@ -79,7 +79,7 @@ def test_exact_version_and_name_parity_passes() -> None:
             AppliedMigration(
                 version="20260812000000",
                 name="add_release_marker",
-                statements=candidate.statements,
+                statements=(candidate.source,),
             )
         ],
     )
@@ -96,7 +96,11 @@ def test_exact_version_and_name_parity_passes() -> None:
             "version": "20260812000000",
             "name": "add_release_marker",
             "statement_count": 1,
-            "statements_sha256": candidate.statements_sha256,
+            "statements_sha256": AppliedMigration(
+                version=candidate.version,
+                name=candidate.name,
+                statements=(candidate.source,),
+            ).statements_sha256,
         }
     ]
 
@@ -166,24 +170,32 @@ def test_untracked_production_history_is_visible_without_blocking_coverage() -> 
         "create table public.delete_withheld_backtest_result (id uuid primary key);",
     )
     candidates.append(latest)
+    historical_applied = [
+        AppliedMigration(
+            version=f"20260601{index:06d}",
+            name=f"promotion_one_history_{index}",
+            statements=(f"select {index}",),
+        )
+        for index in range(7)
+    ]
+    historical_mapped = [
+        AppliedMigration(
+            version=f"20260602{index:06d}",
+            name=candidate.name,
+            statements=(candidate.source,),
+        )
+        for index, candidate in enumerate(candidates[5:10])
+    ]
     applied = [
-        AppliedMigration(
-            version="20260601000000",
-            name="promotion_one_manual_repair",
-            statements=("select 1",),
-        ),
-        AppliedMigration(
-            version="20260602000000",
-            name="promotion_one_manual_readback",
-            statements=("select 2",),
-        ),
+        *historical_applied,
+        *historical_mapped,
         *[
             AppliedMigration(
                 version=candidate.version,
                 name=candidate.name,
-                statements=candidate.statements,
+                statements=(candidate.source,),
             )
-            for candidate in candidates
+            for candidate in candidates[10:]
         ],
     ]
 
@@ -199,25 +211,73 @@ def test_untracked_production_history_is_visible_without_blocking_coverage() -> 
 
     assert report["status"] == "pass"
     assert report["stop_reasons"] == []
-    assert report["advisories"] == ["untracked_applied_migrations"]
+    assert report["advisories"] == ["historical_migration_ledger_variance"]
     assert report["latest_candidate_version"] == "20260811210000"
     assert report["latest_applied_version"] == "20260811210000"
     assert report["missing_migrations"] == []
+    variance = report["historical_ledger_variance"]
+    assert variance["reconciled_through_version"] == "20260811210000"
+    assert [mapping["candidate_version"] for mapping in variance["version_mappings"]] == [
+        candidate.version for candidate in candidates[5:10]
+    ]
     assert [
-        migration["version"] for migration in report["unexpected_applied_migrations"]
-    ] == ["20260601000000", "20260602000000"]
+        migration["version"]
+        for migration in variance["candidate_without_ledger_identity"]
+    ] == [candidate.version for candidate in candidates[:5]]
+    assert [
+        migration["version"]
+        for migration in variance["applied_without_candidate_identity"]
+    ] == [migration.version for migration in historical_applied]
+    assert variance["applied_row_surplus"] == 2
     assert report["readback"] == (
-        "candidate_migration_coverage_verified_with_untracked_applied"
+        "candidate_migration_coverage_verified_with_historical_ledger_variance"
     )
     assert report["counts"] == {
         "candidate": 61,
         "applied": 63,
         "missing": 0,
-        "unexpected": 2,
+        "unexpected": 7,
         "name_drift": 0,
         "content_drift": 0,
+        "historical_candidate_without_ledger_identity": 5,
+        "historical_applied_without_candidate_identity": 7,
+        "applied_row_surplus": 2,
     }
     assert report["migration_apply"] == "never"
+
+
+def test_candidate_newer_than_reconciled_production_watermark_still_blocks() -> None:
+    applied_candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260811210000_delete_withheld_backtest_result.sql",
+        "create function public.delete_withheld() returns boolean "
+        "language sql as 'select true';",
+    )
+    pending_candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812183000_guest_account_signup_handoffs.sql",
+        "create table public.guest_account_signup_handoffs (id uuid primary key);",
+    )
+
+    report = build_migration_report(
+        candidate_sha="e" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[applied_candidate, pending_candidate],
+        applied_migrations=[
+            AppliedMigration(
+                version=applied_candidate.version,
+                name=applied_candidate.name,
+                statements=(applied_candidate.source,),
+            )
+        ],
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["missing_candidate_migrations"]
+    assert [row["version"] for row in report["missing_migrations"]] == [
+        pending_candidate.version
+    ]
 
 
 def test_blank_applied_migration_name_blocks_as_drift() -> None:
@@ -281,6 +341,44 @@ def test_same_version_and_name_with_different_statements_blocks() -> None:
             "version": candidate.version,
             "reason": "statements_mismatch",
             "candidate_statement_count": 1,
+            "candidate_statements_sha256": candidate.statements_sha256,
+            "applied_statement_count": 1,
+            "applied_statements_sha256": applied.statements_sha256,
+        }
+    ]
+
+
+def test_reconciled_historical_content_drift_is_reported_without_blocking() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260811210000_delete_withheld_backtest_result.sql",
+        "create function public.delete_withheld() returns boolean "
+        "language sql as 'select true';",
+    )
+    applied = AppliedMigration(
+        version=candidate.version,
+        name=candidate.name,
+        statements=("select 'hand-reconciled history'",),
+    )
+
+    report = build_migration_report(
+        candidate_sha="f" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[applied],
+    )
+
+    assert report["status"] == "pass"
+    assert report["stop_reasons"] == []
+    assert report["content_drift"] == []
+    assert report["advisories"] == ["historical_migration_ledger_variance"]
+    assert report["historical_ledger_variance"]["content_drift"] == [
+        {
+            "version": candidate.version,
+            "reason": "statements_mismatch",
+            "candidate_statement_count": len(candidate.statements),
             "candidate_statements_sha256": candidate.statements_sha256,
             "applied_statement_count": 1,
             "applied_statements_sha256": applied.statements_sha256,
@@ -890,6 +988,9 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
         "missing": 1,
         "name_drift": 0,
         "unexpected": 0,
+        "historical_candidate_without_ledger_identity": 0,
+        "historical_applied_without_candidate_identity": 0,
+        "applied_row_surplus": 0,
     }
     assert report["database_access"] == "read_only"
     assert report["database_transport"] == "tls_verify_full"

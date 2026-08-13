@@ -33,6 +33,8 @@ _REMOTE_BRANCH_REF = re.compile(
 )
 _RENDER_PATH = "render.yaml"
 _MIGRATION_APPLY = "never"
+# Production history was hand-reconciled through this pre-gate migration.
+_LEDGER_RECONCILIATION_THROUGH = "20260811210000"
 
 
 class MigrationGateError(RuntimeError):
@@ -401,15 +403,25 @@ def build_migration_report(
         applied_migrations,
         source="production",
     )
+    historical_mappings, mapped_candidate_versions, mapped_applied_versions = (
+        _historical_migration_mappings(candidate_by_version, applied_by_version)
+    )
     missing = [
         migration.as_missing_record()
         for version, migration in candidate_by_version.items()
-        if version not in applied_by_version
+        if version > _LEDGER_RECONCILIATION_THROUGH and version not in applied_by_version
+    ]
+    historical_candidate_without_ledger_identity = [
+        migration.as_record()
+        for version, migration in candidate_by_version.items()
+        if version <= _LEDGER_RECONCILIATION_THROUGH
+        and version not in applied_by_version
+        and version not in mapped_candidate_versions
     ]
     unexpected = [
         migration.as_record()
         for version, migration in applied_by_version.items()
-        if version not in candidate_by_version
+        if version not in candidate_by_version and version not in mapped_applied_versions
     ]
     name_drift = [
         {
@@ -418,20 +430,70 @@ def build_migration_report(
             "applied_name": applied_by_version[version].name,
         }
         for version, candidate in candidate_by_version.items()
+        if version > _LEDGER_RECONCILIATION_THROUGH
         if version in applied_by_version
         and applied_by_version[version].name != candidate.name
     ]
     content_drift = [
         _content_drift_record(candidate, applied_by_version[version])
         for version, candidate in candidate_by_version.items()
+        if version > _LEDGER_RECONCILIATION_THROUGH
         if version in applied_by_version
-        and candidate.statements != applied_by_version[version].statements
+        and not _migration_content_matches(candidate, applied_by_version[version])
     ]
+    historical_name_drift = [
+        {
+            "version": version,
+            "candidate_name": candidate.name,
+            "applied_name": applied_by_version[version].name,
+        }
+        for version, candidate in candidate_by_version.items()
+        if version <= _LEDGER_RECONCILIATION_THROUGH
+        if version in applied_by_version
+        and applied_by_version[version].name != candidate.name
+    ]
+    historical_content_drift = [
+        _content_drift_record(candidate, applied_by_version[version])
+        for version, candidate in candidate_by_version.items()
+        if version <= _LEDGER_RECONCILIATION_THROUGH
+        if version in applied_by_version
+        and not _migration_content_matches(candidate, applied_by_version[version])
+    ]
+    historical_applied_without_candidate_identity = [
+        migration
+        for migration in unexpected
+        if str(migration["version"]) <= _LEDGER_RECONCILIATION_THROUGH
+    ]
+    strict_unexpected = [
+        migration
+        for migration in unexpected
+        if str(migration["version"]) > _LEDGER_RECONCILIATION_THROUGH
+    ]
+    candidate_rows_through_reconciliation = sum(
+        version <= _LEDGER_RECONCILIATION_THROUGH for version in candidate_by_version
+    )
+    applied_rows_through_reconciliation = sum(
+        version <= _LEDGER_RECONCILIATION_THROUGH for version in applied_by_version
+    )
+    applied_row_surplus = max(
+        applied_rows_through_reconciliation - candidate_rows_through_reconciliation,
+        0,
+    )
+    has_historical_variance = bool(
+        historical_mappings
+        or historical_candidate_without_ledger_identity
+        or historical_applied_without_candidate_identity
+        or historical_name_drift
+        or historical_content_drift
+        or applied_row_surplus
+    )
     stop_reasons: list[str] = []
     advisories: list[str] = []
     if missing:
         stop_reasons.append("missing_candidate_migrations")
-    if unexpected:
+    if has_historical_variance:
+        advisories.append("historical_migration_ledger_variance")
+    if strict_unexpected:
         advisories.append("untracked_applied_migrations")
     if name_drift:
         stop_reasons.append("applied_migration_name_drift")
@@ -454,6 +516,19 @@ def build_migration_report(
         "unexpected_applied_migrations": unexpected,
         "name_drift": name_drift,
         "content_drift": content_drift,
+        "historical_ledger_variance": {
+            "reconciled_through_version": _LEDGER_RECONCILIATION_THROUGH,
+            "version_mappings": historical_mappings,
+            "candidate_without_ledger_identity": (
+                historical_candidate_without_ledger_identity
+            ),
+            "applied_without_candidate_identity": (
+                historical_applied_without_candidate_identity
+            ),
+            "name_drift": historical_name_drift,
+            "content_drift": historical_content_drift,
+            "applied_row_surplus": applied_row_surplus,
+        },
         "stop_reasons": stop_reasons,
         "advisories": advisories,
         "latest_candidate_version": max(candidate_by_version, default=None),
@@ -471,8 +546,13 @@ def build_migration_report(
         "readback": (
             (
                 "candidate_migration_coverage_verified_with_untracked_applied"
-                if unexpected
-                else "migration_ledger_parity_verified"
+                if strict_unexpected
+                else (
+                    "candidate_migration_coverage_verified_with_"
+                    "historical_ledger_variance"
+                    if has_historical_variance
+                    else "migration_ledger_parity_verified"
+                )
             )
             if candidate_coverage_verified
             else "blocked_pending_schema_parity"
@@ -484,6 +564,13 @@ def build_migration_report(
             "unexpected": len(unexpected),
             "name_drift": len(name_drift),
             "content_drift": len(content_drift),
+            "historical_candidate_without_ledger_identity": len(
+                historical_candidate_without_ledger_identity
+            ),
+            "historical_applied_without_candidate_identity": len(
+                historical_applied_without_candidate_identity
+            ),
+            "applied_row_surplus": applied_row_surplus,
         },
         "database_access": "read_only",
         "database_transport": "tls_verify_full",
@@ -653,6 +740,67 @@ def _resolve_ssl_root_cert(value: str) -> str:
             "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT must be an absolute " "readable file"
         ) from exc
     return str(resolved)
+
+
+def _historical_migration_mappings(
+    candidate_by_version: Mapping[str, CandidateMigration],
+    applied_by_version: Mapping[str, AppliedMigration],
+) -> tuple[list[dict[str, object]], set[str], set[str]]:
+    mappings: list[dict[str, object]] = []
+    mapped_candidate_versions: set[str] = set()
+    mapped_applied_versions: set[str] = set()
+    available_applied_versions = {
+        version
+        for version in applied_by_version
+        if version <= _LEDGER_RECONCILIATION_THROUGH
+        and version not in candidate_by_version
+    }
+    for candidate_version, candidate in candidate_by_version.items():
+        if (
+            candidate_version > _LEDGER_RECONCILIATION_THROUGH
+            or candidate_version in applied_by_version
+        ):
+            continue
+        accepted_names = {
+            candidate.name,
+            f"{candidate.version}_{candidate.name}",
+        }
+        matches = [
+            version
+            for version in available_applied_versions
+            if applied_by_version[version].name in accepted_names
+        ]
+        if len(matches) != 1:
+            continue
+        applied_version = matches[0]
+        applied = applied_by_version[applied_version]
+        mappings.append(
+            {
+                "candidate_version": candidate.version,
+                "candidate_name": candidate.name,
+                "applied_version": applied.version,
+                "applied_name": applied.name,
+                "content_match": _migration_content_matches(candidate, applied),
+            }
+        )
+        mapped_candidate_versions.add(candidate_version)
+        mapped_applied_versions.add(applied_version)
+        available_applied_versions.remove(applied_version)
+    return mappings, mapped_candidate_versions, mapped_applied_versions
+
+
+def _migration_content_matches(
+    candidate: CandidateMigration,
+    applied: AppliedMigration,
+) -> bool:
+    if applied.statements is None:
+        return False
+    if candidate.statements == applied.statements:
+        return True
+    return (
+        len(applied.statements) == 1
+        and candidate.source.strip() == applied.statements[0].strip()
+    )
 
 
 def _content_drift_record(
