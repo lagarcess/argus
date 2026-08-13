@@ -129,14 +129,23 @@ class LaunchBacktestRequest(BaseModel):
                 validate_contribution_period_fits_window,
             )
 
-            # Measured against the window the user asked for, not the one the
-            # provider could serve. Coverage moves the boundary to the nearest
-            # session, so a plain "January, monthly" would otherwise be refused
-            # for being one day short of the month it literally is.
+            # Which window the period must fit depends on why the two differ,
+            # and coverage already owns that distinction. Nudging a boundary to
+            # the nearest session leaves the user's month a month, so the ask is
+            # what counts. Truncating a year to three weeks because the asset is
+            # newly listed does not, so there the served window counts.
+            truncated = (
+                self.coverage_preflight is not None
+                and self.coverage_preflight.adjustment_reason
+                == "provider_coverage_adjustment"
+            )
+            window_start, window_end = (
+                (start, end) if truncated else (requested_start, requested_end)
+            )
             validate_contribution_period_fits_window(
                 self.cadence,
-                start=requested_start,
-                end=requested_end,
+                start=window_start,
+                end=window_end,
             )
 
         return self

@@ -530,3 +530,81 @@ def test_no_card_producer_lets_the_two_roles_collapse() -> None:
     for producer, facts in produced.items():
         assert facts["starting_capital"] == SEED, producer
         assert facts["recurring_contribution"] == CONTRIBUTION, producer
+
+
+def _preflight(*, reason: str, effective: dict[str, str], requested: dict[str, str]):
+    return {
+        "schema_version": "market_data_coverage_v1",
+        "outcome": "adjusted_coverage",
+        "requested_date_range": requested,
+        "effective_date_range": effective,
+        "adjustment_reason": reason,
+        "preflight_id": "preflight-455",
+        "observations_by_symbol": {"AAPL": 15},
+    }
+
+
+_YEAR = {"start": "2024-01-01", "end": "2024-12-31"}
+_JANUARY_ASKED = {"start": "2024-01-01", "end": "2024-01-31"}
+_JANUARY_SERVED = {"start": "2024-01-02", "end": "2024-01-31"}
+_THREE_WEEKS = {"start": "2024-12-10", "end": "2024-12-31"}
+
+
+@pytest.mark.parametrize(
+    ("label", "date_range", "requested", "reason", "fits"),
+    [
+        # Nudging a boundary to the nearest session leaves a month a month.
+        ("calendar alignment", _JANUARY_SERVED, _JANUARY_ASKED, "calendar_alignment", True),
+        # Truncating a year to three weeks does not, so the served window rules.
+        ("provider truncation", _THREE_WEEKS, _YEAR, "provider_coverage_adjustment", False),
+        # A truncation that still leaves room stays runnable.
+        ("truncation with room", _YEAR, _YEAR, "provider_coverage_adjustment", True),
+        # With no coverage at all the request's own window is the only truth.
+        ("no coverage, short ask", _THREE_WEEKS, None, None, False),
+    ],
+)
+def test_the_window_a_period_must_fit_follows_why_coverage_moved_it(
+    label: str,
+    date_range: dict[str, str],
+    requested: dict[str, str] | None,
+    reason: str | None,
+    fits: bool,
+) -> None:
+    """Coverage owns the distinction, so the rule reads it rather than guessing.
+
+    Measuring only the requested span would let a year-long monthly plan mint
+    against three weeks of data; measuring only the served span would refuse a
+    plain "January, monthly" for being one session short of the month it is.
+    """
+    from argus.agent_runtime.stages.confirm import _validation_error_code
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from pydantic import ValidationError
+
+    payload: dict[str, Any] = {
+        "strategy_type": "dca_accumulation",
+        "symbol": "AAPL",
+        "timeframe": "1D",
+        "date_range": date_range,
+        "sizing_mode": "capital_amount",
+        "capital_amount": 200.0,
+        "cadence": "monthly",
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+    }
+    if requested is not None:
+        payload["requested_date_range"] = requested
+    if reason is not None and requested is not None:
+        payload["coverage_preflight"] = _preflight(
+            reason=reason,
+            effective=date_range,
+            requested=requested,
+        )
+
+    try:
+        LaunchBacktestRequest(**payload)
+    except ValidationError as exc:
+        assert not fits, f"{label} should have been accepted"
+        assert _validation_error_code(exc) == "contribution_period_exceeds_window"
+    else:
+        assert fits, f"{label} should have been refused"

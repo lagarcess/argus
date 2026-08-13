@@ -170,8 +170,16 @@ export function ConfirmationDirectEditControls({
 
   const isRecurring = confirmation.strategy_type === "dca_accumulation";
   // Backend truth: the only periods this card's window can hold. The picker
-  // renders exactly these, so it can never offer an invalid pair.
-  const periodOptions = constraints?.contribution?.periods ?? [];
+  // renders exactly these, plus the card's own period when the served window
+  // no longer holds it, because showing the run's actual period is honest and
+  // silently swapping it for another is not. The backend still refuses a
+  // period that cannot fit, naming the rule.
+  const offeredPeriods = constraints?.contribution?.periods ?? [];
+  const cardPeriod = confirmation.display_facts?.contribution_period ?? "";
+  const periodOptions =
+    cardPeriod && !offeredPeriods.includes(cardPeriod)
+      ? [cardPeriod, ...offeredPeriods]
+      : offeredPeriods;
   const labels: Record<DirectEditKind, string> = {
     capital: isRecurring
       ? t("chat.confirmation.direct_edit.edit_money", "Edit amounts")
@@ -197,10 +205,8 @@ export function ConfirmationDirectEditControls({
           ? String(startingCapital)
           : "0",
       );
-      const period = facts?.contribution_period ?? "";
-      setPeriodDraft(
-        periodOptions.includes(period) ? period : (periodOptions[0] ?? ""),
-      );
+      // The card's own period, never another one chosen on the user's behalf.
+      setPeriodDraft(facts?.contribution_period ?? periodOptions[0] ?? "");
     } else if (kind === "dates") {
       setStartDraft(confirmation.date_range?.start ?? "");
       setEndDraft(confirmation.date_range?.end ?? "");

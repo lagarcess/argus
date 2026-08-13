@@ -210,3 +210,18 @@ describe("confirmation direct edit surface", () => {
     expect(component).toContain('case "confirmation_changed"');
   });
 });
+
+describe("issue 455: the period picker never chooses for the user", () => {
+  test("shows the card's own period even when the served window no longer holds it", () => {
+    const editor = source("components/chat/ConfirmationDirectEdit.tsx");
+    // The draft is the card's period, full stop. Falling back to the first
+    // offered option would silently replace a period the user chose.
+    expect(editor).toContain(
+      'setPeriodDraft(facts?.contribution_period ?? periodOptions[0] ?? "")',
+    );
+    expect(editor).not.toContain("periodOptions.includes(period) ? period");
+    // A period the window no longer holds is still shown, so the select can
+    // render the truth rather than quietly moving off it.
+    expect(editor).toContain("cardPeriod && !offeredPeriods.includes(cardPeriod)");
+  });
+});
