@@ -1553,14 +1553,77 @@ The canonical backtest config used by the engine for execution and reproducibili
 - > [!NOTE]
   > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
 
-### DCA / Recurring-Buy Amount Semantics
-- **Current executable amount:** one recurring contribution amount.
-- **Supported cadences:** `daily`, `weekly`, `biweekly`, `monthly`, `quarterly`.
-- **Stored field:** `StrategySummary.capital_amount` continues to mean the recurring contribution for DCA / recurring-buy drafts.
-- **Not currently executable in DCA:** separate starting principal, total capital budget, contribution ceiling, or maximum invested cap.
-- If the user supplies both a recurring contribution and a starting/total capital amount, Argus must preserve the distinction conversationally, but must not show `Ready to run` as if both amounts will execute in the DCA engine.
-- The supported recovery path is to ask whether the user wants to run the recurring-buy simulation only, adjust the recurring contribution, or switch to a supported buy-and-hold style test using starting capital.
-- Deferred(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording. This is broader unsupported DCA engine capability work and is outside the Spanish canary/chart attribution fix.
+### DCA / Recurring-Buy Capital Semantics
+
+A recurring plan has exactly two money roles and they are peers, never each
+other's default. Both are declared together in one `DcaCapitalPlan`
+(`argus.domain.dca_capital`), and every layer that shows, edits, validates, or
+executes a plan reads that owner rather than deciding for itself.
+
+- **`starting_capital`** — the seed, invested on day one at the fill price
+  after modeled costs. **Default `0`**, because the common question ("what if I
+  had bought $200 of Coca-Cola every month") has no lump sum in it.
+- **`recurring_contribution`** — invested every period.
+- **`cadence`** — the contribution period: `daily`, `weekly`, `biweekly`,
+  `monthly`, `quarterly`. Wire and storage keep the name `cadence`; no user-facing
+  surface names the period as a standalone parameter (see the copy rule below).
+
+**Neither role may stand in for the other.** A DCA engine config carries the
+plan under `dca_capital` and carries **no** top-level `starting_capital`,
+`recurring_contribution`, or `starting_principal`, so a reader that reaches for
+the wrong role raises rather than silently reading the other one. Configs
+written before this shape existed are migrated at one named site: their
+`starting_capital` was the contribution and their seed was `0`.
+
+- `LaunchBacktestRequest` carries `starting_capital` and
+  `recurring_contribution` as named fields for DCA and refuses both for any
+  other strategy type. `capital_amount` remains the older spelling of the
+  contribution for stored cards; when both are present they must state the same
+  number (`dca_capital_role_conflict` otherwise), so neither spelling can
+  quietly override the other.
+- `StrategySummary.capital_amount` continues to mean the recurring contribution
+  for DCA drafts. The seed rides `optional_parameters.initial_capital` and only
+  counts when the user actually stated it, so the shared bankroll default never
+  becomes a seed.
+
+**The bankroll floor does not apply to a recurring plan.** `MIN_STARTING_CAPITAL`
+answers "is this a fundable one-time position", which a plan seeded at `$0` is
+not. A plan is refused by its own rule instead:
+
+| Condition | Refusal code |
+| :--- | :--- |
+| Both roles `0` | `dca_requires_starting_capital_or_contribution` |
+| Contribution `0` beside a seed | `dca_contribution_zero_is_buy_and_hold` |
+| Either role negative or above `MAX_STARTING_CAPITAL` | `invalid_starting_capital` / `invalid_recurring_contribution` |
+| Period that cannot fit the window once | `contribution_period_exceeds_window` |
+| Unsupported period value | `unsupported_dca_cadence` |
+
+**The period must fit the window at least once.** A three week window does not
+offer monthly. The card advertises the fitting set in
+`capabilities.edit_constraints.contribution.periods`, so the picker can never
+present a pair the engine would refuse, and narrowing the window narrows the
+choices. A typed or natural-language request for a period that cannot fit
+refuses immediately, naming the rule, with no round trip.
+
+**Fractional shares.** Every contribution is fully invested on its contribution
+date at the fill price after modeled costs. No cash accumulates waiting for a
+whole share and there is no cash drag, so total contributed is the plain sum of
+the two roles with no residual. The assumptions strip and the public receipt
+both disclose it (`fractional_shares`).
+
+**Non-trading days.** A contribution buys at the first available price in its
+period, so one falling on a weekend, a holiday, or a day the month does not
+have buys on the next trading day.
+
+**Still not executable in DCA:** a plan-wide budget, a contribution ceiling, or
+a maximum invested cap, because each would have to stop contributions partway
+through the window (`unsupported_dca_contribution_ceiling`). Starting principal
+is no longer among them.
+
+**Copy rule (user-facing):** the contribution renders as one phrase, `$200
+monthly` / `$200 cada mes`, with the period an inline choice on that field
+rather than a separately labeled parameter. No surface in any language labels
+the period on its own.
 
 ### Symbol Constraints
 - **Minimum:** 1 symbol
@@ -3404,7 +3467,11 @@ re-reads the current card and composes cleanly);
 the exact code, including `invalid_starting_capital`, `future_end_date`,
 `invalid_chronological_date_range`, `invalid_date_window`,
 `provider_history_start_unavailable`, `no_common_data_window`,
-`insufficient_common_data`, and `unsupported_cost_value`. Failures persist
+`insufficient_common_data`, `unsupported_cost_value`,
+`invalid_recurring_contribution`,
+`dca_requires_starting_capital_or_contribution`,
+`dca_contribution_zero_is_buy_and_hold`, `contribution_period_exceeds_window`,
+`capital_role_conflict`, and `capital_role_not_applicable`. Failures persist
 nothing.
 
 ### Confirmation card editing surface
@@ -3416,16 +3483,28 @@ nothing.
   behaviour.
 - The card also advertises `capabilities.edit_constraints`, the engine's own
   accepted-value envelope: `capital.min`/`capital.max` (the run-time
-  starting-capital band; `min` is absent on recurring cards because a
-  contribution is exempt from the bankroll floor), `fees.max` and
-  `slippage.max` (decimal rate caps), and `date_window.max_end` plus a
-  per-asset-class `date_window.min_start` provider history floor. The
-  client renders and pre-checks against these values and never restates
-  them; the confirm preflight enforces the same imported constants, so a
-  card whose `validation.status` is `ready_to_run` can never violate
-  run-time validation.
+  starting-capital band), `fees.max` and `slippage.max` (decimal rate caps),
+  and `date_window.max_end` plus a per-asset-class `date_window.min_start`
+  provider history floor. The client renders and pre-checks against these
+  values and never restates them; the confirm preflight enforces the same
+  imported constants, so a card whose `validation.status` is `ready_to_run`
+  can never violate run-time validation.
+- A recurring card advertises its two money roles instead of the shared
+  bankroll band: `starting_capital.min`/`.max` (floor `0`, because `$0` is the
+  seed's default) and `contribution.min`/`.max` plus `contribution.periods`,
+  the periods that fit this card's own window at least once. `capital.min` is
+  absent on a recurring card because the bankroll floor is not its rule.
+- The direct-edit request names the roles it is editing. `capital` is the
+  one-time starting capital of a non-recurring plan; `starting_capital`,
+  `recurring_contribution`, and `contribution_period` belong to a recurring
+  plan. Sending `capital` alongside either plan role is `422
+  capital_role_conflict`; sending a role to a card that does not have it is
+  `422 capital_role_not_applicable`. Nothing is guessed at, so no value can
+  arrive in the wrong role.
 - `display_facts.capital` carries the typed number seeding the capital
-  editor; card rows remain display strings and are never parsed back.
+  editor. A recurring card seeds its editor from `display_facts.starting_capital`,
+  `display_facts.recurring_contribution`, and `display_facts.contribution_period`
+  instead. Card rows remain display strings and are never parsed back.
 - The card carries exactly three actions: `run_backtest` (when ready),
   `adjust_assumptions` (labelled "Change assumptions"), and
   `cancel_confirmation`. The `change_dates` and `change_asset` action types
