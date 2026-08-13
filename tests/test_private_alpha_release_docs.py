@@ -9,10 +9,21 @@ ROOT = Path(__file__).resolve().parents[1]
 RELEASE_PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 PUBLIC_ACCOUNT_ACCESS_FLAG = "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"
 
-# Point-in-time records keep the claims they shipped with. Everything else is
-# standing documentation and must agree with the release profile.
-_RECORD_TREES = ("docs/archive/", "docs/release-manifests/")
+# Records of a moment keep the claims they shipped with, because quoting a
+# superseded posture is their job. Everything else under docs/, .agent/, and the
+# repo root is standing guidance a reader consults for current truth, so it is
+# in scope by default rather than by being listed.
+_RECORD_TREES = (
+    "docs/archive/",
+    "docs/release-manifests/",
+    "docs/release-evidence/",
+    "docs/evidence/",
+    "docs/reports/",
+    "docs/qa/",
+)
 _DATED_RECORD = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+# Domain knowledge vendored for agents, not Argus access policy.
+_UNRELATED_TREES = (".agent/skills/",)
 
 # Closed boolean vocabularies, so a new stale sentence is caught by grammar
 # rather than by matching a phrase somebody already wrote. "on" is excluded
@@ -46,7 +57,9 @@ def _standing_doc_paths() -> list[Path]:
     return [
         path
         for path in candidates
-        if not path.relative_to(ROOT).as_posix().startswith(_RECORD_TREES)
+        if not path.relative_to(ROOT)
+        .as_posix()
+        .startswith(_RECORD_TREES + _UNRELATED_TREES)
         and not _DATED_RECORD.match(path.name)
     ]
 
