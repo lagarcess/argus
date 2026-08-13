@@ -294,7 +294,9 @@ and login; it should not be exposed as a frontend product surface.
 ### Notes
 - The public access-request endpoint may insert a missing `requested` row. It
   never updates an existing requested, approved, privileged, or disabled row.
-- `requested` and unknown roles never grant permanent account access.
+- `requested` and unknown roles never grant an elevated role. While public
+  account access is open they do not block signup either, because denial needs
+  `disabled_at`; when it is closed, neither role admits the email.
 - The ops approval action loads an active requested row and stored language,
   sends the localized approval email first, and only then compare-and-sets
   `requested` to `user` while `disabled_at` remains null.
@@ -302,12 +304,15 @@ and login; it should not be exposed as a frontend product surface.
   pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
-- If an email is missing or `disabled_at` is set, `/auth/signup` and
-  `/auth/login` still check the allowlist before provider signup/session work,
-  but public auth responses are normalized to reduce invite enumeration:
-  signup returns `400 auth_signup_failed`, login returns `401 unauthorized`,
-  and authenticated API requests reject disabled/unlisted emails after token
-  validation with `403 private_alpha_access_required`.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` decides what this table denies, and
+  it has been open in production since 2026-08-12. Only a row with `disabled_at`
+  set is denied now; a missing email is admitted. When that flag is off instead,
+  a missing email is denied too.
+- For a denied email, `/auth/signup` and `/auth/login` check this table before
+  provider signup/session work, but public auth responses are normalized to
+  reduce invite enumeration: signup returns `400 auth_signup_failed`, login
+  returns `401 unauthorized`, and authenticated API requests reject the email
+  after token validation with `403 private_alpha_access_required`.
 - The table may contain emails for existing Supabase Auth users; seeding the
   allowlist must not create auth users by itself.
 ---

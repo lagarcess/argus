@@ -1601,10 +1601,15 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - email + password
 
 **Private-alpha access:**
-- Private-alpha signup and login are gated by the server-side Supabase `private_alpha_allowlist` table.
-- `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
-- `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
-- Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is the one gate over permanent
+  signup, login, and authenticated requests, and it has been open in production
+  since 2026-08-12. Public registration is therefore open: the server-side
+  Supabase `private_alpha_allowlist` table admits any email and denies only a
+  row whose `disabled_at` is set. When that flag is off instead, the same table
+  becomes an admission list and only an email carrying a role may enter.
+- `POST /auth/signup` must apply that gate before calling Supabase Auth signup, so denied emails do not create auth users or profiles.
+- `POST /auth/login` must also apply it before creating a browser session, so denied emails cannot enter the app.
+- Authenticated API requests must also reject users the gate denies, so an existing session cannot keep using access the gate would no longer grant.
 - `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
   `{"email":"person@example.com","language":"en"}` where `language` is exactly
   `en` or `es-419`. Every syntactically valid new, duplicate, approved,
@@ -1617,7 +1622,9 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - An access request may insert only a missing `requested` row with normalized
   email and the requested language. It must never overwrite an existing
   requested, approved, privileged, or disabled row. `requested` and unknown
-  roles do not grant permanent access.
+  roles grant no role elevation. While public registration is open they also
+  withhold nothing, because admission needs only the absence of a disabled row;
+  when the public gate is closed instead, neither role admits the email.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
   method and path. It loads one active requested row and its language, sends
@@ -1724,7 +1731,8 @@ Guest access is additive and server-authoritative.
 `ARGUS_GUEST_ACCESS_ENABLED` defaults to `true`; explicit `false` is the
 emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
 defaults to `true` and controls presentation only. The independent
-`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` policy remains false by default.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` policy has been open in production
+since 2026-08-12, so guests may create permanent accounts.
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
@@ -1798,9 +1806,10 @@ move the complete conversation-owned product graph atomically.
 excluded from owner rewriting: they retain anonymous attribution or become
 null through their existing foreign-key behavior.
 
-While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
-remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
-authenticate without role elevation; explicitly disabled rows remain blocked.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` has been live in production since
+2026-08-12, so unlisted ordinary accounts may authenticate without role
+elevation while explicitly disabled rows stay blocked. When that flag is off
+instead, permanent signup and login admit active allowlist roles only.
 Before that flag may be enabled, founder-approved production-parity evidence
 must prove that every enabled permanent Auth provider supplies a verified email
 compatible with profile and allowlist-role rules. Phone, OAuth, or other

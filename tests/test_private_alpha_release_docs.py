@@ -1,12 +1,129 @@
 from __future__ import annotations
 
+import json
+import re
+from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
+PUBLIC_ACCOUNT_ACCESS_FLAG = "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"
+
+# Point-in-time records keep the claims they shipped with. Everything else is
+# standing documentation and must agree with the release profile.
+_RECORD_TREES = ("docs/archive/", "docs/release-manifests/")
+_DATED_RECORD = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+
+# Closed boolean vocabularies, so a new stale sentence is caught by grammar
+# rather than by matching a phrase somebody already wrote. "on" is excluded
+# because it is usually a preposition here, and "enabled"/"disabled" because
+# they also describe Auth providers and allowlist rows.
+_STATE_WORDS = {
+    "true": ("true",),
+    "false": ("false", "off"),
+}
+# A doc may describe the other value only inside a subordinate clause, so it
+# scopes the behavior instead of declaring it. "unless" is deliberately absent:
+# "stays false unless approved" asserts a standing value.
+_SUBORDINATING = re.compile(r"\b(?:if|when|whenever|while|once)\b", re.IGNORECASE)
+_BLOCK_BREAK = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#|```|\|)")
 
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _release_profile_value(key: str) -> str:
+    profile = json.loads(RELEASE_PROFILE_PATH.read_text(encoding="utf-8"))
+    return profile["services"]["api"]["env"][key]
+
+
+def _standing_doc_paths() -> list[Path]:
+    """Every Markdown file whose claims are supposed to be true right now."""
+    candidates = sorted(
+        {*(ROOT / "docs").rglob("*.md"), *ROOT.glob("*.md"), *(ROOT / ".agent").rglob("*.md")}
+    )
+    return [
+        path
+        for path in candidates
+        if not path.relative_to(ROOT).as_posix().startswith(_RECORD_TREES)
+        and not _DATED_RECORD.match(path.name)
+    ]
+
+
+def _claim_sentences(text: str) -> Iterator[str]:
+    """Yield sentences with Markdown wrapping collapsed.
+
+    Blocks break on blank lines, list markers, headings, fences, and table rows
+    so a claim is never read across two unrelated bullets.
+    """
+    block: list[str] = []
+    for line in text.splitlines() + [""]:
+        if not line.strip() or _BLOCK_BREAK.match(line):
+            if block:
+                yield from re.split(r"(?<=[.;])\s+", " ".join(" ".join(block).split()))
+                block = []
+            if line.strip():
+                block = [line]
+            continue
+        block.append(line)
+
+
+def test_public_account_access_claims_cannot_contradict_the_release_profile() -> None:
+    """The release profile owns this flag; standing prose only derives from it.
+
+    Prose drifted out of agreement with the deployed flag once already, because
+    nothing connected a sentence to the profile that decides the value.
+    """
+    declared = _release_profile_value(PUBLIC_ACCOUNT_ACCESS_FLAG)
+    stale_words = _STATE_WORDS["false" if declared == "true" else "true"]
+    stale_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={stale_words[0]}"
+    declared_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={declared}"
+
+    contradictions: list[str] = []
+    silent: list[str] = []
+
+    for path in _standing_doc_paths():
+        relative = path.relative_to(ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        if PUBLIC_ACCOUNT_ACCESS_FLAG not in text:
+            continue
+
+        if stale_assignment in text:
+            contradictions.append(f"{relative}: declares `{stale_assignment}`")
+        if declared_assignment not in text:
+            silent.append(relative)
+
+        for sentence in _claim_sentences(text):
+            lowered = sentence.lower()
+            scoped = _SUBORDINATING.search(lowered)
+            if PUBLIC_ACCOUNT_ACCESS_FLAG in sentence:
+                stale_hit = next(
+                    (
+                        match
+                        for word in stale_words
+                        if (match := re.search(rf"\b{word}\b", lowered))
+                    ),
+                    None,
+                )
+                if stale_hit and not (scoped and scoped.start() < stale_hit.start()):
+                    contradictions.append(f"{relative}: {sentence}")
+            if declared == "true" and "allowlist-gated" in lowered:
+                gate = lowered.index("allowlist-gated")
+                if not (scoped and scoped.start() < gate):
+                    contradictions.append(f"{relative}: {sentence}")
+
+    assert not contradictions, (
+        f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in "
+        f"{RELEASE_PROFILE_PATH.name}, so these standing claims are wrong:\n"
+        + "\n".join(f"  - {item}" for item in contradictions)
+    )
+    assert not silent, (
+        f"These standing docs discuss {PUBLIC_ACCOUNT_ACCESS_FLAG} without "
+        f"stating `{declared_assignment}`, so a reader cannot tell whether "
+        "public account creation is open:\n"
+        + "\n".join(f"  - {item}" for item in sorted(set(silent)))
+    )
 
 
 def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:

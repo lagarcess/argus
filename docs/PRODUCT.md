@@ -504,19 +504,22 @@ real Supabase anonymous authenticated user with one temporary workspace, never
 the unauthenticated Postgres `anon` role, the mock developer, or a synthetic
 email profile.
 
-The checked-in policy is intentionally asymmetric:
+The checked-in policy opens guest entry and permanent accounts alike:
 
 - `ARGUS_GUEST_ACCESS_ENABLED=true`
 - `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true`
-- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true`
 
 The frontend presentation flag cannot grant access. The server remains
-authoritative. The Guest server and presentation flags default on; explicit
-`false` is their emergency rollback kill switch. Public-account access remains
-an independent false-by-default gate. While it is off, permanent signup and
-login remain allowlist-gated, the guest surface offers **Sign in**, and
-unlisted guests cannot create permanent accounts. Existing admin and developer
-roles remain unchanged.
+authoritative. All three flags default on; explicit `false` is their emergency
+rollback kill switch. Public-account access stays an independent gate, and the
+founder opened it in production on 2026-08-12. Public registration is now open:
+anyone may create a permanent account, only an explicitly disabled allowlist row
+blocks signup or login, and the guest surface offers account creation alongside
+**Sign in**. When that gate is off instead, permanent signup and login are
+limited to active allowlist roles and guests are offered an access request
+rather than account creation. Existing admin and developer roles are unchanged
+either way, because opening the gate grants access without granting a role.
 
 Two clocks govern a guest, and they are deliberately distinct. The
 **workspace** lives seven fixed days with one conversation: that is how long

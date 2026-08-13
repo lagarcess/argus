@@ -99,9 +99,11 @@ and stops before execution. Issue #310 is closed.
 PR #312 added registered-only avatar monogram themes as `40eba1f6`. PR #319
 integrated the public-alpha technical-readiness lane as `1c3775aa`: capped
 registered/Guest provider keys, measured Render capacity, the requested-access
-and approval-email path, CAPTCHA wiring, and recorded hosted evidence. The
-permanent-account gate remains `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, so
-that landing does not authorize public account access or a new tester cohort.
+and approval-email path, CAPTCHA wiring, and recorded hosted evidence. At that
+landing the permanent-account gate was still closed, so PR #319 itself did not
+authorize public account access or a new tester cohort. The founder opened the
+gate later, on 2026-08-12, and
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is now live in production.
 PR #320 unified the frontend failure vocabulary as `53c36d40`; PRs #323, #325,
 and #328 delivered the bounded auth copy, error-localization, and card-container
 corrections as `c1a13949`, `05fbef06`, and `403ea114`; and PR #327 removed the
@@ -1461,8 +1463,9 @@ disclosure. See
 - Guest is now an accepted part of the normal product shape:
   `ARGUS_GUEST_ACCESS_ENABLED=true` and
   `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` are default-on emergency kill
-  switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false` remains the independent
-  permanent-account gate.
+  switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is the independent
+  permanent-account gate and the founder opened it in production on 2026-08-12,
+  so public registration is open.
 - Public exposure still requires a branch-deployed exact-SHA canary, hosted
   anonymous-Auth and Turnstile controls, trusted-origin/rate-limit proof, a hard
   provider budget, cleanup scheduling, cost/latency calibration, a completed
