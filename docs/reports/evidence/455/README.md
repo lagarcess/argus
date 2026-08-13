@@ -92,17 +92,35 @@ The provider mode is pinned inside the module: coverage skips the calendar
 entirely in synthetic mode, so inheriting the runner's mode would let these
 assertions pass by never consulting a calendar at all.
 
-## Two defects these guards caught
+## Three defects found while proving the lane
 
-Both were introduced by this lane and both are the shape the lane exists to remove:
+The first two were introduced here; the third was pre-existing and defeated a
+founder requirement outright.
 
-1. `edit_constraints` advertised a `$0.01` contribution minimum the plan never had, a second and stricter rule that would have refused a run the engine accepts.
-2. The backend emitted a `fractional_shares` receipt key the frontend's frozen vocabulary had never heard of, so the fact would have reached a shared page and been dropped. The repo's own closed-set test caught it.
+1. `edit_constraints` advertised a `$0.01` contribution minimum the plan never
+   had, a second and stricter rule that would have refused a run the engine
+   accepts.
+2. The backend emitted a `fractional_shares` receipt key the frontend's frozen
+   vocabulary had never heard of, so the fact would have reached a shared page
+   and been dropped. The repo's own closed-set test caught it.
+3. Narrowing a window below its contribution period is required to refuse
+   immediately and name the rule. It said "One part of the draft is not
+   executable in the current backtest engine" instead, because
+   `_validation_error_code` matched five hard-coded strings and called
+   everything else `missing_rule_group`. Every code this lane added degraded the
+   same way. The code is now read from the structured error pydantic already
+   carries:
+
+   ```
+   narrow to 3 weeks with monthly selected      -> contribution_period_exceeds_window
+   ask for quarterly in a 3-week window         -> contribution_period_exceeds_window
+   switch to quarterly in a 12-month window     -> applied
+   ```
 
 ## Test results at this head
 
 - Backend, hermetic (`ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture`,
-  provider keys blanked): **5081 passed, 489 skipped, 2 failed**. Both failures
+  provider keys blanked): **5082 passed, 489 skipped, 2 failed**. Both failures
   are `tests/memory/test_mem0_configuration.py`, `ModuleNotFoundError: No module
   named 'mem0'`: the package is not installed in this worktree's venv, and
   `git diff 3602ca16..HEAD -- tests/memory src/argus/api/personalization_memory_index.py src/argus/memory`
@@ -112,7 +130,7 @@ Both were introduced by this lane and both are the shape the lane exists to remo
 - Frontend typecheck: clean. Lint: 0 errors (8 pre-existing warnings).
 - `next build`: succeeded.
 - Browser: **4 passed** (en/es-419 × phone/desktop).
-- New tests in this lane: **67** in `test_dca_capital_semantics.py`, **10** in
+- New tests in this lane: **68** in `test_dca_capital_semantics.py`, **10** in
   `test_dca_trading_day_rule.py`, plus the end-to-end seeded-plan pair in
   `test_engine_launch.py`.
 - `ruff check .`: passed.
