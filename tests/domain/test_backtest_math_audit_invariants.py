@@ -13,6 +13,10 @@ from argus.domain.backtesting.coverage import (
     build_metric_time_basis,
     prepare_market_data,
 )
+from argus.domain.backtesting.metrics import (
+    _compute_metrics,
+    _compute_metrics_from_equity,
+)
 from argus.domain.backtesting.runner import compute_alpha_metrics
 from argus.domain.market_data.capabilities import EquityMarketSession
 
@@ -612,6 +616,38 @@ def test_unrepresentable_short_window_annualization_does_not_abort_either_path(
         abs=0.01,
     )
     assert performance["annualized_return_pct"] is None
+
+
+@pytest.mark.parametrize("metric_path", ["returns", "equity"])
+def test_total_loss_annualizes_to_negative_one_hundred_in_both_metric_paths(
+    metric_path: str,
+) -> None:
+    index = pd.DatetimeIndex(["2025-01-01", "2025-01-02"], tz="UTC")
+    time_basis = build_metric_time_basis(
+        asset_class="crypto",
+        timeframe="1D",
+        effective_index=index,
+    )
+    if metric_path == "returns":
+        metrics = _compute_metrics(
+            strategy_returns=pd.Series([0.0, -1.0], index=index),
+            benchmark_returns=pd.Series([0.0, 0.0], index=index),
+            allocation_capital=1_000.0,
+            time_basis=time_basis,
+            trade_count=2,
+            closed_trade_pnls=[-1_000.0],
+        )
+    else:
+        metrics = _compute_metrics_from_equity(
+            strategy_equity=pd.Series([1_000.0, 0.0], index=index),
+            benchmark_equity=pd.Series([1_000.0, 1_000.0], index=index),
+            invested_capital=1_000.0,
+            time_basis=time_basis,
+            trade_count=2,
+            closed_trade_pnls=[-1_000.0],
+        )
+
+    assert metrics["performance"]["annualized_return_pct"] == -100.0
 
 
 def test_continuous_daily_dispersion_uses_a_calendar_year() -> None:
