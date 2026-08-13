@@ -43,6 +43,9 @@ def direct_edit_confirmation_preparation(
     *,
     capital: float | None,
     date_window: dict[str, str] | None,
+    starting_capital: float | None = None,
+    recurring_contribution: float | None = None,
+    contribution_period: str | None = None,
     fee_rate: float | None = None,
     slippage: float | None = None,
     language: str = "en",
@@ -57,17 +60,30 @@ def direct_edit_confirmation_preparation(
     except ValueError:
         return DirectEditPreparation(error_code="confirmation_payload_invalid")
 
+    is_recurring = executable_strategy_type(summary) == "dca_accumulation"
     operations: list[EditOperation] = []
-    if capital is not None:
+    money_edits = (
+        (capital, "capital"),
+        (starting_capital, "starting_capital"),
+        (recurring_contribution, "recurring_contribution"),
+    )
+    if any(value is not None for value, _ in money_edits):
         if str(launch.get("sizing_mode") or "") == "position_size":
             return DirectEditPreparation(error_code="capital_not_applicable")
-        capital_target = (
-            "recurring_contribution"
-            if executable_strategy_type(summary) == "dca_accumulation"
-            else "capital"
-        )
+    # A card edits the money roles its own plan has. The shared bankroll field
+    # cannot reach a recurring plan, and the plan's roles cannot reach a
+    # one-time position, so no value can arrive in the wrong role.
+    for value, target in money_edits:
+        if value is None:
+            continue
+        if is_recurring != (target != "capital"):
+            return DirectEditPreparation(error_code="capital_role_not_applicable")
+        operations.append(EditOperation(op="set", target=target, number=float(value)))
+    if contribution_period is not None:
+        if not is_recurring:
+            return DirectEditPreparation(error_code="capital_role_not_applicable")
         operations.append(
-            EditOperation(op="set", target=capital_target, number=float(capital))
+            EditOperation(op="set", target="cadence", value=contribution_period)
         )
     window_intent: LLMDateRangeIntent | None = None
     if date_window is not None:

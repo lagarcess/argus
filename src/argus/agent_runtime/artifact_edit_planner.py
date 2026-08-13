@@ -44,6 +44,7 @@ class EditOperation(BaseModel):
         "benchmark",
         "date_window",
         "capital",
+        "starting_capital",
         "recurring_contribution",
         "cadence",
         "timeframe",
@@ -537,7 +538,16 @@ def _unique_models(preferred_model: str) -> list[str]:
     return ordered
 
 
-_NUMBER_TARGETS = {"capital", "recurring_contribution", "fees", "slippage"}
+# ``capital`` and ``starting_capital`` both land in the plan's non-recurring
+# money, which is the bankroll for a one-time position and the seed for a
+# recurring plan. A card has one shape, so the slot has one meaning on it.
+_NUMBER_TARGETS = {
+    "capital",
+    "starting_capital",
+    "recurring_contribution",
+    "fees",
+    "slippage",
+}
 _INDICATOR_PARAMETER_TARGETS = {
     "indicator_entry_threshold": "entry_threshold",
     "indicator_exit_threshold": "exit_threshold",
@@ -694,7 +704,7 @@ def apply_edit_operations(
         if target in _NUMBER_TARGETS:
             if op in {"set", "replace"} and operation.number is not None:
                 amount = float(operation.number)
-                if target == "capital":
+                if target in {"capital", "starting_capital"}:
                     resolved.initial_capital = amount
                 elif target == "recurring_contribution":
                     resolved.recurring_contribution_amount = amount

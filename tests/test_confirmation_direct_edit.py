@@ -239,13 +239,24 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
         _confirmation_payload(strategy_type="dca_accumulation", cadence="weekly"),
     )
 
-    # A recurring contribution is exempt from the bankroll floor (the launch
-    # adapter's rule), so an ordinary small DCA amount stays valid here.
-    response = _direct_edit(
+    # The shared bankroll field cannot reach a recurring plan at all: its two
+    # money roles are named, so nothing arrives in the wrong one.
+    refused = _direct_edit(
         client,
         conversation["id"],
         CONFIRMATION_ID,
         {"capital": 250},
+    )
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "capital_role_not_applicable"
+
+    # A recurring contribution is exempt from the bankroll floor, so an
+    # ordinary small DCA amount stays valid here.
+    response = _direct_edit(
+        client,
+        conversation["id"],
+        CONFIRMATION_ID,
+        {"recurring_contribution": 250},
     )
     assert response.status_code == 200, response.text
     message = response.json()["message"]
@@ -257,11 +268,11 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
     assert provenance["capital_amount"] == "recurring_contribution"
     card = message["metadata"]["confirmation_card"]
     contribution_rows = [row for row in card["rows"] if row["key"] == "contribution"]
-    assert contribution_rows and contribution_rows[0]["value"] == "$250"
+    assert contribution_rows and contribution_rows[0]["value"] == "$250 weekly"
     constraints = card["capabilities"]["edit_constraints"]
-    assert (
-        "min" not in constraints["capital"]
-    ), "a recurring card must not advertise the bankroll floor"
+    assert constraints["starting_capital"]["min"] == 0.0
+    assert "min" not in constraints["capital"]
+    assert constraints["contribution"]["periods"]
 
 
 def test_direct_edit_matches_the_conversational_edit_artifact() -> None:

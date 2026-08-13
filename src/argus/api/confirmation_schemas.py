@@ -58,25 +58,45 @@ class ConfirmationDirectEditWindow(BaseModel):
 class ConfirmationDirectEditRequest(BaseModel):
     """Edit the pending confirmation's capital, dates, or costs without a turn.
 
-    At least one field is required. Capital is the starting capital, or the
-    recurring contribution when the pending strategy is a recurring-buy plan,
-    matching the money-role semantics of the conversational path. Costs are
-    decimal rates (0.002 is 0.2 percent); zero explicitly clears a cost. The
-    slippage cap is enforced by the shared edit resolver, not re-stated here.
+    At least one field is required. ``capital`` is the one-time starting
+    capital of a non-recurring plan. A recurring plan names its two money roles
+    separately, ``starting_capital`` and ``recurring_contribution``, because
+    neither may ever stand in for the other; sending ``capital`` for one is
+    refused rather than guessed at. Costs are decimal rates (0.002 is 0.2
+    percent); zero explicitly clears a cost. The slippage cap is enforced by
+    the shared edit resolver, not re-stated here.
     """
 
     capital: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    starting_capital: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    recurring_contribution: float | None = Field(
+        default=None,
+        gt=0,
+        allow_inf_nan=False,
+    )
+    contribution_period: str | None = Field(default=None, max_length=24)
     date_window: ConfirmationDirectEditWindow | None = None
     fee_rate: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     slippage: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def require_one_edit(self) -> "ConfirmationDirectEditRequest":
-        if (
-            self.capital is None
-            and self.date_window is None
-            and self.fee_rate is None
-            and self.slippage is None
+        if self.capital is not None and (
+            self.starting_capital is not None
+            or self.recurring_contribution is not None
+        ):
+            raise ValueError("capital_role_conflict")
+        if not any(
+            value is not None
+            for value in (
+                self.capital,
+                self.starting_capital,
+                self.recurring_contribution,
+                self.contribution_period,
+                self.date_window,
+                self.fee_rate,
+                self.slippage,
+            )
         ):
             raise ValueError("at_least_one_edit_required")
         return self

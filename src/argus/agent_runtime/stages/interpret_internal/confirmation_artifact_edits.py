@@ -14,6 +14,7 @@ from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
 from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.strategy_contract import executable_strategy_type
 from argus.nlp.natural_time import resolve_date_range_intent
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
@@ -71,8 +72,16 @@ def apply_resolved_artifact_edit_to_strategy_summary(
             )
             field_provenance["date_range"] = "explicit_user"
     if resolved.initial_capital is not None:
-        candidate.capital_amount = float(resolved.initial_capital)
-        field_provenance["capital_amount"] = "starting_capital"
+        if executable_strategy_type(candidate) == "dca_accumulation":
+            # A recurring plan's seed is its own role. Writing it onto
+            # capital_amount would spend it as the contribution instead.
+            candidate.extra_parameters["initial_capital"] = float(
+                resolved.initial_capital
+            )
+            field_provenance["initial_capital"] = "starting_capital"
+        else:
+            candidate.capital_amount = float(resolved.initial_capital)
+            field_provenance["capital_amount"] = "starting_capital"
     if resolved.recurring_contribution_amount is not None:
         recurring_amount = float(resolved.recurring_contribution_amount)
         candidate.capital_amount = recurring_amount

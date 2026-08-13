@@ -1537,9 +1537,13 @@ def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -
 
     assert card is not None
     rows = {row["label"]: row["value"] for row in card["rows"]}
-    assert rows["Contribution"] == "$20,000"
-    assert "$20,000 recurring contribution" in card["assumptions"]
-    assert "$100,000 recurring contribution" not in card["assumptions"]
+    # The stated $100,000 is the seed and the $20,000 is the contribution. Each
+    # renders under its own label and neither borrows the other's number.
+    assert rows["Contribution"] == "$20,000 weekly"
+    assert rows["Starting capital"] == "$100,000"
+    assert "$20,000 weekly contribution" in card["assumptions"]
+    assert "$100,000 starting capital" in card["assumptions"]
+    assert not any("recurring contribution" in item for item in card["assumptions"])
 
 
 def test_dca_total_capital_alone_does_not_satisfy_recurring_contribution(
