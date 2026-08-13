@@ -302,3 +302,55 @@ def test_narrowing_a_window_narrows_the_offered_periods() -> None:
 
     assert set(narrow) < set(wide)
     assert "monthly" not in narrow
+
+
+def test_every_request_refusal_reaches_the_card_under_its_own_name() -> None:
+    """A wrapped ValueError keeps its code; no refusal degrades to a generic one.
+
+    The confirm stage used to recognise five hard-coded codes and call
+    everything else ``missing_rule_group``, so each new rule silently lost its
+    name on the way to the user. This asserts the general behaviour over every
+    refusal the request model can raise, including ones added later.
+    """
+    from argus.agent_runtime.stages.confirm import _validation_error_code
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from pydantic import ValidationError
+
+    base = {
+        "strategy_type": "dca_accumulation",
+        "symbol": "AAPL",
+        "timeframe": "1D",
+        "date_range": {"start": "2024-01-02", "end": "2024-12-31"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 200.0,
+        "cadence": "monthly",
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+    }
+    refusals = {
+        "contribution_period_exceeds_window": {
+            "date_range": {"start": "2024-01-02", "end": "2024-01-22"}
+        },
+        "dca_capital_role_conflict": {"recurring_contribution": 999.0},
+        "future_end_date": {
+            "date_range": {"start": "2024-01-02", "end": "2999-12-31"}
+        },
+        "invalid_chronological_date_range": {
+            "date_range": {"start": "2024-12-31", "end": "2024-01-02"}
+        },
+        "cadence_not_applicable": {"strategy_type": "buy_and_hold"},
+        "starting_capital_not_applicable": {
+            "strategy_type": "buy_and_hold",
+            "cadence": None,
+            "starting_capital": 1_000.0,
+        },
+    }
+
+    for expected, override in refusals.items():
+        try:
+            LaunchBacktestRequest(**{**base, **override})
+        except ValidationError as exc:
+            assert _validation_error_code(exc) == expected, expected
+        else:  # pragma: no cover - a refusal that stopped refusing
+            raise AssertionError(f"{expected} no longer refuses")
