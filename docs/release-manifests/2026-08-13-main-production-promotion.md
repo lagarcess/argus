@@ -3,6 +3,11 @@
 ## Candidate
 
 - Candidate SHA: `d4d2ac14e83be892747200fde313b3cda64f811d`
+- Shipping SHA: `a17c419f`, which adds this manifest, its evidence, and the
+  comparison gate on top of the measured candidate. Proven to carry **no
+  product delta**: `git diff d4d2ac14 a17c419f -- src/ web/app web/components
+  web/lib web/public render.yaml supabase/` is empty, so the tree the eval
+  measured is the tree that ships.
 - Source branch: `codex/private-alpha-next`
 - Rollback target: `5d8ba7a5f259f0ae65a4477d2952ad6c09096c1e`
 - Commits ahead of production at cut: 133
