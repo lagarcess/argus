@@ -43,7 +43,7 @@ type LocaleJourney = {
 const JOURNEYS: LocaleJourney[] = [
   {
     language: "en",
-    chatInputName: "Ask about any company or idea",
+    chatInputName: "What do you want to test?",
     newChat: "New chat",
     createAccount: "Create account",
     createTitle: "Create your account",
@@ -62,7 +62,7 @@ const JOURNEYS: LocaleJourney[] = [
   },
   {
     language: "es-419",
-    chatInputName: "Pregunta sobre cualquier empresa o idea",
+    chatInputName: "¿Qué quieres probar?",
     newChat: "Nuevo chat",
     createAccount: "Crear cuenta",
     createTitle: "Crea tu cuenta",
