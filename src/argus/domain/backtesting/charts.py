@@ -5,14 +5,13 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import vectorbt as vbt
 
-from argus.domain.backtesting.config import _vbt_freq
 from argus.domain.backtesting.coverage import PreparedMarketData
 from argus.domain.backtesting.execution import (
     ExecutionEvent,
     _build_long_only_execution_ledger,
     _dca_equity_curve,
+    _execute_long_only_ledger,
     _execution_realism_settings,
 )
 from argus.domain.backtesting.metrics import portfolio_value_summary
@@ -66,19 +65,13 @@ def build_result_chart(
                 slippage=float(realism["slippage"]),
             )
         else:
-            portfolio = vbt.Portfolio.from_signals(
+            symbol_equity = _execute_long_only_ledger(
+                execution_events=execution_events,
                 close=close,
-                entries=entries,
-                exits=exits,
+                initial_capital=allocation_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
-                init_cash=allocation_capital,
-                freq=_vbt_freq(config["timeframe"]),
-                accumulate=False,
-            )
-            symbol_equity = pd.Series(
-                portfolio.value().values, index=close.index, dtype=float
-            )
+            ).equity_curve
         symbol_equity_curves.append(symbol_equity)
         _collect_execution_fill_events(
             events, symbol=symbol, execution_events=execution_events

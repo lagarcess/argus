@@ -174,7 +174,7 @@ def test_unsupported_intent_options_contradiction_blocks_es(
     _assert_blocked_unsupported_admission(result, symbol="AAPL")
 
 
-def test_unsupported_request_turn_act_contradiction_blocks_and_keeps_prose(
+def test_issue_453_unsupported_request_turn_act_contradiction_blocks_without_prose(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _stub_equity_asset_resolution(monkeypatch)
@@ -189,7 +189,7 @@ def test_unsupported_request_turn_act_contradiction_blocks_and_keeps_prose(
         ),
     )
     _assert_blocked_unsupported_admission(result, symbol="TSLA")
-    assert result.patch.get("assistant_response") == refusal
+    assert result.patch.get("assistant_response") is None
 
 
 def test_supported_intent_with_unsupported_request_act_blocks(
@@ -673,12 +673,12 @@ async def _run_interpret_async(
         pytest.param("low_confidence", id="low_confidence"),
     ],
 )
-async def test_prose_bearing_contradiction_keeps_verdict_through_readiness_and_admission(
+async def test_prose_bearing_contradiction_keeps_verdict_and_suppresses_prose_at_admission(
     monkeypatch: pytest.MonkeyPatch,
     conflict_audit: Any,
     response_shape: str,
 ) -> None:
-    """The clarification-prose normalizer must never erase a non-promoted verdict."""
+    """A non-promoted verdict survives readiness, but admission hides its prose."""
 
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -723,7 +723,7 @@ async def test_prose_bearing_contradiction_keeps_verdict_through_readiness_and_a
         result, symbol="TSLA", expected_intent=expected_intent
     )
     assert result.decision.semantic_turn_act == expected_turn_act
-    assert result.patch.get("assistant_response") == REFUSAL_PROSE_EN
+    assert result.patch.get("assistant_response") is None
 
 
 @pytest.mark.asyncio

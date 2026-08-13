@@ -8,6 +8,9 @@ from typing import Any, Literal
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
+from argus.agent_runtime.clarification_contract import (
+    validated_starting_capital_bounds,
+)
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.state.models import (
     ConversationMessage,
@@ -182,8 +185,9 @@ class OpenRouterClarificationGenerator:
         context = {
             "language": request.language,
             "current_user_message": request.current_user_message,
-            "candidate_strategy_draft": request.candidate_strategy_draft.model_dump(
-                mode="python"
+            "candidate_strategy_draft": _candidate_strategy_for_voice(
+                request.candidate_strategy_draft,
+                response_intent=request.response_intent,
             ),
             "missing_required_fields": request.missing_required_fields,
             "ambiguous_fields": request.ambiguous_fields,
@@ -270,16 +274,21 @@ class OpenRouterClarificationGenerator:
                     "response; translate those facts into product language such as "
                     "available equity history or current currency-data window.\n\n"
                     "If response_intent.kind is unsupported_recovery, do not write a "
-                    "bare generic question. Acknowledge the exact idea using the "
-                    "candidate strategy's asset, period, and unsupported rule when "
-                    "available; name the limitation in product language; then offer "
+                    "bare generic question. Use only the typed capability cause plus "
+                    "the candidate strategy's typed asset and period context; never "
+                    "quote or infer a rule from untyped interpreter text. Name the "
+                    "limitation in "
+                    "product language; then offer "
                     "the provided simplification_options as concrete runnable next "
                     "moves. Ask which direction to use. Say what Argus can or cannot "
                     "test in plain user language. Do not use implementation terms "
                     "such as rule_spec, signal engine, executable, provider, schema, "
                     "registry, metadata, or reason code. Do not claim the unsupported "
                     "part is executable or can become runnable after the user defines "
-                    "custom logic."
+                    "custom logic. When the typed cause is "
+                    "unsupported_starting_capital, treat it as a validation range, "
+                    "not a strategy capability limit. State the typed minimum and "
+                    "maximum and ask for an amount inside that range."
                 )
             ),
             SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),
@@ -291,12 +300,24 @@ class OpenRouterClarificationGenerator:
 def _unsupported_constraints_for_voice(
     constraints: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Keep typed recovery facts while withholding internal explanation copy."""
+    """Keep typed recovery facts while withholding untyped model-authored copy."""
 
-    return [
-        {key: value for key, value in constraint.items() if key != "explanation"}
-        for constraint in constraints
-    ]
+    sanitized: list[dict[str, Any]] = []
+    for constraint in constraints:
+        category = constraint.get("category")
+        projected = {
+            key: value
+            for key, value in constraint.items()
+            if key not in {"explanation", "raw_value", "minimum", "maximum"}
+        }
+        if category == "unsupported_starting_capital":
+            projected.update(validated_starting_capital_bounds(constraint))
+        if category == "unsupported_time_granularity":
+            raw_value = constraint.get("raw_value")
+            if isinstance(raw_value, str) and raw_value.strip():
+                projected["raw_value"] = raw_value.strip()
+        sanitized.append(projected)
+    return sanitized
 
 
 def _response_intent_for_voice(response_intent: dict[str, Any]) -> dict[str, Any]:
@@ -305,6 +326,9 @@ def _response_intent_for_voice(response_intent: dict[str, Any]) -> dict[str, Any
     if not isinstance(facts, dict):
         return sanitized
     sanitized_facts = dict(facts)
+    strategy = sanitized_facts.get("strategy")
+    if sanitized.get("kind") == "unsupported_recovery" and isinstance(strategy, dict):
+        sanitized_facts["strategy"] = _typed_strategy_for_unsupported_voice(strategy)
     constraints = sanitized_facts.get("unsupported_constraints")
     if isinstance(constraints, list) and all(
         isinstance(item, dict) for item in constraints
@@ -314,6 +338,44 @@ def _response_intent_for_voice(response_intent: dict[str, Any]) -> dict[str, Any
         )
     sanitized["facts"] = sanitized_facts
     return sanitized
+
+
+def _candidate_strategy_for_voice(
+    strategy: StrategySummary,
+    *,
+    response_intent: dict[str, Any],
+) -> dict[str, Any]:
+    payload = strategy.model_dump(mode="python")
+    if response_intent.get("kind") != "unsupported_recovery":
+        return payload
+    return _typed_strategy_for_unsupported_voice(payload)
+
+
+def _typed_strategy_for_unsupported_voice(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    allowed_fields = {
+        "requested_strategy_template",
+        "strategy_type",
+        "asset_universe",
+        "asset_class",
+        "timeframe",
+        "cadence",
+        "sizing_mode",
+        "comparison_baseline",
+        "entry_rule",
+        "exit_rule",
+        "rule_spec",
+    }
+    projected = {
+        key: value
+        for key, value in strategy.items()
+        if key in allowed_fields and value not in (None, "", [], {})
+    }
+    date_range = strategy.get("date_range")
+    if isinstance(date_range, dict):
+        projected["date_range"] = dict(date_range)
+    return projected
 
 
 def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str]]:

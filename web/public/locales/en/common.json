@@ -394,10 +394,10 @@
       },
       "unsupported_recovery": "Argus can't run that rule directly yet. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_for_asset": "Argus can't run that rule directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value": "Argus can't run {{rawValue}} directly yet. Which supported direction should I use: {{options}}?",
-      "unsupported_recovery_with_raw_value_for_asset": "Argus can't run {{rawValue}} directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_incomplete": "What rule should I test? Which supported direction should I use: {{options}}?",
       "unsupported_recovery_incomplete_for_asset": "What rule should I test for {{symbol}}? Which supported direction should I use: {{options}}?",
+      "starting_capital_range": "Starting capital must be between {{minimum}} and {{maximum}}. What amount in that range should I use?",
+      "starting_capital_floor": "Starting capital must be at least {{minimum}}. What amount should I use?",
       "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
       "unsupported_timeframe_with_raw_value": "{{rawValue}} is not a supported bar size. Choose daily or 1-hour bars.",
       "timeframe_actions": {
