@@ -126,21 +126,20 @@ class LaunchBacktestRequest(BaseModel):
 
         if self.cadence is not None:
             from argus.domain.dca_capital import (
+                contribution_period_window,
                 validate_contribution_period_fits_window,
             )
 
-            # Which window the period must fit depends on why the two differ,
-            # and coverage already owns that distinction. Nudging a boundary to
-            # the nearest session leaves the user's month a month, so the ask is
-            # what counts. Truncating a year to three weeks because the asset is
-            # newly listed does not, so there the served window counts.
-            truncated = (
-                self.coverage_preflight is not None
-                and self.coverage_preflight.adjustment_reason
-                == "provider_coverage_adjustment"
-            )
-            window_start, window_end = (
-                (start, end) if truncated else (requested_start, requested_end)
+            # The card advertises which periods it will accept from the same
+            # owner, so the two cannot offer and refuse the same period.
+            window_start, window_end = contribution_period_window(
+                requested=(requested_start, requested_end),
+                effective=(start, end),
+                adjustment_reason=(
+                    self.coverage_preflight.adjustment_reason
+                    if self.coverage_preflight is not None
+                    else None
+                ),
             )
             validate_contribution_period_fits_window(
                 self.cadence,

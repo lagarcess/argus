@@ -162,6 +162,33 @@ def validate_contribution_period_fits_window(
         raise DcaCapitalError("contribution_period_exceeds_window")
 
 
+# Coverage's own reason for moving a window, as the only input to which window
+# a contribution period has to fit.
+PROVIDER_TRUNCATION_REASON = "provider_coverage_adjustment"
+
+
+def contribution_period_window(
+    *,
+    requested: tuple[date, date] | None,
+    effective: tuple[date, date],
+    adjustment_reason: Any = None,
+) -> tuple[date, date]:
+    """The window a contribution period must fit, given why coverage moved it.
+
+    One owner, because the card advertises the periods it will accept and the
+    request model refuses the ones it will not: if they picked this window
+    separately, a card could offer a period the engine then rejects.
+
+    Nudging a boundary to the nearest session leaves the user's month a month,
+    so the ask is what counts. Truncating a year to three weeks because the
+    asset is newly listed does not, so there the served window counts.
+    """
+    if requested is None:
+        return effective
+    truncated = str(adjustment_reason or "") == PROVIDER_TRUNCATION_REASON
+    return effective if truncated else requested
+
+
 def _add_months(value: date, months: int) -> date:
     month_index = value.month - 1 + months
     year = value.year + month_index // 12

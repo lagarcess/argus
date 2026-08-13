@@ -608,3 +608,89 @@ def test_the_window_a_period_must_fit_follows_why_coverage_moved_it(
         assert _validation_error_code(exc) == "contribution_period_exceeds_window"
     else:
         assert fits, f"{label} should have been refused"
+
+
+@pytest.mark.parametrize(
+    ("reason", "effective"),
+    [
+        ("provider_coverage_adjustment", {"start": "2024-12-10", "end": "2024-12-31"}),
+        ("calendar_alignment", {"start": "2024-01-02", "end": "2024-12-31"}),
+        ("provider_coverage_adjustment", {"start": "2024-06-01", "end": "2024-12-31"}),
+        ("none", {"start": "2024-01-01", "end": "2024-12-31"}),
+    ],
+)
+def test_a_card_never_offers_a_period_the_request_model_refuses(
+    reason: str,
+    effective: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The advertised set and the accepted set are the same set.
+
+    The card promises which periods it will take and the request model refuses
+    the ones it will not. Picking the measuring window separately let a card
+    offer `monthly` against three weeks of data, so both now read one owner and
+    this asserts they cannot disagree for any coverage outcome.
+    """
+    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from pydantic import ValidationError
+
+    # A card only advertises edit constraints while the in-place surface is on,
+    # so this pins the flag rather than inheriting whatever ran before it.
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+    requested = {"start": "2024-01-01", "end": "2024-12-31"}
+    coverage = {
+        "schema_version": "market_data_coverage_v1",
+        "outcome": "adjusted_coverage",
+        "adjustment_reason": reason,
+        "requested_date_range": requested,
+        "effective_date_range": effective,
+        "preflight_id": "preflight-455",
+        "observations_by_symbol": {"AAPL": 20},
+    }
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "confirmation_id": "confirmation-agreement",
+                "strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "cadence": "monthly",
+                    "capital_amount": 200.0,
+                    "date_range": dict(requested),
+                },
+                "optional_parameters": {},
+                "launch_payload": {
+                    "sizing_mode": "capital_amount",
+                    "coverage_preflight": coverage,
+                },
+            },
+        }
+    )
+    offered = set(card["capabilities"]["edit_constraints"]["contribution"]["periods"])
+
+    accepted = set()
+    for period in CONTRIBUTION_PERIOD_VALUES:
+        try:
+            LaunchBacktestRequest(
+                strategy_type="dca_accumulation",
+                symbol="AAPL",
+                timeframe="1D",
+                date_range=effective,
+                requested_date_range=requested,
+                coverage_preflight=coverage,
+                sizing_mode="capital_amount",
+                capital_amount=200.0,
+                cadence=period,
+                parameters={},
+                risk_rules=[],
+                benchmark_symbol="SPY",
+            )
+        except ValidationError:
+            continue
+        accepted.add(period)
+
+    assert offered == accepted, f"{reason}: card offers {offered}, engine takes {accepted}"

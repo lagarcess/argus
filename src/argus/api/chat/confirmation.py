@@ -285,7 +285,10 @@ def runtime_confirmation_card(
         if capabilities.get("execution_costs_editable"):
             direct_edits.append("costs")
         capabilities["direct_edits"] = direct_edits
-        capabilities["edit_constraints"] = _edit_constraints(strategy)
+        capabilities["edit_constraints"] = _edit_constraints(
+            strategy,
+            launch_payload=launch_payload,
+        )
     card["capabilities"] = capabilities
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
@@ -315,7 +318,11 @@ def runtime_confirmation_card(
     return card
 
 
-def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
+def _edit_constraints(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The accepted-value envelope this card's edits must satisfy.
 
     Backend canonical truth: the values are the engine's own bounds, imported
@@ -355,22 +362,48 @@ def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
     constraints["starting_capital"] = {"min": 0.0, "max": MAX_STARTING_CAPITAL}
     constraints["contribution"] = {
         "max": MAX_STARTING_CAPITAL,
-        "periods": _contribution_periods_for_strategy(strategy),
+        "periods": _contribution_periods_for_strategy(
+            strategy,
+            launch_payload=launch_payload or {},
+        ),
     }
     return constraints
 
 
-def _contribution_periods_for_strategy(strategy: dict[str, Any]) -> list[str]:
-    """Only periods that fit at least once inside this card's window."""
-    from argus.domain.dca_capital import contribution_periods_for_window
+def _contribution_periods_for_strategy(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> list[str]:
+    """Only periods that fit at least once inside this card's window.
+
+    The window comes from the same owner the request model validates against,
+    so this card can never offer a period the engine would then refuse.
+    """
+    from argus.domain.dca_capital import (
+        contribution_period_window,
+        contribution_periods_for_window,
+    )
 
     try:
-        resolved = resolve_date_range(strategy.get("date_range"), today=_confirmation_today())
+        resolved = resolve_date_range(
+            strategy.get("date_range"), today=_confirmation_today()
+        )
     except (TypeError, ValueError):
         return []
-    return list(
-        contribution_periods_for_window(start=resolved.start, end=resolved.end)
+    coverage = launch_payload.get("coverage_preflight")
+    coverage = coverage if isinstance(coverage, dict) else {}
+    effective = _date_range_payload(coverage.get("effective_date_range"))
+    start, end = contribution_period_window(
+        requested=(resolved.start, resolved.end),
+        effective=(
+            (date.fromisoformat(effective["start"]), date.fromisoformat(effective["end"]))
+            if effective is not None
+            else (resolved.start, resolved.end)
+        ),
+        adjustment_reason=coverage.get("adjustment_reason"),
     )
+    return list(contribution_periods_for_window(start=start, end=end))
 
 
 class DeadConfirmationCardError(ValueError):
