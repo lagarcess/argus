@@ -3181,10 +3181,22 @@ async def _repair_incomplete_strategy_extraction(
             continue
         if not _focused_strategy_extraction_has_material_fields(extraction):
             continue
+        base_response = failed_response
+        if _request_has_active_strategy_context(
+            request
+        ) and _selected_requested_field_base(request):
+            pending_draft = _pending_strategy_draft_from_request_or_response(
+                response=failed_response,
+                request=request,
+            )
+            if pending_draft is not None:
+                base_response = failed_response.model_copy(
+                    update={"candidate_strategy_draft": pending_draft}
+                )
         response = _response_from_focused_strategy_extraction(
             extraction=extraction,
             request=request,
-            base_response=failed_response,
+            base_response=base_response,
         )
         response = _normalize_response_for_runtime_context(
             response,
@@ -4804,6 +4816,15 @@ def _structured_interpretation_has_required_shape(
         and not _llm_strategy_draft_has_extractable_fields(
             response.candidate_strategy_draft
         )
+    ):
+        return False
+    if (
+        response.intent == "unsupported_or_out_of_scope"
+        and response.semantic_turn_act == "unsupported_request"
+        and _request_has_active_strategy_context(request)
+        and _selected_requested_field_base(request)
+        and _request_current_turn_has_material_execution_evidence(request)
+        and not response.unsupported_constraints
     ):
         return False
     if (

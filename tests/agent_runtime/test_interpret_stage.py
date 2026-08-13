@@ -300,8 +300,10 @@ def test_interpreter_unavailable_spanish_atr_routes_to_unsupported_recovery(
 
     assert clarification.outcome == "await_user_reply"
     assert clarification.patch["response_intent"]["kind"] == "unsupported_recovery"
-    assert "ATR 14" in clarification.patch["assistant_prompt"]
-    assert "TSLA" in clarification.patch["assistant_prompt"]
+    prompt = clarification.patch["assistant_prompt"]
+    assert "ATR 14" not in prompt
+    assert "that rule" in prompt
+    assert "TSLA" in prompt
 
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
