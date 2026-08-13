@@ -102,12 +102,18 @@ Both were introduced by this lane and both are the shape the lane exists to remo
 ## Test results at this head
 
 - Backend, hermetic (`ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture`,
-  provider keys blanked): **5071 passed, 489 skipped, 2 failed**. Both failures
+  provider keys blanked): **5081 passed, 489 skipped, 2 failed**. Both failures
   are `tests/memory/test_mem0_configuration.py`, `ModuleNotFoundError: No module
-  named 'mem0'`, pre-existing in this worktree's venv and unrelated to the lane.
+  named 'mem0'`: the package is not installed in this worktree's venv, and
+  `git diff 3602ca16..HEAD -- tests/memory src/argus/api/personalization_memory_index.py src/argus/memory`
+  is empty, so those paths are byte-identical to the base. CI installs the
+  package and passes them.
 - Frontend unit: **1482 passed, 0 failed** across 144 files.
 - Frontend typecheck: clean. Lint: 0 errors (8 pre-existing warnings).
 - `next build`: succeeded.
 - Browser: **4 passed** (en/es-419 × phone/desktop).
+- New tests in this lane: **67** in `test_dca_capital_semantics.py`, **10** in
+  `test_dca_trading_day_rule.py`, plus the end-to-end seeded-plan pair in
+  `test_engine_launch.py`.
 - `ruff check .`: passed.
 - `scripts/check_modularity_budget.py`: no violations.
