@@ -189,15 +189,13 @@ the landed tree is verified.
 ```bash
 export ARGUS_OPS_TOKEN="..."
 export ARGUS_CANARY_EMAIL="..."
-export ARGUS_CANARY_PASSWORD="..."
 export ARGUS_CANARY_SUPABASE_URL="https://lgdhvepyrzbnscqssgqq.supabase.co"
 export ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="..."
 ```
 
 For local founder/operator runs, `.github/canary-render.sh` also accepts
-`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` and `SUPABASE_URL` /
-`SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
-remain the preferred GitHub Actions secret names.
+`MOCK_USER_EMAIL`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` from the root
+`.env`. The `ARGUS_CANARY_*` names remain the preferred GitHub Actions names.
 
 9. Confirm the API is in real-workflow private-alpha validation mode. This mode
    keeps the API lean and sends `Run backtest` through the durable Render
@@ -263,35 +261,89 @@ Local and dev-agent work runs backtests in-process on local compute; the mode
 scripts pin dispatch off (dev hard-off, QA default-off with explicit
 pre-export opt-in).
 
-13. Run the authoritative Spanish release journey with privacy-safe evidence.
-This is the only release canary: it checks the exact deployed SHA, the real
-Render workflow, finalized evidence identity, explicit decision capture, reload
-hydration, Omnisearch provenance, and the deployed Spanish signup/login browser
-path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
-`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` aliases.
+13. Run both authoritative canary surfaces with privacy-safe evidence. They are
+separate fail-red jobs, so one cannot hide or relabel a failure in the other.
 
-The disabled-email denial check runs at the API layer, not in the browser.
-Before the check, the canary creates a `user` allowlist row with `disabled_at`
-set. `.github/canary-requested-signup-denial.py` sends that address to the
-ops-authenticated `POST /api/v1/internal/canary/requested-signup-denial`
-policy endpoint and requires `200 {"denied": true}`. This proves the disabled
-row is blocked with public access on and with the allowlist-only emergency
-rollback. The probe never calls the signup provider or CAPTCHA, so it cannot
-create an auth identity. `verify_no_signup_auth_identity` asserts that none
-exists before the canary clears `disabled_at` and runs the browser signup.
-The exit trap deletes any resulting auth identity and allowlist row, then
-reads back that no matching auth identity remains. Do not move this check back
-into Playwright and do not weaken Turnstile anywhere deployed.
+- **Release coherence** checks the exact deployed SHA across API, app, and
+  `argus-backtests`; runs the release-config audit, warmup, and live-provider
+  workflow proof; and keeps the direct API signup-denial probe.
+- **Authenticated browser journey** starts from a private Playwright storage
+  state, loads the Spanish chat directly, completes one real backtest, records
+  the decision, reloads the result, and reopens it through Omnisearch. It never
+  visits the signup or login page.
+
+The disabled-email denial check belongs only to release coherence. The runner
+creates a `user` allowlist row with `disabled_at` set, then
+`.github/canary-requested-signup-denial.py` calls the ops-authenticated
+`POST /api/v1/internal/canary/requested-signup-denial` policy endpoint and
+requires `200 {"denied": true}`. The probe never calls the signup provider or
+CAPTCHA. `verify_no_signup_auth_identity` confirms that it created no Auth user,
+and the exit trap removes the temporary allowlist row. Do not move this probe
+into Playwright, enable its temporary identity for browser use, or weaken
+Turnstile anywhere deployed.
+
+For a local release-coherence run:
+
+```bash
+mkdir -p temp/release-evidence
+ARGUS_CANARY_SURFACE=release-coherence \
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_HARNESS_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/release-coherence.json \
+ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/release-coherence-capture.json \
+.github/canary-render.sh
+```
+
+For a local authenticated-browser run, install the pinned browser dependencies
+first and use the dedicated canary identity described below:
 
 ```bash
 cd web && bun install --frozen-lockfile && bunx playwright install chromium
 cd ..
-mkdir -p temp/release-evidence
+ARGUS_CANARY_SURFACE=authenticated-browser-journey \
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
-ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
-ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json \
+ARGUS_CANARY_HARNESS_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/authenticated-browser.json \
+ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/authenticated-browser-capture.json \
 .github/canary-render.sh
 ```
+
+### Canary identity, session rotation, and revocation
+
+`ARGUS_CANARY_EMAIL` must identify a dedicated Supabase Auth user. It must never
+be an admin, developer, employee account, or real user. Its enabled
+`private_alpha_allowlist` row must have exactly `role=user`, and its Auth user
+app metadata must contain `source=private-alpha-canary`. App metadata is
+operator-owned; do not use user-editable metadata for this marker. The canary
+fails closed if those facts are not true.
+
+No long-lived browser state or password is stored in GitHub. On every browser
+run, the service-role step generates and verifies a one-time magic link for the
+dedicated identity, serializes the resulting least-privilege session to a mode
+`0600` Playwright storage-state file, and passes only that file and the expected
+user id into the browser process. The browser process explicitly has the
+service-role variables removed. This is the routine rotation: every run gets a
+fresh session.
+
+The exit trap revokes that session with local scope and deletes both the
+storage-state file and its private token handoff. Argus also checks the Supabase
+session id on authenticated API requests, so a removed session stops being an
+active Argus session. A successful run is not complete if revocation fails.
+
+For emergency revocation:
+
+1. Disable the canary allowlist row.
+2. In Supabase Auth, revoke every session for the dedicated user and confirm no
+   `auth.sessions` row remains for its user id.
+3. Delete the dedicated Auth user only after session revocation is confirmed.
+4. Remove or replace `ARGUS_CANARY_EMAIL` in GitHub Actions.
+5. Provision a new dedicated `role=user` identity with
+   Auth app metadata `source=private-alpha-canary`, update the GitHub value, and
+   run a manual canary before restoring the schedule.
+
+Do not use deletion alone as immediate revocation. A previously issued access
+token can remain cryptographically valid until expiry even after its Auth user
+is deleted.
 
 If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
 The first authoritative run writes the sanitized capture beside the human-safe
@@ -307,13 +359,12 @@ If the failure happened before any final response existed, keep the capture as
 diagnostic evidence and inspect the hashed labels, failure stage, API logs, and
 route-receipt summary instead of forcing a replay or spending a second journey.
 
-Read the failure stage and reason before treating a canary red as a product
-regression. `browser_auth` / `captcha_challenge_timeout` means the rendered
-client never reached the auth API because the Turnstile challenge did not
-complete, which is a harness limit on headless runners, not a product defect.
-`browser` / `rendered_golden_path_failed` is the journey itself failing after
-auth succeeded. Do not retry a challenge timeout: a headless runner cannot
-solve it, so a retry only doubles the run.
+Read the job name, failure stage, and reason before treating a canary red as a
+product regression. `Release coherence` owns deployment, config, warmup,
+provider, and API signup-denial failures. `Authenticated browser journey` owns
+session creation, the rendered Golden Path, the real backtest, and browser/API
+postconditions. A browser job must never report a Turnstile challenge timeout,
+because it does not cross an auth form.
 
 If the exact candidate reaches the API but returns the normal interpreter
 recovery response, keep the failed capture and evidence. Record the safe HTTP
@@ -332,8 +383,8 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-workflow version status, local smoke, warmup, the authoritative Spanish release
-canary, and the release manifest all pass against the intended candidate commit.
+workflow version status, local smoke, warmup, both canary surfaces, and the
+release manifest all pass against the intended candidate commit.
 If any service reports a different commit, deploy the candidate branch before
 continuing. If
 warmup fails, do not invite testers yet. Check Render service status and redeploy
@@ -347,55 +398,51 @@ canary variables above plus `RENDER_API_KEY` and `ARGUS_WORKFLOW_DATABASE_URL`,
 then use the scheduled or manually dispatched `Private Alpha Canary` workflow.
 Set `ARGUS_WORKFLOW_DATABASE_URL` from the `.env`/`.env.example` mapping to
 `SUPABASE_POSTGRES_TRANSACTION_POOLER_URL`; do not use the session pooler for
-short-lived workflow tasks. That workflow runs the local smoke gate, warmup,
-and the authoritative Spanish release journey. The real backtest in that journey
-is the live-provider drift check: it runs on `argus-backtests`, while
+short-lived workflow tasks. The two jobs report independently. Release
+coherence owns warmup and the provider/config proof. The real backtest in the
+browser journey runs on `argus-backtests`, while
 `release-config-audit --expect-mode real-workflow` proves the workflow env itself
 is using `live_provider`. Warmup then runs the deployed `workflow_proof` task and requires
 `workflow_runtime_provider_mode=live_provider` and
 `workflow_runtime_proof=ready`, proving effective workflow runtime rather than
-only saved Render env vars. It uploads the `private-alpha-canary-evidence`
-artifact containing Spanish release evidence plus its exit-code file, and it does
-not deploy or configure analytics. On failure it also uploads
-`private-alpha-canary-failure-capture` and `private-alpha-canary-browser-context`,
-the second holding Playwright's error context for the browser phase. The canary
-script masks its own credentials out of those browser files before it exits,
-because Playwright's error context records every rendered input value. Secrets
-are scoped to the operational steps that need them; install and artifact upload
-steps do not receive canary credentials or service-role keys.
+only saved Render env vars. The jobs upload
+`private-alpha-release-coherence-evidence` and
+`private-alpha-authenticated-browser-evidence`, each with its own exit file.
+Their failure captures are separate. The browser job can also upload
+`private-alpha-authenticated-browser-context` after its redaction sentinel is
+present.
 
-The canary runs in two halves, and which half a file lands in decides whether a
-fix to it is already live.
+The canary script masks the email, any legacy password present in an operator
+environment, the session access and refresh tokens, serialized auth-cookie
+values, and the artifact probe value before it creates
+`web/temp/playwright-results/.redacted`. The workflow keeps the sentinel gate:
+if redaction did not run or failed, it logs
+`browser_context_upload=skipped_unredacted` and does not upload browser context.
+The storage state and private handoff are temporary files outside the artifact
+paths and are deleted on exit.
 
-Everything up to and including the resolver runs from the ref the run started
-on: Checkout, Set up Python, Set up Bun, Install Render CLI, and the first part
-of "Resolve deployed canary release". That step runs
-`.github/render-env-sync.sh`, which sources `.github/argus-env.sh`, then
-`.github/canary-deployed-sha.py`, and only after that does it
-`git checkout --detach` onto the deployed SHA. The other pre-detach steps pin
-their versions inline and read no repo file.
+To prove this control, manually dispatch from the candidate branch twice. Use
+`browser_artifact_probe=redacted` first. The browser job must fail deliberately,
+the probe value must be masked in its context, and the sentinel-gated context
+upload must occur. Then use `browser_artifact_probe=unredacted`. Redaction fails
+deliberately, no sentinel is written, and the context upload must be skipped.
+Both are expected red proof runs. Never use a real credential as the probe.
 
-Everything after the detach runs from the deployed release: the dependency
-installs, the Spanish static UI assertions, `.github/local-smoke.sh`,
-`.github/warmup-render.sh`, `.github/canary-render.sh` and everything it calls
-(`.github/canary-browser.sh`, `.github/canary-requested-signup-denial.py`,
-`.github/private-alpha-release-profile.py`), and the `web/e2e` specs.
+Trigger choice controls which harness is exercised:
 
-`.github/render-env-sync.sh` is in both halves. The resolver calls it directly
-before the detach, and `warmup-render.sh` and `canary-render.sh` call it again
-after, so one job runs that same file from two different trees.
+- A schedule checks out `main`, resolves the coherent production SHA, and
+  detaches to that deployed commit. The harness SHA and deployed SHA must match.
+- A `workflow_dispatch` keeps the selected branch checked out while the resolver
+  records the exact coherent production SHA separately. Only dispatch may run a
+  branch harness against a different deployed target, and both SHAs are written
+  to the evidence.
 
-The starting ref depends on the trigger. A scheduled run takes the workflow YAML
-and the initial checkout from `main`, because cron only executes the default
-branch's YAML. A manual dispatch takes both from the ref selected for the
-dispatch, because the Checkout step uses `github.sha`. The detach happens either
-way.
-
-So a resolver or workflow-YAML fix is live on the next scheduled run as soon as
-it is on `main`, and can be exercised before that by dispatching the workflow
-from its own branch. A fix to any post-detach script, which is most of the
-canary harness, changes nothing until `main` is deployed to Render. Check which
-half a file is in before reading a merge as a fix.
+This means a branch dispatch can prove a canary-harness fix before promotion,
+while still testing the exact production deployment. Merging the fix only into
+`codex/private-alpha-next` does not change scheduled runs. The scheduled canary
+uses the fix only after the production promotion reaches `main`; a still-red
+schedule before that promotion is the old deployed harness, not evidence that
+the branch fix failed.
 
 After the gate passes, copy the relevant command output and canary evidence into
 a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The

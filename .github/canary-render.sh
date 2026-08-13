@@ -1,5 +1,5 @@
 #!/bin/bash
-# Browser-owned Golden Path canary for the private-alpha Render deployment.
+# Split release-coherence and authenticated-browser canary surfaces.
 
 set -euo pipefail
 umask 077
@@ -15,6 +15,7 @@ argus_load_root_env >/dev/null || true
 APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"
 API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"
 EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"
+# Kept only as a defense-in-depth redaction value for older operator env files.
 PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"
 SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"
 SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-${SUPABASE_URL:-${SUPABASE_PROJECT_URL:-}}}"
@@ -26,6 +27,12 @@ EVIDENCE_PATH="${ARGUS_CANARY_EVIDENCE_PATH:-}"
 CAPTURE_PATH="${ARGUS_CANARY_CAPTURE_PATH:-}"
 CANDIDATE_SHA="${ARGUS_CANARY_SHA:-${GITHUB_SHA:-}}"
 CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+HARNESS_SHA="${ARGUS_CANARY_HARNESS_SHA:-$CHECKED_OUT_SHA}"
+ALLOW_HARNESS_MISMATCH="${ARGUS_CANARY_ALLOW_HARNESS_MISMATCH:-false}"
+SURFACE="${ARGUS_CANARY_SURFACE:-}"
+ARTIFACT_PROBE="${ARGUS_CANARY_BROWSER_ARTIFACT_PROBE:-none}"
+REDACTION_PROBE_VALUE="${ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE:-}"
+SIMULATE_REDACTION_FAILURE="${ARGUS_CANARY_REDACT_SIMULATE_FAILURE:-false}"
 FOCUSED_SYMBOL_PATH="${ARGUS_CANARY_FOCUSED_SYMBOL_PATH:-}"
 RELEASE_PROFILE_TOOL="$SCRIPT_DIR/private-alpha-release-profile.py"
 PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value prompt 2>/dev/null || true)"
@@ -41,6 +48,8 @@ if [ -z "$CANDIDATE_SHA" ]; then
 fi
 
 BROWSER_IDENTITY_HANDOFF="$(mktemp)"
+BROWSER_STORAGE_STATE="$(mktemp)"
+BROWSER_SESSION_HANDOFF="$(mktemp)"
 BROWSER_PHASE_OUTPUT="$(mktemp)"
 BROWSER_AUTH_CURL_CONFIG="$(mktemp)"
 SERVICE_ROLE_CURL_CONFIG="$(mktemp)"
@@ -59,6 +68,7 @@ IDEA_ROWS="$(mktemp)"
 IDEA_VERSION_ROWS="$(mktemp)"
 RECEIPT_ROWS="$(mktemp)"
 chmod 600 "$BROWSER_IDENTITY_HANDOFF" "$BROWSER_PHASE_OUTPUT"
+chmod 600 "$BROWSER_STORAGE_STATE" "$BROWSER_SESSION_HANDOFF"
 chmod 600 "$BROWSER_AUTH_CURL_CONFIG" "$SERVICE_ROLE_CURL_CONFIG"
 chmod 600 "$SIGNUP_AUTH_USERS_RESPONSE" "$SIGNUP_AUTH_USER_IDS"
 chmod 600 "$SIGNUP_ALLOWLIST_RESPONSE"
@@ -68,16 +78,22 @@ printf 'header = "Authorization: Bearer %s"\n' "$SUPABASE_SERVICE_ROLE_KEY" \
   >> "$SERVICE_ROLE_CURL_CONFIG"
 
 SIGNUP_IDENTITY_SETUP_ATTEMPTED="false"
+BROWSER_SESSION_MINTED="false"
 
 cleanup() {
   local exit_status=$?
   local signup_cleanup_failed=0
+  local session_revocation_failed=0
   trap - EXIT
   if [ "${SIGNUP_IDENTITY_SETUP_ATTEMPTED:-false}" = "true" ]; then
     cleanup_signup_identity || signup_cleanup_failed=1
   fi
+  if [ "${BROWSER_SESSION_MINTED:-false}" = "true" ]; then
+    revoke_browser_session || session_revocation_failed=1
+  fi
   redact_browser_artifacts || true
   rm -f "$BROWSER_IDENTITY_HANDOFF"
+  rm -f "$BROWSER_STORAGE_STATE" "$BROWSER_SESSION_HANDOFF"
   rm -f "$BROWSER_PHASE_OUTPUT"
   rm -f "$BROWSER_AUTH_CURL_CONFIG"
   rm -f \
@@ -98,6 +114,12 @@ cleanup() {
     "$RECEIPT_ROWS"
   if [ "$signup_cleanup_failed" -ne 0 ]; then
     echo "ERROR: dedicated signup identity cleanup failed." >&2
+    if [ "$exit_status" -eq 0 ]; then
+      exit_status=1
+    fi
+  fi
+  if [ "$session_revocation_failed" -ne 0 ]; then
+    echo "ERROR: dedicated canary session revocation failed." >&2
     if [ "$exit_status" -eq 0 ]; then
       exit_status=1
     fi
@@ -233,6 +255,7 @@ workflow_commit_matches_candidate() {
 
 build_release_evidence_json() {
   CANARY_STATUS="$CANARY_STATUS" \
+  CANARY_SURFACE="$SURFACE" \
   CANARY_FAILURE_STAGE="$CANARY_FAILURE_STAGE" \
   CANARY_FAILURE_REASON="$CANARY_FAILURE_REASON" \
   CANARY_CAPTURE_WRITE_STATUS="$CANARY_CAPTURE_WRITE_STATUS" \
@@ -255,6 +278,7 @@ build_release_evidence_json() {
   CANARY_WORKFLOW_VERSION_STATUS="$WORKFLOW_VERSION_STATUS" \
   CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
   CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
+  CANARY_HARNESS_SHA="$HARNESS_SHA" \
   CANARY_LANGUAGE="$LANGUAGE" \
   CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
   CANARY_CONVERSATION_LABEL="$CONVERSATION_LABEL" \
@@ -281,6 +305,7 @@ def optional_int(value: str):
 
 payload = {
     "status": os.environ["CANARY_STATUS"],
+    "surface": os.environ["CANARY_SURFACE"],
     "failure_stage": optional(os.environ["CANARY_FAILURE_STAGE"]),
     "failure_reason": optional(os.environ["CANARY_FAILURE_REASON"]),
     "capture_write_status": os.environ["CANARY_CAPTURE_WRITE_STATUS"],
@@ -305,6 +330,7 @@ payload = {
     "workflow_version_status": optional(os.environ["CANARY_WORKFLOW_VERSION_STATUS"]),
     "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
     "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
+    "harness_sha": os.environ["CANARY_HARNESS_SHA"],
     "language": os.environ["CANARY_LANGUAGE"],
     "focused_symbol_path": optional(os.environ["CANARY_FOCUSED_SYMBOL_PATH"]),
     "conversation_label": optional(os.environ["CANARY_CONVERSATION_LABEL"]),
@@ -637,7 +663,7 @@ run_warmup_probe() {
   print_sanitized_warmup_output
 }
 
-validate_release_evidence_contract() {
+validate_canary_harness_contract() {
   if ! python3 "$RELEASE_PROFILE_TOOL" validate >/dev/null; then
     fail_canary "release_profile" "release_profile_invalid"
   fi
@@ -650,10 +676,25 @@ validate_release_evidence_contract() {
   if [ -z "$PROMPT" ] || [ -z "$DECISION_STATE" ] || [ -z "$SEARCH_QUERY" ]; then
     fail_canary "release_profile" "browser_journey_input_missing"
   fi
-  if [ "$CANDIDATE_SHA" != "unknown" ] && [ "$CHECKED_OUT_SHA" != "unknown" ] && [ "$CANDIDATE_SHA" != "$CHECKED_OUT_SHA" ]; then
-    echo "ERROR: canary commit mismatch"
-    fail_canary "commit" "canary_commit_mismatch"
+  if [ "$HARNESS_SHA" != "$CHECKED_OUT_SHA" ]; then
+    fail_canary "commit" "canary_harness_sha_mismatch"
   fi
+  case "$ALLOW_HARNESS_MISMATCH" in
+    true|false) ;;
+    *) fail_canary "commit" "canary_harness_mismatch_mode_invalid" ;;
+  esac
+  if [ "$CANDIDATE_SHA" != "unknown" ] && [ "$CHECKED_OUT_SHA" != "unknown" ] && [ "$CANDIDATE_SHA" != "$CHECKED_OUT_SHA" ]; then
+    if [ "$ALLOW_HARNESS_MISMATCH" != "true" ]; then
+      fail_canary "commit" "canary_commit_mismatch"
+    fi
+    if [ "${GITHUB_EVENT_NAME:-}" != "workflow_dispatch" ]; then
+      fail_canary "commit" "canary_harness_mismatch_not_dispatch"
+    fi
+  fi
+}
+
+validate_release_evidence_contract() {
+  validate_canary_harness_contract
 
   run_deploy_status_probe
   run_warmup_probe
@@ -697,47 +738,143 @@ validate_release_evidence_contract() {
   echo "canary_real_workflow_task=$REAL_WORKFLOW_TASK"
   echo "canary_expected_sha=$CANDIDATE_SHA"
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
+  echo "canary_harness_sha=$HARNESS_SHA"
+}
+
+validate_browser_evidence_contract() {
+  validate_canary_harness_contract
+  echo "canary_expected_sha=$CANDIDATE_SHA"
+  echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
+  echo "canary_harness_sha=$HARNESS_SHA"
+}
+
+mint_browser_session_state() {
+  if ! (
+    cd web
+    ARGUS_CANARY_APP_URL="$APP_URL" \
+    ARGUS_CANARY_EMAIL="$EMAIL" \
+    ARGUS_CANARY_SUPABASE_URL="$SUPABASE_URL" \
+    ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
+    ARGUS_CANARY_BROWSER_STORAGE_STATE="$BROWSER_STORAGE_STATE" \
+    ARGUS_CANARY_BROWSER_SESSION_HANDOFF="$BROWSER_SESSION_HANDOFF" \
+      bun e2e/support/private-alpha-canary-session.ts mint
+  ); then
+    return 1
+  fi
+  BROWSER_SESSION_MINTED="true"
+}
+
+revoke_browser_session() {
+  (
+    cd web
+    ARGUS_CANARY_SUPABASE_URL="$SUPABASE_URL" \
+    ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
+    ARGUS_CANARY_BROWSER_SESSION_HANDOFF="$BROWSER_SESSION_HANDOFF" \
+      bun e2e/support/private-alpha-canary-session.ts revoke
+  )
+}
+
+load_browser_session() {
+  local values
+  if ! values="$(CANARY_SESSION_EMAIL="$EMAIL" python3 - "$BROWSER_SESSION_HANDOFF" <<'PY'
+import json
+import os
+import pathlib
+import stat
+import sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.is_file() or stat.S_IMODE(path.stat().st_mode) & 0o077:
+    raise SystemExit("private browser session handoff is missing or exposed")
+payload = json.loads(path.read_text(encoding="utf-8"))
+if payload.get("schema_version") != 1:
+    raise SystemExit("private browser session handoff has the wrong schema")
+email = str(payload.get("email") or "").strip().casefold()
+if email != os.environ["CANARY_SESSION_EMAIL"].strip().casefold():
+    raise SystemExit("private browser session belongs to the wrong identity")
+for key in ("user_id", "access_token", "refresh_token"):
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise SystemExit("private browser session handoff is incomplete")
+    print(value)
+PY
+  )"; then
+    return 1
+  fi
+  USER_ID="$(printf '%s\n' "$values" | sed -n '1p')"
+  BROWSER_ACCESS_TOKEN="$(printf '%s\n' "$values" | sed -n '2p')"
+  printf 'header = "Authorization: Bearer %s"\n' "$BROWSER_ACCESS_TOKEN" \
+    > "$BROWSER_AUTH_CURL_CONFIG"
+  chmod 600 "$BROWSER_AUTH_CURL_CONFIG"
 }
 
 run_browser_canary_phase() {
-  local phase="$1"
-  if ! env -u SUPABASE_SERVICE_ROLE_KEY \
+  if ! env -u ARGUS_OPS_TOKEN \
+    -u ARGUS_WORKFLOW_DATABASE_URL \
+    -u RENDER_API_KEY \
+    -u SUPABASE_SERVICE_ROLE_KEY \
     -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
-    ARGUS_CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
-    ARGUS_CANARY_BROWSER_PHASE="$phase" \
+    ARGUS_CANARY_BROWSER_STORAGE_STATE="$BROWSER_STORAGE_STATE" \
+    ARGUS_CANARY_BROWSER_USER_ID="$USER_ID" \
     ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$BROWSER_IDENTITY_HANDOFF" \
+    ARGUS_CANARY_BROWSER_ARTIFACT_PROBE="$ARTIFACT_PROBE" \
+    ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE="$REDACTION_PROBE_VALUE" \
     "$SCRIPT_DIR/canary-browser.sh" 2>&1 | tee "$BROWSER_PHASE_OUTPUT"; then
     return 1
   fi
 }
 
-browser_auth_challenge_timed_out() {
-  # The rendered client only calls the auth API after Turnstile returns a token,
-  # so a timeout waiting for that call means the challenge never completed.
-  [ -s "$BROWSER_PHASE_OUTPUT" ] &&
-    grep -qF "page.waitForResponse" "$BROWSER_PHASE_OUTPUT" &&
-    grep -qF "/auth/" "$BROWSER_PHASE_OUTPUT"
-}
-
 redact_browser_artifacts() {
   local results_dir="web/temp/playwright-results"
   [ -d "$results_dir" ] || return 0
+  rm -f "$results_dir/.redacted"
   CANARY_REDACT_DIR="$results_dir" \
   CANARY_REDACT_PASSWORD="$PASSWORD" \
   CANARY_REDACT_EMAIL="$EMAIL" \
+  CANARY_REDACT_SESSION_PATH="$BROWSER_SESSION_HANDOFF" \
+  CANARY_REDACT_STORAGE_STATE_PATH="$BROWSER_STORAGE_STATE" \
+  CANARY_REDACT_PROBE_VALUE="$REDACTION_PROBE_VALUE" \
+  CANARY_REDACT_SIMULATE_FAILURE="$SIMULATE_REDACTION_FAILURE" \
     python3 - <<'PY'
+import json
 import os
 import pathlib
 
 # Playwright's failure context embeds every rendered input value, including the
-# canary password, so no browser artifact leaves this job unmasked.
+# canary credential probe, so no browser artifact leaves this job unmasked.
 directory = pathlib.Path(os.environ["CANARY_REDACT_DIR"])
+if os.environ.get("CANARY_REDACT_SIMULATE_FAILURE") == "true":
+    raise SystemExit("simulated browser artifact redaction failure")
+
+session_values = []
+session_path_value = os.environ.get("CANARY_REDACT_SESSION_PATH", "").strip()
+if session_path_value:
+    session_path = pathlib.Path(session_path_value)
+    if session_path.is_file() and session_path.stat().st_size:
+        payload = json.loads(session_path.read_text(encoding="utf-8"))
+        for key in ("access_token", "refresh_token"):
+            value = payload.get(key) if isinstance(payload, dict) else None
+            if isinstance(value, str) and value:
+                session_values.append(value)
+storage_state_value = os.environ.get("CANARY_REDACT_STORAGE_STATE_PATH", "").strip()
+if storage_state_value:
+    storage_path = pathlib.Path(storage_state_value)
+    if storage_path.is_file() and storage_path.stat().st_size:
+        storage_state = json.loads(storage_path.read_text(encoding="utf-8"))
+        cookies = storage_state.get("cookies") if isinstance(storage_state, dict) else None
+        if isinstance(cookies, list):
+            for cookie in cookies:
+                value = cookie.get("value") if isinstance(cookie, dict) else None
+                if isinstance(value, str) and value:
+                    session_values.append(value)
 masked_values = sorted(
     (
         value
         for value in (
             os.environ.get("CANARY_REDACT_PASSWORD", "").strip(),
             os.environ.get("CANARY_REDACT_EMAIL", "").strip(),
+            os.environ.get("CANARY_REDACT_PROBE_VALUE", "").strip(),
+            *session_values,
         )
         if value
     ),
@@ -776,7 +913,7 @@ run_disabled_signup_denial_canary() {
 }
 
 run_browser_canary() {
-  if ! run_browser_canary_phase "full"; then
+  if ! run_browser_canary_phase; then
     BROWSER_CANARY_STATUS="failed"
     return 1
   fi
@@ -785,6 +922,7 @@ run_browser_canary() {
 
 verify_browser_identity_handoff() {
   local values
+  local session_user_id="$USER_ID"
   if ! values="$(python3 - "$BROWSER_IDENTITY_HANDOFF" <<'PY'
 import json
 import pathlib
@@ -805,7 +943,6 @@ if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
 
 keys = (
     "user_id",
-    "access_token",
     "conversation_id",
     "backtest_job_id",
     "backtest_run_id",
@@ -852,7 +989,6 @@ PY
 
   IFS=$'\t' read -r \
     USER_ID \
-    BROWSER_ACCESS_TOKEN \
     CONVERSATION_ID \
     BACKTEST_JOB_ID \
     BACKTEST_RUN_ID \
@@ -866,6 +1002,9 @@ PY
     BROWSER_PAGE_ERROR_COUNT \
     BROWSER_BLOCKING_OVERLAY_PRESENT <<< "$values"
 
+  if [ "$USER_ID" != "$session_user_id" ]; then
+    return 1
+  fi
   if [ "$CAPTURED_DECISION_STATE" != "$DECISION_STATE" ]; then
     return 1
   fi
@@ -884,6 +1023,7 @@ PY
 
 recover_browser_failure_capture_inputs() {
   local values
+  local session_user_id="$USER_ID"
   if ! values="$(python3 - "$BROWSER_IDENTITY_HANDOFF" <<'PY'
 import json
 import pathlib
@@ -898,12 +1038,11 @@ except json.JSONDecodeError as exc:
     raise SystemExit(1) from exc
 if payload.get("schema_version") != 1 or payload.get("source") != "playwright":
     raise SystemExit(1)
-required = ("user_id", "access_token", "conversation_id")
+required = ("user_id", "conversation_id")
 if any(not isinstance(payload.get(key), str) or not payload[key].strip() for key in required):
     raise SystemExit(1)
 keys = (
     "user_id",
-    "access_token",
     "conversation_id",
     "backtest_job_id",
     "backtest_run_id",
@@ -919,13 +1058,15 @@ PY
 
   IFS='|' read -r \
     USER_ID \
-    BROWSER_ACCESS_TOKEN \
     CONVERSATION_ID \
     BACKTEST_JOB_ID \
     BACKTEST_RUN_ID \
     EVIDENCE_ARTIFACT_ID \
     IDEA_ID \
     IDEA_VERSION_ID <<< "$values"
+  if [ "$USER_ID" != "$session_user_id" ]; then
+    return 0
+  fi
   [ "$BACKTEST_JOB_ID" = "-" ] && BACKTEST_JOB_ID=""
   [ "$BACKTEST_RUN_ID" = "-" ] && BACKTEST_RUN_ID=""
   [ "$EVIDENCE_ARTIFACT_ID" = "-" ] && EVIDENCE_ARTIFACT_ID=""
@@ -1141,19 +1282,12 @@ service_role_curl() {
 }
 
 signup_identity_is_safe() {
-  CANARY_LOGIN_EMAIL="$EMAIL" CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
+  CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - <<'PY'
 import os
 
-login_email = os.environ["CANARY_LOGIN_EMAIL"].strip().casefold()
 signup_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
 pinned_signup_email = "delivered@resend.dev"
-raise SystemExit(
-    0
-    if login_email
-    and signup_email == pinned_signup_email
-    and login_email != signup_email
-    else 1
-)
+raise SystemExit(0 if signup_email == pinned_signup_email else 1)
 PY
 }
 
@@ -1307,37 +1441,6 @@ PY
 
 verify_no_signup_auth_identity() {
   collect_signup_auth_user_ids && [ ! -s "$SIGNUP_AUTH_USER_IDS" ]
-}
-
-enable_disabled_signup_allowlist() {
-  local encoded_email
-  if ! encoded_email="$(encoded_signup_email)"; then
-    return 1
-  fi
-  service_role_curl \
-    -X PATCH \
-    -H "Content-Type: application/json" \
-    -H "Prefer: return=representation" \
-    -d '{"disabled_at":null}' \
-    "${SUPABASE_URL}/rest/v1/private_alpha_allowlist?email=eq.${encoded_email}&role=eq.user&disabled_at=not.is.null" \
-    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
-    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
-import json
-import os
-import pathlib
-import sys
-
-rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
-target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
-if (
-    not isinstance(rows, list)
-    or len(rows) != 1
-    or rows[0].get("email") != target
-    or rows[0].get("role") != "user"
-    or rows[0].get("disabled_at") is not None
-):
-    raise SystemExit("disabled signup identity enablement did not affect exactly one row")
-PY
 }
 
 prepare_signup_identity() {
@@ -1534,61 +1637,107 @@ if not any(row.get("task") == "result_summary" for row in receipt_rows):
 PY
 }
 
-if [ -z "$EMAIL" ]; then
-  fail_canary "auth" "missing_canary_email"
-fi
-if [ -z "$PASSWORD" ]; then
-  fail_canary "auth" "missing_canary_password"
-fi
-if [ -z "$SIGNUP_EMAIL" ]; then
-  fail_canary "auth" "missing_canary_signup_email"
-fi
-if ! signup_identity_is_safe; then
-  fail_canary "auth" "canary_signup_identity_not_safe"
-fi
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-  fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
-fi
-if [ -z "$OPS_TOKEN" ]; then
-  fail_canary "auth" "missing_ops_token"
-fi
-
-prepare_capture_destination
-validate_release_evidence_contract
-if ! prepare_signup_identity; then
-  fail_canary "auth" "canary_signup_identity_setup_failed"
-fi
-if ! run_disabled_signup_denial_canary; then
-  fail_canary "auth" "disabled_signup_was_not_denied"
-fi
-if ! verify_no_signup_auth_identity; then
-  fail_canary "auth" "disabled_signup_has_auth_identity"
-fi
-if ! enable_disabled_signup_allowlist; then
-  fail_canary "auth" "disabled_signup_enablement_failed"
-fi
-
-if ! run_browser_canary; then
-  recover_browser_failure_capture_inputs || true
-  if browser_auth_challenge_timed_out; then
-    fail_canary "browser_auth" "captcha_challenge_timeout"
+require_supabase_verifier_inputs() {
+  if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+    fail_canary "supabase_verifier" "missing_supabase_verifier_credentials"
   fi
-  fail_canary "browser" "rendered_golden_path_failed"
-fi
-if ! verify_browser_identity_handoff; then
-  fail_canary "browser_identity" "private_identity_handoff_failed"
-fi
-if ! require_browser_session_for_read_only_api_postconditions; then
-  fail_canary "api_postconditions" "browser_session_missing"
-fi
-if ! verify_api_postconditions; then
-  fail_canary "api_postconditions" "canonical_api_postconditions_failed"
-fi
-if ! verify_canonical_postconditions; then
-  fail_canary "supabase_postconditions" "canonical_supabase_postconditions_failed"
-fi
+}
 
-CANARY_STATUS="passed"
-CANARY_CAPTURE_WRITE_STATUS="not_written_success"
-write_canary_evidence
-echo "Canary passed: the rendered Spanish browser owned one real Golden Path and all canonical postconditions matched."
+run_release_coherence_surface() {
+  if [ -z "$OPS_TOKEN" ]; then
+    fail_canary "auth" "missing_ops_token"
+  fi
+  if [ -z "$SIGNUP_EMAIL" ]; then
+    fail_canary "auth" "missing_canary_signup_email"
+  fi
+  if ! signup_identity_is_safe; then
+    fail_canary "auth" "canary_signup_identity_not_safe"
+  fi
+  prepare_capture_destination
+  validate_release_evidence_contract
+  if ! prepare_signup_identity; then
+    fail_canary "auth" "canary_signup_identity_setup_failed"
+  fi
+  if ! run_disabled_signup_denial_canary; then
+    fail_canary "auth" "disabled_signup_was_not_denied"
+  fi
+  if ! verify_no_signup_auth_identity; then
+    fail_canary "auth" "disabled_signup_has_auth_identity"
+  fi
+  CANARY_STATUS="passed"
+  CANARY_CAPTURE_WRITE_STATUS="not_written_success"
+  write_canary_evidence
+  echo "Release coherence passed: deploys, config, live workflow proof, and API auth denial matched."
+}
+
+validate_browser_artifact_probe() {
+  case "$ARTIFACT_PROBE" in
+    none)
+      if [ "$SIMULATE_REDACTION_FAILURE" != "false" ]; then
+        fail_canary "browser_artifact" "redaction_failure_simulation_without_probe"
+      fi
+      ;;
+    redacted)
+      if [ "$SIMULATE_REDACTION_FAILURE" != "false" ] || [ -z "$REDACTION_PROBE_VALUE" ]; then
+        fail_canary "browser_artifact" "redacted_probe_config_invalid"
+      fi
+      ;;
+    unredacted)
+      if [ "$SIMULATE_REDACTION_FAILURE" != "true" ] || [ -z "$REDACTION_PROBE_VALUE" ]; then
+        fail_canary "browser_artifact" "unredacted_probe_config_invalid"
+      fi
+      ;;
+    *) fail_canary "browser_artifact" "browser_artifact_probe_invalid" ;;
+  esac
+  if [ "$ARTIFACT_PROBE" != "none" ] && [ "${GITHUB_EVENT_NAME:-}" != "workflow_dispatch" ]; then
+    fail_canary "browser_artifact" "browser_artifact_probe_not_dispatch"
+  fi
+}
+
+run_authenticated_browser_surface() {
+  if [ -z "$EMAIL" ]; then
+    fail_canary "auth" "missing_canary_email"
+  fi
+  validate_browser_artifact_probe
+  prepare_capture_destination
+  validate_browser_evidence_contract
+  if ! mint_browser_session_state; then
+    fail_canary "browser_auth" "authenticated_session_mint_failed"
+  fi
+  if ! load_browser_session; then
+    fail_canary "browser_auth" "authenticated_session_handoff_failed"
+  fi
+  if ! run_browser_canary; then
+    recover_browser_failure_capture_inputs || true
+    fail_canary "browser" "rendered_golden_path_failed"
+  fi
+  if ! verify_browser_identity_handoff; then
+    fail_canary "browser_identity" "private_identity_handoff_failed"
+  fi
+  if ! require_browser_session_for_read_only_api_postconditions; then
+    fail_canary "api_postconditions" "browser_session_missing"
+  fi
+  if ! verify_api_postconditions; then
+    fail_canary "api_postconditions" "canonical_api_postconditions_failed"
+  fi
+  if ! verify_canonical_postconditions; then
+    fail_canary "supabase_postconditions" "canonical_supabase_postconditions_failed"
+  fi
+  CANARY_STATUS="passed"
+  CANARY_CAPTURE_WRITE_STATUS="not_written_success"
+  write_canary_evidence
+  echo "Authenticated browser journey passed: the Spanish Golden Path completed one real backtest."
+}
+
+require_supabase_verifier_inputs
+case "$SURFACE" in
+  release-coherence)
+    run_release_coherence_surface
+    ;;
+  authenticated-browser-journey)
+    run_authenticated_browser_surface
+    ;;
+  *)
+    fail_canary "surface" "canary_surface_invalid"
+    ;;
+esac

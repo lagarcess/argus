@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 const runId = `${Date.now()}-${process.pid}`;
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+const canaryStorageState = process.env.ARGUS_CANARY_BROWSER_STORAGE_STATE;
 const reuseExistingServer =
   process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === "true";
 const mockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH ?? "true";
@@ -20,6 +21,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL: externalBaseURL ?? `http://localhost:${port}`,
+    storageState: canaryStorageState,
     trace: "on-first-retry",
   },
   webServer: externalBaseURL ? undefined : {
