@@ -8,7 +8,6 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-import yaml
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
@@ -31,7 +30,7 @@ from pydantic import BaseModel, Field
 
 from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
-    measurement_fixture_paths,
+    measurement_fixture_documents,
 )
 from tests.evals.prose_evidence import judged_prose_evidence
 
@@ -135,8 +134,7 @@ class ProseJudgeResponse(BaseModel):
 
 def load_eval_cases(path: Path = FIXTURE_DIR) -> list[EvalCase]:
     cases: list[EvalCase] = []
-    for fixture_path in measurement_fixture_paths(path):
-        payload = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
+    for fixture_path, payload in measurement_fixture_documents(path):
         category = str(payload["category"])
         if category not in LOCKED_EVAL_CATEGORIES:
             raise ValueError(f"unknown eval category: {category}")

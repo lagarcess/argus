@@ -11,6 +11,7 @@ from tests.evals.measurement_eval_harness import (
     PROSE_JUDGE_RUBRIC_VERSION,
     load_eval_cases,
 )
+from tests.evals.measurement_eval_scorecard import measurement_fixture_case_ids
 
 EXPECTED_LOCKED_CATEGORIES = {
     "messy_english",
@@ -50,6 +51,7 @@ def _walk(value: Any) -> list[tuple[str, Any]]:
 def test_measurement_fixtures_cover_locked_categories_as_data() -> None:
     cases = load_eval_cases()
 
+    assert tuple(case.id for case in cases) == measurement_fixture_case_ids()
     assert LOCKED_EVAL_CATEGORIES == EXPECTED_LOCKED_CATEGORIES
     assert {case.category for case in cases} == EXPECTED_LOCKED_CATEGORIES
     assert {path.stem for path in FIXTURE_DIR.glob("*.yaml")} == (

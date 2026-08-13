@@ -82,6 +82,8 @@ poetry run pytest tests/evals/test_measurement_eval_live.py -q
 
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
+Once `ARGUS_RUN_LIVE_EVALS=1` is set, missing provider credentials fail the
+run instead of turning the requested gate into a green skip.
 The live harness keeps bar data in the configured market-data mode but uses a
 provider-backed asset catalog for company-name grounding. Set
 `ARGUS_ASSET_PROVIDER_MODE=recorded_provider_fixture` with a provider-shaped
@@ -129,13 +131,15 @@ validated `provenance` object:
 - `candidate_sha`
 - `python_version`
 - `fixture_sha256`
+- `fixture_case_ids`
 - `worktree_clean`
 - `live_market_data_probe` for a live run
 
-The writer rechecks the provider modes, SHA, Python version, fixture hash, and
-clean worktree immediately before serialization. If any value changed during
-the run, it emits no scorecard. A live scorecard additionally requires
-`market_data_provider_mode=live_provider` and the successful calendar probe.
+The writer rechecks the provider modes, SHA, Python version, fixture hash,
+fixture case identities, and clean worktree immediately before serialization.
+If any value changed during the run, it emits no scorecard. A live scorecard
+also requires every fixture case exactly once, `market_data_provider_mode`
+set to `live_provider`, and the successful calendar probe.
 
 Expected-fail cases never count as passes. They are reported separately so
 known broken behavior stays visible.

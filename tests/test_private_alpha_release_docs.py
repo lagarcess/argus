@@ -7,6 +7,13 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+LIVE_EVAL_RESULT_STATUSES = (
+    "passed",
+    "failed",
+    "expected_failed",
+    "unexpected_pass",
+    "skipped",
+)
 
 KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
     {
@@ -73,7 +80,34 @@ def _assert_main_promotion_live_eval_evidence(
         "end": "2024-01-10",
     }
     assert probe.get("adjustment_reason") == "calendar_alignment"
+    fixture_case_ids = provenance.get("fixture_case_ids")
+    assert (
+        isinstance(fixture_case_ids, list)
+        and fixture_case_ids
+        and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
+        and len(fixture_case_ids) == len(set(fixture_case_ids))
+    ), "live eval scorecard is missing fixture case identities"
+    results = scorecard.get("results")
+    assert isinstance(results, list), "live eval scorecard is missing results"
+    assert all(
+        isinstance(result, dict)
+        and isinstance(result.get("id"), str)
+        and isinstance(result.get("category"), str)
+        and result.get("status") in LIVE_EVAL_RESULT_STATUSES
+        for result in results
+    ), "live eval scorecard contains malformed results"
+    result_case_ids = [result["id"] for result in results]
+    assert result_case_ids == fixture_case_ids, (
+        "live eval scorecard does not contain the complete fixture result set"
+    )
     totals = scorecard.get("totals", {})
+    calculated_totals = {
+        status: sum(result["status"] == status for result in results)
+        for status in LIVE_EVAL_RESULT_STATUSES
+    }
+    assert totals == calculated_totals, (
+        "live eval scorecard totals do not match its complete results"
+    )
     assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
     assert totals.get("failed") == 0
     assert totals.get("unexpected_pass") == 0
@@ -113,6 +147,7 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
                     "candidate_sha": candidate_sha,
                     "python_version": "3.10.20",
                     "fixture_sha256": "b" * 64,
+                    "fixture_case_ids": ["case-a", "case-b"],
                     "worktree_clean": True,
                     "live_market_data_probe": {
                         "requested_date_range": {
@@ -127,10 +162,24 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
                     },
                 },
                 "totals": {
-                    "passed": 44,
+                    "passed": 2,
                     "failed": 0,
+                    "expected_failed": 0,
                     "unexpected_pass": 0,
+                    "skipped": 0,
                 },
+                "results": [
+                    {
+                        "id": "case-a",
+                        "category": "messy_english",
+                        "status": "passed",
+                    },
+                    {
+                        "id": "case-b",
+                        "category": "messy_spanish",
+                        "status": "passed",
+                    },
+                ],
             }
         ),
         encoding="utf-8",
@@ -147,6 +196,82 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
         manifest_path,
         repository_root=tmp_path,
     )
+
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    scorecard["totals"]["passed"] = 1
+    scorecard_path.write_text(json.dumps(scorecard), encoding="utf-8")
+    with pytest.raises(AssertionError, match="totals do not match"):
+        _assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
+
+
+def test_main_promotion_manifest_rejects_summary_without_complete_results(
+    tmp_path: Path,
+) -> None:
+    candidate_sha = "a" * 40
+    scorecard_relative_path = (
+        "docs/reports/evidence/promotion/argus-eval-scorecard.json"
+    )
+    scorecard_path = tmp_path / scorecard_relative_path
+    scorecard_path.parent.mkdir(parents=True)
+    scorecard_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "provenance": {
+                    "evaluation_mode": "live",
+                    "market_data_provider_mode": "live_provider",
+                    "asset_provider_mode": "live_provider",
+                    "candidate_sha": candidate_sha,
+                    "python_version": "3.10.20",
+                    "fixture_sha256": "b" * 64,
+                    "fixture_case_ids": ["case-a", "case-b"],
+                    "worktree_clean": True,
+                    "live_market_data_probe": {
+                        "requested_date_range": {
+                            "start": "2024-01-01",
+                            "end": "2024-01-10",
+                        },
+                        "effective_date_range": {
+                            "start": "2024-01-02",
+                            "end": "2024-01-10",
+                        },
+                        "adjustment_reason": "calendar_alignment",
+                    },
+                },
+                "totals": {
+                    "passed": 2,
+                    "failed": 0,
+                    "expected_failed": 0,
+                    "unexpected_pass": 0,
+                    "skipped": 0,
+                },
+                "results": [
+                    {
+                        "id": "case-a",
+                        "category": "messy_english",
+                        "status": "passed",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard_relative_path}`\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="complete fixture result set"):
+        _assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
 
 
 def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
@@ -673,6 +798,7 @@ def test_eval_docs_document_mocked_first_test_tiers_and_agent_pointer() -> None:
         "candidate_sha",
         "python_version",
         "fixture_sha256",
+        "fixture_case_ids",
         "worktree_clean",
         "live_market_data_probe",
     ):

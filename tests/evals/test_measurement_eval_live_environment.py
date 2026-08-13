@@ -300,3 +300,17 @@ def test_live_suite_runs_environment_probe_before_any_eval_case(
         live_suite.test_measurement_live_eval_suite_writes_scorecard(monkeypatch)
 
     assert case_iteration_started is False
+
+
+def test_explicit_live_suite_fails_when_openrouter_key_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.evals import test_measurement_eval_live as live_suite
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="OPENROUTER_API_KEY is required for requested live evals",
+    ):
+        live_suite._assert_requested_live_eval_credentials()

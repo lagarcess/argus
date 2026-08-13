@@ -10,7 +10,9 @@ import pytest
 from tests.evals import measurement_eval_scorecard as scorecards
 
 
-def _valid_scorecard_provenance() -> Any:
+def _valid_scorecard_provenance(
+    *fixture_case_ids: str,
+) -> Any:
     return scorecards.EvalScorecardProvenance(
         evaluation_mode="live",
         market_data_provider_mode="live_provider",
@@ -18,6 +20,7 @@ def _valid_scorecard_provenance() -> Any:
         candidate_sha="a" * 40,
         python_version="3.10.20",
         fixture_sha256="b" * 64,
+        fixture_case_ids=fixture_case_ids or ("case-a",),
         worktree_clean=True,
         live_market_data_probe=scorecards.LiveMarketDataProbe(
             symbol="SPY",
@@ -46,7 +49,12 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
 
     scorecard = scorecards.scorecard_for_results(
         results,
-        provenance=_valid_scorecard_provenance(),
+        provenance=_valid_scorecard_provenance(
+            "case-a",
+            "case-b",
+            "case-c",
+            "case-d",
+        ),
     )
 
     assert scorecard["category_pass_rates"]["messy_english"] == {
@@ -76,11 +84,12 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         ("candidate_sha", "not-a-sha"),
         ("python_version", ""),
         ("fixture_sha256", "not-a-hash"),
+        ("fixture_case_ids", ()),
     ],
 )
 def test_scorecard_refuses_missing_or_malformed_provenance(
     field_name: str,
-    invalid_value: str,
+    invalid_value: Any,
 ) -> None:
     provenance = replace(
         _valid_scorecard_provenance(),
@@ -140,7 +149,7 @@ def test_scorecard_records_provenance_and_provider_cost() -> None:
 
     scorecard = scorecards.scorecard_for_results(
         results,
-        provenance=_valid_scorecard_provenance(),
+        provenance=_valid_scorecard_provenance("costed-case"),
     )
 
     assert scorecard["schema_version"] == 2
@@ -151,6 +160,7 @@ def test_scorecard_records_provenance_and_provider_cost() -> None:
         "candidate_sha": "a" * 40,
         "python_version": "3.10.20",
         "fixture_sha256": "b" * 64,
+        "fixture_case_ids": ["costed-case"],
         "worktree_clean": True,
         "live_market_data_probe": {
             "symbol": "SPY",
@@ -171,6 +181,19 @@ def test_scorecard_records_provenance_and_provider_cost() -> None:
         "unreported_cost_receipt_count": 1,
         "reported_cost_usd": 0.375,
     }
+
+
+def test_live_scorecard_refuses_incomplete_fixture_result_set() -> None:
+    provenance = _valid_scorecard_provenance("case-a", "case-b")
+
+    with pytest.raises(
+        ValueError,
+        match="scorecard_results:incomplete_fixture_result_set",
+    ):
+        scorecards.scorecard_for_results(
+            [{"id": "case-a", "category": "messy_english", "status": "passed"}],
+            provenance=provenance,
+        )
 
 
 def test_measurement_fixture_identity_binds_filenames_and_contents(

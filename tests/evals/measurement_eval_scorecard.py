@@ -12,6 +12,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable
 
+import yaml  # type: ignore[import-untyped]
+
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -53,6 +55,7 @@ class EvalScorecardProvenance:
     candidate_sha: str
     python_version: str
     fixture_sha256: str
+    fixture_case_ids: tuple[str, ...]
     worktree_clean: bool
     live_market_data_probe: LiveMarketDataProbe | None = None
 
@@ -76,6 +79,33 @@ def measurement_fixture_sha256(path: Path = FIXTURE_DIR) -> str:
     return digest.hexdigest()
 
 
+def measurement_fixture_documents(
+    path: Path = FIXTURE_DIR,
+) -> tuple[tuple[Path, dict[str, Any]], ...]:
+    documents: list[tuple[Path, dict[str, Any]]] = []
+    for fixture_path in measurement_fixture_paths(path):
+        payload = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):
+            raise ValueError("scorecard_provenance:fixture_cases_invalid")
+        documents.append((fixture_path, payload))
+    return tuple(documents)
+
+
+def measurement_fixture_case_ids(path: Path = FIXTURE_DIR) -> tuple[str, ...]:
+    case_ids: list[str] = []
+    for _fixture_path, payload in measurement_fixture_documents(path):
+        raw_cases = payload["cases"]
+        for raw_case in raw_cases:
+            raw_case_id = raw_case.get("id") if isinstance(raw_case, dict) else None
+            case_id = str(raw_case_id or "").strip()
+            if not case_id:
+                raise ValueError("scorecard_provenance:fixture_case_id_missing")
+            case_ids.append(case_id)
+    if not case_ids or len(case_ids) != len(set(case_ids)):
+        raise ValueError("scorecard_provenance:fixture_case_ids")
+    return tuple(case_ids)
+
+
 def build_scorecard_provenance(
     *,
     evaluation_mode: str,
@@ -91,6 +121,7 @@ def build_scorecard_provenance(
     candidate_sha = _candidate_sha(repository_root)
     python_version = platform.python_version()
     fixture_sha256 = measurement_fixture_sha256(fixture_dir)
+    fixture_case_ids = measurement_fixture_case_ids(fixture_dir)
     worktree_clean = _worktree_is_clean(repository_root)
     if not worktree_clean:
         raise ValueError("scorecard_provenance:worktree_clean")
@@ -106,6 +137,7 @@ def build_scorecard_provenance(
         candidate_sha=candidate_sha,
         python_version=python_version,
         fixture_sha256=fixture_sha256,
+        fixture_case_ids=fixture_case_ids,
         worktree_clean=worktree_clean,
         live_market_data_probe=live_probe,
     )
@@ -171,6 +203,8 @@ def scorecard_for_results(
     *,
     provenance: EvalScorecardProvenance,
 ) -> dict[str, Any]:
+    provenance_payload = validated_provenance_payload(provenance)
+    _assert_complete_live_result_set(results, provenance=provenance)
     by_category: dict[str, dict[str, int | float]] = {}
     for result in results:
         category = str(result["category"])
@@ -202,7 +236,7 @@ def scorecard_for_results(
     return {
         "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "provenance": validated_provenance_payload(provenance),
+        "provenance": provenance_payload,
         "provider_usage": _provider_usage(results),
         "category_pass_rates": by_category,
         "totals": {
@@ -250,6 +284,12 @@ def validated_provenance_payload(
         raise ValueError("scorecard_provenance:candidate_sha")
     if not _SHA256_PATTERN.fullmatch(provenance.fixture_sha256):
         raise ValueError("scorecard_provenance:fixture_sha256")
+    if (
+        not provenance.fixture_case_ids
+        or any(not case_id.strip() for case_id in provenance.fixture_case_ids)
+        or len(provenance.fixture_case_ids) != len(set(provenance.fixture_case_ids))
+    ):
+        raise ValueError("scorecard_provenance:fixture_case_ids")
     if provenance.worktree_clean is not True:
         raise ValueError("scorecard_provenance:worktree_clean")
 
@@ -279,6 +319,7 @@ def validated_provenance_payload(
         "candidate_sha": provenance.candidate_sha,
         "python_version": provenance.python_version,
         "fixture_sha256": provenance.fixture_sha256,
+        "fixture_case_ids": list(provenance.fixture_case_ids),
         "worktree_clean": provenance.worktree_clean,
         "live_market_data_probe": live_probe_payload,
     }
@@ -296,11 +337,24 @@ def assert_provenance_matches_current_run(
         "candidate_sha": _candidate_sha(REPOSITORY_ROOT),
         "python_version": platform.python_version(),
         "fixture_sha256": measurement_fixture_sha256(FIXTURE_DIR),
+        "fixture_case_ids": measurement_fixture_case_ids(FIXTURE_DIR),
         "worktree_clean": _worktree_is_clean(REPOSITORY_ROOT),
     }
     for field_name, expected in expected_values.items():
         if getattr(provenance, field_name) != expected:
             raise ValueError(f"scorecard_provenance:{field_name}_mismatch")
+
+
+def _assert_complete_live_result_set(
+    results: list[dict[str, Any]],
+    *,
+    provenance: EvalScorecardProvenance,
+) -> None:
+    if provenance.evaluation_mode != "live":
+        return
+    result_case_ids = tuple(str(result.get("id") or "") for result in results)
+    if result_case_ids != provenance.fixture_case_ids:
+        raise ValueError("scorecard_results:incomplete_fixture_result_set")
 
 
 def _resolved_provider_mode(env_name: str) -> str:
