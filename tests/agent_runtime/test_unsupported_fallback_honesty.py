@@ -99,7 +99,9 @@ def test_momentum_generation_failure_fallback_is_capability_honest() -> None:
     prompt = result.patch["assistant_prompt"]
     assert result.outcome == "await_user_reply"
     assert "does not define" not in prompt
-    assert "a momentum breakout strategy" in prompt
+    assert "a momentum breakout strategy" not in prompt
+    assert "that rule" in prompt
+    assert "AAPL" in prompt
     assert "can't run" in prompt
     assert "Use a supported RSI threshold rule" in prompt
     assert "Compare with buy and hold" in prompt
@@ -161,7 +163,10 @@ def test_other_unsupported_reasons_never_claim_rule_is_undefined() -> None:
     )
     prompt = result.patch["assistant_prompt"]
     assert "does not define" not in prompt
-    assert "a max drawdown guard of 3%" in prompt
+    assert "a max drawdown guard of 3%" not in prompt
+    assert "that rule" in prompt
+    assert "AAPL" in prompt
+    assert "Use a supported RSI threshold rule" in prompt
     assert result.patch["clarification"]["prompt_source"] == "degraded_fallback"
 
 

@@ -1,0 +1,281 @@
+{
+  "evidence_class": "controlled",
+  "live_api_or_llm_called": false,
+  "phase": "baseline",
+  "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+  "generated_at": "2026-08-12",
+  "receipts": [
+    {
+      "scenario": "raw-summary",
+      "locale": "en",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "Use $500 for a Netflix idea.",
+      "visible_assistant_text": "Argus can't run User wants to invest $500 directly yet for NFLX. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_with_raw_value",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-en-raw-summary.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "e8ce8265-e78d-42ce-b122-871b05bd21a2"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "supported-dca",
+      "locale": "en",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "What if I had bought Coca-Cola every month for five years?",
+      "visible_assistant_text": "I can't run buying Coca-Cola every month for five years yet. Choose buy and hold instead.",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "controlled_pre_fix_persisted_prose",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-en-supported-dca.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "69d9914e-17e0-4ed7-b699-4419f3ef4bf0"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "capital-bounds",
+      "locale": "en",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "Buy and hold NFLX with $500 starting capital in 2024.",
+      "visible_assistant_text": "Argus can't run $500 directly yet for NFLX. Choose a supported amount.",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "controlled_pre_fix_persisted_prose",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-en-capital-bounds.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "premature-acknowledgment",
+      "locale": "en",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "$500",
+      "visible_assistant_text": "Got it, you want to invest $500. That starting capital is unsupported for NFLX.",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "controlled_pre_fix_persisted_prose",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-en-premature-acknowledgment.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "raw-summary",
+      "locale": "es-419",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "Usa $500 para una idea de Netflix.",
+      "visible_assistant_text": "Argus todavía no puede ejecutar User wants to invest $500 directamente para NFLX. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_with_raw_value",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-es-419-raw-summary.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "e8ce8265-e78d-42ce-b122-871b05bd21a2"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "supported-dca",
+      "locale": "es-419",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?",
+      "visible_assistant_text": "No puedo ejecutar compras mensuales de Coca-Cola durante cinco años. Elige comprar y mantener.",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "controlled_pre_fix_persisted_prose",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-es-419-supported-dca.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "69d9914e-17e0-4ed7-b699-4419f3ef4bf0"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "capital-bounds",
+      "locale": "es-419",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "Compra y mantén NFLX con $500 de capital inicial durante 2024.",
+      "visible_assistant_text": "Argus todavía no puede ejecutar $500 directamente para NFLX. Elige un monto compatible.",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "controlled_pre_fix_persisted_prose",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-es-419-capital-bounds.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "premature-acknowledgment",
+      "locale": "es-419",
+      "phase": "baseline",
+      "sha": "8025672924d1c74eb80cc926c72b5d8574b613d7",
+      "request_text": "$500",
+      "visible_assistant_text": "Entendido, quieres invertir $500. Ese capital inicial no es compatible para NFLX.",
+      "forbidden_string_assertions": [],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "controlled_pre_fix_persisted_prose",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "baseline-controlled-es-419-premature-acknowledgment.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    }
+  ]
+}
