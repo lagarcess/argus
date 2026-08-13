@@ -136,6 +136,35 @@ def test_unexpected_applied_migration_and_name_drift_both_block() -> None:
     assert report["human_approval"] == "required_for_migration_drift_reconciliation"
 
 
+def test_blank_applied_migration_name_blocks_as_drift() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        "create table public.release_marker (id uuid primary key);",
+    )
+
+    report = build_migration_report(
+        candidate_sha="c" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[
+            AppliedMigration(version="20260812000000", name=""),
+        ],
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["applied_migration_name_drift"]
+    assert report["name_drift"] == [
+        {
+            "version": "20260812000000",
+            "candidate_name": "add_release_marker",
+            "applied_name": "",
+        }
+    ]
+
+
 def test_duplicate_candidate_version_fails_closed() -> None:
     first = CandidateMigration.from_source(
         "supabase/migrations/20260812000000_first.sql",

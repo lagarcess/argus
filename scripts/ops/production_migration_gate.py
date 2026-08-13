@@ -361,7 +361,6 @@ def build_migration_report(
         }
         for version, candidate in candidate_by_version.items()
         if version in applied_by_version
-        and applied_by_version[version].name
         and applied_by_version[version].name != candidate.name
     ]
     stop_reasons: list[str] = []

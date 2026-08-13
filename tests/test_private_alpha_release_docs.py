@@ -66,20 +66,33 @@ def test_production_migration_gate_is_executable_and_precedes_service_deploy() -
         assert "human" in normalized.lower()
 
     promotion_gate_index = promotion_path.index(command)
-    assert promotion_gate_index < promotion_path.index("Merge the approved slice")
+    promotion_candidate_index = promotion_path.index(
+        "exact would-be `main` promotion commit"
+    )
+    promotion_landing_index = promotion_path.index("Land only the gated candidate")
+    assert promotion_candidate_index < promotion_gate_index
+    assert promotion_gate_index < promotion_landing_index
     assert promotion_gate_index < promotion_path.index(
         "Update the release/config contract"
     )
     assert promotion_gate_index < promotion_path.index("Promote the live environment")
+    assert "landed `origin/main` SHA differs" in promotion_path
+    assert "rerun the gate against that landed SHA" in promotion_path
     runbook_gate_index = tester_gate.index(command)
+    runbook_landing_index = tester_gate.index("Land or read back the candidate")
+    assert "exact would-be `main` promotion commit" in tester_gate
+    assert runbook_gate_index < runbook_landing_index
     assert runbook_gate_index < tester_gate.index("sync the Blueprint")
     assert runbook_gate_index < tester_gate.index("api-real-workflow-on")
     assert runbook_gate_index < tester_gate.index("Deploy **all three live services**")
+    assert "rerun the gate against the landed SHA" in tester_gate
     assert "Production Migration Gate" in manifest
     assert "Candidate migrations" in manifest
     assert "Applied production migrations" in manifest
     assert "Missing migrations" in manifest
     assert "Safety classifications" in manifest
+    assert "Landed `origin/main` SHA" in manifest
+    assert "Gate-to-landed-SHA identity" in manifest
 
 
 def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:

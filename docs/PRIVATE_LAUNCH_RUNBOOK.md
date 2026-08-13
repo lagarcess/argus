@@ -31,15 +31,21 @@ This runbook is for the first trusted-user internet tests on Render.
 
 The promotion target is `main`, but `codex/private-alpha-next` remains the
 integration staging branch until the founder approves promotion. Do not merge
-to `main` or open a release PR before that approval. After the approved commit
-lands on the configured deployment branch, use the live Render deploy mode the
-founder deliberately approved. Manual deployment remains valid until the
-founder explicitly enables `checksPass` for all three services. Every candidate
-still follows the gate below and needs a release manifest before testers are
-invited; start from
+to `main` or open a release PR before that approval. Use the live Render deploy
+mode the founder deliberately approved. Manual deployment remains valid until
+the founder explicitly enables `checksPass` for all three services. Every
+candidate still follows the gate below and needs a release manifest before
+testers are invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
 API/web env fingerprint, workflow-service proof, canary evidence, rollback
 target, autodeploy proof for all three services, and approver.
+
+The candidate below must be the exact would-be `main` promotion commit: the
+immutable commit produced from current `main` and the approved integration tree
+that will actually land and deploy. A worker or integration head is not
+sufficient when the landing method creates a different commit. If the landing
+method cannot preserve a pre-gated SHA, keep all three live autodeploy triggers
+manual through step 4 and gate the landed SHA before any deploy-capable action.
 
 Local preflight doctrine:
 
@@ -110,6 +116,24 @@ hash, ledger before and after, and affected-object readback in the release
 manifest. Then rerun the same gate. Do not deploy until the rerun reports
 `status=pass`, and attach its JSON as durable release evidence.
 
+4. Land or read back the candidate on `main` without rewriting the gated
+   commit, then prove the landed ref is the same exact SHA:
+
+```bash
+ARGUS_GATED_CANDIDATE_SHA="$ARGUS_CANDIDATE_SHA"
+git fetch origin main
+ARGUS_LANDED_MAIN_SHA="$(git rev-parse origin/main)"
+test "$ARGUS_LANDED_MAIN_SHA" = "$ARGUS_GATED_CANDIDATE_SHA"
+```
+
+Do not continue on a failed comparison. A squash, rebase, conflict edit, new
+merge commit, or concurrent `main` update invalidates the earlier report. Keep
+all three live triggers manual, check out the exact landed commit, rerun steps
+1 and 2, then rerun the gate against the landed SHA as described in step 3 and
+replace the manifest evidence. When `checksPass` is already live, use only a
+landing method that preserves the pre-gated commit SHA; otherwise code can
+deploy before the landed tree is verified.
+
 > [!WARNING]
 > **A Blueprint sync enables autodeploy after #470.** The repository declares
 > `autoDeployTrigger: checksPass`, but live Render was returned to manual
@@ -120,11 +144,11 @@ manifest. Then rerun the same gate. Do not deploy until the rerun reports
 > API sync reads the same target from the release profile and turns it on for
 > `argus-backtests`. The normal three-service configuration sync can therefore
 > enable autodeploy for all three as a side effect of syncing configuration,
-> not as the result of a fresh deployment decision. Before step 4, obtain an
+> not as the result of a fresh deployment decision. Before step 5, obtain an
 > explicit founder decision to enable autodeploy. Without that decision, keep
 > all three live triggers manual and deploy all three services explicitly.
 
-4. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
+5. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
    `argus-app` config drift needs reconciliation. Render Blueprints cannot
    declare the `argus-backtests` Workflow service. Its release contract is held
    in four separate places that must agree:
@@ -133,20 +157,20 @@ manifest. Then rerun the same gate. Do not deploy until the rerun reports
    - `.github/render-env-sync.sh workflow-runtime` applies that target through
      the Render Workflow API;
    - `release-config-audit` reads the live Workflow configuration back;
-   - steps 9 and 10 deploy `argus-backtests` and prove its ready version matches
+   - steps 10 and 11 deploy `argus-backtests` and prove its ready version matches
      the same candidate as the API and app.
 
    If any one of these four controls drifts, `argus-backtests` can stay stale
    even while the API and app advance, which is the failure caught on
    2026-08-11.
-5. Confirm Render is updating the existing `argus-app` and `argus-api` services.
+6. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-6. Confirm the live deploy mode matches the deliberate founder decision and is
+7. Confirm the live deploy mode matches the deliberate founder decision and is
    uniform across `argus-api`, `argus-app`, and the Git-linked
    `argus-backtests` Workflow: either all three are manual (`off`) or all three
    use `checksPass`. Never enable autodeploy for only a subset of the three.
    The repository target is not proof that live enablement was approved.
-7. Export local ops and canary secrets, or keep these in the root `.env` file
+8. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
 ```bash
@@ -162,7 +186,7 @@ For local founder/operator runs, `.github/canary-render.sh` also accepts
 `SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
 remain the preferred GitHub Actions secret names.
 
-8. Confirm the API is in real-workflow private-alpha validation mode. This mode
+9. Confirm the API is in real-workflow private-alpha validation mode. This mode
    keeps the API lean and sends `Run backtest` through the durable Render
    Workflow job path:
 
@@ -172,7 +196,7 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-9. Deploy **all three live services** from the candidate commit:
+10. Deploy **all three live services** from the candidate commit:
    `argus-api`, then `argus-app`, then **`argus-backtests`**.
 
    When all three live triggers use `checksPass`, a commit on the configured
@@ -188,7 +212,7 @@ Restart `argus-api` after changing Render env values.
    every time, and never let a promotion finish with the three on different
    commits.
 
-10. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
+11. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
    commits match the candidate commit you intend to test and that their latest
    versions are ready:
 
@@ -211,7 +235,7 @@ canary resolvers require that prefix to match the exact API/web commit. They do
 not trust mutable workflow env markers, so checks-passing and manual releases
 use the same version-owned proof.
 
-11. Run the product warmup script and verify the API stayed in real workflow
+12. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
    stale queued/running job scan:
 
@@ -226,7 +250,7 @@ Local and dev-agent work runs backtests in-process on local compute; the mode
 scripts pin dispatch off (dev hard-off, QA default-off with explicit
 pre-export opt-in).
 
-12. Run the authoritative Spanish release journey with privacy-safe evidence.
+13. Run the authoritative Spanish release journey with privacy-safe evidence.
 This is the only release canary: it checks the exact deployed SHA, the real
 Render workflow, finalized evidence identity, explicit decision capture, reload
 hydration, Omnisearch provenance, and the deployed Spanish signup/login browser

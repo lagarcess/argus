@@ -220,11 +220,19 @@ Use the following progression when moving from integration to `main`:
 
 1. Develop on a focused `codex/private-alpha-next` slice.
 2. Validate on the staging/private-alpha surface with the proof workflow task.
-3. Select and record the target environment and intended config contract
-   without syncing or changing the live environment.
-4. Run the read-only production migration gate against the exact candidate
-   before any service deploy. Supply the production Postgres URL explicitly
-   from the operator secret store; the gate does not discover dotenv files.
+3. Select and record the target environment, intended config contract, and
+   landing method without syncing or changing the live environment. If the
+   landing method cannot preserve one pre-gated commit SHA, keep all three live
+   autodeploy triggers manual until the landed commit is gated.
+4. Create or resolve the exact would-be `main` promotion commit from current
+   `main` and the approved integration tree without publishing it. This must be
+   the immutable commit that will land and deploy, not merely the worker or
+   integration head. Record its SHA and parents. Any rebase, squash, conflict
+   edit, new merge, or concurrent target-branch change invalidates it.
+5. Check out that exact promotion commit and run the read-only production
+   migration gate before any service deploy. Supply the production Postgres URL
+   explicitly from the operator secret store; the gate does not discover dotenv
+   files.
 
    ```bash
    export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
@@ -243,14 +251,20 @@ Use the following progression when moving from integration to `main`:
    human applies only the approved files out of band and in repository order,
    reads back the ledger and affected objects, then reruns this same gate.
    Attach the final report to the release manifest as durable evidence.
-5. Record the release manifest, including the migration-gate report, workflow
+6. Record the release manifest, including the migration-gate report, workflow
    task selection, and env fingerprint.
-6. Merge the approved slice to `main` only after the migration gate passes.
-7. Update the release/config contract for the target environment.
-8. Promote the live environment so `argus-backtests` runs the intended task
+7. Land only the gated candidate on `main`, without rewriting it, then fetch
+   `origin/main` and prove it resolves to the recorded gate candidate SHA. If
+   the landed `origin/main` SHA differs, the report is invalid: stop every
+   deploy-capable action, keep autodeploy manual, check out the landed commit,
+   and rerun the gate against that landed SHA. Replace the manifest evidence
+   before continuing. When `checksPass` is already live, only a landing method
+   that preserves the pre-gated SHA is allowed.
+8. Update the release/config contract for the target environment.
+9. Promote the live environment so `argus-backtests` runs the intended task
    (`workflow_proof` for proof validation or `run_backtest_job` for real
    execution).
-9. Re-run warmup and canaries against the exact deployed SHA and env
+10. Re-run warmup and canaries against the exact deployed SHA and env
    fingerprint.
 
 When the backtest service moves between proof and real workflow modes, the

@@ -27,6 +27,9 @@ privacy-safe labels from canary evidence.
 - Gate report durable attachment or committed path:
 - Gate checked at:
 - Gate candidate SHA:
+- Gated candidate parents and intended landing method:
+- Landed `origin/main` SHA:
+- Gate-to-landed-SHA identity: exact / invalidated and rerun
 - Sanitized production project and database host:
 - Candidate migrations, with version, name, and SHA-256:
 - Applied production migrations, with version and name:
