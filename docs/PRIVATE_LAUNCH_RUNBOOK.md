@@ -270,7 +270,10 @@ separate fail-red jobs, so one cannot hide or relabel a failure in the other.
 - **Authenticated browser journey** starts from a private Playwright storage
   state, loads the Spanish chat directly, completes one real backtest, records
   the decision, reloads the result, and reopens it through Omnisearch. It never
-  visits the signup or login page.
+  visits the signup or login page. It rechecks three-service deployed-SHA
+  coherence immediately before minting the session and after the canonical
+  postconditions, so a rollout during the journey cannot inherit the earlier
+  release label.
 
 The disabled-email denial check belongs only to release coherence. The runner
 creates a `user` allowlist row with `disabled_at` set, then
@@ -313,9 +316,11 @@ ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/authenticated-browser-capture.js
 `ARGUS_CANARY_EMAIL` must identify a dedicated Supabase Auth user. It must never
 be an admin, developer, employee account, or real user. Its enabled
 `private_alpha_allowlist` row must have exactly `role=user`, and its Auth user
-app metadata must contain `source=private-alpha-canary`. App metadata is
+app metadata must contain `source=private-alpha-canary`. Its exact `profiles`
+row must also have `is_admin=false`; changing an allowlist role does not prove
+that a previously elevated profile lost its privilege. App metadata is
 operator-owned; do not use user-editable metadata for this marker. The canary
-fails closed if those facts are not true.
+fails closed if any of those facts are not true.
 
 Provisioning is a one-time manual action for identity rotation. Generate a new
 address matching
@@ -341,10 +346,13 @@ user id into the browser process. The browser process explicitly has the
 service-role variables removed. This is the routine rotation: every run gets a
 fresh session.
 
-The exit trap revokes that session with local scope and deletes both the
-storage-state file and its private token handoff. Argus also checks the Supabase
-session id on authenticated API requests, so a removed session stops being an
-active Argus session. A successful run is not complete if revocation fails.
+The browser surface revokes that session with local scope before it records
+success. The exit trap retries revocation on every earlier failure path, then
+deletes both the storage-state file and its private token handoff. Argus also
+checks the Supabase session id on authenticated API requests, so a removed
+session stops being an active Argus session. A revocation failure is an
+`Authenticated browser journey` failure, never a passed artifact with a red
+process exit.
 
 For emergency revocation:
 

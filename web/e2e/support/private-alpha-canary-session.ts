@@ -96,6 +96,24 @@ async function assertAllowlistedUser(email: string): Promise<void> {
   }
 }
 
+async function assertNonAdminProfile(userId: string): Promise<void> {
+  const client = serviceClient();
+  const { data, error } = await client
+    .from("profiles")
+    .select("id,is_admin")
+    .eq("id", userId);
+  const rows = Array.isArray(data) ? data : [];
+  const row = rows[0];
+  if (
+    error ||
+    rows.length !== 1 ||
+    row?.id !== userId ||
+    row.is_admin !== false
+  ) {
+    throw new Error("canary_identity_profile_is_not_least_privilege");
+  }
+}
+
 async function assertProvisionableAllowlist(email: string): Promise<void> {
   const client = serviceClient();
   const { data, error } = await client
@@ -144,9 +162,12 @@ function assertDedicatedUser(user: User | undefined, count: number): void {
   }
 }
 
-async function assertDedicatedCanaryIdentity(email: string): Promise<void> {
+async function assertDedicatedCanaryIdentity(email: string): Promise<User> {
   const matches = await usersMatchingEmail(email);
-  assertDedicatedUser(matches[0], matches.length);
+  const user = matches[0];
+  assertDedicatedUser(user, matches.length);
+  if (!user) throw new Error("canary_identity_is_not_dedicated");
+  return user;
 }
 
 async function provision(): Promise<void> {
@@ -178,6 +199,7 @@ async function provision(): Promise<void> {
   try {
     assertDedicatedUser(user, 1);
     assertLeastPrivilegeUser(user, email);
+    await assertNonAdminProfile(user.id);
     const client = serviceClient();
     const { data, error } = await client
       .from("private_alpha_allowlist")
@@ -263,9 +285,10 @@ async function mint(): Promise<void> {
   const storagePath = requiredEnv("ARGUS_CANARY_BROWSER_STORAGE_STATE");
   const sessionPath = requiredEnv("ARGUS_CANARY_BROWSER_SESSION_HANDOFF");
   const appUrl = new URL(requiredEnv("ARGUS_CANARY_APP_URL"));
+  const dedicatedUser = await assertDedicatedCanaryIdentity(email);
   await Promise.all([
     assertAllowlistedUser(email),
-    assertDedicatedCanaryIdentity(email),
+    assertNonAdminProfile(dedicatedUser.id),
   ]);
 
   const admin = serviceClient();
@@ -286,6 +309,7 @@ async function mint(): Promise<void> {
 
   try {
     assertLeastPrivilege(data.session, email);
+    await assertNonAdminProfile(data.session.user.id);
     const cookies = await storageStateCookies(data.session);
     const now = Math.floor(Date.now() / 1000);
     const storageState = {

@@ -89,7 +89,7 @@ cleanup() {
     cleanup_signup_identity || signup_cleanup_failed=1
   fi
   if [ "${BROWSER_SESSION_MINTED:-false}" = "true" ]; then
-    revoke_browser_session || session_revocation_failed=1
+    revoke_browser_session_once || session_revocation_failed=1
   fi
   redact_browser_artifacts || true
   rm -f "$BROWSER_IDENTITY_HANDOFF"
@@ -743,6 +743,7 @@ validate_release_evidence_contract() {
 
 validate_browser_evidence_contract() {
   validate_canary_harness_contract
+  run_deploy_status_probe
   echo "canary_expected_sha=$CANDIDATE_SHA"
   echo "canary_checked_out_sha=$CHECKED_OUT_SHA"
   echo "canary_harness_sha=$HARNESS_SHA"
@@ -772,6 +773,16 @@ revoke_browser_session() {
     ARGUS_CANARY_BROWSER_SESSION_HANDOFF="$BROWSER_SESSION_HANDOFF" \
       bun e2e/support/private-alpha-canary-session.ts revoke
   )
+}
+
+revoke_browser_session_once() {
+  if [ "${BROWSER_SESSION_MINTED:-false}" != "true" ]; then
+    return 0
+  fi
+  if ! revoke_browser_session; then
+    return 1
+  fi
+  BROWSER_SESSION_MINTED="false"
 }
 
 load_browser_session() {
@@ -1731,6 +1742,10 @@ run_authenticated_browser_surface() {
   fi
   if ! verify_canonical_postconditions; then
     fail_canary "supabase_postconditions" "canonical_supabase_postconditions_failed"
+  fi
+  run_deploy_status_probe
+  if ! revoke_browser_session_once; then
+    fail_canary "browser_auth" "authenticated_session_revocation_failed"
   fi
   CANARY_STATUS="passed"
   CANARY_CAPTURE_WRITE_STATUS="not_written_success"

@@ -45,6 +45,7 @@ def _supabase_session_stub(
     metadata_source: str = "private-alpha-canary",
     listed_user: bool = True,
     allowlist_role: str = "user",
+    profile_is_admin: bool = False,
 ) -> Iterator[tuple[str, list[dict[str, Any]]]]:
     calls: list[dict[str, Any]] = []
     access_token = _jwt(
@@ -108,6 +109,9 @@ def _supabase_session_stub(
                 self._respond(
                     [{"email": email, "role": allowlist_role, "disabled_at": None}]
                 )
+                return
+            if self.path.startswith("/rest/v1/profiles?"):
+                self._respond([{"id": user_id, "is_admin": profile_is_admin}])
                 return
             if self.path.startswith("/auth/v1/admin/users?"):
                 self._respond({"users": users, "aud": "authenticated"})
@@ -203,9 +207,7 @@ def test_backend_ci_installs_the_cross_runtime_canary_test_dependency() -> None:
     assert "Install frontend dependencies for cross-runtime contract tests" in backend
     assert "cd web && bun install --frozen-lockfile" in backend
     assert 'ARGUS_CI_BUN_VERSION: "1.3.14"' in workflow
-    assert (
-        backend.count("bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}") == 1
-    )
+    assert backend.count("bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}") == 1
     assert 'bun-version: "1.3.14"' not in workflow
 
 
@@ -269,6 +271,39 @@ def test_render_runner_has_surface_specific_fail_red_entrypoints() -> None:
     assert "captcha_challenge_timeout" not in source
 
 
+def test_browser_surface_binds_the_journey_to_one_deployed_release() -> None:
+    source = _source(".github/canary-render.sh")
+    browser_contract = source.split("validate_browser_evidence_contract() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    browser_surface = source.split("run_authenticated_browser_surface() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+
+    assert "run_deploy_status_probe" in browser_contract
+    after_postconditions = browser_surface.split("verify_canonical_postconditions", 1)[1]
+    assert "run_deploy_status_probe" in after_postconditions
+    assert after_postconditions.index("run_deploy_status_probe") < (
+        after_postconditions.index('CANARY_STATUS="passed"')
+    )
+
+
+def test_browser_revokes_the_session_before_recording_success() -> None:
+    source = _source(".github/canary-render.sh")
+    browser_surface = source.split("run_authenticated_browser_surface() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+
+    assert 'fail_canary "browser_auth" "authenticated_session_revocation_failed"' in (
+        browser_surface
+    )
+    assert browser_surface.index("revoke_browser_session_once") < browser_surface.index(
+        'CANARY_STATUS="passed"'
+    )
+    cleanup = source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
+    assert "revoke_browser_session_once" in cleanup
+
+
 def test_session_state_is_private_rotated_and_absent_from_browser_environment() -> None:
     source = _source(".github/canary-render.sh")
     runner = _source(".github/canary-browser.sh")
@@ -284,6 +319,9 @@ def test_session_state_is_private_rotated_and_absent_from_browser_environment() 
     assert "private_alpha_allowlist" in session_tool
     assert 'row.role !== "user"' in session_tool
     assert 'source !== "private-alpha-canary"' in session_tool
+    assert '.from("profiles")' in session_tool
+    assert "row.is_admin !== false" in session_tool
+    assert session_tool.count("assertNonAdminProfile") >= 3
     assert "-u SUPABASE_SERVICE_ROLE_KEY" in runner
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in runner
     assert 'ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="' not in runner
@@ -403,6 +441,45 @@ def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
     assert service_role_key not in result.stdout + result.stderr
     assert email not in result.stdout + result.stderr
     assert any(call["path"] == "/auth/v1/logout?scope=local" for call in calls)
+
+
+def test_session_tool_rejects_a_stale_admin_profile_before_mint(
+    tmp_path: Path,
+    faker: Faker,
+) -> None:
+    email = faker.email().lower()
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        profile_is_admin=True,
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_APP_URL": "https://app.example.test",
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
+                "ARGUS_CANARY_BROWSER_STORAGE_STATE": str(tmp_path / "state.json"),
+                "ARGUS_CANARY_BROWSER_SESSION_HANDOFF": str(tmp_path / "handoff.json"),
+            }
+        )
+        result = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode != 0
+    assert "canary_identity_profile_is_not_least_privilege" in result.stderr
+    assert email not in result.stdout + result.stderr
+    assert any(call["path"].startswith("/rest/v1/profiles?") for call in calls)
+    assert not any(call["path"] == "/auth/v1/admin/generate_link" for call in calls)
 
 
 def test_redaction_masks_session_tokens_and_failure_creates_no_sentinel(
@@ -633,5 +710,43 @@ def test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role(
     assert email not in result.stdout + result.stderr
     assert not any(
         call["method"] == "POST" and call["path"] == "/auth/v1/admin/users"
+        for call in calls
+    )
+
+
+def test_session_tool_refuses_to_provision_over_a_stale_admin_profile(
+    faker: Faker,
+) -> None:
+    email = f"private-alpha-canary+{faker.sha256()[:32]}@get-argus.com"
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        profile_is_admin=True,
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
+            }
+        )
+        result = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode != 0
+    assert "canary_identity_profile_is_not_least_privilege" in result.stderr
+    assert email not in result.stdout + result.stderr
+    assert not any(
+        call["method"] == "POST"
+        and call["path"].startswith("/rest/v1/private_alpha_allowlist?")
         for call in calls
     )
