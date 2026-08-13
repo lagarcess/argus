@@ -1479,10 +1479,13 @@ disclosure. See
   onboarding/`primary_goal` branch; guest behavior differs only through
   verified identity, persistence, allowances, and conversion policy.
 - Founder decisions still open: first traffic size, CAPTCHA/provider posture,
-  acceptable cost and latency bands, cleanup cadence/owner, public-account
-  enablement timing, and canary approval. Public-account access must not be
-  enabled before its account-method and abuse-control gate is explicitly
-  approved.
+  acceptable cost and latency bands, cleanup cadence/owner, and canary approval.
+  Public-account enablement is no longer among them, because the founder enabled
+  it in production on 2026-08-12 as recorded in
+  `docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`. The
+  account-method and abuse-control requirement that gated it is stated once in
+  `docs/API_CONTRACT.md`; whether its evidence was produced is an open question
+  there rather than a second copy here.
 
 ##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 
