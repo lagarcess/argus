@@ -173,6 +173,27 @@ class LaunchBacktestRequest(BaseModel):
             self.capital_amount = self.recurring_contribution
 
 
+def launch_request_error_code(exc: Exception) -> str:
+    """Recover this model's own refusal code from a wrapped ValueError.
+
+    The model raises ``ValueError("<code>")``; pydantic keeps that exception in
+    the error's ``ctx``, so the code is read from there. One owner, because an
+    enumerated copy silently degrades every code nobody remembered to add, and
+    there were two such copies before this existed.
+    """
+    errors = getattr(exc, "errors", None)
+    if not callable(errors):
+        return "missing_rule_group"
+    for error in errors():
+        if error.get("type") != "value_error":
+            continue
+        source = (error.get("ctx") or {}).get("error")
+        code = str(source) if source is not None else ""
+        if code and code.replace("_", "").isalnum():
+            return code
+    return "missing_rule_group"
+
+
 def _normalize_symbols(symbols: list[str], *, fallback_symbol: str) -> list[str]:
     normalized: list[str] = []
     for value in symbols:

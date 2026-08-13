@@ -393,6 +393,18 @@ def test_a_period_is_measured_against_the_window_the_user_asked_for(
         "date_range": {"start": "2024-01-02", "end": requested_end},
         # What the user asked for.
         "requested_date_range": {"start": "2024-01-01", "end": requested_end},
+        # Only coverage moves a boundary, and it says why. A differing pair with
+        # no record is not a shape the runtime produces, and an unnamed reason
+        # is read as a truncation rather than assumed to be alignment.
+        "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "adjustment_reason": "calendar_alignment",
+            "requested_date_range": {"start": "2024-01-01", "end": requested_end},
+            "effective_date_range": {"start": "2024-01-02", "end": requested_end},
+            "preflight_id": "preflight-455",
+            "observations_by_symbol": {"AAPL": 15},
+        },
         "sizing_mode": "capital_amount",
         "capital_amount": 200.0,
         "cadence": period,
@@ -594,9 +606,10 @@ def test_the_window_a_period_must_fit_follows_why_coverage_moved_it(
     }
     if requested is not None:
         payload["requested_date_range"] = requested
-    if reason is not None and requested is not None:
+        # Only coverage moves a boundary, so a differing pair without a
+        # coverage record is not a shape the runtime produces.
         payload["coverage_preflight"] = _preflight(
-            reason=reason,
+            reason=reason or "calendar_alignment",
             effective=date_range,
             requested=requested,
         )
@@ -617,10 +630,12 @@ def test_the_window_a_period_must_fit_follows_why_coverage_moved_it(
         ("calendar_alignment", {"start": "2024-01-02", "end": "2024-12-31"}),
         ("provider_coverage_adjustment", {"start": "2024-06-01", "end": "2024-12-31"}),
         ("none", {"start": "2024-01-01", "end": "2024-12-31"}),
+        # A legacy record with no reason and a materially shorter served window.
+        (None, {"start": "2024-12-10", "end": "2024-12-31"}),
     ],
 )
 def test_a_card_never_offers_a_period_the_request_model_refuses(
-    reason: str,
+    reason: str | None,
     effective: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -643,12 +658,13 @@ def test_a_card_never_offers_a_period_the_request_model_refuses(
     coverage = {
         "schema_version": "market_data_coverage_v1",
         "outcome": "adjusted_coverage",
-        "adjustment_reason": reason,
         "requested_date_range": requested,
         "effective_date_range": effective,
         "preflight_id": "preflight-455",
         "observations_by_symbol": {"AAPL": 20},
     }
+    if reason is not None:
+        coverage["adjustment_reason"] = reason
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
@@ -660,7 +676,10 @@ def test_a_card_never_offers_a_period_the_request_model_refuses(
                     "asset_class": "equity",
                     "cadence": "monthly",
                     "capital_amount": 200.0,
-                    "date_range": dict(requested),
+                    # materialize_confirmation_strategy replaces the range with
+                    # the served one before a card is built, so the fixture has
+                    # to carry that shape or it tests something else.
+                    "date_range": dict(effective),
                 },
                 "optional_parameters": {},
                 "launch_payload": {

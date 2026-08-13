@@ -33,7 +33,10 @@ from argus.domain.backtesting.confirmation_preflight import (
     prepare_confirmation_launch,
 )
 from argus.domain.engine_launch.display import format_data_through_label
-from argus.domain.engine_launch.models import LaunchBacktestRequest
+from argus.domain.engine_launch.models import (
+    LaunchBacktestRequest,
+    launch_request_error_code,
+)
 from argus.domain.engine_launch.strategies import validate_launch_supported
 from argus.domain.market_data.capabilities import (
     fetch_alpaca_market_clock,
@@ -346,22 +349,7 @@ def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
 
 
 def _validation_error_code(exc: ValidationError) -> str:
-    """Recover the request model's own refusal code from a wrapped ValueError.
-
-    The model raises `ValueError("<code>")`; pydantic keeps that exception in
-    the error's `ctx`, so the code is read from there rather than matched
-    against rendered text. An enumerated list would silently degrade every
-    code nobody remembered to add, which is how a named refusal becomes a
-    generic one.
-    """
-    for error in exc.errors():
-        if error.get("type") != "value_error":
-            continue
-        source = (error.get("ctx") or {}).get("error")
-        code = str(source) if source is not None else ""
-        if code and code.replace("_", "").isalnum():
-            return code
-    return "missing_rule_group"
+    return launch_request_error_code(exc)
 
 
 def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, Any]:

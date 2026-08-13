@@ -377,30 +377,31 @@ def _contribution_periods_for_strategy(
 ) -> list[str]:
     """Only periods that fit at least once inside this card's window.
 
-    The window comes from the same owner the request model validates against,
-    so this card can never offer a period the engine would then refuse.
+    Both windows come from the coverage payload, the same place the request
+    model reads them. A materialized strategy has already had its date range
+    replaced by the served window, so deriving the request from it would
+    advertise fewer periods than the engine actually accepts.
     """
     from argus.domain.dca_capital import (
         contribution_period_window,
         contribution_periods_for_window,
     )
 
-    try:
-        resolved = resolve_date_range(
-            strategy.get("date_range"), today=_confirmation_today()
-        )
-    except (TypeError, ValueError):
-        return []
     coverage = launch_payload.get("coverage_preflight")
     coverage = coverage if isinstance(coverage, dict) else {}
-    effective = _date_range_payload(coverage.get("effective_date_range"))
+    requested = _coverage_window(coverage.get("requested_date_range"))
+    effective = _coverage_window(coverage.get("effective_date_range"))
+    if effective is None:
+        try:
+            resolved = resolve_date_range(
+                strategy.get("date_range"), today=_confirmation_today()
+            )
+        except (TypeError, ValueError):
+            return []
+        requested, effective = None, (resolved.start, resolved.end)
     start, end = contribution_period_window(
-        requested=(resolved.start, resolved.end),
-        effective=(
-            (date.fromisoformat(effective["start"]), date.fromisoformat(effective["end"]))
-            if effective is not None
-            else (resolved.start, resolved.end)
-        ),
+        requested=requested,
+        effective=effective,
         adjustment_reason=coverage.get("adjustment_reason"),
     )
     return list(contribution_periods_for_window(start=start, end=end))
@@ -1183,6 +1184,16 @@ def _period_adjustment_from_launch_payload(
         "requested_date_range": dict(requested),
         "effective_date_range": dict(effective),
     }
+
+
+def _coverage_window(value: Any) -> tuple[date, date] | None:
+    payload = _date_range_payload(value)
+    if payload is None:
+        return None
+    try:
+        return date.fromisoformat(payload["start"]), date.fromisoformat(payload["end"])
+    except ValueError:
+        return None
 
 
 def _date_range_payload(value: Any) -> dict[str, str] | None:

@@ -163,8 +163,9 @@ def validate_contribution_period_fits_window(
 
 
 # Coverage's own reason for moving a window, as the only input to which window
-# a contribution period has to fit.
-PROVIDER_TRUNCATION_REASON = "provider_coverage_adjustment"
+# a contribution period has to fit. Only alignment is safe to measure the ask
+# against, so it is the value named here rather than its complement.
+CALENDAR_ALIGNMENT_REASON = "calendar_alignment"
 
 
 def contribution_period_window(
@@ -183,10 +184,16 @@ def contribution_period_window(
     so the ask is what counts. Truncating a year to three weeks because the
     asset is newly listed does not, so there the served window counts.
     """
-    if requested is None:
+    if requested is None or requested == effective:
         return effective
-    truncated = str(adjustment_reason or "") == PROVIDER_TRUNCATION_REASON
-    return effective if truncated else requested
+    # The ask counts only when coverage says the move was calendar alignment.
+    # Everything else measures the served window: a truncation genuinely cannot
+    # hold the period, a record written before the reason existed cannot say
+    # which move it was, and a reason added later is unknown here. Defaulting
+    # the other way would run a year-long plan against three weeks of data.
+    if str(adjustment_reason or "") == CALENDAR_ALIGNMENT_REASON:
+        return requested
+    return effective
 
 
 def _add_months(value: date, months: int) -> date:

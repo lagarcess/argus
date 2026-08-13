@@ -138,14 +138,6 @@ def _validation_failure(error_code: str) -> ConfirmationLaunchPreflight:
 
 
 def _validation_error_code(exc: ValidationError) -> str:
-    text = str(exc)
-    for code in (
-        "future_end_date",
-        "invalid_chronological_date_range",
-        "invalid_date_range",
-        "capital_amount_required",
-        "position_size_required",
-    ):
-        if code in text:
-            return code
-    return "missing_rule_group"
+    from argus.domain.engine_launch.models import launch_request_error_code
+
+    return launch_request_error_code(exc)
