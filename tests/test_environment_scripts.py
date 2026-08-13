@@ -999,13 +999,12 @@ def test_warmup_script_runs_remote_workflow_proof_for_real_workflow_mode() -> No
     assert "workflow_runtime_proof=ready" in warmup
 
 
-def test_warmup_script_runs_stale_job_scan_when_supabase_verifier_env_exists() -> None:
+def test_warmup_script_never_runs_a_scheduled_janitor() -> None:
     warmup = _source(".github/warmup-render.sh")
 
-    assert ".github/stale-backtest-jobs.sh" in warmup
-    assert "ARGUS_STALE_JOBS_SUPABASE_URL" in warmup
-    assert "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY" in warmup
-    assert "Skipping stale backtest job scan" in warmup
+    assert ".github/stale-backtest-jobs.sh" not in warmup
+    assert "scripts/ops/scheduled_maintenance.py" not in warmup
+    assert "run_stale_job_scan" not in warmup
     assert "set -x" not in warmup
 
 

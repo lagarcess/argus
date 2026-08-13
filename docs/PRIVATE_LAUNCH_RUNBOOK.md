@@ -420,9 +420,10 @@ API/web/cron SHAs, `workflow_task`,
 `argus-backtests`, canary evidence, rollback target, and approver.
 
 The stale job scan belongs to the target `argus-maintenance` release surface.
+Warmup and canary checks never invoke recurring janitors.
 The checked-in cron declaration is not hosted proof. Until the activation gate
-below passes, the warmup scan and operator-run entry point remain the only
-effective triggers.
+below passes, only a human operator may invoke the shared maintenance entry
+point.
 
 **Destructive ops jobs refuse to guess their target.** `DATABASE_URL`,
 `SUPABASE_URL` (or `SUPABASE_PROJECT_URL`), and `SUPABASE_SERVICE_ROLE_KEY`

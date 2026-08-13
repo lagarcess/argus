@@ -140,12 +140,17 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
 
 def test_private_alpha_canary_workflow_is_manual_and_scheduled_only() -> None:
     workflow = _canary_workflow()
+    joined_steps = "\n".join(
+        str(step.get("run", "")) for step in workflow["jobs"]["canary"]["steps"]
+    )
 
     assert workflow["name"] == "Private Alpha Canary"
     assert set(workflow["on"]) == {"workflow_dispatch", "schedule"}
     assert workflow["on"]["schedule"] == [{"cron": "30 14 * * *"}]
     assert workflow["permissions"] == {"contents": "read"}
     assert "deploy" not in workflow["jobs"]
+    assert "stale-backtest-jobs.sh" not in joined_steps
+    assert "scripts/ops/scheduled_maintenance.py" not in joined_steps
 
 
 def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
