@@ -82,6 +82,77 @@ def _claim_sentences(text: str) -> Iterator[str]:
         block.append(line)
 
 
+def _access_claim_contradictions(text: str, declared: str) -> list[str]:
+    """Claims in `text` that a reader would take as the wrong flag value.
+
+    Every standing doc is scanned whole, not only the parts naming the flag: the
+    posture claim below is the shape that drifted without ever naming it.
+    """
+    stale_words = _STATE_WORDS["false" if declared == "true" else "true"]
+    stale_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={stale_words[0]}"
+
+    found: list[str] = []
+    if stale_assignment in text:
+        found.append(f"declares `{stale_assignment}`")
+
+    for sentence in _claim_sentences(text):
+        lowered = sentence.lower()
+        scoped = _SUBORDINATING.search(lowered)
+        if PUBLIC_ACCOUNT_ACCESS_FLAG in sentence:
+            # Earliest stale word wins, so a later scoped clause cannot excuse
+            # an unscoped one before it.
+            stale_at = min(
+                (
+                    match.start()
+                    for word in stale_words
+                    if (match := re.search(rf"\b{word}\b", lowered))
+                ),
+                default=None,
+            )
+            if stale_at is not None and not (scoped and scoped.start() < stale_at):
+                found.append(sentence)
+        if declared == "true" and "allowlist-gated" in lowered:
+            gate = lowered.index("allowlist-gated")
+            if not (scoped and scoped.start() < gate):
+                found.append(sentence)
+    return found
+
+
+def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> None:
+    """The guard above is only worth its name if these shapes stay separated."""
+    must_catch = (
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=false`",
+        f"The independent `{PUBLIC_ACCOUNT_ACCESS_FLAG}` policy remains false.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` defaults off and controls accounts.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` stays false unless the founder agrees.",
+        "Public account creation is still allowlist-gated.",
+        "Standing mitigations: allowlist-gated account creation, and Turnstile.",
+    )
+    must_allow = (
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}` is off, signup is allowlist-gated.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` has been live since 2026-08-12.",
+        # The founder-owned precondition in API_CONTRACT.md must never read as a
+        # stale claim, or a later round deletes it to get the suite green.
+        "Before that flag may be enabled, founder-approved evidence must prove "
+        "that every enabled permanent Auth provider supplies a verified email "
+        "compatible with profile and allowlist-role rules.",
+        "Only an explicitly disabled allowlist row blocks signup or login.",
+    )
+
+    for claim in must_catch:
+        assert _access_claim_contradictions(claim, "true"), f"missed: {claim}"
+    for claim in must_allow:
+        assert not _access_claim_contradictions(claim, "true"), f"false alarm: {claim}"
+
+    # The guard inverts with the profile rather than hardcoding today's posture.
+    assert _access_claim_contradictions(
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` is live.", "false"
+    )
+    assert not _access_claim_contradictions(
+        "Public account creation is still allowlist-gated.", "false"
+    )
+
+
 def test_public_account_access_claims_cannot_contradict_the_release_profile() -> None:
     """The release profile owns this flag; standing prose only derives from it.
 
@@ -89,8 +160,10 @@ def test_public_account_access_claims_cannot_contradict_the_release_profile() ->
     nothing connected a sentence to the profile that decides the value.
     """
     declared = _release_profile_value(PUBLIC_ACCOUNT_ACCESS_FLAG)
-    stale_words = _STATE_WORDS["false" if declared == "true" else "true"]
-    stale_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={stale_words[0]}"
+    assert declared in _STATE_WORDS, (
+        f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in the release profile. "
+        "Add its boolean spelling to _STATE_WORDS before this guard can read it."
+    )
     declared_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={declared}"
 
     contradictions: list[str] = []
@@ -99,32 +172,13 @@ def test_public_account_access_claims_cannot_contradict_the_release_profile() ->
     for path in _standing_doc_paths():
         relative = path.relative_to(ROOT).as_posix()
         text = path.read_text(encoding="utf-8")
-        if PUBLIC_ACCOUNT_ACCESS_FLAG not in text:
-            continue
 
-        if stale_assignment in text:
-            contradictions.append(f"{relative}: declares `{stale_assignment}`")
-        if declared_assignment not in text:
+        contradictions.extend(
+            f"{relative}: {claim}"
+            for claim in _access_claim_contradictions(text, declared)
+        )
+        if PUBLIC_ACCOUNT_ACCESS_FLAG in text and declared_assignment not in text:
             silent.append(relative)
-
-        for sentence in _claim_sentences(text):
-            lowered = sentence.lower()
-            scoped = _SUBORDINATING.search(lowered)
-            if PUBLIC_ACCOUNT_ACCESS_FLAG in sentence:
-                stale_hit = next(
-                    (
-                        match
-                        for word in stale_words
-                        if (match := re.search(rf"\b{word}\b", lowered))
-                    ),
-                    None,
-                )
-                if stale_hit and not (scoped and scoped.start() < stale_hit.start()):
-                    contradictions.append(f"{relative}: {sentence}")
-            if declared == "true" and "allowlist-gated" in lowered:
-                gate = lowered.index("allowlist-gated")
-                if not (scoped and scoped.start() < gate):
-                    contradictions.append(f"{relative}: {sentence}")
 
     assert not contradictions, (
         f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in "
