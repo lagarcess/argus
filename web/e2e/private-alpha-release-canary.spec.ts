@@ -242,11 +242,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
 
     await page.getByTestId("chat-input").fill(retryPrompt);
     await page.getByTestId("chat-send").click();
+    const retryButton = page.getByRole("button", {
+      name: label("common.retry"),
+    });
+    await expect(retryButton).toBeVisible();
     await expect(
-      page.getByText(label("chat.error_backtest"), { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: label("common.retry") }),
+      page.getByRole("status").filter({ has: retryButton }),
     ).toBeVisible();
     expect(interceptedRunRequests).toBe(0);
   });

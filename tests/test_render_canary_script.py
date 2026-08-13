@@ -506,6 +506,7 @@ def test_browser_has_separate_intercepted_typed_error_recovery_proof() -> None:
     assert 'type: "error"' in browser_source
     assert 'recovery_action: "retry_last_turn"' in browser_source
     assert 'label("common.retry")' in browser_source
+    assert 'getByRole("status").filter({ has: retryButton })' in browser_source
     assert "expect(interceptedRunRequests).toBe(0)" in browser_source
 
 
