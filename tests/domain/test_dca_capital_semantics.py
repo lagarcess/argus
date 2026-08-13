@@ -805,3 +805,64 @@ def test_a_card_never_offers_a_money_bound_the_request_model_refuses(
     # only thing between "some money" and none.
     assert "min" not in contribution_band
     assert not accepts(seed=0.0, contribution=0.0)
+
+
+def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The captured card must stay the real card, not a hand-built lookalike.
+
+    The browser evidence under docs/reports/evidence/455 is served to the app by
+    the Playwright spec, so if it drifts from what the confirm stage emits the
+    screenshots stop vouching for anything. Two findings in this lane came from
+    fixtures that did not match production, so this pins the one that ships.
+    """
+    import json
+
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.stages.confirm import confirm_stage
+    from argus.agent_runtime.state.models import RunState, StrategySummary
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+
+    evidence = json.loads(
+        (
+            pathlib.Path(__file__).resolve().parents[2]
+            / "docs/reports/evidence/455/dca-confirmation-card.json"
+        ).read_text()
+    )
+
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state = state.model_copy(
+        update={
+            "candidate_strategy_draft": StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["KO"],
+                asset_class="equity",
+                cadence="monthly",
+                capital_amount=200.0,
+                date_range={"start": "2020-01-02", "end": "2024-12-31"},
+                extra_parameters={"field_provenance": {"cadence": "explicit_user"}},
+            )
+        }
+    )
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+    assert result.outcome == "await_approval"
+    produced = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": result.stage_patch["confirmation_payload"],
+        }
+    )
+    assert produced is not None
+
+    assert produced["rows"] == evidence["rows"]
+    assert produced["assumptions"] == evidence["assumptions"]
+    assert produced["display_facts"] == evidence["display_facts"]
+    produced_constraints = produced["capabilities"]["edit_constraints"]
+    evidence_constraints = evidence["capabilities"]["edit_constraints"]
+    for field in ("starting_capital", "contribution"):
+        assert produced_constraints[field] == evidence_constraints[field], field
