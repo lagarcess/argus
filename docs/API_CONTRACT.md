@@ -1738,24 +1738,51 @@ defaults to `true` and controls presentation only. The independent
   `renewed_after_expiry=true`; the expired workspace is never revived.
   Disabling the flag stops new anonymous identities while already-verified
   guests remain usable until conversion, fixed expiry, or cleanup.
-- `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
-  update to add verified email/password credentials to the current anonymous
-  identity. The browser supplies its current rotated session refresh token;
-  the original bootstrap cookie is only a backward-compatible fallback. The
-  route preserves the Auth UUID and uses `permanent_account_access_allowed` as
-  its sole permanent-account gate: when public account access is disabled,
-  only active allowlisted roles may link; when enabled, any email not explicitly
-  disabled may link.
+- `POST /api/v1/auth/guest/signup` creates a new permanent Supabase Auth user
+  through ordinary password signup. It never adds email/password credentials to
+  the anonymous Auth user. It requires a fresh CAPTCHA token, a prepared
+  `new_account_signup` handoff cookie, and
+  `permanent_account_access_allowed` as its permanent-account gate. When public
+  account access is disabled, only active allowlisted roles may register; when
+  enabled, any email not explicitly disabled may register.
+- The guest projection returned by `GET /api/v1/me` includes the active
+  workspace `conversation_id` alongside its expiry and allowances. The client
+  uses this server-owned id as the handoff source if conversation hydration has
+  not yet selected the route locally.
+- Before provider signup, the client calls `POST /api/v1/auth/guest/handoffs`
+  with `handoff_kind=new_account_signup`, the source conversation, and optional
+  typed pending action. That response first sets the HttpOnly claim cookies for
+  a handoff whose expiry equals the fixed guest workspace expiry. The signup
+  route validates that prepared handoff. A server-only proof in signup metadata
+  lets a database trigger bind the newly inserted Auth UUID to the handoff
+  atomically and remove the proof in the same transaction. If email
+  confirmation is required, the guest workspace remains active until first
+  verified login claims it. If signup returns a session immediately, the route
+  claims it before returning.
+- Retrying the same unconfirmed guest signup resends the signup confirmation
+  without changing the password or creating another Auth user. If the same
+  bound Auth user is already confirmed but its claim was interrupted, Argus
+  verifies the submitted password and resumes that exact handoff. This includes
+  replaying the committed claim when its response was lost; the claimed source
+  session is accepted only on this retry route and only the same bound
+  destination can receive the replay. An email owned by any other permanent
+  identity returns `409 account_exists_use_login` before provider mutation;
+  transfer to an existing account still requires login.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
-  pending action to a ten-minute handoff without resolving whether that account
-  exists. The response exposes only the handoff id and expiry; the id and opaque
-  secret used for reconciliation exist in Secure/SameSite/HttpOnly cookies.
+  pending action without resolving whether that account exists. Its optional
+  `handoff_kind` defaults to `existing_account`, which expires in ten minutes;
+  `new_account_signup` expires with the fixed guest workspace. The response
+  exposes only the handoff id and expiry; the id and opaque secret used for
+  reconciliation exist in Secure/SameSite/HttpOnly cookies before any signup
+  provider mutation.
 - `POST /api/v1/auth/login` consumes a cookie-bound handoff before returning
   the permanent session. Its optional `guest_claim` contains the original
   conversation id and verified typed pending action. Retrying the same login
   after an ambiguous response returns the same claim result without repeating
-  transfer; the explicit claim endpoint remains strict single-use.
+  transfer. If an ordinary signup committed before its profile write, this
+  login creates the missing permanent profile before claim. The explicit claim
+  endpoint remains strict single-use.
 - `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
   the signed-in destination, then atomically transfers the complete mutable
   product graph. It is single-use and returns the original conversation id plus
@@ -1792,8 +1819,10 @@ expiry. The existing message settlement and backtest admission transactions
 own completed-turn and unique-simulation charges; feedback insert and charge
 are one transaction. Replays, failures, and interruptions add no unit.
 
-New-account linking preserves the owner UUID. An existing-account claim must
-move the complete conversation-owned product graph atomically.
+New-account signup creates a different Auth UUID. Both new-account signup and
+existing-account login use the same claim transaction to move the complete
+conversation-owned product graph atomically. The anonymous source remains the
+owner until that claim commits.
 `cost_ledger_entries`, security evidence, and route evidence are deliberately
 excluded from owner rewriting: they retain anonymous attribution or become
 null through their existing foreign-key behavior.
@@ -1877,6 +1906,80 @@ empty identity list never creates a profile.
   "request_id": "uuid"
 }
 ```
+
+## `POST /auth/guest/signup`
+
+Create a permanent account from an active guest workspace and preserve the
+workspace through the existing handoff transaction.
+
+**Request:**
+```json
+{
+  "email": "user@email.com",
+  "password": "string",
+  "captcha_token": "bounded-turnstile-token",
+  "display_name": "Alex",
+  "username": "alex",
+  "language": "es-419"
+}
+```
+
+The authenticated caller must be the active anonymous owner recorded by a
+prepared `new_account_signup` handoff. Its HttpOnly cookies must match the
+request's normalized email. The handoff preparation request owns
+`source_conversation_id` and the optional typed `pending_action`. CAPTCHA,
+language, username, and permanent-account access rules match ordinary signup.
+
+**Confirmation-required response:**
+```json
+{
+  "user": {},
+  "session": null
+}
+```
+
+The already prepared Secure/SameSite/HttpOnly handoff cookies remain valid
+through the guest workspace expiry. The response does not replace the active
+guest session. The client shows the localized check-your-email state and must
+not refresh registered-account surfaces until confirmation and login complete
+the claim.
+
+**Immediate-session response:**
+```json
+{
+  "user": {},
+  "session": {},
+  "guest_claim": {
+    "conversation_id": "uuid",
+    "pending_action": null
+  }
+}
+```
+
+The claim commits before the permanent session is returned. A retry that maps
+to the same already-bound unconfirmed Auth user resends the signup confirmation
+and returns the confirmation-required shape without calling signup again. If
+that same bound user is already confirmed but the claim was interrupted, the
+route verifies the submitted password through normal login and finishes the
+claim. A different Auth UUID or an invalid password never receives the guest
+workspace.
+
+An email bound to any other Auth user returns the existing explicit guest
+conversion response:
+
+```json
+{
+  "type": "https://api.argus.app/problems/account-exists-use-login",
+  "title": "Account Already Exists",
+  "status": 409,
+  "detail": "This email already has an Argus account. Sign in instead; your conversation comes with you.",
+  "code": "account_exists_use_login",
+  "request_id": "uuid"
+}
+```
+
+This route replaces `POST /api/v1/auth/guest/link`. No active guest registration
+path calls the authenticated Supabase user-update endpoint.
 
 ## `POST /auth/login`
 

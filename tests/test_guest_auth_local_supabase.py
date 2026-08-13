@@ -8,12 +8,12 @@ import secrets
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
+from html import unescape
 from threading import Event
 from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
-import httpx
 import psycopg
 import pytest
 from argus.agent_runtime.stages.confirm import _coverage_preflight
@@ -38,6 +38,11 @@ LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
 LOCAL_ANON_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_ANON_KEY", "").strip()
 LOCAL_SERVICE_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY", "").strip()
 LOCAL_DATABASE_URL = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
+LOCAL_MAILPIT_URL = os.getenv("ARGUS_LOCAL_MAILPIT_URL", "").strip()
+LOCAL_AUTH_CONFIRMATIONS = (
+    os.getenv("ARGUS_LOCAL_AUTH_EMAIL_CONFIRMATIONS_ENABLED", "").strip().lower()
+    == "true"
+)
 
 pytestmark = pytest.mark.skipif(
     not all((LOCAL_URL, LOCAL_ANON_KEY, LOCAL_SERVICE_KEY, LOCAL_DATABASE_URL)),
@@ -77,6 +82,114 @@ def _gateway() -> SupabaseGateway:
         client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY),
         auth_client=create_client(LOCAL_URL, LOCAL_ANON_KEY),
     )
+
+
+def _deterministic_launch_payload(language: str) -> dict[str, Any]:
+    base_launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 10_000,
+        "benchmark_symbol": "SPY",
+        "language": language,
+    }
+    preflight = _coverage_preflight(
+        base_launch_payload,
+        optional_parameter_status={},
+    )
+    assert preflight["outcome"] == "ready_to_confirm"
+    return dict(preflight["launch_payload"])
+
+
+def _deterministic_real_tool_turn(launch_payload: dict[str, Any]):
+    async def turn(**_: Any):
+        result = api_state.build_backtest_tool().run(launch_payload)
+        assert result["success"] is True
+        tool_payload = result["payload"]
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "The deterministic simulation completed.",
+                "final_response_payload": {
+                    "result": tool_payload["envelope"],
+                    "result_card": tool_payload["result_card"],
+                    "explanation_context": tool_payload["explanation_context"],
+                },
+            },
+        }
+
+    return turn
+
+
+def _mailpit_messages() -> list[dict[str, Any]]:
+    import httpx
+
+    response = httpx.get(f"{LOCAL_MAILPIT_URL}/api/v1/messages", timeout=10)
+    response.raise_for_status()
+    payload = response.json()
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        raise AssertionError("Mailpit returned an unexpected message list.")
+    return [dict(message) for message in messages]
+
+
+def _mailpit_message_for(email: str) -> dict[str, Any]:
+    import httpx
+
+    normalized = email.casefold()
+    summaries = _mailpit_messages()
+    summary = next(
+        (
+            message
+            for message in summaries
+            if any(
+                str(recipient.get("Address") or "").casefold() == normalized
+                for recipient in message.get("To") or []
+            )
+        ),
+        None,
+    )
+    if summary is None:
+        raise AssertionError(f"Mailpit has no message for {email}.")
+    response = httpx.get(
+        f"{LOCAL_MAILPIT_URL}/api/v1/message/{summary['ID']}", timeout=10
+    )
+    response.raise_for_status()
+    return dict(response.json())
+
+
+def _confirmation_url(message: dict[str, Any]) -> str:
+    text = unescape(str(message.get("Text") or ""))
+    url = next(
+        (
+            candidate
+            for candidate in re.findall(r"https?://[^\s)]+", text)
+            if "type=signup" in candidate
+        ),
+        None,
+    )
+    if url is None:
+        raise AssertionError("The signup email has no confirmation URL.")
+    return url
+
+
+def _auth_audit_actions_for_user(user_id: str) -> list[str]:
+    """Return Auth actions whether GoTrue records the user as actor or subject."""
+    with psycopg.connect(LOCAL_DATABASE_URL) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "select payload ->> 'action' from auth.audit_log_entries "
+                "where payload ->> 'actor_id' = %s "
+                "or payload -> 'traits' ->> 'user_id' = %s "
+                "order by created_at",
+                (user_id, user_id),
+            )
+            return [str(row[0]) for row in cursor.fetchall()]
 
 
 def test_real_anonymous_identity_survives_reload(
@@ -299,41 +412,7 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
         "visitor_key", visitor_key_for("testclient")
     ).execute()
 
-    base_launch_payload = {
-        "strategy_type": "buy_and_hold",
-        "symbol": "AAPL",
-        "symbols": ["AAPL"],
-        "asset_class": "equity",
-        "timeframe": "1D",
-        "date_range": {"start": "2024-01-01", "end": "2024-03-31"},
-        "sizing_mode": "capital_amount",
-        "capital_amount": 10_000,
-        "benchmark_symbol": "SPY",
-        "language": "en",
-    }
-    preflight = _coverage_preflight(
-        base_launch_payload,
-        optional_parameter_status={},
-    )
-    assert preflight["outcome"] == "ready_to_confirm"
-    launch_payload = preflight["launch_payload"]
-
-    async def deterministic_real_tool_turn(**_: Any):
-        result = api_state.build_backtest_tool().run(launch_payload)
-        assert result["success"] is True
-        tool_payload = result["payload"]
-        yield {
-            "type": "final",
-            "payload": {
-                "stage_outcome": "ready_to_respond",
-                "assistant_response": "The deterministic simulation completed.",
-                "final_response_payload": {
-                    "result": tool_payload["envelope"],
-                    "result_card": tool_payload["result_card"],
-                    "explanation_context": tool_payload["explanation_context"],
-                },
-            },
-        }
+    launch_payload = _deterministic_launch_payload("en")
 
     try:
         with (
@@ -342,7 +421,7 @@ def test_guest_run_through_real_flag_off_tool_corridor_settles_simulation(
             patch.object(
                 agent_router,
                 "stream_agent_turn_events",
-                deterministic_real_tool_turn,
+                _deterministic_real_tool_turn(launch_payload),
             ),
             TestClient(app, base_url="http://localhost:3000") as client,
         ):
@@ -664,232 +743,6 @@ def test_cleanup_deletes_real_anonymous_auth_user_through_admin() -> None:
                         (aggregate_id,),
                     )
 
-
-def test_real_anonymous_identity_links_in_place_without_moving_product_rows(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    auth_router.reset_auth_attempt_limiter_for_tests()
-    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
-    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
-    gateway = _gateway()
-    email = f"block3-link-{secrets.token_hex(6)}@example.test"
-    password = f"Block3-{secrets.token_urlsafe(18)}"
-    user_id: str | None = None
-    conversation_id: str | None = None
-    try:
-        guest = gateway.sign_in_anonymously(
-            captcha_token="local-captcha-proof",
-            language="en",
-        )
-        original_refresh_token = str(guest["session"]["refresh_token"])
-        rotated = httpx.post(
-            f"{LOCAL_URL.rstrip('/')}/auth/v1/token?grant_type=refresh_token",
-            headers={
-                "apikey": LOCAL_ANON_KEY,
-                "Content-Type": "application/json",
-            },
-            json={"refresh_token": original_refresh_token},
-            timeout=15,
-        )
-        assert rotated.is_success
-        rotated_session = rotated.json()
-        auth_user = guest["user"]
-        user_id = str(auth_user["id"])
-        profile = gateway.get_or_create_profile_for_auth_user(auth_user)
-        gateway.create_guest_workspace(
-            user_id=profile.id,
-            created_at=profile.created_at,
-        )
-        conversation = gateway.create_conversation(
-            user_id=user_id,
-            title="Identity link proof",
-            title_source="system_default",
-            language="en",
-        )
-        conversation_id = conversation.id
-        gateway.client.table("messages").insert(
-            {
-                "conversation_id": conversation_id,
-                "user_id": user_id,
-                "role": "user",
-                "content": "Preserve this exact message",
-            }
-        ).execute()
-        with (
-            patch.object(api_state, "supabase_gateway", gateway),
-            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
-            TestClient(app, base_url="http://localhost:3000") as client,
-        ):
-            client.cookies.set(
-                "sb-auth-token",
-                str(rotated_session["access_token"]),
-            )
-            client.cookies.set(
-                "sb-refresh-token",
-                original_refresh_token,
-            )
-            linked = client.post(
-                "/api/v1/auth/guest/link",
-                json={
-                    "email": email,
-                    "password": password,
-                    "refresh_token": str(rotated_session["refresh_token"]),
-                },
-                headers={"origin": "http://localhost:3000"},
-            )
-
-            assert linked.status_code == 200
-            assert linked.json()["account_kind"] == "registered"
-            assert linked.json()["user"]["id"] == user_id
-            assert linked.json()["user"]["email"] == email
-            access_token = str(linked.json()["session"]["access_token"])
-            reloaded = client.get(
-                "/api/v1/me",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-
-        assert reloaded.status_code == 200
-        assert reloaded.json()["account_kind"] == "registered"
-        assert reloaded.json()["user"]["id"] == user_id
-        verified = gateway.get_auth_user_from_token(access_token)
-        assert str(verified["id"]) == user_id
-        assert verified["is_anonymous"] is False
-        assert str(verified["email"]).lower() == email
-        preserved = (
-            gateway.client.table("conversations")
-            .select("id,user_id")
-            .eq("id", conversation_id)
-            .single()
-            .execute()
-            .data
-        )
-        assert preserved == {"id": conversation_id, "user_id": user_id}
-        messages = (
-            gateway.client.table("messages")
-            .select("id,user_id,content")
-            .eq("conversation_id", conversation_id)
-            .execute()
-            .data
-        )
-        assert len(messages) == 1
-        assert messages[0]["user_id"] == user_id
-        assert messages[0]["content"] == "Preserve this exact message"
-        workspace = (
-            gateway.client.table("guest_workspaces")
-            .select("status,claimed_by,conversation_id")
-            .eq("user_id", user_id)
-            .single()
-            .execute()
-            .data
-        )
-        assert workspace == {
-            "status": "claimed",
-            "claimed_by": user_id,
-            "conversation_id": conversation_id,
-        }
-    finally:
-        if user_id:
-            with suppress(Exception):
-                gateway.delete_auth_user(user_id)
-
-
-def test_disabled_public_email_cannot_link_real_anonymous_identity(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    auth_router.reset_auth_attempt_limiter_for_tests()
-    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED", "true")
-    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
-    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
-    gateway = _gateway()
-    email = f"disabled-link-{secrets.token_hex(6)}@example.test"
-    password = f"Disabled-{secrets.token_urlsafe(18)}"
-    user_id: str | None = None
-    conversation_id: str | None = None
-    try:
-        gateway.client.table("private_alpha_allowlist").insert(
-            {
-                "email": email,
-                "disabled_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).execute()
-        guest = gateway.sign_in_anonymously(
-            captcha_token="local-captcha-proof",
-            language="en",
-        )
-        auth_user = guest["user"]
-        user_id = str(auth_user["id"])
-        profile = gateway.get_or_create_profile_for_auth_user(auth_user)
-        gateway.create_guest_workspace(
-            user_id=profile.id,
-            created_at=profile.created_at,
-        )
-        conversation = gateway.create_conversation(
-            user_id=user_id,
-            title="Disabled identity proof",
-            title_source="system_default",
-            language="en",
-        )
-        conversation_id = conversation.id
-
-        with (
-            patch.object(api_state, "supabase_gateway", gateway),
-            patch.object(api_state, "DATABASE_URL", LOCAL_DATABASE_URL),
-            TestClient(app, base_url="http://localhost:3000") as client,
-        ):
-            client.cookies.set(
-                "sb-auth-token",
-                str(guest["session"]["access_token"]),
-            )
-            client.cookies.set(
-                "sb-refresh-token",
-                str(guest["session"]["refresh_token"]),
-            )
-            response = client.post(
-                "/api/v1/auth/guest/link",
-                json={"email": email, "password": password},
-                headers={"origin": "http://localhost:3000"},
-            )
-
-        assert response.status_code == 400
-        assert response.json()["code"] == "guest_identity_link_failed"
-        with psycopg.connect(LOCAL_DATABASE_URL) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "select is_anonymous, email from auth.users where id = %s",
-                    (user_id,),
-                )
-                assert cursor.fetchone() == (True, None)
-                cursor.execute(
-                    "select count(*) from auth.users where lower(email) = %s",
-                    (email,),
-                )
-                assert cursor.fetchone()[0] == 0
-                cursor.execute(
-                    "select status, claimed_by, conversation_id::text"
-                    " from public.guest_workspaces where user_id = %s",
-                    (user_id,),
-                )
-                assert cursor.fetchone() == ("active", None, conversation_id)
-                cursor.execute(
-                    "select user_id::text from public.conversations where id = %s",
-                    (conversation_id,),
-                )
-                assert cursor.fetchone()[0] == user_id
-    finally:
-        with suppress(Exception):
-            gateway.client.table("private_alpha_allowlist").delete().eq(
-                "email", email
-            ).execute()
-        if user_id:
-            with suppress(Exception):
-                gateway.delete_auth_user(user_id)
-
-
 def test_signup_taken_username_creates_no_auth_user_or_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -982,9 +835,7 @@ def test_username_availability_treats_pattern_characters_as_literals() -> None:
         )
         assert created.user is not None
         user_id = str(created.user.id)
-        gateway.get_or_create_profile_for_auth_user(
-            created.user.model_dump(mode="json")
-        )
+        gateway.get_or_create_profile_for_auth_user(created.user.model_dump(mode="json"))
 
         for literal_username, pattern_match_username in username_pairs:
             gateway.client.table("profiles").update(
@@ -996,9 +847,9 @@ def test_username_availability_treats_pattern_characters_as_literals() -> None:
                 literal_username,
             ) as available:
                 assert available.username_available is True
-            gateway.client.table("profiles").update(
-                {"username": literal_username}
-            ).eq("id", user_id).execute()
+            gateway.client.table("profiles").update({"username": literal_username}).eq(
+                "id", user_id
+            ).execute()
             with serialized_username_signup(
                 LOCAL_DATABASE_URL,
                 f"username-probe-{suffix}@example.test",
@@ -1188,6 +1039,16 @@ def test_signup_creates_profile_before_first_login_claims_pending_handoff(
             )
             assert signed_up.status_code == 200, signed_up.json()
             destination_user_id = str(signed_up.json()["user"]["id"])
+            if signed_up.json()["session"] is None:
+                assert LOCAL_MAILPIT_URL
+                import httpx
+
+                confirmation = httpx.get(
+                    _confirmation_url(_mailpit_message_for(email)),
+                    follow_redirects=False,
+                    timeout=10,
+                )
+                assert confirmation.status_code == 303
 
             signed_in = guest_client.post(
                 "/api/v1/auth/login",

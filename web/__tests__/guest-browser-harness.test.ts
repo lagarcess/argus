@@ -743,7 +743,7 @@ describe("browser safety evidence", () => {
       const safe = emptyEvidence();
       safe.owner_labels = ["b".repeat(20)];
       safe.normalized_mutation_counts = {
-        "POST /api/v1/auth/guest/link": 1,
+        "POST /api/v1/auth/guest/signup": 1,
       };
       assertSafeEvidence(safe);
 
@@ -1014,9 +1014,11 @@ describe("Checks 6–20 harness guards", () => {
       source.indexOf("function cleanupGraphRows"),
     );
 
-    expect(check15).toContain("same_uuid_conversion");
+    expect(check15).toContain("distinct_uuid_conversion");
     expect(check15).toContain("decisionTargetsEvidence");
-    expect(check15).toContain("POST /api/v1/auth/guest/link");
+    expect(check15).toContain("POST /api/v1/auth/guest/signup");
+    expect(check15).toContain("mutableGraphRows(sourceAfter)");
+    expect(check15).toContain("account.body.user.id !== sourceOwner");
     expect(check15).toContain(
       "allowlistDisposableRegisteredIdentity(primaryOwner)",
     );

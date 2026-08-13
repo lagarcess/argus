@@ -483,6 +483,18 @@ def current_user(request: Request) -> User:
             user_id=auth_user_id,
             at=datetime.now(timezone.utc),
         )
+        if (
+            workspace is None
+            and request.scope.get("path") == "/api/v1/auth/guest/signup"
+        ):
+            # A claim can commit before its response reaches the browser. Keep
+            # that source session valid only for the replay-safe signup route.
+            workspace = (
+                api_state.supabase_gateway.get_guest_workspace_for_signup_retry(
+                    user_id=auth_user_id,
+                    at=datetime.now(timezone.utc),
+                )
+            )
         if workspace is None:
             raise problem(
                 request,

@@ -351,12 +351,20 @@ describe("guest conversion contract", () => {
     const hook = readFileSync(hookPath, "utf-8");
 
     expect(hook).toContain("createGuestHandoff");
+    expect(hook).toContain("registerGuestAccount");
     expect(hook).toContain("loginWithEmail");
+    expect(hook).toContain(
+      "conversationId ?? account?.guest?.conversation_id ?? null",
+    );
     expect(hook).toContain("authenticated.guest_claim");
     const authenticate = hook.slice(hook.indexOf("const authenticate"));
     expect(authenticate.indexOf("createGuestHandoff")).toBeLessThan(
       authenticate.indexOf("loginWithEmail"),
     );
+    expect(authenticate.indexOf("registerGuestAccount")).toBeLessThan(
+      authenticate.indexOf("await refreshAccount()"),
+    );
+    expect(authenticate).toContain('status: "email_confirmation_required"');
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");
     expect(authenticate).toContain("await refreshHistory()");
