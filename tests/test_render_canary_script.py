@@ -426,6 +426,16 @@ def test_shell_verifies_the_profile_owned_decision_note_text() -> None:
     assert 'decision.get("note") != os.environ["CANARY_DECISION_NOTE"]' in source
 
 
+def test_browser_matches_decision_state_inside_its_localized_template() -> None:
+    browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
+
+    assert "function decisionStateLocator" in browser_source
+    assert "exact: false" in browser_source.split(
+        "function decisionStateLocator", 1
+    )[1].split("\n}", 1)[0]
+    assert browser_source.count("decisionStateLocator(page, canaryDecisionState)") == 2
+
+
 def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 

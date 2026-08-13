@@ -113,6 +113,12 @@ async function openAuthenticatedChat(page: Page): Promise<{ userId: string }> {
   return { userId: canaryUserId };
 }
 
+function decisionStateLocator(page: Page, state: string) {
+  return page.getByText(label(`chat.result_card.decision_states.${state}`), {
+    exact: false,
+  });
+}
+
 function captureBrowserErrors(page: Page) {
   const evidence = { consoleErrorCount: 0, pageErrorCount: 0 };
   page.on("console", (message) => {
@@ -444,24 +450,14 @@ test.describe.serial("private-alpha rendered release canary", () => {
     }
 
     await expect(
-      page.getByText(
-        label(`chat.result_card.decision_states.${canaryDecisionState}`),
-        {
-          exact: true,
-        },
-      ),
+      decisionStateLocator(page, canaryDecisionState),
     ).toBeVisible();
     await page.reload();
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
     ).toHaveCount(1, { timeout: 60_000 });
     await expect(
-      page.getByText(
-        label(`chat.result_card.decision_states.${canaryDecisionState}`),
-        {
-          exact: true,
-        },
-      ),
+      decisionStateLocator(page, canaryDecisionState),
     ).toBeVisible();
     await expect(
       page.getByText(label("chat.error_backtest"), { exact: true }),
