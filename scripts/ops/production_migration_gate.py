@@ -38,6 +38,9 @@ _LEDGER_RECONCILIATION_THROUGH = "20260811210000"
 _RECONCILED_CANDIDATE_CATALOG_SHA256 = (
     "f05cf5738ce8b6e0ad74ce2b4b77d773387bc5421bab3a101448241b5431e2c2"
 )
+_RECONCILED_PRODUCTION_LEDGER_SHA256 = (
+    "e352a2c003572611f0fb201305e085e3736eefbfae0d62ef29f4322a18062032"
+)
 
 
 class MigrationGateError(RuntimeError):
@@ -396,6 +399,7 @@ def build_migration_report(
     candidate_migrations: Sequence[CandidateMigration],
     applied_migrations: Sequence[AppliedMigration],
     reconciled_candidate_catalog_sha256: str | None = None,
+    reconciled_production_ledger_sha256: str | None = None,
 ) -> dict[str, object]:
     """Build a fail-closed comparison report for release evidence."""
 
@@ -411,6 +415,11 @@ def build_migration_report(
     candidate_catalog_matches_reconciliation = (
         reconciled_candidate_catalog_sha256 is None
         or candidate_catalog_sha256 == reconciled_candidate_catalog_sha256
+    )
+    production_ledger_sha256 = _production_ledger_sha256(applied_migrations)
+    production_ledger_matches_reconciliation = (
+        reconciled_production_ledger_sha256 is None
+        or production_ledger_sha256 == reconciled_production_ledger_sha256
     )
     historical_mappings, mapped_candidate_versions, mapped_applied_versions = (
         _historical_migration_mappings(candidate_by_version, applied_by_version)
@@ -490,6 +499,7 @@ def build_migration_report(
     )
     has_historical_variance = bool(
         not candidate_catalog_matches_reconciliation
+        or not production_ledger_matches_reconciliation
         or historical_mappings
         or historical_candidate_without_ledger_identity
         or historical_applied_without_candidate_identity
@@ -501,6 +511,8 @@ def build_migration_report(
     advisories: list[str] = []
     if not candidate_catalog_matches_reconciliation:
         stop_reasons.append("historical_candidate_catalog_drift")
+    if not production_ledger_matches_reconciliation:
+        stop_reasons.append("historical_production_ledger_drift")
     if missing:
         stop_reasons.append("missing_candidate_migrations")
     if has_historical_variance:
@@ -533,6 +545,10 @@ def build_migration_report(
             "candidate_catalog_sha256": candidate_catalog_sha256,
             "candidate_catalog_matches_reconciliation": (
                 candidate_catalog_matches_reconciliation
+            ),
+            "production_ledger_sha256": production_ledger_sha256,
+            "production_ledger_matches_reconciliation": (
+                production_ledger_matches_reconciliation
             ),
             "version_mappings": historical_mappings,
             "candidate_without_ledger_identity": (
@@ -597,6 +613,9 @@ def main(
     connect_factory: ConnectFactory | None = None,
     reconciled_candidate_catalog_sha256: str | None = (
         _RECONCILED_CANDIDATE_CATALOG_SHA256
+    ),
+    reconciled_production_ledger_sha256: str | None = (
+        _RECONCILED_PRODUCTION_LEDGER_SHA256
     ),
 ) -> int:
     """Run the production migration gate and write its durable JSON report."""
@@ -666,6 +685,7 @@ def main(
             candidate_migrations=candidate_migrations,
             applied_migrations=applied_migrations,
             reconciled_candidate_catalog_sha256=(reconciled_candidate_catalog_sha256),
+            reconciled_production_ledger_sha256=(reconciled_production_ledger_sha256),
         )
         report["landing_verification"] = (
             {
@@ -769,6 +789,21 @@ def _candidate_catalog_sha256(
         }
         for migration in sorted(
             candidate_migrations,
+            key=lambda migration: migration.version,
+        )
+        if migration.version <= _LEDGER_RECONCILIATION_THROUGH
+    ]
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _production_ledger_sha256(
+    applied_migrations: Sequence[AppliedMigration],
+) -> str:
+    payload = [
+        migration.as_record()
+        for migration in sorted(
+            applied_migrations,
             key=lambda migration: migration.version,
         )
         if migration.version <= _LEDGER_RECONCILIATION_THROUGH

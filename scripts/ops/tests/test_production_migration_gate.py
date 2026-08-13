@@ -349,6 +349,40 @@ def test_backdated_candidate_change_breaks_the_reconciled_catalog_fingerprint() 
     )
 
 
+def test_historical_ledger_change_breaks_the_reconciled_production_fingerprint() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260811210000_delete_withheld_backtest_result.sql",
+        "create function public.delete_withheld() returns boolean "
+        "language sql as 'select true';",
+    )
+    applied = AppliedMigration(
+        version=candidate.version,
+        name=candidate.name,
+        statements=(candidate.source,),
+    )
+
+    report = build_migration_report(
+        candidate_sha="3" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[applied],
+        reconciled_candidate_catalog_sha256=(
+            migration_gate._candidate_catalog_sha256([candidate])
+        ),
+        reconciled_production_ledger_sha256="0" * 64,
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["historical_production_ledger_drift"]
+    assert (
+        report["historical_ledger_variance"]["production_ledger_matches_reconciliation"]
+        is False
+    )
+
+
 def test_blank_applied_migration_name_blocks_as_drift() -> None:
     candidate = CandidateMigration.from_source(
         "supabase/migrations/20260812000000_add_release_marker.sql",
@@ -1046,6 +1080,7 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
         repo_root=repo,
         connect_factory=lambda *_args, **_kwargs: connection,
         reconciled_candidate_catalog_sha256=None,
+        reconciled_production_ledger_sha256=None,
     )
 
     report = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1116,6 +1151,7 @@ def test_cli_passes_only_when_the_production_ledger_matches(
         repo_root=repo,
         connect_factory=lambda *_args, **_kwargs: connection,
         reconciled_candidate_catalog_sha256=None,
+        reconciled_production_ledger_sha256=None,
     )
 
     report = json.loads(capsys.readouterr().out)
