@@ -156,7 +156,7 @@ def _auth_audit_actions_for_user(user_id: str) -> list[str]:
             return [str(row[0]) for row in cursor.fetchall()]
 
 
-def test_real_guest_signup_recovers_after_claim_failure_and_moves_product_rows(
+def test_real_guest_signup_replays_after_claim_commits_but_response_is_lost(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     auth_router.reset_auth_attempt_limiter_for_tests()
@@ -174,12 +174,13 @@ def test_real_guest_signup_recovers_after_claim_failure_and_moves_product_rows(
     real_claim = gateway.claim_guest_workspace_handoff
     claim_attempts = 0
 
-    def fail_first_claim(**kwargs: object) -> dict[str, object]:
+    def lose_first_claim_response(**kwargs: object) -> dict[str, object]:
         nonlocal claim_attempts
         claim_attempts += 1
+        claimed = real_claim(**kwargs)  # type: ignore[arg-type]
         if claim_attempts == 1:
-            raise RuntimeError("simulated_claim_interruption")
-        return real_claim(**kwargs)  # type: ignore[arg-type]
+            raise RuntimeError("simulated_response_loss_after_claim")
+        return claimed
 
     try:
         with (
@@ -188,7 +189,7 @@ def test_real_guest_signup_recovers_after_claim_failure_and_moves_product_rows(
             patch.object(
                 gateway,
                 "claim_guest_workspace_handoff",
-                side_effect=fail_first_claim,
+                side_effect=lose_first_claim_response,
             ),
             TestClient(app, base_url="http://localhost:3000") as client,
         ):
@@ -269,6 +270,7 @@ def test_real_guest_signup_recovers_after_claim_failure_and_moves_product_rows(
             destination_user_id = str(signed_up.json()["user"]["id"])
             assert destination_user_id != source_user_id
             assert signed_up.json()["user"]["email"] == email
+            assert claim_attempts == 2
             access_token = str(signed_up.json()["session"]["access_token"])
             reloaded = client.get(
                 "/api/v1/me",

@@ -793,6 +793,57 @@ def test_guest_signup_retry_logs_in_same_bound_confirmed_account_and_claims() ->
     gateway.resend_signup_confirmation.assert_not_called()
 
 
+def test_guest_signup_replays_consumed_handoff_after_lost_claim_response() -> None:
+    gateway = MagicMock(spec=SupabaseGateway)
+    gateway.private_alpha_email_disabled.return_value = False
+    gateway.get_guest_signup_handoff.return_value = {
+        **_signup_handoff(destination_user_id=REGISTERED_ID),
+        "status": "consumed",
+    }
+    gateway.login.return_value = {
+        "user": _signup_auth_user(confirmed=True),
+        "session": {
+            "access_token": "registered-access-token",
+            "refresh_token": "registered-refresh-token",
+            "expires_in": 3600,
+        },
+    }
+    gateway.get_or_create_profile_for_auth_user.return_value = _profile(
+        user_id=REGISTERED_ID,
+        email="approved@example.com",
+    )
+    gateway.claim_guest_workspace_handoff.return_value = {
+        "source_user_id": GUEST_ID,
+        "destination_user_id": REGISTERED_ID,
+        "conversation_id": CONVERSATION_ID,
+        "pending_action": _signup_handoff(destination_user_id=None)["pending_action"],
+        "handoff_kind": "new_account_signup",
+        "replayed": True,
+    }
+
+    with (
+        patch("argus.api.routers.auth.serialized_guest_signup") as serialized,
+        patch("argus.api.routers.auth.emit_verified_guest_funnel_event") as emit,
+    ):
+        serialized.return_value.__enter__.return_value = GuestSignupPrevalidation(
+            auth_user_id=REGISTERED_ID,
+            auth_user_confirmed=True,
+            username_available=True,
+        )
+        response = _post_guest_signup(gateway)
+
+    assert response.status_code == 200
+    assert response.json()["reconciled"] is True
+    assert response.json()["guest_claim"]["conversation_id"] == CONVERSATION_ID
+    gateway.claim_guest_workspace_handoff.assert_called_once_with(
+        handoff_id=HANDOFF_ID,
+        opaque_secret="opaque-signup-secret",
+        destination_user_id=REGISTERED_ID,
+        allow_same_destination_replay=True,
+    )
+    emit.assert_not_called()
+
+
 def test_guest_signup_confirmed_retry_with_wrong_password_keeps_account_separate() -> (
     None
 ):

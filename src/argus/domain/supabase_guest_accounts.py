@@ -150,7 +150,7 @@ class GuestAccountPersistenceMixin:
             .eq("secret_hash", secret_hash)
             .eq("destination_email_hash", destination_email_hash)
             .eq("handoff_kind", "new_account_signup")
-            .eq("status", "pending")
+            .in_("status", ["pending", "consumed"])
             .gt("expires_at", at.isoformat())
             .limit(1)
             .execute()
@@ -238,6 +238,25 @@ class GuestAccountPersistenceMixin:
             .select("*")
             .eq("user_id", user_id)
             .eq("status", "active")
+            .gt("expires_at", at.isoformat())
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        return GuestWorkspace.model_validate(row) if row else None
+
+    def get_guest_workspace_for_signup_retry(
+        self,
+        *,
+        user_id: str,
+        at: datetime,
+    ) -> GuestWorkspace | None:
+        """Recover a claimed source only for the idempotent signup retry path."""
+        rows = (
+            self.client.table("guest_workspaces")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("status", "claimed")
             .gt("expires_at", at.isoformat())
             .limit(1)
             .execute()

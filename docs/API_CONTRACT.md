@@ -1762,10 +1762,12 @@ defaults to `true` and controls presentation only. The independent
 - Retrying the same unconfirmed guest signup resends the signup confirmation
   without changing the password or creating another Auth user. If the same
   bound Auth user is already confirmed but its claim was interrupted, Argus
-  verifies the submitted password and resumes that exact handoff. An email
-  owned by any other permanent identity returns `409 account_exists_use_login`
-  before provider mutation; transfer to an existing account still requires
-  login.
+  verifies the submitted password and resumes that exact handoff. This includes
+  replaying the committed claim when its response was lost; the claimed source
+  session is accepted only on this retry route and only the same bound
+  destination can receive the replay. An email owned by any other permanent
+  identity returns `409 account_exists_use_login` before provider mutation;
+  transfer to an existing account still requires login.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
   pending action without resolving whether that account exists. Its optional

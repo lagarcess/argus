@@ -271,6 +271,9 @@ account created by signup or verified by login.
 - Claim locks the handoff and complete source product graph, resolves the
   destination only from verified Auth email truth, verifies every foreign
   owner, and transfers all mutable product rows in one transaction.
+- A consumed handoff remains a read-only replay oracle for the same bound
+  destination when a signup or login response is lost. It never repeats the
+  transfer or accepts another destination.
 - Conversation, message, strategy, job/run, Idea/IdeaVersion, evidence,
   decision, and context ids do not change. Checkpoint rows keep
   `thread_id == conversation_id`.
