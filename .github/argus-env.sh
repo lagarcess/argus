@@ -2,7 +2,7 @@
 # Shared Argus environment contract for local mode scripts and Render drift tests.
 
 ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"
-ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"
+ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"
 ARGUS_PRIVATE_LAUNCH_API_BASE_URL="${ARGUS_PRIVATE_LAUNCH_API_URL}/api/v1"
 ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="https://argus-app-suz5.onrender.com,https://arguschat.ai,https://www.arguschat.ai"
 ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID="srv-d78tanmuk2gs73e17nn0"
