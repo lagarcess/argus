@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -373,7 +374,7 @@ describe("chat recovery display", () => {
     expect(text).not.toContain("invalid_chronological_date_range");
   });
 
-  test("unsupported-symbol option localizes from the reason code (#296)", () => {
+  test("unsupported-symbol option localizes without raw symbol copy (#296)", () => {
     const display = recoveryDisplayFromMetadata({
       response_intent: {
         kind: "unsupported_recovery",
@@ -398,14 +399,16 @@ describe("chat recovery display", () => {
     });
 
     const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
-    // The true blocker is named and the advisory option renders in Spanish —
-    // no backend English inside a localized sentence.
-    expect(es).toContain("SAMSUNG");
+    // The advisory option renders in Spanish without turning untyped symbol
+    // output into the sentence subject.
+    expect(es).not.toContain("SAMSUNG");
+    assert.ok(es.includes("esa regla"));
     expect(es).toContain("Usar un símbolo de acción o cripto compatible");
     expect(es).not.toContain("Use a supported stock");
 
     const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
-    expect(en).toContain("SAMSUNG");
+    expect(en).not.toContain("SAMSUNG");
+    assert.ok(en.includes("that rule"));
     expect(en).toContain("Use a supported stock or crypto symbol");
   });
 
@@ -445,42 +448,6 @@ describe("chat recovery display", () => {
     );
     expect(text).not.toContain("Backtest WMT");
     expect(text).not.toContain("can't run");
-  });
-
-  test("renders unsupported recovery from typed clarification sidecars", () => {
-    const display = recoveryDisplayFromMetadata({
-      clarification: {
-        kind: "unsupported_recovery",
-        reason_code: "unsupported_strategy_logic",
-        prompt_source: "degraded_fallback",
-        requested_field: "unsupported_constraints",
-        semantic_needs: ["simplification_choice"],
-        payload: {
-          raw_value: "ATR 14",
-          strategy: {
-            asset_universe: ["TSLA"],
-          },
-        },
-        options: [
-          {
-            id: "rsi_threshold",
-            replacement_values: {
-              simplify_logic: "rsi_only",
-            },
-          },
-          {
-            id: "buy_and_hold",
-            replacement_values: {
-              strategy_type: "buy_and_hold",
-            },
-          },
-        ],
-      },
-    });
-
-    expect(recoveryDisplayText(display, tFromCatalog(esCatalog))).toBe(
-      "Argus todavía no puede ejecutar ATR 14 directamente para TSLA. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
-    );
   });
 
   test("renders degraded timeframe recovery truthfully in English and Spanish", () => {
@@ -597,7 +564,7 @@ describe("chat recovery display", () => {
     expect(es).not.toContain("Probarlo en un período histórico");
   });
 
-  test("degraded momentum recovery is capability-honest in English and Spanish", () => {
+  test("degraded momentum recovery uses only the typed capability cause", () => {
     const display = recoveryDisplayFromMetadata({
       clarification: {
         kind: "unsupported_recovery",
@@ -623,10 +590,12 @@ describe("chat recovery display", () => {
     });
 
     const en = recoveryDisplayText(display, tFromCatalog(enCatalog));
-    expect(en).toContain("a momentum breakout strategy");
+    expect(en).toContain("that rule");
+    expect(en).not.toContain("a momentum breakout strategy");
     expect(en).not.toContain("does not define");
     const es = recoveryDisplayText(display, tFromCatalog(esCatalog));
-    expect(es).toContain("a momentum breakout strategy");
+    expect(es).toContain("esa regla");
+    expect(es).not.toContain("a momentum breakout strategy");
     expect(es).not.toContain("no define");
   });
 
