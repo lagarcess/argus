@@ -92,13 +92,20 @@ The provider mode is pinned inside the module: coverage skips the calendar
 entirely in synthetic mode, so inheriting the runner's mode would let these
 assertions pass by never consulting a calendar at all.
 
+## Two defects these guards caught
+
+Both were introduced by this lane and both are the shape the lane exists to remove:
+
+1. `edit_constraints` advertised a `$0.01` contribution minimum the plan never had, a second and stricter rule that would have refused a run the engine accepts.
+2. The backend emitted a `fractional_shares` receipt key the frontend's frozen vocabulary had never heard of, so the fact would have reached a shared page and been dropped. The repo's own closed-set test caught it.
+
 ## Test results at this head
 
 - Backend, hermetic (`ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture`,
   provider keys blanked): **5071 passed, 489 skipped, 2 failed**. Both failures
   are `tests/memory/test_mem0_configuration.py`, `ModuleNotFoundError: No module
   named 'mem0'`, pre-existing in this worktree's venv and unrelated to the lane.
-- Frontend unit: **1482 passed, 0 failed** across 145 files.
+- Frontend unit: **1482 passed, 0 failed** across 144 files.
 - Frontend typecheck: clean. Lint: 0 errors (8 pre-existing warnings).
 - `next build`: succeeded.
 - Browser: **4 passed** (en/es-419 × phone/desktop).
