@@ -580,7 +580,7 @@ Product defaults:
 
 ```bash
 ARGUS_GUEST_ACCESS_ENABLED=true
-ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
+ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true
 NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
 ARGUS_VISITOR_KEY_SECRET=<unique high-entropy environment secret>
 ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
@@ -589,9 +589,12 @@ ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
 Guest access is part of the normal product shape. The two Guest flags are
 default-on emergency kill switches; explicit `false` activates rollback. The
 frontend flag controls presentation only and the API remains authoritative.
-Public-account access remains off, permanent signup/login stays
-allowlist-gated, existing admin/developer behavior is unchanged, and no Create
-account promise is shown.
+Public-account access is open as of 2026-08-12: permanent signup and login
+admit any email without an explicitly disabled allowlist row, the guest surface
+offers account creation, and existing admin/developer behavior is unchanged
+because opening the gate grants no role. That third flag is the one that fails
+closed when unset, so it must be set explicitly on every service that reads it;
+omitting it denies registration rather than opening it.
 
 Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
@@ -659,7 +662,8 @@ Rollback order:
 
 1. set `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`;
 2. set `ARGUS_GUEST_ACCESS_ENABLED=false`;
-3. keep `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`;
+3. leave `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` untouched, because rolling
+   guest access back does not close public registration;
 4. verify the preserved centered auth landing path;
 5. stop new guest creation while retaining existing rows for safe expiry,
    conversion, or bounded cleanup.
@@ -678,7 +682,10 @@ The live `argus-api` plan is `standard`. The live `argus-app` plan is
 `starter`. The requested-role migration and access-request exposure are
 complete after the paid-plan readback and maintenance/private-health probes in
 `docs/release-evidence/public-alpha-readiness.md`. Public account creation is
-still allowlist-gated; `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false`.
+open: the founder set `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` live on
+2026-08-12, recorded in
+`docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`, so
+anyone may register and the allowlist blocks only explicitly disabled rows.
 The evidence records the paid API instance type plus the maintenance and
 private/SSH/local verification controls.
 

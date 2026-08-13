@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,105 @@ from tests.evals.measurement_eval_scorecard import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
+PUBLIC_ACCOUNT_ACCESS_FLAG = "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"
+# The release profile owns this flag's value. Product truth is where prose states
+# it, and every other doc may point here rather than repeat it.
+CANONICAL_VALUE_DOC = "docs/PRODUCT.md"
+
+# Records of a moment keep the claims they shipped with, because quoting a
+# superseded posture is their job. Everything else under docs/, .agent/, and the
+# repo root is standing guidance a reader consults for current truth, so it is
+# in scope by default rather than by being listed.
+_RECORD_TREES = (
+    "docs/archive/",
+    "docs/release-manifests/",
+    "docs/release-evidence/",
+    "docs/evidence/",
+    "docs/reports/",
+    "docs/qa/",
+)
+_DATED_RECORD = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+# Domain knowledge vendored for agents, not Argus access policy.
+_UNRELATED_TREES = (".agent/skills/",)
+
+# Closed boolean vocabularies, so a new stale sentence is caught by grammar
+# rather than by matching a phrase somebody already wrote. These are read next to
+# the flag name, where "on" would usually be a preposition ("on 2026-08-12") and
+# "enabled"/"disabled" would usually be an Auth provider or an allowlist row.
+_STATE_WORDS = {
+    "true": ("true",),
+    "false": ("false", "off"),
+}
+# A doc may describe the other value only inside a subordinate clause, so it
+# scopes the behavior instead of declaring it. "unless" is deliberately absent:
+# "stays false unless approved" asserts a standing value.
+_SUBORDINATING = re.compile(r"\b(?:if|when|whenever|while|once)\b", re.IGNORECASE)
+_BLOCK_BREAK = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#|```|\|)")
+
+# Prose names this policy without naming the variable, which is how four sites
+# escaped the first pass. A sentence must be about the gate before its state
+# words are read as a claim about the gate.
+_GATE_SUBJECT = re.compile(
+    r"public[-\s]?(?:account|permanent|registration|signup|login)"
+    r"|permanent[-\s]?accounts?\b",
+    re.IGNORECASE,
+)
+# Words that call the gate open or shut, keyed by the value each asserts, so the
+# same reading runs whichever way the profile points. "on" and "closed" are
+# absent because "on 2026-08-12" and "fails closed" are ordinary prose here.
+_GATE_STATE = {
+    "true": re.compile(r"\b(?:true|open|opens|opened|enabled)\b", re.IGNORECASE),
+    "false": re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE),
+}
+# Words that cannot be the noun a state word modifies, so a state word followed
+# by one of them, by punctuation, or by nothing is predicative and asserts the
+# gate: "access is disabled", "registration is enabled", "off for new accounts".
+_NOT_A_MODIFIED_NOUN = (
+    r"for|so|and|or|but|to|on|in|of|with|no|not|all|any|every|because|since|"
+    r"unless|while|when|if|then|until|except|by|as|at|from|that|which|it|its|"
+    r"this|these|those|there|here|only|merely|just|simply|still|now|today"
+)
+# Attributive instead: the word modifies the noun after it and describes that
+# noun, not the gate. "an explicitly disabled allowlist row" stays true while the
+# gate is open, and "every enabled permanent Auth provider" is not a gate claim
+# either, which is why both boolean words are safe to read in both directions.
+# Asking what the word modifies replaces enumerating the nouns it might modify.
+_ATTRIBUTIVE = re.compile(
+    rf"[\s-]+(?!(?:{_NOT_A_MODIFIED_NOUN})\b)\w+",
+    re.IGNORECASE,
+)
+# What precedes settles it before what follows has to. A copula makes the word
+# predicative whatever comes next, so "is disabled pending review" is a gate
+# claim even though "pending" could pass for the noun it modifies. A determiner
+# after the copula means the opposite, as in "is a disabled row", so it is
+# excluded rather than read as a claim.
+_PREDICATIVE = re.compile(
+    r"\b(?:is|are|was|were|be|been|being|remains?|stays?|becomes?|became|"
+    r"fails?|defaults?|keeps?|kept)\s+"
+    r"(?!(?:a|an|the)\b)(?:\w+\s+)?$",
+    re.IGNORECASE,
+)
+# "not open" asserts the other state, however far the negator sits from it, so
+# this looks anywhere earlier in the same clause rather than counting words.
+# "not only open" asserts this state, so the additive and emphatic forms are
+# excluded rather than read as negation.
+_NEGATION = re.compile(
+    r"\b(?:not|never|no longer|cannot|without)\b(?!\s+(?:only|merely|just|simply)\b)",
+    re.IGNORECASE,
+)
+# One clause is the unit a claim lives in. Splitting here lets a state word be
+# read whether it sits before or after the account phrase, while keeping a
+# neighbouring flag's value or an unrelated subject out of this claim.
+_CLAUSE_BREAK = re.compile(
+    r",\s+|;\s+|:\s+|\s+(?:and|but|or|so|because|although|though|whereas)\s+",
+    re.IGNORECASE,
+)
+# Another environment variable ends this flag's value: a stale value after one of
+# these belongs to that variable, not to ours.
+_OTHER_ENV_VAR = re.compile(r"\b(?:ARGUS|NEXT_PUBLIC|SUPABASE|OPENROUTER|ALPACA)_\w+")
+# Self-identifying: this term means the gate is shut, whatever the subject.
+_GATE_SHUT_TERM = "allowlist-gated"
 LIVE_EVAL_RESULT_STATUSES = (
     "passed",
     "failed",
@@ -38,6 +138,317 @@ def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def _release_profile_value(key: str) -> str:
+    profile = json.loads(RELEASE_PROFILE_PATH.read_text(encoding="utf-8"))
+    return profile["services"]["api"]["env"][key]
+
+
+def _standing_doc_paths() -> list[Path]:
+    """Every Markdown file whose claims are supposed to be true right now."""
+    candidates = sorted(
+        {
+            *(ROOT / "docs").rglob("*.md"),
+            *ROOT.glob("*.md"),
+            *(ROOT / ".agent").rglob("*.md"),
+        }
+    )
+    return [
+        path
+        for path in candidates
+        if not path.relative_to(ROOT)
+        .as_posix()
+        .startswith(_RECORD_TREES + _UNRELATED_TREES)
+        and not _DATED_RECORD.match(path.name)
+    ]
+
+
+def _claim_sentences(text: str) -> Iterator[str]:
+    """Yield sentences with Markdown wrapping collapsed.
+
+    Blocks break on blank lines, list markers, headings, fences, and table rows
+    so a claim is never read across two unrelated bullets. A fenced block yields
+    one line at a time, because its lines are already separate statements and
+    joining them would read a neighbouring variable's value as this one's.
+    """
+    block: list[str] = []
+    fenced = False
+    for line in text.splitlines() + [""]:
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            if line.strip():
+                yield line.strip()
+            continue
+        if not line.strip() or _BLOCK_BREAK.match(line):
+            if block:
+                yield from re.split(r"(?<=[.;])\s+", " ".join(" ".join(block).split()))
+                block = []
+            if line.strip():
+                block = [line]
+            continue
+        block.append(line)
+
+
+def _declares(position: int | None, scope_at: int | None) -> bool:
+    """Whether a value at `position` states the gate's standing posture.
+
+    A subordinating conjunction opening before it scopes the value to a case
+    instead, which is how a doc keeps describing the off state honestly.
+    """
+    return position is not None and not (scope_at is not None and scope_at < position)
+
+
+def _clauses(sentence: str) -> Iterator[tuple[int, str]]:
+    """Yield (offset, clause) for each clause of `sentence`."""
+    start = 0
+    for gap in _CLAUSE_BREAK.finditer(sentence):
+        if gap.start() > start:
+            yield start, sentence[start : gap.start()]
+        start = gap.end()
+    if start < len(sentence):
+        yield start, sentence[start:]
+
+
+def _flag_value_claim(clause: str, stale_words: tuple[str, ...]) -> int | None:
+    """Where the clause gives this flag the stale value, if it does.
+
+    Only text after the flag name counts, and another environment variable ends
+    the window, so a neighbouring flag's value is never read as this one's.
+    """
+    named = clause.find(PUBLIC_ACCOUNT_ACCESS_FLAG.lower())
+    if named < 0:
+        return None
+    window_end = len(clause)
+    if other := _OTHER_ENV_VAR.search(clause, named + len(PUBLIC_ACCOUNT_ACCESS_FLAG)):
+        window_end = other.start()
+    return min(
+        (
+            match.start()
+            for word in stale_words
+            if (match := re.compile(rf"\b{word}\b").search(clause, named, window_end))
+        ),
+        default=None,
+    )
+
+
+def _gate_state_claim(clause: str, stale_state: re.Pattern[str]) -> int | None:
+    """Where the clause asserts the stale gate state in words, if it does.
+
+    The clause must be about the gate, in either word order, then each state word
+    is judged by how it is used: a copula before it makes it predicative and a
+    claim about the gate, while modifying the noun after it describes that noun.
+    """
+    if not _GATE_SUBJECT.search(clause):
+        return None
+    for match in stale_state.finditer(clause):
+        before = clause[: match.start()]
+        if _NEGATION.search(before):
+            continue
+        if _PREDICATIVE.search(before):
+            return match.start()
+        if _ATTRIBUTIVE.match(clause, match.end()):
+            continue
+        return match.start()
+    return None
+
+
+def _access_claim_contradictions(text: str, declared: str) -> list[str]:
+    """Claims in `text` that a reader would take as the wrong flag value.
+
+    Clauses are read whether or not they name the variable, because prose that
+    describes the policy in words is how most of this drift survived.
+    """
+    stale = "false" if declared == "true" else "true"
+    stale_words = _STATE_WORDS[stale]
+    stale_state = _GATE_STATE[stale]
+
+    found: list[str] = []
+    for sentence in _claim_sentences(text):
+        lowered = sentence.lower()
+
+        # The named flag keeps its value across a whole sentence, because "remains
+        # a separate policy and stays `false`" carries the subject over the
+        # conjunction. Binding the value to the name is what keeps a neighbouring
+        # flag out, so this needs no clause split.
+        sentence_scope = _SUBORDINATING.search(lowered)
+        if _declares(
+            _flag_value_claim(lowered, stale_words),
+            sentence_scope.start() if sentence_scope else None,
+        ):
+            found.append(sentence)
+            continue
+
+        # Prose is read one clause at a time instead, so a state word counts
+        # whether it sits before or after the account phrase, and an unrelated
+        # subject in a neighbouring clause is not dragged in.
+        for offset, clause in _clauses(lowered):
+            # A subordinating conjunction earlier in the sentence scopes this
+            # clause too, so splitting cannot strip an off-case description of
+            # the condition that made it honest.
+            inherited = _SUBORDINATING.search(lowered[:offset])
+            local = _SUBORDINATING.search(clause)
+            scope_at = -1 if inherited else (local.start() if local else None)
+
+            # Runs in both directions: after a rollback to `false`, prose still
+            # calling registration open is the same defect mirrored.
+            if declared == "true" and _GATE_SHUT_TERM in clause:
+                claimed = clause.index(_GATE_SHUT_TERM)
+            else:
+                claimed = _gate_state_claim(clause, stale_state)
+
+            if _declares(claimed, scope_at):
+                found.append(sentence)
+                break
+    return found
+
+
+def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> None:
+    """The guard above is only worth its name if these shapes stay separated."""
+    must_catch = (
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=false`",
+        f"The independent `{PUBLIC_ACCOUNT_ACCESS_FLAG}` policy remains false.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` defaults off and controls accounts.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` stays false unless the founder agrees.",
+        # The named flag keeps its value across a conjunction, so reading prose
+        # clause by clause must not sever the value from the name.
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` remains a separate policy and stays "
+        "`false` until explicitly approved.",
+        "Public account creation is still allowlist-gated.",
+        "Standing mitigations: allowlist-gated account creation, and Turnstile.",
+        # Shapes that never name the variable, which is how four sites survived
+        # the first pass: DESIGN.md and private-alpha-next-integration.md.
+        "Public account access remains explicitly disabled and founder owned.",
+        "Guest defaults on with rollback; public-account access remains off.",
+        "Rollback is flags first: keep public-account access false.",
+        "Public permanent accounts are disabled, so guest chrome hides signup.",
+        # A denial noun after the state word does not make it the exception when a
+        # function word or punctuation separates them: these shut the gate and
+        # then mention accounts, rather than describing one denied account.
+        "Public account access is disabled for all accounts.",
+        "Public registration is off for new accounts.",
+        "Public signup is disabled, so no accounts can be created.",
+        "Public signup is disabled for new accounts.",
+        # A copula settles it before the following word can pose as the noun
+        # being modified.
+        "Public signup is disabled pending review.",
+        "Public account access is off limits.",
+        "Public account creation is disabled indefinitely.",
+        # The state word may sit before the account phrase, not only after it.
+        "Registration is disabled for public accounts.",
+        # A fenced block declares one value per line.
+        f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
+    )
+    must_allow = (
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}` is off, signup is allowlist-gated.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` has been live since 2026-08-12.",
+        # Conditional and procedural off-state guidance stays writable, which is
+        # why the assignment is parsed rather than banned as a substring.
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}=false`, only allowlisted roles enter.",
+        f"When rolling back, set `{PUBLIC_ACCOUNT_ACCESS_FLAG}=false` and redeploy.",
+        # A disabled allowlist row is not a claim that the gate is shut.
+        "Public registration is open. The server turns away only an email "
+        "carrying an explicitly disabled allowlist row.",
+        "Public-account access is an independent gate that fails closed when "
+        "unset, so a deployment omitting the variable denies registration.",
+        # A neighbouring variable's `false` is not this gate's value.
+        f"```bash\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=true\nOTHER_FLAG=false\n```",
+        # Accurate prose may keep the denial exception next to the subject. A
+        # distance rule rejected these and forced authors to pad sentences.
+        "Public signup is open except for explicitly disabled emails.",
+        "Public account creation is open, and only an explicitly disabled row "
+        "is refused.",
+        "Public registration is open, so a disabled allowlist entry is the only "
+        "refusal.",
+        # Negation asserts the open state, so it is not a shut claim.
+        "Public account creation is not disabled.",
+        # A determiner after the copula means the word modifies the noun after
+        # it, so this is one denied account rather than the gate.
+        "Public registration is open, so the only refusal is a disabled "
+        "allowlist entry.",
+        # A neighbouring flag's value is not this flag's, even in one sentence.
+        f"Set `ARGUS_GUEST_ACCESS_ENABLED=false` but keep "
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true`.",
+        # Negation holds however far it sits from the state word.
+        "Public signup is not expected to be open.",
+        "Public registration is not currently expected to remain open.",
+        # The founder-owned precondition in API_CONTRACT.md must never read as a
+        # stale claim, or a later round deletes it to get the suite green.
+        "Before that flag may be enabled, founder-approved evidence must prove "
+        "that every enabled permanent Auth provider supplies a verified email "
+        "compatible with profile and allowlist-role rules.",
+        "Only an explicitly disabled allowlist row blocks signup or login.",
+    )
+
+    for claim in must_catch:
+        assert _access_claim_contradictions(claim, "true"), f"missed: {claim}"
+    for claim in must_allow:
+        assert not _access_claim_contradictions(claim, "true"), f"false alarm: {claim}"
+
+    # The guard inverts with the profile rather than hardcoding today's posture.
+    # A rollback to `false` has to catch open-state prose the same way, or the
+    # docs only derive from the profile in one direction.
+    for claim in (
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` is live.",
+        "Public registration is now open.",
+        "Public account creation is open to anyone.",
+        "Permanent accounts opened to the public.",
+        # A synonym list could not carry these; asking what the word modifies can.
+        "Public registration is enabled.",
+        "Public account access is enabled for everyone.",
+        "Public signup is open for new accounts.",
+        # Additive "not only" asserts the state rather than negating it.
+        "Public signup is not only open; it is unrestricted.",
+        # Mirror of the before-the-phrase case in the rollback direction.
+        "Registration remains open for public accounts.",
+    ):
+        assert _access_claim_contradictions(
+            claim, "false"
+        ), f"missed on rollback: {claim}"
+    for claim in (
+        "Public account creation is still allowlist-gated.",
+        "Public registration is not open.",
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}=true`, any undisabled email may enter.",
+    ):
+        assert not _access_claim_contradictions(claim, "false"), f"false alarm: {claim}"
+
+
+def test_public_account_access_claims_cannot_contradict_the_release_profile() -> None:
+    """The release profile owns this flag; standing prose only derives from it.
+
+    Prose drifted out of agreement with the deployed flag once already, because
+    nothing connected a sentence to the profile that decides the value.
+    """
+    declared = _release_profile_value(PUBLIC_ACCOUNT_ACCESS_FLAG)
+    assert declared in _STATE_WORDS, (
+        f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in the release profile. "
+        "Add its boolean spelling to _STATE_WORDS before this guard can read it."
+    )
+    declared_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={declared}"
+
+    contradictions: list[str] = []
+    for path in _standing_doc_paths():
+        relative = path.relative_to(ROOT).as_posix()
+        contradictions.extend(
+            f"{relative}: {claim}"
+            for claim in _access_claim_contradictions(
+                path.read_text(encoding="utf-8"), declared
+            )
+        )
+
+    assert not contradictions, (
+        f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in "
+        f"{RELEASE_PROFILE_PATH.name}, so these standing claims are wrong:\n"
+        + "\n".join(f"  - {item}" for item in contradictions)
+    )
+    # One doc states the value; the rest may point at it. Requiring the literal
+    # in every doc that mentions the flag was asking a test to keep copies in
+    # agreement, which is the split-brain shape this repo forbids, and it made a
+    # flag change a hand-edit of every copy.
+    assert declared_assignment in _source(CANONICAL_VALUE_DOC), (
+        f"{CANONICAL_VALUE_DOC} is where prose states this flag's value, so it "
+        f"must say `{declared_assignment}` to match {RELEASE_PROFILE_PATH.name}."
+    )
 def _commit_measurement_fixture_candidate(
     repository_root: Path,
     *,
