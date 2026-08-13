@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.api.chat.confirmation import runtime_confirmation_card
+from argus.domain.backtesting.config import SymbolAsset
 from argus.domain.backtesting.coverage import _dataset_id
 from argus.domain.engine import _build_signals
 from argus.domain.engine_launch.adapter import (
@@ -2477,3 +2478,65 @@ def test_launch_classifies_malformed_execution_realism_as_invalid_input(
     assert result.envelope.execution_status == "blocked_invalid_input"
     assert result.envelope.failure_category == "parameter_validation_error"
     assert result.envelope.failure_reason == "invalid_execution_realism_fee_bps"
+
+
+@pytest.mark.parametrize(
+    ("starting_capital", "expected_invested"),
+    [(0.0, 1_200.0), (5_000.0, 6_200.0)],
+)
+def test_a_seeded_plan_executes_both_roles_end_to_end(
+    monkeypatch: pytest.MonkeyPatch,
+    starting_capital: float,
+    expected_invested: float,
+) -> None:
+    """Both money roles reach the engine and both are invested.
+
+    Prices are flat, so the ending value is exactly what went in: the seed once
+    plus one contribution per month. A defect that dropped the seed, or spent it
+    as a contribution, would move this number.
+    """
+    request = LaunchBacktestRequest(
+        strategy_type="dca_accumulation",
+        symbol="AAPL",
+        timeframe="1D",
+        date_range={"start": "2024-01-02", "end": "2024-06-28"},
+        sizing_mode="capital_amount",
+        capital_amount=200.0,
+        starting_capital=starting_capital,
+        cadence="monthly",
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+    index = pd.bdate_range("2024-01-02", "2024-06-28", tz="UTC")
+    close = pd.Series(100.0, index=index)
+    bars = pd.DataFrame(
+        {"open": close, "high": close, "low": close, "close": close, "volume": 1e6},
+        index=index,
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: SymbolAsset(symbol=symbol, asset_class="equity"),
+    )
+    for target in (
+        "argus.domain.engine_launch.adapter.fetch_ohlcv",
+        "argus.domain.engine.fetch_ohlcv",
+    ):
+        monkeypatch.setattr(target, lambda **_: bars.copy())
+    for target in (
+        "argus.domain.engine_launch.adapter.fetch_price_series",
+        "argus.domain.engine.fetch_price_series",
+    ):
+        monkeypatch.setattr(target, lambda **_: close.copy())
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    resolved = result.envelope.resolved_parameters
+    assert resolved["starting_capital"] == starting_capital
+    assert resolved["recurring_contribution"] == 200.0
+    assert result.result_card is not None
+    rows = {row["key"]: row["value"] for row in result.result_card["rows"]}
+    money = f"${expected_invested:,.0f}"
+    assert rows["cash_value"] == f"{money} -> {money}"
