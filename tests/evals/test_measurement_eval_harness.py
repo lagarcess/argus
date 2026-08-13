@@ -1100,6 +1100,74 @@ def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any)
     assert result["prose_judge"]["failed_criteria"] == ["missing_assistant_text"]
 
 
+def test_prose_judge_route_receipt_is_included_in_case_cost_evidence(
+    monkeypatch: Any,
+) -> None:
+    case = harness.EvalCase(
+        id="prose-judge-cost",
+        category="messy_english",
+        prompt="Explain this simply",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="conversation_followup",
+            capability_verdict="answer_only",
+        ),
+        prose_judge_criteria=("plain_language",),
+    )
+    active_receipts: list[SimpleNamespace] | None = None
+
+    def begin_capture() -> object:
+        nonlocal active_receipts
+        assert active_receipts is None
+        active_receipts = []
+        return object()
+
+    def end_capture(_token: object) -> list[SimpleNamespace]:
+        nonlocal active_receipts
+        assert active_receipts is not None
+        captured = active_receipts
+        active_receipts = None
+        return captured
+
+    def record_receipt(task: str) -> None:
+        assert active_receipts is not None
+        active_receipts.append(
+            SimpleNamespace(as_dict=lambda: {"task": task, "usage_cost_usd": 0.01})
+        )
+
+    def interpret_stage(**_kwargs: Any) -> SimpleNamespace:
+        record_receipt("interpret")
+        return SimpleNamespace(
+            outcome="ready_to_respond",
+            patch={
+                "intent": "conversation_followup",
+                "assistant_response": "A short, plain explanation.",
+            },
+        )
+
+    def judge_prose_quality(**_kwargs: Any) -> dict[str, Any]:
+        record_receipt("prose_judge")
+        return {
+            "pass": True,
+            "failed_criteria": [],
+            "notes": "",
+            "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
+        }
+
+    monkeypatch.setattr(harness, "begin_openrouter_route_receipt_capture", begin_capture)
+    monkeypatch.setattr(harness, "end_openrouter_route_receipt_capture", end_capture)
+    monkeypatch.setattr(harness, "interpret_stage", interpret_stage)
+    monkeypatch.setattr(harness, "judge_prose_quality", judge_prose_quality)
+
+    result = harness.run_eval_case(case)
+
+    assert [receipt["task"] for receipt in result["route_receipts"]] == [
+        "interpret",
+        "prose_judge",
+    ]
+
+
 def test_followup_clarification_runs_clarify_stage(monkeypatch: Any) -> None:
     case = harness.EvalCase(
         id="followup-clarifies",

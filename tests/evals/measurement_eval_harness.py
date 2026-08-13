@@ -248,10 +248,19 @@ def run_eval_case(
             judge_result = _missing_prose_judge_result()
             failed_checks.append("prose_judge:missing_assistant_text")
         else:
-            judge_result = judge_prose_quality(
-                case=case,
-                assistant_text=assistant_text,
-            )
+            judge_route_token = begin_openrouter_route_receipt_capture()
+            try:
+                judge_result = judge_prose_quality(
+                    case=case,
+                    assistant_text=assistant_text,
+                )
+            finally:
+                route_receipts.extend(
+                    receipt.as_dict()
+                    for receipt in end_openrouter_route_receipt_capture(
+                        judge_route_token
+                    )
+                )
             if not judge_result["pass"]:
                 failed_checks.extend(
                     f"prose_judge:{criterion}"
