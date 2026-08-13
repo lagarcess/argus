@@ -1,0 +1,345 @@
+{
+  "evidence_class": "controlled",
+  "live_api_or_llm_called": false,
+  "phase": "after",
+  "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+  "generated_at": "2026-08-12",
+  "receipts": [
+    {
+      "scenario": "raw-summary",
+      "locale": "en",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "Use $500 for a Netflix idea.",
+      "visible_assistant_text": "Argus can't run that rule directly yet for NFLX. Which supported direction should I use: Use a supported RSI threshold rule or Compare with buy and hold?",
+      "forbidden_string_assertions": [
+        {
+          "value": "User wants to invest $500",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_typed_capability",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-en-raw-summary.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "e8ce8265-e78d-42ce-b122-871b05bd21a2"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "supported-dca",
+      "locale": "en",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "What if I had bought Coca-Cola every month for five years?",
+      "visible_assistant_text": "How much would you like to invest in Coca-Cola each month?",
+      "forbidden_string_assertions": [
+        {
+          "value": "can't run",
+          "absent": true
+        },
+        {
+          "value": "unsupported",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "llm_generated_typed_dca_clarification",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-en-supported-dca.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "69d9914e-17e0-4ed7-b699-4419f3ef4bf0"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "capital-bounds",
+      "locale": "en",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "Buy and hold NFLX with $500 starting capital in 2024.",
+      "visible_assistant_text": "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?",
+      "forbidden_string_assertions": [
+        {
+          "value": "can't run $500",
+          "absent": true
+        },
+        {
+          "value": "unsupported starting capital",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_typed_numeric_bounds",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-en-capital-bounds.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "premature-acknowledgment",
+      "locale": "en",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "$500",
+      "visible_assistant_text": "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?",
+      "forbidden_string_assertions": [
+        {
+          "value": "Got it, you want to invest $500.",
+          "absent": true
+        },
+        {
+          "value": "Got it",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Temporary chat · available until Aug 19, 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_typed_bounds_without_acknowledgment",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-en-premature-acknowledgment.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "raw-summary",
+      "locale": "es-419",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "Usa $500 para una idea de Netflix.",
+      "visible_assistant_text": "Argus todavía no puede ejecutar esa regla directamente para NFLX. ¿Qué camino quieres usar: Usar una regla RSI compatible o Comparar con comprar y mantener?",
+      "forbidden_string_assertions": [
+        {
+          "value": "User wants to invest $500",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_typed_capability",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-es-419-raw-summary.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "e8ce8265-e78d-42ce-b122-871b05bd21a2"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "supported-dca",
+      "locale": "es-419",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?",
+      "visible_assistant_text": "¿Cuánto quieres invertir en Coca-Cola cada mes?",
+      "forbidden_string_assertions": [
+        {
+          "value": "No puedo ejecutar",
+          "absent": true
+        },
+        {
+          "value": "no es compatible",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "llm_generated_typed_dca_clarification",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-es-419-supported-dca.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "69d9914e-17e0-4ed7-b699-4419f3ef4bf0"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "capital-bounds",
+      "locale": "es-419",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "Compra y mantén NFLX con $500 de capital inicial durante 2024.",
+      "visible_assistant_text": "El capital inicial debe estar entre $1,000 y $100,000,000. ¿Qué monto dentro de ese rango quieres usar?",
+      "forbidden_string_assertions": [
+        {
+          "value": "no puede ejecutar $500",
+          "absent": true
+        },
+        {
+          "value": "capital inicial no compatible",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_typed_numeric_bounds",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-es-419-capital-bounds.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    },
+    {
+      "scenario": "premature-acknowledgment",
+      "locale": "es-419",
+      "phase": "after",
+      "sha": "d87d5d6524e0af89d99dab26cc3e4b6f56c24742",
+      "request_text": "$500",
+      "visible_assistant_text": "El capital inicial debe estar entre $1,000 y $100,000,000. ¿Qué monto dentro de ese rango quieres usar?",
+      "forbidden_string_assertions": [
+        {
+          "value": "Entendido, quieres invertir $500.",
+          "absent": true
+        },
+        {
+          "value": "Entendido",
+          "absent": true
+        }
+      ],
+      "guest_assertion": {
+        "account_kind": "guest",
+        "me_request_observed": true,
+        "temporary_notice_visible": true,
+        "temporary_notice_text": "Chat temporal · disponible hasta 19 ago 2026",
+        "sign_in_visible": true
+      },
+      "prompt_source": "degraded_fallback_typed_bounds_without_acknowledgment",
+      "evidence_class": "controlled",
+      "live_api_or_llm_called": false,
+      "screenshot_filename": "after-controlled-es-419-premature-acknowledgment.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot_dimensions": {
+        "width": 1440,
+        "height": 1000
+      },
+      "original_transcript_ids": [
+        "4494321e-ad2a-4e7f-b3ec-40485e1f5830"
+      ],
+      "provenance_limit": "Transcript identifiers are provenance only. This artifact is not a live replay.",
+      "console_errors": [],
+      "page_errors": []
+    }
+  ]
+}

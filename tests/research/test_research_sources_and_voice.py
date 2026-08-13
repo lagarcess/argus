@@ -98,28 +98,85 @@ def test_sources_reach_the_typed_surface_in_the_shape_the_panel_renders(
     )
 
 
-def test_a_grounded_answer_without_links_says_so_instead_of_inventing_one(
+def test_market_pulse_drawer_excludes_explicitly_stale_sources(monkeypatch) -> None:
+    document = agent_response(
+        text="NVIDIA (NVDA) leads today's movers.",
+        tickers=["NVDA"],
+        lookup_rows=[("NVIDIA", "NVDA", "NVIDIA Corporation")],
+        sources=[],
+        web_search_invocations=1,
+    )
+    document["output"].insert(
+        2,
+        {
+            "type": "search_results",
+            "results": [
+                {
+                    "url": "https://www.cnbc.com/2016/06/16/old-movers.html",
+                    "title": "Old movers",
+                    "date": "2016-06-16",
+                },
+                {
+                    "url": "https://www.slickcharts.com/gainers",
+                    "title": "April gainers",
+                    "date": "2026-04-01",
+                },
+                {
+                    "url": "https://www.nasdaq.com/market-activity/stocks/screener",
+                    "title": "Today's market activity",
+                    "date": "2026-08-12",
+                },
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        grounded,
+        "_client",
+        lambda: PerplexityAgentClient("k", transport=RecordingTransport([document])),
+    )
+
+    result = _run(
+        "What's moving today?",
+        monkeypatch,
+        question_kind="market_pulse",
+        period_start_date="2026-08-12",
+    )
+
+    assert result is not None
+    assert [source["url"] for source in result.stage_patch["research"]["sources"]] == [
+        "https://www.nasdaq.com/market-activity/stocks/screener"
+    ]
+
+
+def test_a_pure_quote_without_public_links_stays_silent_about_the_drawer(
     monkeypatch,
 ) -> None:
-    """Market data arrives as figures, not articles, so a grounded answer
-    often has nothing to link. Saying that is the honest alternative to the
-    citation line the model used to write."""
+    """A quote needs provider provenance, not a fake publisher link. The
+    provider receipt owns that provenance, so user copy must not narrate an
+    empty source drawer."""
     monkeypatch.setattr(
         grounded,
         "_client",
         lambda: PerplexityAgentClient(
             "k",
             transport=RecordingTransport(
-                [agent_response(text="NVDA rose 2.3%.", sources=[])]
+                [agent_response(text="Apple closed at $312.41.", sources=[])]
             ),
         ),
     )
 
-    result = _run("What's moving today?", monkeypatch, question_kind="market_pulse")
+    result = _run(
+        "What is Apple trading at?",
+        monkeypatch,
+        question_kind="live_quote",
+        symbols=["AAPL"],
+    )
 
     assert result is not None
     assert result.stage_patch["research"]["sources"] == []
-    assert "no source links to open" in result.stage_patch["assistant_response"]
+    answer = result.stage_patch["assistant_response"]
+    assert answer == "Apple closed at $312.41."
+    assert "source" not in answer.lower()
 
 
 def test_no_rail_prompt_asks_the_model_for_sources_or_names_a_tool() -> None:
@@ -157,6 +214,13 @@ def test_no_rail_prompt_asks_the_model_for_sources_or_names_a_tool() -> None:
         assert tool not in retry
     assert "Do not write a sources line" in retry
 
+    publisher_retry = grounded._publisher_source_retry_prompt(
+        "Explain Apple's growth.", language="en"
+    )
+    for tool in declared_tool_names():
+        assert tool not in publisher_retry
+    assert "Do not write a sources or citations line" in publisher_retry
+
 
 @pytest.mark.parametrize(
     "prose",
@@ -191,9 +255,9 @@ def test_ordinary_finance_prose_survives_the_guard() -> None:
 def test_the_guard_follows_the_configuration_not_a_hand_list() -> None:
     declared = declared_tool_names()
     assert declared, "the rail must declare the tools it uses"
-    guard = (
-        REPO_ROOT / "src/argus/domain/research/perplexity_agent.py"
-    ).read_text(encoding="utf-8")
+    guard = (REPO_ROOT / "src/argus/domain/research/perplexity_agent.py").read_text(
+        encoding="utf-8"
+    )
     guard_body = guard[guard.index("def _provider_vocabulary_pattern") :]
     for tool in declared:
         assert f'"{tool}"' not in guard_body, (

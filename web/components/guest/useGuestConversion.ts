@@ -4,10 +4,12 @@ import { useCallback, useRef, useState } from "react";
 import type { AuthFormSubmission } from "@/components/auth/AuthForm";
 import {
   createGuestHandoff,
-  linkGuestIdentity,
+  registerGuestAccount,
 } from "@/lib/guest-api";
 import {
   loginWithEmail,
+  normalizeApiLanguage,
+  signupWithEmail,
 } from "@/lib/argus-api";
 import type { UserResponse } from "@/lib/guest-account";
 import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
@@ -19,6 +21,37 @@ import {
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
 import { randomId } from "@/lib/random-id";
+
+type GuestClaim = {
+  conversation_id: string;
+  pending_action: {
+    reason: string;
+    conversation_id: string;
+    action_id: string;
+  } | null;
+};
+
+function verifiedClaimAction(
+  claimed: GuestClaim,
+  conversationId: string,
+  latch: SingleUseGuestAction | null,
+) {
+  if (claimed.conversation_id !== conversationId) {
+    throw new Error("The temporary conversation could not be verified.");
+  }
+  const expected = latch?.take() ?? null;
+  if (!expected) return null;
+  const claimedAction = claimed.pending_action;
+  if (
+    !claimedAction ||
+    claimedAction.action_id !== expected.actionId ||
+    claimedAction.conversation_id !== expected.conversationId ||
+    claimedAction.reason !== expected.reason
+  ) {
+    throw new Error("The pending action could not be verified.");
+  }
+  return expected;
+}
 
 type UseGuestConversionInput = {
   account: UserResponse | null;
@@ -44,6 +77,8 @@ export function useGuestConversion({
   const [resetKind, setResetKind] = useState<"daily" | "workspace">("daily");
   const latchRef = useRef<SingleUseGuestAction | null>(null);
   const handoffPreparedRef = useRef(false);
+  const sourceConversationId =
+    conversationId ?? account?.guest?.conversation_id ?? null;
 
   const requestConversion = useCallback(
     (
@@ -84,24 +119,66 @@ export function useGuestConversion({
     async (submission: AuthFormSubmission) => {
       const latch = latchRef.current;
       if (submission.mode === "signup") {
-        await linkGuestIdentity({
-          email: submission.email,
-          password: submission.password,
-        });
+        if (!sourceConversationId) {
+          const registered = await signupWithEmail({
+            email: submission.email,
+            password: submission.password,
+            language: normalizeApiLanguage(account?.user.language),
+            display_name: submission.displayName || null,
+          });
+          if (registered.needsEmailConfirmation) {
+            return { status: "email_confirmation_required" as const };
+          }
+        } else {
+          const pending = latch?.take();
+          if (pending) {
+            latchRef.current = new SingleUseGuestAction(pending);
+          }
+          const registered = await registerGuestAccount({
+            email: submission.email,
+            password: submission.password,
+            language: normalizeApiLanguage(account?.user.language),
+            display_name: submission.displayName || null,
+            source_conversation_id: sourceConversationId,
+            pending_action: pending
+              ? pendingGuestActionSummary(pending)
+              : {
+                  reason: "keep_history",
+                  conversation_id: sourceConversationId,
+                  action_id: randomId(),
+                },
+          });
+          handoffPreparedRef.current = true;
+          if (registered.needsEmailConfirmation) {
+            return { status: "email_confirmation_required" as const };
+          }
+          const claimed = registered.response.guest_claim;
+          if (!claimed) {
+            throw new Error("The temporary conversation could not be claimed.");
+          }
+          const expected = verifiedClaimAction(
+            claimed,
+            sourceConversationId,
+            latchRef.current,
+          );
+          if (expected) {
+            latchRef.current = new SingleUseGuestAction(expected);
+          }
+        }
       } else {
-        if (conversationId && !handoffPreparedRef.current) {
+        if (sourceConversationId && !handoffPreparedRef.current) {
           const pending = latch?.take();
           if (pending) {
             latchRef.current = new SingleUseGuestAction(pending);
           }
           await createGuestHandoff({
             destination_email: submission.email,
-            source_conversation_id: conversationId,
+            source_conversation_id: sourceConversationId,
             pending_action: pending
               ? pendingGuestActionSummary(pending)
               : {
                   reason: "keep_history",
-                  conversation_id: conversationId,
+                  conversation_id: sourceConversationId,
                   action_id: randomId(),
                 },
           });
@@ -112,22 +189,17 @@ export function useGuestConversion({
           email: submission.email,
           password: submission.password,
         });
-        if (handoffPreparedRef.current) {
+        if (handoffPreparedRef.current && sourceConversationId) {
           const claimed = authenticated.guest_claim;
           if (!claimed) {
             throw new Error("The temporary conversation could not be claimed.");
           }
-          const expected = latchRef.current?.take();
+          const expected = verifiedClaimAction(
+            claimed,
+            sourceConversationId,
+            latchRef.current,
+          );
           if (expected) {
-            const claimedAction = claimed.pending_action;
-            if (
-              !claimedAction ||
-              claimedAction.action_id !== expected.actionId ||
-              claimedAction.conversation_id !== expected.conversationId ||
-              claimedAction.reason !== expected.reason
-            ) {
-              throw new Error("The pending action could not be verified.");
-            }
             latchRef.current = new SingleUseGuestAction(expected);
           }
         }
@@ -146,7 +218,13 @@ export function useGuestConversion({
         await onResume(action);
       }
     },
-    [conversationId, onResume, refreshAccount, refreshHistory],
+    [
+      account?.user.language,
+      onResume,
+      refreshAccount,
+      refreshHistory,
+      sourceConversationId,
+    ],
   );
 
   return {

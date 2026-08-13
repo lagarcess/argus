@@ -173,6 +173,7 @@ def test_guest_account_response_contract_is_typed_and_exact() -> None:
         account_kind="guest",
         guest=GuestAccountSummary(
             expires_at=now + timedelta(days=7),
+            conversation_id="00000000-0000-0000-0000-000000000002",
             conversation_limit=1,
             message_limit=10,
             simulation_limit=1,
@@ -1011,6 +1012,7 @@ def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
         account_kind="guest",
         guest=GuestAccountSummary(
             expires_at=now + timedelta(days=7),
+            conversation_id="00000000-0000-0000-0000-000000000002",
             conversation_limit=1,
             message_limit=10,
             simulation_limit=1,

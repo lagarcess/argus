@@ -290,7 +290,7 @@ def test_access_request_environment_contract_is_value_free() -> None:
     }
     assert api_env["ARGUS_APP_ORIGIN"] == {
         "key": "ARGUS_APP_ORIGIN",
-        "value": "https://argus-app-suz5.onrender.com",
+        "value": "https://arguschat.ai",
     }
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert (

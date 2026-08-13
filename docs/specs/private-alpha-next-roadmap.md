@@ -99,9 +99,11 @@ and stops before execution. Issue #310 is closed.
 PR #312 added registered-only avatar monogram themes as `40eba1f6`. PR #319
 integrated the public-alpha technical-readiness lane as `1c3775aa`: capped
 registered/Guest provider keys, measured Render capacity, the requested-access
-and approval-email path, CAPTCHA wiring, and recorded hosted evidence. The
-permanent-account gate remains `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, so
-that landing does not authorize public account access or a new tester cohort.
+and approval-email path, CAPTCHA wiring, and recorded hosted evidence. At that
+landing the permanent-account gate was still closed, so PR #319 itself did not
+authorize public account access or a new tester cohort. The founder opened the
+gate later, on 2026-08-12, and
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is now live in production.
 PR #320 unified the frontend failure vocabulary as `53c36d40`; PRs #323, #325,
 and #328 delivered the bounded auth copy, error-localization, and card-container
 corrections as `c1a13949`, `05fbef06`, and `403ea114`; and PR #327 removed the
@@ -1461,8 +1463,9 @@ disclosure. See
 - Guest is now an accepted part of the normal product shape:
   `ARGUS_GUEST_ACCESS_ENABLED=true` and
   `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true` are default-on emergency kill
-  switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false` remains the independent
-  permanent-account gate.
+  switches. `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is the independent
+  permanent-account gate and the founder opened it in production on 2026-08-12,
+  so public registration is open.
 - Public exposure still requires a branch-deployed exact-SHA canary, hosted
   anonymous-Auth and Turnstile controls, trusted-origin/rate-limit proof, a hard
   provider budget, cleanup scheduling, cost/latency calibration, a completed
@@ -1476,10 +1479,16 @@ disclosure. See
   onboarding/`primary_goal` branch; guest behavior differs only through
   verified identity, persistence, allowances, and conversion policy.
 - Founder decisions still open: first traffic size, CAPTCHA/provider posture,
-  acceptable cost and latency bands, cleanup cadence/owner, public-account
-  enablement timing, and canary approval. Public-account access must not be
-  enabled before its account-method and abuse-control gate is explicitly
-  approved.
+  acceptable cost and latency bands, cleanup cadence/owner, and canary approval.
+  Public-account enablement is no longer among them, because the founder enabled
+  it in production on 2026-08-12 as recorded in
+  `docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`. Two
+  prerequisites were written for that gate, and the flag being on does not waive
+  either. The account-method proof is owned by `docs/API_CONTRACT.md`, where
+  whether its evidence was produced is an open founder question. The abuse
+  controls are owned by the minimum bundle in
+  `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`, which enumerates the Turnstile, velocity,
+  and origin-truth checks for internet-facing exposure.
 
 ##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 

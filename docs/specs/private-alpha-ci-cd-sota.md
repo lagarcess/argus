@@ -15,10 +15,10 @@ For current product sequencing, use
 relevant details and addenda in
 `docs/specs/private-alpha-next-decision-memo.md`.
 
-Implementation note: the release gate now centers on local smoke, Render
-release-config audit, live API/web/cron deploy SHA checks, workflow env parity
-proof, cron env parity proof, an authoritative Spanish release canary, and a
-per-candidate release manifest.
+Implementation note: the release gate now centers on local smoke, exact-candidate
+production migration parity before deploy, Render release-config audit, live
+API/web deploy SHA checks, workflow version and env parity proof, an
+authoritative Spanish release canary, and a per-candidate release manifest.
 The Spanish journey proves the real workflow, finalized evidence/result metadata,
 decision-note hydration, Omnisearch provenance, and deployed signup/login UI.
 Keep this document as the release gate contract whenever a candidate is
@@ -138,30 +138,23 @@ contracts.
 
 ### Current Service Topology
 
-The stable target topology is four surfaces:
+The stable target topology is three live services:
 
 - `argus-app`: web surface
 - `argus-api`: chat/runtime/orchestration surface
 - `argus-backtests`: workflow execution surface
-- `argus-maintenance`: scheduled retention and job reconciliation surface
 
-`argus-maintenance` is a Render cron service. It runs destructive maintenance
-with the service-role key, so it is promoted and verified with the other three,
-never treated as a side service. See Scheduled Maintenance in
-`docs/PRIVATE_LAUNCH_RUNBOOK.md`.
+Render Blueprints declare the API and web services, but do not support Workflow
+services. `argus-backtests` is therefore guaranteed by the explicit workflow
+runtime sync, release, and version-status checks in
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`. All three Git-linked services use
+`checksPass` autodeploy. Enabling only API and web would increase workflow skew.
+Workflow deploy proof comes from the ready Render version id and its Git commit
+prefix, not from mutable env markers that an automatic release cannot refresh.
 
-**It is declared in `render.yaml` and deliberately not created, so today
-nothing runs on a schedule.** At current scale there is no guest data to
-delete and no stranded job to rescue, so guest retention and stale-job
-reconciliation are run by hand with `scripts/ops/scheduled_maintenance.py`,
-and #412's stranded-job condition is settled by an operator rather than by a
-schedule.
-
-It stays in this list precisely because it is absent: every gate above checks
-it, `cron-deploy-status` must report `status=absent` for the current
-promotion, any other status is a finding, and a failed Render lookup is a real
-failure rather than proof of absence. Dropping it to three surfaces would
-delete that check.
+Guest retention and stale-job reconciliation remain operator-run jobs through
+`scripts/ops/scheduled_maintenance.py`. They are not a fourth deployed release
+surface.
 
 The workflow surface has two explicit tasks, not two separate services:
 
@@ -199,12 +192,13 @@ permissions.
 
 ### Contract Layers
 
-Release readiness should be checked at four layers together:
+Release readiness should be checked at five layers together:
 
 1. Commit layer: what SHA is deployed?
-2. Runtime layer: what mode is the service actually running in?
-3. Locale/feature layer: what user-visible surfaces are enabled?
-4. Behavior layer: do canaries and reloads preserve the right artifact lifecycle?
+2. Schema layer: does production's migration ledger match that exact candidate?
+3. Runtime layer: what mode is the service actually running in?
+4. Locale/feature layer: what user-visible surfaces are enabled?
+5. Behavior layer: do canaries and reloads preserve the right artifact lifecycle?
 
 ### Ownership Rules
 
@@ -226,14 +220,72 @@ Use the following progression when moving from integration to `main`:
 
 1. Develop on a focused `codex/private-alpha-next` slice.
 2. Validate on the staging/private-alpha surface with the proof workflow task.
-3. Record the release manifest, including the workflow task selection and env
-   fingerprint.
-4. Merge the approved slice to `main`.
-5. Update the release/config contract for the target environment.
-6. Promote the live environment so `argus-backtests` runs the intended task
+3. Select and record the target environment, intended config contract, and
+   landing method without syncing or changing the live environment. If the
+   landing method cannot preserve one pre-gated commit SHA, keep all three live
+   autodeploy triggers manual until the landed commit is gated.
+4. Create or resolve the exact would-be `main` promotion commit from current
+   `main` and the approved integration tree without publishing it. This must be
+   the immutable commit that will land and deploy, not merely the worker or
+   integration head. Record its SHA and parents. Any rebase, squash, conflict
+   edit, new merge, or concurrent target-branch change invalidates it.
+5. Check out that exact promotion commit and run the read-only production
+   migration gate before any service deploy. Supply the production Postgres URL
+   explicitly from the operator secret store; the gate does not discover dotenv
+   files. Use a query- and fragment-free URI; the gate rejects libpq connection
+   parameters that could override the validated host or user. Supply the
+   current production Supabase root CA by absolute path. The gate forces
+   `sslmode=verify-full`, disables alternate GSS transport selection, and never
+   falls back to plaintext.
+
+   ```bash
+   export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
+   export ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT="<absolute path to production Supabase CA>"
+   ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
+   poetry run python scripts/ops/production_migration_gate.py \
+     --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+     --output temp/release-evidence/production-migration-gate.json
+   ```
+
+   Inspect the report's full candidate, applied, missing, unexpected,
+   name-drift, and content-drift lists. Candidate and applied records include
+   statement counts and statement-array SHA-256 digests derived from Supabase's
+   ledger format. `status=pass` requires exact version, name, and statement
+   content parity. Missing statement history or any content drift is a stop,
+   as is any missing migration or other mismatch, including an additive
+   migration. The gate never applies migrations. A human reviews pending SQL
+   and its additive,
+   contract-replacing, or destructive classification against the live objects;
+   ambiguous automated classifications fail toward `contract-replacing`. The
+   human applies only the approved files out of band and in repository order,
+   reads back the ledger and affected objects, then reruns this same gate.
+   Attach the final report to the release manifest as durable evidence.
+6. Record the release manifest, including the migration-gate report, workflow
+   task selection, and env fingerprint.
+7. Land only the gated candidate on `main`, without rewriting it, then fetch
+   and prove `origin/main` resolves to the recorded gate candidate SHA by
+   rerunning the executable gate in landed-ref mode:
+
+   ```bash
+   poetry run python scripts/ops/production_migration_gate.py \
+     --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+     --verify-landed-ref origin/main \
+     --output temp/release-evidence/production-migration-gate.json
+   ```
+
+   This mode fetches the remote branch itself and fails before database access
+   if the fetch or exact-SHA comparison fails. It then repeats schema parity, so
+   the final report binds both proofs. If the landed `origin/main` SHA differs,
+   the report is invalid: stop every deploy-capable action, keep autodeploy
+   manual, check out the landed commit, and rerun the gate against that landed
+   SHA. Replace the manifest evidence before continuing. When `checksPass` is
+   already live, only a landing method that preserves the pre-gated SHA is
+   allowed.
+8. Update the release/config contract for the target environment.
+9. Promote the live environment so `argus-backtests` runs the intended task
    (`workflow_proof` for proof validation or `run_backtest_job` for real
    execution).
-7. Re-run warmup and canaries against the exact deployed SHA and env
+10. Re-run warmup and canaries against the exact deployed SHA and env
    fingerprint.
 
 When the backtest service moves between proof and real workflow modes, the
@@ -585,6 +637,8 @@ The system is ready only when all of the following are true:
 - The live deploy’s effective runtime env matches the documented contract.
 - The candidate passes a local ephemeral smoke stack before any internet-
   reachable canary or deploy.
+- The read-only production migration gate reports exact parity before any
+  config sync, merge, or service action that can deploy the candidate.
 - The canary asserts both commit and runtime mode.
 - `main` is the promotion target, not a surprise prerequisite.
 - Public tester exposure only happens after the release gate passes.
@@ -600,14 +654,17 @@ Before any guest traffic:
 
 - the exact candidate SHA must pass the local real-Auth/Postgres browser matrix
   in an isolated process;
-- checked-in server/frontend Guest defaults must remain true, explicit false
-  must preserve rollback, and public-account access must remain false;
+- checked-in server/frontend Guest defaults must remain true and explicit false
+  must preserve rollback. Public-account access is no longer held closed here:
+  the founder opened it on 2026-08-12;
 - the branch-deployed canary must prove `/` opens guest chat only in the
-  approved staged mode, while permanent signup/login remains allowlist-gated;
+  approved staged mode, and that permanent signup/login admits an ordinary
+  unlisted email while a disabled row stays blocked;
 - hosted Supabase must explicitly enable anonymous Auth, configure an approved
   CAPTCHA posture, and retain provider plus Argus rate limits;
-- conversion must prove same-UUID linking and atomic existing-account claim
-  without duplicate artifacts, usage, jobs, or pending actions;
+- conversion must prove distinct-UUID ordinary signup and atomic claim, plus
+  atomic existing-account login claim, without duplicate artifacts, usage,
+  jobs, or pending actions;
 - the cleanup dry run and bounded real run must be scheduled with an owner,
   alert on failures/lag, and preserve converted or permanent accounts;
 - guest analytics must stay personless and metadata-only; browser facts cross
@@ -618,9 +675,10 @@ Before any guest traffic:
   single canary's provider-reported latency/cost. Unsupported production
   projections must remain explicitly unmeasured.
 
-Canary failure rolls back presentation first, then server guest bootstrap.
-`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` stays false unless a separate founder
-decision authorizes it. A local Block 4 pass is not “public ready.”
+Canary failure rolls back presentation first, then server guest bootstrap. It
+does not touch `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true`, which the founder
+authorized separately on 2026-08-12; closing public registration again is its
+own founder decision. A local Block 4 pass is not “public ready.”
 
 ## Non-Goals
 
@@ -635,8 +693,11 @@ decision authorizes it. A local Block 4 pass is not “public ready.”
 The current checkout and private-alpha deploy evidence show:
 
 - `codex/private-alpha-next` is the active integration lane.
-- Render services are still configured with branch `main`, while the private
-  alpha flow relies on manual deploys and env sync helpers.
+- Render services are configured with branch `main` and `checksPass`
+  autodeploy. The workflow is not Blueprint-managed, so its matching trigger is
+  enforced by the release profile, runtime sync, and live audit. Its ready
+  version name supplies the deployed Git prefix used by the three-service SHA
+  resolver for both automatic and manual releases.
 - The live API is in `real-workflow` mode now, but the effective env contract
   should still be audited before each invite.
 - The intended pre-deploy check is a local ephemeral stack, not a second live

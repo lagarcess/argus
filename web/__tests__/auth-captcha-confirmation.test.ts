@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { loginWithEmail, signupWithEmail } from "../lib/argus-api";
+import { registerGuestAccount } from "../lib/guest-api";
 import { requestPasswordRecovery } from "../lib/auth-security";
 
 const root = join(import.meta.dir, "..");
@@ -12,6 +13,7 @@ const originalLocalToken =
   process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
 const originalTurnstileSiteKey =
   process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+const originalMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH;
 
 function successfulJson(payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -22,6 +24,7 @@ function successfulJson(payload: unknown): Response {
 
 beforeEach(() => {
   process.env.NODE_ENV = "test";
+  process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
   delete process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
   delete process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
 });
@@ -39,6 +42,11 @@ afterEach(() => {
   } else {
     process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY =
       originalTurnstileSiteKey;
+  }
+  if (originalMockAuth === undefined) {
+    delete process.env.NEXT_PUBLIC_MOCK_AUTH;
+  } else {
+    process.env.NEXT_PUBLIC_MOCK_AUTH = originalMockAuth;
   }
 });
 
@@ -75,6 +83,63 @@ describe("password auth CAPTCHA and confirmation contract", () => {
     });
 
     expect(result.needsEmailConfirmation).toBe(false);
+  });
+
+  test("guest signup prepares the durable handoff before calling provider signup", async () => {
+    const requests: Array<{ path: string; body: Record<string, unknown> }> = [];
+    globalThis.fetch = (async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      requests.push({
+        path,
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      });
+      if (path.endsWith("/auth/guest/handoffs")) {
+        return new Response(
+          JSON.stringify({
+            handoff_id: "handoff-1",
+            expires_at: "2026-08-19T12:00:00Z",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return successfulJson({ user: { id: "user-1" }, session: null });
+    }) as typeof globalThis.fetch;
+
+    const result = await registerGuestAccount({
+      email: "alpha@example.com",
+      password: "password123",
+      language: "es-419",
+      display_name: "Alex",
+      source_conversation_id: "conversation-1",
+      pending_action: {
+        reason: "keep_history",
+        conversation_id: "conversation-1",
+        action_id: "keep-1",
+      },
+    });
+
+    expect(requests.map((request) => request.path)).toEqual([
+      "/api/v1/auth/guest/handoffs",
+      "/api/v1/auth/guest/signup",
+    ]);
+    expect(requests[0]?.body).toEqual({
+      handoff_kind: "new_account_signup",
+      destination_email: "alpha@example.com",
+      source_conversation_id: "conversation-1",
+      pending_action: {
+        reason: "keep_history",
+        conversation_id: "conversation-1",
+        action_id: "keep-1",
+      },
+    });
+    expect(requests[1]?.body).toMatchObject({
+      email: "alpha@example.com",
+      password: "password123",
+      language: "es-419",
+      display_name: "Alex",
+      captcha_token: "argus-local-browser-qa",
+    });
+    expect(result.needsEmailConfirmation).toBe(true);
   });
 
   test("password login acquires a CAPTCHA token at the shared API boundary", async () => {

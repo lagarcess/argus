@@ -5,8 +5,11 @@ import { useTranslation } from "react-i18next";
 import AuthForm, {
   type AuthFormMode,
 } from "@/components/auth/AuthForm";
-import { linkGuestIdentity } from "@/lib/guest-api";
-import { loginWithEmail } from "@/lib/argus-api";
+import {
+  loginWithEmail,
+  normalizeApiLanguage,
+  signupWithEmail,
+} from "@/lib/argus-api";
 import { retryGuestSession } from "@/lib/guest-session";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
@@ -73,9 +76,19 @@ export default function ExpiredGuestSession({
               allowModeSwitch={publicAccountAccessEnabled}
               embedded
               onModeChange={setAuthMode}
-              onSubmit={async ({ mode, email, password }) => {
+              onSubmit={async ({ mode, displayName, email, password }) => {
                 if (mode === "signup") {
-                  await linkGuestIdentity({ email, password });
+                  const result = await signupWithEmail({
+                    email,
+                    password,
+                    language: normalizeApiLanguage(
+                      i18n.resolvedLanguage ?? i18n.language,
+                    ),
+                    display_name: displayName || null,
+                  });
+                  if (result.needsEmailConfirmation) {
+                    return { status: "email_confirmation_required" as const };
+                  }
                 } else {
                   await loginWithEmail({ email, password });
                 }

@@ -19,15 +19,24 @@ from tests.evals.measurement_eval_harness import (
     expected_fail_issue_for_result,
     load_eval_cases,
     run_eval_case,
+)
+from tests.evals.measurement_eval_scorecard import (
+    build_scorecard_provenance,
     write_scorecard,
 )
+
+
+def _assert_requested_live_eval_credentials() -> None:
+    if not (os.getenv("OPENROUTER_API_KEY") or "").strip():
+        raise RuntimeError(
+            "OPENROUTER_API_KEY is required for requested live evals"
+        )
 
 
 def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     if os.getenv("ARGUS_RUN_LIVE_EVALS") != "1":
         pytest.skip("set ARGUS_RUN_LIVE_EVALS=1 to spend live LLM eval calls")
-    if not os.getenv("OPENROUTER_API_KEY"):
-        pytest.skip("OPENROUTER_API_KEY is required for live evals")
+    _assert_requested_live_eval_credentials()
 
     if not (os.getenv("ARGUS_ASSET_PROVIDER_MODE") or "").strip():
         asset_provider_mode = (
@@ -46,8 +55,9 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
         )
     clear_asset_cache()
 
+    provenance = build_scorecard_provenance(evaluation_mode="live")
     results = [run_eval_case(case) for case in load_eval_cases()]
-    scorecard_path = write_scorecard(results)
+    scorecard_path = write_scorecard(results, provenance=provenance)
     failures = [
         {
             "id": result["id"],

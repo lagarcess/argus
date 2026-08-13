@@ -365,12 +365,12 @@ reported earnings since. Want to run it now?"
   and its own founder decision.
 - **Shares one reader with the empty chat polish sidequest, Piece 2.** Ownership
   is stated in the spec so two do not get built.
-- **Scheduler is designed and merged, but nothing is scheduled.** #414 defined
-  `argus-maintenance`, a `type: cron` service on `*/15 * * * *`, and the
-  service was deliberately never created, so no schedule runs today. A Render
-  cron service carries one schedule, so when it is created this pillar rides
-  that pass as a guarded daily branch rather than a second schedule or a second
-  surface. Creating it is a precondition for this pillar, not a given.
+- **Maintenance tooling is merged, but nothing is scheduled.** #414 added the
+  retention and reconciliation entry point. #448 removed the uncreated
+  `argus-maintenance` Render surface and its release enumeration. The jobs stay
+  available for an operator to run from a laptop against an explicit target.
+  Any future scheduler is a new founder decision and a new release contract;
+  it is a precondition for this pillar, not a given.
 
 ## Continuous, not a lane
 
@@ -665,17 +665,14 @@ profile and fall back to the nameless pool.
   because it overlapped nine files, then reconciled once against a finished
   lane rather than a moving one.
 
-- **Scheduled maintenance cron** (PR #414, merged 2026-08-09 at `70635831`) —
-  answers #401 and the scheduled half of #412 by defining an `argus-maintenance`
-  Render cron service that runs the existing retention and reconciliation jobs
-  unchanged. **The service has deliberately not been created.** At current
-  scale there is no guest data to delete and no stranded job to rescue, so
-  paying for an always-on service would buy nothing. The definition sits inert
-  in `render.yaml` until a blueprint sync creates it, which is a decision to
-  revisit when guest volume makes running the scripts by hand impractical.
-  Two review rounds taught eleven enumeration sites that a fourth Render
-  surface exists, and closed a fail-open where a failed service lookup read as
-  "absent" and would have passed the canary green over stale destructive code.
+- **Operator-run maintenance** (PR #414, merged 2026-08-09 at `70635831`,
+  revised by #448) retains the existing retention and reconciliation jobs plus
+  their shared entry point. The `argus-maintenance` Render service was never
+  created, and #448 removed that phantom fourth surface from `render.yaml` and
+  the release gates. At current scale there is no guest data to delete and no
+  stranded job to rescue, so an operator runs the jobs from a laptop against
+  an explicit target when needed. A future scheduler requires a new decision
+  and must be added to the deployment contract intentionally.
 
 - **Research sidecar rename** (PR #418, merged 2026-08-09 at `c69e7489`) —
   the sidecar's `memory` block became `follow_up`, because it never was a

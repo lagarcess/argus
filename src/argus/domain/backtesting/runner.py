@@ -6,11 +6,18 @@ from typing import Any
 import pandas as pd
 import vectorbt as vbt
 
-from argus.domain.backtesting.config import _periods_per_year, _vbt_freq
-from argus.domain.backtesting.coverage import PreparedMarketData
+from argus.domain.backtesting.config import _vbt_freq
+from argus.domain.backtesting.coverage import (
+    MetricTimeBasis,
+    PreparedMarketData,
+    build_metric_time_basis,
+)
 from argus.domain.backtesting.execution import (
+    ClosedTrade,
+    LongOnlyExecutionResult,
     _build_long_only_execution_ledger,
     _dca_equity_curve,
+    _execute_long_only_ledger,
     _execution_fill_count,
     _execution_realism_settings,
 )
@@ -122,7 +129,8 @@ def compute_alpha_metrics(
     symbol_equity_curves: list[pd.Series] = []
     benchmark_equity_curves: list[pd.Series] = []
     gross_symbol_equity_curves: list[pd.Series] = []
-    periods_per_year = _periods_per_year(config["timeframe"])
+    closed_trades: list[ClosedTrade] = []
+    gross_closed_trades: list[ClosedTrade] = []
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
     allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
@@ -148,6 +156,34 @@ def compute_alpha_metrics(
             entries=entries,
             exits=exits,
             allow_accumulation=is_dca,
+        )
+        symbol_execution: LongOnlyExecutionResult | None = None
+        if not is_dca:
+            symbol_execution = _execute_long_only_ledger(
+                execution_events=execution_events,
+                close=close,
+                initial_capital=allocation_capital,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
+            )
+        symbol_closed_trades = (
+            symbol_execution.closed_trades if symbol_execution is not None else ()
+        )
+        closed_trades.extend(symbol_closed_trades)
+        gross_symbol_execution: LongOnlyExecutionResult | None = None
+        if has_modeled_costs and not is_dca:
+            gross_symbol_execution = _execute_long_only_ledger(
+                execution_events=execution_events,
+                close=close,
+                initial_capital=allocation_capital,
+                fees=0.0,
+                slippage=0.0,
+            )
+            gross_closed_trades.extend(gross_symbol_execution.closed_trades)
+        symbol_time_basis = _metric_time_basis_for(
+            config=config,
+            effective_index=close.index,
+            prepared_market_data=prepared_market_data,
         )
 
         if prepared_market_data is None:
@@ -190,42 +226,18 @@ def compute_alpha_metrics(
                 strategy_equity=symbol_equity,
                 benchmark_equity=benchmark_equity,
                 invested_capital=invested_capital,
-                periods_per_year=periods_per_year,
+                time_basis=symbol_time_basis,
                 trade_count=_execution_fill_count(execution_events, side="buy"),
+                closed_trade_pnls=[],
             )
         else:
-            portfolio = vbt.Portfolio.from_signals(
-                close=close,
-                entries=entries,
-                exits=exits,
-                fees=float(realism["fees"]),
-                slippage=float(realism["slippage"]),
-                init_cash=allocation_capital,
-                freq=_vbt_freq(config["timeframe"]),
-                accumulate=False,
-            )
-
-            symbol_equity = pd.Series(
-                portfolio.value().values, index=close.index, dtype=float
-            )
+            if symbol_execution is None:
+                raise ValueError("execution_result_unavailable")
+            symbol_equity = symbol_execution.equity_curve
             if has_modeled_costs:
-                gross_portfolio = vbt.Portfolio.from_signals(
-                    close=close,
-                    entries=entries,
-                    exits=exits,
-                    fees=0.0,
-                    slippage=0.0,
-                    init_cash=allocation_capital,
-                    freq=_vbt_freq(config["timeframe"]),
-                    accumulate=False,
-                )
-                gross_symbol_equity_curves.append(
-                    pd.Series(
-                        gross_portfolio.value().values,
-                        index=close.index,
-                        dtype=float,
-                    )
-                )
+                if gross_symbol_execution is None:
+                    raise ValueError("execution_result_unavailable")
+                gross_symbol_equity_curves.append(gross_symbol_execution.equity_curve)
             benchmark_equity = _benchmark_buy_and_hold_equity(
                 close=benchmark_normalized,
                 allocation_capital=allocation_capital,
@@ -240,18 +252,20 @@ def compute_alpha_metrics(
                     strategy_equity=symbol_equity,
                     benchmark_equity=benchmark_equity,
                     invested_capital=allocation_capital,
-                    periods_per_year=periods_per_year,
+                    time_basis=symbol_time_basis,
                     trade_count=_execution_fill_count(execution_events),
+                    closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
                 )
             else:
-                # No modeled costs: keep the legacy returns-based computation
-                # bit-for-bit so flag-off output stays byte-identical.
+                # Idealized execution still uses the returns-based metric path;
+                # its equity and closed trades come from the same fill ledger.
                 by_symbol[symbol] = _compute_metrics(
                     strategy_returns=symbol_equity.pct_change().fillna(0.0),
                     benchmark_returns=benchmark_equity.pct_change().fillna(0.0),
                     allocation_capital=allocation_capital,
-                    periods_per_year=periods_per_year,
+                    time_basis=symbol_time_basis,
                     trade_count=_execution_fill_count(execution_events),
+                    closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
                 )
 
         symbol_equity_curves.append(symbol_equity)
@@ -260,14 +274,21 @@ def compute_alpha_metrics(
     aggregate_strategy_equity = _sum_without_edge_backfill(symbol_equity_curves)
     aggregate_benchmark_equity = _sum_without_edge_backfill(benchmark_equity_curves)
     trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
+    aggregate_time_basis = _metric_time_basis_for(
+        config=config,
+        effective_index=aggregate_strategy_equity.index,
+        prepared_market_data=prepared_market_data,
+    )
+    aggregate_closed_trade_pnls = [trade.net_pnl for trade in closed_trades]
     if is_dca:
         aggregate_invested = allocation_capital * max(trade_count, 1)
         aggregate_metrics = _compute_metrics_from_equity(
             strategy_equity=aggregate_strategy_equity,
             benchmark_equity=aggregate_benchmark_equity,
             invested_capital=aggregate_invested,
-            periods_per_year=periods_per_year,
+            time_basis=aggregate_time_basis,
             trade_count=trade_count,
+            closed_trade_pnls=[],
         )
     else:
         aggregate_invested = float(config["starting_capital"])
@@ -276,16 +297,18 @@ def compute_alpha_metrics(
                 strategy_equity=aggregate_strategy_equity,
                 benchmark_equity=aggregate_benchmark_equity,
                 invested_capital=aggregate_invested,
-                periods_per_year=periods_per_year,
+                time_basis=aggregate_time_basis,
                 trade_count=trade_count,
+                closed_trade_pnls=aggregate_closed_trade_pnls,
             )
         else:
             aggregate_metrics = _compute_metrics(
                 strategy_returns=aggregate_strategy_equity.pct_change().fillna(0.0),
                 benchmark_returns=aggregate_benchmark_equity.pct_change().fillna(0.0),
                 allocation_capital=aggregate_invested,
-                periods_per_year=periods_per_year,
+                time_basis=aggregate_time_basis,
                 trade_count=trade_count,
+                closed_trade_pnls=aggregate_closed_trade_pnls,
             )
     if has_modeled_costs and gross_symbol_equity_curves:
         gross_aggregate_equity = _sum_without_edge_backfill(gross_symbol_equity_curves)
@@ -293,8 +316,9 @@ def compute_alpha_metrics(
             strategy_equity=gross_aggregate_equity,
             benchmark_equity=aggregate_benchmark_equity,
             invested_capital=aggregate_invested,
-            periods_per_year=periods_per_year,
+            time_basis=aggregate_time_basis,
             trade_count=trade_count,
+            closed_trade_pnls=[trade.net_pnl for trade in gross_closed_trades],
         )
         aggregate_metrics.setdefault("performance", {})["execution_realism"] = (
             _execution_realism_performance_summary(
@@ -313,6 +337,25 @@ def compute_alpha_metrics(
         "aggregate": aggregate_metrics,
         "by_symbol": by_symbol,
     }
+
+
+def _metric_time_basis_for(
+    *,
+    config: dict[str, Any],
+    effective_index: pd.Index,
+    prepared_market_data: PreparedMarketData | None,
+) -> MetricTimeBasis:
+    if prepared_market_data is not None:
+        return prepared_market_data.metric_time_basis_for(
+            asset_class=str(config["asset_class"]),
+            timeframe=str(config["timeframe"]),
+            effective_index=effective_index,
+        )
+    return build_metric_time_basis(
+        asset_class=str(config["asset_class"]),
+        timeframe=str(config["timeframe"]),
+        effective_index=effective_index,
+    )
 
 
 def _sum_without_edge_backfill(curves: list[pd.Series]) -> pd.Series:

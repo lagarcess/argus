@@ -1,12 +1,13 @@
 # Private Alpha Release Manifest Template
 
-Use one manifest per validated candidate checkpoint or promoted candidate. Fill
-this after the release gate passes and before sending tester links. A validated
-private-alpha checkpoint records technical evidence only; it does not itself
-authorize a `main` merge, production deployment, automatic production
-deployment, tester invitation, or tester exposure. Do not include raw
-conversation, user, run, or job ids; use the privacy-safe labels from canary
-evidence.
+Use one manifest per validated candidate checkpoint or promoted candidate.
+Start it before promotion, record the production migration gate before any
+deploy-capable action, and finish it after the release gate passes and before
+sending tester links. A validated private-alpha checkpoint records technical
+evidence only; it does not itself authorize a `main` merge, production
+deployment, automatic production deployment, tester invitation, or tester
+exposure. Do not include raw conversation, user, run, or job ids; use the
+privacy-safe labels from canary evidence.
 
 ## Candidate
 
@@ -20,6 +21,38 @@ evidence.
 - Rollback target:
 - Decision record:
 
+## Production Migration Gate
+
+- Gate command: `scripts/ops/production_migration_gate.py`
+- Gate report durable attachment or committed path:
+- Gate checked at:
+- Gate candidate SHA:
+- Gated candidate parents and intended landing method:
+- Landed `origin/main` SHA:
+- Gate-to-landed-SHA identity: exact / invalidated and rerun
+- Landed-ref verification: `--verify-landed-ref origin/main`, status and SHA
+- Sanitized production project and database host:
+- Database transport: `sslmode=verify-full`, production CA, GSS disabled
+- Candidate migrations, with version, name, file SHA-256, statement count, and
+  statement-array SHA-256:
+- Applied production migrations, with version, name, statement count, and
+  statement-array SHA-256:
+- Latest applied production migration:
+- Missing migrations:
+- Unexpected applied migrations:
+- Migration name drift:
+- Migration content drift, including missing statement history:
+- Safety classifications and live requirements for every missing migration:
+- Classification basis and human live-schema review:
+- Gate result: `status=pass` required before service deploy
+- Gate human-approval state:
+- Gate apply result: `not_performed_by_gate`
+- Gate ledger readback:
+- Human apply performed: no / yes, by:
+- If applied, repository order and ledger before/after:
+- If applied, affected-object readback:
+- Confirm the gate never applies migrations:
+
 ## Deploy Proof
 
 - API service: `argus-api`
@@ -28,9 +61,10 @@ evidence.
 - Web service: `argus-app`
 - Web deploy status:
 - Web deployed SHA:
-- Cron service: `argus-maintenance`
-- Cron deploy status (`live`, or `absent` if the blueprint is not applied yet):
-- Cron deployed SHA:
+- Workflow service: `argus-backtests`
+- Workflow version status:
+- Workflow released SHA:
+- Workflow version id:
 - Checked at:
 
 ## Environment Proof
@@ -41,8 +75,9 @@ evidence.
 - api_web_env_fingerprint:
 - workflow_env_fingerprint:
 - workflow_env_status:
-- cron_env_fingerprint:
-- cron_env_status:
+- autodeploy_fingerprint:
+- autodeploy_status:
+- all three services use `checksPass`:
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -51,6 +86,7 @@ evidence.
 - Backtest service mode:
 - Workflow service proof:
   - `argus-backtests` latest deploy/status:
+  - workflow autodeploy verified: `checksPass`
   - workflow provider mode verified: `live_provider`
   - effective runtime provider mode verified: `live_provider`
   - effective runtime proof status:
@@ -69,8 +105,8 @@ evidence.
   - provider anonymous-user rate limit:
   - Argus per-IP guest-attempt limit:
 - Guest cleanup:
-  - command and schedule:
-  - owner / alert destination:
+  - operator-run command:
+  - explicit target:
   - dry-run selected:
   - real selected/deleted/preserved/failed:
   - cleanup lag:

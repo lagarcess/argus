@@ -1447,6 +1447,43 @@ Metrics are grouped into categories.
 }
 ```
 
+`win_rate` and `profit_factor` are nullable closed-trade metrics. A completed
+trade is one canonical long-only position with an executed open fill and an
+executed close fill. Open positions do not enter either metric. `win_rate` is
+winning completed trades divided by all completed trades, so a breakeven trade
+is closed but is not a win. `profit_factor` is gross positive realized P&L
+divided by absolute gross negative realized P&L after modeled fees and
+slippage. It is `null` when there are no completed trades or no losing trade,
+and it is `0.0` when completed trades lose money without any winning trade.
+`total_trades` retains its existing executed-fill meaning; it is not a count of
+completed positions. If a close and a new open share one timestamp, the
+canonical ledger applies the close before the open. The same ordered fills own
+both portfolio equity and closed-trade P&L.
+
+For example, an open buy-and-hold position persists:
+
+```json
+{
+  "win_rate": null,
+  "total_trades": 1,
+  "profit_factor": null
+}
+```
+
+Annual return uses the elapsed calendar time between the first and last
+effective market-data timestamps, with 365.2425 calendar days per year.
+Irregular gaps therefore remain elapsed time instead of being compressed into
+adjacent observations. `annualized_return_pct` is `null` when a valid, extreme
+short-window return cannot be represented as a finite annual rate. Volatility
+and Sharpe use one asset-aware observation
+frequency owned by the market-data coverage boundary: crypto uses continuous
+24/7 time, currency pairs use the current provider's continuous calendar, and
+equities use 252 sessions plus the real session durations supplied by the same
+market calendar, including early closes and provider-emitted partial final
+candles. Daily equity uses 252 observations per year. This time-basis correction
+does not redefine DCA contribution-return semantics; that remains a separate
+metric-contract decision.
+
 ## Benchmark Defaults
 - **equity** -> `SPY`
 - **crypto** -> `BTC`
@@ -1564,10 +1601,16 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - email + password
 
 **Private-alpha access:**
-- Private-alpha signup and login are gated by the server-side Supabase `private_alpha_allowlist` table.
-- `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
-- `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
-- Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is the one gate over permanent
+  signup, login, and authenticated requests, and it has been open in production
+  since 2026-08-12. Public registration is therefore open: the server-side
+  Supabase `private_alpha_allowlist` table admits any email and denies only a
+  row whose `disabled_at` is set. When that flag is off instead, the same table
+  becomes an admission list: only an email whose active row carries `admin`,
+  `developer`, or `user` may enter, so a `requested` row does not admit it.
+- `POST /auth/signup` must apply that gate before calling Supabase Auth signup, so denied emails do not create auth users or profiles.
+- `POST /auth/login` must also apply it before creating a browser session, so denied emails cannot enter the app.
+- Authenticated API requests must also reject users the gate denies, so an existing session cannot keep using access the gate would no longer grant.
 - `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
   `{"email":"person@example.com","language":"en"}` where `language` is exactly
   `en` or `es-419`. Every syntactically valid new, duplicate, approved,
@@ -1580,7 +1623,9 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - An access request may insert only a missing `requested` row with normalized
   email and the requested language. It must never overwrite an existing
   requested, approved, privileged, or disabled row. `requested` and unknown
-  roles do not grant permanent access.
+  roles grant no role elevation. While public registration is open they also
+  withhold nothing, because admission needs only the absence of a disabled row;
+  when the public gate is closed instead, neither role admits the email.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
   method and path. It loads one active requested row and its language, sends
@@ -1687,7 +1732,10 @@ Guest access is additive and server-authoritative.
 `ARGUS_GUEST_ACCESS_ENABLED` defaults to `true`; explicit `false` is the
 emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
 defaults to `true` and controls presentation only. The independent
-`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` policy remains false by default.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` policy has been open in production
+since 2026-08-12, so guests may create permanent accounts. That policy is the
+one flag here that fails closed when unset, so an environment omitting it denies
+permanent accounts rather than allowing them.
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
@@ -1701,24 +1749,51 @@ defaults to `true` and controls presentation only. The independent
   `renewed_after_expiry=true`; the expired workspace is never revived.
   Disabling the flag stops new anonymous identities while already-verified
   guests remain usable until conversion, fixed expiry, or cleanup.
-- `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
-  update to add verified email/password credentials to the current anonymous
-  identity. The browser supplies its current rotated session refresh token;
-  the original bootstrap cookie is only a backward-compatible fallback. The
-  route preserves the Auth UUID and uses `permanent_account_access_allowed` as
-  its sole permanent-account gate: when public account access is disabled,
-  only active allowlisted roles may link; when enabled, any email not explicitly
-  disabled may link.
+- `POST /api/v1/auth/guest/signup` creates a new permanent Supabase Auth user
+  through ordinary password signup. It never adds email/password credentials to
+  the anonymous Auth user. It requires a fresh CAPTCHA token, a prepared
+  `new_account_signup` handoff cookie, and
+  `permanent_account_access_allowed` as its permanent-account gate. When public
+  account access is disabled, only active allowlisted roles may register; when
+  enabled, any email not explicitly disabled may register.
+- The guest projection returned by `GET /api/v1/me` includes the active
+  workspace `conversation_id` alongside its expiry and allowances. The client
+  uses this server-owned id as the handoff source if conversation hydration has
+  not yet selected the route locally.
+- Before provider signup, the client calls `POST /api/v1/auth/guest/handoffs`
+  with `handoff_kind=new_account_signup`, the source conversation, and optional
+  typed pending action. That response first sets the HttpOnly claim cookies for
+  a handoff whose expiry equals the fixed guest workspace expiry. The signup
+  route validates that prepared handoff. A server-only proof in signup metadata
+  lets a database trigger bind the newly inserted Auth UUID to the handoff
+  atomically and remove the proof in the same transaction. If email
+  confirmation is required, the guest workspace remains active until first
+  verified login claims it. If signup returns a session immediately, the route
+  claims it before returning.
+- Retrying the same unconfirmed guest signup resends the signup confirmation
+  without changing the password or creating another Auth user. If the same
+  bound Auth user is already confirmed but its claim was interrupted, Argus
+  verifies the submitted password and resumes that exact handoff. This includes
+  replaying the committed claim when its response was lost; the claimed source
+  session is accepted only on this retry route and only the same bound
+  destination can receive the replay. An email owned by any other permanent
+  identity returns `409 account_exists_use_login` before provider mutation;
+  transfer to an existing account still requires login.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
-  pending action to a ten-minute handoff without resolving whether that account
-  exists. The response exposes only the handoff id and expiry; the id and opaque
-  secret used for reconciliation exist in Secure/SameSite/HttpOnly cookies.
+  pending action without resolving whether that account exists. Its optional
+  `handoff_kind` defaults to `existing_account`, which expires in ten minutes;
+  `new_account_signup` expires with the fixed guest workspace. The response
+  exposes only the handoff id and expiry; the id and opaque secret used for
+  reconciliation exist in Secure/SameSite/HttpOnly cookies before any signup
+  provider mutation.
 - `POST /api/v1/auth/login` consumes a cookie-bound handoff before returning
   the permanent session. Its optional `guest_claim` contains the original
   conversation id and verified typed pending action. Retrying the same login
   after an ambiguous response returns the same claim result without repeating
-  transfer; the explicit claim endpoint remains strict single-use.
+  transfer. If an ordinary signup committed before its profile write, this
+  login creates the missing permanent profile before claim. The explicit claim
+  endpoint remains strict single-use.
 - `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
   the signed-in destination, then atomically transfers the complete mutable
   product graph. It is single-use and returns the original conversation id plus
@@ -1755,15 +1830,18 @@ expiry. The existing message settlement and backtest admission transactions
 own completed-turn and unique-simulation charges; feedback insert and charge
 are one transaction. Replays, failures, and interruptions add no unit.
 
-New-account linking preserves the owner UUID. An existing-account claim must
-move the complete conversation-owned product graph atomically.
+New-account signup creates a different Auth UUID. Both new-account signup and
+existing-account login use the same claim transaction to move the complete
+conversation-owned product graph atomically. The anonymous source remains the
+owner until that claim commits.
 `cost_ledger_entries`, security evidence, and route evidence are deliberately
 excluded from owner rewriting: they retain anonymous attribution or become
 null through their existing foreign-key behavior.
 
-While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
-remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
-authenticate without role elevation; explicitly disabled rows remain blocked.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` has been live in production since
+2026-08-12, so unlisted ordinary accounts may authenticate without role
+elevation while explicitly disabled rows stay blocked. When that flag is off
+instead, permanent signup and login admit active allowlist roles only.
 Before that flag may be enabled, founder-approved production-parity evidence
 must prove that every enabled permanent Auth provider supplies a verified email
 compatible with profile and allowlist-role rules. Phone, OAuth, or other
@@ -1816,9 +1894,10 @@ the existing localized check-your-email state and must not redirect to chat.
 
 **Private-alpha blocked response:** signup intentionally returns the same
 generic `400 auth_signup_failed` shape used for provider signup failures, while
-still checking the allowlist before calling Supabase Auth signup. Public signup
-attempts must not distinguish unlisted/disabled private-alpha emails from
-listed emails that fail provider signup.
+still checking the allowlist before calling Supabase Auth signup. A caller must
+not be able to tell a denied email from a listed email that failed provider
+signup. Denial means an explicitly disabled row while the public gate is open,
+and an unlisted email as well when it is closed.
 
 When an optional username is supplied, the server trims and case-folds it and
 serializes same-email and same-username signup attempts before checking profile
@@ -1840,6 +1919,80 @@ empty identity list never creates a profile.
   "request_id": "uuid"
 }
 ```
+
+## `POST /auth/guest/signup`
+
+Create a permanent account from an active guest workspace and preserve the
+workspace through the existing handoff transaction.
+
+**Request:**
+```json
+{
+  "email": "user@email.com",
+  "password": "string",
+  "captcha_token": "bounded-turnstile-token",
+  "display_name": "Alex",
+  "username": "alex",
+  "language": "es-419"
+}
+```
+
+The authenticated caller must be the active anonymous owner recorded by a
+prepared `new_account_signup` handoff. Its HttpOnly cookies must match the
+request's normalized email. The handoff preparation request owns
+`source_conversation_id` and the optional typed `pending_action`. CAPTCHA,
+language, username, and permanent-account access rules match ordinary signup.
+
+**Confirmation-required response:**
+```json
+{
+  "user": {},
+  "session": null
+}
+```
+
+The already prepared Secure/SameSite/HttpOnly handoff cookies remain valid
+through the guest workspace expiry. The response does not replace the active
+guest session. The client shows the localized check-your-email state and must
+not refresh registered-account surfaces until confirmation and login complete
+the claim.
+
+**Immediate-session response:**
+```json
+{
+  "user": {},
+  "session": {},
+  "guest_claim": {
+    "conversation_id": "uuid",
+    "pending_action": null
+  }
+}
+```
+
+The claim commits before the permanent session is returned. A retry that maps
+to the same already-bound unconfirmed Auth user resends the signup confirmation
+and returns the confirmation-required shape without calling signup again. If
+that same bound user is already confirmed but the claim was interrupted, the
+route verifies the submitted password through normal login and finishes the
+claim. A different Auth UUID or an invalid password never receives the guest
+workspace.
+
+An email bound to any other Auth user returns the existing explicit guest
+conversion response:
+
+```json
+{
+  "type": "https://api.argus.app/problems/account-exists-use-login",
+  "title": "Account Already Exists",
+  "status": 409,
+  "detail": "This email already has an Argus account. Sign in instead; your conversation comes with you.",
+  "code": "account_exists_use_login",
+  "request_id": "uuid"
+}
+```
+
+This route replaces `POST /api/v1/auth/guest/link`. No active guest registration
+path calls the authenticated Supabase user-update endpoint.
 
 ## `POST /auth/login`
 
@@ -1867,9 +2020,10 @@ Supabase Auth without logging or persistence.
 ```
 
 **Private-alpha blocked response:** login intentionally returns the same generic
-`401 unauthorized` shape used for invalid credentials, so public login attempts
-cannot distinguish unlisted/disabled private-alpha emails from listed emails
-with wrong passwords.
+`401 unauthorized` shape used for invalid credentials, so a caller cannot tell a
+denied email from a listed email with a wrong password. Denial means an
+explicitly disabled row while the public gate is open, and an unlisted email as
+well when it is closed.
 
 ```json
 {
@@ -2917,8 +3071,7 @@ Example unsupported-recovery clarification payload:
       "strategy": {
         "asset_universe": ["TSLA"],
         "asset_class": "equity"
-      },
-      "raw_value": "ATR 14"
+      }
     },
     "options": [
       {
@@ -2937,6 +3090,43 @@ Example unsupported-recovery clarification payload:
   }
 }
 ```
+
+### Cause-aware unsupported recovery
+
+`unsupported_recovery` is an additive typed projection. Its cause determines
+both the recovery route and the facts available to deterministic fallback copy:
+
+- A surviving `unsupported_strategy_logic` capability constraint may use
+  `unsupported_recovery` with supported simplification options. Only this
+  capability route may say that Argus cannot run a strategy.
+- Incomplete or unparseable extraction is a normal clarification outcome. It
+  asks for the missing executable detail and must not be represented as a
+  strategy-capability refusal.
+- `unsupported_starting_capital` is a launch-validation range outcome, not a
+  strategy-capability refusal. It asks for a starting-capital amount before a
+  confirmation card or acknowledgement is emitted.
+- `capital_amount` remains role-sensitive at launch validation. For DCA it is
+  the recurring contribution, so an invalid DCA contribution routes to the
+  normal sizing clarification and never inherits the one-time bankroll floor.
+
+`raw_value` may remain in runtime records as opaque diagnostic or interpreter
+evidence. It is never a generic display subject and is not included in the
+generic clarifier voice input, `assistant_prompt`, or deterministic fallback
+copy. A generic capability recovery instead speaks about the typed capability
+and its supported options.
+
+For `unsupported_starting_capital`, `payload.minimum` is a typed finite number
+and `payload.maximum` is an optional typed finite number. A finite minimum
+alone is a valid floor projection. When a maximum is present, the projection
+emits both bounds only if both are finite and ordered with `minimum <= maximum`;
+missing minimum, malformed, non-finite, or reversed pairs fail closed by
+omitting the numeric bounds and using the generic starting-capital prompt.
+
+`unsupported_time_granularity` is the dedicated typed exception. Its typed bar
+size may be supplied to the clarifier and displayed in the bar-size recovery,
+because it names the specific timeframe field rather than a generic strategy
+or interpretation value. This exception does not permit other `raw_value`
+fields to become clarifier voice input or display text.
 
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
@@ -3020,8 +3210,8 @@ final payload and persisted metadata:
 {
   "research": {
     "schema_version": "argus_research/v1",
-    "capability_class": "fast_quote",
-    "shape": "fast",
+    "capability_class": "balanced_lookup",
+    "shape": "balanced",
     "sources": [
       {
         "title": "Netflix Q2 2026 shareholder letter",
@@ -3041,9 +3231,8 @@ final payload and persisted metadata:
       "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
       "comparison_set": [],
       "peer_suggestions": ["DIS"],
-      "open_thread": {"shape": "fast", "period_of_interest": null}
-    },
-    "degraded": {"code": "asset_class_not_covered"}
+      "open_thread": {"shape": "balanced", "period_of_interest": null}
+    }
   }
 }
 ```
@@ -3061,27 +3250,52 @@ Contract rules:
   describes the work, not the configuration tier it ran on: a market survey
   is `screening` whether it grounded on the balanced tier or the thorough
   one, so retuning a shape never moves its metering.
+- A pure quote or market-data number may use `fast`; its public source list may
+  be empty because provider provenance belongs to the route receipt rather
+  than a publisher link. A narrative, causal, or explanatory clause is typed
+  as requiring publisher evidence and can never use `fast`, even if it also
+  asks for a current figure. Company reads require at least one public
+  publisher, filing, investor-relations, or company page. If none survives
+  the first balanced attempt, Argus retries once without the provider-only
+  finance citation channel. If none survives sanitization and question-aware
+  selection after that retry, Argus emits
+  `research_unavailable_missing_public_sources` and does not publish the
+  unsupported claim.
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
-  radar ("what's happening in cybersecurity") ground through
-  `finance_search` on the balanced tier and cache as `movers`. Screening
+  radar ("what's happening in cybersecurity") use the balanced tier and
+  cache as `movers`. Screening
   carries every stated condition into the provider call and the answer names
   which condition each asset satisfies; a screen that silently drops the
   user's threshold is a defect, not a simplification. Sector radar answers
   with sector analysis, not a list of company descriptions. These shapes name
-  no subject, so their runnable rows come from the assets the answer itself
-  found, each passed through provider-backed resolution first.
-- A survey that returns zero `finance_search` invocations answered from model
-  knowledge. It carries `degraded.code = "survey_not_grounded"` and says so
-  in prose rather than presenting itself as the current state of the market.
+  no subject, so their runnable rows come from resolver-verified tickers the
+  answer itself names. One- and two-character tickers count only when their
+  notation is unambiguous, such as a cashtag, parentheses, a table cell, or
+  the resolved company name on the same line.
+- Survey grounding counts finance, web, and URL retrieval independently. A
+  survey with no retrieval carries `degraded.code = "survey_not_grounded"`
+  and replaces unsupported prose with the precise retrieval failure. A survey
+  that retrieved but names no resolver-verified ticker carries
+  `degraded.code = "survey_synthesis_incomplete"` and says that sources were
+  found but the requested assets could not be extracted. Neither failure
+  renders subject-dependent figure or asset copy, and neither emits a
+  runnable row.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
   (`{title, domain, url, source_date}`), and every rail shape renders through
   that one panel. The model never authors a citation line: prompts forbid
   source lines and links, and only URLs the packet returned can enter the
-  typed path. A grounded answer with no linkable sources says so, because
-  market data arrives as figures rather than articles.
+  typed path. Provider-owned hosts remain excluded. Parsing retains a bounded
+  internal citation pool; the public selection step then drops an explicitly
+  dated source published before the period implied by the question, keeps at
+  most one page per publisher, and caps the drawer at five. An undated live
+  page remains eligible because it can plausibly describe the current period.
+  When a current market pulse, screen, or sector radar has no explicit period,
+  the question date is its freshness lower bound. Classifier-supplied period
+  lower bounds are ISO-date typed; a malformed value is rejected instead of
+  turning a bounded question into an unbounded one.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around

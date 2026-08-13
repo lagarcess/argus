@@ -2,10 +2,52 @@ import { describe, expect, test } from "bun:test";
 
 import {
   conversationLoadFailureMessage,
+  shouldShowEmptyChatSurface,
   shouldShowConversationDisclaimer,
 } from "../lib/chat-conversation-load-state";
 
 describe("chat conversation load state", () => {
+  test("routes every settled empty conversation through its account landing surface", () => {
+    expect(
+      shouldShowEmptyChatSurface({
+        messages: [],
+        isHydratingConversation: false,
+        hasConversationLoadFailure: false,
+      }),
+    ).toBe(true);
+  });
+
+  test("keeps loading failures and non-empty transcripts off the empty surface", () => {
+    expect(
+      shouldShowEmptyChatSurface({
+        messages: [],
+        isHydratingConversation: true,
+        hasConversationLoadFailure: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowEmptyChatSurface({
+        messages: [],
+        isHydratingConversation: false,
+        hasConversationLoadFailure: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowEmptyChatSurface({
+        messages: [
+          {
+            id: "user-message",
+            role: "user",
+            kind: "text",
+            content: "Compare Apple with SPY",
+          },
+        ],
+        isHydratingConversation: false,
+        hasConversationLoadFailure: false,
+      }),
+    ).toBe(false);
+  });
+
   test("builds a retryable assistant message for transient conversation load failures", () => {
     const message = conversationLoadFailureMessage(
       " conversation-1 ",
