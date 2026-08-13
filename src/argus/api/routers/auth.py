@@ -12,8 +12,8 @@ from argus.api import state as api_state
 from argus.api.browser_cookies import delete_browser_cookie, set_browser_cookie
 from argus.api.dependencies import (
     _apply_auth_session_cookies,
-    _session_cookie_secure,
     auth_response,
+    browser_cookie_policy,
     current_user,
     problem,
 )
@@ -363,20 +363,18 @@ def create_guest_handoff(
         _GUEST_HANDOFF_COOKIE,
         opaque_secret,
         httponly=True,
-        secure=_session_cookie_secure(request),
-        samesite="lax",
         max_age=cookie_max_age,
         path="/api/v1/auth",
+        **browser_cookie_policy(request),
     )
     set_browser_cookie(
         response,
         _GUEST_HANDOFF_ID_COOKIE,
         payload.handoff_id,
         httponly=True,
-        secure=_session_cookie_secure(request),
-        samesite="lax",
         max_age=cookie_max_age,
         path="/api/v1/auth",
+        **browser_cookie_policy(request),
     )
     return response
 
@@ -483,9 +481,8 @@ def _clear_guest_handoff_cookies(request: Request, response: JSONResponse) -> No
             response,
             cookie_name,
             path="/api/v1/auth",
-            secure=_session_cookie_secure(request),
             httponly=True,
-            samesite="lax",
+            **browser_cookie_policy(request),
         )
 
 
