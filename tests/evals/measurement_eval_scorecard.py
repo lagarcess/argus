@@ -95,7 +95,13 @@ def measurement_fixture_identity_at_git_sha(
     fixture_prefix = "tests/evals/measurement_cases"
     try:
         verified_commit = subprocess.run(
-            ["git", "rev-parse", "--verify", f"{candidate_sha}^{{commit}}"],
+            [
+                "git",
+                "--no-replace-objects",
+                "rev-parse",
+                "--verify",
+                f"{candidate_sha}^{{commit}}",
+            ],
             cwd=repository_root,
             check=True,
             capture_output=True,
@@ -112,6 +118,7 @@ def measurement_fixture_identity_at_git_sha(
         listed = subprocess.run(
             [
                 "git",
+                "--no-replace-objects",
                 "ls-tree",
                 "-r",
                 "--name-only",
@@ -136,7 +143,12 @@ def measurement_fixture_identity_at_git_sha(
         entries = []
         for git_path in fixture_paths:
             shown = subprocess.run(
-                ["git", "show", f"{candidate_sha}:{git_path}"],
+                [
+                    "git",
+                    "--no-replace-objects",
+                    "show",
+                    f"{candidate_sha}:{git_path}",
+                ],
                 cwd=repository_root,
                 check=True,
                 capture_output=True,
@@ -457,7 +469,7 @@ def _resolved_provider_mode(env_name: str) -> str:
 def _candidate_sha(repository_root: Path) -> str:
     try:
         completed = subprocess.run(
-            ["git", "rev-parse", "--verify", "HEAD"],
+            ["git", "--no-replace-objects", "rev-parse", "--verify", "HEAD"],
             cwd=repository_root,
             check=True,
             capture_output=True,
@@ -475,7 +487,13 @@ def _candidate_sha(repository_root: Path) -> str:
 def _worktree_is_clean(repository_root: Path) -> bool:
     try:
         completed = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=all"],
+            [
+                "git",
+                "--no-replace-objects",
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+            ],
             cwd=repository_root,
             check=True,
             capture_output=True,

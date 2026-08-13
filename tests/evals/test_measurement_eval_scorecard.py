@@ -260,6 +260,76 @@ def test_candidate_fixture_identity_rejects_non_commit_git_object(
         )
 
 
+def test_candidate_fixture_identity_ignores_git_replacement_refs(
+    tmp_path: Path,
+) -> None:
+    fixture_dir = tmp_path / "tests" / "evals" / "measurement_cases"
+    fixture_dir.mkdir(parents=True)
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    def commit_fixture(case_id: str) -> str:
+        (fixture_dir / "messy_english.yaml").write_text(
+            f"category: messy_english\ncases: [{{id: {case_id}}}]\n",
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["git", "add", "tests/evals/measurement_cases"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Argus Eval Test",
+                "-c",
+                "user.email=argus-eval@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "--quiet",
+                "-m",
+                case_id,
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    candidate_sha = commit_fixture("case-a")
+    expected = scorecards.measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_sha,
+        repository_root=tmp_path,
+    )
+    replacement_sha = commit_fixture("case-b")
+    subprocess.run(
+        ["git", "replace", candidate_sha, replacement_sha],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    observed = scorecards.measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_sha,
+        repository_root=tmp_path,
+    )
+
+    assert observed == expected
+
+
 def test_write_scorecard_requires_provenance(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         scorecards.write_scorecard([], output_dir=tmp_path)
