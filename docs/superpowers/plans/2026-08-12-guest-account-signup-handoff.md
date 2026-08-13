@@ -84,7 +84,7 @@ git commit -m "fix(auth): bind guest signup handoffs atomically"
 - Modify: `src/argus/domain/username_signup.py`
 - Test: `tests/test_guest_conversion.py`
 - Test: `tests/test_alpha_api_supabase.py`
-- Test: `tests/test_guest_auth_local_supabase.py`
+- Test: `tests/test_guest_signup_local_supabase.py`
 
 **Interfaces:**
 - Consumes: `public.prepare_guest_signup_handoff`, a prepared handoff cookie, the existing claim RPC, and ordinary `SupabaseGateway.signup`.
@@ -131,7 +131,7 @@ schema, and the `/auth/guest/link` route.
 
 ```bash
 poetry run pytest tests/test_guest_conversion.py tests/test_alpha_api_supabase.py -q
-poetry run pytest tests/test_guest_auth_local_supabase.py -q
+poetry run pytest tests/test_guest_auth_local_supabase.py tests/test_guest_signup_local_supabase.py -q
 ```
 
 Expected: route tests pass and the real local flow proves source UUID differs
@@ -219,7 +219,7 @@ The generated contract must contain `/api/v1/auth/guest/signup` and no
 - [ ] **Step 2: Run focused and broad deterministic gates**
 
 ```bash
-poetry run pytest tests/test_guest_conversion.py tests/test_guest_handoff_postgres.py tests/test_guest_auth_local_supabase.py -q
+poetry run pytest tests/test_guest_conversion.py tests/test_guest_handoff_postgres.py tests/test_guest_auth_local_supabase.py tests/test_guest_signup_local_supabase.py -q
 poetry run pytest -q
 cd web && bun test && bun run lint && bun run build
 ```
