@@ -381,9 +381,9 @@
       "asset_target": "¿Qué activo quieres probar?",
       "assumption": "¿Qué supuesto quieres ajustar?",
       "assumption_for_asset": "¿Qué supuesto quieres ajustar para {{symbol}}?",
-      "sizing_amount_schedule": "¿Cuánto quieres invertir en cada compra y con qué frecuencia?",
+      "sizing_amount_schedule": "¿Cuánto quieres invertir en cada compra y cada cuánto?",
       "sizing_amount": "¿Cuánto quieres invertir?",
-      "schedule": "¿Con qué frecuencia quieres hacer las compras?",
+      "schedule": "¿Cada cuánto quieres hacer las compras?",
       "rule_definition": "¿Qué regla de entrada o salida quieres probar?",
       "refinement": "¿Qué quieres ajustar de esta idea?",
       "refinement_for_asset": "¿Qué quieres cambiar, comparar o poner a prueba ahora para {{assetText}}?",
@@ -528,13 +528,6 @@
       "equity": "Acciones",
       "crypto": "Cripto",
       "currency_pair": "Par de divisas"
-    },
-    "cadence": {
-      "daily": "Diaria",
-      "weekly": "Semanal",
-      "biweekly": "Quincenal",
-      "monthly": "Mensual",
-      "quarterly": "Trimestral"
     },
     "view_details": "Ver detalles",
     "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
