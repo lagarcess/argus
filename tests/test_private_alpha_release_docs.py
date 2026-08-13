@@ -44,15 +44,27 @@ _BLOCK_BREAK = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#|```|\|)")
 # words are read as a claim about the gate.
 _GATE_SUBJECT = re.compile(
     r"public[-\s]?(?:account|permanent|registration|signup|login)"
-    r"|permanent[-\s]?account access",
+    r"|permanent[-\s]?accounts?\b",
     re.IGNORECASE,
 )
-# Generic words for "shut". "disabled" is safe to read here, unlike next to the
-# flag name, because the window below keeps it beside a public-account subject,
-# so an unrelated "explicitly disabled allowlist row" later in the same sentence
-# is not mistaken for a claim about the gate.
-_CLOSED_STATE = re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE)
-_SUBJECT_STATE_WINDOW = 60
+# Words that call the gate open or shut, keyed by the value each asserts, so the
+# same reading runs whichever way the profile points. "on" and "closed" are
+# absent because "on 2026-08-12" and "fails closed" are ordinary prose here.
+_GATE_STATE = {
+    "true": re.compile(r"\b(?:true|open|opens|opened)\b", re.IGNORECASE),
+    "false": re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE),
+}
+# A state word modifying one of these describes the denial exception rather than
+# the gate: "an explicitly disabled allowlist row" stays true while the gate is
+# open. Reading what the word modifies is what distance from the subject could
+# not do, so accurate prose no longer has to hold the two terms apart.
+_DENIAL_OBJECT = re.compile(
+    r"\W*(?:\w+[-\s]+){0,3}?"
+    r"(?:rows?|entr(?:y|ies)|emails?|address(?:es)?|accounts?)\b",
+    re.IGNORECASE,
+)
+# "not open" asserts the other state, so it is not a claim for this direction.
+_NEGATION = re.compile(r"\b(?:not|never|no longer|cannot|without)\s+(?:\w+\s+){0,2}$")
 # Self-identifying: this term means the gate is shut, whatever the subject.
 _GATE_SHUT_TERM = "allowlist-gated"
 
@@ -122,13 +134,33 @@ def _declares(position: int | None, scope_at: int | None) -> bool:
     return position is not None and not (scope_at is not None and scope_at < position)
 
 
+def _gate_state_claim(lowered: str, stale_state: re.Pattern[str]) -> int | None:
+    """Where a sentence asserts the stale gate state in words, if it does.
+
+    Requires a public-account subject, then reads what each state word modifies,
+    so one denied account is never mistaken for the gate itself.
+    """
+    subject = _GATE_SUBJECT.search(lowered)
+    if not subject:
+        return None
+    for match in stale_state.finditer(lowered, subject.end()):
+        if _DENIAL_OBJECT.match(lowered, match.end()):
+            continue
+        if _NEGATION.search(lowered[: match.start()]):
+            continue
+        return match.start()
+    return None
+
+
 def _access_claim_contradictions(text: str, declared: str) -> list[str]:
     """Claims in `text` that a reader would take as the wrong flag value.
 
     Sentences are read whether or not they name the variable, because prose that
     describes the policy in words is how most of this drift survived.
     """
-    stale_words = _STATE_WORDS["false" if declared == "true" else "true"]
+    stale = "false" if declared == "true" else "true"
+    stale_words = _STATE_WORDS[stale]
+    stale_state = _GATE_STATE[stale]
 
     found: list[str] = []
     for sentence in _claim_sentences(text):
@@ -150,14 +182,13 @@ def _access_claim_contradictions(text: str, declared: str) -> list[str]:
                 ),
                 default=None,
             )
-        if declared == "true" and not _declares(claimed, scope_at):
-            if _GATE_SHUT_TERM in lowered:
+        if not _declares(claimed, scope_at):
+            # Runs in both directions: after a rollback to `false`, prose still
+            # calling registration open is the same defect mirrored.
+            if declared == "true" and _GATE_SHUT_TERM in lowered:
                 claimed = lowered.index(_GATE_SHUT_TERM)
-            elif subject := _GATE_SUBJECT.search(lowered):
-                shut = _CLOSED_STATE.search(
-                    lowered, subject.end(), subject.end() + _SUBJECT_STATE_WINDOW
-                )
-                claimed = shut.start() if shut else None
+            else:
+                claimed = _gate_state_claim(lowered, stale_state)
 
         if _declares(claimed, scope_at):
             found.append(sentence)
@@ -196,6 +227,15 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "unset, so a deployment omitting the variable denies registration.",
         # A neighbouring variable's `false` is not this gate's value.
         f"```bash\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=true\nOTHER_FLAG=false\n```",
+        # Accurate prose may keep the denial exception next to the subject. A
+        # distance rule rejected these and forced authors to pad sentences.
+        "Public signup is open except for explicitly disabled emails.",
+        "Public account creation is open, and only an explicitly disabled row "
+        "is refused.",
+        "Public registration is open, so a disabled allowlist entry is the only "
+        "refusal.",
+        # Negation asserts the open state, so it is not a shut claim.
+        "Public account creation is not disabled.",
         # The founder-owned precondition in API_CONTRACT.md must never read as a
         # stale claim, or a later round deletes it to get the suite green.
         "Before that flag may be enabled, founder-approved evidence must prove "
@@ -210,12 +250,23 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         assert not _access_claim_contradictions(claim, "true"), f"false alarm: {claim}"
 
     # The guard inverts with the profile rather than hardcoding today's posture.
-    assert _access_claim_contradictions(
-        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` is live.", "false"
-    )
-    assert not _access_claim_contradictions(
-        "Public account creation is still allowlist-gated.", "false"
-    )
+    # A rollback to `false` has to catch open-state prose the same way, or the
+    # docs only derive from the profile in one direction.
+    for claim in (
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` is live.",
+        "Public registration is now open.",
+        "Public account creation is open to anyone.",
+        "Permanent accounts opened to the public.",
+    ):
+        assert _access_claim_contradictions(
+            claim, "false"
+        ), f"missed on rollback: {claim}"
+    for claim in (
+        "Public account creation is still allowlist-gated.",
+        "Public registration is not open.",
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}=true`, any undisabled email may enter.",
+    ):
+        assert not _access_claim_contradictions(claim, "false"), f"false alarm: {claim}"
 
 
 def test_public_account_access_claims_cannot_contradict_the_release_profile() -> None:
