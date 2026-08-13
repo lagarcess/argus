@@ -52,6 +52,9 @@ jobs:
         with:
           bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}
 
+      - name: Install frontend dependencies for cross-runtime contract tests
+        run: cd web && bun install --frozen-lockfile
+
       - name: Install Poetry
         run: python -m pip install poetry==2.1.3
 

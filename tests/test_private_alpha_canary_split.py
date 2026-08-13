@@ -200,6 +200,8 @@ def test_backend_ci_installs_the_cross_runtime_canary_test_dependency() -> None:
     backend = _job_body(workflow, "backend-checks", "frontend-checks")
 
     assert "Set up Bun for cross-runtime contract tests" in backend
+    assert "Install frontend dependencies for cross-runtime contract tests" in backend
+    assert "cd web && bun install --frozen-lockfile" in backend
     assert 'ARGUS_CI_BUN_VERSION: "1.3.14"' in workflow
     assert (
         backend.count("bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}") == 1
