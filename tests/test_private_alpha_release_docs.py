@@ -590,8 +590,90 @@ def _assert_main_promotion_live_eval_evidence(
         "live eval scorecard totals do not match its complete results"
     )
     assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
-    assert totals.get("failed") == 0
     assert totals.get("unexpected_pass") == 0
+
+    # A promotion asks "is this worse than what users have now", which a suite
+    # scored against frozen expectations cannot answer on its own. So a red
+    # candidate needs a baseline run at the deployed SHA, and the comparison is
+    # the gate. Founder-locked 2026-08-13; see the runbook section
+    # "Live eval is a comparison, not a scoreboard".
+    if totals.get("failed"):
+        _assert_main_promotion_baseline_comparison(
+            manifest,
+            manifest_path,
+            candidate_results=results,
+            repository_root=repository_root,
+        )
+
+
+def _assert_main_promotion_baseline_comparison(
+    manifest: str,
+    manifest_path: Path,
+    *,
+    candidate_results: list[dict[str, object]],
+    repository_root: Path,
+) -> None:
+    baseline_match = re.search(
+        r"^- Baseline eval scorecard: `([^`]+\.json)`",
+        manifest,
+        re.M,
+    )
+    assert baseline_match is not None, (
+        f"{manifest_path.name}: a failing candidate run requires a baseline "
+        "scorecard at the deployed production SHA"
+    )
+    rollback_match = re.search(r"^- Rollback target: `([0-9a-f]{40})`", manifest, re.M)
+    assert rollback_match is not None, (
+        f"{manifest_path.name}: missing the deployed SHA the baseline must run at"
+    )
+    baseline_path = (repository_root / baseline_match.group(1)).resolve()
+    assert baseline_path.is_file(), (
+        f"{manifest_path.name}: baseline eval scorecard does not exist"
+    )
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    # The provenance block ships with the candidate harness, so the first
+    # baseline taken from a production build that predates it is schema v1 and
+    # cannot self-identify. Bind provenance the moment the deployed build can
+    # produce it, and until then require the deployed SHA in the filename so
+    # the evidence still names what it measured.
+    if baseline.get("schema_version", 1) >= 2:
+        baseline_provenance = baseline.get("provenance", {})
+        assert baseline_provenance.get("candidate_sha") == rollback_match.group(1), (
+            f"{manifest_path.name}: baseline was not run at the deployed SHA"
+        )
+        assert baseline_provenance.get("evaluation_mode") == "live"
+    else:
+        assert rollback_match.group(1)[:8] in baseline_path.name, (
+            f"{manifest_path.name}: a pre-provenance baseline must carry the "
+            "deployed SHA in its filename"
+        )
+
+    baseline_failed = {
+        result["id"]
+        for result in baseline.get("results", [])
+        if result.get("status") == "failed"
+    }
+    candidate_failed = {
+        result["id"]
+        for result in candidate_results
+        if result.get("status") == "failed"
+    }
+    assert len(candidate_failed) <= len(baseline_failed), (
+        f"{manifest_path.name}: the candidate fails more cases "
+        f"({len(candidate_failed)}) than the deployed build "
+        f"({len(baseline_failed)}). That is a regression."
+    )
+
+    # A favourable total can still hide a real regression behind an offsetting
+    # flip, and this suite's noise floor is several checks. So every case that
+    # passes deployed and fails on the candidate must be named in the manifest
+    # rather than absorbed into the count.
+    for case_id in sorted(candidate_failed - baseline_failed):
+        assert case_id in manifest, (
+            f"{manifest_path.name}: {case_id} passes on the deployed build and "
+            "fails on the candidate. Name it in the manifest with its "
+            "disposition, or do not promote."
+        )
 
 
 def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(

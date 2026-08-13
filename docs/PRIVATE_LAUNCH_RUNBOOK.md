@@ -569,6 +569,38 @@ private-alpha launch; record any override in the release manifest.
   model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
   landing-gate run and every `main` promotion candidate.
 
+### Live eval is a comparison, not a scoreboard
+
+**Founder-locked 2026-08-13.** A red live eval does not by itself block a
+promotion. The question a promotion asks is *"is this worse than what users
+have right now"*, and a suite scored against frozen expectations cannot answer
+it. Expectations drift as decisions land, so a failing check may be a
+regression, a superseded expectation, or model variance, and the three are
+indistinguishable from one run.
+
+So a red candidate run requires a **baseline run at the deployed production
+SHA**, with identical provider modes, and the two are compared:
+
+- **Candidate fails only what production already fails** → not a regression.
+  Promote, and record every failure with its owner in the manifest.
+- **Candidate fails anything production passes** → that is a regression.
+  Do not promote.
+- **Candidate passes what production fails** → an improvement, record it.
+
+Run the baseline from a detached worktree at `origin/main` so the candidate
+tree is untouched, and commit both scorecards as durable evidence.
+
+Why this rule exists: on 2026-08-13 a candidate carrying five user-visible
+fixes was held by twelve failures that all turned out to live in code already
+deployed. The gate was measuring the wrong thing. Twelve failures nobody had
+reported were outranking five defects real users had hit.
+
+The corollary is the more important half: **run the eval before merging**
+anything that touches the interpreter or the edit spine, not only before
+promoting. PR #431 shipped compound editing on 2026-08-11 without one. The
+suite already contained the cases that would have caught it, and had scored
+them 14/14 eight days earlier. That is [#498](https://github.com/lagarcess/argus/issues/498).
+
 ## Guest Staged Rollout
 
 The operational security checklist for later internet-facing Guest exposure is
