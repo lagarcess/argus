@@ -188,7 +188,7 @@ describe("legal page cookie and storage disclosure", () => {
   test("describes the handoff cookies at their real path scope", async () => {
     // path=/api/v1/auth reaches every auth route, not only sign-in:
     // /auth/login, /auth/logout, /auth/session, /auth/signup, /auth/guest,
-    // /auth/guest/link.
+    // /auth/guest/signup.
     expect(await renderLegal("en", "privacy")).toContain(
       "limited to Argus authentication routes",
     );

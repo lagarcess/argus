@@ -69,6 +69,7 @@
     "tests/agent_runtime/test_latest_result_fact_answers.py": 1504,
     "src/argus/agent_runtime/interpreter/artifact_assumption_edit.py": 1489,
     "tests/test_guest_auth_local_supabase.py": 1465,
+    "tests/test_guest_handoff_postgres.py": 1177,
     "web/e2e/guest-entry.spec.ts": 1461,
     "tests/test_history_postgres.py": 1425,
     "src/argus/api/routers/agent.py": 1393,

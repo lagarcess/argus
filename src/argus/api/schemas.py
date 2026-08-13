@@ -171,6 +171,7 @@ class GuestAccountSummary(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     expires_at: datetime
+    conversation_id: str | None
     conversation_limit: int = Field(ge=1, le=2_147_483_647)
     message_limit: int = Field(ge=1, le=2_147_483_647)
     simulation_limit: int = Field(ge=1, le=2_147_483_647)
@@ -1092,6 +1093,9 @@ class GuestBootstrapRequest(BaseModel):
     language: Language = "en"
 
 
+GuestHandoffKind = Literal["existing_account", "new_account_signup"]
+
+
 GuestConversionReason = Literal[
     "second_simulation",
     "simulation_limit",
@@ -1123,6 +1127,7 @@ class GuestPendingAction(BaseModel):
 class GuestHandoffCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    handoff_kind: GuestHandoffKind = "existing_account"
     destination_email: str = Field(min_length=3, max_length=320)
     source_conversation_id: str = Field(min_length=1, max_length=128)
     pending_action: GuestPendingAction | None = None
@@ -1160,17 +1165,15 @@ class GuestHandoffClaimResponse(BaseModel):
     pending_action: GuestPendingAction | None = None
 
 
-class GuestIdentityLinkRequest(BaseModel):
+class GuestAccountSignupRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=8, max_length=128)
-    refresh_token: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=4096,
-        repr=False,
-    )
+    captcha_token: str = Field(min_length=1, max_length=4096, repr=False)
+    language: Language = "en"
+    display_name: str | None = None
+    username: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -1184,6 +1187,14 @@ class GuestIdentityLinkRequest(BaseModel):
         ):
             raise ValueError("invalid_email")
         return normalized
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().casefold()
+        return normalized or None
 
 
 class GuestFunnelClientEventRequest(BaseModel):

@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 client = TestClient(app)
 USER_ID = "00000000-0000-0000-0000-000000000031"
+CONVERSATION_ID = "00000000-0000-0000-0000-000000000032"
 
 
 def _profile(*, email: str | None) -> User:
@@ -42,7 +43,7 @@ def _workspace() -> GuestWorkspace:
     created_at = utcnow()
     return GuestWorkspace(
         user_id=USER_ID,
-        conversation_id=None,
+        conversation_id=CONVERSATION_ID,
         status="active",
         created_at=created_at,
         expires_at=created_at + timedelta(days=7),
@@ -120,6 +121,7 @@ def test_verified_anonymous_auth_truth_owns_guest_status_and_capabilities(
     assert "avatar_theme" not in payload["user"]
     assert payload["guest"] == {
         "expires_at": workspace.expires_at.isoformat().replace("+00:00", "Z"),
+        "conversation_id": CONVERSATION_ID,
         "conversation_limit": 1,
         "message_limit": 10,
         "simulation_limit": 2,
