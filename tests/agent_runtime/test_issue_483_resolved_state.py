@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from argus.agent_runtime.artifacts.patch_policy import (
+    executable_artifact_patch_missing_fields,
+)
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.interpreter.asset_resolution_context import (
     provider_asset_resolution_context_for_request,
@@ -33,13 +36,6 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
-
-EXECUTABLE_DCA_FIELDS = {
-    "asset_universe",
-    "capital_amount",
-    "cadence",
-    "date_range",
-}
 
 
 @dataclass(frozen=True)
@@ -81,6 +77,19 @@ def _complete_dca_strategy() -> StrategySummary:
                 "capital_amount": "recurring_contribution",
             }
         },
+    )
+
+
+def _canonical_dca_required_fields() -> tuple[str, ...]:
+    contract = build_default_capability_contract()
+    return tuple(
+        executable_artifact_patch_missing_fields(
+            strategy=_complete_dca_strategy(),
+            missing_fields=missing_required_fields_for_strategy(
+                StrategySummary(strategy_type="dca_accumulation"),
+                contract=contract,
+            ),
+        )
     )
 
 
@@ -268,17 +277,11 @@ async def test_issue_483_valid_empty_preflight_cannot_reopen_resolved_asset(
 
 
 @pytest.mark.parametrize(
-    ("resolved_field", "actual_missing_field"),
-    [
-        ("asset_universe", "capital_amount"),
-        ("capital_amount", "asset_universe"),
-        ("date_range", "cadence"),
-        ("cadence", "date_range"),
-    ],
+    "actual_missing_field",
+    _canonical_dca_required_fields(),
 )
 def test_next_question_derives_from_canonical_unresolved_strategy_fields(
     monkeypatch: pytest.MonkeyPatch,
-    resolved_field: str,
     actual_missing_field: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -289,13 +292,14 @@ def test_next_question_derives_from_canonical_unresolved_strategy_fields(
     strategy = strategy.model_copy(update={actual_missing_field: missing_value})
     if actual_missing_field == "asset_universe":
         strategy.asset_class = None
+    required_fields = _canonical_dca_required_fields()
     interpretation = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="continue",
         requires_clarification=True,
         user_goal_summary="Apply the pending strategy update.",
         candidate_strategy_draft=strategy,
-        missing_required_fields=[resolved_field, actual_missing_field],
+        missing_required_fields=list(required_fields),
         semantic_turn_act="answer_pending_need",
     )
 
@@ -338,14 +342,13 @@ def test_next_question_derives_from_canonical_unresolved_strategy_fields(
 
     response_intent = clarified.patch["response_intent"]
     requested_fields = response_intent["requested_fields"]
-    resolved_fields = EXECUTABLE_DCA_FIELDS.difference(canonical_missing)
+    resolved_fields = set(required_fields).difference(canonical_missing)
     assert requested_fields == canonical_missing
     assert resolved_fields.isdisjoint(requested_fields)
-    assert response_intent["facts"]["strategy"][resolved_field] not in (
-        None,
-        "",
-        [],
-        {},
+    strategy_facts = response_intent["facts"]["strategy"]
+    assert all(
+        strategy_facts[field_name] not in (None, "", [], {})
+        for field_name in resolved_fields
     )
     if actual_missing_field == "asset_universe":
         assert requested_fields.count("asset_universe") == 1
