@@ -866,3 +866,94 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
     evidence_constraints = evidence["capabilities"]["edit_constraints"]
     for field in ("starting_capital", "contribution"):
         assert produced_constraints[field] == evidence_constraints[field], field
+
+
+@pytest.mark.parametrize(
+    ("extra", "expects_seed", "expects_ceiling_refusal"),
+    [
+        ({"starting_capital": 1_000.0}, 1_000.0, False),
+        ({"contribution_cap": 5_000.0}, 5_000.0, True),
+        ({"total_budget": 5_000.0}, 5_000.0, True),
+        # Both in one breath: the seed executes and the cap is still refused.
+        ({"starting_capital": 1_000.0, "contribution_cap": 5_000.0}, 1_000.0, True),
+        ({"lump_sum": 2_500.0, "max_budget": 9_000.0}, 2_500.0, True),
+    ],
+)
+def test_a_stated_cap_is_never_hidden_by_a_stated_seed(
+    extra: dict[str, float],
+    expects_seed: float,
+    expects_ceiling_refusal: bool,
+) -> None:
+    """A seed and a plan-wide cap are separate facts and answer separately.
+
+    Both used to be read out of one enumerated key tuple by first match, so a
+    seed listed earlier than the cap keys hid the cap entirely and the run could
+    invest past a limit the user set.
+    """
+    from argus.agent_runtime.semantic_integrity import (
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
+        conserve_semantic_constraints,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+
+    report = conserve_semantic_constraints(
+        strategy=StrategySummary(
+            strategy_type="dca_accumulation",
+            asset_universe=["KO"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=200.0,
+            extra_parameters={"recurring_contribution": 200.0, **extra},
+        ),
+        selected_thread_metadata={},
+    )
+
+    assert report.optional_parameter_values.get("initial_capital") == expects_seed
+    refused = {
+        constraint.category for constraint in report.unsupported_constraints
+    }
+    assert (
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING in refused
+    ) is expects_ceiling_refusal, extra
+
+
+def test_the_ceiling_refusal_has_one_identity_every_reader_derives_from() -> None:
+    """A rename must not silently switch off the reader that defers it.
+
+    The clarify stage suppresses this constraint while execution details are
+    still missing, so an incomplete request collects them before hearing about
+    the cap. Renaming the category without sweeping that predicate added an
+    avoidable recovery round.
+    """
+    from argus.agent_runtime.semantic_integrity import (
+        UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
+        _unsupported_dca_contribution_ceiling_constraint,
+    )
+    from argus.agent_runtime.stages import clarify
+
+    produced = _unsupported_dca_contribution_ceiling_constraint(5_000.0, source="cap")
+    assert produced.category == UNSUPPORTED_DCA_CONTRIBUTION_CEILING
+
+    source = pathlib.Path(clarify.__file__).read_text(encoding="utf-8")
+    assert "UNSUPPORTED_DCA_CONTRIBUTION_CEILING" in source
+    # The literal must appear nowhere but its one definition.
+    assert f'"{UNSUPPORTED_DCA_CONTRIBUTION_CEILING}"' not in source
+
+    from argus.agent_runtime.state.models import RunState, StrategySummary
+
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state = state.model_copy(
+        update={
+            "candidate_strategy_draft": StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["KO"],
+                asset_class="equity",
+            )
+        }
+    )
+    deferred = clarify._blocking_unsupported_constraints(
+        state=state,
+        requested_fields=["capital_amount"],
+        unsupported_constraints=[{"category": UNSUPPORTED_DCA_CONTRIBUTION_CEILING}],
+    )
+    assert deferred == []

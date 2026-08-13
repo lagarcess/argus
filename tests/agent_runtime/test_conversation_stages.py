@@ -219,7 +219,7 @@ def test_clarify_dca_missing_execution_fields_win_over_total_budget_constraint()
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$200,000 starting principal",
                 "explanation": (
                     "The current DCA backtest can only execute the recurring "
@@ -271,7 +271,7 @@ def test_clarify_dca_missing_period_wins_over_total_budget_constraint() -> None:
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$5,000 contribution cap",
                 "explanation": (
                     "The current DCA backtest can only execute the recurring "
@@ -623,7 +623,7 @@ def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$3,000 contribution cap",
                 "explanation": (
                     "I understand $3,000 as a contribution cap, but the current "
@@ -654,7 +654,7 @@ def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_
     assert result.patch["assistant_prompt"] == clarifier.question
     assert len(clarifier.requests) == 1
     assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
-        "unsupported_dca_starting_principal"
+        "unsupported_dca_contribution_ceiling"
     )
     prompt = result.patch["assistant_prompt"]
     assert "recurring-buy" in prompt
@@ -3013,7 +3013,7 @@ def test_confirm_stage_blocks_carried_dca_cap_before_ready_card() -> None:
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$3,000 cap",
                 "explanation": (
                     "The recurring-buy launch can use the per-buy amount and "
@@ -3033,7 +3033,7 @@ def test_confirm_stage_blocks_carried_dca_cap_before_ready_card() -> None:
     assert "confirmation_payload" not in result.patch
     assert result.patch["requested_field"] == "unsupported_constraints"
     constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
-    assert constraint["category"] == "unsupported_dca_starting_principal"
+    assert constraint["category"] == "unsupported_dca_contribution_ceiling"
     assert any(
         option["label"] == "Run recurring buys only"
         for option in constraint["simplification_options"]

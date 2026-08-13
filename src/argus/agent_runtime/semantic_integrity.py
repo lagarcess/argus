@@ -18,6 +18,32 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range,
 )
 
+# Money a recurring plan puts to work on day one, and money that bounds the
+# whole plan. Two different facts, so two key sets: reading them out of one
+# enumerated tuple made the order load-bearing and let a seed hide a cap.
+_DCA_SEED_KEYS: tuple[str, ...] = (
+    "initial_capital",
+    "starting_capital",
+    "starting_principal",
+    "initial_lump_sum",
+    "initial_lump",
+    "lump_sum",
+)
+_DCA_CEILING_KEYS: tuple[str, ...] = (
+    "total_capital",
+    "total_budget",
+    "max_budget",
+    "investment_budget",
+    "cap",
+    "contribution_cap",
+    "capital_cap",
+    "investment_cap",
+)
+
+# One identity for the ceiling refusal, so the producer and every reader that
+# defers or filters it cannot drift apart under a rename.
+UNSUPPORTED_DCA_CONTRIBUTION_CEILING = "unsupported_dca_contribution_ceiling"
+
 
 @dataclass(frozen=True)
 class SemanticConstraintEvidence:
@@ -26,6 +52,11 @@ class SemanticConstraintEvidence:
     normalized_date_range: str | dict[str, Any] | None = None
     recurring_contribution: float | None = None
     total_capital: float | None = None
+    # A plan-wide ceiling is its own fact. Reading it out of the same slot as
+    # the seed let a stated seed hide a stated cap, so the run could invest
+    # past a limit the user set.
+    contribution_ceiling: float | None = None
+    contribution_ceiling_source: str | None = None
     recurring_cadence: str | None = None
 
 
@@ -103,21 +134,25 @@ def conserve_semantic_constraints(
         normalized_date_range=normalized_date_range,
         recurring_contribution=money_evidence.recurring_contribution,
         total_capital=money_evidence.total_capital,
+        contribution_ceiling=money_evidence.contribution_ceiling,
+        contribution_ceiling_source=money_evidence.contribution_ceiling_source,
         recurring_cadence=cadence,
     )
 
     if executable_strategy_type(updated) == "dca_accumulation":
+        # A seed and a ceiling can both be stated in one breath, and they are
+        # answered independently: the seed executes, the ceiling is refused.
+        if money_evidence.contribution_ceiling is not None:
+            unsupported_constraints.append(
+                _unsupported_dca_contribution_ceiling_constraint(
+                    money_evidence.contribution_ceiling,
+                    source=money_evidence.contribution_ceiling_source,
+                )
+            )
+            reason_codes.append("semantic_dca_contribution_ceiling_deferred")
         if money_evidence.total_capital is not None:
             optional_values["initial_capital"] = money_evidence.total_capital
-            if _dca_total_capital_is_a_ceiling(money_evidence.total_capital_source):
-                unsupported_constraints.append(
-                    _unsupported_dca_contribution_ceiling_constraint(
-                        money_evidence.total_capital,
-                        source=money_evidence.total_capital_source,
-                    )
-                )
-                reason_codes.append("semantic_dca_contribution_ceiling_deferred")
-            else:
+            if money_evidence.contribution_ceiling is None:
                 reason_codes.append("semantic_dca_starting_capital_preserved")
         if money_evidence.recurring_contribution is not None:
             updated.capital_amount = money_evidence.recurring_contribution
@@ -186,6 +221,8 @@ class _MoneyRoleEvidence:
     recurring_contribution: float | None = None
     total_capital: float | None = None
     total_capital_source: str | None = None
+    contribution_ceiling: float | None = None
+    contribution_ceiling_source: str | None = None
 
 
 def _structured_money_role_evidence(
@@ -207,25 +244,12 @@ def _structured_money_role_evidence(
             "dca_contribution",
         ),
     )
-    total_key, total = _first_number_with_key(
-        extra,
-        (
-            "initial_capital",
-            "starting_capital",
-            "starting_principal",
-            "initial_lump_sum",
-            "initial_lump",
-            "lump_sum",
-            "total_capital",
-            "total_budget",
-            "max_budget",
-            "investment_budget",
-            "cap",
-            "contribution_cap",
-            "capital_cap",
-            "investment_cap",
-        ),
-    )
+    total_key, total = _first_number_with_key(extra, _DCA_SEED_KEYS)
+    ceiling_key, ceiling = _first_number_with_key(extra, _DCA_CEILING_KEYS)
+    if total is None and ceiling is not None:
+        # Only a ceiling was stated. It still travels in total_capital so the
+        # existing readers see it, and the ceiling fields say what it is.
+        total_key, total = ceiling_key, ceiling
 
     capital_source = str(field_provenance.get("capital_amount") or "").strip()
     if capital_source in {
@@ -274,10 +298,17 @@ def _structured_money_role_evidence(
     ):
         recurring = _coerce_number(strategy.capital_amount)
 
+    resolved_source = total_key or capital_source or None
+    if ceiling is None and resolved_source in _DCA_CEILING_KEYS:
+        # The provenance named a cap even though no ceiling key carried a
+        # number, so the amount on capital_amount is the cap.
+        ceiling, ceiling_key = total, resolved_source
     return _MoneyRoleEvidence(
         recurring_contribution=recurring,
         total_capital=total,
-        total_capital_source=total_key or capital_source or None,
+        total_capital_source=resolved_source,
+        contribution_ceiling=ceiling,
+        contribution_ceiling_source=ceiling_key,
     )
 
 
@@ -423,7 +454,7 @@ def _unsupported_dca_contribution_ceiling_constraint(
     # Deferred(dca-engine): a plan-wide budget or cap has to stop contributions
     # partway through the window, which the engine cannot express.
     return UnsupportedConstraint(
-        category="unsupported_dca_contribution_ceiling",
+        category=UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
         raw_value=f"{formatted} {role_label}",
         explanation=(
             f"I understand {formatted} as a {role_label}, but a recurring plan "
