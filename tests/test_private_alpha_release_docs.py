@@ -54,12 +54,19 @@ _GATE_STATE = {
     "true": re.compile(r"\b(?:true|open|opens|opened)\b", re.IGNORECASE),
     "false": re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE),
 }
-# A state word modifying one of these describes the denial exception rather than
-# the gate: "an explicitly disabled allowlist row" stays true while the gate is
-# open. Reading what the word modifies is what distance from the subject could
-# not do, so accurate prose no longer has to hold the two terms apart.
+# A state word that directly modifies one of these describes the denial exception
+# rather than the gate: "an explicitly disabled allowlist row" stays true while
+# the gate is open. Reading what the word modifies is what distance from the
+# subject could not do, so accurate prose no longer has to hold the two terms
+# apart. Only adjectives may sit in between: a function word or any punctuation
+# means the sentence shut the gate and then mentioned accounts separately, as in
+# "disabled for all accounts", which is a claim about the gate.
+_NOT_A_MODIFIER = (
+    r"for|so|and|or|but|to|on|in|of|with|no|not|all|any|every|because|since|"
+    r"unless|while|when|if|then|until|except"
+)
 _DENIAL_OBJECT = re.compile(
-    r"\W*(?:\w+[-\s]+){0,3}?"
+    rf"[\s-]+(?:(?!(?:{_NOT_A_MODIFIER})\b)\w+[\s-]+){{0,3}}?"
     r"(?:rows?|entr(?:y|ies)|emails?|address(?:es)?|accounts?)\b",
     re.IGNORECASE,
 )
@@ -210,6 +217,12 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Guest defaults on with rollback; public-account access remains off.",
         "Rollback is flags first: keep public-account access false.",
         "Public permanent accounts are disabled, so guest chrome hides signup.",
+        # A denial noun after the state word does not make it the exception when a
+        # function word or punctuation separates them: these shut the gate and
+        # then mention accounts, rather than describing one denied account.
+        "Public account access is disabled for all accounts.",
+        "Public registration is off for new accounts.",
+        "Public signup is disabled, so no accounts can be created.",
         # A fenced block declares one value per line.
         f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
     )
