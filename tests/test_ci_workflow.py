@@ -74,7 +74,8 @@ def test_backend_checks_gates_the_suite_by_directory() -> None:
     A curated file list drops new tests silently, so the backend suite step
     runs `tests` as a directory and must never enumerate individual files.
     """
-    jobs = _workflow()["jobs"]
+    workflow = _workflow()
+    jobs = workflow["jobs"]
     backend_steps = "\n".join(
         str(step.get("run", "")) for step in jobs["backend-checks"]["steps"]
     )
@@ -92,7 +93,11 @@ def test_backend_checks_gates_the_suite_by_directory() -> None:
         for step in jobs["frontend-checks"]["steps"]
         if step.get("uses") == "oven-sh/setup-bun@v2"
     )
-    assert setup_bun_step["with"]["bun-version"] == "1.3.14"
+    assert workflow["env"]["ARGUS_CI_BUN_VERSION"] == "1.3.14"
+    assert (
+        setup_bun_step["with"]["bun-version"]
+        == "${{ env.ARGUS_CI_BUN_VERSION }}"
+    )
     assert "bun test" in frontend_steps
     assert "bun run build" in frontend_steps
 

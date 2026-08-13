@@ -1,5 +1,11 @@
 import { chmod, writeFile } from "node:fs/promises";
-import { expect, test, type Page, type Response } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Page,
+  type Request,
+  type Response,
+} from "@playwright/test";
 import type { SearchConversationItem } from "../lib/search-contract";
 import type { SearchDecisionAction } from "../lib/run-dossier-contract";
 
@@ -78,6 +84,27 @@ function isApiResponse(
     return (
       new URL(response.url()).pathname.endsWith(`/api/v1${suffix}`) &&
       response.request().method() === method
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isRunBacktestRequest(request: Request): boolean {
+  try {
+    if (
+      request.method() !== "POST" ||
+      !new URL(request.url()).pathname.endsWith("/api/v1/chat/stream")
+    ) {
+      return false;
+    }
+    const body = request.postDataJSON() as JsonRecord;
+    const action = body.action;
+    return (
+      Boolean(action) &&
+      typeof action === "object" &&
+      !Array.isArray(action) &&
+      (action as JsonRecord).type === "run_backtest"
     );
   } catch {
     return false;
@@ -285,27 +312,7 @@ test.describe.serial("private-alpha rendered release canary", () => {
     let runBacktestRequests = 0;
 
     page.on("request", (request) => {
-      let pathname = "";
-      try {
-        pathname = new URL(request.url()).pathname;
-      } catch {
-        return;
-      }
-      if (
-        request.method() !== "POST" ||
-        !pathname.endsWith("/api/v1/chat/stream")
-      ) {
-        return;
-      }
-      try {
-        const body = request.postDataJSON() as JsonRecord;
-        const action = body.action;
-        if (record(action, "chat action").type === "run_backtest") {
-          runBacktestRequests += 1;
-        }
-      } catch {
-        // A normal prompt has no action object.
-      }
+      if (isRunBacktestRequest(request)) runBacktestRequests += 1;
     });
 
     const { userId } = await openAuthenticatedChat(page);
@@ -345,11 +352,25 @@ test.describe.serial("private-alpha rendered release canary", () => {
         exact: true,
       }),
     ).toBeVisible({ timeout: 180_000 });
+    // The card can render one frame before the initial turn releases its lock.
+    // Composer editability is the product-owned signal that action admission is ready.
+    await expect(page.getByTestId("chat-input")).toHaveAttribute(
+      "contenteditable",
+      "true",
+      { timeout: 30_000 },
+    );
+    const runRequest = page.waitForRequest(isRunBacktestRequest, {
+      timeout: 30_000,
+    });
     await page
       .getByRole("button", {
         name: label("chat.confirmation.actions.run_backtest"),
       })
       .click();
+    await runRequest;
+    await expect
+      .poll(() => runBacktestRequests, { timeout: 5_000 })
+      .toBe(1);
 
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),

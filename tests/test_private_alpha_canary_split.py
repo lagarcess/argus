@@ -195,6 +195,18 @@ def test_workflow_reports_release_and_browser_surfaces_as_separate_jobs() -> Non
     assert "Run direct API signup-denial probe" not in browser
 
 
+def test_backend_ci_installs_the_cross_runtime_canary_test_dependency() -> None:
+    workflow = _source(".github/workflows/ci.yml")
+    backend = _job_body(workflow, "backend-checks", "frontend-checks")
+
+    assert "Set up Bun for cross-runtime contract tests" in backend
+    assert 'ARGUS_CI_BUN_VERSION: "1.3.14"' in workflow
+    assert (
+        backend.count("bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}") == 1
+    )
+    assert 'bun-version: "1.3.14"' not in workflow
+
+
 def test_dispatch_runs_branch_harness_against_the_resolved_deployed_sha() -> None:
     workflow = _source(".github/workflows/private-alpha-canary.yml")
     resolver = _source(".github/canary-resolve-deployed.sh")
@@ -214,6 +226,7 @@ def test_browser_journey_starts_from_private_storage_state_without_auth_forms() 
     runner = _source(".github/canary-browser.sh")
     config = _source("web/playwright.config.ts")
     spec = _source("web/e2e/private-alpha-release-canary.spec.ts")
+    normalized_spec = " ".join(spec.split())
 
     assert "ARGUS_CANARY_BROWSER_STORAGE_STATE" in runner
     assert "ARGUS_CANARY_BROWSER_STORAGE_STATE" in config
@@ -227,6 +240,10 @@ def test_browser_journey_starts_from_private_storage_state_without_auth_forms() 
     assert "captcha_token" not in spec
     assert 'page.goto("/chat"' in spec
     assert "authenticated storage state" in spec
+    assert 'page.getByTestId("chat-input")' in spec
+    assert '"contenteditable", "true"' in normalized_spec
+    assert "waitForRequest" in spec
+    assert "runBacktestRequests" in spec
 
 
 def test_render_runner_has_surface_specific_fail_red_entrypoints() -> None:
