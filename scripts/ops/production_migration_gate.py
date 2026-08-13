@@ -506,7 +506,7 @@ def build_migration_report(
     if has_historical_variance:
         advisories.append("historical_migration_ledger_variance")
     if strict_unexpected:
-        advisories.append("untracked_applied_migrations")
+        stop_reasons.append("unexpected_applied_migrations")
     if name_drift:
         stop_reasons.append("applied_migration_name_drift")
     if content_drift:
@@ -561,14 +561,9 @@ def build_migration_report(
         "apply_result": "not_performed_by_gate",
         "readback": (
             (
-                "candidate_migration_coverage_verified_with_untracked_applied"
-                if strict_unexpected
-                else (
-                    "candidate_migration_coverage_verified_with_"
-                    "historical_ledger_variance"
-                    if has_historical_variance
-                    else "migration_ledger_parity_verified"
-                )
+                "candidate_migration_coverage_verified_with_" "historical_ledger_variance"
+                if has_historical_variance
+                else "migration_ledger_parity_verified"
             )
             if candidate_coverage_verified
             else "blocked_pending_schema_parity"

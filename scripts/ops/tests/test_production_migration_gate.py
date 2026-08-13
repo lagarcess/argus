@@ -105,7 +105,7 @@ def test_exact_version_and_name_parity_passes() -> None:
     ]
 
 
-def test_name_drift_blocks_while_untracked_applied_rows_are_reported() -> None:
+def test_post_reconciliation_applied_only_and_name_drift_both_block() -> None:
     candidate = CandidateMigration.from_source(
         "supabase/migrations/20260812000000_add_release_marker.sql",
         "create table public.release_marker (id uuid primary key);",
@@ -133,8 +133,11 @@ def test_name_drift_blocks_while_untracked_applied_rows_are_reported() -> None:
     )
 
     assert report["status"] == "blocked"
-    assert report["stop_reasons"] == ["applied_migration_name_drift"]
-    assert report["advisories"] == ["untracked_applied_migrations"]
+    assert report["stop_reasons"] == [
+        "unexpected_applied_migrations",
+        "applied_migration_name_drift",
+    ]
+    assert report["advisories"] == []
     assert report["unexpected_applied_migrations"] == [
         {
             "version": "20260813000000",
@@ -155,6 +158,38 @@ def test_name_drift_blocks_while_untracked_applied_rows_are_reported() -> None:
         }
     ]
     assert report["human_approval"] == "required_for_migration_drift_reconciliation"
+
+
+def test_post_reconciliation_applied_only_migration_blocks_by_itself() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        "create table public.release_marker (id uuid primary key);",
+    )
+
+    report = build_migration_report(
+        candidate_sha="2" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[
+            AppliedMigration(
+                version=candidate.version,
+                name=candidate.name,
+                statements=(candidate.source,),
+            ),
+            AppliedMigration(
+                version="20260813000000",
+                name="production_only",
+                statements=("select 1",),
+            ),
+        ],
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["unexpected_applied_migrations"]
+    assert report["advisories"] == []
 
 
 def test_untracked_production_history_is_visible_without_blocking_coverage() -> None:
