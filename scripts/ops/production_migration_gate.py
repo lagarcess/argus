@@ -68,6 +68,8 @@ class MigrationRecord(TypedDict):
     name: str
     path: str
     sha256: str
+    statement_count: int
+    statements_sha256: str
 
 
 class MissingMigrationRecord(MigrationRecord):
@@ -79,6 +81,8 @@ class MissingMigrationRecord(MigrationRecord):
 class AppliedMigrationRecord(TypedDict):
     version: str
     name: str
+    statement_count: int | None
+    statements_sha256: str | None
 
 
 @dataclass(frozen=True)
@@ -102,9 +106,23 @@ class AppliedMigration:
 
     version: str
     name: str
+    statements: tuple[str, ...] | None
+
+    @property
+    def statements_sha256(self) -> str | None:
+        if self.statements is None:
+            return None
+        return _statements_sha256(self.statements)
 
     def as_record(self) -> AppliedMigrationRecord:
-        return {"version": self.version, "name": self.name}
+        return {
+            "version": self.version,
+            "name": self.name,
+            "statement_count": (
+                len(self.statements) if self.statements is not None else None
+            ),
+            "statements_sha256": self.statements_sha256,
+        }
 
 
 @dataclass(frozen=True)
@@ -116,6 +134,7 @@ class CandidateMigration:
     path: str
     sha256: str
     source: str
+    statements: tuple[str, ...]
 
     @classmethod
     def from_source(cls, path: str, source: str) -> CandidateMigration:
@@ -128,7 +147,12 @@ class CandidateMigration:
             path=path,
             sha256=hashlib.sha256(source.encode("utf-8")).hexdigest(),
             source=source,
+            statements=_split_supabase_statements(source),
         )
+
+    @property
+    def statements_sha256(self) -> str:
+        return _statements_sha256(self.statements)
 
     def as_record(self) -> MigrationRecord:
         return {
@@ -136,6 +160,8 @@ class CandidateMigration:
             "name": self.name,
             "path": self.path,
             "sha256": self.sha256,
+            "statement_count": len(self.statements),
+            "statements_sha256": self.statements_sha256,
         }
 
     def as_missing_record(self) -> MissingMigrationRecord:
@@ -240,6 +266,10 @@ def resolve_production_target(
         raise MigrationGateError(
             "production database URL must be an absolute Postgres URL"
         )
+    if parsed.query or parsed.fragment:
+        raise MigrationGateError(
+            "production database URL must not contain query parameters or fragments"
+        )
     username = unquote(parsed.username or "")
     direct_host = f"db.{expected_project_ref}.supabase.co"
     direct_match = host == direct_host
@@ -286,16 +316,21 @@ def read_applied_migrations(
                     "production database session did not enter read-only mode"
                 )
             cursor.execute(
-                "select version, coalesce(name, '') "
+                "select version, coalesce(name, ''), statements "
                 "from supabase_migrations.schema_migrations order by version"
             )
             rows = cursor.fetchall()
-        if any(len(row) < 2 for row in rows):
+        if any(len(row) < 3 for row in rows):
             raise MigrationGateError(
                 "production migration ledger returned a malformed row"
             )
         applied = [
-            AppliedMigration(version=str(row[0]), name=str(row[1])) for row in rows
+            AppliedMigration(
+                version=str(row[0]),
+                name=str(row[1]),
+                statements=_read_applied_statements(row[2]),
+            )
+            for row in rows
         ]
         _unique_by_version(applied, source="production")
     except MigrationGateError:
@@ -367,6 +402,12 @@ def build_migration_report(
         if version in applied_by_version
         and applied_by_version[version].name != candidate.name
     ]
+    content_drift = [
+        _content_drift_record(candidate, applied_by_version[version])
+        for version, candidate in candidate_by_version.items()
+        if version in applied_by_version
+        and candidate.statements != applied_by_version[version].statements
+    ]
     stop_reasons: list[str] = []
     if missing:
         stop_reasons.append("missing_candidate_migrations")
@@ -374,6 +415,8 @@ def build_migration_report(
         stop_reasons.append("unexpected_applied_migrations")
     if name_drift:
         stop_reasons.append("applied_migration_name_drift")
+    if content_drift:
+        stop_reasons.append("applied_migration_content_drift")
     parity_verified = not stop_reasons
     return {
         "schema_version": "argus.production_migration_gate.v1",
@@ -390,6 +433,7 @@ def build_migration_report(
         "missing_migrations": missing,
         "unexpected_applied_migrations": unexpected,
         "name_drift": name_drift,
+        "content_drift": content_drift,
         "stop_reasons": stop_reasons,
         "latest_applied_version": max(applied_by_version, default=None),
         "human_approval": (
@@ -413,6 +457,7 @@ def build_migration_report(
             "missing": len(missing),
             "unexpected": len(unexpected),
             "name_drift": len(name_drift),
+            "content_drift": len(content_drift),
         },
         "database_access": "read_only",
         "migration_apply": "never",
@@ -546,6 +591,123 @@ def _unique_by_version(
             )
         by_version[migration.version] = migration
     return by_version
+
+
+def _read_applied_statements(value: object) -> tuple[str, ...] | None:
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)) or not all(
+        isinstance(statement, str) for statement in value
+    ):
+        raise MigrationGateError(
+            "production migration ledger returned malformed statements"
+        )
+    return tuple(value)
+
+
+def _content_drift_record(
+    candidate: CandidateMigration,
+    applied: AppliedMigration,
+) -> dict[str, object]:
+    return {
+        "version": candidate.version,
+        "reason": (
+            "missing_applied_statements"
+            if applied.statements is None
+            else "statements_mismatch"
+        ),
+        "candidate_statement_count": len(candidate.statements),
+        "candidate_statements_sha256": candidate.statements_sha256,
+        "applied_statement_count": (
+            len(applied.statements) if applied.statements is not None else None
+        ),
+        "applied_statements_sha256": applied.statements_sha256,
+    }
+
+
+def _statements_sha256(statements: Sequence[str]) -> str:
+    canonical = json.dumps(
+        list(statements),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _split_supabase_statements(source: str) -> tuple[str, ...]:
+    """Mirror Supabase CLI SplitAndTrim boundaries for ledger comparison."""
+
+    statements: list[str] = []
+    start = 0
+    index = 0
+    atomic_delimiters: list[str] = []
+    while index < len(source):
+        if source.startswith("--", index):
+            newline = source.find("\n", index + 2)
+            if newline == -1:
+                index = len(source)
+                break
+            index = newline + 1
+            continue
+        if source.startswith("/*", index):
+            index = _skip_block_comment(source, index)
+            continue
+        character = source[index]
+        if character in {"'", '"'}:
+            index = _skip_quoted(source, index, character)
+            continue
+        dollar_tag = _supabase_dollar_tag_at(source, index)
+        if dollar_tag is not None:
+            end = source.find(dollar_tag, index + len(dollar_tag))
+            index = len(source) if end == -1 else end + len(dollar_tag)
+            continue
+        if character == "\\":
+            index = min(index + 2, len(source))
+            continue
+        if character == "(":
+            atomic_delimiters.append(")")
+            index += 1
+            continue
+        if _ends_begin_atomic(source, index):
+            atomic_delimiters.append("end")
+            index += 1
+            continue
+        if atomic_delimiters:
+            delimiter = atomic_delimiters[-1]
+            if delimiter == ")" and character == ")":
+                atomic_delimiters.pop()
+            elif (
+                delimiter == "end"
+                and source[max(0, index - 2) : index + 1].lower() == "end"
+            ):
+                atomic_delimiters.pop()
+            index += 1
+            continue
+        if character == ";":
+            statement = source[start : index + 1].rstrip(";").strip()
+            if statement:
+                statements.append(statement)
+            start = index + 1
+        index += 1
+    final_statement = source[start:].rstrip(";").strip()
+    if final_statement:
+        statements.append(final_statement)
+    return tuple(statements)
+
+
+def _supabase_dollar_tag_at(source: str, index: int) -> str | None:
+    if source[index] != "$":
+        return None
+    match = re.match(r"\$[A-Za-z0-9_]*\$", source[index:])
+    return match.group(0) if match else None
+
+
+def _ends_begin_atomic(source: str, index: int) -> bool:
+    if source[index] not in {"c", "C"}:
+        return False
+    prefix = source[: index + 1]
+    match = re.search(r"(?i)(?<![\w$])begin\s+atomic$", prefix)
+    return match is not None
 
 
 def _top_level_statements(source: str) -> list[str]:

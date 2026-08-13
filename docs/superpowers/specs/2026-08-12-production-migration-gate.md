@@ -35,17 +35,24 @@ service deploy. A runbook reminder alone is not sufficient.
 5. The exact candidate's existing `render.yaml` `argus-api` `SUPABASE_URL` owns
    the production Supabase project ref. The gate derives that ref and verifies
    it against the connection host or pooler username before connecting. It
-   never prints credentials or creates a second target config.
+   rejects all connection-URI query parameters and fragments so libpq cannot
+   override the validated host or user. It never prints credentials or creates
+   a second target config.
 6. The database session is read-only. The only product query reads
+   version, name, and Supabase's parsed statement array from
    `supabase_migrations.schema_migrations` in version order.
 7. The JSON report records the exact candidate SHA, sanitized database target,
    every candidate migration, every applied migration, the latest applied
-   version, missing migrations, unexpected applied migrations, and name drift.
+   version, missing migrations, unexpected applied migrations, name drift, and
+   content drift. Candidate and applied records include statement counts and
+   statement-array SHA-256 digests; raw SQL remains in the pinned candidate.
 8. Each missing migration receives a conservative safety classification:
    `additive`, `contract-replacing`, or `destructive`, plus the corresponding
    live-database requirement. Unknown SQL is never called additive.
 9. Any missing, unexpected, mismatched, unreadable, malformed, or duplicate
-   migration blocks promotion. Exact parity is the only passing state.
+   migration blocks promotion. A reused version and name with different SQL,
+   or an applied row without statement history, is content drift and blocks.
+   Exact version, name, and statement-content parity is the only passing state.
 10. The gate never applies SQL. A human reviews and applies approved migrations
    out of band, in repository order, then reruns the gate for readback proof.
 11. The report is written as durable release evidence before service deploy.
@@ -119,8 +126,9 @@ in both `docs/specs/private-alpha-ci-cd-sota.md` and
 ## Verification
 
 - Red-first unit tests cover exact candidate enumeration, sanitized target
-  validation, read-only ledger access, parity, missing/unexpected/name-drift
-  stops, and all three safety classes.
+  validation, query-override rejection, read-only ledger access, Supabase
+  statement parsing, parity, missing/unexpected/name/content-drift stops, and
+  all three safety classes.
 - Structural documentation tests prove the gate precedes service deployment.
 - Focused pytest, Ruff, `git diff --check`, scope audit, and the repository
   modularity guard run at the final PR head.

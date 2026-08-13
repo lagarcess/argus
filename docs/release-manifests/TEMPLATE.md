@@ -32,12 +32,15 @@ privacy-safe labels from canary evidence.
 - Gate-to-landed-SHA identity: exact / invalidated and rerun
 - Landed-ref verification: `--verify-landed-ref origin/main`, status and SHA
 - Sanitized production project and database host:
-- Candidate migrations, with version, name, and SHA-256:
-- Applied production migrations, with version and name:
+- Candidate migrations, with version, name, file SHA-256, statement count, and
+  statement-array SHA-256:
+- Applied production migrations, with version, name, statement count, and
+  statement-array SHA-256:
 - Latest applied production migration:
 - Missing migrations:
 - Unexpected applied migrations:
 - Migration name drift:
+- Migration content drift, including missing statement history:
 - Safety classifications and live requirements for every missing migration:
 - Classification basis and human live-schema review:
 - Gate result: `status=pass` required before service deploy

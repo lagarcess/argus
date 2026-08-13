@@ -81,7 +81,9 @@ connection.
    before any operation that can deploy a service, including a Blueprint sync
    or a change to autodeploy configuration. Export the production direct or
    session-pooler URL from the operator secret store under the gate-only name
-   below. Do not put it on the command line or rely on a dotenv file.
+   below. The URL must not contain query parameters or a fragment because libpq
+   can use them to override the validated host or user. Do not put it on the
+   command line or rely on a dotenv file.
 
 ```bash
 export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
@@ -93,11 +95,14 @@ poetry run python scripts/ops/production_migration_gate.py \
 
 The gate reads every migration from the exact candidate Git tree, verifies the
 production Supabase project, opens a read-only database session, and compares
-the full candidate list with `supabase_migrations.schema_migrations`. Read the
-candidate, applied, missing, unexpected, and name-drift lists in the JSON.
+the full candidate list with the version, name, and parsed statement arrays in
+`supabase_migrations.schema_migrations`. Read the candidate, applied, missing,
+unexpected, name-drift, and content-drift lists in the JSON. Candidate and
+applied records expose statement counts and statement-array SHA-256 digests.
 `status=pass` is required before continuing. A missing migration is a stop even
 when its safety classification is additive. An unreadable ledger, unexpected
-production migration, duplicate version, or name mismatch is also a stop.
+production migration, duplicate version, name mismatch, missing statement
+history, or statement content drift is also a stop.
 
 The gate never applies migrations. If it reports a gap, stop the promotion. A
 human reviews the exact pinned SQL and classification. The automated

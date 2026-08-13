@@ -51,6 +51,8 @@ def test_missing_additive_migration_blocks_promotion() -> None:
             "name": "add_release_marker",
             "path": ("supabase/migrations/" "20260812000000_add_release_marker.sql"),
             "sha256": candidate.sha256,
+            "statement_count": 1,
+            "statements_sha256": candidate.statements_sha256,
             "classification": "additive",
             "classification_basis": "conservative_top_level_sql",
             "live_requirement": "human_review_and_live_readback",
@@ -75,6 +77,7 @@ def test_exact_version_and_name_parity_passes() -> None:
             AppliedMigration(
                 version="20260812000000",
                 name="add_release_marker",
+                statements=candidate.statements,
             )
         ],
     )
@@ -90,6 +93,8 @@ def test_exact_version_and_name_parity_passes() -> None:
         {
             "version": "20260812000000",
             "name": "add_release_marker",
+            "statement_count": 1,
+            "statements_sha256": candidate.statements_sha256,
         }
     ]
 
@@ -111,10 +116,12 @@ def test_unexpected_applied_migration_and_name_drift_both_block() -> None:
             AppliedMigration(
                 version="20260812000000",
                 name="different_name",
+                statements=candidate.statements,
             ),
             AppliedMigration(
                 version="20260813000000",
                 name="production_only",
+                statements=("select 1",),
             ),
         ],
     )
@@ -125,7 +132,16 @@ def test_unexpected_applied_migration_and_name_drift_both_block() -> None:
         "applied_migration_name_drift",
     ]
     assert report["unexpected_applied_migrations"] == [
-        {"version": "20260813000000", "name": "production_only"}
+        {
+            "version": "20260813000000",
+            "name": "production_only",
+            "statement_count": 1,
+            "statements_sha256": AppliedMigration(
+                version="20260813000000",
+                name="production_only",
+                statements=("select 1",),
+            ).statements_sha256,
+        }
     ]
     assert report["name_drift"] == [
         {
@@ -151,7 +167,11 @@ def test_blank_applied_migration_name_blocks_as_drift() -> None:
         ),
         candidate_migrations=[candidate],
         applied_migrations=[
-            AppliedMigration(version="20260812000000", name=""),
+            AppliedMigration(
+                version="20260812000000",
+                name="",
+                statements=candidate.statements,
+            ),
         ],
     )
 
@@ -164,6 +184,122 @@ def test_blank_applied_migration_name_blocks_as_drift() -> None:
             "applied_name": "",
         }
     ]
+
+
+def test_same_version_and_name_with_different_statements_blocks() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        "create table public.release_marker (id uuid primary key);",
+    )
+    applied = AppliedMigration(
+        version=candidate.version,
+        name=candidate.name,
+        statements=("create table public.release_marker (id text primary key)",),
+    )
+
+    report = build_migration_report(
+        candidate_sha="d" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[applied],
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["applied_migration_content_drift"]
+    assert report["content_drift"] == [
+        {
+            "version": candidate.version,
+            "reason": "statements_mismatch",
+            "candidate_statement_count": 1,
+            "candidate_statements_sha256": candidate.statements_sha256,
+            "applied_statement_count": 1,
+            "applied_statements_sha256": applied.statements_sha256,
+        }
+    ]
+
+
+def test_missing_applied_statement_history_blocks_content_parity() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        "create table public.release_marker (id uuid primary key);",
+    )
+
+    report = build_migration_report(
+        candidate_sha="e" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[
+            AppliedMigration(
+                version=candidate.version,
+                name=candidate.name,
+                statements=None,
+            )
+        ],
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["applied_migration_content_drift"]
+    assert report["content_drift"][0]["reason"] == "missing_applied_statements"
+
+
+def test_candidate_statement_history_matches_supabase_split_boundaries() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        """-- setup; comment
+create table public.release_marker (
+  label text default 'semi;colon',
+  check (label <> ';')
+);
+create function public.marker() returns void language plpgsql as $body$
+begin
+  perform 'inside;body';
+end;
+$body$;
+/* trailing; comment */ grant select on public.release_marker to authenticated;;
+""",
+    )
+
+    assert candidate.statements == (
+        """-- setup; comment
+create table public.release_marker (
+  label text default 'semi;colon',
+  check (label <> ';')
+)""",
+        """create function public.marker() returns void language plpgsql as $body$
+begin
+  perform 'inside;body';
+end;
+$body$""",
+        "/* trailing; comment */ grant select on public.release_marker to authenticated",
+    )
+
+
+def test_candidate_statement_history_keeps_begin_atomic_together() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        """create function public.marker() returns void language sql
+begin atomic
+  select 1;
+  select 2;
+end;
+select 3;
+""",
+    )
+
+    assert candidate.statements == (
+        """create function public.marker() returns void language sql
+begin atomic
+  select 1;
+  select 2;
+end""",
+        "select 3",
+    )
 
 
 def test_duplicate_candidate_version_fails_closed() -> None:
@@ -361,6 +497,26 @@ def test_production_target_rejects_a_different_pooler_project_without_leaking() 
     assert "do-not-print" not in str(exc_info.value)
 
 
+@pytest.mark.parametrize(
+    "suffix",
+    (
+        "?host=db.evil.example",
+        "?user=postgres.evil",
+        "?options=-csearch_path%3Devil",
+        "#host=db.evil.example",
+    ),
+)
+def test_production_target_rejects_uri_target_overrides(suffix: str) -> None:
+    project_ref = "a" * 20
+    database_url = (
+        f"postgresql://postgres:do-not-print@db.{project_ref}.supabase.co/postgres"
+        f"{suffix}"
+    )
+
+    with pytest.raises(MigrationGateError, match="query parameters or fragments"):
+        resolve_production_target(database_url, expected_project_ref=project_ref)
+
+
 def test_applied_migrations_are_read_in_a_read_only_session() -> None:
     calls: dict[str, Any] = {}
 
@@ -380,10 +536,10 @@ def test_applied_migrations_are_read_in_a_read_only_session() -> None:
         def fetchone(self) -> tuple[str]:
             return ("on",)
 
-        def fetchall(self) -> list[tuple[str, str]]:
+        def fetchall(self) -> list[tuple[object, ...]]:
             return [
-                ("20260811000000", "first"),
-                ("20260812000000", "second"),
+                ("20260811000000", "first", ["create table first (id uuid)"]),
+                ("20260812000000", "second", ["create table second (id uuid)"]),
             ]
 
     class FakeConnection:
@@ -410,8 +566,16 @@ def test_applied_migrations_are_read_in_a_read_only_session() -> None:
     )
 
     assert applied == [
-        AppliedMigration(version="20260811000000", name="first"),
-        AppliedMigration(version="20260812000000", name="second"),
+        AppliedMigration(
+            version="20260811000000",
+            name="first",
+            statements=("create table first (id uuid)",),
+        ),
+        AppliedMigration(
+            version="20260812000000",
+            name="second",
+            statements=("create table second (id uuid)",),
+        ),
     ]
     assert calls["kwargs"] == {
         "application_name": "argus-production-migration-gate",
@@ -422,11 +586,23 @@ def test_applied_migrations_are_read_in_a_read_only_session() -> None:
     assert connection.cursor_instance.queries == [
         "show transaction_read_only",
         (
-            "select version, coalesce(name, '') "
+            "select version, coalesce(name, ''), statements "
             "from supabase_migrations.schema_migrations order by version"
         ),
     ]
     assert connection.closed is True
+
+
+def test_applied_migrations_reject_malformed_statement_history() -> None:
+    connection = _FakeConnection(
+        [("20260812000000", "release_marker", "not-a-text-array")]
+    )
+
+    with pytest.raises(MigrationGateError, match="malformed statements"):
+        read_applied_migrations(
+            "postgresql://postgres:do-not-print@db.example.test/postgres",
+            connect_factory=lambda *_args, **_kwargs: connection,
+        )
 
 
 def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
@@ -459,6 +635,7 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
     assert report["counts"] == {
         "applied": 0,
         "candidate": 1,
+        "content_drift": 0,
         "missing": 1,
         "name_drift": 0,
         "unexpected": 0,
@@ -483,7 +660,15 @@ def test_cli_passes_only_when_the_production_ledger_matches(
         check=True,
     )
     output_path = tmp_path / "migration-gate.json"
-    connection = _FakeConnection([("20260812000000", "add_release_marker")])
+    connection = _FakeConnection(
+        [
+            (
+                "20260812000000",
+                "add_release_marker",
+                ["create table public.release_marker (id uuid primary key)"],
+            )
+        ]
+    )
 
     exit_code = main(
         [
@@ -756,7 +941,7 @@ def _candidate_repo(tmp_path: Path, *, project_ref: str) -> tuple[Path, str]:
 
 
 class _FakeCursor:
-    def __init__(self, rows: list[tuple[str, str]]) -> None:
+    def __init__(self, rows: list[tuple[object, ...]]) -> None:
         self._rows = rows
 
     def __enter__(self) -> _FakeCursor:
@@ -771,12 +956,12 @@ class _FakeCursor:
     def fetchone(self) -> tuple[str]:
         return ("on",)
 
-    def fetchall(self) -> list[tuple[str, str]]:
+    def fetchall(self) -> list[tuple[object, ...]]:
         return self._rows
 
 
 class _FakeConnection:
-    def __init__(self, rows: list[tuple[str, str]]) -> None:
+    def __init__(self, rows: list[tuple[object, ...]]) -> None:
         self._cursor = _FakeCursor(rows)
 
     def cursor(self) -> _FakeCursor:

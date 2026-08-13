@@ -64,6 +64,9 @@ def test_production_migration_gate_is_executable_and_precedes_service_deploy() -
         assert "status=pass" in source
         assert "never applies migrations" in normalized
         assert "human" in normalized.lower()
+        assert "statement" in normalized.lower()
+        assert "content drift" in normalized.lower()
+        assert "query" in normalized.lower()
 
     promotion_gate_index = promotion_path.index(command)
     promotion_candidate_index = promotion_path.index(
@@ -105,6 +108,8 @@ def test_production_migration_gate_is_executable_and_precedes_service_deploy() -
     assert "Candidate migrations" in manifest
     assert "Applied production migrations" in manifest
     assert "Missing migrations" in manifest
+    assert "Migration content drift" in manifest
+    assert "statement-array SHA-256" in manifest
     assert "Safety classifications" in manifest
     assert "Landed `origin/main` SHA" in manifest
     assert "Gate-to-landed-SHA identity" in manifest

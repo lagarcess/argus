@@ -232,7 +232,8 @@ Use the following progression when moving from integration to `main`:
 5. Check out that exact promotion commit and run the read-only production
    migration gate before any service deploy. Supply the production Postgres URL
    explicitly from the operator secret store; the gate does not discover dotenv
-   files.
+   files. Use a query- and fragment-free URI; the gate rejects libpq connection
+   parameters that could override the validated host or user.
 
    ```bash
    export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
@@ -242,10 +243,14 @@ Use the following progression when moving from integration to `main`:
      --output temp/release-evidence/production-migration-gate.json
    ```
 
-   Inspect the report's full candidate, applied, missing, unexpected, and
-   name-drift lists. `status=pass` is required. Any missing migration or other
-   mismatch is a stop, including an additive migration. The gate never applies
-   migrations. A human reviews pending SQL and its additive,
+   Inspect the report's full candidate, applied, missing, unexpected,
+   name-drift, and content-drift lists. Candidate and applied records include
+   statement counts and statement-array SHA-256 digests derived from Supabase's
+   ledger format. `status=pass` requires exact version, name, and statement
+   content parity. Missing statement history or any content drift is a stop,
+   as is any missing migration or other mismatch, including an additive
+   migration. The gate never applies migrations. A human reviews pending SQL
+   and its additive,
    contract-replacing, or destructive classification against the live objects;
    ambiguous automated classifications fail toward `contract-replacing`. The
    human applies only the approved files out of band and in repository order,
