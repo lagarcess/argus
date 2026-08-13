@@ -263,12 +263,12 @@ def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:
         return [
             f"Aporte: {contribution}",
             f"Capital inicial: {_format_money(plan.starting_capital)}",
-            "Fracciones de acciones, cada aporte se invierte por completo",
+            "Fracciones de acciones, nada queda en efectivo",
         ]
     return [
         f"Contribution: {contribution}",
         f"Starting capital: {_format_money(plan.starting_capital)}",
-        "Fractional shares, every contribution is fully invested",
+        "Fractional shares, nothing left as cash",
     ]
 
 

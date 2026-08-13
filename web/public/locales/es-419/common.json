@@ -1561,7 +1561,7 @@
       "recurring_contribution": "${{amount}} cada vez",
       "recurring_contribution_cadence": "${{amount}} {{cadence}}",
       "starting_principal": "${{amount}} al inicio",
-      "fractional_shares": "Fracciones de acciones, cada aporte se invierte por completo"
+      "fractional_shares": "Fracciones de acciones, nada queda en efectivo"
     },
     "strategy_type_values": {
       "buy and hold": "Comprar y mantener",

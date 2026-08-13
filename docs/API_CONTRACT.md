@@ -1609,7 +1609,7 @@ refuses immediately, naming the rule, with no round trip.
 date at the fill price after modeled costs. No cash accumulates waiting for a
 whole share and there is no cash drag, so total contributed is the plain sum of
 the two roles with no residual. The assumptions strip and the public receipt
-both disclose it (`fractional_shares`).
+both disclose it (`fractional_shares`), as fine print rather than a sentence.
 
 **Non-trading days.** A contribution buys at the first available price in its
 period, so one falling on a weekend, a holiday, or a day the month does not

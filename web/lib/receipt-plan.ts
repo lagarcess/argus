@@ -187,6 +187,7 @@ export function receiptAssumptions(
       case "long_only":
       case "equal_weight":
       case "no_costs":
+      case "fractional_shares":
         lines.push(said[assumption.key]);
         break;
       case "modeled_fee_bps": {

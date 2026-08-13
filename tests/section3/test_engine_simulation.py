@@ -1232,7 +1232,7 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
     assert card["assumptions"] == [
         "Contribution: $500 monthly",
         "Starting capital: $0",
-        "Fractional shares, every contribution is fully invested",
+        "Fractional shares, nothing left as cash",
         "Long-only",
         "Equal weight",
         "No fees/slippage",
@@ -1243,7 +1243,7 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
     assert spanish_card["assumptions"] == [
         "Aporte: $500 cada mes",
         "Capital inicial: $0",
-        "Fracciones de acciones, cada aporte se invierte por completo",
+        "Fracciones de acciones, nada queda en efectivo",
         "Solo largo",
         "Peso igual",
         "Sin comisiones/deslizamiento",

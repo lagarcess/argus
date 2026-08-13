@@ -47,7 +47,6 @@
       },
       "contribution": {
         "max": 100000000.0,
-        "min": 0.01,
         "periods": [
           "daily",
           "weekly",
