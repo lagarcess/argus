@@ -2299,13 +2299,18 @@ def test_dca_adapter_separates_recurring_contribution_from_starting_principal(
     result = run_launch_backtest(request)
 
     assert result.envelope.execution_status == "succeeded"
-    assert observed_config["starting_capital"] == 500.0
-    assert observed_config["recurring_contribution"] == 500.0
-    assert observed_config["starting_principal"] == 0.0
+    assert observed_config["dca_capital"] == {
+        "schema_version": "dca_capital_v1",
+        "starting_capital": 0.0,
+        "contribution": 500.0,
+    }
+    # A DCA config carries no bankroll field at all, so nothing downstream can
+    # read the contribution off one.
+    assert "starting_capital" not in observed_config
     assert observed_config["parameters"] == {"dca_cadence": "monthly"}
     assert result.envelope.resolved_parameters["capital_amount"] == 500.0
     assert result.envelope.resolved_parameters["recurring_contribution"] == 500.0
-    assert result.envelope.resolved_parameters["starting_principal"] == 0.0
+    assert result.envelope.resolved_parameters["starting_capital"] == 0.0
 
 
 def test_dca_adapter_supports_quarterly_cadence(

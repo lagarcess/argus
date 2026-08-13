@@ -27,6 +27,7 @@ from argus.domain.backtesting.metrics import (
     portfolio_value_summary,
 )
 from argus.domain.backtesting.signals import _build_signals
+from argus.domain.dca_capital import dca_capital_plan_from_config
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series
 
 _MIN_BENCHMARK_OBSERVATION_COVERAGE = 0.8
@@ -133,10 +134,20 @@ def compute_alpha_metrics(
     gross_closed_trades: list[ClosedTrade] = []
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
-    allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
     has_modeled_costs = _execution_realism_has_costs(realism)
     is_dca = config["template"] == "dca_accumulation"
+    # A DCA config declares its two money roles; every other template funds
+    # one bankroll. Neither shape can read the other's field.
+    dca_plan = dca_capital_plan_from_config(config) if is_dca else None
+    symbol_dca_plan = (
+        dca_plan.per_symbol(len(config["symbols"])) if dca_plan is not None else None
+    )
+    allocation_capital = (
+        symbol_dca_plan.contribution
+        if symbol_dca_plan is not None
+        else float(config["starting_capital"]) / len(config["symbols"])
+    )
 
     for symbol in config["symbols"]:
         if prepared_market_data is None:
@@ -200,17 +211,20 @@ def compute_alpha_metrics(
             benchmark_curve["equity_curve"], index=close.index, dtype=float
         )
         if is_dca:
+            assert symbol_dca_plan is not None
             symbol_equity, invested_capital = _dca_equity_curve(
                 close=close,
                 entries=entries,
-                contribution=allocation_capital,
+                contribution=symbol_dca_plan.contribution,
+                starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
             )
             benchmark_equity, benchmark_invested_capital = _dca_equity_curve(
                 close=benchmark_normalized,
                 entries=entries,
-                contribution=allocation_capital,
+                contribution=symbol_dca_plan.contribution,
+                starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
             )
@@ -218,7 +232,8 @@ def compute_alpha_metrics(
                 gross_symbol_equity, _ = _dca_equity_curve(
                     close=close,
                     entries=entries,
-                    contribution=allocation_capital,
+                    contribution=symbol_dca_plan.contribution,
+                    starting_capital=symbol_dca_plan.starting_capital,
                 )
                 gross_symbol_equity_curves.append(gross_symbol_equity)
             invested_capital = max(invested_capital, benchmark_invested_capital)
@@ -281,7 +296,12 @@ def compute_alpha_metrics(
     )
     aggregate_closed_trade_pnls = [trade.net_pnl for trade in closed_trades]
     if is_dca:
-        aggregate_invested = allocation_capital * max(trade_count, 1)
+        assert dca_plan is not None
+        # Contributions are already per symbol, so they scale with the summed
+        # fill count; the seed is one whole-plan amount and is added once.
+        aggregate_invested = dca_plan.starting_capital + allocation_capital * max(
+            trade_count, 1
+        )
         aggregate_metrics = _compute_metrics_from_equity(
             strategy_equity=aggregate_strategy_equity,
             benchmark_equity=aggregate_benchmark_equity,

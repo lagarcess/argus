@@ -1318,7 +1318,7 @@ def test_dca_contribution_cap_does_not_overwrite_recurring_contribution(
     assert result.decision.missing_required_fields == []
     assert result.patch["optional_parameter_status"]["initial_capital"] == 9000
     constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
-    assert constraints[0]["category"] == "unsupported_dca_starting_principal"
+    assert constraints[0]["category"] == "unsupported_dca_contribution_ceiling"
     assert constraints[0]["raw_value"] == "$9,000 contribution cap"
     assert "contribution cap" in constraints[0]["explanation"]
     assert "starting principal" not in constraints[0]["explanation"]
@@ -1366,13 +1366,16 @@ def test_dca_same_turn_starting_principal_does_not_overwrite_recurring(
         snapshot=None,
     )
 
-    assert result.outcome == "needs_clarification"
+    # Both roles survive the turn and both are executable, so the plan is
+    # ready with a $100,000 seed and a $20,000 weekly contribution.
+    assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.capital_amount == 20000
     assert strategy.cadence == "weekly"
     assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
-    constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
-    assert constraints[0]["category"] == "unsupported_dca_starting_principal"
+    assert result.patch["optional_parameter_status"].get(
+        "unsupported_constraints", []
+    ) == []
 
 
 def test_dca_period_count_is_not_misclassified_as_recurring_money(monkeypatch) -> None:
@@ -1497,21 +1500,16 @@ def test_dca_total_capital_and_recurring_contribution_keep_separate_roles(
         },
     )
 
-    assert result.outcome == "needs_clarification"
+    # The two roles stay separate and both execute: $100,000 seeds the plan and
+    # $20,000 goes in every week.
+    assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.capital_amount == 20000
     assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
     assert result.decision.missing_required_fields == []
-    constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
-    assert constraints[0]["category"] == "unsupported_dca_starting_principal"
-    assert "starting principal" in constraints[0]["explanation"]
-    assert "recurring contribution" in constraints[0]["explanation"]
-    labels = [option["label"] for option in constraints[0]["simplification_options"]]
-    assert labels == [
-        "Run recurring buys only",
-        "Adjust recurring contribution",
-        "Use buy and hold with starting capital",
-    ]
+    assert result.patch["optional_parameter_status"].get(
+        "unsupported_constraints", []
+    ) == []
 
 
 def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -> None:
@@ -1685,7 +1683,7 @@ def test_dca_max_budget_language_preserves_separate_recurring_contribution(
     assert strategy.capital_amount == 20000
     assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
     constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
-    assert constraints[0]["category"] == "unsupported_dca_starting_principal"
+    assert constraints[0]["category"] == "unsupported_dca_contribution_ceiling"
     assert constraints[0]["raw_value"] == "$100,000 maximum budget"
     assert "maximum budget" in constraints[0]["explanation"]
     assert "starting principal" not in constraints[0]["explanation"]

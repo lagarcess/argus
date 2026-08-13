@@ -4006,6 +4006,7 @@ components:
           - recurring_contribution
           - contribution_cadence
           - starting_principal
+          - fractional_shares
         value:
           anyOf:
           - type: string

@@ -44,7 +44,9 @@ from argus.domain.credential_shapes import credential_shape_in
 PUBLIC_EXCERPT_ID_BYTES = 24
 PUBLIC_EXCERPT_PATH_PREFIX = "/r/"
 MAX_VISUAL_POINTS = 500
-MAX_ASSUMPTIONS = 8
+# A recurring run with modeled costs states the most: three plan facts, the
+# fractional-share model, two structural facts, two cost facts, and the benchmark.
+MAX_ASSUMPTIONS = 9
 MAX_METRICS = 8
 MAX_SYMBOLS = 5
 MAX_TEXT_LENGTH = 240
@@ -660,34 +662,32 @@ def _is_recurring_contribution_run(
 def _contribution_assumptions(
     engine: dict[str, Any],
 ) -> list[PublicExcerptAssumption]:
-    """The contribution facts, borrowing the engine's own reading of its config.
+    """The contribution facts, read through the plan the run actually executed.
 
-    The engine reads ``starting_capital`` as the periodic contribution for this
-    template, and treats an absent principal as zero. Both are the engine's rules
-    rather than this module's guesses, so the receipt states what actually ran. A
-    contribution that is not there at all is refused: it is the number every other
-    number on the page was produced from.
+    The receipt's key vocabulary is frozen, so ``starting_principal`` keeps its
+    public name while the plan owns what that number is. A plan that cannot be
+    read at all is refused: its contribution is the number every other number on
+    the page was produced from.
     """
-    amount = _amount(engine.get("recurring_contribution"))
-    if amount is None:
-        amount = _amount(engine.get("starting_capital"))
-    if amount is None:
-        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
-    facts = [
-        PublicExcerptAssumption(key="recurring_contribution", value=_number(amount))
-    ]
-    cadence = _cadence(engine)
-    if cadence is not None:
-        facts.append(
-            PublicExcerptAssumption(key="contribution_cadence", value=cadence)
-        )
-    raw_principal = engine.get("starting_principal")
-    principal = 0.0 if raw_principal in (None, "") else _amount(raw_principal)
-    if principal is None:
-        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
-    facts.append(
-        PublicExcerptAssumption(key="starting_principal", value=_number(principal))
+    from argus.domain.dca_capital import (
+        DcaCapitalError,
+        dca_capital_plan_from_config,
     )
+
+    try:
+        plan = dca_capital_plan_from_config(engine)
+    except DcaCapitalError as exc:
+        raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS) from exc
+    facts = [
+        PublicExcerptAssumption(
+            key="recurring_contribution", value=_number(plan.contribution)
+        ),
+        PublicExcerptAssumption(key="contribution_cadence", value=plan.period),
+        PublicExcerptAssumption(
+            key="starting_principal", value=_number(plan.starting_capital)
+        ),
+        PublicExcerptAssumption(key="fractional_shares"),
+    ]
     return facts
 
 

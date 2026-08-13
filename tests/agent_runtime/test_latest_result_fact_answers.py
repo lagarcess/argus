@@ -820,14 +820,16 @@ async def test_workflow_fact_answer_then_composer_none_edit_reroutes_to_planner(
     )
 
     assert planner_calls
-    # The planned edit lands in the typed edit contract: the DCA money-role
-    # guard owns the turn instead of the terminal followup recovery.
+    # The planned edit lands in the typed edit contract rather than the
+    # terminal followup recovery, and a seeded plan is executable, so the turn
+    # comes back as a card to approve.
     assert second["stage_outcome"] == "await_user_reply"
-    clarification = second["clarification"]
-    assert clarification["reason_code"] == "unsupported_dca_starting_principal"
-    anchored = clarification["payload"]["strategy"]
+    anchored = second["pending_strategy"]["strategy"]
     assert anchored["asset_universe"] == ["COST", "TGT"]
     assert anchored["extra_parameters"]["recurring_contribution"] == 500
+    # The edited role lands on the anchored draft as the seed, beside the
+    # contribution it must never replace.
+    assert anchored["extra_parameters"]["initial_capital"] == 2000
     assert "latest_result_followup_unavailable" not in str(second)
 
 
@@ -925,11 +927,12 @@ async def test_workflow_post_result_composer_none_edit_without_pending_reroutes_
     )
 
     assert planner_calls
-    assert result["stage_outcome"] == "await_user_reply"
-    clarification = result["clarification"]
-    assert clarification["reason_code"] == "unsupported_dca_starting_principal"
-    anchored = clarification["payload"]["strategy"]
+    # A seeded recurring plan is executable, so the rerouted edit comes back as
+    # a card to approve rather than another question.
+    assert result["stage_outcome"] == "await_approval"
+    anchored = result["confirmation_payload"]["strategy"]
     assert anchored["asset_universe"] == ["COST", "TGT"]
+    assert anchored["extra_parameters"]["initial_capital"] == 2000
     assert "latest_result_followup_unavailable" not in str(result)
 
 
@@ -1118,12 +1121,11 @@ async def test_workflow_composer_none_edit_during_active_confirmation_reroutes_t
     )
 
     assert planner_calls
-    # The DCA money-role guard owns the planned edit against the visible card.
+    # The planned edit is applied against the visible card, seeding the plan.
     assert result["stage_outcome"] == "await_user_reply"
-    clarification = result["clarification"]
-    assert clarification["reason_code"] == "unsupported_dca_starting_principal"
-    anchored = clarification["payload"]["strategy"]
+    anchored = result["pending_strategy"]["strategy"]
     assert anchored["asset_universe"] == ["COST", "TGT"]
+    assert anchored["extra_parameters"]["initial_capital"] == 2000
     assert "latest_result_followup_unavailable" not in str(result)
 
 

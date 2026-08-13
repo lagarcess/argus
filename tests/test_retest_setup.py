@@ -238,7 +238,14 @@ def test_inconsistent_dca_snapshot_has_no_retest_setup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _persisted_run(monkeypatch, _DCA)
-    run["config_snapshot"]["engine_config"] = {"recurring_contribution": 999.0}
+    run["config_snapshot"]["engine_config"] = {
+        "parameters": {"dca_cadence": "monthly"},
+        "dca_capital": {
+            "schema_version": "dca_capital_v1",
+            "starting_capital": 0.0,
+            "contribution": 999.0,
+        },
+    }
 
     assert retest_setup_from_run(run, today=_TODAY) is None
 

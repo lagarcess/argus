@@ -109,13 +109,16 @@ def conserve_semantic_constraints(
     if executable_strategy_type(updated) == "dca_accumulation":
         if money_evidence.total_capital is not None:
             optional_values["initial_capital"] = money_evidence.total_capital
-            unsupported_constraints.append(
-                _unsupported_dca_starting_principal_constraint(
-                    money_evidence.total_capital,
-                    source=money_evidence.total_capital_source,
+            if _dca_total_capital_is_a_ceiling(money_evidence.total_capital_source):
+                unsupported_constraints.append(
+                    _unsupported_dca_contribution_ceiling_constraint(
+                        money_evidence.total_capital,
+                        source=money_evidence.total_capital_source,
+                    )
                 )
-            )
-            reason_codes.append("semantic_dca_starting_principal_deferred")
+                reason_codes.append("semantic_dca_contribution_ceiling_deferred")
+            else:
+                reason_codes.append("semantic_dca_starting_capital_preserved")
         if money_evidence.recurring_contribution is not None:
             updated.capital_amount = money_evidence.recurring_contribution
             reason_codes.append("semantic_recurring_contribution_preserved")
@@ -393,24 +396,39 @@ def _coerce_number(value: Any) -> float | None:
     return None
 
 
-def _unsupported_dca_starting_principal_constraint(
+_DCA_CONTRIBUTION_CEILING_SOURCES = {
+    "cap",
+    "contribution_cap",
+    "capital_cap",
+    "investment_cap",
+    "max_budget",
+    "total_budget",
+    "total_capital",
+    "investment_budget",
+}
+
+
+def _dca_total_capital_is_a_ceiling(source: str | None) -> bool:
+    """A budget or cap bounds the whole plan; a principal is money on day one."""
+    return str(source or "").strip().lower() in _DCA_CONTRIBUTION_CEILING_SOURCES
+
+
+def _unsupported_dca_contribution_ceiling_constraint(
     total_capital: float,
     *,
     source: str | None = None,
 ) -> UnsupportedConstraint:
     formatted = _format_money(total_capital)
     role_label = _dca_total_capital_role_label(source)
-    # Deferred(dca-engine): Starting principal, contribution ceilings, and
-    # recurring contributions require a broader DCA engine capability expansion
-    # across launch models, LangGraph contracts, cards, assumptions, and wording.
+    # Deferred(dca-engine): a plan-wide budget or cap has to stop contributions
+    # partway through the window, which the engine cannot express.
     return UnsupportedConstraint(
-        category="unsupported_dca_starting_principal",
+        category="unsupported_dca_contribution_ceiling",
         raw_value=f"{formatted} {role_label}",
         explanation=(
-            f"I understand {formatted} as a {role_label}, but the current "
-            "DCA backtest can only execute the recurring contribution. Starting "
-            "principal and contribution caps are not executable in the same DCA "
-            "run yet."
+            f"I understand {formatted} as a {role_label}, but a recurring plan "
+            "cannot stop partway through its window yet. Starting capital and "
+            "the contribution both run for the whole window."
         ),
         simplification_options=[
             SimplificationOption(
@@ -418,8 +436,8 @@ def _unsupported_dca_starting_principal_constraint(
                 replacement_values={"ignore_initial_capital": True},
             ),
             SimplificationOption(
-                label="Adjust recurring contribution",
-                replacement_values={"requested_field": "capital_amount"},
+                label="Use it as starting capital",
+                replacement_values={"initial_capital": total_capital},
             ),
             SimplificationOption(
                 label="Use buy and hold with starting capital",

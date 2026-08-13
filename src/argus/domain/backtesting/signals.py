@@ -5,6 +5,7 @@ from typing import Any
 import pandas as pd
 
 from argus.domain.backtesting.rules import compile_rule_signals, resolve_series
+from argus.domain.dca_capital import dca_contribution_period_from_config
 from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
@@ -52,7 +53,10 @@ def _build_signals(
         return entries.astype(bool), exits.astype(bool)
 
     if template == "dca_accumulation":
-        cadence = config.get("parameters", {}).get("dca_cadence", "weekly").lower()
+        # The plan owns the period; entries land on the first bar of each
+        # window, which is the next trading day when the window opens on a
+        # weekend, a holiday, or a day the calendar does not have.
+        cadence = dca_contribution_period_from_config(config)
         entries = pd.Series(False, index=index, dtype=bool)
 
         if cadence == "daily":
@@ -72,12 +76,9 @@ def _build_signals(
             # Entry on the first day of each month present in data
             months = _index_period_series(index, freq="M")
             entries = months != months.shift(1)
-        elif cadence == "quarterly":
+        else:
             quarters = _index_period_series(index, freq="Q")
             entries = quarters != quarters.shift(1)
-        else:
-            # Fallback to single entry if unknown cadence
-            entries.iloc[0] = True
 
         exits = pd.Series(False, index=index, dtype=bool)
         return entries.astype(bool), exits.astype(bool)
