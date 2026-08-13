@@ -32,6 +32,10 @@ def _workflow_status(
     )
 
 
+def _cron_status(*, status: str = "live", commit: str = FULL_SHA) -> str:
+    return f"status={status}\ncommit={commit}\n"
+
+
 def test_resolver_accepts_render_workflow_git_prefix() -> None:
     module = _load_module()
 
@@ -39,6 +43,7 @@ def test_resolver_accepts_render_workflow_git_prefix() -> None:
         api_status=_service_status(),
         web_status=_service_status(),
         workflow_status=_workflow_status(),
+        cron_status=_cron_status(),
     ) == FULL_SHA
 
 
@@ -60,4 +65,28 @@ def test_resolver_fails_closed_on_invalid_workflow_version_proof(
             api_status=_service_status(),
             web_status=_service_status(),
             workflow_status=workflow_status,
+            cron_status=_cron_status(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("cron_status", "reason"),
+    [
+        (_cron_status(status="building"), "cron_deploy_not_live"),
+        (_cron_status(commit="abcdef0"), "cron_deploy_sha_mismatch"),
+        ("status=absent\ncommit=<absent>\n", "cron_deploy_not_live"),
+        ("status=lookup_failed\ncommit=<unknown>\n", "cron_status_unavailable"),
+    ],
+)
+def test_resolver_fails_closed_when_cron_is_not_live_on_the_same_release(
+    cron_status: str, reason: str
+) -> None:
+    module = _load_module()
+
+    with pytest.raises(ValueError, match=reason):
+        module.resolve_deployed_sha(
+            api_status=_service_status(),
+            web_status=_service_status(),
+            workflow_status=_workflow_status(),
+            cron_status=cron_status,
         )

@@ -28,12 +28,18 @@ def test_release_profile_is_non_secret_and_defines_real_workflow_canary() -> Non
     serialized = json.dumps(profile).lower()
 
     assert profile["release_mode"] == "real-workflow"
-    assert set(profile["services"]) == {"api", "web", "workflow"}
+    assert set(profile["services"]) == {"api", "web", "workflow", "cron"}
     assert profile["services"]["api"]["name"] == "argus-api"
     assert profile["services"]["web"]["name"] == "argus-app"
     assert profile["services"]["workflow"]["name"] == "argus-backtests"
-    for surface in ("api", "web", "workflow"):
+    assert profile["services"]["cron"]["name"] == "argus-maintenance"
+    for surface in ("api", "web", "workflow", "cron"):
         assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
+    assert profile["services"]["cron"]["schedule"] == "*/15 * * * *"
+    assert profile["services"]["cron"]["notifications_to_send"] == "failure"
+    assert profile["services"]["cron"]["start_command"] == (
+        "poetry run python scripts/ops/scheduled_maintenance.py"
+    )
     assert profile["services"]["api"]["env"]["ARGUS_APP_ORIGIN"] == (
         "https://arguschat.ai"
     )
@@ -141,6 +147,14 @@ def test_profile_utility_validates_hashes_and_emits_expected_pairs() -> None:
     assert workflow_autodeploy.returncode == 0, workflow_autodeploy.stderr
     assert workflow_autodeploy.stdout.strip() == "checksPass"
 
+    cron_pairs = _profile_utility("env-pairs", "cron")
+    assert cron_pairs.returncode == 0, cron_pairs.stderr
+    assert "ARGUS_PERSISTENCE_MODE=supabase" in cron_pairs.stdout
+
+    cron_schedule = _profile_utility("service-value", "cron", "schedule")
+    assert cron_schedule.returncode == 0, cron_schedule.stderr
+    assert cron_schedule.stdout.strip() == "*/15 * * * *"
+
 
 def test_profile_utility_resolves_required_spanish_static_key_values() -> None:
     result = _profile_utility("static-key-values", "es-419")
@@ -169,7 +183,7 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
         for service in render_blueprint["services"]
     }
 
-    for surface in ("api", "web"):
+    for surface in ("api", "web", "cron"):
         service_profile = profile["services"][surface]
         rendered_service = next(
             service
@@ -193,3 +207,14 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
             )
         for key in service_profile["optional"]:
             assert rendered_env[key].get("sync") is False
+
+    cron_profile = profile["services"]["cron"]
+    rendered_cron = next(
+        service
+        for service in render_blueprint["services"]
+        if service["name"] == cron_profile["name"]
+    )
+    assert rendered_cron["type"] == "cron"
+    assert rendered_cron["schedule"] == cron_profile["schedule"]
+    assert rendered_cron["buildCommand"] == cron_profile["build_command"]
+    assert rendered_cron["startCommand"] == cron_profile["start_command"]

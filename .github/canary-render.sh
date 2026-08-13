@@ -110,10 +110,13 @@ WARMUP_OUTPUT=""
 API_DEPLOY_STATUS_OUTPUT=""
 WEB_DEPLOY_STATUS_OUTPUT=""
 WORKFLOW_VERSION_STATUS_OUTPUT=""
+CRON_DEPLOY_STATUS_OUTPUT=""
 ENV_FINGERPRINT=""
 RELEASE_PROFILE_HASH=""
 WORKFLOW_ENV_FINGERPRINT=""
 WORKFLOW_ENV_STATUS=""
+CRON_CONFIG_FINGERPRINT=""
+CRON_CONFIG_STATUS=""
 WORKFLOW_RUNTIME_PROVIDER_MODE=""
 WORKFLOW_RUNTIME_PROOF=""
 WORKFLOW_TASK=""
@@ -125,6 +128,8 @@ WEB_DEPLOY_STATUS=""
 WORKFLOW_VERSION_COMMIT=""
 WORKFLOW_VERSION_ID=""
 WORKFLOW_VERSION_STATUS=""
+CRON_DEPLOY_SHA=""
+CRON_DEPLOY_STATUS=""
 USER_ID=""
 BROWSER_ACCESS_TOKEN=""
 CONVERSATION_ID=""
@@ -242,6 +247,8 @@ build_release_evidence_json() {
   CANARY_ENV_FINGERPRINT="$ENV_FINGERPRINT" \
   CANARY_WORKFLOW_ENV_FINGERPRINT="$WORKFLOW_ENV_FINGERPRINT" \
   CANARY_WORKFLOW_ENV_STATUS="$WORKFLOW_ENV_STATUS" \
+  CANARY_CRON_CONFIG_FINGERPRINT="$CRON_CONFIG_FINGERPRINT" \
+  CANARY_CRON_CONFIG_STATUS="$CRON_CONFIG_STATUS" \
   CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE="$WORKFLOW_RUNTIME_PROVIDER_MODE" \
   CANARY_WORKFLOW_RUNTIME_PROOF="$WORKFLOW_RUNTIME_PROOF" \
   CANARY_WORKFLOW_TASK="$WORKFLOW_TASK" \
@@ -253,6 +260,8 @@ build_release_evidence_json() {
   CANARY_WORKFLOW_VERSION_COMMIT="$WORKFLOW_VERSION_COMMIT" \
   CANARY_WORKFLOW_VERSION_ID="$WORKFLOW_VERSION_ID" \
   CANARY_WORKFLOW_VERSION_STATUS="$WORKFLOW_VERSION_STATUS" \
+  CANARY_CRON_DEPLOY_SHA="$CRON_DEPLOY_SHA" \
+  CANARY_CRON_DEPLOY_STATUS="$CRON_DEPLOY_STATUS" \
   CANARY_EXPECTED_SHA="$CANDIDATE_SHA" \
   CANARY_CHECKED_OUT_SHA="$CHECKED_OUT_SHA" \
   CANARY_LANGUAGE="$LANGUAGE" \
@@ -292,6 +301,8 @@ payload = {
     "env_fingerprint": optional(os.environ["CANARY_ENV_FINGERPRINT"]),
     "workflow_env_fingerprint": optional(os.environ["CANARY_WORKFLOW_ENV_FINGERPRINT"]),
     "workflow_env_status": optional(os.environ["CANARY_WORKFLOW_ENV_STATUS"]),
+    "cron_config_fingerprint": optional(os.environ["CANARY_CRON_CONFIG_FINGERPRINT"]),
+    "cron_config_status": optional(os.environ["CANARY_CRON_CONFIG_STATUS"]),
     "workflow_runtime_provider_mode": optional(os.environ["CANARY_WORKFLOW_RUNTIME_PROVIDER_MODE"]),
     "workflow_runtime_proof": optional(os.environ["CANARY_WORKFLOW_RUNTIME_PROOF"]),
     "workflow_task": optional(os.environ["CANARY_WORKFLOW_TASK"]),
@@ -303,6 +314,8 @@ payload = {
     "workflow_version_commit": optional(os.environ["CANARY_WORKFLOW_VERSION_COMMIT"]),
     "workflow_version_id": optional(os.environ["CANARY_WORKFLOW_VERSION_ID"]),
     "workflow_version_status": optional(os.environ["CANARY_WORKFLOW_VERSION_STATUS"]),
+    "cron_deploy_sha": optional(os.environ["CANARY_CRON_DEPLOY_SHA"]),
+    "cron_deploy_status": optional(os.environ["CANARY_CRON_DEPLOY_STATUS"]),
     "candidate_sha": os.environ["CANARY_EXPECTED_SHA"],
     "checked_out_sha": os.environ["CANARY_CHECKED_OUT_SHA"],
     "language": os.environ["CANARY_LANGUAGE"],
@@ -591,6 +604,9 @@ run_deploy_status_probe() {
   if ! WORKFLOW_VERSION_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" workflow-version-status)"; then
     fail_canary "deploy_status" "workflow_version_status_failed"
   fi
+  if ! CRON_DEPLOY_STATUS_OUTPUT="$("$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status)"; then
+    fail_canary "deploy_status" "cron_status_unavailable"
+  fi
   API_DEPLOY_SHA="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" commit || true)"
   WEB_DEPLOY_SHA="$(extract_status_value "$WEB_DEPLOY_STATUS_OUTPUT" commit || true)"
   API_DEPLOY_STATUS="$(extract_status_value "$API_DEPLOY_STATUS_OUTPUT" status || true)"
@@ -598,6 +614,8 @@ run_deploy_status_probe() {
   WORKFLOW_VERSION_ID="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" workflow_version_id || true)"
   WORKFLOW_VERSION_STATUS="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" status || true)"
   WORKFLOW_VERSION_COMMIT="$(extract_status_value "$WORKFLOW_VERSION_STATUS_OUTPUT" commit || true)"
+  CRON_DEPLOY_SHA="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" commit || true)"
+  CRON_DEPLOY_STATUS="$(extract_status_value "$CRON_DEPLOY_STATUS_OUTPUT" status || true)"
 
   if [ "$API_DEPLOY_STATUS" != "live" ]; then
     fail_canary "deploy_status" "api_deploy_not_live"
@@ -620,6 +638,12 @@ run_deploy_status_probe() {
   if [ -z "$WORKFLOW_VERSION_ID" ]; then
     fail_canary "deploy_status" "workflow_version_id_missing"
   fi
+  if [ "$CRON_DEPLOY_STATUS" != "live" ]; then
+    fail_canary "deploy_status" "cron_deploy_not_live"
+  fi
+  if [ "$CRON_DEPLOY_SHA" != "$CANDIDATE_SHA" ]; then
+    fail_canary "deploy_status" "cron_deploy_sha_mismatch"
+  fi
   echo "canary_api_deploy_status=$API_DEPLOY_STATUS"
   echo "canary_web_deploy_status=$WEB_DEPLOY_STATUS"
   echo "canary_api_deploy_sha=$API_DEPLOY_SHA"
@@ -627,6 +651,8 @@ run_deploy_status_probe() {
   echo "canary_workflow_version_status=$WORKFLOW_VERSION_STATUS"
   echo "canary_workflow_version_commit=$WORKFLOW_VERSION_COMMIT"
   echo "canary_workflow_version_id=$WORKFLOW_VERSION_ID"
+  echo "canary_cron_deploy_status=$CRON_DEPLOY_STATUS"
+  echo "canary_cron_deploy_sha=$CRON_DEPLOY_SHA"
 }
 
 run_warmup_probe() {
@@ -661,6 +687,8 @@ validate_release_evidence_contract() {
   ENV_FINGERPRINT="$(extract_warmup_value env_fingerprint || true)"
   WORKFLOW_ENV_FINGERPRINT="$(extract_warmup_value workflow_env_fingerprint || true)"
   WORKFLOW_ENV_STATUS="$(extract_warmup_value workflow_env_status || true)"
+  CRON_CONFIG_FINGERPRINT="$(extract_warmup_value cron_config_fingerprint || true)"
+  CRON_CONFIG_STATUS="$(extract_warmup_value cron_config_status || true)"
   WORKFLOW_RUNTIME_PROVIDER_MODE="$(extract_warmup_value workflow_runtime_provider_mode || true)"
   WORKFLOW_RUNTIME_PROOF="$(extract_warmup_value workflow_runtime_proof || true)"
   WORKFLOW_TASK="$(extract_warmup_value workflow_task || true)"
@@ -679,6 +707,9 @@ validate_release_evidence_contract() {
   if [[ ! "$WORKFLOW_ENV_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || [ "$WORKFLOW_ENV_STATUS" != "ready" ]; then
     fail_canary "warmup" "workflow_env_drift"
   fi
+  if [[ ! "$CRON_CONFIG_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]] || [ "$CRON_CONFIG_STATUS" != "ready" ]; then
+    fail_canary "warmup" "cron_config_drift"
+  fi
   if [ "$WORKFLOW_RUNTIME_PROVIDER_MODE" != "live_provider" ] || [ "$WORKFLOW_RUNTIME_PROOF" != "ready" ]; then
     fail_canary "warmup" "workflow_runtime_proof_missing"
   fi
@@ -691,6 +722,8 @@ validate_release_evidence_contract() {
   echo "canary_env_fingerprint=$ENV_FINGERPRINT"
   echo "canary_workflow_env_fingerprint=$WORKFLOW_ENV_FINGERPRINT"
   echo "canary_workflow_env_status=$WORKFLOW_ENV_STATUS"
+  echo "canary_cron_config_fingerprint=$CRON_CONFIG_FINGERPRINT"
+  echo "canary_cron_config_status=$CRON_CONFIG_STATUS"
   echo "canary_workflow_runtime_provider_mode=$WORKFLOW_RUNTIME_PROVIDER_MODE"
   echo "canary_workflow_runtime_proof=$WORKFLOW_RUNTIME_PROOF"
   echo "canary_workflow_task=$WORKFLOW_TASK"

@@ -65,6 +65,9 @@ privacy-safe labels from canary evidence.
 - Workflow version status:
 - Workflow released SHA:
 - Workflow version id:
+- Cron service: `argus-maintenance`
+- Cron deploy status:
+- Cron deployed SHA:
 - Checked at:
 
 ## Environment Proof
@@ -75,9 +78,13 @@ privacy-safe labels from canary evidence.
 - api_web_env_fingerprint:
 - workflow_env_fingerprint:
 - workflow_env_status:
+- cron_config_fingerprint:
+- cron_config_status:
+- cron failure notification override: `failure`
+- cron alert destination receipt proof:
 - autodeploy_fingerprint:
 - autodeploy_status:
-- all three services use `checksPass`:
+- all four services use `checksPass`:
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -105,10 +112,10 @@ privacy-safe labels from canary evidence.
   - provider anonymous-user rate limit:
   - Argus per-IP guest-attempt limit:
 - Guest cleanup:
-  - operator-run command:
-  - explicit target:
-  - dry-run selected:
-  - real selected/deleted/preserved/failed:
+  - scheduled service and cadence: `argus-maintenance`, `*/15 * * * *` UTC
+  - alert owner and destination:
+  - first scheduled run timestamp and final summary:
+  - selected/deleted/preserved/failed:
   - cleanup lag:
 - Render config audit command:
 - Secret rotation / least-privilege owner:

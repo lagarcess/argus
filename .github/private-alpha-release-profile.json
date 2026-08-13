@@ -97,6 +97,31 @@
       ],
       "optional": ["NEXT_PUBLIC_POSTHOG_KEY"]
     },
+    "cron": {
+      "name": "argus-maintenance",
+      "auto_deploy_trigger": "checksPass",
+      "runtime": "python",
+      "schedule": "*/15 * * * *",
+      "notifications_to_send": "failure",
+      "build_command": "poetry config virtualenvs.create false && poetry install --only main --no-interaction",
+      "start_command": "poetry run python scripts/ops/scheduled_maintenance.py",
+      "env": {
+        "APP_ENV": "production",
+        "POETRY_VERSION": "2.1.3",
+        "ARGUS_PERSISTENCE_MODE": "supabase",
+        "ARGUS_DEV_MEMORY_FALLBACK": "false",
+        "POSTHOG_REGION": "us"
+      },
+      "required_present": [
+        "POSTHOG_PROJECT_TOKEN",
+        "DATABASE_URL",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "RENDER_API_KEY"
+      ],
+      "optional": []
+    },
     "workflow": {
       "name": "argus-backtests",
       "auto_deploy_trigger": "checksPass",

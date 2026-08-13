@@ -38,45 +38,72 @@ def test_warmup_passes_through_release_profile_proof() -> None:
     assert "release_profile_status=ready" in source
 
 
-def test_phantom_maintenance_surface_is_absent_but_operator_job_remains() -> None:
-    render_yaml = _source("render.yaml")
+def test_shared_maintenance_is_a_first_class_render_release_surface() -> None:
+    render_config = yaml.safe_load(_source("render.yaml"))
     env_contract = _source(".github/argus-env.sh")
     env_sync = _source(".github/render-env-sync.sh")
+    cron = next(
+        service
+        for service in render_config["services"]
+        if service["name"] == "argus-maintenance"
+    )
 
-    assert "argus-maintenance" not in render_yaml
-    assert "ARGUS_RENDER_CRON_ENV" not in env_contract
-    assert "ARGUS_RENDER_MAINTENANCE_SERVICE_NAME" not in env_contract
-    assert "cron-deploy-status" not in env_sync
+    assert cron["type"] == "cron"
+    assert cron["schedule"] == "*/15 * * * *"
+    assert cron["startCommand"] == (
+        "poetry run python scripts/ops/scheduled_maintenance.py"
+    )
+    assert "ARGUS_RENDER_CRON_ENV" in env_contract
+    assert "ARGUS_RENDER_MAINTENANCE_SERVICE_NAME" in env_contract
+    assert "cron-deploy-status" in env_sync
     assert (ROOT / "scripts" / "ops" / "scheduled_maintenance.py").is_file()
 
 
-def test_release_docs_name_three_live_services_without_a_cron_surface() -> None:
+def test_release_docs_name_all_four_live_surfaces_and_the_shared_entry_point() -> None:
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    architecture = _source("docs/ARCHITECTURE.md")
     data_model = _source("docs/DATA_MODEL.md")
     release_contract = _source("docs/specs/private-alpha-ci-cd-sota.md")
+    integrity_contract = _source(
+        "docs/specs/private-alpha-release-integrity-contract.md"
+    )
     manifest = _source("docs/release-manifests/TEMPLATE.md")
 
-    for service in ("argus-api", "argus-app", "argus-backtests"):
+    for service in (
+        "argus-api",
+        "argus-app",
+        "argus-backtests",
+        "argus-maintenance",
+    ):
         assert service in runbook
         assert service in release_contract
         assert service in manifest
-    for source in (runbook, data_model, release_contract, manifest):
-        assert "argus-maintenance" not in source
-        assert "cron-deploy-status" not in source
+    for source in (
+        runbook,
+        architecture,
+        data_model,
+        release_contract,
+        integrity_contract,
+        manifest,
+    ):
+        assert "argus-maintenance" in source
     assert "scripts/ops/scheduled_maintenance.py" in runbook
-    assert "operator-run" in runbook
+    assert "cron-deploy-status" in runbook
+    assert "checked-in cron declaration is not hosted proof" in runbook
+    assert "Hosted enforcement starts only after release" in data_model
 
 
-def test_release_contract_enables_checks_passing_autodeploy_for_all_three() -> None:
+def test_release_contract_enables_checks_passing_autodeploy_for_all_four() -> None:
     profile = json.loads(_source(".github/private-alpha-release-profile.json"))
     render_config = yaml.safe_load(_source("render.yaml"))
     render_by_name = {service["name"]: service for service in render_config["services"]}
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
 
-    for surface in ("api", "web", "workflow"):
+    for surface in ("api", "web", "workflow", "cron"):
         assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
     assert render_by_name["argus-api"]["autoDeployTrigger"] == "checksPass"
     assert render_by_name["argus-app"]["autoDeployTrigger"] == "checksPass"
+    assert render_by_name["argus-maintenance"]["autoDeployTrigger"] == "checksPass"
     assert "argus-backtests" not in render_by_name
     assert "checksPass" in runbook
     assert "argus-api" in runbook

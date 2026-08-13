@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-import json
-import os
-import shutil
 import subprocess
 from pathlib import Path
 
 import yaml
+
+from tests.render_release_test_support import (
+    _render_env,
+    _render_env_payload,
+    _run_render_release_audit,
+    _workflow_env_payload,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 ENV_CONTRACT = ROOT / ".github" / "argus-env.sh"
@@ -14,198 +18,6 @@ ENV_CONTRACT = ROOT / ".github" / "argus-env.sh"
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text()
-
-
-def _render_env(service_name: str) -> dict[str, dict[str, str | bool]]:
-    render_config = yaml.safe_load(_source("render.yaml"))
-
-    for service in render_config["services"]:
-        if service["name"] == service_name:
-            return {env["key"]: env for env in service["envVars"]}
-
-    raise AssertionError(f"{service_name} service missing from render.yaml")
-
-
-def _render_env_payload(
-    service_name: str,
-    *,
-    omit: set[str] | None = None,
-    extra: dict[str, str] | None = None,
-    overrides: dict[str, str] | None = None,
-) -> str:
-    omitted = omit or set()
-    extra = extra or {}
-    overrides = overrides or {}
-    rows: list[dict[str, dict[str, str]]] = []
-
-    for key, env in _render_env(service_name).items():
-        if key in omitted:
-            continue
-        value = overrides.get(key)
-        if value is None:
-            value = str(env.get("value", ""))
-            if not value and key != "NEXT_PUBLIC_POSTHOG_KEY":
-                value = f"fake-secret-{key.lower()}"
-        rows.append({"envVar": {"key": key, "value": value}})
-
-    for key, value in extra.items():
-        rows.append({"envVar": {"key": key, "value": value}})
-
-    return json.dumps(rows)
-
-
-def _workflow_env_payload(
-    *,
-    omit: set[str] | None = None,
-    extra: dict[str, str] | None = None,
-    overrides: dict[str, str] | None = None,
-) -> str:
-    omitted = omit or set()
-    extra = extra or {}
-    overrides = overrides or {}
-    values = {
-        "ARGUS_WORKFLOW_DATABASE_URL": "postgres://workflow-db.example/argus",
-        "APP_ENV": "production",
-        "ARGUS_RENDER_WORKFLOW_PROOF_TASK": "argus-backtests/workflow_proof",
-        "ARGUS_WORKFLOW_PROOF_PLAN": "starter",
-        "POETRY_VERSION": "2.1.3",
-        "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS": "300",
-        "ARGUS_MARKET_DATA_PROVIDER_MODE": "live_provider",
-        "ENABLE_MARKET_DATA_CACHE": "false",
-        "ALPACA_API_KEY": "fake-alpaca-key",
-        "ALPACA_SECRET_KEY": "fake-alpaca-secret",
-        "ALPACA_PAPER_TRADING": "true",
-        "ARGUS_PROD_OPENROUTER_API_KEY": "fake-registered-openrouter-key",
-        "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY": "fake-guest-openrouter-key",
-        "ARGUS_UTILITY_MODEL": "google/gemini-2.5-flash-lite",
-        "ARGUS_UTILITY_FALLBACK_MODEL": "qwen/qwen3.5-9b",
-        "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash",
-        "ARGUS_CHAT_FALLBACK_MODEL": "qwen/qwen3.5-9b",
-        "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS": "30",
-        "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
-        "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
-        "ARGUS_CONTEXT_MODEL": "openai/gpt-oss-120b",
-        "ARGUS_CONTEXT_FALLBACK_MODEL": "deepseek/deepseek-v4-flash",
-    }
-    rows: list[dict[str, dict[str, str]]] = []
-
-    for key, default_value in values.items():
-        if key in omitted:
-            continue
-        rows.append({"envVar": {"key": key, "value": overrides.get(key, default_value)}})
-
-    for key, value in extra.items():
-        rows.append({"envVar": {"key": key, "value": value}})
-
-    return json.dumps(rows)
-
-
-def _run_render_release_audit(
-    tmp_path: Path,
-    *,
-    api_env_json: str,
-    web_env_json: str,
-    workflow_env_json: str | None = None,
-    api_service_json: str | None = None,
-    web_service_json: str | None = None,
-    workflow_service_json: str | None = None,
-    expect_mode: str = "safe-off",
-    isolate: bool = False,
-) -> subprocess.CompletedProcess[str]:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    request_log = tmp_path / "curl-requests.log"
-    fake_curl = bin_dir / "curl"
-    fake_curl.write_text(
-        """#!/bin/bash
-printf "%s\\n" "$*" >> "$FAKE_CURL_REQUEST_LOG"
-case "$*" in
-  *"/services/$FAKE_API_SERVICE_ID/env-vars"*)
-    printf "%s" "$FAKE_API_ENV_JSON"
-    ;;
-  *"/services/$FAKE_WEB_SERVICE_ID/env-vars"*)
-    printf "%s" "$FAKE_WEB_ENV_JSON"
-    ;;
-  *"/services/$FAKE_WORKFLOW_SERVICE_ID/env-vars"*)
-    printf "%s" "$FAKE_WORKFLOW_ENV_JSON"
-    ;;
-  *"/services/$FAKE_API_SERVICE_ID"*) printf "%s" "$FAKE_API_SERVICE_JSON" ;;
-  *"/services/$FAKE_WEB_SERVICE_ID"*) printf "%s" "$FAKE_WEB_SERVICE_JSON" ;;
-  *"/workflows/$FAKE_WORKFLOW_SERVICE_ID"*) printf "%s" "$FAKE_WORKFLOW_SERVICE_JSON" ;;
-  *)
-    echo "unexpected curl request: $*" >&2
-    exit 9
-    ;;
-esac
-""",
-    )
-    fake_curl.chmod(0o755)
-
-    env = os.environ.copy()
-    env.update(
-        {
-            "PATH": f"{bin_dir}:{env['PATH']}",
-            "RENDER_API_KEY": "fake-render-token",
-            "FAKE_API_SERVICE_ID": "srv-d78tanmuk2gs73e17nn0",
-            "FAKE_WEB_SERVICE_ID": "srv-d7ap6bmslomc73eqp8m0",
-            "ARGUS_RENDER_WORKFLOW_SERVICE_ID": "wfl-fake-backtests",
-            "FAKE_WORKFLOW_SERVICE_ID": "wfl-fake-backtests",
-            "FAKE_API_ENV_JSON": api_env_json,
-            "FAKE_WEB_ENV_JSON": web_env_json,
-            "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
-            "FAKE_API_SERVICE_JSON": api_service_json
-            or json.dumps({"autoDeployTrigger": "checksPass"}),
-            "FAKE_WEB_SERVICE_JSON": web_service_json
-            or json.dumps({"autoDeployTrigger": "checksPass"}),
-            "FAKE_WORKFLOW_SERVICE_JSON": workflow_service_json
-            or json.dumps({"autoDeployTrigger": "checksPass"}),
-            "FAKE_CURL_REQUEST_LOG": str(request_log),
-        }
-    )
-
-    script = ".github/render-env-sync.sh"
-    cwd = str(ROOT)
-    if isolate:
-        # Mirror the scripts into a root with no .env so argus_load_root_env is a
-        # no-op, then scrub workflow secrets from the process env. This reproduces
-        # the daily-gate warmup step, which exports neither .env nor the workflow
-        # secrets (ALPACA_*/segmented OpenRouter keys) it audits.
-        github_dir = tmp_path / ".github"
-        github_dir.mkdir()
-        for name in (
-            "render-env-sync.sh",
-            "argus-env.sh",
-            "private-alpha-release-profile.py",
-            "private-alpha-release-profile.json",
-        ):
-            copied = github_dir / name
-            shutil.copy(ROOT / ".github" / name, copied)
-            copied.chmod(0o755)
-        for secret in (
-            "ALPACA_API_KEY",
-            "ALPACA_SECRET_KEY",
-            "ARGUS_PROD_OPENROUTER_API_KEY",
-            "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY",
-            "OPENROUTER_API_KEY",
-            "ARGUS_WORKFLOW_DATABASE_URL",
-        ):
-            env.pop(secret, None)
-        script = str(github_dir / "render-env-sync.sh")
-        cwd = str(tmp_path)
-
-    return subprocess.run(
-        [
-            script,
-            "release-config-audit",
-            "--expect-mode",
-            expect_mode,
-        ],
-        cwd=cwd,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
 
 
 def _real_workflow_api_env_payload() -> str:
@@ -403,11 +215,47 @@ def test_env_example_declares_render_api_key_once() -> None:
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
+    assert set(_contract_array("ARGUS_RENDER_CRON_ENV")) == set(
+        _render_env("argus-maintenance")
+    )
     render_config = yaml.safe_load(_source("render.yaml"))
     assert {service["name"] for service in render_config["services"]} == {
         "argus-api",
         "argus-app",
+        "argus-maintenance",
     }
+
+
+def test_render_blueprint_schedules_shared_maintenance_every_fifteen_minutes() -> None:
+    render_config = yaml.safe_load(_source("render.yaml"))
+    cron = next(
+        service
+        for service in render_config["services"]
+        if service["name"] == "argus-maintenance"
+    )
+    api = next(
+        service for service in render_config["services"] if service["name"] == "argus-api"
+    )
+
+    assert cron["type"] == "cron"
+    assert cron["schedule"] == "*/15 * * * *"
+    assert cron["autoDeployTrigger"] == "checksPass"
+    assert cron["buildCommand"] == api["buildCommand"]
+    assert cron["startCommand"] == (
+        "poetry run python scripts/ops/scheduled_maintenance.py"
+    )
+
+
+def test_maintenance_cron_keeps_destructive_credentials_out_of_source() -> None:
+    cron_env = _render_env("argus-maintenance")
+
+    for key in (
+        "DATABASE_URL",
+        "POSTHOG_PROJECT_TOKEN",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "RENDER_API_KEY",
+    ):
+        assert cron_env[key] == {"key": key, "sync": False}
 
 
 def test_render_web_declares_exact_server_only_https_app_origin() -> None:
@@ -1172,19 +1020,21 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/render-env-sync.sh api-deploy-status" in before_sessions
     assert ".github/render-env-sync.sh web-deploy-status" in before_sessions
     assert ".github/render-env-sync.sh workflow-version-status" in before_sessions
+    assert ".github/render-env-sync.sh cron-deploy-status" in before_sessions
     assert "argus-api" in before_sessions
     assert "argus-app" in before_sessions
     assert "argus-backtests" in before_sessions
-    assert "`argus-api`, then `argus-app`, then **`argus-backtests`**" in (
-        before_sessions
-    )
+    assert (
+        "`argus-api`, then `argus-app`, then `argus-backtests`, then "
+        "**`argus-maintenance`**"
+    ) in normalized_before_sessions
     assert "workflow_commit_mismatch" in before_sessions
-    assert "argus-maintenance" not in runbook
-    assert "cron-deploy-status" not in runbook
+    assert "argus-maintenance" in runbook
+    assert "cron-deploy-status" in runbook
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert (
-        "API deploy-status, app deploy-status, workflow version status, local smoke, warmup, the "
+        "API deploy-status, app deploy-status, workflow version status, cron deploy-status, local smoke, warmup, the "
         "authoritative Spanish release canary, and the release manifest"
         in normalized_before_sessions
     )

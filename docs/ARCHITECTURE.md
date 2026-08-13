@@ -735,16 +735,19 @@ Simple, scalable, and practical Alpha hosting.
 - **Backend**: Render Web Service (FastAPI).
 - **Database/Auth**: Supabase (Postgres + Auth).
 - **Backtest Execution**: Render Workflows for pay-per-run execution.
+- **Scheduled Maintenance**: the `argus-maintenance` Render Cron service runs the
+  shared retention and stale-job entry point after hosted activation is proved.
 
 Private-alpha release validation is governed by the founder-approved contract in
 `docs/specs/private-alpha-release-integrity-contract.md`. One checked-in
-machine-readable profile owns non-secret API, web, workflow, locale, capability,
-and canary expectations. Candidate SHA is a runtime input, not profile content.
-The profile is authoritative for desired release mode: release validation fails
-if `render.yaml`, live Render configuration, or effective API/web/workflow mode
-disagrees. Fast local memory/synthetic/mock-auth execution is useful development
-evidence but cannot substitute for production-parity Supabase/Postgres/real-auth/
-live-provider/Render-Workflow evidence.
+machine-readable profile owns non-secret API, web, workflow, cron, locale,
+capability, and canary expectations. Candidate SHA is a runtime input, not
+profile content. The profile is authoritative for desired release mode: release
+validation fails if `render.yaml`, live Render configuration, or effective
+API/web/workflow/cron mode disagrees. Fast local
+memory/synthetic/mock-auth execution is useful development evidence but cannot
+substitute for production-parity Supabase/Postgres/real-auth/live-provider/
+Render-Workflow evidence.
 The release manifest records the profile hash, environment fingerprints,
 deployed service SHAs, and full real-user Spanish signup-to-evidence-to-decision-
 to-recall canary evidence for that same candidate.

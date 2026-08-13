@@ -365,12 +365,13 @@ reported earnings since. Want to run it now?"
   and its own founder decision.
 - **Shares one reader with the empty chat polish sidequest, Piece 2.** Ownership
   is stated in the spec so two do not get built.
-- **Maintenance tooling is merged, but nothing is scheduled.** #414 added the
-  retention and reconciliation entry point. #448 removed the uncreated
-  `argus-maintenance` Render surface and its release enumeration. The jobs stay
-  available for an operator to run from a laptop against an explicit target.
-  Any future scheduler is a new founder decision and a new release contract;
-  it is a precondition for this pillar, not a given.
+- **Maintenance scheduling is active under #412.** #414 added the shared
+  retention and reconciliation entry point, and #448 removed the cron while it
+  had no live user work to protect. The research rail is now live, so #412 adds
+  one `argus-maintenance` Render cron for every janitor and restores the complete
+  release enumeration. The issue remains open until the hosted service, exact
+  deployed SHA, alert routing, and first scheduled run are read back; checked-in
+  configuration alone is not hosted proof.
 
 ## Continuous, not a lane
 
@@ -665,14 +666,12 @@ profile and fall back to the nameless pool.
   because it overlapped nine files, then reconciled once against a finished
   lane rather than a moving one.
 
-- **Operator-run maintenance** (PR #414, merged 2026-08-09 at `70635831`,
-  revised by #448) retains the existing retention and reconciliation jobs plus
-  their shared entry point. The `argus-maintenance` Render service was never
-  created, and #448 removed that phantom fourth surface from `render.yaml` and
-  the release gates. At current scale there is no guest data to delete and no
-  stranded job to rescue, so an operator runs the jobs from a laptop against
-  an explicit target when needed. A future scheduler requires a new decision
-  and must be added to the deployment contract intentionally.
+- **Shared maintenance entry point** (PR #414, merged 2026-08-09 at `70635831`,
+  revised by #448) retains the existing retention and reconciliation jobs. Its
+  first cron declaration was removed while there was no live user work to
+  protect. Issue #412 now owns the intentional scheduled release surface because
+  a deploy can strand a live research turn. Manual execution remains only for
+  diagnosis or backlog draining.
 
 - **Research sidecar rename** (PR #418, merged 2026-08-09 at `c69e7489`) —
   the sidecar's `memory` block became `follow_up`, because it never was a

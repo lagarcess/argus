@@ -14,6 +14,7 @@ argus_load_root_env >/dev/null || true
 API_SERVICE_ID="${ARGUS_RENDER_API_SERVICE_ID:-$ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID}"
 WEB_SERVICE_ID="${ARGUS_RENDER_WEB_SERVICE_ID:-$ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID}"
 WORKFLOW_SERVICE_ID="${ARGUS_RENDER_WORKFLOW_SERVICE_ID:-$ARGUS_RENDER_BACKTESTS_WORKFLOW_ID}"
+CRON_SERVICE_NAME="$ARGUS_RENDER_MAINTENANCE_SERVICE_NAME"
 
 usage() {
   cat <<'USAGE'
@@ -21,6 +22,7 @@ Usage:
   .github/render-env-sync.sh api-status
   .github/render-env-sync.sh api-deploy-status
   .github/render-env-sync.sh web-deploy-status
+  .github/render-env-sync.sh cron-deploy-status
   .github/render-env-sync.sh api-safe-off
   .github/render-env-sync.sh api-proof-shadow-on
   .github/render-env-sync.sh api-real-workflow-on
@@ -35,6 +37,7 @@ Commands:
   api-status              Print redacted API workflow env status for argus-api.
   api-deploy-status       Print latest argus-api deploy status and commit.
   web-deploy-status       Print latest argus-app deploy status and commit.
+  cron-deploy-status      Print latest argus-maintenance deploy status and commit.
   api-safe-off            Disable API job dispatch/execution and blank its Render key.
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
@@ -96,6 +99,12 @@ release_profile_auto_deploy_trigger() {
   python3 "$RELEASE_PROFILE_TOOL" auto-deploy-trigger "$surface"
 }
 
+release_profile_service_value() {
+  local surface="$1"
+  local field="$2"
+  python3 "$RELEASE_PROFILE_TOOL" service-value "$surface" "$field"
+}
+
 release_profile_required_present() {
   local surface="$1"
   python3 "$RELEASE_PROFILE_TOOL" required-present "$surface"
@@ -112,6 +121,8 @@ WORKFLOW_AUDIT_FAILURES=0
 WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
 AUTODEPLOY_AUDIT_FAILURES=0
 AUTODEPLOY_AUDIT_FINGERPRINT_ROWS=()
+CRON_AUDIT_FAILURES=0
+CRON_AUDIT_FINGERPRINT_ROWS=()
 
 require_local_env() {
   local name="$1"
@@ -183,6 +194,16 @@ render_service_json() {
     --header "Accept: application/json"
 }
 
+render_service_notification_json() {
+  local service_id="$1"
+
+  curl -fsS \
+    --request GET \
+    --url "https://api.render.com/v1/notification-settings/overrides/services/${service_id}" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json"
+}
+
 render_workflow_json() {
   curl -fsS \
     --request GET \
@@ -199,6 +220,45 @@ render_service_deploy_json() {
     --url "https://api.render.com/v1/services/${service_id}/deploys?limit=1" \
     --header "Authorization: Bearer ${RENDER_API_KEY}" \
     --header "Accept: application/json"
+}
+
+# Empty means Render has no such service. Lookup failures stay distinct so a
+# credential or network error cannot make an existing destructive cron vanish.
+cron_service_id() {
+  local payload=""
+  local matches=""
+  local match_count=""
+  local resolved=""
+  if ! payload="$(
+    curl -fsS \
+      --request GET \
+      --url "https://api.render.com/v1/services?name=${CRON_SERVICE_NAME}&type=cron_job&limit=20" \
+      --header "Authorization: Bearer ${RENDER_API_KEY}" \
+      --header "Accept: application/json"
+  )"; then
+    return 1
+  fi
+  if ! matches="$(
+    printf '%s' "$payload" |
+      jq -c --arg name "$CRON_SERVICE_NAME" \
+        '[.[] | .service | select(.name == $name)]'
+  )"; then
+    return 1
+  fi
+  match_count="$(jq -r 'length' <<< "$matches")"
+  if [ "$match_count" -gt 1 ]; then
+    echo "$CRON_SERVICE_NAME matched $match_count exact services; refusing an ambiguous release readback." >&2
+    return 1
+  fi
+  if [ "$match_count" -eq 0 ]; then
+    return 0
+  fi
+  resolved="$(jq -r '.[0].id // ""' <<< "$matches")"
+  if [ -z "$resolved" ]; then
+    echo "$CRON_SERVICE_NAME matched a service without an id; refusing release readback." >&2
+    return 1
+  fi
+  printf '%s' "$resolved"
 }
 
 print_api_status() {
@@ -261,6 +321,29 @@ print_api_deploy_status() {
 print_web_deploy_status() {
   require_local_env RENDER_API_KEY
   print_deploy_status "$WEB_SERVICE_ID" "argus-app"
+}
+
+print_cron_deploy_status() {
+  require_local_env RENDER_API_KEY
+  local service_id=""
+
+  if ! service_id="$(cron_service_id)"; then
+    echo "service=$CRON_SERVICE_NAME"
+    echo "deploy_id=<unknown>"
+    echo "status=lookup_failed"
+    echo "commit=<unknown>"
+    echo "commit_short=<unknown>"
+    return 1
+  fi
+  if [ -z "$service_id" ]; then
+    echo "service=$CRON_SERVICE_NAME"
+    echo "deploy_id=<absent>"
+    echo "status=absent"
+    echo "commit=<absent>"
+    echo "commit_short=<absent>"
+    return 0
+  fi
+  print_deploy_status "$service_id" "$CRON_SERVICE_NAME"
 }
 
 latest_workflow_version_json() {
@@ -362,6 +445,10 @@ record_audit_row() {
     WORKFLOW_AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
     return
   fi
+  if [ "$service" = "$CRON_SERVICE_NAME" ]; then
+    CRON_AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
+    return
+  fi
   AUDIT_FINGERPRINT_ROWS+=("${service}:${row}")
 }
 
@@ -371,6 +458,9 @@ record_audit_failure() {
   AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
   if [ "$service" = "argus-backtests" ]; then
     WORKFLOW_AUDIT_FAILURES=$((WORKFLOW_AUDIT_FAILURES + 1))
+  fi
+  if [ "$service" = "$CRON_SERVICE_NAME" ]; then
+    CRON_AUDIT_FAILURES=$((CRON_AUDIT_FAILURES + 1))
   fi
 }
 
@@ -612,6 +702,10 @@ workflow_env_fingerprint() {
   fingerprint_rows "${WORKFLOW_AUDIT_FINGERPRINT_ROWS[@]}"
 }
 
+cron_config_fingerprint() {
+  fingerprint_rows "${CRON_AUDIT_FINGERPRINT_ROWS[@]}"
+}
+
 autodeploy_fingerprint() {
   fingerprint_rows "${AUTODEPLOY_AUDIT_FINGERPRINT_ROWS[@]}"
 }
@@ -637,6 +731,99 @@ audit_render_auto_deploy_trigger() {
   echo "drift ${service_name}:autoDeployTrigger expected=${expected} actual=${actual}"
   AUDIT_FAILURES=$((AUDIT_FAILURES + 1))
   AUTODEPLOY_AUDIT_FAILURES=$((AUTODEPLOY_AUDIT_FAILURES + 1))
+}
+
+render_cron_service_value() {
+  local config_json="$1"
+  local field="$2"
+
+  case "$field" in
+    runtime)
+      jq -r '
+        .serviceDetails.runtime
+          // .runtime
+          // .service.serviceDetails.runtime
+          // .service.runtime
+          // "<missing>"
+      ' <<< "$config_json"
+      ;;
+    schedule)
+      jq -r '
+        .serviceDetails.schedule
+          // .schedule
+          // .service.serviceDetails.schedule
+          // .service.schedule
+          // "<missing>"
+      ' <<< "$config_json"
+      ;;
+    build_command)
+      jq -r '
+        .serviceDetails.envSpecificDetails.buildCommand
+          // .buildCommand
+          // .service.serviceDetails.envSpecificDetails.buildCommand
+          // .service.buildCommand
+          // "<missing>"
+      ' <<< "$config_json"
+      ;;
+    start_command)
+      jq -r '
+        .serviceDetails.envSpecificDetails.startCommand
+          // .startCommand
+          // .service.serviceDetails.envSpecificDetails.startCommand
+          // .service.startCommand
+          // "<missing>"
+      ' <<< "$config_json"
+      ;;
+    *)
+      echo "Unknown cron service field: $field" >&2
+      return 2
+      ;;
+  esac
+}
+
+audit_render_cron_runtime() {
+  local config_json="$1"
+  local service_name="$2"
+  local field label expected actual
+
+  for field in runtime schedule build_command start_command; do
+    case "$field" in
+      build_command) label="buildCommand" ;;
+      start_command) label="startCommand" ;;
+      *) label="$field" ;;
+    esac
+    expected="$(release_profile_service_value cron "$field")"
+    actual="$(render_cron_service_value "$config_json" "$field")"
+    record_audit_row "$service_name" "${label}=${actual}"
+    if [ "$actual" = "$expected" ]; then
+      echo "ok ${service_name}:${label}=${actual}"
+      continue
+    fi
+    echo "drift ${service_name}:${label} expected=${expected} actual=${actual}"
+    record_audit_failure "$service_name"
+  done
+}
+
+audit_render_cron_notifications() {
+  local config_json="$1"
+  local service_name="$2"
+  local expected actual
+
+  expected="$(release_profile_service_value cron notifications_to_send)"
+  actual="$(
+    jq -r '
+      .notificationsToSend
+        // .override.notificationsToSend
+        // "<missing>"
+    ' <<< "$config_json"
+  )"
+  record_audit_row "$service_name" "notificationsToSend=${actual}"
+  if [ "$actual" = "$expected" ]; then
+    echo "ok ${service_name}:notificationsToSend=${actual}"
+    return 0
+  fi
+  echo "drift ${service_name}:notificationsToSend expected=${expected} actual=${actual}"
+  record_audit_failure "$service_name"
 }
 
 audit_release_config() {
@@ -684,20 +871,32 @@ audit_release_config() {
   WORKFLOW_AUDIT_FINGERPRINT_ROWS=()
   AUTODEPLOY_AUDIT_FAILURES=0
   AUTODEPLOY_AUDIT_FINGERPRINT_ROWS=()
+  CRON_AUDIT_FAILURES=0
+  CRON_AUDIT_FINGERPRINT_ROWS=()
 
   local api_env_json web_env_json workflow_env_json workflow_task real_workflow_task fingerprint workflow_fingerprint
-  local api_service_json web_service_json workflow_service_json autodeploy_fingerprint_value
-  local api_autodeploy_trigger web_autodeploy_trigger workflow_autodeploy_trigger
+  local cron_env_json cron_fingerprint cron_service_id_value cron_lookup_ok
+  local cron_notification_json cron_notification_lookup_ok
+  local api_service_json web_service_json workflow_service_json cron_service_json autodeploy_fingerprint_value
+  local api_autodeploy_trigger web_autodeploy_trigger workflow_autodeploy_trigger cron_autodeploy_trigger
   local mode_pairs=()
   local mode_pair
   local workflow_pairs=()
   local api_profile_pairs=()
   local web_profile_pairs=()
   local workflow_profile_pairs=()
+  local cron_profile_pairs=()
   local api_allowed_keys=()
   local web_allowed_keys=()
   local workflow_allowed_keys=()
+  local cron_allowed_keys=()
   local audit_workflow_env=false
+  while IFS= read -r mode_pair; do
+    cron_profile_pairs+=("$mode_pair")
+  done < <(release_profile_expected_pairs cron "$expected_mode")
+  while IFS= read -r mode_pair; do
+    cron_allowed_keys+=("$mode_pair")
+  done < <(release_profile_allowed_keys cron)
   while IFS= read -r mode_pair; do
     mode_pairs+=("$mode_pair")
   done < <(expected_api_mode_pairs "$expected_mode")
@@ -733,10 +932,29 @@ audit_release_config() {
   api_autodeploy_trigger="$(release_profile_auto_deploy_trigger api)"
   web_autodeploy_trigger="$(release_profile_auto_deploy_trigger web)"
   workflow_autodeploy_trigger="$(release_profile_auto_deploy_trigger workflow)"
+  cron_autodeploy_trigger="$(release_profile_auto_deploy_trigger cron)"
   if [ "$audit_workflow_env" = "true" ]; then
     workflow_env_json="$(render_env_json "$WORKFLOW_SERVICE_ID")"
   else
     workflow_env_json="[]"
+  fi
+  cron_lookup_ok=true
+  cron_notification_lookup_ok=true
+  if ! cron_service_id_value="$(cron_service_id)"; then
+    cron_lookup_ok=false
+    cron_service_id_value=""
+  fi
+  if [ -n "$cron_service_id_value" ]; then
+    cron_env_json="$(render_env_json "$cron_service_id_value")"
+    cron_service_json="$(render_service_json "$cron_service_id_value")"
+    if ! cron_notification_json="$(render_service_notification_json "$cron_service_id_value")"; then
+      cron_notification_lookup_ok=false
+      cron_notification_json="{}"
+    fi
+  else
+    cron_env_json="[]"
+    cron_service_json="{}"
+    cron_notification_json="{}"
   fi
   echo "Argus release config audit"
   echo "expected_mode=$expected_mode"
@@ -770,6 +988,42 @@ audit_release_config() {
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_profile_pairs[@]}"
     audit_render_service_config "$workflow_env_json" "argus-backtests" "${workflow_pairs[@]}"
   fi
+  if [ "$cron_lookup_ok" != "true" ]; then
+    echo "drift $CRON_SERVICE_NAME:service_lookup_failed"
+    record_audit_failure "$CRON_SERVICE_NAME"
+  elif [ -n "$cron_service_id_value" ]; then
+    audit_forbidden_render_env_keys \
+      "$cron_env_json" \
+      "$CRON_SERVICE_NAME" \
+      "${ARGUS_FORBIDDEN_LEGACY_ENV[@]}"
+    audit_unexpected_render_env_keys \
+      "$cron_env_json" \
+      "$CRON_SERVICE_NAME" \
+      "${cron_allowed_keys[@]}"
+    audit_render_service_config \
+      "$cron_env_json" \
+      "$CRON_SERVICE_NAME" \
+      "${cron_profile_pairs[@]}"
+    audit_render_auto_deploy_trigger \
+      "$cron_service_json" \
+      "$CRON_SERVICE_NAME" \
+      "$cron_autodeploy_trigger"
+    audit_render_cron_runtime \
+      "$cron_service_json" \
+      "$CRON_SERVICE_NAME"
+    if [ "$cron_notification_lookup_ok" = "true" ]; then
+      audit_render_cron_notifications \
+        "$cron_notification_json" \
+        "$CRON_SERVICE_NAME"
+    else
+      echo "drift $CRON_SERVICE_NAME:notification_lookup_failed"
+      record_audit_row "$CRON_SERVICE_NAME" "notificationsToSend=<unknown>"
+      record_audit_failure "$CRON_SERVICE_NAME"
+    fi
+  else
+    echo "drift $CRON_SERVICE_NAME:service_absent"
+    record_audit_failure "$CRON_SERVICE_NAME"
+  fi
   workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_WORKFLOW_TASK)"
   real_workflow_task="$(render_env_status_value "$api_env_json" ARGUS_BACKTEST_REAL_WORKFLOW_TASK)"
   fingerprint="$(render_env_fingerprint)"
@@ -778,11 +1032,19 @@ audit_release_config() {
   else
     workflow_fingerprint="<skipped>"
   fi
+  if [ "$cron_lookup_ok" != "true" ]; then
+    cron_fingerprint="<unknown>"
+  elif [ -n "$cron_service_id_value" ]; then
+    cron_fingerprint="$(cron_config_fingerprint)"
+  else
+    cron_fingerprint="<absent>"
+  fi
   autodeploy_fingerprint_value="$(autodeploy_fingerprint)"
   echo "workflow_task=$workflow_task"
   echo "real_workflow_task=$real_workflow_task"
   echo "env_fingerprint=$fingerprint"
   echo "workflow_env_fingerprint=$workflow_fingerprint"
+  echo "cron_config_fingerprint=$cron_fingerprint"
   echo "autodeploy_fingerprint=$autodeploy_fingerprint_value"
   if [ "$audit_workflow_env" != "true" ]; then
     echo "workflow_env_status=skipped"
@@ -790,6 +1052,15 @@ audit_release_config() {
     echo "workflow_env_status=ready"
   else
     echo "workflow_env_status=drift"
+  fi
+  if [ "$cron_lookup_ok" != "true" ]; then
+    echo "cron_config_status=lookup_failed"
+  elif [ -z "$cron_service_id_value" ]; then
+    echo "cron_config_status=absent"
+  elif [ "$CRON_AUDIT_FAILURES" -eq 0 ]; then
+    echo "cron_config_status=ready"
+  else
+    echo "cron_config_status=drift"
   fi
   if [ "$AUTODEPLOY_AUDIT_FAILURES" -eq 0 ]; then
     echo "autodeploy_status=ready"
@@ -972,6 +1243,9 @@ case "$command" in
     ;;
   web-deploy-status)
     print_web_deploy_status
+    ;;
+  cron-deploy-status)
+    print_cron_deploy_status
     ;;
   api-safe-off)
     sync_api_safe_off

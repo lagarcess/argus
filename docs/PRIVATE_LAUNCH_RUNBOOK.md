@@ -33,18 +33,18 @@ The promotion target is `main`, but `codex/private-alpha-next` remains the
 integration staging branch until the founder approves promotion. Do not merge
 to `main` or open a release PR before that approval. Use the live Render deploy
 mode the founder deliberately approved. Manual deployment remains valid until
-the founder explicitly enables `checksPass` for all three services. Every
+the founder explicitly enables `checksPass` for all four services. Every
 candidate still follows the gate below and needs a release manifest before
 testers are invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
-API/web env fingerprint, workflow-service proof, canary evidence, rollback
-target, autodeploy proof for all three services, and approver.
+API/web env fingerprint, workflow-service proof, maintenance-cron proof, canary
+evidence, rollback target, autodeploy proof for all four services, and approver.
 
 The candidate below must be the exact would-be `main` promotion commit: the
 immutable commit produced from current `main` and the approved integration tree
 that will actually land and deploy. A worker or integration head is not
 sufficient when the landing method creates a different commit. If the landing
-method cannot preserve a pre-gated SHA, keep all three live autodeploy triggers
+method cannot preserve a pre-gated SHA, keep all four live autodeploy triggers
 manual through step 4 and gate the landed SHA before any deploy-capable action.
 
 Local preflight doctrine:
@@ -141,7 +141,7 @@ access if the fetch, ref resolution, or exact-SHA comparison fails. It then
 repeats schema parity and records the landing proof in the final JSON. Do not
 continue on any nonzero result. A squash, rebase, conflict edit, new merge
 commit, or concurrent `main` update invalidates the earlier report. Keep all
-three live triggers manual, check out the exact landed commit, rerun steps 1 and
+four live triggers manual, check out the exact landed commit, rerun steps 1 and
 2, then rerun the gate against the landed SHA as described in step 3 and replace
 the manifest evidence. When `checksPass` is already live, use only a landing
 method that preserves the pre-gated commit SHA; otherwise code can deploy before
@@ -150,21 +150,21 @@ the landed tree is verified.
 > [!WARNING]
 > **A Blueprint sync enables autodeploy after #470.** The repository declares
 > `autoDeployTrigger: checksPass`, but live Render was returned to manual
-> (`off`) for `argus-api`, `argus-app`, and `argus-backtests` on 2026-08-12
-> while the active promotion completes. After #470 is promoted, a Blueprint
-> sync directly turns `checksPass` on for the API and app even if the operator
-> intended only to reconcile unrelated configuration. The companion Workflow
-> API sync reads the same target from the release profile and turns it on for
-> `argus-backtests`. The normal three-service configuration sync can therefore
-> enable autodeploy for all three as a side effect of syncing configuration,
+> (`off`) for the three services that existed on 2026-08-12 while the active
+> promotion completes. A Blueprint sync turns `checksPass` on for the API and
+> app and creates or updates the `argus-maintenance` cron with the same trigger.
+> The companion Workflow API sync reads the same target from the release profile
+> and turns it on for `argus-backtests`. The normal four-surface configuration
+> sync can therefore enable autodeploy as a side effect of configuration work,
 > not as the result of a fresh deployment decision. Before step 5, obtain an
 > explicit founder decision to enable autodeploy. Without that decision, keep
-> all three live triggers manual and deploy all three services explicitly.
+> all four live triggers manual and deploy all four services explicitly.
 
-5. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
-   `argus-app` config drift needs reconciliation. Render Blueprints cannot
-   declare the `argus-backtests` Workflow service. Its release contract is held
-   in four separate places that must agree:
+5. In Render, sync the Blueprint from `render.yaml` when intentionally creating
+   or updating `argus-maintenance`, or when `argus-api` or `argus-app` config
+   drift needs reconciliation. Render Blueprints support cron services but
+   cannot declare the `argus-backtests` Workflow service. Its release contract
+   is held in four separate places that must agree:
 
    - the release profile declares the Workflow runtime and deploy target;
    - `.github/render-env-sync.sh workflow-runtime` applies that target through
@@ -176,12 +176,13 @@ the landed tree is verified.
    If any one of these four controls drifts, `argus-backtests` can stay stale
    even while the API and app advance, which is the failure caught on
    2026-08-11.
-6. Confirm Render is updating the existing `argus-app` and `argus-api` services.
-   Stop if Render proposes duplicate services.
+6. Confirm Render is updating the existing `argus-app` and `argus-api` services
+   and creating or updating exactly one `argus-maintenance` cron. Stop if Render
+   proposes any duplicate service or another scheduled janitor.
 7. Confirm the live deploy mode matches the deliberate founder decision and is
-   uniform across `argus-api`, `argus-app`, and the Git-linked
-   `argus-backtests` Workflow: either all three are manual (`off`) or all three
-   use `checksPass`. Never enable autodeploy for only a subset of the three.
+   uniform across `argus-api`, `argus-app`, the Git-linked `argus-backtests`
+   Workflow, and `argus-maintenance`: either all four are manual (`off`) or all
+   four use `checksPass`. Never enable autodeploy for only a subset.
    The repository target is not proof that live enablement was approved.
 8. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
@@ -209,12 +210,13 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-10. Deploy **all three live services** from the candidate commit:
-   `argus-api`, then `argus-app`, then **`argus-backtests`**.
+10. Deploy **all four live services** from the candidate commit:
+   `argus-api`, then `argus-app`, then `argus-backtests`, then
+   **`argus-maintenance`**.
 
-   When all three live triggers use `checksPass`, a commit on the configured
+   When all four live triggers use `checksPass`, a commit on the configured
    deployment branch deploys after its checks pass. In manual mode, explicitly
-   deploy the candidate using the same three-service order.
+   deploy the candidate using the same four-service order.
 
    **`argus-backtests` is the easiest one to forget and the one that breaks the
    canary.** It is the Render Workflow service that actually runs backtests, it
@@ -222,31 +224,32 @@ Restart `argus-api` after changing Render env values.
    2026-08-11. On that promotion the API and web shipped while the workflow
    service stayed a week behind, and the canary stopped at
    `workflow_commit_mismatch` before spending money on a paid journey. Deploy it
-   every time, and never let a promotion finish with the three on different
+   every time, and never let a promotion finish with the four on different
    commits.
 
-11. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
-   commits match the candidate commit you intend to test and that their latest
-   versions are ready:
+11. Confirm the live `argus-api`, `argus-app`, `argus-backtests`, and
+   `argus-maintenance` deploy commits match the candidate commit you intend to
+   test and that their latest versions are ready:
 
 ```bash
 ARGUS_RELEASE_SHA="$(git rev-parse HEAD)"
 .github/render-env-sync.sh api-deploy-status
 .github/render-env-sync.sh web-deploy-status
 .github/render-env-sync.sh workflow-version-status
+.github/render-env-sync.sh cron-deploy-status
 ```
 
-If any of the three deployed commits is not `ARGUS_RELEASE_SHA`, stop and deploy
+If any of the four deployed commits is not `ARGUS_RELEASE_SHA`, stop and deploy
 that stale service before running the strict canaries. The canary script
 enforces the same deployed SHA/status check with `ARGUS_CANARY_SHA`, and its
-resolver compares all three, which is what caught the workflow service running
+resolver compares all four, which is what caught the workflow service running
 behind on 2026-08-11.
 
 For `argus-backtests`, Render exposes the deployed Git commit as the ready
 Workflow version name, currently a seven-character SHA prefix. The status and
-canary resolvers require that prefix to match the exact API/web commit. They do
-not trust mutable workflow env markers, so checks-passing and manual releases
-use the same version-owned proof.
+canary resolvers require that prefix to match the exact API/web/cron commit.
+They do not trust mutable workflow env markers, so checks-passing and manual
+releases use the same version-owned proof.
 
 12. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
@@ -332,8 +335,9 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-workflow version status, local smoke, warmup, the authoritative Spanish release
-canary, and the release manifest all pass against the intended candidate commit.
+workflow version status, cron deploy-status, local smoke, warmup, the
+authoritative Spanish release canary, and the release manifest all pass against
+the intended candidate commit.
 If any service reports a different commit, deploy the candidate branch before
 continuing. If
 warmup fails, do not invite testers yet. Check Render service status and redeploy
@@ -403,17 +407,22 @@ a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
 remains the API/web environment fingerprint; record it as
 `api_web_env_fingerprint` and keep the raw script output for traceability. The
 workflow proof is recorded separately as `workflow_env_fingerprint` and
-`workflow_env_status`. The workflow env proof must show
+`workflow_env_status`; the maintenance proof uses `cron_config_fingerprint` and
+`cron_config_status`. The workflow env proof must show
 `workflow_env_status=ready`, `ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider`,
 redacted-present required workflow secrets,
 `workflow_runtime_provider_mode=live_provider`, and
-`workflow_runtime_proof=ready` before tester exposure. The manifest must also
-name the candidate SHA, deployed API/web SHAs, `workflow_task`,
+`workflow_runtime_proof=ready` before tester exposure. The maintenance proof
+must show `cron_config_status=ready`, a live `argus-maintenance` deploy, and the
+same candidate SHA. The manifest must also name the candidate SHA, deployed
+API/web/cron SHAs, `workflow_task`,
 `real_workflow_task`, backtest service mode, workflow-service proof for
 `argus-backtests`, canary evidence, rollback target, and approver.
 
-The stale job scan is an operator-run step. It is not a deployed release
-surface, and nothing runs it automatically.
+The stale job scan belongs to the target `argus-maintenance` release surface.
+The checked-in cron declaration is not hosted proof. Until the activation gate
+below passes, the warmup scan and operator-run entry point remain the only
+effective triggers.
 
 **Destructive ops jobs refuse to guess their target.** `DATABASE_URL`,
 `SUPABASE_URL` (or `SUPABASE_PROJECT_URL`), and `SUPABASE_SERVICE_ROLE_KEY`
@@ -497,6 +506,7 @@ Keep true secrets manual in Render:
 - `DATABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_JWT_SECRET`
+- `RENDER_API_KEY`
 - `OPENROUTER_API_KEY`
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
@@ -518,11 +528,10 @@ profiles.
 Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
 `sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
 
-## Operator-Run Maintenance
+## Scheduled Maintenance
 
-Maintenance is not a Render service and is not part of the deployed release
-topology. An operator runs the retained entry point from a laptop against an
-explicit target:
+`argus-maintenance` is the fourth target release surface. Render runs one shared
+entry point for every recurring janitor after the cron passes hosted activation:
 
 ```bash
 poetry run python scripts/ops/scheduled_maintenance.py
@@ -530,8 +539,28 @@ poetry run python scripts/ops/scheduled_maintenance.py
 
 That pass runs guest workspace retention first, then stale and stranded
 backtest job reconciliation. Every job runs even when an earlier one fails, so
-one failure never hides another. The retention windows in `DATA_MODEL.md` hold
-only as often as an operator runs this command.
+one failure never hides another.
+
+| Field | Value |
+| --- | --- |
+| Service | `argus-maintenance` (Render cron, `region: virginia`, `plan: starter`) |
+| Schedule | `*/15 * * * *`, UTC |
+| Owner | Render workspace owner for `lagarcess/argus` |
+| Alert destination | `support@get-argus.com`; set the Render service notification override to `failure` before activation |
+| Env contract | `ARGUS_RENDER_CRON_ENV` in `.github/argus-env.sh` and the `cron` surface of `.github/private-alpha-release-profile.json` |
+
+The cadence matches the stale job threshold of fifteen minutes. A stranded job
+therefore waits at most one threshold plus one schedule gap before settlement.
+The same cadence gives guest retention enough bounded passes to drain a backlog.
+Both jobs are no-ops when there is no eligible work and remain safe under a
+repeated scheduled invocation. The checked-in cron declaration is not hosted
+proof: before the live service, exact deployed SHA, alert route, and first
+scheduled run are read back, an operator must continue running the shared entry
+point when maintenance is needed.
+
+This job runs on Render rather than GitHub Actions because it deletes production
+rows. Keeping the service-role credential in Render avoids making write access
+to a workflow file equivalent to production delete access.
 
 The pass exits nonzero if any job fails, and prints a final JSON summary line
 with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
@@ -539,11 +568,22 @@ with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
 `selected`/`auth_deleted`/`auth_delete_failed`/`purge_failed` counts, and the
 reconciler prints its scan report.
 
-Provide `DATABASE_URL`, `SUPABASE_URL` or `SUPABASE_PROJECT_URL`,
-`SUPABASE_SERVICE_ROLE_KEY`, and `RENDER_API_KEY` only in the operator process.
-Do not copy production deletion credentials into CI. Record the command target,
-timestamp, final summary line, and selected or purged counts in operator
-evidence.
+Set `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, `RENDER_API_KEY`, and `POSTHOG_PROJECT_TOKEN`
+manually on this Render service before the first run. `RENDER_API_KEY` lets the
+reconciler inspect terminal task runs; without it the pass exits degraded.
+Do not copy production deletion credentials into CI.
+
+Every release must read back `.github/render-env-sync.sh cron-deploy-status`,
+require `status=live`, and match its full commit to the candidate. The
+`release-config-audit` output must also report `cron_config_status=ready` and a
+64-character `cron_config_fingerprint`. That fingerprint covers the environment,
+runtime, schedule, build command, shared maintenance entry point, and
+`notificationsToSend=failure` override. To activate
+the scheduler, record one real scheduled run with timestamp, final summary line,
+and selected or purged counts, including documented zeros on an empty window.
+After activation, manual invocation is reserved for diagnosis or draining a
+backlog faster than the schedule.
 
 ## Runtime Tuning Flags
 
@@ -606,10 +646,10 @@ site key, non-loopback production preserves the auth landing rather than
 beginning an unusable Guest bootstrap. Do not mutate hosted Auth configuration
 as part of a code promotion.
 
-Guest cleanup is an operator-run step, and nothing runs this deletion
-automatically. The at-least-daily floor is an operator's responsibility, and the
-retention windows in `DATA_MODEL.md` hold exactly as often as someone runs the
-command below.
+After hosted activation, guest cleanup runs every fifteen minutes through
+`argus-maintenance`. The database expiry columns identify eligibility but do not
+schedule deletion. Until the activation evidence above exists, an operator must
+run the shared entry point for the retention window to hold.
 
 To inspect what the next scheduled pass would select, without deleting:
 

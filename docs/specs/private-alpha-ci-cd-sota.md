@@ -138,23 +138,26 @@ contracts.
 
 ### Current Service Topology
 
-The stable target topology is three live services:
+The stable target topology is four live services:
 
 - `argus-app`: web surface
 - `argus-api`: chat/runtime/orchestration surface
 - `argus-backtests`: workflow execution surface
+- `argus-maintenance`: scheduled retention and stale-job reconciliation surface
 
-Render Blueprints declare the API and web services, but do not support Workflow
-services. `argus-backtests` is therefore guaranteed by the explicit workflow
-runtime sync, release, and version-status checks in
-`docs/PRIVATE_LAUNCH_RUNBOOK.md`. All three Git-linked services use
-`checksPass` autodeploy. Enabling only API and web would increase workflow skew.
-Workflow deploy proof comes from the ready Render version id and its Git commit
-prefix, not from mutable env markers that an automatic release cannot refresh.
+Render Blueprints declare the API, web, and cron services, but do not support
+Workflow services. `argus-backtests` is therefore guaranteed by the explicit
+workflow runtime sync, release, and version-status checks in
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`. All four Git-linked services use `checksPass`
+autodeploy. Enabling only a subset would increase release skew. Workflow deploy
+proof comes from the ready Render version id and its Git commit prefix; cron
+proof comes from the live Render deploy readback. Neither trusts a mutable env
+marker that an automatic release cannot refresh.
 
-Guest retention and stale-job reconciliation remain operator-run jobs through
-`scripts/ops/scheduled_maintenance.py`. They are not a fourth deployed release
-surface.
+`argus-maintenance` runs `scripts/ops/scheduled_maintenance.py` every fifteen
+minutes so every recurring janitor shares one schedule and one failure surface.
+Its credentials, env fingerprint, live status, and deployed SHA are part of the
+release audit and coherence canary that enumerate all four services.
 
 The workflow surface has two explicit tasks, not two separate services:
 
@@ -222,7 +225,7 @@ Use the following progression when moving from integration to `main`:
 2. Validate on the staging/private-alpha surface with the proof workflow task.
 3. Select and record the target environment, intended config contract, and
    landing method without syncing or changing the live environment. If the
-   landing method cannot preserve one pre-gated commit SHA, keep all three live
+   landing method cannot preserve one pre-gated commit SHA, keep all four live
    autodeploy triggers manual until the landed commit is gated.
 4. Create or resolve the exact would-be `main` promotion commit from current
    `main` and the approved integration tree without publishing it. This must be
@@ -693,8 +696,9 @@ The current checkout and private-alpha deploy evidence show:
 - Render services are configured with branch `main` and `checksPass`
   autodeploy. The workflow is not Blueprint-managed, so its matching trigger is
   enforced by the release profile, runtime sync, and live audit. Its ready
-  version name supplies the deployed Git prefix used by the three-service SHA
-  resolver for both automatic and manual releases.
+  version name supplies the deployed Git prefix used by the four-surface SHA
+  resolver for both automatic and manual releases. The cron must expose the
+  exact same full commit through its latest live deploy.
 - The live API is in `real-workflow` mode now, but the effective env contract
   should still be audited before each invite.
 - The intended pre-deploy check is a local ephemeral stack, not a second live

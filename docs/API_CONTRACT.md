@@ -3330,6 +3330,12 @@ Contract rules:
   the finalized packet is stored under the requesting turn's key, and an
   identical question within the class TTL answers inline with
   `cache_status: "hit"`, no job, and no provider spend.
+- The public job contract exposes a stale `chat.research` settlement as
+  `failed`, with `failure_code = "research_poller_lost"` and
+  `retryable = true`. `docs/DATA_MODEL.md` owns that terminal transition;
+  `docs/PRIVATE_LAUNCH_RUNBOOK.md` owns scheduler activation and release proof.
+  Reconciliation does not resume the paid provider request or persist a
+  replacement assistant message.
 - Runnable rows name assets in one vocabulary: a short display name derived
   from the resolver's own name (listing boilerplate like "Common Stock" or
   "Inc." stripped, share classes kept) plus the resolver-verified ticker.

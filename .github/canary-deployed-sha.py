@@ -36,15 +36,19 @@ def _workflow_commit_matches(full_sha: str, workflow_sha: str) -> bool:
 
 
 def resolve_deployed_sha(
-    *, api_status: str, web_status: str, workflow_status: str
+    *, api_status: str, web_status: str, workflow_status: str, cron_status: str
 ) -> str:
     api = _status_values(api_status)
     web = _status_values(web_status)
     workflow = _status_values(workflow_status)
+    cron = _status_values(cron_status)
 
     _require(_value(api, "status") == "live", "api_deploy_not_live")
     _require(_value(web, "status") == "live", "web_deploy_not_live")
     _require(_value(workflow, "status") == "ready", "workflow_version_not_ready")
+    cron_state = _value(cron, "status")
+    _require(cron_state not in {"", "lookup_failed"}, "cron_status_unavailable")
+    _require(cron_state == "live", "cron_deploy_not_live")
 
     workflow_version_id = _value(workflow, "workflow_version_id")
     _require(bool(workflow_version_id), "workflow_version_id_missing")
@@ -57,6 +61,7 @@ def resolve_deployed_sha(
         _workflow_commit_matches(api_sha, workflow_sha),
         "workflow_commit_mismatch",
     )
+    _require(api_sha == _value(cron, "commit"), "cron_deploy_sha_mismatch")
     return api_sha
 
 
@@ -65,6 +70,7 @@ def main() -> int:
     parser.add_argument("--api-status", required=True)
     parser.add_argument("--web-status", required=True)
     parser.add_argument("--workflow-status", required=True)
+    parser.add_argument("--cron-status", required=True)
     args = parser.parse_args()
     try:
         print(
@@ -72,6 +78,7 @@ def main() -> int:
                 api_status=args.api_status,
                 web_status=args.web_status,
                 workflow_status=args.workflow_status,
+                cron_status=args.cron_status,
             )
         )
     except ValueError as error:

@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 LOCALES_DIR = ROOT / "web" / "public" / "locales"
-SURFACES = ("api", "web", "workflow")
+SURFACES = ("api", "web", "workflow", "cron")
 FORBIDDEN_KEY_FRAGMENTS = (
     "candidate_sha",
     "deploy_id",
@@ -70,11 +70,14 @@ def validate_profile(profile: dict[str, Any]) -> None:
 
     services = _require_mapping(profile.get("services"), "services")
     if set(services) != set(SURFACES):
-        raise ProfileValidationError("services must define api, web, and workflow")
+        raise ProfileValidationError(
+            "services must define api, web, workflow, and cron"
+        )
     expected_names = {
         "api": "argus-api",
         "web": "argus-app",
         "workflow": "argus-backtests",
+        "cron": "argus-maintenance",
     }
     for surface, expected_name in expected_names.items():
         service = _require_mapping(services.get(surface), f"services.{surface}")
@@ -98,6 +101,18 @@ def validate_profile(profile: dict[str, Any]) -> None:
             raise ProfileValidationError(f"services.{surface}.optional must be a list of strings")
         if set(env).intersection(required_present) or set(env).intersection(optional) or set(required_present).intersection(optional):
             raise ProfileValidationError(f"services.{surface} repeats environment keys")
+
+    cron = _require_mapping(services.get("cron"), "services.cron")
+    for field in ("runtime", "schedule", "build_command", "start_command"):
+        value = cron.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ProfileValidationError(
+                f"services.cron.{field} must be a non-empty string"
+            )
+    if cron.get("notifications_to_send") not in {"failure", "all"}:
+        raise ProfileValidationError(
+            "services.cron.notifications_to_send must include failure notifications"
+        )
 
     workflow = _require_mapping(profile.get("workflow"), "workflow")
     if workflow.get("proof_task") != "argus-backtests/workflow_proof":
@@ -212,6 +227,15 @@ def auto_deploy_trigger(profile: dict[str, Any], surface: str) -> str:
     return value
 
 
+def service_value(profile: dict[str, Any], surface: str, field: str) -> str:
+    value = profile["services"][surface].get(field)
+    if not isinstance(value, str) or not value:
+        raise ProfileValidationError(
+            f"services.{surface}.{field} must be a string"
+        )
+    return value
+
+
 def _nested_value(payload: dict[str, Any], path: str) -> str:
     current: object = payload
     for part in path.split("."):
@@ -258,6 +282,19 @@ def main() -> int:
     env_value_parser.add_argument("key")
     autodeploy_parser = subparsers.add_parser("auto-deploy-trigger")
     autodeploy_parser.add_argument("surface", choices=SURFACES)
+    service_value_parser = subparsers.add_parser("service-value")
+    service_value_parser.add_argument("surface", choices=SURFACES)
+    service_value_parser.add_argument(
+        "field",
+        choices=(
+            "name",
+            "runtime",
+            "schedule",
+            "notifications_to_send",
+            "build_command",
+            "start_command",
+        ),
+    )
     present_parser = subparsers.add_parser("required-present")
     present_parser.add_argument("surface", choices=SURFACES)
     allowed_parser = subparsers.add_parser("allowed-keys")
@@ -291,6 +328,8 @@ def main() -> int:
             print(env_value(profile, args.surface, args.key))
         elif args.command == "auto-deploy-trigger":
             print(auto_deploy_trigger(profile, args.surface))
+        elif args.command == "service-value":
+            print(service_value(profile, args.surface, args.field))
         elif args.command == "required-present":
             print("\n".join(required_present(profile, args.surface)))
         elif args.command == "allowed-keys":

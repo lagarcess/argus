@@ -8,6 +8,12 @@ ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="https://argus-app-suz5.onrender.com,https://a
 ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID="srv-d78tanmuk2gs73e17nn0"
 ARGUS_PRIVATE_LAUNCH_WEB_SERVICE_ID="srv-d7ap6bmslomc73eqp8m0"
 ARGUS_RENDER_BACKTESTS_WORKFLOW_ID="wfl-d8hpsmuq1p3s73duv3q0"
+ARGUS_RELEASE_PROFILE_TOOL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/private-alpha-release-profile.py"
+# Blueprint-created, so release tooling derives its canonical name from the
+# release profile and resolves its id from Render.
+ARGUS_RENDER_MAINTENANCE_SERVICE_NAME="$(
+  python3 "$ARGUS_RELEASE_PROFILE_TOOL" service-value cron name
+)"
 ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"
 ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"
 ARGUS_RENDER_POETRY_VERSION="2.1.3"
@@ -118,6 +124,13 @@ ARGUS_RENDER_WEB_ENV=(
   NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
   NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED
 )
+
+ARGUS_RENDER_CRON_ENV=()
+while IFS= read -r ARGUS_RELEASE_PROFILE_KEY; do
+  [ -n "$ARGUS_RELEASE_PROFILE_KEY" ] || continue
+  ARGUS_RENDER_CRON_ENV+=("$ARGUS_RELEASE_PROFILE_KEY")
+done < <(python3 "$ARGUS_RELEASE_PROFILE_TOOL" allowed-keys cron)
+unset ARGUS_RELEASE_PROFILE_KEY
 
 ARGUS_RENDER_WORKFLOW_PROOF_ENV=(
   APP_ENV

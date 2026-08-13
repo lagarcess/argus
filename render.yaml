@@ -181,3 +181,41 @@ services:
         value: "true"
       - key: NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED
         value: "false"
+
+  # One schedule owns every recurring janitor. Keeping the service-role key on
+  # Render avoids turning a GitHub workflow edit into production delete access.
+  - type: cron
+    name: argus-maintenance
+    runtime: python
+    repo: https://github.com/lagarcess/argus
+    branch: main
+    rootDir: .
+    region: virginia
+    plan: starter
+    schedule: "*/15 * * * *"
+    autoDeployTrigger: checksPass
+    buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
+    startCommand: poetry run python scripts/ops/scheduled_maintenance.py
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: POETRY_VERSION
+        value: "2.1.3"
+      - key: ARGUS_PERSISTENCE_MODE
+        value: supabase
+      - key: ARGUS_DEV_MEMORY_FALLBACK
+        value: "false"
+      - key: POSTHOG_REGION
+        value: us
+      - key: POSTHOG_PROJECT_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false

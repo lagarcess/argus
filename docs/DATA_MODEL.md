@@ -1380,14 +1380,15 @@ Job lifecycle status is separate from engine/runtime failure semantics.
 
 - `status` answers where the job is in its lifecycle.
 - `failure_code` is a stable machine code such as `market_data_unavailable`,
-  `invalid_date_range`, `unsupported_indicator`, or `workflow_timeout`.
+  `invalid_date_range`, `unsupported_indicator`, `workflow_timeout`, or
+  `research_poller_lost`.
 - `failure_detail` is a user-safe grouping such as `market_data_issue`,
   `invalid_date_window`, `unsupported_rule`, or `execution_failed`.
 - `retryable` is computed from the failure category, failure code, attempts, and
   whether an intent-preserving corrected payload exists.
 - `execution_metadata` may store private operational evidence such as workflow
-  run id, cache hit/miss, provider fetch duration, compute duration, attempt
-  count, and source error kind.
+  run id, `perplexity_background_id`, cache hit/miss, provider fetch duration,
+  compute duration, attempt count, and source error kind.
 - `succeeded` is valid only after `result_run_id` links to the fully finalized
   run/evidence tuple. A recoverable persistence-side failure uses
   `status = failed`, `failure_code = finalization_failed`, and
@@ -1410,6 +1411,20 @@ transitions release running capacity immediately. The finalizer and stale
 reconciler serialize on the same locked job row; after the stale failure wins,
 late finalization cannot create or attach a public Run or replace the terminal
 outcome.
+
+The production release contract schedules the shared
+`scripts/ops/scheduled_maintenance.py` entry point every fifteen minutes on the
+Render `argus-maintenance` cron. Hosted enforcement starts only after release
+readback proves that service is live on the candidate SHA and records a
+scheduled run. Its
+stale-job pass settles a `chat.research` row that remains `queued` or `running`
+past the fifteen-minute threshold as `failed`, with
+`failure_code = research_poller_lost` and `retryable = true`. The settlement
+uses the same compare-and-set boundary as every other terminal job transition,
+so a surviving poller cannot lose a completed answer to the janitor. This lane
+does not resume the provider background request: spending on a durable provider
+id, writing an assistant message outside a request, and settling metering remain
+a separate recovery contract.
 
 ### Notes
 - Jobs are idempotent at
@@ -1545,9 +1560,11 @@ foreign key to `profiles.id`.
   so it is deleted only when a successful non-dry-run of the guest cleanup job
   reaches the purge: `purge_expired_visitor_usage` is registered in
   `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every non-dry-run
-  `scripts/ops/cleanup_expired_guest_workspaces.py`. Retention therefore holds
-  exactly as often as an operator runs that job. It is not a deployed release
-  surface. See the runbook's Operator-Run Maintenance section.
+  `scripts/ops/cleanup_expired_guest_workspaces.py`. Once hosted activation is
+  proved, the `argus-maintenance` cron invokes that job every fifteen minutes
+  through the shared maintenance entry point. Until then, retention holds only
+  as often as an operator runs that entry point. See the runbook's Scheduled
+  Maintenance section.
 
 ### Discovery policy
 - A guest receives two grounded searches per visitor per day. Renewing the
@@ -1595,8 +1612,9 @@ user-keyed milestone would re-fire on every renewal. Like
   deletes it: `purge_expired_guest_funnel_milestones` is registered
   in `argus.domain.guest_cleanup.EXPIRING_DATA_PURGES` and runs on every
   non-dry-run `scripts/ops/cleanup_expired_guest_workspaces.py`. A visitor who
-  never returns is deleted by that job, not by the takeover path. Retention
-  therefore holds exactly as often as an operator runs that job.
+  never returns is deleted by that job, not by the takeover path. Once hosted
+  activation is proved, the `argus-maintenance` cron invokes it every fifteen
+  minutes; until then, an operator must run the shared entry point.
 - `claim_guest_funnel_milestone` also takes over an already-expired claim in the
   same statement, so a returning visitor is correct even between purge runs.
 
