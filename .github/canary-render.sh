@@ -760,6 +760,9 @@ mint_browser_session_state() {
     ARGUS_CANARY_BROWSER_SESSION_HANDOFF="$BROWSER_SESSION_HANDOFF" \
       bun e2e/support/private-alpha-canary-session.ts mint
   ); then
+    if [ -s "$BROWSER_SESSION_HANDOFF" ]; then
+      BROWSER_SESSION_MINTED="true"
+    fi
     return 1
   fi
   BROWSER_SESSION_MINTED="true"

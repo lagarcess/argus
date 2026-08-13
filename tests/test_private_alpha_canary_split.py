@@ -48,6 +48,7 @@ def _supabase_session_stub(
     profile_exists: bool = True,
     profile_is_admin: bool = False,
     profile_bootstrap_status: int = 200,
+    logout_statuses: tuple[int, ...] = (204,),
 ) -> Iterator[tuple[str, list[dict[str, Any]]]]:
     calls: list[dict[str, Any]] = []
     access_token = _jwt(
@@ -80,6 +81,7 @@ def _supabase_session_stub(
     }
     users = [user] if listed_user else []
     profile_state = {"exists": profile_exists}
+    logout_state = {"attempt": 0}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: Any) -> None:
@@ -188,7 +190,10 @@ def _supabase_session_stub(
                 )
                 return
             if self.path == "/auth/v1/logout?scope=local":
-                self._respond({}, status_code=204)
+                attempt = logout_state["attempt"]
+                logout_state["attempt"] += 1
+                status_code = logout_statuses[min(attempt, len(logout_statuses) - 1)]
+                self._respond({}, status_code=status_code)
                 return
             self._respond({"error": "not_found"}, status_code=404)
 
@@ -483,6 +488,72 @@ def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
     assert service_role_key not in result.stdout + result.stderr
     assert email not in result.stdout + result.stderr
     assert any(call["path"] == "/auth/v1/logout?scope=local" for call in calls)
+
+
+def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
+    tmp_path: Path,
+    faker: Faker,
+) -> None:
+    email = faker.email().lower()
+    service_role_key = "test-service-role-key"
+    handoff_path = tmp_path / "session-handoff.json"
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        metadata_role="developer",
+        logout_statuses=(503, 204),
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_APP_URL": "https://app.example.test",
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": service_role_key,
+                "ARGUS_CANARY_BROWSER_STORAGE_STATE": str(
+                    tmp_path / "storage-state.json"
+                ),
+                "ARGUS_CANARY_BROWSER_SESSION_HANDOFF": str(handoff_path),
+            }
+        )
+        failed_mint = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        retry = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "revoke"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert failed_mint.returncode != 0
+    assert "canary_session_revocation_failed" in failed_mint.stderr
+    assert handoff_path.stat().st_size > 0
+    assert stat.S_IMODE(handoff_path.stat().st_mode) == 0o600
+    assert retry.returncode == 0, retry.stderr
+    assert retry.stdout.strip() == "canary_session_revocation=completed"
+    assert service_role_key not in failed_mint.stdout + failed_mint.stderr
+    assert email not in failed_mint.stdout + failed_mint.stderr
+    logout_calls = [
+        call for call in calls if call["path"] == "/auth/v1/logout?scope=local"
+    ]
+    assert len(logout_calls) == 2
+
+    render_runner = _source(".github/canary-render.sh")
+    mint_wrapper = render_runner.split("mint_browser_session_state() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    assert '[ -s "$BROWSER_SESSION_HANDOFF" ]' in mint_wrapper
+    assert 'BROWSER_SESSION_MINTED="true"' in mint_wrapper
 
 
 def test_session_tool_rejects_a_stale_admin_profile_before_mint(

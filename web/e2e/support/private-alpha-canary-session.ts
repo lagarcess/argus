@@ -361,6 +361,33 @@ async function revokeTokens(accessToken: string): Promise<void> {
   if (!response.ok) throw new Error("canary_session_revocation_failed");
 }
 
+function handoffForSession(session: Session, email: string): SessionHandoff {
+  return {
+    schema_version: 1,
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_at: session.expires_at ?? 0,
+    user_id: session.user.id,
+    email,
+  };
+}
+
+async function writePrivateSessionHandoff(
+  sessionPath: string,
+  handoff: SessionHandoff,
+): Promise<void> {
+  await writeFile(sessionPath, `${JSON.stringify(handoff)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  await chmod(sessionPath, 0o600);
+}
+
+async function clearPrivateSessionHandoff(sessionPath: string): Promise<void> {
+  await writeFile(sessionPath, "", { encoding: "utf8", mode: 0o600 });
+  await chmod(sessionPath, 0o600);
+}
+
 async function mint(): Promise<void> {
   const email = requiredEnv("ARGUS_CANARY_EMAIL").toLocaleLowerCase();
   const storagePath = requiredEnv("ARGUS_CANARY_BROWSER_STORAGE_STATE");
@@ -373,8 +400,12 @@ async function mint(): Promise<void> {
   ]);
 
   const session = await mintDedicatedSession(email);
+  const handoff = handoffForSession(session, email);
+  let handoffReady = false;
 
   try {
+    await writePrivateSessionHandoff(sessionPath, handoff);
+    handoffReady = true;
     assertLeastPrivilege(session, email);
     await assertNonAdminProfile(session.user.id);
     const cookies = await storageStateCookies(session);
@@ -395,25 +426,23 @@ async function mint(): Promise<void> {
       })),
       origins: [],
     };
-    const handoff: SessionHandoff = {
-      schema_version: 1,
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-      expires_at: session.expires_at ?? 0,
-      user_id: session.user.id,
-      email,
-    };
     await writeFile(storagePath, `${JSON.stringify(storageState)}\n`, {
       encoding: "utf8",
       mode: 0o600,
     });
-    await writeFile(sessionPath, `${JSON.stringify(handoff)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await Promise.all([chmod(storagePath, 0o600), chmod(sessionPath, 0o600)]);
+    await chmod(storagePath, 0o600);
   } catch (error) {
-    await revokeTokens(session.access_token).catch(() => undefined);
+    try {
+      await revokeTokens(session.access_token);
+    } catch {
+      if (!handoffReady) {
+        await writePrivateSessionHandoff(sessionPath, handoff).catch(
+          () => undefined,
+        );
+      }
+      throw new Error("canary_session_revocation_failed");
+    }
+    if (handoffReady) await clearPrivateSessionHandoff(sessionPath);
     throw error;
   }
   console.log("canary_session_state=ready");
