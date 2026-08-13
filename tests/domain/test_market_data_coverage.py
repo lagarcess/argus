@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
@@ -11,7 +11,9 @@ from argus.domain.backtesting.coverage import (
     prepare_market_data,
 )
 from argus.domain.engine import build_result_chart, compute_alpha_metrics
-from argus.domain.market_data.capabilities import EquityMarketSession
+from argus.domain.market_data.capabilities import EASTERN, EquityMarketSession
+
+_UTC_EASTERN_DATE_BOUNDARY_NOW = datetime.fromisoformat("2026-08-13T01:00:00+00:00")
 
 
 def _bars(*days: str, base: float = 100.0) -> pd.DataFrame:
@@ -265,7 +267,7 @@ def test_multi_symbol_and_benchmark_common_window_loss_is_material(
 
 
 def test_continuous_market_classifications_never_use_the_equity_calendar() -> None:
-    today = date.today()
+    today = _UTC_EASTERN_DATE_BOUNDARY_NOW.astimezone(timezone.utc).date()
     requested_start = today - timedelta(days=4)
     latest_complete = today - timedelta(days=1)
     complete_days = tuple(
@@ -284,6 +286,7 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
             {"ETH": _bars(*complete_days), "BTC": _bars(*complete_days)}
         ),
         fetch_market_calendar_func=_no_equity_calendar,
+        now=_UTC_EASTERN_DATE_BOUNDARY_NOW,
     )
     latest_complete_alignment = prepare_market_data(
         {
@@ -301,6 +304,7 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
             {"ETH": _bars(*complete_days), "BTC": _bars(*complete_days)}
         ),
         fetch_market_calendar_func=_no_equity_calendar,
+        now=_UTC_EASTERN_DATE_BOUNDARY_NOW,
     )
     provider_truncated = prepare_market_data(
         {
@@ -317,6 +321,7 @@ def test_continuous_market_classifications_never_use_the_equity_calendar() -> No
             }
         ),
         fetch_market_calendar_func=_no_equity_calendar,
+        now=_UTC_EASTERN_DATE_BOUNDARY_NOW,
     )
 
     assert exact.adjustment_reason == "none"
@@ -328,7 +333,7 @@ def test_relative_equity_period_ending_today_aligns_to_latest_completed_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
-    today = date.today()
+    today = _UTC_EASTERN_DATE_BOUNDARY_NOW.astimezone(EASTERN).date()
     latest_complete = today - timedelta(days=1)
     while latest_complete.weekday() >= 5:
         latest_complete -= timedelta(days=1)
@@ -353,6 +358,7 @@ def test_relative_equity_period_ending_today_aligns_to_latest_completed_session(
         },
         fetch_ohlcv_func=_fetcher({"AAPL": bars, "SPY": bars}),
         fetch_market_calendar_func=_session_calendar(*sessions),
+        now=_UTC_EASTERN_DATE_BOUNDARY_NOW,
     )
 
     assert prepared.outcome == "adjusted_coverage"

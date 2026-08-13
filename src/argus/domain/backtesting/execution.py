@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any, Literal
 
 import pandas as pd
@@ -21,6 +22,20 @@ class ExecutionEvent:
     side: Literal["buy", "sell"] | None = None
     action: Literal["open", "add", "close", "hold", "ignore"] | None = None
     reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ClosedTrade:
+    symbol: str
+    opened_at: pd.Timestamp
+    closed_at: pd.Timestamp
+    net_pnl: float
+
+
+@dataclass(frozen=True)
+class LongOnlyExecutionResult:
+    equity_curve: pd.Series
+    closed_trades: tuple[ClosedTrade, ...]
 
 
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
@@ -181,6 +196,99 @@ def _execution_fill_count(
         1
         for event in execution_events
         if event.event_type == "fill" and (side is None or event.side == side)
+    )
+
+
+def _execute_long_only_ledger(
+    *,
+    execution_events: list[ExecutionEvent],
+    close: pd.Series,
+    initial_capital: float,
+    fees: float,
+    slippage: float,
+) -> LongOnlyExecutionResult:
+    """Value portfolio equity and completed positions from one fill ledger."""
+
+    normalized_close = close.astype(float)
+    if normalized_close.empty or not normalized_close.index.is_unique:
+        raise ValueError("execution_price_unavailable")
+    cash = float(initial_capital)
+    if not isfinite(cash) or cash <= 0.0:
+        raise ValueError("execution_capital_invalid")
+
+    fills_by_timestamp: dict[pd.Timestamp, list[ExecutionEvent]] = {}
+    fill_count = 0
+    for event in execution_events:
+        if event.event_type != "fill":
+            continue
+        fills_by_timestamp.setdefault(pd.Timestamp(event.timestamp), []).append(event)
+        fill_count += 1
+
+    open_symbol: str | None = None
+    opened_at: pd.Timestamp | None = None
+    opening_capital = 0.0
+    shares = 0.0
+    closed: list[ClosedTrade] = []
+    equity_values: list[float] = []
+    processed_fills = 0
+
+    for timestamp, raw_price in normalized_close.items():
+        market_price = float(raw_price)
+        if not isfinite(market_price) or market_price <= 0.0:
+            raise ValueError("execution_price_unavailable")
+        for event in fills_by_timestamp.get(pd.Timestamp(timestamp), []):
+            processed_fills += 1
+            if event.action == "add":
+                raise ValueError("execution_does_not_support_accumulation")
+
+            if event.side == "buy" and event.action == "open":
+                if opened_at is not None:
+                    raise ValueError("execution_position_already_open")
+                cash_per_share = market_price * (1.0 + slippage) * (1.0 + fees)
+                if not isfinite(cash_per_share) or cash_per_share <= 0.0:
+                    raise ValueError("execution_price_unavailable")
+                open_symbol = event.symbol
+                opened_at = event.timestamp
+                opening_capital = cash
+                shares = opening_capital / cash_per_share
+                cash = 0.0
+                continue
+
+            if event.side == "sell" and event.action == "close":
+                if opened_at is None or open_symbol is None:
+                    raise ValueError("execution_position_not_open")
+                gross_proceeds = shares * market_price * (1.0 - slippage)
+                net_proceeds = gross_proceeds * (1.0 - fees)
+                closed.append(
+                    ClosedTrade(
+                        symbol=open_symbol,
+                        opened_at=opened_at,
+                        closed_at=event.timestamp,
+                        net_pnl=float(net_proceeds - opening_capital),
+                    )
+                )
+                cash = net_proceeds
+                open_symbol = None
+                opened_at = None
+                opening_capital = 0.0
+                shares = 0.0
+                continue
+
+            raise ValueError("execution_fill_invalid")
+
+        marked_value = shares * market_price if opened_at is not None else cash
+        equity_values.append(float(marked_value))
+
+    if processed_fills != fill_count:
+        raise ValueError("execution_price_unavailable")
+
+    return LongOnlyExecutionResult(
+        equity_curve=pd.Series(
+            equity_values,
+            index=normalized_close.index,
+            dtype=float,
+        ),
+        closed_trades=tuple(closed),
     )
 
 

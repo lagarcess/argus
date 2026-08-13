@@ -193,7 +193,12 @@ def _execution_costs_payload(performance: dict[str, Any]) -> dict[str, Any] | No
 def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) -> bool:
     if config["template"] in {"buy_and_hold", "dca_accumulation"}:
         return False
-    return int(efficiency.get("total_trades", 0) or 0) > 1
+    win_rate = efficiency.get("win_rate")
+    return (
+        isinstance(win_rate, int | float)
+        and not isinstance(win_rate, bool)
+        and int(efficiency.get("total_trades", 0) or 0) > 1
+    )
 
 
 def _execution_realism_assumption(
