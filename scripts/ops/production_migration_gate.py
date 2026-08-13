@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -698,8 +699,17 @@ def _split_supabase_statements(source: str) -> tuple[str, ...]:
 def _supabase_dollar_tag_at(source: str, index: int) -> str | None:
     if source[index] != "$":
         return None
-    match = re.match(r"\$[A-Za-z0-9_]*\$", source[index:])
-    return match.group(0) if match else None
+    end = index + 1
+    while end < len(source) and _is_supabase_tag_character(source[end]):
+        end += 1
+    if end < len(source) and source[end] == "$":
+        return source[index : end + 1]
+    return None
+
+
+def _is_supabase_tag_character(character: str) -> bool:
+    category = unicodedata.category(character)
+    return character == "_" or category.startswith("L") or category == "Nd"
 
 
 def _ends_begin_atomic(source: str, index: int) -> bool:

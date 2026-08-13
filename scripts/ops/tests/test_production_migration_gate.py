@@ -302,6 +302,28 @@ end""",
     )
 
 
+def test_candidate_statement_history_accepts_unicode_dollar_tags() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260812000000_add_release_marker.sql",
+        """create function public.marker() returns void language plpgsql as $café２$
+begin
+  perform 1;
+end;
+$café２$;
+select 2;
+""",
+    )
+
+    assert candidate.statements == (
+        """create function public.marker() returns void language plpgsql as $café２$
+begin
+  perform 1;
+end;
+$café２$""",
+        "select 2",
+    )
+
+
 def test_duplicate_candidate_version_fails_closed() -> None:
     first = CandidateMigration.from_source(
         "supabase/migrations/20260812000000_first.sql",
