@@ -7,9 +7,10 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
-  Validates routing, state, full conversation-step manifests, and the seven
-  session trajectories. This is the everyday inner-loop check.
+  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_measurement_eval_scorecard.py tests/evals/test_measurement_eval_live_environment.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  Validates routing, scorecard provenance, live-environment refusal, state,
+  full conversation-step manifests, and the seven session trajectories. This
+  is the everyday inner-loop check.
 - **Live eval - only the 3 sanctioned moments:**
   1. Pre-merge on a PR that changes runtime behavior.
   2. Main promotion candidate.
@@ -24,6 +25,8 @@ Run the mocked harness checks with:
 ```bash
 poetry run pytest \
   tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_measurement_eval_scorecard.py \
+  tests/evals/test_measurement_eval_live_environment.py \
   tests/evals/test_chat_runtime_eval_manifest.py \
   tests/evals/test_chat_runtime_trajectory_harness.py \
   -q
@@ -70,7 +73,11 @@ API-contract approval gate.
 Run the live harness with:
 
 ```bash
-ARGUS_RUN_LIVE_EVALS=1 ARGUS_EVAL_ENV_FILE=<path> poetry run pytest tests/evals/test_measurement_eval_live.py -q
+ARGUS_RUN_LIVE_EVALS=1 \
+ARGUS_EVAL_ENV_FILE=<path> \
+ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
+ARGUS_ASSET_PROVIDER_MODE=live_provider \
+poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
 
 Warning: this deliberately spends real LLM tokens. Use it when you want to
@@ -80,6 +87,12 @@ provider-backed asset catalog for company-name grounding. Set
 `ARGUS_ASSET_PROVIDER_MODE=recorded_provider_fixture` with a provider-shaped
 `ARGUS_ASSET_FIXTURE_PATH` for deterministic catalog input; otherwise the
 sanctioned live run requires Alpaca asset-catalog credentials.
+
+The market-data provider mode must be explicit. Before the first LLM call, the
+suite asks the configured provider for a fixed equity window that begins on the
+2024-01-01 market holiday. A valid live environment starts on 2024-01-02 with
+`calendar_alignment`. Synthetic daily data starts on 2024-01-01 and stops the
+suite before it can spend tokens or write a scorecard.
 
 ## When to Run
 
@@ -107,6 +120,22 @@ temp/argus_eval_scorecards/
 scorecards include per-category totals and pass rates. Seven-session scorecards
 include stable trajectory labels, operation names, and failure prefixes only;
 they omit prompts, SSE payloads, route receipts, and runtime identifiers.
+
+Measurement scorecards use schema version 2 and cannot be written without this
+validated `provenance` object:
+
+- `market_data_provider_mode`
+- `asset_provider_mode`
+- `candidate_sha`
+- `python_version`
+- `fixture_sha256`
+- `worktree_clean`
+- `live_market_data_probe` for a live run
+
+The writer rechecks the provider modes, SHA, Python version, fixture hash, and
+clean worktree immediately before serialization. If any value changed during
+the run, it emits no scorecard. A live scorecard additionally requires
+`market_data_provider_mode=live_provider` and the successful calendar probe.
 
 Expected-fail cases never count as passes. They are reported separately so
 known broken behavior stays visible.

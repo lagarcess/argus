@@ -1,12 +1,176 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+
+KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
+    {
+        "2026-06-18-private-alpha-next-ci-cd-sota.md",
+        "2026-06-27-private-alpha-p2-checkpoint.md",
+        "2026-07-14-main-production-promotion.md",
+        "2026-07-10-private-alpha-next-interpret-surface.md",
+        "2026-08-05-main-production-promotion.md",
+        "2026-08-11-main-production-promotion.md",
+        "2026-08-12-main-production-promotion-716221f.md",
+        "2026-08-12-main-production-promotion.md",
+    }
+)
 
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _assert_main_promotion_live_eval_evidence(
+    manifest_path: Path,
+    *,
+    repository_root: Path = ROOT,
+) -> None:
+    manifest = manifest_path.read_text(encoding="utf-8")
+    scorecard_match = re.search(
+        r"^- Live eval scorecard: `([^`]+\.json)`",
+        manifest,
+        re.M,
+    )
+    assert scorecard_match is not None, (
+        f"{manifest_path.name}: missing durable live eval scorecard"
+    )
+    candidate_match = re.search(
+        r"^- (?:Runtime )?Candidate SHA:\s*`([0-9a-f]{40})`",
+        manifest,
+        re.M,
+    )
+    assert candidate_match is not None, f"{manifest_path.name}: missing candidate SHA"
+    scorecard_path = (repository_root / scorecard_match.group(1)).resolve()
+    assert scorecard_path.is_file(), (
+        f"{manifest_path.name}: live eval scorecard does not exist"
+    )
+    assert scorecard_path.is_relative_to(
+        (repository_root / "docs" / "reports" / "evidence").resolve()
+    ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    assert scorecard.get("schema_version") == 2
+    provenance = scorecard.get("provenance", {})
+    assert provenance.get("evaluation_mode") == "live"
+    assert provenance.get("market_data_provider_mode") == "live_provider"
+    assert str(provenance.get("asset_provider_mode") or "").strip()
+    assert provenance.get("candidate_sha") == candidate_match.group(1)
+    assert re.fullmatch(r"\d+\.\d+\.\d+", provenance.get("python_version", ""))
+    assert re.fullmatch(r"[0-9a-f]{64}", provenance.get("fixture_sha256", ""))
+    assert provenance.get("worktree_clean") is True
+    probe = provenance.get("live_market_data_probe", {})
+    assert probe.get("requested_date_range") == {
+        "start": "2024-01-01",
+        "end": "2024-01-10",
+    }
+    assert probe.get("effective_date_range") == {
+        "start": "2024-01-02",
+        "end": "2024-01-10",
+    }
+    assert probe.get("adjustment_reason") == "calendar_alignment"
+    totals = scorecard.get("totals", {})
+    assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
+    assert totals.get("failed") == 0
+    assert totals.get("unexpected_pass") == 0
+
+
+def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{'a' * 40}`\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="missing durable live eval scorecard"):
+        _assert_main_promotion_live_eval_evidence(manifest_path)
+
+
+def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
+    tmp_path: Path,
+) -> None:
+    candidate_sha = "a" * 40
+    scorecard_relative_path = (
+        "docs/reports/evidence/promotion/argus-eval-scorecard.json"
+    )
+    scorecard_path = tmp_path / scorecard_relative_path
+    scorecard_path.parent.mkdir(parents=True)
+    scorecard_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "provenance": {
+                    "evaluation_mode": "live",
+                    "market_data_provider_mode": "live_provider",
+                    "asset_provider_mode": "live_provider",
+                    "candidate_sha": candidate_sha,
+                    "python_version": "3.10.20",
+                    "fixture_sha256": "b" * 64,
+                    "worktree_clean": True,
+                    "live_market_data_probe": {
+                        "requested_date_range": {
+                            "start": "2024-01-01",
+                            "end": "2024-01-10",
+                        },
+                        "effective_date_range": {
+                            "start": "2024-01-02",
+                            "end": "2024-01-10",
+                        },
+                        "adjustment_reason": "calendar_alignment",
+                    },
+                },
+                "totals": {
+                    "passed": 44,
+                    "failed": 0,
+                    "unexpected_pass": 0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard_relative_path}`\n",
+        encoding="utf-8",
+    )
+
+    _assert_main_promotion_live_eval_evidence(
+        manifest_path,
+        repository_root=tmp_path,
+    )
+
+
+def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
+    manifest_dir = ROOT / "docs" / "release-manifests"
+    manifests = []
+    for manifest_path in sorted(manifest_dir.glob("*.md")):
+        if manifest_path.name == "TEMPLATE.md":
+            continue
+        manifest = manifest_path.read_text(encoding="utf-8")
+        if (
+            "main-production-promotion" in manifest_path.name
+            or re.search(r"^- Promotion target: `?main`?$", manifest, re.M)
+        ):
+            manifests.append(manifest_path)
+    missing_evidence: set[str] = set()
+    for manifest_path in manifests:
+        try:
+            _assert_main_promotion_live_eval_evidence(manifest_path)
+        except AssertionError as exc:
+            if "missing durable live eval scorecard" not in str(exc):
+                raise
+            missing_evidence.add(manifest_path.name)
+
+    assert missing_evidence == KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL
 
 
 def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
@@ -494,12 +658,25 @@ def test_eval_docs_document_mocked_first_test_tiers_and_agent_pointer() -> None:
     assert "## Test Tiers" in readme
     assert "**Mocked harness - every change (free, no API calls):**" in readme
     assert "poetry run pytest tests/evals/test_measurement_eval_harness.py" in readme
-    assert "Validates routing, state, full conversation-step manifests" in readme
+    assert "Validates routing, scorecard provenance, live-environment refusal" in readme
+    assert "full conversation-step manifests" in readme
     assert "**Live eval - only the 3 sanctioned moments:**" in readme
     assert "Pre-merge on a PR that changes runtime behavior" in readme
     assert "Main promotion candidate" in readme
     assert "After any model/provider change" in readme
     assert "**Browser QA is also real-API:**" in readme
+    assert "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider" in readme
+    assert "ARGUS_ASSET_PROVIDER_MODE=live_provider" in readme
+    for provenance_field in (
+        "market_data_provider_mode",
+        "asset_provider_mode",
+        "candidate_sha",
+        "python_version",
+        "fixture_sha256",
+        "worktree_clean",
+        "live_market_data_probe",
+    ):
+        assert provenance_field in readme
 
     assert "tests/evals/README.md" in agents
     assert "mocked harness" in agents

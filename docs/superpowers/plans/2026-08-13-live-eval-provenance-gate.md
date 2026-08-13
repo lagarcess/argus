@@ -31,6 +31,8 @@ promotion manifests with an exact legacy exception set.
 ### Task 2: Require scorecard provenance
 
 **Files:**
+- Add: `tests/evals/measurement_eval_scorecard.py`
+- Add: `tests/evals/test_measurement_eval_scorecard.py`
 - Modify: `tests/evals/test_measurement_eval_harness.py`
 - Modify: `tests/evals/measurement_eval_harness.py`
 
@@ -47,7 +49,7 @@ promotion manifests with an exact legacy exception set.
 **Files:**
 - Modify: `tests/evals/test_measurement_eval_live_environment.py`
 - Modify: `tests/evals/test_measurement_eval_live.py`
-- Modify: `tests/evals/measurement_eval_harness.py`
+- Modify: `tests/evals/measurement_eval_scorecard.py`
 
 1. Add tests for accepted 2024-01-02 plus `calendar_alignment` behavior and
    rejected 2024-01-01 plus no-adjustment behavior.

@@ -6,6 +6,11 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from tests.evals import measurement_eval_scorecard as scorecards
 
 
 def test_live_eval_env_preloads_calendar_aware_confirmation(
@@ -155,3 +160,143 @@ def test_live_eval_env_preloads_calendar_aware_confirmation(
         },
         "adjustment_reason": "calendar_alignment",
     }
+
+
+def _prepared_market_data(
+    *,
+    effective_start: str,
+    adjustment_reason: str | None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        effective_date_range=SimpleNamespace(
+            model_dump=lambda: {
+                "start": effective_start,
+                "end": "2024-01-10",
+            }
+        ),
+        adjustment_reason=adjustment_reason,
+    )
+
+
+def test_live_environment_probe_accepts_calendar_aligned_provider_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+
+    probe = scorecards.verify_live_market_data_environment(
+        prepare_market_data_func=lambda _config: _prepared_market_data(
+            effective_start="2024-01-02",
+            adjustment_reason="calendar_alignment",
+        )
+    )
+
+    assert probe.effective_date_range == {
+        "start": "2024-01-02",
+        "end": "2024-01-10",
+    }
+    assert probe.adjustment_reason == "calendar_alignment"
+
+
+def test_live_environment_probe_rejects_synthetic_calendar_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+
+    with pytest.raises(
+        RuntimeError,
+        match="live_eval_market_data_probe_failed",
+    ):
+        scorecards.verify_live_market_data_environment(
+            prepare_market_data_func=lambda _config: _prepared_market_data(
+                effective_start="2024-01-01",
+                adjustment_reason=None,
+            )
+        )
+
+
+def test_live_environment_probe_rejects_non_live_provider_before_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "ARGUS_MARKET_DATA_PROVIDER_MODE",
+        "synthetic_unit_fixture",
+    )
+    fetch_started = False
+
+    def prepare_market_data(_config: dict[str, object]) -> SimpleNamespace:
+        nonlocal fetch_started
+        fetch_started = True
+        return _prepared_market_data(
+            effective_start="2024-01-01",
+            adjustment_reason=None,
+        )
+
+    with pytest.raises(
+        RuntimeError,
+        match="live_eval_requires_explicit_live_provider",
+    ):
+        scorecards.verify_live_market_data_environment(
+            prepare_market_data_func=prepare_market_data,
+        )
+
+    assert fetch_started is False
+
+
+def test_live_provenance_rejects_dirty_worktree_before_provider_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_RUN_LIVE_EVALS", "1")
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(scorecards, "_worktree_is_clean", lambda _root: False)
+    probe_started = False
+
+    def verify_live_market_data_environment() -> scorecards.LiveMarketDataProbe:
+        nonlocal probe_started
+        probe_started = True
+        raise AssertionError("provider probe should not start")
+
+    monkeypatch.setattr(
+        scorecards,
+        "verify_live_market_data_environment",
+        verify_live_market_data_environment,
+    )
+
+    with pytest.raises(ValueError, match="scorecard_provenance:worktree_clean"):
+        scorecards.build_scorecard_provenance(evaluation_mode="live")
+
+    assert probe_started is False
+
+
+def test_live_suite_runs_environment_probe_before_any_eval_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.evals import test_measurement_eval_live as live_suite
+
+    monkeypatch.setenv("ARGUS_RUN_LIVE_EVALS", "1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fixture-openrouter-key")
+    monkeypatch.setenv(
+        "ARGUS_ASSET_PROVIDER_MODE",
+        "recorded_provider_fixture",
+    )
+    monkeypatch.setattr(live_suite, "clear_asset_cache", lambda: None)
+    case_iteration_started = False
+
+    def load_eval_cases() -> list[object]:
+        nonlocal case_iteration_started
+        case_iteration_started = True
+        return []
+
+    monkeypatch.setattr(live_suite, "load_eval_cases", load_eval_cases)
+    monkeypatch.setattr(
+        live_suite,
+        "build_scorecard_provenance",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("live_eval_market_data_probe_failed")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="live_eval_market_data_probe_failed"):
+        live_suite.test_measurement_live_eval_suite_writes_scorecard(monkeypatch)
+
+    assert case_iteration_started is False

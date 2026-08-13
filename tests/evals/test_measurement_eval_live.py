@@ -19,6 +19,9 @@ from tests.evals.measurement_eval_harness import (
     expected_fail_issue_for_result,
     load_eval_cases,
     run_eval_case,
+)
+from tests.evals.measurement_eval_scorecard import (
+    build_scorecard_provenance,
     write_scorecard,
 )
 
@@ -46,8 +49,9 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
         )
     clear_asset_cache()
 
+    provenance = build_scorecard_provenance(evaluation_mode="live")
     results = [run_eval_case(case) for case in load_eval_cases()]
-    scorecard_path = write_scorecard(results)
+    scorecard_path = write_scorecard(results, provenance=provenance)
     failures = [
         {
             "id": result["id"],

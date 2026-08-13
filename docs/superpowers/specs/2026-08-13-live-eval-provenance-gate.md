@@ -30,6 +30,7 @@ scorecard without failing repository tests.
    - candidate Git SHA;
    - Python version;
    - SHA-256 identity of the complete measurement fixture set.
+   - clean-worktree proof, so the recorded SHA names the code that ran.
 2. Scorecard serialization rejects absent, blank, or malformed provenance. It
    never fills missing evidence with an unverified placeholder.
 3. A scorecard marked `live` requires market-data mode `live_provider` and a
@@ -51,6 +52,7 @@ scorecard without failing repository tests.
 ## In scope
 
 - `tests/evals/measurement_eval_harness.py`
+- `tests/evals/measurement_eval_scorecard.py`
 - `tests/evals/test_measurement_eval_live.py`
 - eval harness and environment tests under `tests/evals/`
 - `tests/test_private_alpha_release_docs.py`
@@ -85,6 +87,7 @@ scorecard without failing repository tests.
 - Release-docs tests reject an unlisted promotion manifest without live-eval
   evidence and expose the exact known historical gap.
 - One full live run records both modes as `live_provider`, candidate SHA, Python
-  version, fixture SHA-256, probe result, totals, and provider cost.
+  version, fixture SHA-256, clean-worktree proof, probe result, totals, and
+  provider cost.
 - A PR targets `codex/private-alpha-next`, passes CI, receives a Codex review,
   and has zero unresolved review threads. It remains unmerged and undeployed.

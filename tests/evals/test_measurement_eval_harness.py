@@ -10,7 +10,6 @@ from tests.evals.measurement_eval_harness import (
     LOCKED_EVAL_CATEGORIES,
     PROSE_JUDGE_RUBRIC_VERSION,
     load_eval_cases,
-    scorecard_for_results,
 )
 
 EXPECTED_LOCKED_CATEGORIES = {
@@ -1191,51 +1190,6 @@ def test_confirmation_payload_snapshot_uses_distinct_artifact_references() -> No
     assert active is not None
     assert listed.artifact_id == active.artifact_id
     assert listed is not active
-
-
-def test_scorecard_reports_per_category_pass_rates() -> None:
-    results = [
-        {
-            "id": "case-a",
-            "category": "messy_english",
-            "status": "passed",
-        },
-        {
-            "id": "case-b",
-            "category": "messy_english",
-            "status": "failed",
-        },
-        {
-            "id": "case-c",
-            "category": "messy_spanish",
-            "status": "expected_failed",
-        },
-        {
-            "id": "case-d",
-            "category": "messy_spanish",
-            "status": "unexpected_pass",
-        },
-    ]
-
-    scorecard = scorecard_for_results(results)
-
-    assert scorecard["category_pass_rates"]["messy_english"] == {
-        "passed": 1,
-        "failed": 1,
-        "expected_failed": 0,
-        "unexpected_pass": 0,
-        "skipped": 0,
-        "pass_rate": 0.5,
-    }
-    assert scorecard["category_pass_rates"]["messy_spanish"] == {
-        "passed": 0,
-        "failed": 0,
-        "expected_failed": 1,
-        "unexpected_pass": 1,
-        "skipped": 0,
-        "pass_rate": 0.0,
-    }
-    assert scorecard["totals"]["unexpected_pass"] == 1
 
 
 def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
