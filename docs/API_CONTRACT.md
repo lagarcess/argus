@@ -1606,7 +1606,8 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   since 2026-08-12. Public registration is therefore open: the server-side
   Supabase `private_alpha_allowlist` table admits any email and denies only a
   row whose `disabled_at` is set. When that flag is off instead, the same table
-  becomes an admission list and only an email carrying a role may enter.
+  becomes an admission list: only an email whose active row carries `admin`,
+  `developer`, or `user` may enter, so a `requested` row does not admit it.
 - `POST /auth/signup` must apply that gate before calling Supabase Auth signup, so denied emails do not create auth users or profiles.
 - `POST /auth/login` must also apply it before creating a browser session, so denied emails cannot enter the app.
 - Authenticated API requests must also reject users the gate denies, so an existing session cannot keep using access the gate would no longer grant.
