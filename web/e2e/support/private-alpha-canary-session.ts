@@ -26,6 +26,9 @@ type SessionHandoff = {
   email: string;
 };
 
+const CANARY_PROVISIONING_EMAIL =
+  /^private-alpha-canary\+[a-f0-9]{32}@get-argus\.com$/;
+
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`missing_${name.toLowerCase()}`);
@@ -54,23 +57,24 @@ function normalizedSameSite(
   return "Lax";
 }
 
-function assertLeastPrivilege(
-  session: Session,
-  expectedEmail: string,
-): void {
-  const actualEmail = session.user.email?.trim().toLocaleLowerCase();
-  const userRole = session.user.role?.trim().toLocaleLowerCase();
-  const metadataRole = String(session.user.app_metadata?.role ?? "")
+function assertLeastPrivilegeUser(user: User, expectedEmail: string): void {
+  const actualEmail = user.email?.trim().toLocaleLowerCase();
+  const userRole = user.role?.trim().toLocaleLowerCase();
+  const metadataRole = String(user.app_metadata?.role ?? "")
     .trim()
     .toLocaleLowerCase();
   if (
     actualEmail !== expectedEmail ||
     userRole !== "authenticated" ||
-    session.user.is_anonymous === true ||
+    user.is_anonymous === true ||
     ["admin", "developer", "service_role"].includes(metadataRole)
   ) {
     throw new Error("canary_identity_is_not_least_privilege");
   }
+}
+
+function assertLeastPrivilege(session: Session, expectedEmail: string): void {
+  assertLeastPrivilegeUser(session.user, expectedEmail);
 }
 
 async function assertAllowlistedUser(email: string): Promise<void> {
@@ -92,27 +96,119 @@ async function assertAllowlistedUser(email: string): Promise<void> {
   }
 }
 
-async function assertDedicatedCanaryIdentity(email: string): Promise<void> {
+async function assertProvisionableAllowlist(email: string): Promise<void> {
   const client = serviceClient();
-  const { data, error } = await client.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-  if (error) throw new Error("canary_identity_lookup_failed");
-  const matches = (data.users as User[]).filter(
-    (user) => user.email?.trim().toLocaleLowerCase() === email,
-  );
-  const user = matches[0];
+  const { data, error } = await client
+    .from("private_alpha_allowlist")
+    .select("email,role,disabled_at")
+    .eq("email", email);
+  const rows = Array.isArray(data) ? data : [];
+  if (error || rows.length > 1) {
+    throw new Error("canary_allowlist_lookup_failed");
+  }
+  if (rows[0] && rows[0].role !== "user") {
+    throw new Error("canary_existing_allowlist_is_not_least_privilege");
+  }
+}
+
+async function usersMatchingEmail(email: string): Promise<User[]> {
+  const client = serviceClient();
+  const matches: User[] = [];
+  for (let page = 1; page <= 1000; page += 1) {
+    const { data, error } = await client.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+    if (error) throw new Error("canary_identity_lookup_failed");
+    const users = data.users as User[];
+    matches.push(
+      ...users.filter(
+        (user) => user.email?.trim().toLocaleLowerCase() === email,
+      ),
+    );
+    if (users.length < 1000) return matches;
+  }
+  throw new Error("canary_identity_lookup_unbounded");
+}
+
+function assertDedicatedUser(user: User | undefined, count: number): void {
   const source = String(user?.app_metadata?.source ?? "")
     .trim()
     .toLocaleLowerCase();
   if (
-    matches.length !== 1 ||
+    count !== 1 ||
     source !== "private-alpha-canary" ||
     user?.is_anonymous === true
   ) {
     throw new Error("canary_identity_is_not_dedicated");
   }
+}
+
+async function assertDedicatedCanaryIdentity(email: string): Promise<void> {
+  const matches = await usersMatchingEmail(email);
+  assertDedicatedUser(matches[0], matches.length);
+}
+
+async function provision(): Promise<void> {
+  const email = requiredEnv("ARGUS_CANARY_EMAIL").toLocaleLowerCase();
+  if (!CANARY_PROVISIONING_EMAIL.test(email)) {
+    throw new Error("canary_provisioning_email_is_not_safe");
+  }
+
+  await assertProvisionableAllowlist(email);
+  const admin = serviceClient();
+  const matches = await usersMatchingEmail(email);
+  if (matches.length > 1) throw new Error("canary_identity_is_not_unique");
+  let user = matches[0];
+  let created = false;
+  if (!user) {
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      app_metadata: { source: "private-alpha-canary" },
+      user_metadata: { language: "es-419" },
+    });
+    if (error || !data.user) {
+      throw new Error("canary_identity_provision_failed");
+    }
+    user = data.user;
+    created = true;
+  }
+
+  try {
+    assertDedicatedUser(user, 1);
+    assertLeastPrivilegeUser(user, email);
+    const client = serviceClient();
+    const { data, error } = await client
+      .from("private_alpha_allowlist")
+      .upsert(
+        {
+          email,
+          role: "user",
+          language: "es-419",
+          disabled_at: null,
+        },
+        { onConflict: "email" },
+      )
+      .select("email,role,disabled_at");
+    const rows = Array.isArray(data) ? data : [];
+    if (
+      error ||
+      rows.length !== 1 ||
+      rows[0]?.email?.trim().toLocaleLowerCase() !== email ||
+      rows[0]?.role !== "user" ||
+      rows[0]?.disabled_at !== null
+    ) {
+      throw new Error("canary_allowlist_provision_failed");
+    }
+  } catch (error) {
+    if (created) {
+      const { error: rollbackError } = await admin.auth.admin.deleteUser(user.id);
+      if (rollbackError) throw new Error("canary_identity_provision_rollback_failed");
+    }
+    throw error;
+  }
+  console.log("canary_identity_provision=ready");
 }
 
 async function storageStateCookies(
@@ -257,6 +353,10 @@ async function revoke(): Promise<void> {
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
+  if (mode === "provision") {
+    await provision();
+    return;
+  }
   if (mode === "mint") {
     await mint();
     return;

@@ -42,6 +42,9 @@ def _supabase_session_stub(
     user_id: str,
     session_id: str,
     metadata_role: str | None = None,
+    metadata_source: str = "private-alpha-canary",
+    listed_user: bool = True,
+    allowlist_role: str = "user",
 ) -> Iterator[tuple[str, list[dict[str, Any]]]]:
     calls: list[dict[str, Any]] = []
     access_token = _jwt(
@@ -56,7 +59,7 @@ def _supabase_session_stub(
     app_metadata = {
         "provider": "email",
         "providers": ["email"],
-        "source": "private-alpha-canary",
+        "source": metadata_source,
     }
     if metadata_role is not None:
         app_metadata["role"] = metadata_role
@@ -72,6 +75,7 @@ def _supabase_session_stub(
         "updated_at": "2026-08-13T00:00:00Z",
         "is_anonymous": False,
     }
+    users = [user] if listed_user else []
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: Any) -> None:
@@ -101,10 +105,12 @@ def _supabase_session_stub(
                 }
             )
             if self.path.startswith("/rest/v1/private_alpha_allowlist?"):
-                self._respond([{"email": email, "role": "user", "disabled_at": None}])
+                self._respond(
+                    [{"email": email, "role": allowlist_role, "disabled_at": None}]
+                )
                 return
             if self.path.startswith("/auth/v1/admin/users?"):
-                self._respond({"users": [user], "aud": "authenticated"})
+                self._respond({"users": users, "aud": "authenticated"})
                 return
             if self.path == "/auth/v1/user":
                 self._respond({"user": user})
@@ -132,6 +138,15 @@ def _supabase_session_stub(
                         "redirect_to": "",
                         "verification_type": "magiclink",
                     }
+                )
+                return
+            if self.path == "/auth/v1/admin/users":
+                users.append(user)
+                self._respond(user)
+                return
+            if self.path.startswith("/rest/v1/private_alpha_allowlist?"):
+                self._respond(
+                    [{"email": email, "role": allowlist_role, "disabled_at": None}]
                 )
                 return
             if self.path == "/auth/v1/verify":
@@ -455,3 +470,149 @@ def test_workflow_preserves_redaction_sentinel_gate_for_browser_upload() -> None
     assert "web/temp/playwright-results/.redacted" in check
     assert "browser_context_upload=skipped_unredacted" in check
     assert "if: failure() && steps.browser_context.outputs.ready == 'true'" in upload
+
+
+def test_manual_identity_provisioning_is_safe_and_never_runs_on_schedule() -> None:
+    workflow = _source(".github/workflows/private-alpha-canary.yml")
+    session_tool = _source("web/e2e/support/private-alpha-canary-session.ts")
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+
+    assert "canary_identity_action:" in workflow
+    assert "Provision dedicated canary identity" in workflow
+    provision_step = workflow.split("Provision dedicated canary identity", 1)[1].split(
+        "\n      - name:", 1
+    )[0]
+    assert "github.event_name == 'workflow_dispatch'" in provision_step
+    assert "inputs.canary_identity_action == 'provision'" in provision_step
+    assert "private-alpha-canary-session.ts provision" in provision_step
+    assert "CANARY_PROVISIONING_EMAIL" in session_tool
+    assert "createUser" in session_tool
+    assert 'source: "private-alpha-canary"' in session_tool
+    assert 'language: "es-419"' in session_tool
+    assert "canary_identity_provision=ready" in session_tool
+    assert "canary_identity_action=provision" in runbook
+
+
+def test_session_tool_provisions_only_a_safe_dedicated_identity(
+    tmp_path: Path,
+    faker: Faker,
+) -> None:
+    email = f"private-alpha-canary+{faker.sha256()[:32]}@get-argus.com"
+    service_role_key = "test-service-role-key"
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        listed_user=False,
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": service_role_key,
+            }
+        )
+        result = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "canary_identity_provision=ready"
+    assert service_role_key not in result.stdout + result.stderr
+    assert email not in result.stdout + result.stderr
+    create = next(
+        call
+        for call in calls
+        if call["method"] == "POST" and call["path"] == "/auth/v1/admin/users"
+    )
+    assert create["body"]["email_confirm"] is True
+    assert create["body"]["app_metadata"] == {"source": "private-alpha-canary"}
+    assert create["body"]["user_metadata"] == {"language": "es-419"}
+    assert any(
+        call["method"] == "POST"
+        and call["path"].startswith("/rest/v1/private_alpha_allowlist?")
+        for call in calls
+    )
+
+
+def test_session_tool_refuses_to_relabel_an_existing_unknown_identity(
+    faker: Faker,
+) -> None:
+    email = f"private-alpha-canary+{faker.sha256()[:32]}@get-argus.com"
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        metadata_source="employee",
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
+            }
+        )
+        result = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode != 0
+    assert "canary_identity_is_not_dedicated" in result.stderr
+    assert email not in result.stdout + result.stderr
+    assert not any(
+        call["method"] == "POST"
+        and call["path"].startswith("/rest/v1/private_alpha_allowlist?")
+        for call in calls
+    )
+
+
+def test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role(
+    faker: Faker,
+) -> None:
+    email = f"private-alpha-canary+{faker.sha256()[:32]}@get-argus.com"
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        listed_user=False,
+        allowlist_role="developer",
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
+            }
+        )
+        result = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode != 0
+    assert "canary_existing_allowlist_is_not_least_privilege" in result.stderr
+    assert email not in result.stdout + result.stderr
+    assert not any(
+        call["method"] == "POST" and call["path"] == "/auth/v1/admin/users"
+        for call in calls
+    )

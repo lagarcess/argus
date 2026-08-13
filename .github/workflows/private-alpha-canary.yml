@@ -12,6 +12,14 @@ name: Private Alpha Canary
           - none
           - redacted
           - unredacted
+      canary_identity_action:
+        description: One-time setup for a newly rotated dedicated canary identity
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - provision
   schedule:
     - cron: "30 14 * * *"
 
@@ -216,6 +224,14 @@ jobs:
             printf ' - %s\n' "${missing[@]}"
             exit 1
           fi
+
+      - name: Provision dedicated canary identity
+        if: github.event_name == 'workflow_dispatch' && inputs.canary_identity_action == 'provision'
+        env:
+          ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}
+          ARGUS_CANARY_SUPABASE_URL: ${{ secrets.ARGUS_CANARY_SUPABASE_URL }}
+          ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY }}
+        run: cd web && bun e2e/support/private-alpha-canary-session.ts provision
 
       - name: Prepare authenticated-browser evidence directory
         run: |

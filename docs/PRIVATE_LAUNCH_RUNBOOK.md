@@ -317,6 +317,22 @@ app metadata must contain `source=private-alpha-canary`. App metadata is
 operator-owned; do not use user-editable metadata for this marker. The canary
 fails closed if those facts are not true.
 
+Provisioning is a one-time manual action for identity rotation. Generate a new
+address matching
+`private-alpha-canary+<32-lowercase-hex>@get-argus.com`, write it directly to
+the GitHub `ARGUS_CANARY_EMAIL` secret without echoing it, and dispatch the
+candidate branch with `canary_identity_action=provision`. That action is never
+available to the schedule. It accepts only the canary-specific address shape,
+refuses to relabel an existing unknown user, creates a confirmed non-anonymous
+Auth user with app metadata `source=private-alpha-canary`, records Spanish in
+Auth user metadata, and creates the enabled `role=user` allowlist row. It prints
+no email, user id, token, or service-role value. Later manual and scheduled runs
+use the default `canary_identity_action=validate` and fail closed on drift.
+
+After the new identity completes a normal browser canary, revoke the prior
+identity using the emergency sequence below. Do not leave two active canary
+identities as an informal fallback.
+
 No long-lived browser state or password is stored in GitHub. On every browser
 run, the service-role step generates and verifies a one-time magic link for the
 dedicated identity, serializes the resulting least-privilege session to a mode
