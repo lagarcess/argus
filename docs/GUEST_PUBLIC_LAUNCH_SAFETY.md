@@ -21,9 +21,10 @@ remain separate decisions:
 - Guest code may integrate without completing this checklist.
 - Internet-facing Guest traffic requires this checklist and founder approval.
 - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is a separate policy that the
-  founder approved and opened in production on 2026-08-12. Public registration
-  is open, so this checklist no longer gates it; explicit `false` closes it
-  again.
+  founder approved and opened in production on 2026-08-12, so this checklist
+  never gated it and does not gate it now; explicit `false` closes it again. The
+  minimum bundle below is still the abuse-control reference for any
+  internet-facing exposure, including registered traffic.
 
 ## Algorithm Decision
 

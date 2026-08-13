@@ -1482,10 +1482,13 @@ disclosure. See
   acceptable cost and latency bands, cleanup cadence/owner, and canary approval.
   Public-account enablement is no longer among them, because the founder enabled
   it in production on 2026-08-12 as recorded in
-  `docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`. The
-  account-method and abuse-control requirement that gated it is stated once in
-  `docs/API_CONTRACT.md`; whether its evidence was produced is an open question
-  there rather than a second copy here.
+  `docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`. Two
+  prerequisites were written for that gate, and the flag being on does not waive
+  either. The account-method proof is owned by `docs/API_CONTRACT.md`, where
+  whether its evidence was produced is an open founder question. The abuse
+  controls are owned by the minimum bundle in
+  `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`, which enumerates the Turnstile, velocity,
+  and origin-truth checks for internet-facing exposure.
 
 ##### Conversational edit contract (macro pattern) — DONE (landed `0fb32c1`)
 
