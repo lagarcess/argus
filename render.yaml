@@ -83,7 +83,7 @@ services:
       - key: ARGUS_ENABLE_EXECUTION_REALISM
         value: "true"
       - key: ARGUS_ENABLE_PERSONALIZATION_MEMORY
-        value: "false"
+        value: "true"
       - key: ARGUS_RESEARCH_RAIL_ENABLED
         value: "true"
       - key: ARGUS_RESEARCH_GLOBAL_DAILY_CEILING

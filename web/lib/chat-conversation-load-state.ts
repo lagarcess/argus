@@ -31,6 +31,29 @@ export function conversationLoadFailureMessage(
   };
 }
 
+type EmptyChatSurfaceState = Readonly<{
+  messages: readonly Message[];
+  isHydratingConversation: boolean;
+  hasConversationLoadFailure: boolean;
+}>;
+
+/**
+ * A settled conversation with no messages is the account's landing surface.
+ * Conversation identity is deliberately absent so every empty entry route
+ * renders the same surface for the current account kind.
+ */
+export function shouldShowEmptyChatSurface({
+  messages,
+  isHydratingConversation,
+  hasConversationLoadFailure,
+}: EmptyChatSurfaceState): boolean {
+  return (
+    messages.length === 0 &&
+    !isHydratingConversation &&
+    !hasConversationLoadFailure
+  );
+}
+
 export function shouldShowConversationDisclaimer(
   messages: Message[],
   isStreamingResponse: boolean,
