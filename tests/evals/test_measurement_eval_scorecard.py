@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -218,6 +219,45 @@ def test_measurement_fixture_identity_binds_filenames_and_contents(
     assert len(original) == 64
     assert original != renamed
     assert renamed != changed
+
+
+def test_candidate_fixture_identity_rejects_non_commit_git_object(
+    tmp_path: Path,
+) -> None:
+    fixture_dir = tmp_path / "tests" / "evals" / "measurement_cases"
+    fixture_dir.mkdir(parents=True)
+    (fixture_dir / "messy_english.yaml").write_text(
+        "category: messy_english\ncases: [{id: case-a}]\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "add", "tests/evals/measurement_cases"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    tree_sha = subprocess.run(
+        ["git", "write-tree"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    with pytest.raises(
+        RuntimeError,
+        match="scorecard_provenance:candidate_commit_unavailable",
+    ):
+        scorecards.measurement_fixture_identity_at_git_sha(
+            candidate_sha=tree_sha,
+            repository_root=tmp_path,
+        )
 
 
 def test_write_scorecard_requires_provenance(tmp_path: Path) -> None:

@@ -94,6 +94,21 @@ def measurement_fixture_identity_at_git_sha(
         raise ValueError("scorecard_provenance:candidate_sha")
     fixture_prefix = "tests/evals/measurement_cases"
     try:
+        verified_commit = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{candidate_sha}^{{commit}}"],
+            cwd=repository_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "scorecard_provenance:candidate_commit_unavailable"
+        ) from exc
+    if verified_commit != candidate_sha:
+        raise RuntimeError("scorecard_provenance:candidate_commit_unavailable")
+    try:
         listed = subprocess.run(
             [
                 "git",
