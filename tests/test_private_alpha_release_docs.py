@@ -8,6 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE_PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 PUBLIC_ACCOUNT_ACCESS_FLAG = "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"
+# The release profile owns this flag's value. Product truth is where prose states
+# it, and every other doc may point here rather than repeat it.
+CANONICAL_VALUE_DOC = "docs/PRODUCT.md"
 
 # Records of a moment keep the claims they shipped with, because quoting a
 # superseded posture is their job. Everything else under docs/, .agent/, and the
@@ -397,29 +400,27 @@ def test_public_account_access_claims_cannot_contradict_the_release_profile() ->
     declared_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={declared}"
 
     contradictions: list[str] = []
-    silent: list[str] = []
-
     for path in _standing_doc_paths():
         relative = path.relative_to(ROOT).as_posix()
-        text = path.read_text(encoding="utf-8")
-
         contradictions.extend(
             f"{relative}: {claim}"
-            for claim in _access_claim_contradictions(text, declared)
+            for claim in _access_claim_contradictions(
+                path.read_text(encoding="utf-8"), declared
+            )
         )
-        if PUBLIC_ACCOUNT_ACCESS_FLAG in text and declared_assignment not in text:
-            silent.append(relative)
 
     assert not contradictions, (
         f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in "
         f"{RELEASE_PROFILE_PATH.name}, so these standing claims are wrong:\n"
         + "\n".join(f"  - {item}" for item in contradictions)
     )
-    assert not silent, (
-        f"These standing docs discuss {PUBLIC_ACCOUNT_ACCESS_FLAG} without "
-        f"stating `{declared_assignment}`, so a reader cannot tell whether "
-        "public account creation is open:\n"
-        + "\n".join(f"  - {item}" for item in sorted(set(silent)))
+    # One doc states the value; the rest may point at it. Requiring the literal
+    # in every doc that mentions the flag was asking a test to keep copies in
+    # agreement, which is the split-brain shape this repo forbids, and it made a
+    # flag change a hand-edit of every copy.
+    assert declared_assignment in _source(CANONICAL_VALUE_DOC), (
+        f"{CANONICAL_VALUE_DOC} is where prose states this flag's value, so it "
+        f"must say `{declared_assignment}` to match {RELEASE_PROFILE_PATH.name}."
     )
 
 
