@@ -330,9 +330,13 @@ candidate branch with `canary_identity_action=provision`. That action is never
 available to the schedule. It accepts only the canary-specific address shape,
 refuses to relabel an existing unknown user, creates a confirmed non-anonymous
 Auth user with app metadata `source=private-alpha-canary`, records Spanish in
-Auth user metadata, and creates the enabled `role=user` allowlist row. It prints
-no email, user id, token, or service-role value. Later manual and scheduled runs
-use the default `canary_identity_action=validate` and fail closed on drift.
+Auth user metadata, and creates the enabled `role=user` allowlist row. For a new
+identity, it then mints a one-time session and calls Argus's authenticated
+`GET /api/v1/me` endpoint so the normal backend profile owner creates the
+profile. The setup session is revoked before the action requires the exact
+profile row to have `is_admin=false`. It prints no email, user id, token, or
+service-role value. Later manual and scheduled runs use the default
+`canary_identity_action=validate` and fail closed on drift.
 
 After the new identity completes a normal browser canary, revoke the prior
 identity using the emergency sequence below. Do not leave two active canary

@@ -45,7 +45,9 @@ def _supabase_session_stub(
     metadata_source: str = "private-alpha-canary",
     listed_user: bool = True,
     allowlist_role: str = "user",
+    profile_exists: bool = True,
     profile_is_admin: bool = False,
+    profile_bootstrap_status: int = 200,
 ) -> Iterator[tuple[str, list[dict[str, Any]]]]:
     calls: list[dict[str, Any]] = []
     access_token = _jwt(
@@ -77,6 +79,7 @@ def _supabase_session_stub(
         "is_anonymous": False,
     }
     users = [user] if listed_user else []
+    profile_state = {"exists": profile_exists}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: Any) -> None:
@@ -103,6 +106,7 @@ def _supabase_session_stub(
                     "method": "GET",
                     "path": self.path,
                     "apikey": self.headers.get("apikey"),
+                    "authorization": self.headers.get("Authorization"),
                 }
             )
             if self.path.startswith("/rest/v1/private_alpha_allowlist?"):
@@ -111,13 +115,31 @@ def _supabase_session_stub(
                 )
                 return
             if self.path.startswith("/rest/v1/profiles?"):
-                self._respond([{"id": user_id, "is_admin": profile_is_admin}])
+                rows = (
+                    [{"id": user_id, "is_admin": profile_is_admin}]
+                    if profile_state["exists"]
+                    else []
+                )
+                self._respond(rows)
                 return
             if self.path.startswith("/auth/v1/admin/users?"):
                 self._respond({"users": users, "aud": "authenticated"})
                 return
             if self.path == "/auth/v1/user":
                 self._respond({"user": user})
+                return
+            if self.path == "/api/v1/me":
+                if self.headers.get("Authorization") != f"Bearer {access_token}":
+                    self._respond({"error": "unauthorized"}, status_code=401)
+                    return
+                if profile_bootstrap_status != 200:
+                    self._respond(
+                        {"error": "bootstrap_failed"},
+                        status_code=profile_bootstrap_status,
+                    )
+                    return
+                profile_state["exists"] = True
+                self._respond({"user": {"id": user_id}})
                 return
             self._respond({"error": "not_found"}, status_code=404)
 
@@ -167,6 +189,19 @@ def _supabase_session_stub(
                 return
             if self.path == "/auth/v1/logout?scope=local":
                 self._respond({}, status_code=204)
+                return
+            self._respond({"error": "not_found"}, status_code=404)
+
+        def do_DELETE(self) -> None:  # noqa: N802
+            calls.append(
+                {
+                    "method": "DELETE",
+                    "path": self.path,
+                    "apikey": self.headers.get("apikey"),
+                }
+            )
+            if self.path == f"/auth/v1/admin/users/{user_id}":
+                self._respond({"user": user})
                 return
             self._respond({"error": "not_found"}, status_code=404)
 
@@ -273,6 +308,7 @@ def test_render_runner_has_surface_specific_fail_red_entrypoints() -> None:
 
 def test_browser_surface_binds_the_journey_to_one_deployed_release() -> None:
     source = _source(".github/canary-render.sh")
+    workflow = _source(".github/workflows/private-alpha-canary.yml")
     browser_contract = source.split("validate_browser_evidence_contract() {", 1)[1].split(
         "\n}", 1
     )[0]
@@ -286,6 +322,12 @@ def test_browser_surface_binds_the_journey_to_one_deployed_release() -> None:
     assert after_postconditions.index("run_deploy_status_probe") < (
         after_postconditions.index('CANARY_STATUS="passed"')
     )
+    workflow_browser = _job_body(workflow, "authenticated-browser-journey", None)
+    browser_run = workflow_browser.split(
+        "Run authenticated Spanish browser journey", 1
+    )[1].split("\n      - name:", 1)[0]
+    assert "RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}" in browser_run
+    assert "-u RENDER_API_KEY" in _source(".github/canary-browser.sh")
 
 
 def test_browser_revokes_the_session_before_recording_success() -> None:
@@ -581,6 +623,8 @@ def test_manual_identity_provisioning_is_safe_and_never_runs_on_schedule() -> No
     assert "github.event_name == 'workflow_dispatch'" in provision_step
     assert "inputs.canary_identity_action == 'provision'" in provision_step
     assert "private-alpha-canary-session.ts provision" in provision_step
+    assert "ARGUS_CANARY_API_URL" in provision_step
+    assert "ARGUS_PRIVATE_LAUNCH_API_URL" in provision_step
     assert "CANARY_PROVISIONING_EMAIL" in session_tool
     assert "createUser" in session_tool
     assert 'source: "private-alpha-canary"' in session_tool
@@ -602,9 +646,11 @@ def test_session_tool_provisions_only_a_safe_dedicated_identity(
         user_id=faker.uuid4(),
         session_id=faker.uuid4(),
         listed_user=False,
+        profile_exists=False,
     ) as (supabase_url, calls):
         env.update(
             {
+                "ARGUS_CANARY_API_URL": supabase_url,
                 "ARGUS_CANARY_EMAIL": email,
                 "ARGUS_CANARY_SUPABASE_URL": supabase_url,
                 "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": service_role_key,
@@ -634,6 +680,60 @@ def test_session_tool_provisions_only_a_safe_dedicated_identity(
     assert any(
         call["method"] == "POST"
         and call["path"].startswith("/rest/v1/private_alpha_allowlist?")
+        for call in calls
+    )
+    profile_bootstrap = next(
+        call
+        for call in calls
+        if call["method"] == "GET" and call["path"] == "/api/v1/me"
+    )
+    assert profile_bootstrap["authorization"].startswith("Bearer ")
+    assert profile_bootstrap["apikey"] is None
+    assert any(call["path"] == "/auth/v1/logout?scope=local" for call in calls)
+    assert any(call["path"].startswith("/rest/v1/profiles?") for call in calls)
+
+
+def test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap(
+    faker: Faker,
+) -> None:
+    email = f"private-alpha-canary+{faker.sha256()[:32]}@get-argus.com"
+    service_role_key = "test-service-role-key"
+    user_id = faker.uuid4()
+    env = os.environ.copy()
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=user_id,
+        session_id=faker.uuid4(),
+        listed_user=False,
+        profile_exists=False,
+        profile_bootstrap_status=503,
+    ) as (supabase_url, calls):
+        env.update(
+            {
+                "ARGUS_CANARY_API_URL": supabase_url,
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": service_role_key,
+            }
+        )
+        result = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode != 0
+    assert "canary_profile_bootstrap_failed" in result.stderr
+    assert service_role_key not in result.stdout + result.stderr
+    assert email not in result.stdout + result.stderr
+    assert any(call["path"] == "/auth/v1/logout?scope=local" for call in calls)
+    assert any(
+        call["method"] == "DELETE"
+        and call["path"] == f"/auth/v1/admin/users/{user_id}"
         for call in calls
     )
 

@@ -37,9 +37,7 @@ function requiredEnv(name: string): string {
 
 function serviceClient() {
   const supabaseUrl = requiredEnv("ARGUS_CANARY_SUPABASE_URL");
-  const serviceRoleKey = requiredEnv(
-    "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
-  );
+  const serviceRoleKey = requiredEnv("ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY");
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
@@ -96,7 +94,7 @@ async function assertAllowlistedUser(email: string): Promise<void> {
   }
 }
 
-async function assertNonAdminProfile(userId: string): Promise<void> {
+async function nonAdminProfileExists(userId: string): Promise<boolean> {
   const client = serviceClient();
   const { data, error } = await client
     .from("profiles")
@@ -104,12 +102,18 @@ async function assertNonAdminProfile(userId: string): Promise<void> {
     .eq("id", userId);
   const rows = Array.isArray(data) ? data : [];
   const row = rows[0];
-  if (
-    error ||
-    rows.length !== 1 ||
-    row?.id !== userId ||
-    row.is_admin !== false
-  ) {
+  if (error || rows.length > 1) {
+    throw new Error("canary_profile_lookup_failed");
+  }
+  if (rows.length === 0) return false;
+  if (row?.id !== userId || row.is_admin !== false) {
+    throw new Error("canary_identity_profile_is_not_least_privilege");
+  }
+  return true;
+}
+
+async function assertNonAdminProfile(userId: string): Promise<void> {
+  if (!(await nonAdminProfileExists(userId))) {
     throw new Error("canary_identity_profile_is_not_least_privilege");
   }
 }
@@ -170,6 +174,80 @@ async function assertDedicatedCanaryIdentity(email: string): Promise<User> {
   return user;
 }
 
+async function mintDedicatedSession(email: string): Promise<Session> {
+  const admin = serviceClient();
+  const { data: linkData, error: linkError } =
+    await admin.auth.admin.generateLink({ type: "magiclink", email });
+  const tokenHash = linkData?.properties?.hashed_token?.trim();
+  const verificationType = linkData?.properties?.verification_type;
+  if (linkError || !tokenHash || verificationType !== "magiclink") {
+    throw new Error("canary_session_link_failed");
+  }
+
+  const verifier = serviceClient();
+  const { data, error } = await verifier.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: "magiclink",
+  });
+  if (error || !data.session) throw new Error("canary_session_mint_failed");
+  return data.session;
+}
+
+function profileBootstrapUrl(): string {
+  let apiUrl: URL;
+  try {
+    apiUrl = new URL(requiredEnv("ARGUS_CANARY_API_URL"));
+  } catch {
+    throw new Error("canary_api_url_invalid");
+  }
+  const localHost = ["127.0.0.1", "localhost", "::1"].includes(apiUrl.hostname);
+  if (
+    (apiUrl.protocol !== "https:" &&
+      !(apiUrl.protocol === "http:" && localHost)) ||
+    apiUrl.username ||
+    apiUrl.password ||
+    apiUrl.search ||
+    apiUrl.hash
+  ) {
+    throw new Error("canary_api_url_invalid");
+  }
+  return `${apiUrl.href.replace(/\/$/, "")}/api/v1/me`;
+}
+
+async function bootstrapProfile(email: string, userId: string): Promise<void> {
+  const session = await mintDedicatedSession(email);
+  let bootstrapError: unknown;
+  try {
+    assertLeastPrivilege(session, email);
+    if (session.user.id !== userId) {
+      throw new Error("canary_profile_bootstrap_identity_mismatch");
+    }
+    const response = await fetch(profileBootstrapUrl(), {
+      redirect: "error",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+    if (!response.ok) throw new Error("canary_profile_bootstrap_failed");
+    const payload = (await response.json().catch(() => null)) as {
+      user?: { id?: unknown };
+    } | null;
+    if (payload?.user?.id !== userId) {
+      throw new Error("canary_profile_bootstrap_identity_mismatch");
+    }
+  } catch (error) {
+    bootstrapError = error;
+  }
+
+  try {
+    await revokeTokens(session.access_token);
+  } catch {
+    throw new Error("canary_profile_bootstrap_revocation_failed");
+  }
+  if (bootstrapError) throw bootstrapError;
+}
+
 async function provision(): Promise<void> {
   const email = requiredEnv("ARGUS_CANARY_EMAIL").toLocaleLowerCase();
   if (!CANARY_PROVISIONING_EMAIL.test(email)) {
@@ -199,7 +277,7 @@ async function provision(): Promise<void> {
   try {
     assertDedicatedUser(user, 1);
     assertLeastPrivilegeUser(user, email);
-    await assertNonAdminProfile(user.id);
+    const profileExists = await nonAdminProfileExists(user.id);
     const client = serviceClient();
     const { data, error } = await client
       .from("private_alpha_allowlist")
@@ -223,19 +301,22 @@ async function provision(): Promise<void> {
     ) {
       throw new Error("canary_allowlist_provision_failed");
     }
+    if (!profileExists) await bootstrapProfile(email, user.id);
+    await assertNonAdminProfile(user.id);
   } catch (error) {
     if (created) {
-      const { error: rollbackError } = await admin.auth.admin.deleteUser(user.id);
-      if (rollbackError) throw new Error("canary_identity_provision_rollback_failed");
+      const { error: rollbackError } = await admin.auth.admin.deleteUser(
+        user.id,
+      );
+      if (rollbackError)
+        throw new Error("canary_identity_provision_rollback_failed");
     }
     throw error;
   }
   console.log("canary_identity_provision=ready");
 }
 
-async function storageStateCookies(
-  session: Session,
-): Promise<PendingCookie[]> {
+async function storageStateCookies(session: Session): Promise<PendingCookie[]> {
   const pending = new Map<string, PendingCookie>();
   const client = createServerClient(
     requiredEnv("ARGUS_CANARY_SUPABASE_URL"),
@@ -291,26 +372,12 @@ async function mint(): Promise<void> {
     assertNonAdminProfile(dedicatedUser.id),
   ]);
 
-  const admin = serviceClient();
-  const { data: linkData, error: linkError } =
-    await admin.auth.admin.generateLink({ type: "magiclink", email });
-  const tokenHash = linkData?.properties?.hashed_token?.trim();
-  const verificationType = linkData?.properties?.verification_type;
-  if (linkError || !tokenHash || verificationType !== "magiclink") {
-    throw new Error("canary_session_link_failed");
-  }
-
-  const verifier = serviceClient();
-  const { data, error } = await verifier.auth.verifyOtp({
-    token_hash: tokenHash,
-    type: "magiclink",
-  });
-  if (error || !data.session) throw new Error("canary_session_mint_failed");
+  const session = await mintDedicatedSession(email);
 
   try {
-    assertLeastPrivilege(data.session, email);
-    await assertNonAdminProfile(data.session.user.id);
-    const cookies = await storageStateCookies(data.session);
+    assertLeastPrivilege(session, email);
+    await assertNonAdminProfile(session.user.id);
+    const cookies = await storageStateCookies(session);
     const now = Math.floor(Date.now() / 1000);
     const storageState = {
       cookies: cookies.map(({ name, value, options }) => ({
@@ -330,10 +397,10 @@ async function mint(): Promise<void> {
     };
     const handoff: SessionHandoff = {
       schema_version: 1,
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at ?? 0,
-      user_id: data.session.user.id,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at ?? 0,
+      user_id: session.user.id,
       email,
     };
     await writeFile(storagePath, `${JSON.stringify(storageState)}\n`, {
@@ -346,7 +413,7 @@ async function mint(): Promise<void> {
     });
     await Promise.all([chmod(storagePath, 0o600), chmod(sessionPath, 0o600)]);
   } catch (error) {
-    await revokeTokens(data.session.access_token).catch(() => undefined);
+    await revokeTokens(session.access_token).catch(() => undefined);
     throw error;
   }
   console.log("canary_session_state=ready");

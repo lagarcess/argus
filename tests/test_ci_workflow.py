@@ -221,10 +221,13 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
         "ARGUS_CANARY_SUPABASE_URL",
         "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
     }
-    browser_secret_names = {
+    browser_identity_secret_names = {
         "ARGUS_CANARY_EMAIL",
         "ARGUS_CANARY_SUPABASE_URL",
         "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
+    }
+    browser_operational_secret_names = browser_identity_secret_names | {
+        "RENDER_API_KEY"
     }
 
     release_steps = {
@@ -239,12 +242,17 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     assert release_steps["Check release-coherence secrets"] == release_secret_names
     assert release_steps["Run direct API signup-denial probe"] == release_secret_names
     assert browser_steps["Resolve deployed canary release"] == {"RENDER_API_KEY"}
-    assert browser_steps["Check authenticated-browser secrets"] == browser_secret_names
+    assert browser_steps["Check authenticated-browser secrets"] == (
+        browser_operational_secret_names
+    )
+    assert browser_steps["Provision dedicated canary identity"] == (
+        browser_identity_secret_names
+    )
     assert browser_steps["Run authenticated Spanish browser journey"] == (
-        browser_secret_names
+        browser_operational_secret_names
     )
     assert browser_steps["Run authenticated Spanish browser journey"].isdisjoint(
-        {"RENDER_API_KEY", "ARGUS_OPS_TOKEN", "ARGUS_WORKFLOW_DATABASE_URL"}
+        {"ARGUS_OPS_TOKEN", "ARGUS_WORKFLOW_DATABASE_URL"}
     )
     for steps in (release_steps, browser_steps):
         for name, secrets in steps.items():
