@@ -158,12 +158,13 @@ describe("guest session entry contract", () => {
     expect(entry).not.toContain("retryGuestSession");
   });
 
-  test("links with the current browser refresh token instead of the bootstrap cookie", () => {
+  test("registers an active guest through a prepared signup handoff", () => {
     const guestApi = readFileSync(join(root, "lib/guest-api.ts"), "utf-8");
 
-    expect(guestApi).toContain("getSupabaseClient");
-    expect(guestApi).toContain("session.refresh_token");
-    expect(guestApi).toContain("refresh_token:");
-    expect(guestApi).toContain("Authorization");
+    expect(guestApi).toContain("registerGuestAccount");
+    expect(guestApi).toContain('handoff_kind: "new_account_signup"');
+    expect(guestApi).toContain('"/auth/guest/signup"');
+    expect(guestApi).toContain("persistBrowserSession(response)");
+    expect(guestApi).not.toContain('"/auth/guest/link"');
   });
 });

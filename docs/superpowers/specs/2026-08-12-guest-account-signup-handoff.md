@@ -47,7 +47,7 @@ Before account creation, the active guest prepares the durable transfer:
 ```json
 {
   "handoff_kind": "new_account_signup",
-  "email": "person@example.com",
+  "destination_email": "person@example.com",
   "source_conversation_id": "conversation-uuid",
   "pending_action": {
     "reason": "keep_history",
@@ -101,10 +101,19 @@ guests use ordinary signup because their expired work is not recoverable.
   guest workspace, never later than seven days after workspace creation.
 
 Preparing a signup handoff is one locked database operation. For the same guest
-and normalized email it reuses the pending row and rotates the secret. If a
-new Auth UUID has already been bound, the destination cannot change. This keeps
+and normalized email it reuses the pending row and rotates the secret when the
+browser no longer holds the current one. A later password-login preparation
+for that same email also reuses the signup ticket because its HttpOnly cookie
+is not browser-readable. If a new Auth UUID has already been bound, its email
+and destination cannot change. This keeps
 double clicks, ambiguous responses, and same-email retries on one account and
 one transfer record.
+
+If signup returned a confirmed session but the immediate claim was interrupted,
+the same guest can retry with the same email and password. Argus verifies that
+password through normal login, checks the resulting Auth UUID against the bound
+handoff, creates the permanent profile if signup committed before that API
+write, and resumes the claim. No password proof means no transfer.
 
 The handoff destination foreign key points to `auth.users(id)` rather than
 `profiles(id)`. This lets an Auth insert trigger bind the newly created UUID in

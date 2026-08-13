@@ -79,6 +79,7 @@ function guestMe(language: "en" | "es-419" = "en") {
     account_kind: "guest",
     guest: {
       expires_at: EXPIRES_AT,
+      conversation_id: CONVERSATION_ID,
       conversation_limit: 1,
       message_limit: 10,
       simulation_limit: 1,

@@ -5,8 +5,6 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Any
 
-import httpx
-
 from argus.api.schemas import Conversation, Language
 from argus.domain.guest_funnel_milestones import purge_expired_milestones
 from argus.domain.guest_workspaces import GuestWorkspace
@@ -24,21 +22,7 @@ def _row_one(result: Any) -> dict[str, Any] | None:
 
 
 class EmailAlreadyRegisteredError(RuntimeError):
-    """The linking email already belongs to a permanent account."""
-
-
-def _email_already_registered_response(response: Any) -> bool:
-    try:
-        body = response.json()
-    except ValueError:
-        return False
-    if not isinstance(body, dict):
-        return False
-    code = str(body.get("error_code") or body.get("code") or "").strip().lower()
-    if code == "email_exists":
-        return True
-    message = str(body.get("msg") or body.get("message") or "").lower()
-    return "already" in message and "registered" in message
+    """The signup email already belongs to another permanent account."""
 
 
 class GuestAccountPersistenceMixin:
@@ -93,55 +77,100 @@ class GuestAccountPersistenceMixin:
         destination_email: str,
         source_conversation_id: str,
         pending_action: dict[str, Any] | None,
-        created_at: datetime,
+        handoff_kind: str = "existing_account",
+        existing_opaque_secret: str | None = None,
     ) -> dict[str, Any]:
-        workspace = _row_one(
-            self.client.table("guest_workspaces")
-            .select("user_id,conversation_id,status,expires_at")
-            .eq("user_id", source_user_id)
-            .eq("conversation_id", source_conversation_id)
-            .eq("status", "active")
-            .gt("expires_at", created_at.isoformat())
-            .limit(1)
-            .execute()
-        )
-        if not workspace:
-            raise RuntimeError("Guest workspace is not available for handoff.")
-
         opaque_secret = secrets.token_urlsafe(32)
         secret_hash = hashlib.sha256(opaque_secret.encode("utf-8")).hexdigest()
-        expires_at = created_at + timedelta(minutes=10)
-        (
-            self.client.table("guest_workspace_handoffs")
-            .update({"status": "revoked"})
-            .eq("source_user_id", source_user_id)
-            .eq("status", "pending")
-            .execute()
+        existing_secret_hash = (
+            hashlib.sha256(existing_opaque_secret.encode("utf-8")).hexdigest()
+            if existing_opaque_secret
+            else None
         )
-        created = (
-            self.client.table("guest_workspace_handoffs")
-            .insert(
+        try:
+            prepared = self.client.rpc(
+                "prepare_guest_workspace_handoff",
                 {
-                    "source_user_id": source_user_id,
-                    "destination_email_hash": hashlib.sha256(
+                    "p_source_user_id": source_user_id,
+                    "p_destination_email_hash": hashlib.sha256(
                         destination_email.strip().lower().encode("utf-8")
                     ).hexdigest(),
-                    "source_conversation_id": source_conversation_id,
-                    "secret_hash": secret_hash,
-                    "pending_action": pending_action,
-                    "created_at": created_at.isoformat(),
-                    "expires_at": expires_at.isoformat(),
-                }
+                    "p_source_conversation_id": source_conversation_id,
+                    "p_pending_action": pending_action,
+                    "p_secret_hash": secret_hash,
+                    "p_existing_secret_hash": existing_secret_hash,
+                    "p_handoff_kind": handoff_kind,
+                },
+            ).execute()
+        except Exception as exc:
+            detail = str(exc)
+            known_codes = (
+                "guest_signup_destination_bound",
+                "guest_handoff_source_not_anonymous",
+                "guest_handoff_workspace_unavailable",
+                "guest_handoff_invalid",
             )
-            .execute()
-        )
-        row = _row_one(created)
+            code = next((value for value in known_codes if value in detail), None)
+            raise RuntimeError(code or "guest_handoff_prepare_unavailable") from None
+        row = _row_one(prepared)
         if row is None:
-            raise RuntimeError("Guest handoff was not created.")
+            raise RuntimeError("guest_handoff_prepare_unavailable")
         return {
             "id": str(row["id"]),
             "expires_at": row["expires_at"],
-            "opaque_secret": opaque_secret,
+            "opaque_secret": (
+                existing_opaque_secret
+                if row.get("reused_secret") is True and existing_opaque_secret
+                else opaque_secret
+            ),
+        }
+
+    def get_guest_signup_handoff(
+        self,
+        *,
+        handoff_id: str,
+        opaque_secret: str,
+        source_user_id: str,
+        destination_email: str,
+        at: datetime,
+    ) -> dict[str, Any]:
+        secret_hash = hashlib.sha256(opaque_secret.encode("utf-8")).hexdigest()
+        destination_email_hash = hashlib.sha256(
+            destination_email.strip().lower().encode("utf-8")
+        ).hexdigest()
+        row = _row_one(
+            self.client.table("guest_workspace_handoffs")
+            .select(
+                "id,secret_hash,source_user_id,destination_user_id,"
+                "destination_email_hash,source_conversation_id,pending_action,"
+                "handoff_kind,status,expires_at"
+            )
+            .eq("id", handoff_id)
+            .eq("source_user_id", source_user_id)
+            .eq("secret_hash", secret_hash)
+            .eq("destination_email_hash", destination_email_hash)
+            .eq("handoff_kind", "new_account_signup")
+            .eq("status", "pending")
+            .gt("expires_at", at.isoformat())
+            .limit(1)
+            .execute()
+        )
+        if row is None:
+            raise RuntimeError("guest_handoff_invalid")
+        return {
+            "id": str(row["id"]),
+            "source_user_id": str(row["source_user_id"]),
+            "destination_user_id": (
+                str(row["destination_user_id"])
+                if row.get("destination_user_id")
+                else None
+            ),
+            "source_conversation_id": str(row["source_conversation_id"]),
+            "pending_action": row.get("pending_action"),
+            "handoff_kind": str(row["handoff_kind"]),
+            "status": str(row["status"]),
+            "expires_at": row["expires_at"],
+            "proof": str(row["secret_hash"]),
         }
 
     def claim_guest_workspace_handoff(
@@ -179,99 +208,24 @@ class GuestAccountPersistenceMixin:
         row = _row_one(result)
         if row is None:
             raise RuntimeError("guest_handoff_invalid")
-        return dict(row)
-
-    def mark_guest_identity_linked(self, user_id: str, *, at: datetime) -> None:
-        (
-            self.client.table("guest_workspaces")
-            .update(
-                {
-                    "status": "claimed",
-                    "claimed_by": user_id,
-                    "claimed_at": at.isoformat(),
-                    "updated_at": at.isoformat(),
-                }
-            )
-            .eq("user_id", user_id)
-            .eq("status", "active")
-            .execute()
-        )
-
-    def guest_identity_link_completed(self, user_id: str) -> bool:
-        row = _row_one(
-            self.client.table("guest_workspaces")
-            .select("user_id,status,claimed_by")
-            .eq("user_id", user_id)
-            .eq("status", "claimed")
-            .eq("claimed_by", user_id)
-            .limit(1)
-            .execute()
-        )
-        return row is not None
-
-    def link_anonymous_identity(
-        self,
-        *,
-        access_token: str,
-        refresh_token: str,
-        email: str,
-        password: str,
-    ) -> dict[str, Any]:
-        auth_client = self.auth_client or self.client
-        auth_url = str(auth_client.supabase_url).rstrip("/")
-        auth_key = str(auth_client.supabase_key)
-        headers = {
-            "apikey": auth_key,
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        }
+        payload = dict(row)
         try:
-            with httpx.Client(timeout=15, follow_redirects=False) as client:
-                updated = client.put(
-                    f"{auth_url}/auth/v1/user",
-                    headers=headers,
-                    json={"email": email, "password": password},
-                )
-                if not updated.is_success:
-                    if _email_already_registered_response(updated):
-                        raise EmailAlreadyRegisteredError(
-                            "The email already belongs to a permanent account."
-                        )
-                    raise RuntimeError("Provider rejected anonymous identity linking.")
-                refreshed = client.post(
-                    f"{auth_url}/auth/v1/token?grant_type=refresh_token",
-                    headers={"apikey": auth_key, "Content-Type": "application/json"},
-                    json={"refresh_token": refresh_token},
-                )
-                if not refreshed.is_success:
-                    raise RuntimeError("Provider could not refresh the linked identity.")
-                payload = refreshed.json()
-        except EmailAlreadyRegisteredError:
-            raise
-        except Exception as exc:
-            raise RuntimeError("Anonymous identity linking failed.") from exc
-
-        auth_user = payload.get("user")
-        session_access_token = payload.get("access_token")
-        session_refresh_token = payload.get("refresh_token")
-        if (
-            not isinstance(auth_user, dict)
-            or auth_user.get("is_anonymous") is not False
-            or str(auth_user.get("email") or "").strip().lower() != email.strip().lower()
-            or not isinstance(session_access_token, str)
-            or not session_access_token
-            or not isinstance(session_refresh_token, str)
-            or not session_refresh_token
-        ):
-            raise RuntimeError("Provider returned an invalid linked identity.")
-        return {
-            "user": auth_user,
-            "session": {
-                "access_token": session_access_token,
-                "refresh_token": session_refresh_token,
-                "expires_in": payload.get("expires_in"),
-            },
-        }
+            handoff = _row_one(
+                self.client.table("guest_workspace_handoffs")
+                .select("handoff_kind")
+                .eq("id", handoff_id)
+                .eq("secret_hash", secret_hash)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            handoff = None
+        if handoff and handoff.get("handoff_kind") in {
+            "existing_account",
+            "new_account_signup",
+        }:
+            payload["handoff_kind"] = str(handoff["handoff_kind"])
+        return payload
 
     def get_active_guest_workspace(
         self,

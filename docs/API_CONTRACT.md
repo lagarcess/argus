@@ -1708,6 +1708,10 @@ defaults to `true` and controls presentation only. The independent
   `permanent_account_access_allowed` as its permanent-account gate. When public
   account access is disabled, only active allowlisted roles may register; when
   enabled, any email not explicitly disabled may register.
+- The guest projection returned by `GET /api/v1/me` includes the active
+  workspace `conversation_id` alongside its expiry and allowances. The client
+  uses this server-owned id as the handoff source if conversation hydration has
+  not yet selected the route locally.
 - Before provider signup, the client calls `POST /api/v1/auth/guest/handoffs`
   with `handoff_kind=new_account_signup`, the source conversation, and optional
   typed pending action. That response first sets the HttpOnly claim cookies for
@@ -1719,9 +1723,12 @@ defaults to `true` and controls presentation only. The independent
   verified login claims it. If signup returns a session immediately, the route
   claims it before returning.
 - Retrying the same unconfirmed guest signup resends the signup confirmation
-  without changing the password or creating another Auth user. An email owned
-  by any other permanent identity returns `409 account_exists_use_login` before
-  provider mutation; transfer to an existing account still requires login.
+  without changing the password or creating another Auth user. If the same
+  bound Auth user is already confirmed but its claim was interrupted, Argus
+  verifies the submitted password and resumes that exact handoff. An email
+  owned by any other permanent identity returns `409 account_exists_use_login`
+  before provider mutation; transfer to an existing account still requires
+  login.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
   pending action without resolving whether that account exists. Its optional
@@ -1734,7 +1741,9 @@ defaults to `true` and controls presentation only. The independent
   the permanent session. Its optional `guest_claim` contains the original
   conversation id and verified typed pending action. Retrying the same login
   after an ambiguous response returns the same claim result without repeating
-  transfer; the explicit claim endpoint remains strict single-use.
+  transfer. If an ordinary signup committed before its profile write, this
+  login creates the missing permanent profile before claim. The explicit claim
+  endpoint remains strict single-use.
 - `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
   the signed-in destination, then atomically transfers the complete mutable
   product graph. It is single-use and returns the original conversation id plus
@@ -1910,7 +1919,11 @@ the claim.
 
 The claim commits before the permanent session is returned. A retry that maps
 to the same already-bound unconfirmed Auth user resends the signup confirmation
-and returns the confirmation-required shape without calling signup again.
+and returns the confirmation-required shape without calling signup again. If
+that same bound user is already confirmed but the claim was interrupted, the
+route verifies the submitted password through normal login and finishes the
+claim. A different Auth UUID or an invalid password never receives the guest
+workspace.
 
 An email bound to any other Auth user returns the existing explicit guest
 conversion response:

@@ -59,6 +59,7 @@ class AccountContext:
     user_id: str
     expires_at: datetime | None
     capabilities: AccountCapabilities
+    conversation_id: str | None = None
     # Carried so funnel milestones can be claimed against the visitor rather
     # than a guest user id that renewal replaces. None when the context was
     # built without a request.
@@ -131,6 +132,7 @@ def guest_account_context(
         user_id=workspace.user_id,
         expires_at=workspace.expires_at,
         capabilities=guest_capabilities(),
+        conversation_id=workspace.conversation_id,
         visitor_key=visitor_key,
     )
 
@@ -145,6 +147,7 @@ def registered_account_context(
         user_id=user_id,
         expires_at=None,
         capabilities=registered_capabilities(),
+        conversation_id=None,
         visitor_key=visitor_key,
     )
 

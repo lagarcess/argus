@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -65,6 +66,7 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
             "decision",
             "context_packet",
             "run_context_packet",
+            "read_state",
             "handoff",
         )
     }
@@ -98,6 +100,18 @@ def _seed_complete_graph(connection) -> dict[str, Any]:
                 ids["assistant_message"],
                 ids["conversation"],
                 source,
+            ),
+        )
+        cursor.execute(
+            "insert into public.conversation_read_states"
+            " (user_id,conversation_id,read_through_occurred_at,"
+            "  read_through_source_kind,read_through_source_id)"
+            " values (%s,%s,%s,'chat_turn',%s)",
+            (
+                source,
+                ids["conversation"],
+                created_at,
+                ids["user_message"],
             ),
         )
         cursor.execute(
@@ -301,6 +315,70 @@ def _claim_by_email(
         return cursor.fetchone()
 
 
+def _prepare_signup_handoff(
+    connection,
+    graph: dict[str, Any],
+    *,
+    email: str,
+    secret_hash: str,
+    existing_secret_hash: str | None = None,
+):
+    destination_email_hash = hashlib.sha256(
+        email.strip().lower().encode("utf-8")
+    ).hexdigest()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select id::text,expires_at,destination_user_id::text,reused_secret"
+            " from public.prepare_guest_workspace_handoff(%s,%s,%s,%s::jsonb,%s,%s,%s)",
+            (
+                graph["source"],
+                destination_email_hash,
+                graph["conversation"],
+                (
+                    '{"reason":"keep_history",'
+                    f'"conversation_id":"{graph["conversation"]}",'
+                    '"action_id":"signup-1"}'
+                ),
+                secret_hash,
+                existing_secret_hash,
+                "new_account_signup",
+            ),
+        )
+        return cursor.fetchone()
+
+
+def _prepare_existing_handoff(
+    connection,
+    graph: dict[str, Any],
+    *,
+    email: str,
+    secret_hash: str,
+    existing_secret_hash: str | None = None,
+):
+    destination_email_hash = hashlib.sha256(
+        email.strip().lower().encode("utf-8")
+    ).hexdigest()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "select id::text,expires_at,destination_user_id::text,reused_secret"
+            " from public.prepare_guest_workspace_handoff(%s,%s,%s,%s::jsonb,%s,%s,%s)",
+            (
+                graph["source"],
+                destination_email_hash,
+                graph["conversation"],
+                (
+                    '{"reason":"keep_history",'
+                    f'"conversation_id":"{graph["conversation"]}",'
+                    '"action_id":"login-1"}'
+                ),
+                secret_hash,
+                existing_secret_hash,
+                "existing_account",
+            ),
+        )
+        return cursor.fetchone()
+
+
 def _delete_fixture_identities(connection, graph: dict[str, Any]) -> None:
     with connection.cursor() as cursor:
         cursor.execute(
@@ -361,6 +439,198 @@ def test_handoff_storage_and_privileged_claim_contract_exist() -> None:
 
     assert private_function is not None
     assert service_wrapper is not None
+
+
+def test_signup_handoff_binds_new_auth_uuid_and_scrubs_one_time_proof() -> None:
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        destination_user_id = str(uuid.uuid4())
+        email = f"guest-signup-{destination_user_id[:8]}@example.com"
+        secret_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        try:
+            prepared = _prepare_signup_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=secret_hash,
+            )
+            assert prepared[0] != graph["handoff"]
+            assert prepared[2:] == (None, False)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select expires_at = ("
+                    " select expires_at from public.guest_workspaces where user_id=%s"
+                    ") from public.guest_workspace_handoffs where id=%s",
+                    (graph["source"], prepared[0]),
+                )
+                assert cursor.fetchone()[0] is True
+                cursor.execute(
+                    "insert into auth.users"
+                    " (id,email,is_anonymous,raw_user_meta_data)"
+                    " values (%s,%s,false,%s::jsonb)",
+                    (
+                        destination_user_id,
+                        email,
+                        json.dumps(
+                            {
+                                "language": "en",
+                                "argus_guest_signup": {
+                                    "handoff_id": prepared[0],
+                                    "proof": secret_hash,
+                                },
+                            }
+                        ),
+                    ),
+                )
+                cursor.execute(
+                    "select destination_user_id::text,handoff_kind,status"
+                    " from public.guest_workspace_handoffs where id=%s",
+                    (prepared[0],),
+                )
+                assert cursor.fetchone() == (
+                    destination_user_id,
+                    "new_account_signup",
+                    "pending",
+                )
+                cursor.execute(
+                    "select raw_user_meta_data ? 'argus_guest_signup'"
+                    " from auth.users where id=%s",
+                    (destination_user_id,),
+                )
+                assert cursor.fetchone()[0] is False
+                cursor.execute(
+                    "select count(*) from public.profiles where id=%s",
+                    (destination_user_id,),
+                )
+                assert cursor.fetchone()[0] == 0
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "delete from auth.users where id=%s",
+                    (destination_user_id,),
+                )
+            _delete_fixture_identities(connection, graph)
+
+
+@pytest.mark.parametrize("tamper", ["proof", "email"])
+def test_signup_handoff_rejects_tampered_auth_insert_atomically(tamper: str) -> None:
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        destination_user_id = str(uuid.uuid4())
+        email = f"guest-signup-{destination_user_id[:8]}@example.com"
+        secret_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        prepared = _prepare_signup_handoff(
+            connection,
+            graph,
+            email=email,
+            secret_hash=secret_hash,
+        )
+        attempted_email = "wrong@example.com" if tamper == "email" else email
+        attempted_proof = "f" * 64 if tamper == "proof" else secret_hash
+        try:
+            with pytest.raises(
+                psycopg.Error,
+                match=(
+                    "guest_signup_handoff_wrong_email"
+                    if tamper == "email"
+                    else "guest_signup_handoff_invalid"
+                ),
+            ):
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "insert into auth.users"
+                        " (id,email,is_anonymous,raw_user_meta_data)"
+                        " values (%s,%s,false,%s::jsonb)",
+                        (
+                            destination_user_id,
+                            attempted_email,
+                            json.dumps(
+                                {
+                                    "argus_guest_signup": {
+                                        "handoff_id": prepared[0],
+                                        "proof": attempted_proof,
+                                    }
+                                }
+                            ),
+                        ),
+                    )
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select count(*) from auth.users where id=%s",
+                    (destination_user_id,),
+                )
+                assert cursor.fetchone()[0] == 0
+                cursor.execute(
+                    "select destination_user_id from public.guest_workspace_handoffs"
+                    " where id=%s",
+                    (prepared[0],),
+                )
+                assert cursor.fetchone()[0] is None
+        finally:
+            _delete_fixture_identities(connection, graph)
+
+
+def test_signup_handoff_retry_reuses_cookie_and_cannot_switch_bound_email() -> None:
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        destination_user_id = str(uuid.uuid4())
+        email = f"guest-signup-{destination_user_id[:8]}@example.com"
+        secret_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        replacement_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        try:
+            first = _prepare_signup_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=secret_hash,
+            )
+            replay = _prepare_signup_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=replacement_hash,
+                existing_secret_hash=secret_hash,
+            )
+            assert replay[0] == first[0]
+            assert replay[3] is True
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select secret_hash from public.guest_workspace_handoffs where id=%s",
+                    (first[0],),
+                )
+                assert cursor.fetchone()[0] == secret_hash
+                cursor.execute(
+                    "insert into auth.users"
+                    " (id,email,is_anonymous,raw_user_meta_data)"
+                    " values (%s,%s,false,%s::jsonb)",
+                    (
+                        destination_user_id,
+                        email,
+                        json.dumps(
+                            {
+                                "argus_guest_signup": {
+                                    "handoff_id": first[0],
+                                    "proof": secret_hash,
+                                }
+                            }
+                        ),
+                    ),
+                )
+            with pytest.raises(psycopg.Error, match="guest_signup_destination_bound"):
+                _prepare_signup_handoff(
+                    connection,
+                    graph,
+                    email="different@example.com",
+                    secret_hash=replacement_hash,
+                )
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "delete from auth.users where id=%s",
+                    (destination_user_id,),
+                )
+            _delete_fixture_identities(connection, graph)
 
 
 def test_email_bound_claim_resolves_only_after_verified_login_and_reconciles_once() -> (
@@ -437,12 +707,136 @@ def test_handoff_table_and_claim_wrapper_are_not_client_executable() -> None:
                     'service_role',
                     'public.claim_guest_workspace_handoff_by_email(uuid,text,uuid,boolean)',
                     'execute'
+                  ),
+                  has_function_privilege(
+                    'anon',
+                    'public.prepare_guest_workspace_handoff(uuid,text,uuid,jsonb,text,text,text)',
+                    'execute'
+                  ),
+                  has_function_privilege(
+                    'authenticated',
+                    'public.prepare_guest_workspace_handoff(uuid,text,uuid,jsonb,text,text,text)',
+                    'execute'
+                  ),
+                  has_function_privilege(
+                    'service_role',
+                    'public.prepare_guest_workspace_handoff(uuid,text,uuid,jsonb,text,text,text)',
+                    'execute'
                   )
                 """
             )
             privileges = cursor.fetchone()
 
-    assert privileges == (False, False, False, False, True, False, False, True)
+    assert privileges == (
+        False,
+        False,
+        False,
+        False,
+        True,
+        False,
+        False,
+        True,
+        False,
+        False,
+        True,
+    )
+
+
+def test_unbound_signup_switch_to_login_replaces_signup_handoff() -> None:
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        email = f"existing-{uuid.uuid4().hex[:8]}@example.com"
+        signup_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        login_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        try:
+            signup = _prepare_signup_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=signup_hash,
+            )
+            login = _prepare_existing_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=login_hash,
+                existing_secret_hash=signup_hash,
+            )
+            assert login[0] != signup[0]
+            assert login[3] is False
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select handoff_kind,status from public.guest_workspace_handoffs"
+                    " where id=%s",
+                    (signup[0],),
+                )
+                assert cursor.fetchone() == ("new_account_signup", "revoked")
+                cursor.execute(
+                    "select handoff_kind,status from public.guest_workspace_handoffs"
+                    " where id=%s",
+                    (login[0],),
+                )
+                assert cursor.fetchone() == ("existing_account", "pending")
+        finally:
+            _delete_fixture_identities(connection, graph)
+
+
+def test_bound_signup_login_reuses_workspace_lifetime_handoff() -> None:
+    with _connect() as connection:
+        graph = _seed_complete_graph(connection)
+        destination_user_id = str(uuid.uuid4())
+        email = f"confirmed-{destination_user_id[:8]}@example.com"
+        signup_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        login_hash = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+        try:
+            signup = _prepare_signup_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=signup_hash,
+            )
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "insert into auth.users"
+                    " (id,email,is_anonymous,raw_user_meta_data)"
+                    " values (%s,%s,false,%s::jsonb)",
+                    (
+                        destination_user_id,
+                        email,
+                        json.dumps(
+                            {
+                                "argus_guest_signup": {
+                                    "handoff_id": signup[0],
+                                    "proof": signup_hash,
+                                }
+                            }
+                        ),
+                    ),
+                )
+            login = _prepare_existing_handoff(
+                connection,
+                graph,
+                email=email,
+                secret_hash=login_hash,
+                existing_secret_hash=signup_hash,
+            )
+            assert login[0] == signup[0]
+            assert login[2] == destination_user_id
+            assert login[3] is True
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "select handoff_kind,status from public.guest_workspace_handoffs"
+                    " where id=%s",
+                    (login[0],),
+                )
+                assert cursor.fetchone() == ("new_account_signup", "pending")
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "delete from auth.users where id=%s",
+                    (destination_user_id,),
+                )
+            _delete_fixture_identities(connection, graph)
 
 
 def test_complete_graph_claim_preserves_ids_and_moves_each_owner_once() -> None:
@@ -460,6 +854,7 @@ def test_complete_graph_claim_preserves_ids_and_moves_each_owner_once() -> None:
             with connection.cursor() as cursor:
                 for table, expected_count in (
                     ("conversations", 1),
+                    ("conversation_read_states", 1),
                     ("messages", 2),
                     ("chat_turn_lifecycles", 1),
                     ("strategies", 1),
@@ -565,6 +960,7 @@ def test_wrong_destination_and_tampered_secret_change_zero_owners() -> None:
             with connection.cursor() as cursor:
                 for table in (
                     "conversations",
+                    "conversation_read_states",
                     "messages",
                     "backtest_runs",
                     "backtest_jobs",
@@ -719,6 +1115,7 @@ def test_failure_at_each_transfer_group_rolls_back_every_owner(
 
             for owner_table in (
                 "conversations",
+                "conversation_read_states",
                 "messages",
                 "chat_turn_lifecycles",
                 "strategies",

@@ -568,12 +568,13 @@ revalidation, and Auth-row deletion are one database transaction. Claimed
 source identities use a fifteen-minute reconciliation grace; incomplete
 bootstrap identities use five minutes.
 
-Conversion safety is non-negotiable: new accounts link the anonymous identity
-in place; existing accounts use the email-hash-bound one-time handoff that
-login claims before returning a permanent session. Guest
-usage never merges into registered hour/day counters. Cleanup re-verifies
-anonymous and unclaimed truth and must not delete a converted or permanent
-account.
+Conversion safety is non-negotiable: new accounts use ordinary signup to create
+a different permanent Auth identity, then claim the complete guest graph
+through the workspace-lifetime, email-hash-bound handoff. Existing accounts use
+the short-lived handoff that login claims before returning a permanent session.
+Guest usage never merges into registered hour/day counters. Cleanup
+re-verifies anonymous source truth and must not delete a permanent account or
+the transferred graph.
 
 Guest funnel capture uses the shared metadata-only server envelope. Only the two
 typed browser-owned facts cross `POST /api/v1/analytics/guest-events`; PostHog
