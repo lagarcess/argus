@@ -345,8 +345,7 @@ def _apply_auth_session_cookies(
     cookie_kwargs: dict[str, Any] = {
         "httponly": True,
         "path": "/",
-        "samesite": "lax",
-        "secure": _session_cookie_secure(request),
+        **browser_cookie_policy(request),
     }
     if isinstance(max_age, int):
         cookie_kwargs["max_age"] = max_age
@@ -355,6 +354,19 @@ def _apply_auth_session_cookies(
         set_browser_cookie(response, "sb-auth-token", access_token, **cookie_kwargs)
     if isinstance(refresh_token, str) and refresh_token:
         set_browser_cookie(response, "sb-refresh-token", refresh_token, **cookie_kwargs)
+
+
+def browser_cookie_policy(request: Request) -> dict[str, Any]:
+    """One owner for how every Argus browser cookie crosses origins.
+
+    The app and the API are separate registrable domains, so a cookie the API
+    sets is third-party to the app and a `SameSite=Lax` cookie is never sent
+    back on a cross-site fetch. `SameSite=None` is only honoured alongside
+    `Secure`, so plain-http local development keeps `Lax`.
+    """
+
+    secure = _session_cookie_secure(request)
+    return {"secure": secure, "samesite": "none" if secure else "lax"}
 
 
 def _session_cookie_secure(request: Request) -> bool:

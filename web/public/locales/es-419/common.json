@@ -116,7 +116,7 @@
             },
             "guest_handoff": {
               "label": "Cookies de traspaso de invitado",
-              "body": "Si empiezas como invitado y luego creas una cuenta, Argus crea dos cookies de corta duración para trasladar tu conversación temporal a la cuenta nueva. Duran diez minutos, se limitan a las rutas de autenticación de Argus y se eliminan apenas termina el traspaso."
+              "body": "Si empiezas como invitado y luego creas una cuenta, Argus crea dos cookies para trasladar tu conversación temporal a la cuenta nueva. Iniciar sesión en una cuenta que ya tienes usa una cookie de diez minutos. Crear una cuenta nueva usa una que dura lo mismo que tu espacio de invitado, hasta siete días. Ambas se limitan a las rutas de autenticación de Argus, viajan a la API de Argus en su propio dominio y se eliminan apenas termina el traspaso."
             },
             "security": {
               "label": "Cookies de seguridad",
