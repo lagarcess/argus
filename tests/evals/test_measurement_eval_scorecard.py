@@ -203,14 +203,14 @@ def test_measurement_fixture_identity_binds_filenames_and_contents(
     fixture_dir.mkdir()
     first = fixture_dir / "first.yaml"
     second = fixture_dir / "second.yaml"
-    first.write_text("category: first\ncases: []\n", encoding="utf-8")
-    second.write_text("category: second\ncases: []\n", encoding="utf-8")
+    first.write_text("category: first\ncases: [{id: first}]\n", encoding="utf-8")
+    second.write_text("category: second\ncases: [{id: second}]\n", encoding="utf-8")
 
     original = scorecards.measurement_fixture_sha256(fixture_dir)
     second.rename(fixture_dir / "renamed.yaml")
     renamed = scorecards.measurement_fixture_sha256(fixture_dir)
     (fixture_dir / "renamed.yaml").write_text(
-        "category: renamed\ncases: []\n",
+        "category: renamed\ncases: [{id: renamed}]\n",
         encoding="utf-8",
     )
     changed = scorecards.measurement_fixture_sha256(fixture_dir)

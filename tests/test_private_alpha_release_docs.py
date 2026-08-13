@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
+
+from tests.evals.measurement_eval_scorecard import (
+    measurement_fixture_identity_at_git_sha,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 LIVE_EVAL_RESULT_STATUSES = (
@@ -31,6 +36,63 @@ KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _commit_measurement_fixture_candidate(
+    repository_root: Path,
+    *,
+    case_ids: tuple[str, ...],
+) -> str:
+    fixture_dir = repository_root / "tests" / "evals" / "measurement_cases"
+    fixture_dir.mkdir(parents=True)
+    (fixture_dir / "messy_english.yaml").write_text(
+        json.dumps(
+            {
+                "category": "messy_english",
+                "cases": [{"id": case_id} for case_id in case_ids],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "add", "tests/evals/measurement_cases"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Argus Eval Test",
+            "-c",
+            "user.email=argus-eval@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--quiet",
+            "-m",
+            "test fixture candidate",
+        ],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
 
 
 def _assert_main_promotion_live_eval_evidence(
@@ -87,6 +149,14 @@ def _assert_main_promotion_live_eval_evidence(
         and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
         and len(fixture_case_ids) == len(set(fixture_case_ids))
     ), "live eval scorecard is missing fixture case identities"
+    candidate_fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_match.group(1),
+        repository_root=repository_root,
+    )
+    assert (
+        provenance.get("fixture_sha256") == candidate_fixture_identity.sha256
+        and fixture_case_ids == list(candidate_fixture_identity.case_ids)
+    ), "live eval scorecard does not match the candidate fixture identity"
     results = scorecard.get("results")
     assert isinstance(results, list), "live eval scorecard is missing results"
     assert all(
@@ -130,7 +200,14 @@ def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(
 def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
     tmp_path: Path,
 ) -> None:
-    candidate_sha = "a" * 40
+    candidate_sha = _commit_measurement_fixture_candidate(
+        tmp_path,
+        case_ids=("case-a", "case-b"),
+    )
+    fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_sha,
+        repository_root=tmp_path,
+    )
     scorecard_relative_path = (
         "docs/reports/evidence/promotion/argus-eval-scorecard.json"
     )
@@ -146,8 +223,8 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
                     "asset_provider_mode": "live_provider",
                     "candidate_sha": candidate_sha,
                     "python_version": "3.10.20",
-                    "fixture_sha256": "b" * 64,
-                    "fixture_case_ids": ["case-a", "case-b"],
+                    "fixture_sha256": fixture_identity.sha256,
+                    "fixture_case_ids": list(fixture_identity.case_ids),
                     "worktree_clean": True,
                     "live_market_data_probe": {
                         "requested_date_range": {
@@ -210,7 +287,10 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
 def test_main_promotion_manifest_rejects_summary_without_complete_results(
     tmp_path: Path,
 ) -> None:
-    candidate_sha = "a" * 40
+    candidate_sha = _commit_measurement_fixture_candidate(
+        tmp_path,
+        case_ids=("case-a", "case-b"),
+    )
     scorecard_relative_path = (
         "docs/reports/evidence/promotion/argus-eval-scorecard.json"
     )
@@ -227,7 +307,7 @@ def test_main_promotion_manifest_rejects_summary_without_complete_results(
                     "candidate_sha": candidate_sha,
                     "python_version": "3.10.20",
                     "fixture_sha256": "b" * 64,
-                    "fixture_case_ids": ["case-a", "case-b"],
+                    "fixture_case_ids": ["case-a"],
                     "worktree_clean": True,
                     "live_market_data_probe": {
                         "requested_date_range": {
@@ -242,7 +322,7 @@ def test_main_promotion_manifest_rejects_summary_without_complete_results(
                     },
                 },
                 "totals": {
-                    "passed": 2,
+                    "passed": 1,
                     "failed": 0,
                     "expected_failed": 0,
                     "unexpected_pass": 0,
@@ -267,7 +347,7 @@ def test_main_promotion_manifest_rejects_summary_without_complete_results(
         encoding="utf-8",
     )
 
-    with pytest.raises(AssertionError, match="complete fixture result set"):
+    with pytest.raises(AssertionError, match="candidate fixture identity"):
         _assert_main_promotion_live_eval_evidence(
             manifest_path,
             repository_root=tmp_path,

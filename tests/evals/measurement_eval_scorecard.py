@@ -60,6 +60,12 @@ class EvalScorecardProvenance:
     live_market_data_probe: LiveMarketDataProbe | None = None
 
 
+@dataclass(frozen=True)
+class MeasurementFixtureIdentity:
+    sha256: str
+    case_ids: tuple[str, ...]
+
+
 def measurement_fixture_paths(path: Path = FIXTURE_DIR) -> tuple[Path, ...]:
     fixture_paths = tuple(sorted(path.glob("*.yaml")))
     if not fixture_paths:
@@ -68,15 +74,65 @@ def measurement_fixture_paths(path: Path = FIXTURE_DIR) -> tuple[Path, ...]:
 
 
 def measurement_fixture_sha256(path: Path = FIXTURE_DIR) -> str:
-    digest = hashlib.sha256()
-    for fixture_path in measurement_fixture_paths(path):
-        relative_name = fixture_path.relative_to(path).as_posix().encode("utf-8")
-        contents = fixture_path.read_bytes()
-        digest.update(len(relative_name).to_bytes(8, "big"))
-        digest.update(relative_name)
-        digest.update(len(contents).to_bytes(8, "big"))
-        digest.update(contents)
-    return digest.hexdigest()
+    return measurement_fixture_identity(path).sha256
+
+
+def measurement_fixture_identity(path: Path = FIXTURE_DIR) -> MeasurementFixtureIdentity:
+    entries = tuple(
+        (fixture_path.relative_to(path).as_posix(), fixture_path.read_bytes())
+        for fixture_path in measurement_fixture_paths(path)
+    )
+    return _measurement_fixture_identity_from_entries(entries)
+
+
+def measurement_fixture_identity_at_git_sha(
+    *,
+    candidate_sha: str,
+    repository_root: Path = REPOSITORY_ROOT,
+) -> MeasurementFixtureIdentity:
+    if not _FULL_SHA_PATTERN.fullmatch(candidate_sha):
+        raise ValueError("scorecard_provenance:candidate_sha")
+    fixture_prefix = "tests/evals/measurement_cases"
+    try:
+        listed = subprocess.run(
+            [
+                "git",
+                "ls-tree",
+                "-r",
+                "--name-only",
+                candidate_sha,
+                "--",
+                fixture_prefix,
+            ],
+            cwd=repository_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        fixture_paths = tuple(
+            sorted(
+                git_path
+                for git_path in listed.stdout.splitlines()
+                if Path(git_path).parent.as_posix() == fixture_prefix
+                and git_path.endswith(".yaml")
+            )
+        )
+        entries = []
+        for git_path in fixture_paths:
+            shown = subprocess.run(
+                ["git", "show", f"{candidate_sha}:{git_path}"],
+                cwd=repository_root,
+                check=True,
+                capture_output=True,
+                timeout=10,
+            )
+            entries.append((Path(git_path).name, shown.stdout))
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "scorecard_provenance:candidate_fixture_identity_unavailable"
+        ) from exc
+    return _measurement_fixture_identity_from_entries(tuple(entries))
 
 
 def measurement_fixture_documents(
@@ -92,10 +148,26 @@ def measurement_fixture_documents(
 
 
 def measurement_fixture_case_ids(path: Path = FIXTURE_DIR) -> tuple[str, ...]:
+    return measurement_fixture_identity(path).case_ids
+
+
+def _measurement_fixture_identity_from_entries(
+    entries: tuple[tuple[str, bytes], ...],
+) -> MeasurementFixtureIdentity:
+    if not entries:
+        raise ValueError("scorecard_provenance:fixture_set_empty")
+    digest = hashlib.sha256()
     case_ids: list[str] = []
-    for _fixture_path, payload in measurement_fixture_documents(path):
-        raw_cases = payload["cases"]
-        for raw_case in raw_cases:
+    for relative_name_text, contents in sorted(entries):
+        relative_name = relative_name_text.encode("utf-8")
+        digest.update(len(relative_name).to_bytes(8, "big"))
+        digest.update(relative_name)
+        digest.update(len(contents).to_bytes(8, "big"))
+        digest.update(contents)
+        payload = yaml.safe_load(contents)
+        if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):
+            raise ValueError("scorecard_provenance:fixture_cases_invalid")
+        for raw_case in payload["cases"]:
             raw_case_id = raw_case.get("id") if isinstance(raw_case, dict) else None
             case_id = str(raw_case_id or "").strip()
             if not case_id:
@@ -103,7 +175,10 @@ def measurement_fixture_case_ids(path: Path = FIXTURE_DIR) -> tuple[str, ...]:
             case_ids.append(case_id)
     if not case_ids or len(case_ids) != len(set(case_ids)):
         raise ValueError("scorecard_provenance:fixture_case_ids")
-    return tuple(case_ids)
+    return MeasurementFixtureIdentity(
+        sha256=digest.hexdigest(),
+        case_ids=tuple(case_ids),
+    )
 
 
 def build_scorecard_provenance(
@@ -120,8 +195,7 @@ def build_scorecard_provenance(
     asset_provider_mode = _resolved_provider_mode("ARGUS_ASSET_PROVIDER_MODE")
     candidate_sha = _candidate_sha(repository_root)
     python_version = platform.python_version()
-    fixture_sha256 = measurement_fixture_sha256(fixture_dir)
-    fixture_case_ids = measurement_fixture_case_ids(fixture_dir)
+    fixture_identity = measurement_fixture_identity(fixture_dir)
     worktree_clean = _worktree_is_clean(repository_root)
     if not worktree_clean:
         raise ValueError("scorecard_provenance:worktree_clean")
@@ -136,8 +210,8 @@ def build_scorecard_provenance(
         asset_provider_mode=asset_provider_mode,
         candidate_sha=candidate_sha,
         python_version=python_version,
-        fixture_sha256=fixture_sha256,
-        fixture_case_ids=fixture_case_ids,
+        fixture_sha256=fixture_identity.sha256,
+        fixture_case_ids=fixture_identity.case_ids,
         worktree_clean=worktree_clean,
         live_market_data_probe=live_probe,
     )
@@ -329,6 +403,7 @@ def assert_provenance_matches_current_run(
     provenance: EvalScorecardProvenance,
 ) -> None:
     validated_provenance_payload(provenance)
+    fixture_identity = measurement_fixture_identity(FIXTURE_DIR)
     expected_values = {
         "market_data_provider_mode": _resolved_provider_mode(
             "ARGUS_MARKET_DATA_PROVIDER_MODE"
@@ -336,8 +411,8 @@ def assert_provenance_matches_current_run(
         "asset_provider_mode": _resolved_provider_mode("ARGUS_ASSET_PROVIDER_MODE"),
         "candidate_sha": _candidate_sha(REPOSITORY_ROOT),
         "python_version": platform.python_version(),
-        "fixture_sha256": measurement_fixture_sha256(FIXTURE_DIR),
-        "fixture_case_ids": measurement_fixture_case_ids(FIXTURE_DIR),
+        "fixture_sha256": fixture_identity.sha256,
+        "fixture_case_ids": fixture_identity.case_ids,
         "worktree_clean": _worktree_is_clean(REPOSITORY_ROOT),
     }
     for field_name, expected in expected_values.items():
