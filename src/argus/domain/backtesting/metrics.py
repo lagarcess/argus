@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from math import sqrt
+from math import expm1, isfinite, log1p, sqrt
 from typing import Any
 
 import numpy as np
@@ -50,13 +50,31 @@ def portfolio_value_summary(equity_curve: pd.Series) -> dict[str, Any] | None:
     }
 
 
-def _annualized_return_pct(total_return: float, time_basis: MetricTimeBasis) -> float:
+def _annualized_return_pct(
+    total_return: float,
+    time_basis: MetricTimeBasis,
+) -> float | None:
+    if not isfinite(total_return) or total_return < -1.0:
+        return None
+    if total_return == -1.0:
+        return -100.0
     if time_basis.elapsed_years is None:
         return total_return * 100.0
     if time_basis.elapsed_years <= 0:
         return total_return * 100.0
-    annualized = float((1 + total_return) ** (1 / time_basis.elapsed_years) - 1)
-    return annualized * 100.0
+    try:
+        annualized_pct = expm1(log1p(total_return) / time_basis.elapsed_years) * 100.0
+    except OverflowError:
+        return None
+    return float(annualized_pct) if isfinite(annualized_pct) else None
+
+
+def _rounded_annualized_return_pct(
+    total_return: float,
+    time_basis: MetricTimeBasis,
+) -> float | None:
+    annualized = _annualized_return_pct(total_return, time_basis)
+    return round(annualized, 2) if annualized is not None else None
 
 
 def _compute_metrics(
@@ -87,9 +105,9 @@ def _compute_metrics(
             "benchmark_return_pct": round(benchmark_return_pct, 2),
             "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
             "profit": round(allocation_capital * total_return, 2),
-            "annualized_return_pct": round(
-                _annualized_return_pct(total_return, time_basis),
-                2,
+            "annualized_return_pct": _rounded_annualized_return_pct(
+                total_return,
+                time_basis,
             ),
         },
         "risk": {
@@ -136,9 +154,9 @@ def _compute_metrics_from_equity(
             "benchmark_return_pct": round(benchmark_return_pct, 2),
             "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
             "profit": round(strategy_equity.iloc[-1] - invested_capital, 2),
-            "annualized_return_pct": round(
-                _annualized_return_pct(total_return, time_basis),
-                2,
+            "annualized_return_pct": _rounded_annualized_return_pct(
+                total_return,
+                time_basis,
             ),
         },
         "risk": {

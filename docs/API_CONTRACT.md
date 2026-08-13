@@ -1473,13 +1473,16 @@ For example, an open buy-and-hold position persists:
 Annual return uses the elapsed calendar time between the first and last
 effective market-data timestamps, with 365.2425 calendar days per year.
 Irregular gaps therefore remain elapsed time instead of being compressed into
-adjacent observations. Volatility and Sharpe use one asset-aware observation
+adjacent observations. `annualized_return_pct` is `null` when a valid, extreme
+short-window return cannot be represented as a finite annual rate. Volatility
+and Sharpe use one asset-aware observation
 frequency owned by the market-data coverage boundary: crypto uses continuous
 24/7 time, currency pairs use the current provider's continuous calendar, and
 equities use 252 sessions plus the real session durations supplied by the same
-market calendar, including early closes. Daily equity uses 252 observations per
-year. This time-basis correction does not redefine DCA contribution-return
-semantics; that remains a separate metric-contract decision.
+market calendar, including early closes and provider-emitted partial final
+candles. Daily equity uses 252 observations per year. This time-basis correction
+does not redefine DCA contribution-return semantics; that remains a separate
+metric-contract decision.
 
 ## Benchmark Defaults
 - **equity** -> `SPY`

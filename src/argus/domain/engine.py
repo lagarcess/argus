@@ -133,7 +133,7 @@ def _max_drawdown_pct(equity_curve: pd.Series) -> float:
 def _annualized_return_pct(
     total_return: float,
     time_basis: MetricTimeBasis,
-) -> float:
+) -> float | None:
     return _metrics._annualized_return_pct(total_return, time_basis)
 
 

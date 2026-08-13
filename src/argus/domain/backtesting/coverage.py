@@ -568,6 +568,24 @@ def _calendar_expected_equity_observations(
     end_date: date,
     interval_minutes: int,
 ) -> int | None:
+    observations_by_session = _calendar_equity_observations_by_session(
+        sessions=sessions,
+        start_date=start_date,
+        end_date=end_date,
+        interval_minutes=interval_minutes,
+    )
+    if observations_by_session is None:
+        return None
+    return sum(observations_by_session)
+
+
+def _calendar_equity_observations_by_session(
+    *,
+    sessions: Sequence[EquityMarketSession] | None,
+    start_date: date,
+    end_date: date,
+    interval_minutes: int,
+) -> tuple[int, ...] | None:
     if sessions is None:
         return None
     unique_sessions: dict[date, EquityMarketSession] = {}
@@ -581,17 +599,27 @@ def _calendar_expected_equity_observations(
         return None
     if not unique_sessions:
         return None
-    return sum(
-        max(
-            1,
-            ceil(
-                (session.closes_at - session.opens_at).total_seconds()
-                / 60
-                / interval_minutes
-            ),
+    observations: list[int] = []
+    for session in unique_sessions.values():
+        observation_count = _provider_session_observation_count(
+            duration_minutes=(session.closes_at - session.opens_at).total_seconds()
+            / 60.0,
+            interval_minutes=interval_minutes,
         )
-        for session in unique_sessions.values()
-    )
+        if observation_count is None:
+            return None
+        observations.append(observation_count)
+    return tuple(observations)
+
+
+def _provider_session_observation_count(
+    *,
+    duration_minutes: float,
+    interval_minutes: int,
+) -> int | None:
+    if duration_minutes <= 0.0 or interval_minutes <= 0:
+        return None
+    return max(1, ceil(duration_minutes / float(interval_minutes)))
 
 
 def _metric_asset_class(value: str) -> AssetClass:
@@ -614,33 +642,30 @@ def _metric_periods_per_year(
         periods = _CALENDAR_DAYS_PER_YEAR * 24.0 * 60.0 / float(interval_minutes)
         return periods, "continuous_market_calendar"
 
-    session_periods: list[float] = []
     if equity_market_sessions:
-        for session in equity_market_sessions:
-            duration_minutes = (
-                session.closes_at - session.opens_at
-            ).total_seconds() / 60.0
-            if duration_minutes <= 0:
-                raise ValueError("market_calendar_unavailable")
-            session_periods.append(
-                1.0
-                if timeframe == "1D"
-                else max(1.0, duration_minutes / float(interval_minutes))
-            )
-    if session_periods:
-        periods_per_session = sum(session_periods) / len(session_periods)
+        session_dates = [session.session_date for session in equity_market_sessions]
+        observations_by_session = _calendar_equity_observations_by_session(
+            sessions=equity_market_sessions,
+            start_date=min(session_dates),
+            end_date=max(session_dates),
+            interval_minutes=interval_minutes,
+        )
+        if observations_by_session is None:
+            raise ValueError("market_calendar_unavailable")
+        periods_per_session = sum(observations_by_session) / len(observations_by_session)
         return (
             _EQUITY_SESSIONS_PER_YEAR * periods_per_session,
             "equity_market_calendar",
         )
 
-    periods_per_session = (
-        1.0
-        if timeframe == "1D"
-        else max(1.0, _EQUITY_SESSION_MINUTES / float(interval_minutes))
+    fallback_periods_per_session = _provider_session_observation_count(
+        duration_minutes=float(_EQUITY_SESSION_MINUTES),
+        interval_minutes=interval_minutes,
     )
+    if fallback_periods_per_session is None:
+        raise ValueError("unsupported_timeframe")
     return (
-        _EQUITY_SESSIONS_PER_YEAR * periods_per_session,
+        _EQUITY_SESSIONS_PER_YEAR * fallback_periods_per_session,
         "equity_session_fallback",
     )
 

@@ -575,6 +575,45 @@ def test_two_bar_annualization_uses_the_single_elapsed_interval(
     )
 
 
+@pytest.mark.parametrize(
+    ("fee_bps", "slippage_bps"),
+    [(0.0, 0.0), (10.0, 5.0)],
+)
+def test_unrepresentable_short_window_annualization_does_not_abort_either_path(
+    monkeypatch: pytest.MonkeyPatch,
+    fee_bps: float,
+    slippage_bps: float,
+) -> None:
+    monkeypatch.setenv("ARGUS_ENABLE_EXECUTION_REALISM", "true")
+    index = pd.DatetimeIndex(["2025-01-01", "2025-01-02"], tz="UTC")
+    metrics = _run_with_signals(
+        config=_config(
+            template="signal_strategy",
+            periods=2,
+            fee_bps=fee_bps,
+            slippage_bps=slippage_bps,
+            asset_class="crypto",
+            index=index,
+        ),
+        strategy_prices=[100.0, 1_000.0],
+        benchmark_prices=[100.0, 100.0],
+        entries=[True, False],
+        exits=[False, False],
+        index=index,
+    )
+
+    fee = fee_bps / 10_000.0
+    slippage = slippage_bps / 10_000.0
+    shares = 1_000.0 / (100.0 * (1.0 + slippage) * (1.0 + fee))
+    expected_total_return_pct = (shares * 1_000.0 / 1_000.0 - 1.0) * 100.0
+    performance = metrics["aggregate"]["performance"]
+    assert performance["total_return_pct"] == pytest.approx(
+        expected_total_return_pct,
+        abs=0.01,
+    )
+    assert performance["annualized_return_pct"] is None
+
+
 def test_continuous_daily_dispersion_uses_a_calendar_year() -> None:
     index = pd.DatetimeIndex(
         ["2025-01-01", "2025-01-02", "2025-01-03"],
@@ -651,10 +690,10 @@ def test_currency_pair_daily_dispersion_uses_provider_continuous_calendar() -> N
     ("asset_class", "timeframe", "expected_periods_per_year"),
     [
         ("equity", "1D", 252.0),
-        ("equity", "1h", 1_638.0),
-        ("equity", "2h", 819.0),
-        ("equity", "4h", 409.5),
-        ("equity", "6h", 273.0),
+        ("equity", "1h", 1_764.0),
+        ("equity", "2h", 1_008.0),
+        ("equity", "4h", 504.0),
+        ("equity", "6h", 504.0),
         ("equity", "12h", 252.0),
         ("crypto", "1D", 365.2425),
         ("crypto", "1h", 8_765.82),
@@ -722,7 +761,27 @@ def test_equity_time_basis_uses_only_sessions_in_the_effective_window() -> None:
     assert tuple(
         session.session_date for session in basis.equity_market_sessions or ()
     ) == (effective_date,)
-    assert basis.periods_per_year == 1_638.0
+    assert basis.periods_per_year == 1_764.0
+
+
+@pytest.mark.parametrize(
+    ("timeframe", "provider_bars_per_session"),
+    [("1h", 7), ("2h", 4), ("6h", 2)],
+)
+def test_equity_time_basis_fallback_counts_partial_provider_candles(
+    timeframe: str,
+    provider_bars_per_session: int,
+) -> None:
+    basis = build_metric_time_basis(
+        asset_class="equity",
+        timeframe=timeframe,
+        effective_index=pd.DatetimeIndex(
+            ["2025-01-02T14:30:00Z", "2025-01-03T14:30:00Z"]
+        ),
+    )
+
+    assert basis.source == "equity_session_fallback"
+    assert basis.periods_per_year == 252.0 * provider_bars_per_session
 
 
 def test_equity_intraday_dispersion_uses_real_sessions_and_early_closes(
@@ -787,9 +846,9 @@ def test_equity_intraday_dispersion_uses_real_sessions_and_early_closes(
         prepared_market_data=prepared,
     )
 
-    # One 390-minute session and one 210-minute early close average 300 minutes.
-    # The shared equity basis is 252 * 300 / 60 = 1,260 hourly periods.
-    expected_periods_per_year = 1_260.0
+    # Providers emit seven hourly bars for 390 minutes and four for 210 minutes.
+    # The shared calendar basis is 252 * ((7 + 4) / 2) = 1,386 periods.
+    expected_periods_per_year = 1_386.0
     expected_volatility = (0.10 / sqrt(11.0)) * sqrt(expected_periods_per_year) * 100.0
     expected_sharpe = sqrt(expected_periods_per_year / 11.0)
 
