@@ -2039,17 +2039,18 @@ export default function ChatInterface() {
               : "chat.input_placeholder_prerail",
         )
       : t("chat.followup_placeholder", "Ask a follow-up...");
+  const hasConversationLoadFailure =
+    failedConversationId !== null && failedConversationId === conversationId;
   const showEmptyChatSurface = shouldShowEmptyChatSurface({
     messages,
     isHydratingConversation,
-    hasConversationLoadFailure:
-      failedConversationId !== null && failedConversationId === conversationId,
+    hasConversationLoadFailure,
   });
   const conversationComposerUnavailable =
     isStreamingResponse ||
     isHydratingConversation ||
     guestSubmissionPending ||
-    failedConversationId === conversationId;
+    hasConversationLoadFailure;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
     enabled: !mobileShell.isBelowTablet,
@@ -2359,7 +2360,7 @@ export default function ChatInterface() {
                       isHydratingConversation && (
                         <ConversationRetrievalState state="loading" />
                       )}
-                    {failedConversationId === conversationId && (
+                    {hasConversationLoadFailure && (
                       <ConversationRetrievalState
                         state="error"
                         onRetry={() => {

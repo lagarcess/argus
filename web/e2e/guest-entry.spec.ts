@@ -4,6 +4,8 @@ test.describe.configure({ timeout: 60_000 });
 
 const GUEST_ID = "00000000-0000-4000-8000-000000000101";
 const CONVERSATION_ID = "00000000-0000-4000-8000-000000000202";
+const REPLACEMENT_CONVERSATION_ID =
+  "00000000-0000-4000-8000-000000000303";
 const EXPIRES_AT = "2026-07-31T18:00:00Z";
 const EN_EXPIRY_DATE = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
@@ -283,9 +285,15 @@ async function mockGuestJourney(
     if (route.request().method() === "POST") {
       evidence.conversationCreateCalls += 1;
       evidence.requestOrder.push("/conversations");
+      const createdConversationId = pathname.endsWith("/guest/replace")
+        ? REPLACEMENT_CONVERSATION_ID
+        : CONVERSATION_ID;
+      if (createdConversationId === REPLACEMENT_CONVERSATION_ID) {
+        evidence.persistedMessages = [];
+      }
       await fulfillJson(route, {
         conversation: {
-          id: CONVERSATION_ID,
+          id: createdConversationId,
           title: "New idea",
           title_source: "system_default",
           pinned: false,
@@ -411,7 +419,9 @@ test("@guest-shell Start over reuses the guest landing surface", async ({
   });
   await dialog.getByRole("button", { name: "Start over" }).click();
 
-  await expect(page).toHaveURL(new RegExp(`conversation=${CONVERSATION_ID}`));
+  await expect(page).toHaveURL(
+    new RegExp(`conversation=${REPLACEMENT_CONVERSATION_ID}`),
+  );
   expect(await readGuestEmptySurface(page)).toEqual(landingSurface);
   expect(evidence.conversationCreateCalls).toBe(2);
 });

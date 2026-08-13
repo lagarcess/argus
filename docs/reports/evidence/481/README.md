@@ -79,7 +79,9 @@ The replacement frame also retains the temporary-chat expiry once the guest
 session has been established. That is account metadata, not a separate empty
 surface. The focused browser regression starts with an established guest and
 asserts the rendered heading group, placeholder, starter labels, and empty
-header title are exactly equal before and after **Start over**.
+header title are exactly equal before and after **Start over**. Its mock returns
+a distinct replacement conversation ID, and the test requires the route to
+adopt that ID before accepting the surface comparison.
 
 Every post-fix frame was checked against its rendered DOM text before capture.
 All four replacement frames had the localized heading and invitation, localized
