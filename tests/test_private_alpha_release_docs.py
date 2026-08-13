@@ -1,12 +1,381 @@
 from __future__ import annotations
 
+import json
+import re
+import subprocess
 from pathlib import Path
 
+import pytest
+
+from tests.evals.measurement_eval_scorecard import (
+    measurement_fixture_identity_at_git_sha,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
+LIVE_EVAL_RESULT_STATUSES = (
+    "passed",
+    "failed",
+    "expected_failed",
+    "unexpected_pass",
+    "skipped",
+)
+
+KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
+    {
+        "2026-06-18-private-alpha-next-ci-cd-sota.md",
+        "2026-06-27-private-alpha-p2-checkpoint.md",
+        "2026-07-14-main-production-promotion.md",
+        "2026-07-10-private-alpha-next-interpret-surface.md",
+        "2026-08-05-main-production-promotion.md",
+        "2026-08-11-main-production-promotion.md",
+        "2026-08-12-main-production-promotion-716221f.md",
+        "2026-08-12-main-production-promotion.md",
+    }
+)
 
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _commit_measurement_fixture_candidate(
+    repository_root: Path,
+    *,
+    case_ids: tuple[str, ...],
+) -> str:
+    fixture_dir = repository_root / "tests" / "evals" / "measurement_cases"
+    fixture_dir.mkdir(parents=True)
+    (fixture_dir / "messy_english.yaml").write_text(
+        json.dumps(
+            {
+                "category": "messy_english",
+                "cases": [{"id": case_id} for case_id in case_ids],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "add", "tests/evals/measurement_cases"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Argus Eval Test",
+            "-c",
+            "user.email=argus-eval@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--quiet",
+            "-m",
+            "test fixture candidate",
+        ],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _assert_main_promotion_live_eval_evidence(
+    manifest_path: Path,
+    *,
+    repository_root: Path = ROOT,
+) -> None:
+    manifest = manifest_path.read_text(encoding="utf-8")
+    scorecard_match = re.search(
+        r"^- Live eval scorecard: `([^`]+\.json)`",
+        manifest,
+        re.M,
+    )
+    assert scorecard_match is not None, (
+        f"{manifest_path.name}: missing durable live eval scorecard"
+    )
+    candidate_match = re.search(
+        r"^- (?:Runtime )?Candidate SHA:\s*`([0-9a-f]{40})`",
+        manifest,
+        re.M,
+    )
+    assert candidate_match is not None, f"{manifest_path.name}: missing candidate SHA"
+    scorecard_path = (repository_root / scorecard_match.group(1)).resolve()
+    assert scorecard_path.is_file(), (
+        f"{manifest_path.name}: live eval scorecard does not exist"
+    )
+    assert scorecard_path.is_relative_to(
+        (repository_root / "docs" / "reports" / "evidence").resolve()
+    ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    assert scorecard.get("schema_version") == 2
+    provenance = scorecard.get("provenance", {})
+    assert provenance.get("evaluation_mode") == "live"
+    assert provenance.get("market_data_provider_mode") == "live_provider"
+    assert str(provenance.get("asset_provider_mode") or "").strip()
+    assert provenance.get("candidate_sha") == candidate_match.group(1)
+    assert re.fullmatch(r"\d+\.\d+\.\d+", provenance.get("python_version", ""))
+    assert re.fullmatch(r"[0-9a-f]{64}", provenance.get("fixture_sha256", ""))
+    assert provenance.get("worktree_clean") is True
+    probe = provenance.get("live_market_data_probe", {})
+    assert probe.get("requested_date_range") == {
+        "start": "2024-01-01",
+        "end": "2024-01-10",
+    }
+    assert probe.get("effective_date_range") == {
+        "start": "2024-01-02",
+        "end": "2024-01-10",
+    }
+    assert probe.get("adjustment_reason") == "calendar_alignment"
+    fixture_case_ids = provenance.get("fixture_case_ids")
+    assert (
+        isinstance(fixture_case_ids, list)
+        and fixture_case_ids
+        and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
+        and len(fixture_case_ids) == len(set(fixture_case_ids))
+    ), "live eval scorecard is missing fixture case identities"
+    candidate_fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_match.group(1),
+        repository_root=repository_root,
+    )
+    assert (
+        provenance.get("fixture_sha256") == candidate_fixture_identity.sha256
+        and fixture_case_ids == list(candidate_fixture_identity.case_ids)
+    ), "live eval scorecard does not match the candidate fixture identity"
+    results = scorecard.get("results")
+    assert isinstance(results, list), "live eval scorecard is missing results"
+    assert all(
+        isinstance(result, dict)
+        and isinstance(result.get("id"), str)
+        and isinstance(result.get("category"), str)
+        and result.get("status") in LIVE_EVAL_RESULT_STATUSES
+        for result in results
+    ), "live eval scorecard contains malformed results"
+    result_case_ids = [result["id"] for result in results]
+    assert result_case_ids == fixture_case_ids, (
+        "live eval scorecard does not contain the complete fixture result set"
+    )
+    totals = scorecard.get("totals", {})
+    calculated_totals = {
+        status: sum(result["status"] == status for result in results)
+        for status in LIVE_EVAL_RESULT_STATUSES
+    }
+    assert totals == calculated_totals, (
+        "live eval scorecard totals do not match its complete results"
+    )
+    assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
+    assert totals.get("failed") == 0
+    assert totals.get("unexpected_pass") == 0
+
+
+def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{'a' * 40}`\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="missing durable live eval scorecard"):
+        _assert_main_promotion_live_eval_evidence(manifest_path)
+
+
+def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
+    tmp_path: Path,
+) -> None:
+    candidate_sha = _commit_measurement_fixture_candidate(
+        tmp_path,
+        case_ids=("case-a", "case-b"),
+    )
+    fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_sha,
+        repository_root=tmp_path,
+    )
+    scorecard_relative_path = (
+        "docs/reports/evidence/promotion/argus-eval-scorecard.json"
+    )
+    scorecard_path = tmp_path / scorecard_relative_path
+    scorecard_path.parent.mkdir(parents=True)
+    scorecard_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "provenance": {
+                    "evaluation_mode": "live",
+                    "market_data_provider_mode": "live_provider",
+                    "asset_provider_mode": "live_provider",
+                    "candidate_sha": candidate_sha,
+                    "python_version": "3.10.20",
+                    "fixture_sha256": fixture_identity.sha256,
+                    "fixture_case_ids": list(fixture_identity.case_ids),
+                    "worktree_clean": True,
+                    "live_market_data_probe": {
+                        "requested_date_range": {
+                            "start": "2024-01-01",
+                            "end": "2024-01-10",
+                        },
+                        "effective_date_range": {
+                            "start": "2024-01-02",
+                            "end": "2024-01-10",
+                        },
+                        "adjustment_reason": "calendar_alignment",
+                    },
+                },
+                "totals": {
+                    "passed": 2,
+                    "failed": 0,
+                    "expected_failed": 0,
+                    "unexpected_pass": 0,
+                    "skipped": 0,
+                },
+                "results": [
+                    {
+                        "id": "case-a",
+                        "category": "messy_english",
+                        "status": "passed",
+                    },
+                    {
+                        "id": "case-b",
+                        "category": "messy_spanish",
+                        "status": "passed",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard_relative_path}`\n",
+        encoding="utf-8",
+    )
+
+    _assert_main_promotion_live_eval_evidence(
+        manifest_path,
+        repository_root=tmp_path,
+    )
+
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    scorecard["totals"]["passed"] = 1
+    scorecard_path.write_text(json.dumps(scorecard), encoding="utf-8")
+    with pytest.raises(AssertionError, match="totals do not match"):
+        _assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
+
+
+def test_main_promotion_manifest_rejects_summary_without_complete_results(
+    tmp_path: Path,
+) -> None:
+    candidate_sha = _commit_measurement_fixture_candidate(
+        tmp_path,
+        case_ids=("case-a", "case-b"),
+    )
+    scorecard_relative_path = (
+        "docs/reports/evidence/promotion/argus-eval-scorecard.json"
+    )
+    scorecard_path = tmp_path / scorecard_relative_path
+    scorecard_path.parent.mkdir(parents=True)
+    scorecard_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "provenance": {
+                    "evaluation_mode": "live",
+                    "market_data_provider_mode": "live_provider",
+                    "asset_provider_mode": "live_provider",
+                    "candidate_sha": candidate_sha,
+                    "python_version": "3.10.20",
+                    "fixture_sha256": "b" * 64,
+                    "fixture_case_ids": ["case-a"],
+                    "worktree_clean": True,
+                    "live_market_data_probe": {
+                        "requested_date_range": {
+                            "start": "2024-01-01",
+                            "end": "2024-01-10",
+                        },
+                        "effective_date_range": {
+                            "start": "2024-01-02",
+                            "end": "2024-01-10",
+                        },
+                        "adjustment_reason": "calendar_alignment",
+                    },
+                },
+                "totals": {
+                    "passed": 1,
+                    "failed": 0,
+                    "expected_failed": 0,
+                    "unexpected_pass": 0,
+                    "skipped": 0,
+                },
+                "results": [
+                    {
+                        "id": "case-a",
+                        "category": "messy_english",
+                        "status": "passed",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard_relative_path}`\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="candidate fixture identity"):
+        _assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
+
+
+def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
+    manifest_dir = ROOT / "docs" / "release-manifests"
+    manifests = []
+    for manifest_path in sorted(manifest_dir.glob("*.md")):
+        if manifest_path.name == "TEMPLATE.md":
+            continue
+        manifest = manifest_path.read_text(encoding="utf-8")
+        if (
+            "main-production-promotion" in manifest_path.name
+            or re.search(r"^- Promotion target: `?main`?$", manifest, re.M)
+        ):
+            manifests.append(manifest_path)
+    missing_evidence: set[str] = set()
+    for manifest_path in manifests:
+        try:
+            _assert_main_promotion_live_eval_evidence(manifest_path)
+        except AssertionError as exc:
+            if "missing durable live eval scorecard" not in str(exc):
+                raise
+            missing_evidence.add(manifest_path.name)
+
+    assert missing_evidence == KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL
 
 
 def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
@@ -494,12 +863,26 @@ def test_eval_docs_document_mocked_first_test_tiers_and_agent_pointer() -> None:
     assert "## Test Tiers" in readme
     assert "**Mocked harness - every change (free, no API calls):**" in readme
     assert "poetry run pytest tests/evals/test_measurement_eval_harness.py" in readme
-    assert "Validates routing, state, full conversation-step manifests" in readme
+    assert "Validates routing, scorecard provenance, live-environment refusal" in readme
+    assert "full conversation-step manifests" in readme
     assert "**Live eval - only the 3 sanctioned moments:**" in readme
     assert "Pre-merge on a PR that changes runtime behavior" in readme
     assert "Main promotion candidate" in readme
     assert "After any model/provider change" in readme
     assert "**Browser QA is also real-API:**" in readme
+    assert "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider" in readme
+    assert "ARGUS_ASSET_PROVIDER_MODE=live_provider" in readme
+    for provenance_field in (
+        "market_data_provider_mode",
+        "asset_provider_mode",
+        "candidate_sha",
+        "python_version",
+        "fixture_sha256",
+        "fixture_case_ids",
+        "worktree_clean",
+        "live_market_data_probe",
+    ):
+        assert provenance_field in readme
 
     assert "tests/evals/README.md" in agents
     assert "mocked harness" in agents
