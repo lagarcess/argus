@@ -71,6 +71,17 @@ _ATTRIBUTIVE = re.compile(
     rf"[\s-]+(?!(?:{_NOT_A_MODIFIED_NOUN})\b)\w+",
     re.IGNORECASE,
 )
+# What precedes settles it before what follows has to. A copula makes the word
+# predicative whatever comes next, so "is disabled pending review" is a gate
+# claim even though "pending" could pass for the noun it modifies. A determiner
+# after the copula means the opposite, as in "is a disabled row", so it is
+# excluded rather than read as a claim.
+_PREDICATIVE = re.compile(
+    r"\b(?:is|are|was|were|be|been|being|remains?|stays?|becomes?|became|"
+    r"fails?|defaults?|keeps?|kept)\s+"
+    r"(?!(?:a|an|the)\b)(?:\w+\s+)?$",
+    re.IGNORECASE,
+)
 # "not open" asserts the other state. "not only open" asserts this one, so the
 # additive and emphatic forms are excluded rather than read as negation.
 _NEGATION = re.compile(
@@ -149,17 +160,20 @@ def _declares(position: int | None, scope_at: int | None) -> bool:
 def _gate_state_claim(lowered: str, stale_state: re.Pattern[str]) -> int | None:
     """Where a sentence asserts the stale gate state in words, if it does.
 
-    Requires a public-account subject, then asks what each state word modifies:
-    an attributive word describes the noun after it, so only a predicative one
-    asserts the gate.
+    Requires a public-account subject, then asks how each state word is used: a
+    copula before it makes it predicative and a claim about the gate, while
+    modifying the noun after it makes it a description of that noun instead.
     """
     subject = _GATE_SUBJECT.search(lowered)
     if not subject:
         return None
     for match in stale_state.finditer(lowered, subject.end()):
-        if _ATTRIBUTIVE.match(lowered, match.end()):
+        before = lowered[: match.start()]
+        if _NEGATION.search(before):
             continue
-        if _NEGATION.search(lowered[: match.start()]):
+        if _PREDICATIVE.search(before):
+            return match.start()
+        if _ATTRIBUTIVE.match(lowered, match.end()):
             continue
         return match.start()
     return None
@@ -230,6 +244,11 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Public registration is off for new accounts.",
         "Public signup is disabled, so no accounts can be created.",
         "Public signup is disabled for new accounts.",
+        # A copula settles it before the following word can pose as the noun
+        # being modified.
+        "Public signup is disabled pending review.",
+        "Public account access is off limits.",
+        "Public account creation is disabled indefinitely.",
         # A fenced block declares one value per line.
         f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
     )
@@ -256,6 +275,10 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "refusal.",
         # Negation asserts the open state, so it is not a shut claim.
         "Public account creation is not disabled.",
+        # A determiner after the copula means the word modifies the noun after
+        # it, so this is one denied account rather than the gate.
+        "Public registration is open, so the only refusal is a disabled "
+        "allowlist entry.",
         # The founder-owned precondition in API_CONTRACT.md must never read as a
         # stale claim, or a later round deletes it to get the suite green.
         "Before that flag may be enabled, founder-approved evidence must prove "
