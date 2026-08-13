@@ -51,27 +51,32 @@ _GATE_SUBJECT = re.compile(
 # same reading runs whichever way the profile points. "on" and "closed" are
 # absent because "on 2026-08-12" and "fails closed" are ordinary prose here.
 _GATE_STATE = {
-    "true": re.compile(r"\b(?:true|open|opens|opened)\b", re.IGNORECASE),
+    "true": re.compile(r"\b(?:true|open|opens|opened|enabled)\b", re.IGNORECASE),
     "false": re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE),
 }
-# A state word that directly modifies one of these describes the denial exception
-# rather than the gate: "an explicitly disabled allowlist row" stays true while
-# the gate is open. Reading what the word modifies is what distance from the
-# subject could not do, so accurate prose no longer has to hold the two terms
-# apart. Only adjectives may sit in between: a function word or any punctuation
-# means the sentence shut the gate and then mentioned accounts separately, as in
-# "disabled for all accounts", which is a claim about the gate.
-_NOT_A_MODIFIER = (
+# Words that cannot be the noun a state word modifies, so a state word followed
+# by one of them, by punctuation, or by nothing is predicative and asserts the
+# gate: "access is disabled", "registration is enabled", "off for new accounts".
+_NOT_A_MODIFIED_NOUN = (
     r"for|so|and|or|but|to|on|in|of|with|no|not|all|any|every|because|since|"
-    r"unless|while|when|if|then|until|except"
+    r"unless|while|when|if|then|until|except|by|as|at|from|that|which|it|its|"
+    r"this|these|those|there|here|only|merely|just|simply|still|now|today"
 )
-_DENIAL_OBJECT = re.compile(
-    rf"[\s-]+(?:(?!(?:{_NOT_A_MODIFIER})\b)\w+[\s-]+){{0,3}}?"
-    r"(?:rows?|entr(?:y|ies)|emails?|address(?:es)?|accounts?)\b",
+# Attributive instead: the word modifies the noun after it and describes that
+# noun, not the gate. "an explicitly disabled allowlist row" stays true while the
+# gate is open, and "every enabled permanent Auth provider" is not a gate claim
+# either, which is why both boolean words are safe to read in both directions.
+# Asking what the word modifies replaces enumerating the nouns it might modify.
+_ATTRIBUTIVE = re.compile(
+    rf"[\s-]+(?!(?:{_NOT_A_MODIFIED_NOUN})\b)\w+",
     re.IGNORECASE,
 )
-# "not open" asserts the other state, so it is not a claim for this direction.
-_NEGATION = re.compile(r"\b(?:not|never|no longer|cannot|without)\s+(?:\w+\s+){0,2}$")
+# "not open" asserts the other state. "not only open" asserts this one, so the
+# additive and emphatic forms are excluded rather than read as negation.
+_NEGATION = re.compile(
+    r"\b(?:not|never|no longer|cannot|without)\s+"
+    r"(?!(?:only|merely|just|simply)\b)(?:\w+\s+){0,2}$"
+)
 # Self-identifying: this term means the gate is shut, whatever the subject.
 _GATE_SHUT_TERM = "allowlist-gated"
 
@@ -144,14 +149,15 @@ def _declares(position: int | None, scope_at: int | None) -> bool:
 def _gate_state_claim(lowered: str, stale_state: re.Pattern[str]) -> int | None:
     """Where a sentence asserts the stale gate state in words, if it does.
 
-    Requires a public-account subject, then reads what each state word modifies,
-    so one denied account is never mistaken for the gate itself.
+    Requires a public-account subject, then asks what each state word modifies:
+    an attributive word describes the noun after it, so only a predicative one
+    asserts the gate.
     """
     subject = _GATE_SUBJECT.search(lowered)
     if not subject:
         return None
     for match in stale_state.finditer(lowered, subject.end()):
-        if _DENIAL_OBJECT.match(lowered, match.end()):
+        if _ATTRIBUTIVE.match(lowered, match.end()):
             continue
         if _NEGATION.search(lowered[: match.start()]):
             continue
@@ -223,6 +229,7 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Public account access is disabled for all accounts.",
         "Public registration is off for new accounts.",
         "Public signup is disabled, so no accounts can be created.",
+        "Public signup is disabled for new accounts.",
         # A fenced block declares one value per line.
         f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
     )
@@ -270,6 +277,12 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Public registration is now open.",
         "Public account creation is open to anyone.",
         "Permanent accounts opened to the public.",
+        # A synonym list could not carry these; asking what the word modifies can.
+        "Public registration is enabled.",
+        "Public account access is enabled for everyone.",
+        "Public signup is open for new accounts.",
+        # Additive "not only" asserts the state rather than negating it.
+        "Public signup is not only open; it is unrestricted.",
     ):
         assert _access_claim_contradictions(
             claim, "false"
