@@ -26,9 +26,9 @@ _DATED_RECORD = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 _UNRELATED_TREES = (".agent/skills/",)
 
 # Closed boolean vocabularies, so a new stale sentence is caught by grammar
-# rather than by matching a phrase somebody already wrote. "on" is excluded
-# because it is usually a preposition here, and "enabled"/"disabled" because
-# they also describe Auth providers and allowlist rows.
+# rather than by matching a phrase somebody already wrote. These are read next to
+# the flag name, where "on" would usually be a preposition ("on 2026-08-12") and
+# "enabled"/"disabled" would usually be an Auth provider or an allowlist row.
 _STATE_WORDS = {
     "true": ("true",),
     "false": ("false", "off"),
@@ -47,8 +47,10 @@ _GATE_SUBJECT = re.compile(
     r"|permanent[-\s]?account access",
     re.IGNORECASE,
 )
-# Generic words for "shut", read only close to the subject so an unrelated
-# "disabled allowlist row" later in the sentence is not a claim about the gate.
+# Generic words for "shut". "disabled" is safe to read here, unlike next to the
+# flag name, because the window below keeps it beside a public-account subject,
+# so an unrelated "explicitly disabled allowlist row" later in the same sentence
+# is not mistaken for a claim about the gate.
 _CLOSED_STATE = re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE)
 _SUBJECT_STATE_WINDOW = 60
 # Self-identifying: this term means the gate is shut, whatever the subject.
@@ -87,10 +89,20 @@ def _claim_sentences(text: str) -> Iterator[str]:
     """Yield sentences with Markdown wrapping collapsed.
 
     Blocks break on blank lines, list markers, headings, fences, and table rows
-    so a claim is never read across two unrelated bullets.
+    so a claim is never read across two unrelated bullets. A fenced block yields
+    one line at a time, because its lines are already separate statements and
+    joining them would read a neighbouring variable's value as this one's.
     """
     block: list[str] = []
+    fenced = False
     for line in text.splitlines() + [""]:
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            if line.strip():
+                yield line.strip()
+            continue
         if not line.strip() or _BLOCK_BREAK.match(line):
             if block:
                 yield from re.split(r"(?<=[.;])\s+", " ".join(" ".join(block).split()))
@@ -167,6 +179,8 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "Guest defaults on with rollback; public-account access remains off.",
         "Rollback is flags first: keep public-account access false.",
         "Public permanent accounts are disabled, so guest chrome hides signup.",
+        # A fenced block declares one value per line.
+        f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
     )
     must_allow = (
         f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}` is off, signup is allowlist-gated.",
@@ -180,6 +194,8 @@ def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> Non
         "carrying an explicitly disabled allowlist row.",
         "Public-account access is an independent gate that fails closed when "
         "unset, so a deployment omitting the variable denies registration.",
+        # A neighbouring variable's `false` is not this gate's value.
+        f"```bash\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=true\nOTHER_FLAG=false\n```",
         # The founder-owned precondition in API_CONTRACT.md must never read as a
         # stale claim, or a later round deletes it to get the suite green.
         "Before that flag may be enabled, founder-approved evidence must prove "
