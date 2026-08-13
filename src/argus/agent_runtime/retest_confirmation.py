@@ -328,11 +328,27 @@ def _extra_parameters(
     return extra
 
 
+def _dca_capital_roles(setup: RetestSetup) -> dict[str, Any]:
+    """Both money roles of a stored recurring plan, under their own names."""
+    if setup.strategy_type != "dca_accumulation":
+        return {}
+    return {
+        "starting_capital": setup.starting_capital,
+        "recurring_contribution": setup.recurring_contribution,
+    }
+
+
 def _optional_parameters(setup: RetestSetup) -> dict[str, dict[str, Any]]:
     contract = build_default_capability_contract()
     defaults = contract.optional_defaults
     overrides: dict[str, Any] = {"timeframe": setup.timeframe}
-    if setup.capital_amount is not None:
+    if setup.strategy_type == "dca_accumulation":
+        # For a recurring plan initial_capital is the seed, so the stored seed
+        # goes here and the contribution rides capital_amount. Writing the
+        # contribution into this slot would fund the run twice over.
+        if setup.starting_capital is not None:
+            overrides["initial_capital"] = setup.starting_capital
+    elif setup.capital_amount is not None:
         overrides["initial_capital"] = setup.capital_amount
     realism = setup.execution_realism
     if isinstance(realism, dict) and realism.get("enabled"):
@@ -381,6 +397,7 @@ def _launch_payload(
         "capital_amount": setup.capital_amount,
         "position_size": setup.position_size,
         "cadence": setup.cadence,
+        **_dca_capital_roles(setup),
         "parameters": dict(setup.parameters),
         "risk_rules": [],
         "benchmark_symbol": setup.benchmark_symbol,

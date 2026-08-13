@@ -2574,8 +2574,8 @@ stores nothing and makes no LLM, provider, or market-data call.
 - Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
 - Confirmation eligibility requires semantic conservation: explicit date, asset, cadence, and money-role constraints from the user must survive interpretation, normalization, and default application.
 - Defaults fill absent fields only. They do not override explicit user constraints.
-- For DCA/recurring-buy drafts, `capital_amount` means the recurring contribution. Starting or total capital may be understood as user intent, but current DCA execution does not support it as a separate executable input. It must not overwrite the recurring contribution or be silently treated as an investment ceiling.
-- A DCA draft that contains unsupported starting principal / total capital semantics must route to clarification or simplification, not to a confident `Ready to run` card for both amounts.
+- For DCA/recurring-buy drafts, `capital_amount` means the recurring contribution and `optional_parameters.initial_capital` means the starting capital that seeds the plan on day one. Both are executable and both are runnable together; neither may overwrite the other.
+- A plan-wide budget, contribution ceiling, or maximum invested cap is still not executable, because it would have to stop contributions partway through the window. A DCA draft carrying one must route to clarification or simplification rather than a confident `Ready to run` card that silently ignores the cap.
 - `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
 - `show_breakdown` requires canonical result run context. A stale
@@ -4577,7 +4577,7 @@ Not in current contract:
 - advanced quota systems
 - cross-asset strategy runs
 - custom benchmarks (Alpha uses SPY/BTC defaults, or the tested pair for currency pairs)
-- DCA starting principal, total capital budgets, contribution ceilings, and recurring contribution combinations
+- DCA plan-wide budgets, contribution ceilings, and maximum invested caps (starting capital and the recurring contribution are both executable, together)
 
 ---
 
