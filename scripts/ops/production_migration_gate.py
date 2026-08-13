@@ -292,6 +292,7 @@ def resolve_production_target(
 def read_applied_migrations(
     database_url: str,
     *,
+    ssl_root_cert: str,
     connect_factory: ConnectFactory | None = None,
 ) -> list[AppliedMigration]:
     """Read production's migration ledger through a read-only session."""
@@ -307,7 +308,10 @@ def read_applied_migrations(
             application_name="argus-production-migration-gate",
             autocommit=True,
             connect_timeout=10,
+            gssencmode="disable",
             options="-c default_transaction_read_only=on",
+            sslmode="verify-full",
+            sslrootcert=ssl_root_cert,
         )
         with connection.cursor() as cursor:
             cursor.execute("show transaction_read_only")
@@ -461,6 +465,7 @@ def build_migration_report(
             "content_drift": len(content_drift),
         },
         "database_access": "read_only",
+        "database_transport": "tls_verify_full",
         "migration_apply": "never",
     }
 
@@ -525,8 +530,12 @@ def main(
             database_url,
             expected_project_ref=contract.production_supabase_project_ref,
         )
+        ssl_root_cert = _resolve_ssl_root_cert(
+            str(source.get("ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT") or "").strip()
+        )
         applied_migrations = read_applied_migrations(
             database_url,
+            ssl_root_cert=ssl_root_cert,
             connect_factory=connect_factory,
         )
         report = build_migration_report(
@@ -551,6 +560,7 @@ def main(
             "status": "blocked",
             "candidate_sha": args.candidate_sha,
             "database_access": "read_only",
+            "database_transport": "tls_verify_full",
             "migration_apply": "never",
             "stop_reasons": ["gate_execution_failed"],
             "error": str(exc),
@@ -604,6 +614,24 @@ def _read_applied_statements(value: object) -> tuple[str, ...] | None:
             "production migration ledger returned malformed statements"
         )
     return tuple(value)
+
+
+def _resolve_ssl_root_cert(value: str) -> str:
+    path = Path(value)
+    try:
+        if not value or not path.is_absolute():
+            raise OSError
+        resolved = path.resolve(strict=True)
+        if not resolved.is_file():
+            raise OSError
+        with resolved.open("rb") as certificate:
+            if not certificate.read(1):
+                raise OSError
+    except OSError as exc:
+        raise MigrationGateError(
+            "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT must be an absolute " "readable file"
+        ) from exc
+    return str(resolved)
 
 
 def _content_drift_record(

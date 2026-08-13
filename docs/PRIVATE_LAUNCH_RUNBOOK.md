@@ -83,10 +83,14 @@ connection.
    session-pooler URL from the operator secret store under the gate-only name
    below. The URL must not contain query parameters or a fragment because libpq
    can use them to override the validated host or user. Do not put it on the
-   command line or rely on a dotenv file.
+   command line or rely on a dotenv file. Download the current production
+   project's root CA from Supabase Database Settings and provide its absolute
+   path. The gate forces `sslmode=verify-full`; it cannot fall back to a
+   plaintext connection.
 
 ```bash
 export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
+export ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT="<absolute path to production Supabase CA>"
 ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
 poetry run python scripts/ops/production_migration_gate.py \
   --candidate-sha "$ARGUS_CANDIDATE_SHA" \

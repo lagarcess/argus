@@ -584,6 +584,7 @@ def test_applied_migrations_are_read_in_a_read_only_session() -> None:
 
     applied = read_applied_migrations(
         "postgresql://postgres:do-not-print@db.example.test/postgres",
+        ssl_root_cert="/operator/production-supabase-ca.crt",
         connect_factory=connect,
     )
 
@@ -603,7 +604,10 @@ def test_applied_migrations_are_read_in_a_read_only_session() -> None:
         "application_name": "argus-production-migration-gate",
         "autocommit": True,
         "connect_timeout": 10,
+        "gssencmode": "disable",
         "options": "-c default_transaction_read_only=on",
+        "sslmode": "verify-full",
+        "sslrootcert": "/operator/production-supabase-ca.crt",
     }
     assert connection.cursor_instance.queries == [
         "show transaction_read_only",
@@ -623,6 +627,7 @@ def test_applied_migrations_reject_malformed_statement_history() -> None:
     with pytest.raises(MigrationGateError, match="malformed statements"):
         read_applied_migrations(
             "postgresql://postgres:do-not-print@db.example.test/postgres",
+            ssl_root_cert="/operator/production-supabase-ca.crt",
             connect_factory=lambda *_args, **_kwargs: connection,
         )
 
@@ -633,6 +638,7 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
 ) -> None:
     repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
     output_path = tmp_path / "evidence" / "migration-gate.json"
+    ssl_root_cert = _ssl_root_cert(tmp_path)
     connection = _FakeConnection([])
 
     exit_code = main(
@@ -642,7 +648,8 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
                 "postgresql://postgres."
                 f"{'a' * 20}:do-not-print@"
                 "aws-0-us-east-1.pooler.supabase.com:6543/postgres"
-            )
+            ),
+            "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT": str(ssl_root_cert),
         },
         repo_root=repo,
         connect_factory=lambda *_args, **_kwargs: connection,
@@ -663,6 +670,7 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
         "unexpected": 0,
     }
     assert report["database_access"] == "read_only"
+    assert report["database_transport"] == "tls_verify_full"
     assert report["migration_apply"] == "never"
     assert "do-not-print" not in captured.out
     assert "do-not-print" not in output_path.read_text(encoding="utf-8")
@@ -682,13 +690,14 @@ def test_cli_passes_only_when_the_production_ledger_matches(
         check=True,
     )
     output_path = tmp_path / "migration-gate.json"
+    ssl_root_cert = _ssl_root_cert(tmp_path)
     connection = _FakeConnection(
         [
             (
                 "20260812000000",
                 "add_release_marker",
                 ["create table public.release_marker (id uuid primary key)"],
-            )
+            ),
         ]
     )
 
@@ -705,7 +714,8 @@ def test_cli_passes_only_when_the_production_ledger_matches(
             "ARGUS_PRODUCTION_DATABASE_URL": (
                 "postgresql://postgres:do-not-print@"
                 f"db.{'a' * 20}.supabase.co:5432/postgres"
-            )
+            ),
+            "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT": str(ssl_root_cert),
         },
         repo_root=repo,
         connect_factory=lambda *_args, **_kwargs: connection,
@@ -721,6 +731,47 @@ def test_cli_passes_only_when_the_production_ledger_matches(
         "resolved_sha": candidate_sha,
     }
     assert json.loads(output_path.read_text(encoding="utf-8")) == report
+
+
+def test_cli_requires_a_readable_absolute_production_ca_before_connecting(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
+    empty_ca = tmp_path / "empty-ca.crt"
+    empty_ca.touch()
+
+    for ssl_root_cert in (
+        "",
+        "relative-ca.crt",
+        str(tmp_path / "missing-ca.crt"),
+        str(empty_ca),
+    ):
+        exit_code = main(
+            [
+                "--candidate-sha",
+                candidate_sha,
+                "--output",
+                str(tmp_path / "migration-gate.json"),
+            ],
+            environ={
+                "ARGUS_PRODUCTION_DATABASE_URL": (
+                    "postgresql://postgres:do-not-print@"
+                    f"db.{'a' * 20}.supabase.co:5432/postgres"
+                ),
+                "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT": ssl_root_cert,
+            },
+            repo_root=repo,
+            connect_factory=lambda *_args, **_kwargs: pytest.fail(
+                "database access must not start"
+            ),
+        )
+
+        report = json.loads(capsys.readouterr().out)
+        assert exit_code == 2
+        assert report["error"] == (
+            "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT must be an absolute " "readable file"
+        )
 
 
 def test_verify_landed_ref_fetches_the_remote_before_comparing(tmp_path: Path) -> None:
@@ -829,6 +880,7 @@ def test_cli_redacts_database_failures_and_writes_a_blocked_report(
 ) -> None:
     repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
     output_path = tmp_path / "migration-gate.json"
+    ssl_root_cert = _ssl_root_cert(tmp_path)
 
     def fail_connect(*_args: object, **_kwargs: object) -> _FakeConnection:
         raise RuntimeError("driver failed with password do-not-print")
@@ -839,7 +891,8 @@ def test_cli_redacts_database_failures_and_writes_a_blocked_report(
             "ARGUS_PRODUCTION_DATABASE_URL": (
                 "postgresql://postgres:do-not-print@"
                 f"db.{'a' * 20}.supabase.co:5432/postgres"
-            )
+            ),
+            "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT": str(ssl_root_cert),
         },
         repo_root=repo,
         connect_factory=fail_connect,
@@ -960,6 +1013,12 @@ def _candidate_repo(tmp_path: Path, *, project_ref: str) -> tuple[Path, str]:
         text=True,
     ).stdout.strip()
     return repo, candidate_sha
+
+
+def _ssl_root_cert(tmp_path: Path) -> Path:
+    certificate = tmp_path / "production-supabase-ca.crt"
+    certificate.write_text("test-only production CA\n", encoding="utf-8")
+    return certificate
 
 
 class _FakeCursor:

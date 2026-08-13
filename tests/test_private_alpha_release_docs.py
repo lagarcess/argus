@@ -61,12 +61,14 @@ def test_production_migration_gate_is_executable_and_precedes_service_deploy() -
         normalized = " ".join(source.split())
         assert command in source
         assert "ARGUS_PRODUCTION_DATABASE_URL" in source
+        assert "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT" in source
         assert "status=pass" in source
         assert "never applies migrations" in normalized
         assert "human" in normalized.lower()
         assert "statement" in normalized.lower()
         assert "content drift" in normalized.lower()
         assert "query" in normalized.lower()
+        assert "verify-full" in normalized.lower()
 
     promotion_gate_index = promotion_path.index(command)
     promotion_candidate_index = promotion_path.index(

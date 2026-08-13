@@ -233,10 +233,14 @@ Use the following progression when moving from integration to `main`:
    migration gate before any service deploy. Supply the production Postgres URL
    explicitly from the operator secret store; the gate does not discover dotenv
    files. Use a query- and fragment-free URI; the gate rejects libpq connection
-   parameters that could override the validated host or user.
+   parameters that could override the validated host or user. Supply the
+   current production Supabase root CA by absolute path. The gate forces
+   `sslmode=verify-full`, disables alternate GSS transport selection, and never
+   falls back to plaintext.
 
    ```bash
    export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
+   export ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT="<absolute path to production Supabase CA>"
    ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
    poetry run python scripts/ops/production_migration_gate.py \
      --candidate-sha "$ARGUS_CANDIDATE_SHA" \
