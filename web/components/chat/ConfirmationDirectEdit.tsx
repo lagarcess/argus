@@ -60,15 +60,35 @@ function directEditErrorText(
   const money = (value: number | undefined, fallback: string) =>
     typeof value === "number" ? `$${value.toLocaleString()}` : fallback;
   switch (code) {
+    case "invalid_recurring_contribution":
+      return t("chat.confirmation.direct_edit.errors.invalid_contribution", {
+        defaultValue: "Each contribution must be between {{min}} and {{max}}.",
+        min: money(constraints?.contribution?.min, "$0.01"),
+        max: money(constraints?.contribution?.max, "$100,000,000"),
+      });
+    case "dca_requires_starting_capital_or_contribution":
+      return t(
+        "chat.confirmation.direct_edit.errors.dca_needs_money",
+        "Set a starting capital, a contribution, or both.",
+      );
+    case "dca_contribution_zero_is_buy_and_hold":
+      return t(
+        "chat.confirmation.direct_edit.errors.dca_contribution_zero",
+        "With no contribution this is a buy and hold of the starting capital. Add a contribution, or test it as buy and hold.",
+      );
+    case "contribution_period_exceeds_window":
+      return t(
+        "chat.confirmation.direct_edit.errors.contribution_period_exceeds_window",
+        "That period does not fit inside the tested dates. Pick a shorter period or a longer date range.",
+      );
     case "invalid_starting_capital":
       // The engine runs a recurring contribution through the same band, so
       // the refusal names whichever money role this card edits.
       return isRecurring
-        ? t("chat.confirmation.direct_edit.errors.invalid_contribution", {
-            defaultValue:
-              "Each contribution must be between {{min}} and {{max}}.",
-            min: money(capitalMin, "$1,000"),
-            max: money(capitalMax, "$100,000,000"),
+        ? t("chat.confirmation.direct_edit.errors.invalid_seed", {
+            defaultValue: "Starting capital must be between {{min}} and {{max}}.",
+            min: money(constraints?.starting_capital?.min, "$0"),
+            max: money(constraints?.starting_capital?.max, "$100,000,000"),
           })
         : t("chat.confirmation.direct_edit.errors.invalid_starting_capital", {
             defaultValue:
@@ -124,6 +144,8 @@ export function ConfirmationDirectEditControls({
 }: ConfirmationDirectEditControlsProps) {
   const [openKind, setOpenKind] = useState<DirectEditKind | null>(null);
   const [capitalDraft, setCapitalDraft] = useState("");
+  const [seedDraft, setSeedDraft] = useState("");
+  const [periodDraft, setPeriodDraft] = useState("");
   const [startDraft, setStartDraft] = useState("");
   const [endDraft, setEndDraft] = useState("");
   const [costDraft, setCostDraft] = useState<ExecutionCostEditDraft>({
@@ -147,9 +169,12 @@ export function ConfirmationDirectEditControls({
   }
 
   const isRecurring = confirmation.strategy_type === "dca_accumulation";
+  // Backend truth: the only periods this card's window can hold. The picker
+  // renders exactly these, so it can never offer an invalid pair.
+  const periodOptions = constraints?.contribution?.periods ?? [];
   const labels: Record<DirectEditKind, string> = {
     capital: isRecurring
-      ? t("chat.confirmation.direct_edit.edit_contribution", "Edit contribution")
+      ? t("chat.confirmation.direct_edit.edit_money", "Edit amounts")
       : t("chat.confirmation.direct_edit.edit_capital", "Edit capital"),
     dates: t("chat.confirmation.direct_edit.edit_dates", "Edit dates"),
     costs: t("chat.confirmation.direct_edit.edit_costs", "Edit costs"),
@@ -161,9 +186,20 @@ export function ConfirmationDirectEditControls({
   const open = (kind: DirectEditKind) => {
     setError(null);
     if (kind === "capital") {
-      const seed = confirmation.display_facts?.capital;
+      const facts = confirmation.display_facts;
+      const seed = isRecurring ? facts?.recurring_contribution : facts?.capital;
       setCapitalDraft(
         typeof seed === "number" && Number.isFinite(seed) ? String(seed) : "",
+      );
+      const startingCapital = facts?.starting_capital;
+      setSeedDraft(
+        typeof startingCapital === "number" && Number.isFinite(startingCapital)
+          ? String(startingCapital)
+          : "0",
+      );
+      const period = facts?.contribution_period ?? "";
+      setPeriodDraft(
+        periodOptions.includes(period) ? period : (periodOptions[0] ?? ""),
       );
     } else if (kind === "dates") {
       setStartDraft(confirmation.date_range?.start ?? "");
@@ -198,15 +234,16 @@ export function ConfirmationDirectEditControls({
         );
         return;
       }
-      const min = constraints?.capital?.min;
-      const max = constraints?.capital?.max;
+      const band = isRecurring ? constraints?.contribution : constraints?.capital;
       if (
-        (typeof min === "number" && amount < min) ||
-        (typeof max === "number" && amount > max)
+        (typeof band?.min === "number" && amount < band.min) ||
+        (typeof band?.max === "number" && amount > band.max)
       ) {
         setError(
           directEditErrorText(
-            "invalid_starting_capital",
+            isRecurring
+              ? "invalid_recurring_contribution"
+              : "invalid_starting_capital",
             t,
             constraints,
             isRecurring,
@@ -214,7 +251,29 @@ export function ConfirmationDirectEditControls({
         );
         return;
       }
-      edit = { capital: amount };
+      if (!isRecurring) {
+        edit = { capital: amount };
+      } else {
+        // Starting capital is its own role and $0 is its default, so an empty
+        // field means no seed rather than an unset value to guess at.
+        const seed = Number((seedDraft || "0").replace(/[\s,$]/g, ""));
+        const seedMax = constraints?.starting_capital?.max;
+        if (
+          !Number.isFinite(seed) ||
+          seed < 0 ||
+          (typeof seedMax === "number" && seed > seedMax)
+        ) {
+          setError(
+            directEditErrorText("invalid_starting_capital", t, constraints, true),
+          );
+          return;
+        }
+        edit = {
+          starting_capital: seed,
+          recurring_contribution: amount,
+          ...(periodDraft ? { contribution_period: periodDraft } : {}),
+        };
+      }
     } else if (openKind === "dates") {
       if (!startDraft || !endDraft || startDraft > endDraft) {
         setError(
@@ -288,15 +347,15 @@ export function ConfirmationDirectEditControls({
     }
   };
 
-  const fields =
-    openKind === "capital" ? (
-      <label className="flex items-center gap-1.5">
-        <span className="sr-only">{capitalFieldLabel}</span>
+  const contributionField = (
+    <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
+      {capitalFieldLabel}
+      <span className="flex items-center gap-1.5">
         <span aria-hidden="true" className="text-[13px] text-[#8d969e]">
           $
         </span>
         <input
-          ref={firstFieldRef}
+          ref={isRecurring ? undefined : firstFieldRef}
           type="text"
           inputMode="decimal"
           value={capitalDraft}
@@ -305,7 +364,76 @@ export function ConfirmationDirectEditControls({
           data-testid="direct-edit-capital-input"
           className={`${inlineEditFieldClassName} w-36 tablet:w-28`}
         />
-      </label>
+        {isRecurring && periodOptions.length > 0 && (
+          <select
+            value={periodDraft}
+            onChange={(event) => setPeriodDraft(event.target.value)}
+            aria-label={t(
+              "chat.confirmation.direct_edit.period_label",
+              "How often",
+            )}
+            data-testid="direct-edit-period-select"
+            className={`${inlineEditFieldClassName} w-32`}
+          >
+            {periodOptions.map((option) => (
+              <option key={option} value={option}>
+                {t(
+                  `chat.confirmation.contribution_periods.${option}`,
+                  option.replace(/_/g, " "),
+                )}
+              </option>
+            ))}
+          </select>
+        )}
+      </span>
+    </label>
+  );
+
+  const fields =
+    openKind === "capital" ? (
+      isRecurring ? (
+        <>
+          <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">
+            {t(
+              "chat.confirmation.direct_edit.starting_capital_label",
+              "Starting capital",
+            )}
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="text-[13px] text-[#8d969e]">
+                $
+              </span>
+              <input
+                ref={firstFieldRef}
+                type="text"
+                inputMode="decimal"
+                value={seedDraft}
+                onChange={(event) => setSeedDraft(event.target.value)}
+                onKeyDown={onFieldKeyDown}
+                data-testid="direct-edit-starting-capital-input"
+                className={`${inlineEditFieldClassName} w-36 tablet:w-28`}
+              />
+            </span>
+          </label>
+          {contributionField}
+        </>
+      ) : (
+        <label className="flex items-center gap-1.5">
+          <span className="sr-only">{capitalFieldLabel}</span>
+          <span aria-hidden="true" className="text-[13px] text-[#8d969e]">
+            $
+          </span>
+          <input
+            ref={firstFieldRef}
+            type="text"
+            inputMode="decimal"
+            value={capitalDraft}
+            onChange={(event) => setCapitalDraft(event.target.value)}
+            onKeyDown={onFieldKeyDown}
+            data-testid="direct-edit-capital-input"
+            className={`${inlineEditFieldClassName} w-36 tablet:w-28`}
+          />
+        </label>
+      )
     ) : openKind === "dates" ? (
       <>
         <label className="flex flex-col gap-0.5 text-[11px] text-[#8d969e]">

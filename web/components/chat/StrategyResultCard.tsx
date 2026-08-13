@@ -31,7 +31,7 @@ import {
 } from "@/lib/result-card-display";
 import { degradedValueClass, inlineFailureTextClass } from "@/lib/failure-treatment";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
-import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import {
@@ -700,8 +700,7 @@ function resultDisplayCopy(
     sideLabel: t("chat.result_card.details.side", "Side"),
     allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
     benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
-    cadenceLabel: t("chat.result_card.details.cadence", "Cadence"),
-    cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence, t) ?? cadence,
+    contributionPhrase: (amount, period) => contributionPhrase(amount, period, t),
     contributionLabel: t(
       "chat.result_card.details.contribution",
       "Contribution",

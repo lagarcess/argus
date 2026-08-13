@@ -23,7 +23,6 @@ import {
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
-import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
@@ -319,7 +318,7 @@ function confirmationCardViewModel(
 ) {
   const rows = confirmation.rows.map((row) => ({
     key: confirmationRowKey(row),
-    row: displayConfirmationRowValue(row, t),
+    row,
   }));
   const assetRow = rowForKey(rows, "assets");
   const strategyRow = rowForKey(rows, "strategy");
@@ -327,7 +326,9 @@ function confirmationCardViewModel(
   const startingCapitalRow = rowForKey(rows, "starting_capital");
   const contributionRow = rowForKey(rows, "contribution");
   const assetSymbols = splitSymbolList(assetRow?.value ?? "");
-  const primaryCapitalRow = startingCapitalRow ?? contributionRow;
+  // A recurring plan's headline money is what goes in every period; its
+  // starting capital, usually $0, reads as a detail beneath.
+  const primaryCapitalRow = contributionRow ?? startingCapitalRow;
   const compactPeriod = compactDateRangeDisplay(confirmation.date_range, language);
   const displayPeriodRow =
     periodRow && compactPeriod
@@ -407,19 +408,6 @@ function RetestPeriodDisclosure({
       </p>
     </div>
   );
-}
-
-function displayConfirmationRowValue(
-  row: StrategyConfirmationPayload["rows"][number],
-  t: TFunction,
-): StrategyConfirmationPayload["rows"][number] {
-  if (confirmationRowKey(row) !== "cadence") {
-    return row;
-  }
-  const displayValue = cadenceDisplayLabel(row.value, t);
-  return displayValue && displayValue !== row.value
-    ? { ...row, value: displayValue }
-    : row;
 }
 
 function isConfirmationRow(

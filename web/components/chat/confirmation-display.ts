@@ -35,7 +35,6 @@ const CONFIRMATION_STATUS_LABEL_KEYS: Record<StrategyConfirmationStatus, string>
 const CONFIRMATION_ROW_LABEL_KEYS: Record<StrategyConfirmationRowKey, string> = {
   assets: "chat.confirmation.rows.assets",
   buy_rule: "chat.confirmation.rows.buy_rule",
-  cadence: "chat.confirmation.rows.cadence",
   contribution: "chat.confirmation.rows.contribution",
   exit_rule: "chat.confirmation.rows.exit_rule",
   period: "chat.confirmation.rows.period",
@@ -70,7 +69,6 @@ const LABEL_TO_STATUS: Record<string, StrategyConfirmationStatus> = {
 const LABEL_TO_ROW_KEY: Record<string, StrategyConfirmationRowKey> = {
   assets: "assets",
   "buy rule": "buy_rule",
-  cadence: "cadence",
   contribution: "contribution",
   "exit rule": "exit_rule",
   period: "period",

@@ -646,7 +646,6 @@
         "side": "Dirección",
         "allocation": "Asignación",
         "benchmark": "Referencia",
-        "cadence": "Cadencia",
         "contribution": "Contribución",
         "entry_rule": "Regla de entrada",
         "exit_rule": "Regla de salida",
@@ -782,7 +781,6 @@
         "strategy": "Estrategia",
         "assets": "Activos",
         "period": "Periodo",
-        "cadence": "Frecuencia",
         "buy_rule": "Regla de compra",
         "exit_rule": "Regla de salida",
         "starting_capital": "Capital inicial",
@@ -828,15 +826,22 @@
           "provider_history_start": "Los datos de esta prueba comienzan después; elige una fecha de inicio igual o posterior a {{min}}.",
           "no_common_data": "Estos activos no comparten datos suficientes para ese periodo.",
           "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}.",
-          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo."
-        }
+          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo.",
+          "invalid_seed": "El capital inicial debe estar entre {{min}} y {{max}}.",
+          "dca_needs_money": "Define un capital inicial, un aporte, o ambos.",
+          "dca_contribution_zero": "Sin aporte esto es comprar y mantener el capital inicial. Agrega un aporte, o pruébalo como comprar y mantener.",
+          "contribution_period_exceeds_window": "Ese período no cabe en las fechas de la prueba. Elige un período más corto o un rango de fechas más largo."
+        },
+        "edit_money": "Editar montos",
+        "starting_capital_label": "Capital inicial",
+        "period_label": "Cada cuánto"
       },
       "edit_disclosure": {
         "unapplied": "No pude cambiar {{targets}}; el resto quedó aplicado abajo.",
         "targets": {
           "asset": "los activos",
           "benchmark": "el benchmark",
-          "cadence": "la frecuencia",
+          "cadence": "el período del aporte",
           "capital": "el capital inicial",
           "date_window": "las fechas",
           "fees": "las comisiones",
@@ -844,10 +849,18 @@
           "slippage": "el deslizamiento",
           "strategy_family": "la estrategia",
           "timeframe": "el intervalo",
-          "generic": "esa parte"
+          "generic": "esa parte",
+          "starting_capital": "el capital inicial"
         }
       },
-      "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
+      "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}.",
+      "contribution_periods": {
+        "daily": "cada día",
+        "weekly": "cada semana",
+        "biweekly": "cada dos semanas",
+        "monthly": "cada mes",
+        "quarterly": "cada trimestre"
+      }
     },
     "next_experiments": {
       "section": "Qué probar después",
@@ -861,7 +874,7 @@
         "supported_rsi_or_ma_rule": "Simplificar a una regla RSI o SMA/EMA compatible",
         "adjust_indicator_thresholds": "Probar otros umbrales del indicador",
         "adjust_signal_periods": "Probar otros períodos de la señal",
-        "adjust_contribution_cadence": "Probar otra cadencia de aportes",
+        "adjust_contribution_cadence": "Probar otro calendario de aportes",
         "compare_buy_and_hold": "Comparar con comprar y mantener",
         "recurring_monthly_buys": "Probar compras mensuales recurrentes"
       },
@@ -871,7 +884,7 @@
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
       },
       "labels_short": {
-        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_contribution_cadence": "Cada cuánto",
         "adjust_indicator_thresholds": "Otros umbrales",
         "adjust_signal_periods": "Otros períodos",
         "change_date_range": "Otras fechas",
@@ -1554,7 +1567,8 @@
       "benchmark_same_modeled_costs": "Comparado con {{symbol}}, mismos costos",
       "recurring_contribution": "${{amount}} cada vez",
       "recurring_contribution_cadence": "${{amount}} {{cadence}}",
-      "starting_principal": "${{amount}} al inicio"
+      "starting_principal": "${{amount}} al inicio",
+      "fractional_shares": "Fracciones de acciones, cada aporte se invierte por completo"
     },
     "strategy_type_values": {
       "buy and hold": "Comprar y mantener",

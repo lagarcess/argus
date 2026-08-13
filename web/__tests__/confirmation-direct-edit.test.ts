@@ -106,7 +106,9 @@ describe("confirmation direct edit surface", () => {
 
   test("input seeds come from typed fields, never parsed display strings", () => {
     const editor = source("components/chat/ConfirmationDirectEdit.tsx");
-    expect(editor).toContain("display_facts?.capital");
+    expect(editor).toContain("facts?.capital");
+    expect(editor).toContain("facts?.recurring_contribution");
+    expect(editor).toContain("facts?.starting_capital");
     expect(editor).toContain("date_range?.start");
     expect(editor).toContain("costEditDraftFromDisplayFacts");
     expect(editor).not.toContain("rows.find");

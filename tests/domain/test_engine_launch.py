@@ -2374,7 +2374,7 @@ def test_dca_adapter_supports_quarterly_cadence(
     assert result.envelope.resolved_parameters["cadence"] == "quarterly"
     assert result.envelope.caveats[0] == "Daily data only."
     assert result.envelope.caveats[-1].startswith(
-        "Recurring entries use the first available daily price"
+        "Each contribution buys at the first available daily price"
     )
 
 
