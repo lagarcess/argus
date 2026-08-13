@@ -108,13 +108,13 @@ def direct_edit_confirmation_preparation(
         operations,
         current_asset_universe=summary.asset_universe,
     )
-    if any(
-        entry.split(".", 1)[-1] in _COST_EDIT_TARGETS.values()
-        for entry in resolved.unsupported
-    ):
+    refused_targets = {entry.split(".", 1)[-1] for entry in resolved.unsupported}
+    if refused_targets & set(_COST_EDIT_TARGETS.values()):
         # The shared resolver is the one cost gate; a refused rate surfaces as
         # a typed field error instead of a generic invalid-payload conflict.
         return DirectEditPreparation(error_code="unsupported_cost_value")
+    if "cadence" in refused_targets:
+        return DirectEditPreparation(error_code="unsupported_dca_cadence")
     if resolved.unsupported or not resolved.has_changes():
         return DirectEditPreparation(error_code="confirmation_payload_invalid")
     field_provenance = _field_provenance_of(summary)
@@ -134,7 +134,10 @@ def direct_edit_confirmation_preparation(
     state = state.model_copy(
         update={
             "candidate_strategy_draft": summary,
-            "optional_parameter_status": _user_owned_parameter_status(source_payload),
+            "optional_parameter_status": _parameter_status_with_edits(
+                source_payload,
+                resolved=resolved,
+            ),
         }
     )
     result = confirm_stage(
@@ -200,6 +203,23 @@ def _drop_stale_date_evidence(summary: StrategySummary) -> None:
             summary.extra_parameters["evidence_spans"] = cleaned
         else:
             summary.extra_parameters.pop("evidence_spans", None)
+
+
+def _parameter_status_with_edits(
+    source_payload: dict[str, Any],
+    *,
+    resolved: Any,
+) -> dict[str, Any]:
+    """The user-owned parameter state this edit re-confirms against.
+
+    The confirm stage reads a plan's starting capital from here, so an edited
+    seed has to arrive here too. Carrying it only on the draft would leave a
+    second copy nobody reads, and the run would quietly use the old seed.
+    """
+    status = _user_owned_parameter_status(source_payload)
+    if resolved.initial_capital is not None:
+        status["initial_capital"] = float(resolved.initial_capital)
+    return status
 
 
 def _user_owned_parameter_status(source_payload: dict[str, Any]) -> dict[str, Any]:

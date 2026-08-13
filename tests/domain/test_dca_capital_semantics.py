@@ -354,3 +354,83 @@ def test_every_request_refusal_reaches_the_card_under_its_own_name() -> None:
             assert _validation_error_code(exc) == expected, expected
         else:  # pragma: no cover - a refusal that stopped refusing
             raise AssertionError(f"{expected} no longer refuses")
+
+
+@pytest.mark.parametrize(
+    ("period", "requested_end", "fits"),
+    [
+        # A window that is exactly one period long stays runnable after the
+        # provider moves its boundary to the nearest session.
+        ("monthly", "2024-01-31", True),
+        ("weekly", "2024-01-08", True),
+        ("quarterly", "2024-03-31", True),
+        # A window genuinely shorter than its period is still refused.
+        ("monthly", "2024-01-22", False),
+        ("quarterly", "2024-02-28", False),
+    ],
+)
+def test_a_period_is_measured_against_the_window_the_user_asked_for(
+    period: str,
+    requested_end: str,
+    fits: bool,
+) -> None:
+    """Coverage narrows the dates; the rule still answers the user's question.
+
+    Provider alignment can move a boundary onto the next session, so measuring
+    against the served window would refuse "January, monthly" for being one day
+    short of the month it literally is.
+    """
+    from argus.agent_runtime.stages.confirm import _validation_error_code
+    from argus.domain.engine_launch.models import LaunchBacktestRequest
+    from pydantic import ValidationError
+
+    request = {
+        "strategy_type": "dca_accumulation",
+        "symbol": "AAPL",
+        "timeframe": "1D",
+        # What coverage served: the first session on or after the request.
+        "date_range": {"start": "2024-01-02", "end": requested_end},
+        # What the user asked for.
+        "requested_date_range": {"start": "2024-01-01", "end": requested_end},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 200.0,
+        "cadence": period,
+        "parameters": {},
+        "risk_rules": [],
+        "benchmark_symbol": "SPY",
+    }
+    try:
+        LaunchBacktestRequest(**request)
+    except ValidationError as exc:
+        assert not fits, f"{period} to {requested_end} should have been accepted"
+        assert _validation_error_code(exc) == "contribution_period_exceeds_window"
+    else:
+        assert fits, f"{period} to {requested_end} should have been refused"
+
+
+def test_an_unsupported_period_is_refused_rather_than_reported_as_applied() -> None:
+    """The applier drops a period it cannot use, so the resolver must refuse it.
+
+    An operation marked applied and then silently discarded is the shape the
+    edit contract exists to prevent: the card comes back unchanged while the
+    response says the change landed.
+    """
+    from argus.agent_runtime.artifact_edit_planner import (
+        EditOperation,
+        apply_edit_operations,
+    )
+
+    for value in ("fortnightly", "every other tuesday", "yearly"):
+        resolved = apply_edit_operations(
+            [EditOperation(op="set", target="cadence", value=value)]
+        )
+        assert resolved.cadence is None, value
+        assert "set.cadence" in resolved.unsupported, value
+        assert "set.cadence" not in resolved.applied, value
+
+    for value in CONTRIBUTION_PERIOD_VALUES:
+        resolved = apply_edit_operations(
+            [EditOperation(op="set", target="cadence", value=value)]
+        )
+        assert resolved.cadence == value
+        assert resolved.unsupported == []

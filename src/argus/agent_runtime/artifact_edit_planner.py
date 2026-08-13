@@ -744,7 +744,14 @@ def apply_edit_operations(
             if op in {"set", "replace"} and (operation.value or "").strip():
                 cleaned = operation.value.strip()
                 if target == "cadence":
-                    resolved.cadence = cleaned
+                    # The applier drops a period it does not support, so an
+                    # unsupported one is refused here rather than reported as
+                    # applied and then silently discarded.
+                    period = _supported_dca_cadence_value(cleaned)
+                    if period is None:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                    resolved.cadence = period
                 else:
                     resolved.timeframe = cleaned
                 resolved.applied.append(f"set.{target}")

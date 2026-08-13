@@ -22,7 +22,6 @@ from argus.domain.dca_capital import (
     DcaCapitalPlan,
     build_dca_capital_plan,
     dca_capital_config_fields,
-    validate_contribution_period_fits_window,
 )
 from argus.domain.engine import (
     build_result_card,
@@ -471,13 +470,6 @@ def _run_dca_accumulation(
     )
     config = _with_prepared_coverage(config, prepared_market_data)
     _validate_launch_config(config)
-    # Coverage may narrow the window after the request was accepted; the
-    # period must still fit what will actually be simulated.
-    validate_contribution_period_fits_window(
-        capital_plan.period,
-        start=date.fromisoformat(config["start_date"]),
-        end=date.fromisoformat(config["end_date"]),
-    )
 
     metrics = recorder.compute_alpha_metrics(
         config,

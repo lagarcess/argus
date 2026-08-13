@@ -111,17 +111,8 @@ class LaunchBacktestRequest(BaseModel):
         except ValueError as exc:
             raise ValueError("invalid_date_range") from exc
         validate_backtest_date_window(start=start, end=end)
-        if self.cadence is not None:
-            from argus.domain.dca_capital import (
-                validate_contribution_period_fits_window,
-            )
 
-            validate_contribution_period_fits_window(
-                self.cadence,
-                start=start,
-                end=end,
-            )
-
+        requested_start, requested_end = start, end
         if self.requested_date_range is not None:
             try:
                 requested_start = date.fromisoformat(self.requested_date_range.start)
@@ -129,6 +120,21 @@ class LaunchBacktestRequest(BaseModel):
             except ValueError as exc:
                 raise ValueError("invalid_date_range") from exc
             validate_backtest_date_window(
+                start=requested_start,
+                end=requested_end,
+            )
+
+        if self.cadence is not None:
+            from argus.domain.dca_capital import (
+                validate_contribution_period_fits_window,
+            )
+
+            # Measured against the window the user asked for, not the one the
+            # provider could serve. Coverage moves the boundary to the nearest
+            # session, so a plain "January, monthly" would otherwise be refused
+            # for being one day short of the month it literally is.
+            validate_contribution_period_fits_window(
+                self.cadence,
                 start=requested_start,
                 end=requested_end,
             )
