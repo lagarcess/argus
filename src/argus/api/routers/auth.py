@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.browser_cookies import delete_browser_cookie, set_browser_cookie
@@ -520,6 +521,13 @@ def _guest_handoff_problem(request: Request, raw_code: str) -> HTTPException:
         ),
     }
     code = next((value for value in known if value in raw_code), "guest_handoff_invalid")
+    if code == "guest_handoff_invalid" and raw_code and raw_code != code:
+        # The enumerated map cannot name every failure, so record what it
+        # collapsed rather than reporting a generic invalid handoff.
+        logger.warning(
+            "Guest handoff failure degraded to a generic code",
+            raw_code=raw_code,
+        )
     status, title, detail = known.get(
         code,
         (400, "Invalid Handoff", "This guest handoff is invalid."),
@@ -598,6 +606,15 @@ def signup_guest_account(
     handoff_id = request.cookies.get(_GUEST_HANDOFF_ID_COOKIE, "").strip()
     opaque_secret = request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip()
     if not handoff_id or not opaque_secret:
+        # Names which cookie the browser withheld. A cross-site policy or a
+        # tracking-prevention setting drops these silently, and without this the
+        # failure is indistinguishable from an expired handoff.
+        logger.warning(
+            "Guest signup rejected before validation: handoff cookies absent",
+            handoff_id_cookie_present=bool(handoff_id),
+            secret_cookie_present=bool(opaque_secret),
+            cookie_names_seen=sorted(request.cookies),
+        )
         return _guest_handoff_failure_response(request, "guest_handoff_invalid")
 
     try:
