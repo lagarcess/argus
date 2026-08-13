@@ -20,6 +20,7 @@ from argus.domain.backtesting.execution import (
     _execute_long_only_ledger,
     _execution_fill_count,
     _execution_realism_settings,
+    symbol_allocation_capital,
 )
 from argus.domain.backtesting.metrics import (
     _compute_metrics,
@@ -143,10 +144,9 @@ def compute_alpha_metrics(
     symbol_dca_plan = (
         dca_plan.per_symbol(len(config["symbols"])) if dca_plan is not None else None
     )
-    allocation_capital = (
-        symbol_dca_plan.contribution
-        if symbol_dca_plan is not None
-        else float(config["starting_capital"]) / len(config["symbols"])
+    allocation_capital = symbol_allocation_capital(
+        config,
+        symbol_count=len(config["symbols"]),
     )
 
     for symbol in config["symbols"]:

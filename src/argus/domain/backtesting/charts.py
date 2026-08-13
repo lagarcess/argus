@@ -13,6 +13,7 @@ from argus.domain.backtesting.execution import (
     _dca_equity_curve,
     _execute_long_only_ledger,
     _execution_realism_settings,
+    symbol_allocation_capital,
 )
 from argus.domain.backtesting.metrics import portfolio_value_summary
 from argus.domain.backtesting.signals import _build_signals
@@ -39,10 +40,9 @@ def build_result_chart(
         if is_dca
         else None
     )
-    allocation_capital = (
-        symbol_dca_plan.contribution
-        if symbol_dca_plan is not None
-        else float(config["starting_capital"]) / len(config["symbols"])
+    allocation_capital = symbol_allocation_capital(
+        config,
+        symbol_count=len(config["symbols"]),
     )
     symbol_equity_curves: list[pd.Series] = []
     events: dict[str, dict[str, set[str]]] = {}

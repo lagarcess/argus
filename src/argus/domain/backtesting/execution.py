@@ -292,6 +292,20 @@ def _execute_long_only_ledger(
     )
 
 
+def symbol_allocation_capital(config: dict[str, Any], *, symbol_count: int) -> float:
+    """The money one symbol's simulation starts each period with.
+
+    A recurring plan allocates its contribution; every other template allocates
+    its bankroll. One owner, so no caller has to choose between the two names.
+    """
+    from argus.domain.dca_capital import dca_capital_plan_from_config
+
+    divisor = max(symbol_count, 1)
+    if config["template"] == "dca_accumulation":
+        return dca_capital_plan_from_config(config).per_symbol(divisor).contribution
+    return float(config["starting_capital"]) / divisor
+
+
 def _dca_equity_curve(
     *,
     close: pd.Series,
