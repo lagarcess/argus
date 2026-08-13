@@ -439,19 +439,44 @@ def test_browser_matches_decision_state_inside_its_localized_template() -> None:
 def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
+    assert 'import type { SearchConversationItem } from "../lib/search-contract"' in (
+        browser_source
+    )
+    assert "function isSearchConversationItem" in browser_source
     assert "await page.reload()" in browser_source
     leave_source = browser_source.index('label("chat.new_chat")')
     open_search = browser_source.index('label("common.search")')
-    click_evidence = browser_source.index('label("command_palette.type.evidence")')
-    assert leave_source < open_search < click_evidence
+    click_result = browser_source.index("data-palette-row-index")
+    assert leave_source < open_search < click_result
     assert "New chat did not leave the source conversation" in browser_source
     assert "Source result remained visible before Omnisearch reopening" in browser_source
     assert 'url.pathname.endsWith("/api/v1/search")' in browser_source
-    assert "item.id === evidenceArtifactId" in browser_source
     assert "item.conversation_id === conversationId" in browser_source
-    assert 'item.lifecycle === "decided"' in browser_source
-    assert 'label("command_palette.type.evidence")' in browser_source
+    assert '(value as JsonRecord).type === "conversation"' in browser_source
+    assert "dossier.run_id !== backtestRunId" in browser_source
+    assert "action.evidence_artifact_id === evidenceArtifactId" in browser_source
+    assert 'item.type === "evidence"' not in browser_source
     assert "Omnisearch did not reopen the canonical source conversation" in browser_source
+
+
+def test_api_postcondition_derives_omnisearch_identity_from_conversation_dossier() -> None:
+    source = _source(".github/canary-render.sh")
+    postconditions = source.split("verify_api_postconditions() {", 1)[1].split(
+        "\nservice_role_curl()", 1
+    )[0]
+
+    assert "from argus.api.schemas import PaginatedSearch" in postconditions
+    assert "PaginatedSearch.model_validate" in postconditions
+    assert 'item.type != "conversation"' in postconditions
+    assert 'item.conversation_id != os.environ["CANARY_CONVERSATION_ID"]' in (
+        postconditions
+    )
+    assert 'dossier.run_id != os.environ["CANARY_RUN_ID"]' in postconditions
+    assert 'decision.state != os.environ["CANARY_DECISION_STATE"]' in postconditions
+    assert 'action.evidence_artifact_id == os.environ["CANARY_EVIDENCE_ID"]' in (
+        postconditions
+    )
+    assert 'item.get("type") == "evidence"' not in postconditions
 
 
 def test_new_chat_poll_keeps_private_conversation_id_out_of_failure_output() -> None:

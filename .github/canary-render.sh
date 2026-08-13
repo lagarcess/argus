@@ -1187,10 +1187,12 @@ PY
   CANARY_IDEA_ID="$IDEA_ID" \
   CANARY_IDEA_VERSION_ID="$IDEA_VERSION_ID" \
   CANARY_FOCUSED_SYMBOL_PATH="$FOCUSED_SYMBOL_PATH" \
-  python3 - <<'PY'
+  poetry run python - <<'PY'
 import json
 import os
 import pathlib
+
+from argus.api.schemas import PaginatedSearch
 
 def load(name: str):
     return json.loads(pathlib.Path(os.environ[name]).read_text(encoding="utf-8"))
@@ -1249,29 +1251,36 @@ for required_identity in (
     if required_identity not in encoded_messages:
         raise SystemExit("read-only messages API omitted canonical result continuity")
 
-search = load("CANARY_SEARCH_FILE")
-search_items = search.get("items") if isinstance(search, dict) else None
-if not isinstance(search_items, list):
-    raise SystemExit("read-only Omnisearch API omitted items")
-for item in search_items:
-    if not isinstance(item, dict):
+search = PaginatedSearch.model_validate(load("CANARY_SEARCH_FILE"))
+for item in search.items:
+    if (
+        item.type != "conversation"
+        or item.conversation_id != os.environ["CANARY_CONVERSATION_ID"]
+    ):
         continue
-    if item.get("type") == "evidence" and item.get("id") == os.environ["CANARY_EVIDENCE_ID"]:
-        if (
-            item.get("conversation_id") != os.environ["CANARY_CONVERSATION_ID"]
-            or item.get("lifecycle") != "decided"
-        ):
-            raise SystemExit("read-only Omnisearch API returned contradictory evidence")
-        break
+    dossier = item.dossier
+    if dossier is None:
+        raise SystemExit("read-only Omnisearch API omitted the source dossier")
+    decision = dossier.decision
+    if (
+        dossier.run_id != os.environ["CANARY_RUN_ID"]
+        or decision is None
+        or decision.state != os.environ["CANARY_DECISION_STATE"]
+        or not any(
+            action.type == "decision"
+            and action.evidence_artifact_id == os.environ["CANARY_EVIDENCE_ID"]
+            and action.decision_state == os.environ["CANARY_DECISION_STATE"]
+            for action in dossier.actions
+        )
+    ):
+        raise SystemExit("read-only Omnisearch API returned a contradictory dossier")
+    break
 else:
-    raise SystemExit("read-only Omnisearch API omitted browser-created evidence")
-ledger_groups = search.get("ledger_groups")
-if not isinstance(ledger_groups, list) or not any(
-    isinstance(group, dict)
-    and group.get("decision_state") == os.environ["CANARY_DECISION_STATE"]
-    and isinstance(group.get("count"), int)
-    and group["count"] >= 1
-    for group in ledger_groups
+    raise SystemExit("read-only Omnisearch API omitted the browser-created source")
+if search.ledger_groups is None or not any(
+    group.decision_state == os.environ["CANARY_DECISION_STATE"]
+    and group.count >= 1
+    for group in search.ledger_groups
 ):
     raise SystemExit("read-only Omnisearch API omitted the saved decision group")
 PY

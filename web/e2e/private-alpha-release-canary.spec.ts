@@ -1,5 +1,7 @@
 import { chmod, writeFile } from "node:fs/promises";
 import { expect, test, type Page, type Response } from "@playwright/test";
+import type { SearchConversationItem } from "../lib/search-contract";
+import type { SearchDecisionAction } from "../lib/run-dossier-contract";
 
 type JsonRecord = Record<string, unknown>;
 type StaticLabels = Record<string, string>;
@@ -35,6 +37,17 @@ function record(value: unknown, name: string): JsonRecord {
     throw new Error(`Browser canary response omitted ${name}`);
   }
   return value as JsonRecord;
+}
+
+function isSearchConversationItem(
+  value: unknown,
+): value is SearchConversationItem {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (value as JsonRecord).type === "conversation"
+  );
 }
 
 function privateId(value: unknown, name: string): string {
@@ -518,31 +531,38 @@ test.describe.serial("private-alpha rendered release canary", () => {
       await searchResponse.json(),
       "Omnisearch payload",
     );
-    const searchItems = Array.isArray(searchPayload.items)
-      ? searchPayload.items
-      : [];
-    const matchingEvidence = searchItems
-      .map((item) => record(item, "Omnisearch item"))
-      .find(
-        (item) =>
-          item.type === "evidence" &&
-          item.id === evidenceArtifactId &&
-          item.conversation_id === conversationId &&
-          item.lifecycle === "decided",
-      );
-    if (!matchingEvidence) {
+    if (!Array.isArray(searchPayload.items)) {
+      throw new Error("Omnisearch payload omitted result items");
+    }
+    const conversationItems = searchPayload.items.filter(isSearchConversationItem);
+    const matchingConversationIndex = conversationItems.findIndex(
+      (item) => item.conversation_id === conversationId,
+    );
+    if (matchingConversationIndex < 0) {
       throw new Error(
-        "Omnisearch did not return the browser-created canonical evidence",
+        "Omnisearch did not return the browser-created source conversation",
       );
     }
-    const evidenceTitle = String(matchingEvidence.title ?? "").trim();
-    if (!evidenceTitle)
-      throw new Error("Omnisearch evidence omitted a rendered title");
+    const matchingConversation = conversationItems[matchingConversationIndex];
+    const dossier = matchingConversation.dossier;
+    const decisionAction = dossier?.actions.find(
+      (action): action is SearchDecisionAction =>
+        action.type === "decision" &&
+        action.evidence_artifact_id === evidenceArtifactId,
+    );
+    if (
+      !dossier ||
+      dossier.run_id !== backtestRunId ||
+      dossier.decision?.state !== canaryDecisionState ||
+      !decisionAction ||
+      decisionAction.decision_state !== canaryDecisionState
+    ) {
+      throw new Error(
+        "Omnisearch dossier did not preserve the browser-created evidence",
+      );
+    }
     await page
-      .getByRole("button")
-      .filter({ hasText: label("command_palette.type.evidence") })
-      .filter({ hasText: evidenceTitle })
-      .first()
+      .locator(`[data-palette-row-index="${matchingConversationIndex}"]`)
       .click();
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
