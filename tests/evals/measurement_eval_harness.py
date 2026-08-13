@@ -4,11 +4,10 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-import yaml
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
@@ -29,6 +28,10 @@ from argus.llm.openrouter import (
 )
 from pydantic import BaseModel, Field
 
+from tests.evals.measurement_eval_scorecard import (
+    FIXTURE_DIR,
+    measurement_fixture_documents,
+)
 from tests.evals.prose_evidence import judged_prose_evidence
 
 LOCKED_EVAL_CATEGORIES = {
@@ -41,8 +44,6 @@ LOCKED_EVAL_CATEGORIES = {
     "graceful_recovery",
     "asset_discovery_routing",
 }
-FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
-SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v1"
 PROSE_JUDGE_RUBRIC = """
 Version: argus-prose-quality-v1
@@ -133,8 +134,7 @@ class ProseJudgeResponse(BaseModel):
 
 def load_eval_cases(path: Path = FIXTURE_DIR) -> list[EvalCase]:
     cases: list[EvalCase] = []
-    for fixture_path in sorted(path.glob("*.yaml")):
-        payload = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
+    for fixture_path, payload in measurement_fixture_documents(path):
         category = str(payload["category"])
         if category not in LOCKED_EVAL_CATEGORIES:
             raise ValueError(f"unknown eval category: {category}")
@@ -246,10 +246,19 @@ def run_eval_case(
             judge_result = _missing_prose_judge_result()
             failed_checks.append("prose_judge:missing_assistant_text")
         else:
-            judge_result = judge_prose_quality(
-                case=case,
-                assistant_text=assistant_text,
-            )
+            judge_route_token = begin_openrouter_route_receipt_capture()
+            try:
+                judge_result = judge_prose_quality(
+                    case=case,
+                    assistant_text=assistant_text,
+                )
+            finally:
+                route_receipts.extend(
+                    receipt.as_dict()
+                    for receipt in end_openrouter_route_receipt_capture(
+                        judge_route_token
+                    )
+                )
             if not judge_result["pass"]:
                 failed_checks.extend(
                     f"prose_judge:{criterion}"
@@ -403,54 +412,6 @@ def typed_expectation_failures(
     return failures
 
 
-def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
-    by_category: dict[str, dict[str, int | float]] = {}
-    for result in results:
-        category = str(result["category"])
-        bucket = by_category.setdefault(
-            category,
-            {
-                "passed": 0,
-                "failed": 0,
-                "expected_failed": 0,
-                "unexpected_pass": 0,
-                "skipped": 0,
-                "pass_rate": 0.0,
-            },
-        )
-        status = str(result["status"])
-        if status not in bucket:
-            status = "failed"
-        bucket[status] = int(bucket[status]) + 1
-
-    for bucket in by_category.values():
-        denominator = sum(
-            int(bucket[status])
-            for status in ("passed", "failed", "expected_failed", "unexpected_pass")
-        )
-        bucket["pass_rate"] = (
-            0.0 if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
-        )
-
-    return {
-        "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "category_pass_rates": by_category,
-        "totals": {
-            "passed": sum(int(item["passed"]) for item in by_category.values()),
-            "failed": sum(int(item["failed"]) for item in by_category.values()),
-            "expected_failed": sum(
-                int(item["expected_failed"]) for item in by_category.values()
-            ),
-            "unexpected_pass": sum(
-                int(item["unexpected_pass"]) for item in by_category.values()
-            ),
-            "skipped": sum(int(item["skipped"]) for item in by_category.values()),
-        },
-        "results": results,
-    }
-
-
 def blocking_eval_results(
     results: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -469,17 +430,6 @@ def expected_fail_issue_for_result(result: dict[str, Any]) -> str | None:
         return None
     issue = expected_fail.get("issue")
     return issue if isinstance(issue, str) and issue else None
-
-
-def write_scorecard(
-    results: list[dict[str, Any]], *, output_dir: Path = SCORECARD_DIR
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    scorecard = scorecard_for_results(results)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    path = output_dir / f"argus-eval-scorecard-{stamp}.json"
-    path.write_text(json.dumps(scorecard, indent=2, sort_keys=True), encoding="utf-8")
-    return path
 
 
 def judge_prose_quality(*, case: EvalCase, assistant_text: str) -> dict[str, Any]:
