@@ -57,6 +57,7 @@ function account(
       ? {
           guest: {
             expires_at: "2026-08-03T18:00:00Z",
+            conversation_id: CONVERSATION_ID,
             conversation_limit: 1,
             message_limit: 10,
             simulation_limit: 1,

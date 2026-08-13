@@ -8,6 +8,7 @@ import { expectOneCanonicalCard } from "./auth-card-assertions";
 
 const GUEST_ID = "00000000-0000-4000-8000-000000000501";
 const CONVERSATION_ID = "00000000-0000-4000-8000-000000000502";
+const REGISTERED_ID = "00000000-0000-4000-8000-000000000503";
 const EXPIRES_AT = "2026-08-07T18:00:00Z";
 const APPROVED_EMAIL = "approved-guest@example.com";
 const PASSWORD = "correct-horse-battery-staple";
@@ -66,6 +67,7 @@ function guestMe(
     account_kind: "guest",
     guest: {
       expires_at: EXPIRES_AT,
+      conversation_id: CONVERSATION_ID,
       conversation_limit: 1,
       message_limit: 10,
       simulation_limit: 1,
@@ -92,6 +94,7 @@ function registeredMe(
   return {
     user: {
       ...guestMe(publicAccountAccessEnabled, language).user,
+      id: REGISTERED_ID,
       email: APPROVED_EMAIL,
       onboarding: {
         completed: true,
@@ -119,6 +122,7 @@ function registeredMe(
 function testAccessToken(
   email: string | null,
   isAnonymous: boolean,
+  subject = GUEST_ID,
 ): string {
   const encode = (value: Record<string, unknown>) =>
     Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -130,7 +134,7 @@ function testAccessToken(
       exp: Math.floor(Date.now() / 1000) + 3600,
       is_anonymous: isAnonymous,
       role: "authenticated",
-      sub: GUEST_ID,
+      sub: subject,
     }),
     "test-signature",
   ].join(".");
@@ -175,6 +179,7 @@ async function mockGuestJourney(
   page: Page,
   publicAccountAccessEnabled = false,
   language: "en" | "es-419" = "en",
+  conversationHasContent = false,
 ): Promise<MockGuestJourneyState> {
   const state = { registered: false };
   await page.route("**/api/v1/auth/guest", (route) =>
@@ -210,7 +215,21 @@ async function mockGuestJourney(
   await page.route("**/api/v1/conversations**", (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname.endsWith("/messages")) {
-      return fulfillJson(route, page, { items: [], next_cursor: null });
+      return fulfillJson(route, page, {
+        items: conversationHasContent
+          ? [
+              {
+                id: "00000000-0000-4000-8000-000000000505",
+                conversation_id: CONVERSATION_ID,
+                role: "user",
+                content: "Preserve this guest idea",
+                created_at: "2026-07-31T18:00:00Z",
+                metadata: {},
+              },
+            ]
+          : [],
+        next_cursor: null,
+      });
     }
     return fulfillJson(route, page, {
       items: [
@@ -231,49 +250,84 @@ async function mockGuestJourney(
   return state;
 }
 
-async function mockApprovedGuestLink(
+async function mockApprovedGuestSignup(
   page: Page,
   state: MockGuestJourneyState,
   bodies: Array<Record<string, unknown>>,
   authorizationHeaders: string[],
 ): Promise<void> {
-  const accessToken = testAccessToken(APPROVED_EMAIL, false);
-  await page.route("**/api/v1/auth/guest/link", async (route) => {
+  const accessToken = testAccessToken(APPROVED_EMAIL, false, REGISTERED_ID);
+  let pendingAction: Record<string, unknown> | null = null;
+  await page.route("**/api/v1/auth/guest/handoffs", async (route) => {
+    if (route.request().method() !== "OPTIONS") {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      bodies.push(body);
+      pendingAction =
+        typeof body.pending_action === "object" && body.pending_action !== null
+          ? (body.pending_action as Record<string, unknown>)
+          : null;
+      authorizationHeaders.push(
+        route.request().headers().authorization ?? "",
+      );
+      await fulfillJson(
+        route,
+        page,
+        {
+          handoff_id: "00000000-0000-4000-8000-000000000504",
+          expires_at: EXPIRES_AT,
+        },
+        201,
+      );
+      return;
+    }
+    await fulfillJson(route, page, {}, 204);
+  });
+  await page.route("**/api/v1/auth/guest/signup", async (route) => {
     if (route.request().method() !== "OPTIONS") {
       bodies.push(route.request().postDataJSON() as Record<string, unknown>);
       authorizationHeaders.push(
         route.request().headers().authorization ?? "",
       );
       state.registered = true;
-    }
-    await fulfillJson(
-      route,
-      page,
-      {
-        authenticated: true,
-        account_kind: "registered",
-        user: { id: GUEST_ID, email: APPROVED_EMAIL },
-        session: {
-          access_token: accessToken,
-          refresh_token: "registered-refresh-token",
-          expires_in: 3600,
+      await fulfillJson(
+        route,
+        page,
+        {
+          authenticated: true,
+          account_kind: "registered",
+          user: { id: REGISTERED_ID, email: APPROVED_EMAIL },
+          session: {
+            access_token: accessToken,
+            refresh_token: "registered-refresh-token",
+            expires_in: 3600,
+          },
+          guest_claim: {
+            conversation_id: CONVERSATION_ID,
+            pending_action: pendingAction,
+          },
         },
-      },
-      200,
-    );
+        200,
+      );
+      return;
+    }
+    await fulfillJson(route, page, {}, 204);
   });
   await page.route("**/auth/v1/user", (route) =>
-    fulfillJson(route, page, {
-      id: GUEST_ID,
-      email: APPROVED_EMAIL,
-      aud: "authenticated",
-      role: "authenticated",
-      is_anonymous: false,
-      app_metadata: { provider: "email", providers: ["email"] },
-      user_metadata: {},
-      identities: [],
-      created_at: "2026-07-31T18:00:00Z",
-      updated_at: "2026-07-31T18:00:00Z",
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: REGISTERED_ID,
+        email: APPROVED_EMAIL,
+        aud: "authenticated",
+        role: "authenticated",
+        is_anonymous: false,
+        app_metadata: { provider: "email", providers: ["email"] },
+        user_metadata: {},
+        identities: [],
+        created_at: "2026-07-31T18:00:00Z",
+        updated_at: "2026-07-31T18:00:00Z",
+      }),
     }),
   );
 }
@@ -512,13 +566,13 @@ test("enabled guest account access preserves the direct auth flow", async ({
   await expect(dialog.getByPlaceholder("Name")).toBeVisible();
 });
 
-test("approved guest links the existing identity while public signup is gated", async ({
+test("approved guest creates a distinct identity while public signup is gated", async ({
   page,
 }) => {
   const bodies: Array<Record<string, unknown>> = [];
   const authorizationHeaders: string[] = [];
-  const state = await mockGuestJourney(page);
-  await mockApprovedGuestLink(
+  const state = await mockGuestJourney(page, false, "en", true);
+  await mockApprovedGuestSignup(
     page,
     state,
     bodies,
@@ -529,6 +583,8 @@ test("approved guest links the existing identity while public signup is gated", 
   await expect(page.getByTestId("chat-input")).toBeVisible({
     timeout: 60_000,
   });
+  await expect(page).toHaveURL(new RegExp(`conversation=${CONVERSATION_ID}`));
+  await expect(page.getByText("Preserve this guest idea")).toBeVisible();
 
   await page.getByRole("button", { name: "Sign in" }).click();
   let dialog = page.getByRole("dialog", {
@@ -540,15 +596,23 @@ test("approved guest links the existing identity while public signup is gated", 
   await dialog.getByPlaceholder("Password").fill(PASSWORD);
   await dialog.getByRole("button", { name: "Sign up" }).click();
 
+  await expect.poll(() => bodies.length).toBe(2);
+  await expect.poll(() => state.registered).toBe(true);
+
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId("chat-input")).toHaveCount(1);
-  expect(bodies).toEqual([
-    {
-      email: APPROVED_EMAIL,
-      password: PASSWORD,
-      refresh_token: "guest-refresh-token",
-    },
-  ]);
-  expect(authorizationHeaders).toHaveLength(1);
-  expect(authorizationHeaders[0]).toMatch(/^Bearer /);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toMatchObject({
+    handoff_kind: "new_account_signup",
+    destination_email: APPROVED_EMAIL,
+    source_conversation_id: CONVERSATION_ID,
+  });
+  expect(bodies[1]).toEqual({
+    email: APPROVED_EMAIL,
+    password: PASSWORD,
+    captcha_token: "argus-local-browser-qa",
+    language: "en",
+    display_name: null,
+  });
+  expect(authorizationHeaders).toEqual(["", ""]);
 });

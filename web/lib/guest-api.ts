@@ -6,7 +6,7 @@ import {
   type AuthResponsePayload,
   type Conversation,
 } from "@/lib/argus-api";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { acquirePasswordAuthCaptchaToken } from "@/lib/guest-captcha";
 import type { GuestPendingActionSummary } from "@/lib/guest-conversion";
 
 export async function requestAccess(payload: {
@@ -23,6 +23,7 @@ export async function requestAccess(payload: {
 }
 
 export async function createGuestHandoff(payload: {
+  handoff_kind?: "existing_account" | "new_account_signup";
   destination_email: string;
   source_conversation_id: string;
   pending_action?: GuestPendingActionSummary | null;
@@ -36,33 +37,35 @@ export async function createGuestHandoff(payload: {
   );
 }
 
-export async function linkGuestIdentity(payload: {
+export async function registerGuestAccount(payload: {
   email: string;
   password: string;
+  language: ApiLanguage;
+  display_name?: string | null;
+  username?: string | null;
+  source_conversation_id: string;
+  pending_action?: GuestPendingActionSummary | null;
 }) {
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    throw new Error("Supabase auth client is unavailable for account creation.");
-  }
-  const { data, error } = await supabase.auth.getSession();
-  const session = data.session;
-  if (error || !session?.access_token || !session.refresh_token) {
-    throw new Error("The current guest session is unavailable.");
-  }
-  const response = await apiFetch<
-    AuthResponsePayload & { account_kind: "registered" }
-  >("/auth/guest/link", {
+  await createGuestHandoff({
+    handoff_kind: "new_account_signup",
+    destination_email: payload.email,
+    source_conversation_id: payload.source_conversation_id,
+    pending_action: payload.pending_action,
+  });
+  const captchaToken = await acquirePasswordAuthCaptchaToken();
+  const response = await apiFetch<AuthResponsePayload>("/auth/guest/signup", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
     body: JSON.stringify({
-      ...payload,
-      refresh_token: session.refresh_token,
+      email: payload.email,
+      password: payload.password,
+      captcha_token: captchaToken,
+      language: payload.language,
+      display_name: payload.display_name,
+      username: payload.username,
     }),
   });
   await persistBrowserSession(response);
-  return response;
+  return { response, needsEmailConfirmation: !response.session };
 }
 
 export async function replaceGuestConversation() {

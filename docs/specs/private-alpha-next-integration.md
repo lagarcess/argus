@@ -701,7 +701,9 @@ be present before Guest grounded discovery is exposed.
 
 The conversion contract has two owners:
 
-- provider-native anonymous-to-permanent linking keeps the same Auth UUID;
+- ordinary signup creates a different permanent Auth UUID, binds it to the
+  workspace-lifetime signup handoff, and claims the complete guest graph after
+  immediate session creation or first confirmed login;
 - an existing registered account claims the complete guest graph through the
   short-lived, email-hash-bound, single-use server handoff. Login completes
   the claim before returning its session and can reconcile one ambiguous

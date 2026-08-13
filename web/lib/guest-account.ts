@@ -37,6 +37,7 @@ export type ApiUser = {
 
 export type GuestAccountSummary = {
   expires_at: string;
+  conversation_id: string | null;
   conversation_limit: number;
   message_limit: number;
   simulation_limit: number;

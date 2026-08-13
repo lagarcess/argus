@@ -660,8 +660,9 @@ Before any guest traffic:
   approved staged mode, while permanent signup/login remains allowlist-gated;
 - hosted Supabase must explicitly enable anonymous Auth, configure an approved
   CAPTCHA posture, and retain provider plus Argus rate limits;
-- conversion must prove same-UUID linking and atomic existing-account claim
-  without duplicate artifacts, usage, jobs, or pending actions;
+- conversion must prove distinct-UUID ordinary signup and atomic claim, plus
+  atomic existing-account login claim, without duplicate artifacts, usage,
+  jobs, or pending actions;
 - the cleanup dry run and bounded real run must be scheduled with an owner,
   alert on failures/lag, and preserve converted or permanent accounts;
 - guest analytics must stay personless and metadata-only; browser facts cross

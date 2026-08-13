@@ -295,19 +295,23 @@ class SupabaseGateway(
         display_name: str | None = None,
         username: str | None = None,
         language: Language = "en",
+        guest_signup_handoff: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         try:
             auth_client = self.auth_client or self.client
+            metadata: dict[str, Any] = {
+                "display_name": display_name,
+                "username": username,
+                "language": language,
+            }
+            if guest_signup_handoff is not None:
+                metadata["argus_guest_signup"] = guest_signup_handoff
             response = auth_client.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
                     "options": {
-                        "data": {
-                            "display_name": display_name,
-                            "username": username,
-                            "language": language,
-                        },
+                        "data": metadata,
                         "captcha_token": captcha_token,
                     },
                 }
@@ -317,6 +321,22 @@ class SupabaseGateway(
             return response.model_dump(mode="json")
         except Exception as e:
             raise RuntimeError(f"Signup failed: {e}") from e
+
+    def get_auth_user_by_id(self, user_id: str) -> dict[str, Any]:
+        response = self.client.auth.admin.get_user_by_id(user_id)
+        if response.user is None:
+            raise RuntimeError("Auth user was not found.")
+        return response.user.model_dump(mode="json")
+
+    def resend_signup_confirmation(self, *, email: str, captcha_token: str) -> None:
+        auth_client = self.auth_client or self.client
+        auth_client.auth.resend(
+            {
+                "type": "signup",
+                "email": email,
+                "options": {"captcha_token": captcha_token},
+            }
+        )
 
     def private_alpha_role_for_email(self, email: str) -> str | None:
         rows = (

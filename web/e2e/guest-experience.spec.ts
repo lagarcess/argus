@@ -274,6 +274,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
 
   let primaryMe: GuestMe | null = null;
   let primaryOwner = "";
+  let primaryGuestOwner = "";
   let primaryConversation = "";
   let primaryExpiry = "";
   let primaryGraph: ConversationGraph | null = null;
@@ -319,6 +320,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
         },
       });
       primaryOwner = primaryMe.user.id;
+      primaryGuestOwner = primaryOwner;
       primaryExpiry = primaryMe.guest?.expires_at ?? "";
       disposableUserIds.add(primaryOwner);
       evidence.owner_labels.push(evidenceLabel("owner", primaryOwner));
@@ -472,6 +474,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
           },
         });
         primaryOwner = primaryMe.user.id;
+        primaryGuestOwner = primaryOwner;
         primaryExpiry = primaryMe.guest?.expires_at ?? "";
         disposableUserIds.add(primaryOwner);
         evidence.owner_labels.push(evidenceLabel("owner", primaryOwner));
@@ -1589,7 +1592,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
           }),
         ).toBe(true);
         for (const route of [
-          "POST /api/v1/auth/guest/link",
+          "POST /api/v1/auth/guest/signup",
           "POST /api/v1/auth/guest/handoffs",
           "POST /api/v1/auth/login",
         ]) {
@@ -1606,8 +1609,9 @@ test("@guest-experience exact-head 20-check matrix", async ({
       (value) => (currentCheck = value),
       async () => {
         if (!primaryGraph) throw new Error("Primary result graph is missing");
-        const before = conversationGraph(primaryOwner, primaryConversation);
-        const beforeDecisions = ownerSnapshot(primaryOwner).decisions;
+        const sourceOwner = primaryOwner;
+        const before = conversationGraph(sourceOwner, primaryConversation);
+        const beforeDecisions = ownerSnapshot(sourceOwner).decisions;
         const mutationsBefore = mergeMutationCounts(monitors);
         const signup = newSignupCredentials();
         const card = latestResultCard(page);
@@ -1622,23 +1626,26 @@ test("@guest-experience exact-head 20-check matrix", async ({
         await signupDialog.getByPlaceholder("Name").fill("Local QA");
         await signupDialog.getByPlaceholder("Email address").fill(signup.email);
         await signupDialog.getByPlaceholder("Password").fill(signup.password);
-        const linkResponse = page.waitForResponse(
+        const signupResponse = page.waitForResponse(
           (response) =>
             response.request().method() === "POST" &&
             new URL(response.url()).pathname.endsWith(
-              "/api/v1/auth/guest/link",
+              "/api/v1/auth/guest/signup",
             ),
         );
         await signupDialog
           .getByRole("button", { name: "Sign up" })
           .last()
           .click();
-        expect((await linkResponse).status()).toBe(200);
-        disposableUserIds.add(primaryOwner);
-        const mutationsAfterLink = mergeMutationCounts(monitors);
+        expect((await signupResponse).status()).toBe(200);
+        const mutationsAfterSignup = mergeMutationCounts(monitors);
         expect(
-          (mutationsAfterLink["POST /api/v1/auth/guest/link"] ?? 0) -
-            (mutationsBefore["POST /api/v1/auth/guest/link"] ?? 0),
+          (mutationsAfterSignup["POST /api/v1/auth/guest/handoffs"] ?? 0) -
+            (mutationsBefore["POST /api/v1/auth/guest/handoffs"] ?? 0),
+        ).toBe(1);
+        expect(
+          (mutationsAfterSignup["POST /api/v1/auth/guest/signup"] ?? 0) -
+            (mutationsBefore["POST /api/v1/auth/guest/signup"] ?? 0),
         ).toBe(1);
 
         await expect(
@@ -1651,14 +1658,17 @@ test("@guest-experience exact-head 20-check matrix", async ({
         expect(account.status).toBe(200);
         expect(
           account.body.account_kind === "registered" &&
-            account.body.user.id === primaryOwner,
+            account.body.user.id !== sourceOwner,
         ).toBe(true);
+        primaryOwner = account.body.user.id;
+        disposableUserIds.add(primaryOwner);
+        evidence.owner_labels.push(evidenceLabel("owner", primaryOwner));
         const profile = profileAccountKind(primaryOwner);
         expect(profile).toEqual({
           is_anonymous: false,
           email_present: true,
         });
-        expect(workspaceFacts(primaryOwner).claimed_by === primaryOwner).toBe(
+        expect(workspaceFacts(sourceOwner).claimed_by === primaryOwner).toBe(
           true,
         );
         expect(
@@ -1667,7 +1677,22 @@ test("@guest-experience exact-head 20-check matrix", async ({
             conversationGraph(primaryOwner, primaryConversation),
           ),
         ).toBe(true);
-        evidence.same_uuid_conversion = true;
+        const sourceAfter = conversationGraph(
+          sourceOwner,
+          primaryConversation,
+        );
+        expect(mutableGraphRows(sourceAfter)).toBe(0);
+        expect(
+          sourceAfter.checkpoints.length === before.checkpoints.length &&
+            sourceAfter.checkpoints.every(
+              (id, index) => id === before.checkpoints[index],
+            ),
+        ).toBe(true);
+        expect(profileAccountKind(sourceOwner)).toEqual({
+          is_anonymous: true,
+          email_present: false,
+        });
+        evidence.distinct_uuid_conversion = true;
 
         await card.getByRole("button", { name: "Watching" }).click();
         await card
@@ -2210,21 +2235,24 @@ test("@guest-experience exact-head 20-check matrix", async ({
           denied.status === 403 && denied.body.code === "guest_session_expired",
         ).toBe(true);
         markClaimedWorkspaceCleanupReady(claimGuestOwner);
-        markClaimedWorkspaceCleanupReady(primaryOwner);
+        markClaimedWorkspaceCleanupReady(primaryGuestOwner);
         const cleanup = cleanupExpectedGuestCandidates([
           expiredOwner,
           claimGuestOwner,
+          primaryGuestOwner,
         ]);
         expect(cleanup).toEqual({
-          dry_run_count: 2,
-          deleted_count: 2,
-          claimed_identity_count: 1,
+          dry_run_count: 3,
+          deleted_count: 3,
+          claimed_identity_count: 2,
           expired_workspace_count: 1,
         });
         expect(authUserExists(expiredOwner)).toBe(false);
         expect(authUserExists(claimGuestOwner)).toBe(false);
+        expect(authUserExists(primaryGuestOwner)).toBe(false);
         disposableUserIds.delete(expiredOwner);
         disposableUserIds.delete(claimGuestOwner);
+        disposableUserIds.delete(primaryGuestOwner);
         const expiredGraphAfter = conversationGraph(
           expiredOwner,
           seeded.conversationId,
