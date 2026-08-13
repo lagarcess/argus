@@ -213,10 +213,22 @@ def _validated_launch_payload(
     except ValidationError as exc:
         return _tagged_launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
+        error_code = str(exc)
+        raw_value = (
+            launch_payload.get("capital_amount")
+            if error_code == "invalid_starting_capital"
+            else launch_payload.get("timeframe")
+        )
         return _tagged_launch_validation_failure(
-            str(exc),
-            raw_value=launch_payload.get("timeframe"),
+            error_code,
+            raw_value=raw_value,
             optional_parameter_status=state.optional_parameter_status,
+            capital_role=(
+                "recurring_contribution"
+                if error_code == "invalid_starting_capital"
+                and launch_payload.get("strategy_type") == "dca_accumulation"
+                else None
+            ),
         )
     except Exception:
         return _tagged_launch_validation_failure("missing_rule_group")

@@ -54,39 +54,10 @@ jobs:
           api_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh api-deploy-status)"
           web_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh web-deploy-status)"
           workflow_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh workflow-version-status)"
-          if ! cron_status="$(RENDER_API_KEY="$RENDER_API_KEY" .github/render-env-sync.sh cron-deploy-status)"; then
-            echo "ERROR: cron_status_unavailable" >&2
-            exit 1
-          fi
           deployed_sha="$(python3 .github/canary-deployed-sha.py \
             --api-status "$api_status" \
             --web-status "$web_status" \
             --workflow-status "$workflow_status")"
-          cron_value() {
-            local key="$1"
-            awk -F= -v key="$key" \
-              '$1 == key { print substr($0, length(key) + 2); found=1; exit } END { if (!found) exit 1 }' \
-              <<< "$cron_status"
-          }
-          if ! cron_deploy_status="$(cron_value status)" \
-            || ! cron_deploy_sha="$(cron_value commit)"; then
-            echo "ERROR: cron_status_unavailable" >&2
-            exit 1
-          fi
-          if [ -z "$cron_deploy_status" ] || [ "$cron_deploy_status" = "lookup_failed" ]; then
-            echo "ERROR: cron_status_unavailable" >&2
-            exit 1
-          fi
-          if [ "$cron_deploy_status" != "absent" ]; then
-            if [ "$cron_deploy_status" != "live" ]; then
-              echo "ERROR: cron_deploy_not_live" >&2
-              exit 1
-            fi
-            if [ "$cron_deploy_sha" != "$deployed_sha" ]; then
-              echo "ERROR: cron_deploy_sha_mismatch" >&2
-              exit 1
-            fi
-          fi
           git cat-file -e "${deployed_sha}^{commit}"
           git checkout --detach "$deployed_sha"
           candidate_sha="$(git rev-parse HEAD)"

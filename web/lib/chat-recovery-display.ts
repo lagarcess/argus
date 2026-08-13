@@ -22,6 +22,8 @@ export type RecoveryDisplay =
         reasonCode?: string;
         rawValue?: string;
         symbol?: string;
+        minimum?: number;
+        maximum?: number;
         options: Array<{
           label?: string;
           replacementValues?: Record<string, unknown> | null;
@@ -57,6 +59,10 @@ function stringArrayOrNull(value: unknown): string[] | null {
   }
   const values = value.map((item) => String(item ?? "").trim()).filter(Boolean);
   return values.length > 0 ? values : null;
+}
+
+function finiteNumberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export function recoveryDisplayFromMetadata(
@@ -171,6 +177,26 @@ export function recoveryDisplayText(
           })
         : t("chat.clarification.future_performance");
     }
+    if (display.values.reasonCode === "unsupported_starting_capital") {
+      const minimum = display.values.minimum;
+      const maximum = display.values.maximum;
+      if (
+        minimum !== undefined &&
+        maximum !== undefined &&
+        minimum <= maximum
+      ) {
+        return t("chat.clarification.starting_capital_range", {
+          minimum: formatUsdAmount(minimum),
+          maximum: formatUsdAmount(maximum),
+        });
+      }
+      if (minimum !== undefined) {
+        return t("chat.clarification.starting_capital_floor", {
+          minimum: formatUsdAmount(minimum),
+        });
+      }
+      return "";
+    }
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) =>
         optionDisplayText(option, t, display.values.reasonCode),
@@ -181,7 +207,6 @@ export function recoveryDisplayText(
       return "";
     }
     const symbol = display.values.symbol;
-    const rawValue = display.values.rawValue;
     const reasonCode = display.values.reasonCode;
     // No category: nothing was recognized as a rule, so ask for one.
     const ruleMissing = !reasonCode || reasonCode === "unsupported_constraint";
@@ -189,15 +214,10 @@ export function recoveryDisplayText(
       ? symbol
         ? "chat.clarification.unsupported_recovery_incomplete_for_asset"
         : "chat.clarification.unsupported_recovery_incomplete"
-      : rawValue
-        ? symbol
-          ? "chat.clarification.unsupported_recovery_with_raw_value_for_asset"
-          : "chat.clarification.unsupported_recovery_with_raw_value"
-        : symbol
-          ? "chat.clarification.unsupported_recovery_for_asset"
-          : "chat.clarification.unsupported_recovery";
+      : symbol
+        ? "chat.clarification.unsupported_recovery_for_asset"
+        : "chat.clarification.unsupported_recovery";
     return t(key, {
-      rawValue,
       symbol,
       options: optionsText,
     });
@@ -250,12 +270,15 @@ function unsupportedRecoveryDisplay(
     return null;
   }
   const facts = recordOrNull(intent.facts);
+  const reasonCode = unsupportedReasonCode(facts);
+  const bounds = unsupportedNumericBounds(facts, reasonCode);
   return {
     kind: "unsupported_recovery",
     values: {
-      reasonCode: unsupportedReasonCode(facts),
+      reasonCode,
       rawValue: unsupportedRawValue(facts),
       symbol: primarySymbol(recordOrNull(facts?.strategy)),
+      ...bounds,
       options,
     },
   };
@@ -586,13 +609,16 @@ function unsupportedRecoveryDisplayFromClarification(
   }
   const payload = recordOrNull(clarification.payload);
   const rawValue = stringOrNull(payload?.raw_value);
+  const reasonCode = stringOrNull(clarification.reason_code) ?? undefined;
+  const bounds = unsupportedNumericBounds(payload, reasonCode, true);
   return {
     kind: "unsupported_recovery",
     values: {
-      reasonCode: stringOrNull(clarification.reason_code) ?? undefined,
+      reasonCode,
       rawValue:
         rawValue && !looksLikeInternalCode(rawValue) ? rawValue : undefined,
       symbol: primarySymbol(recordOrNull(payload?.strategy)),
+      ...bounds,
       options,
     },
   };
@@ -611,6 +637,47 @@ function unsupportedReasonCode(
     }
   }
   return undefined;
+}
+
+function unsupportedNumericBounds(
+  source: Record<string, unknown> | null,
+  reasonCode: string | undefined,
+  direct = false,
+): { minimum?: number; maximum?: number } {
+  if (reasonCode !== "unsupported_starting_capital" || !source) {
+    return {};
+  }
+  let boundsSource = source;
+  if (!direct) {
+    const constraints = Array.isArray(source.unsupported_constraints)
+      ? source.unsupported_constraints
+      : [];
+    const constraint = constraints
+      .map((item) => recordOrNull(item))
+      .find(
+        (item) =>
+          stringOrNull(item?.category) === "unsupported_starting_capital",
+      );
+    if (!constraint) {
+      return {};
+    }
+    boundsSource = constraint;
+  }
+  const minimum = finiteNumberOrNull(boundsSource.minimum);
+  if (minimum === null) {
+    return {};
+  }
+  if (!Object.hasOwn(boundsSource, "maximum")) {
+    return { minimum };
+  }
+  const maximum = finiteNumberOrNull(boundsSource.maximum);
+  if (maximum === null || minimum > maximum) {
+    return {};
+  }
+  return {
+    minimum,
+    maximum,
+  };
 }
 
 function strategyValues(value: unknown): Record<string, string> | undefined {
@@ -709,6 +776,15 @@ function looksLikeInternalCode(value: string): boolean {
   }
   // Sentence punctuation marks an explanation, not a name (mirrors backend).
   return value.trimEnd().endsWith(".") || value.includes(". ");
+}
+
+function formatUsdAmount(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function canonicalJson(value: unknown): string {

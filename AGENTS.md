@@ -27,6 +27,70 @@ Before making code changes, agents must review these source-of-truth docs in thi
 > [!IMPORTANT]
 > If code contradicts these docs, assume the docs represent intended Alpha direction unless implementation constraints prove otherwise.
 
+# 🧠 The Split-Brain Rule (Founder-Locked 2026-08-12)
+
+**Ask of every change: who else holds this fact, and what forces them to agree?**
+
+This is the single question that generates most of Argus's defects. Not "is it
+tested." A duplicated fact that is tested is still duplicated; the test merely
+pins today's agreement, and the copies drift the Tuesday someone touches one.
+
+Ten defects found on 2026-08-12, the day Argus first had real users, were all
+one shape: the same fact living in two places with nothing forcing them to
+agree.
+
+| Defect | The two brains |
+| :--- | :--- |
+| #483 | The turn summary knows the asset; the missing-fields check does not |
+| #475 | `argus-api` caches market data 12 hours; `argus-backtests` does not cache |
+| #455 | `recurring_contribution or starting_capital`, one field standing in for another |
+| #480 | Guest identity and permanent identity, so a signup reads as an email change |
+| #453 | The interpreter's raw value and the typed projection it should have become |
+| #459 | Supabase's dashboard owns 13 email templates; our code owns a 14th |
+| #470 | Render declared `arguschat.ai`; the repo declared `onrender.com` |
+| #438 | A flag in the release profile that `render.yaml` never declared |
+| n/a | The em dash rule in `.agent/rules`, enforced in one prompt out of many |
+| n/a | A test asserting a two-service deploy step while three services were live |
+
+None were regressions. Every one had existed for weeks and had simply never
+been executed by a person.
+
+## How to satisfy it
+
+**One owner, everything else derives.** Not two implementations kept in sync,
+and not a test asserting they match. A single source that others read.
+
+Worked examples in this repo:
+
+- PR #477 clamps the data window inside the shared resolution that both
+  preflight and worker call, so they cannot disagree.
+- PR #446 **deleted** `user_phrase` rather than giving it a language parameter,
+  so the domain layer can no longer format prose at all.
+- PR #472 introduced one shared `LOCAL_QA_CAPTCHA_TOKEN` rather than a second
+  literal.
+- PR #443 needed twelve review rounds because each one moved the guard to a
+  better place while the truth it checked stayed split across the route's reads,
+  the transcript, and the job tables. Only "one liveness oracle every reader
+  derives from" could ever have worked.
+
+## The tells
+
+Reach for this rule the moment you see any of these:
+
+- A fallback like `a or b`, which makes one value silently become another.
+- A second cache, a second config file, or a second template store.
+- A rule written in prose that some code paths enforce and others do not.
+- A test that asserts two things match, rather than a structure that makes a
+  mismatch unrepresentable.
+- Any fact that lives both in this repo and in a dashboard nobody diffs.
+
+## The related rule
+
+Fix the macro pattern, not the flagged line, and treat recurrence as proof the
+previous fix was at the wrong altitude. Two rounds on one theme is the trigger,
+not three. **The tell is a fix that enumerates:** adding the fourth field or the
+third known-bad string means the next unenumerated case is already waiting.
+
 # 🎯 Alpha Product Truth
 
 **Argus Alpha Priorities:**

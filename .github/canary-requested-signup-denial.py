@@ -1,28 +1,23 @@
 #!/usr/bin/env python3
-"""Probe that the deployed API denies a requested private-alpha signup."""
+"""Probe that the deployed API denies an explicitly disabled signup email."""
 
 from __future__ import annotations
 
 import json
 import os
-import secrets
 import sys
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-PROBE = "requested_signup_denial"
+PROBE = "disabled_signup_denial"
 ATTEMPTS = 2
 TIMEOUT_SECONDS = 20
-EXPECTED_STATUS = 400
-EXPECTED_CODE = "auth_signup_failed"
-# The deployed handler rejects a requested-role email before it reaches the
-# captcha, so this token is never verified and must never be a real one.
-PLACEHOLDER_CAPTCHA_TOKEN = "argus-canary-denial-probe-unverified"
+EXPECTED_STATUS = 200
 REQUIRED_ENV = (
     "CANARY_REQUESTED_SIGNUP_DENIAL_API_URL",
     "CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL",
-    "CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE",
+    "CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN",
 )
 
 
@@ -42,25 +37,23 @@ def _response_payload(body: bytes) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def _signup_body(values: dict[str, str]) -> bytes:
+def _policy_body(values: dict[str, str]) -> bytes:
     return json.dumps(
-        {
-            "email": values["CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL"],
-            # A single-use random password keeps a regressed denial from
-            # leaving a guessable account behind.
-            "password": secrets.token_urlsafe(32),
-            "captcha_token": PLACEHOLDER_CAPTCHA_TOKEN,
-            "language": values["CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE"],
-        }
+        {"email": values["CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL"]}
     ).encode("utf-8")
 
 
 def _request_denial(values: dict[str, str]) -> tuple[int, dict[str, Any]]:
     api_url = values["CANARY_REQUESTED_SIGNUP_DENIAL_API_URL"].rstrip("/")
     request = Request(
-        f"{api_url}/api/v1/auth/signup",
-        data=_signup_body(values),
-        headers={"Content-Type": "application/json"},
+        f"{api_url}/api/v1/internal/canary/requested-signup-denial",
+        data=_policy_body(values),
+        headers={
+            "Authorization": (
+                f"Bearer {values['CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN']}"
+            ),
+            "Content-Type": "application/json",
+        },
         method="POST",
     )
     try:
@@ -87,18 +80,18 @@ def main() -> int:
             )
             continue
 
-        code = payload.get("code")
-        if status == EXPECTED_STATUS and code == EXPECTED_CODE:
+        denied = payload.get("denied")
+        if status == EXPECTED_STATUS and denied is True:
             print(
                 f"canary_probe={PROBE} attempt={attempt} result=passed "
-                f"status={status} code={code}"
+                f"status={status} denied=true"
             )
             return 0
         # A reachable API that answers anything else is a real signal, so it is
         # reported once instead of being retried into ambiguity.
         print(
             f"canary_probe={PROBE} attempt={attempt} result=unexpected_response "
-            f"status={status} code={code!r}"
+            f"status={status} denied={denied!r}"
         )
         return 1
 

@@ -92,18 +92,6 @@ def _to_date(value: str | date | datetime) -> date:
     return value
 
 
-def _periods_per_year(timeframe: str) -> float:
-    mapping = {
-        "1D": 252.0,
-        "1h": 24.0 * 365.0,
-        "2h": 12.0 * 365.0,
-        "4h": 6.0 * 365.0,
-        "6h": 4.0 * 365.0,
-        "12h": 2.0 * 365.0,
-    }
-    return mapping[timeframe]
-
-
 def _vbt_freq(timeframe: str) -> str:
     mapping = {
         "1D": "1D",

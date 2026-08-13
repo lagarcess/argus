@@ -23,7 +23,7 @@ def test_canary_defaults_to_private_launch_urls() -> None:
     assert 'APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"' in source
     assert 'API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"' in source
     assert (
-        'ARGUS_PRIVATE_LAUNCH_APP_URL="https://argus-app-suz5.onrender.com"' in env_source
+        'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
     )
     assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"' in env_source
 
@@ -83,14 +83,11 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert '"$SCRIPT_DIR/render-env-sync.sh" api-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" web-deploy-status' in source
     assert '"$SCRIPT_DIR/render-env-sync.sh" workflow-version-status' in source
-    assert '"$SCRIPT_DIR/render-env-sync.sh" cron-deploy-status' in source
     assert 'fail_canary "deploy_status" "api_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "web_deploy_sha_mismatch"' in source
     assert 'fail_canary "deploy_status" "workflow_version_commit_mismatch"' in source
-    assert 'fail_canary "deploy_status" "workflow_version_id_mismatch"' in source
-    assert 'fail_canary "deploy_status" "cron_status_unavailable"' in source
-    assert 'fail_canary "deploy_status" "cron_deploy_not_live"' in source
-    assert 'fail_canary "deploy_status" "api_cron_deploy_sha_mismatch"' in source
+    assert 'fail_canary "deploy_status" "workflow_version_id_missing"' in source
+    assert "workflow_commit_matches_candidate" in source
     assert 'fail_canary "release_profile" "release_profile_hash_mismatch"' in source
     assert "extract_warmup_value env_fingerprint" in source
     assert "extract_warmup_value workflow_env_fingerprint" in source
@@ -98,8 +95,8 @@ def test_canary_requires_exact_candidate_deploys_and_warmup_profile() -> None:
     assert "extract_warmup_value workflow_runtime_proof" in source
     assert "canary_expected_sha=$CANDIDATE_SHA" in source
     assert "canary_checked_out_sha=$CHECKED_OUT_SHA" in source
-    assert "canary_cron_deploy_status=$CRON_DEPLOY_STATUS" in source
-    assert "canary_cron_deploy_sha=$CRON_DEPLOY_SHA" in source
+    assert "cron-deploy-status" not in source
+    assert "canary_cron_deploy" not in source
 
 
 def test_canary_language_and_inputs_are_profile_owned() -> None:
@@ -154,7 +151,7 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     assert "signup_identity_is_safe" in shell_source
     assert "prepare_signup_identity" in shell_source
     assert "delete_signup_auth_identity" in shell_source
-    assert "insert_requested_signup_allowlist" in shell_source
+    assert "insert_disabled_signup_allowlist" in shell_source
     assert "cleanup_signup_identity" in shell_source
     assert "trap cleanup EXIT" in shell_source
 
@@ -162,7 +159,7 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
         "\n}", 1
     )[0]
     assert prepare_body.index("delete_signup_auth_identity") < prepare_body.index(
-        "insert_requested_signup_allowlist"
+        "insert_disabled_signup_allowlist"
     )
 
     cleanup_body = shell_source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
@@ -170,6 +167,12 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     assert cleanup_body.index("cleanup_signup_identity") < cleanup_body.index(
         'rm -f "$BROWSER_AUTH_CURL_CONFIG"'
     )
+
+    delete_body = shell_source.split("delete_signup_auth_identity() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    assert delete_body.count("collect_signup_auth_user_ids") == 2
+    assert '[ ! -s "$SIGNUP_AUTH_USER_IDS" ]' in delete_body
 
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
     assert main_body.index("signup_identity_is_safe") < main_body.index(
@@ -180,23 +183,24 @@ def test_canary_prepares_and_always_cleans_a_pinned_signup_identity() -> None:
     )
 
 
-def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
+def test_canary_denies_disabled_signup_before_atomic_enablement() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
     main_body = shell_source.split('if [ -z "$EMAIL" ]; then', 1)[1]
 
-    assert '"role": "requested"' in shell_source
-    assert "run_requested_signup_denial_canary" in shell_source
+    assert '"role": "user"' in shell_source
+    assert '"disabled_at":' in shell_source
+    assert "run_disabled_signup_denial_canary" in shell_source
     assert "verify_no_signup_auth_identity" in shell_source
-    assert "promote_requested_signup_allowlist" in shell_source
-    assert "role=eq.requested" in shell_source
-    assert "disabled_at=is.null" in shell_source
-    assert '"role":"user"' in shell_source
+    assert "enable_disabled_signup_allowlist" in shell_source
+    assert "role=eq.user" in shell_source
+    assert "disabled_at=not.is.null" in shell_source
+    assert '-d \'{"disabled_at":null}\'' in shell_source
 
     assert main_body.index("prepare_signup_identity") < main_body.index(
-        "run_requested_signup_denial_canary"
+        "run_disabled_signup_denial_canary"
     ) < main_body.index("verify_no_signup_auth_identity") < main_body.index(
-        "promote_requested_signup_allowlist"
+        "enable_disabled_signup_allowlist"
     ) < main_body.index("run_browser_canary")
 
     assert "ARGUS_CANARY_BROWSER_PHASE" in runner_source
@@ -208,20 +212,24 @@ def test_canary_denies_requested_signup_before_atomic_promotion() -> None:
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
 
 
-def test_requested_signup_denial_probes_the_api_instead_of_the_browser() -> None:
+def test_disabled_signup_denial_probes_policy_instead_of_signup() -> None:
     shell_source = _source(".github/canary-render.sh")
-    denial_body = shell_source.split("run_requested_signup_denial_canary() {", 1)[
+    denial_body = shell_source.split("run_disabled_signup_denial_canary() {", 1)[
         1
     ].split("\n}", 1)[0]
 
     assert "canary-requested-signup-denial.py" in denial_body
     assert 'CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL"' in denial_body
     assert 'CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL"' in denial_body
-    assert 'CANARY_REQUESTED_SIGNUP_DENIAL_LANGUAGE="$LANGUAGE"' in denial_body
-    assert "env -u SUPABASE_SERVICE_ROLE_KEY" in denial_body
+    assert 'CANARY_REQUESTED_SIGNUP_DENIAL_OPS_TOKEN="$OPS_TOKEN"' in denial_body
+    assert "env -u ARGUS_OPS_TOKEN" in denial_body
+    assert "-u SUPABASE_SERVICE_ROLE_KEY" in denial_body
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in denial_body
     assert "run_browser_canary_phase" not in denial_body
     assert "access-denial" not in shell_source
+    assert "/api/v1/auth/signup" not in _source(
+        ".github/canary-requested-signup-denial.py"
+    )
 
 
 def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:

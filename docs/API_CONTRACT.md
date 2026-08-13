@@ -1447,6 +1447,43 @@ Metrics are grouped into categories.
 }
 ```
 
+`win_rate` and `profit_factor` are nullable closed-trade metrics. A completed
+trade is one canonical long-only position with an executed open fill and an
+executed close fill. Open positions do not enter either metric. `win_rate` is
+winning completed trades divided by all completed trades, so a breakeven trade
+is closed but is not a win. `profit_factor` is gross positive realized P&L
+divided by absolute gross negative realized P&L after modeled fees and
+slippage. It is `null` when there are no completed trades or no losing trade,
+and it is `0.0` when completed trades lose money without any winning trade.
+`total_trades` retains its existing executed-fill meaning; it is not a count of
+completed positions. If a close and a new open share one timestamp, the
+canonical ledger applies the close before the open. The same ordered fills own
+both portfolio equity and closed-trade P&L.
+
+For example, an open buy-and-hold position persists:
+
+```json
+{
+  "win_rate": null,
+  "total_trades": 1,
+  "profit_factor": null
+}
+```
+
+Annual return uses the elapsed calendar time between the first and last
+effective market-data timestamps, with 365.2425 calendar days per year.
+Irregular gaps therefore remain elapsed time instead of being compressed into
+adjacent observations. `annualized_return_pct` is `null` when a valid, extreme
+short-window return cannot be represented as a finite annual rate. Volatility
+and Sharpe use one asset-aware observation
+frequency owned by the market-data coverage boundary: crypto uses continuous
+24/7 time, currency pairs use the current provider's continuous calendar, and
+equities use 252 sessions plus the real session durations supplied by the same
+market calendar, including early closes and provider-emitted partial final
+candles. Daily equity uses 252 observations per year. This time-basis correction
+does not redefine DCA contribution-return semantics; that remains a separate
+metric-contract decision.
+
 ## Benchmark Defaults
 - **equity** -> `SPY`
 - **crypto** -> `BTC`
@@ -3018,8 +3055,7 @@ Example unsupported-recovery clarification payload:
       "strategy": {
         "asset_universe": ["TSLA"],
         "asset_class": "equity"
-      },
-      "raw_value": "ATR 14"
+      }
     },
     "options": [
       {
@@ -3038,6 +3074,43 @@ Example unsupported-recovery clarification payload:
   }
 }
 ```
+
+### Cause-aware unsupported recovery
+
+`unsupported_recovery` is an additive typed projection. Its cause determines
+both the recovery route and the facts available to deterministic fallback copy:
+
+- A surviving `unsupported_strategy_logic` capability constraint may use
+  `unsupported_recovery` with supported simplification options. Only this
+  capability route may say that Argus cannot run a strategy.
+- Incomplete or unparseable extraction is a normal clarification outcome. It
+  asks for the missing executable detail and must not be represented as a
+  strategy-capability refusal.
+- `unsupported_starting_capital` is a launch-validation range outcome, not a
+  strategy-capability refusal. It asks for a starting-capital amount before a
+  confirmation card or acknowledgement is emitted.
+- `capital_amount` remains role-sensitive at launch validation. For DCA it is
+  the recurring contribution, so an invalid DCA contribution routes to the
+  normal sizing clarification and never inherits the one-time bankroll floor.
+
+`raw_value` may remain in runtime records as opaque diagnostic or interpreter
+evidence. It is never a generic display subject and is not included in the
+generic clarifier voice input, `assistant_prompt`, or deterministic fallback
+copy. A generic capability recovery instead speaks about the typed capability
+and its supported options.
+
+For `unsupported_starting_capital`, `payload.minimum` is a typed finite number
+and `payload.maximum` is an optional typed finite number. A finite minimum
+alone is a valid floor projection. When a maximum is present, the projection
+emits both bounds only if both are finite and ordered with `minimum <= maximum`;
+missing minimum, malformed, non-finite, or reversed pairs fail closed by
+omitting the numeric bounds and using the generic starting-capital prompt.
+
+`unsupported_time_granularity` is the dedicated typed exception. Its typed bar
+size may be supplied to the clarifier and displayed in the bar-size recovery,
+because it names the specific timeframe field rather than a generic strategy
+or interpretation value. This exception does not permit other `raw_value`
+fields to become clarifier voice input or display text.
 
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
