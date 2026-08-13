@@ -251,6 +251,20 @@ def test_classifier_marks_top_level_object_removal_destructive(source: str) -> N
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        "do $$ begin delete from public.rows; end $$;",
+        "do $migration$ begin perform public.rebuild_rows(); end $migration$;",
+    ],
+)
+def test_classifier_marks_executable_do_blocks_destructive(source: str) -> None:
+    assert classify_migration(source) == (
+        "destructive",
+        "maintenance_backup_and_founder_approval_required",
+    )
+
+
+@pytest.mark.parametrize(
     ("source", "classification"),
     [
         (

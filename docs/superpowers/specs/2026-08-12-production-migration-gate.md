@@ -59,9 +59,12 @@ until production records them as applied.
 The classifier strips comments, quoted values, and dollar-quoted function
 bodies before examining top-level statements. It uses a strict additive
 allowlist. Data deletion, truncation, or object removal is destructive.
-Replacement, permission removal, data rewrites, and other non-additive or
-unrecognized statements are contract-replacing. This biases ambiguous SQL
-toward a safer operator review.
+Executable top-level `DO` blocks are also destructive by construction because
+their stripped procedural body can perform arbitrary live changes. Stored
+function bodies remain excluded because defining a function does not execute
+its body during the migration. Replacement, permission removal, data rewrites,
+and other non-additive or unrecognized statements are contract-replacing. This
+biases ambiguous SQL toward a safer operator review.
 
 The report maps classifications to requirements:
 

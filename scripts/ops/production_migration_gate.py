@@ -629,7 +629,9 @@ def _dollar_tag_at(source: str, index: int) -> str | None:
 
 def _is_destructive(statement: str) -> bool:
     return bool(
-        re.search(r"\b(?:truncate|delete\s+from)\b", statement)
+        statement == "do"
+        or statement.startswith("do ")
+        or re.search(r"\b(?:truncate|delete\s+from)\b", statement)
         or re.search(r"\bdrop\b", statement)
     )
 
