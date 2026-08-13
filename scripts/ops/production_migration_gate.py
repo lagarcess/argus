@@ -35,6 +35,9 @@ _RENDER_PATH = "render.yaml"
 _MIGRATION_APPLY = "never"
 # Production history was hand-reconciled through this pre-gate migration.
 _LEDGER_RECONCILIATION_THROUGH = "20260811210000"
+_RECONCILED_CANDIDATE_CATALOG_SHA256 = (
+    "f05cf5738ce8b6e0ad74ce2b4b77d773387bc5421bab3a101448241b5431e2c2"
+)
 
 
 class MigrationGateError(RuntimeError):
@@ -392,6 +395,7 @@ def build_migration_report(
     target: ProductionDatabaseTarget,
     candidate_migrations: Sequence[CandidateMigration],
     applied_migrations: Sequence[AppliedMigration],
+    reconciled_candidate_catalog_sha256: str | None = None,
 ) -> dict[str, object]:
     """Build a fail-closed comparison report for release evidence."""
 
@@ -402,6 +406,11 @@ def build_migration_report(
     applied_by_version = _unique_by_version(
         applied_migrations,
         source="production",
+    )
+    candidate_catalog_sha256 = _candidate_catalog_sha256(candidate_migrations)
+    candidate_catalog_matches_reconciliation = (
+        reconciled_candidate_catalog_sha256 is None
+        or candidate_catalog_sha256 == reconciled_candidate_catalog_sha256
     )
     historical_mappings, mapped_candidate_versions, mapped_applied_versions = (
         _historical_migration_mappings(candidate_by_version, applied_by_version)
@@ -480,7 +489,8 @@ def build_migration_report(
         0,
     )
     has_historical_variance = bool(
-        historical_mappings
+        not candidate_catalog_matches_reconciliation
+        or historical_mappings
         or historical_candidate_without_ledger_identity
         or historical_applied_without_candidate_identity
         or historical_name_drift
@@ -489,6 +499,8 @@ def build_migration_report(
     )
     stop_reasons: list[str] = []
     advisories: list[str] = []
+    if not candidate_catalog_matches_reconciliation:
+        stop_reasons.append("historical_candidate_catalog_drift")
     if missing:
         stop_reasons.append("missing_candidate_migrations")
     if has_historical_variance:
@@ -518,6 +530,10 @@ def build_migration_report(
         "content_drift": content_drift,
         "historical_ledger_variance": {
             "reconciled_through_version": _LEDGER_RECONCILIATION_THROUGH,
+            "candidate_catalog_sha256": candidate_catalog_sha256,
+            "candidate_catalog_matches_reconciliation": (
+                candidate_catalog_matches_reconciliation
+            ),
             "version_mappings": historical_mappings,
             "candidate_without_ledger_identity": (
                 historical_candidate_without_ledger_identity
@@ -584,6 +600,9 @@ def main(
     environ: Mapping[str, str] | None = None,
     repo_root: Path | None = None,
     connect_factory: ConnectFactory | None = None,
+    reconciled_candidate_catalog_sha256: str | None = (
+        _RECONCILED_CANDIDATE_CATALOG_SHA256
+    ),
 ) -> int:
     """Run the production migration gate and write its durable JSON report."""
 
@@ -651,6 +670,7 @@ def main(
             target=target,
             candidate_migrations=candidate_migrations,
             applied_migrations=applied_migrations,
+            reconciled_candidate_catalog_sha256=(reconciled_candidate_catalog_sha256),
         )
         report["landing_verification"] = (
             {
@@ -740,6 +760,26 @@ def _resolve_ssl_root_cert(value: str) -> str:
             "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT must be an absolute " "readable file"
         ) from exc
     return str(resolved)
+
+
+def _candidate_catalog_sha256(
+    candidate_migrations: Sequence[CandidateMigration],
+) -> str:
+    payload = [
+        {
+            "version": migration.version,
+            "name": migration.name,
+            "path": migration.path,
+            "sha256": migration.sha256,
+        }
+        for migration in sorted(
+            candidate_migrations,
+            key=lambda migration: migration.version,
+        )
+        if migration.version <= _LEDGER_RECONCILIATION_THROUGH
+    ]
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _historical_migration_mappings(

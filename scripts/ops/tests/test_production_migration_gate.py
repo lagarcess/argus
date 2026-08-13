@@ -207,6 +207,9 @@ def test_untracked_production_history_is_visible_without_blocking_coverage() -> 
         ),
         candidate_migrations=candidates,
         applied_migrations=applied,
+        reconciled_candidate_catalog_sha256=(
+            migration_gate._candidate_catalog_sha256(candidates)
+        ),
     )
 
     assert report["status"] == "pass"
@@ -280,6 +283,37 @@ def test_candidate_newer_than_reconciled_production_watermark_still_blocks() -> 
     ]
 
 
+def test_backdated_candidate_change_breaks_the_reconciled_catalog_fingerprint() -> None:
+    candidate = CandidateMigration.from_source(
+        "supabase/migrations/20260811000000_backdated_release_marker.sql",
+        "create table public.backdated_release_marker (id uuid primary key);",
+    )
+
+    report = build_migration_report(
+        candidate_sha="1" * 40,
+        target=ProductionDatabaseTarget(
+            project_ref="production-ref",
+            database_host="pooler.supabase.test",
+        ),
+        candidate_migrations=[candidate],
+        applied_migrations=[
+            AppliedMigration(
+                version=candidate.version,
+                name=candidate.name,
+                statements=(candidate.source,),
+            )
+        ],
+        reconciled_candidate_catalog_sha256="0" * 64,
+    )
+
+    assert report["status"] == "blocked"
+    assert report["stop_reasons"] == ["historical_candidate_catalog_drift"]
+    assert (
+        report["historical_ledger_variance"]["candidate_catalog_matches_reconciliation"]
+        is False
+    )
+
+
 def test_blank_applied_migration_name_blocks_as_drift() -> None:
     candidate = CandidateMigration.from_source(
         "supabase/migrations/20260812000000_add_release_marker.sql",
@@ -332,6 +366,9 @@ def test_same_version_and_name_with_different_statements_blocks() -> None:
         ),
         candidate_migrations=[candidate],
         applied_migrations=[applied],
+        reconciled_candidate_catalog_sha256=(
+            migration_gate._candidate_catalog_sha256([candidate])
+        ),
     )
 
     assert report["status"] == "blocked"
@@ -973,6 +1010,7 @@ def test_cli_writes_a_complete_blocking_report_without_leaking_credentials(
         },
         repo_root=repo,
         connect_factory=lambda *_args, **_kwargs: connection,
+        reconciled_candidate_catalog_sha256=None,
     )
 
     report = json.loads(output_path.read_text(encoding="utf-8"))
@@ -1042,6 +1080,7 @@ def test_cli_passes_only_when_the_production_ledger_matches(
         },
         repo_root=repo,
         connect_factory=lambda *_args, **_kwargs: connection,
+        reconciled_candidate_catalog_sha256=None,
     )
 
     report = json.loads(capsys.readouterr().out)
