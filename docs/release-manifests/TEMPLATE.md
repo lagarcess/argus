@@ -30,6 +30,7 @@ privacy-safe labels from canary evidence.
 - Gated candidate parents and intended landing method:
 - Landed `origin/main` SHA:
 - Gate-to-landed-SHA identity: exact / invalidated and rerun
+- Landed-ref verification: `--verify-landed-ref origin/main`, status and SHA
 - Sanitized production project and database host:
 - Candidate migrations, with version, name, and SHA-256:
 - Applied production migrations, with version and name:

@@ -70,22 +70,37 @@ def test_production_migration_gate_is_executable_and_precedes_service_deploy() -
         "exact would-be `main` promotion commit"
     )
     promotion_landing_index = promotion_path.index("Land only the gated candidate")
+    promotion_landed_gate_index = promotion_path.index("--verify-landed-ref origin/main")
     assert promotion_candidate_index < promotion_gate_index
     assert promotion_gate_index < promotion_landing_index
+    assert promotion_landing_index < promotion_landed_gate_index
+    assert promotion_landed_gate_index < promotion_path.index(
+        "Update the release/config contract"
+    )
+    assert promotion_landed_gate_index < promotion_path.index(
+        "Promote the live environment"
+    )
     assert promotion_gate_index < promotion_path.index(
         "Update the release/config contract"
     )
     assert promotion_gate_index < promotion_path.index("Promote the live environment")
     assert "landed `origin/main` SHA differs" in promotion_path
-    assert "rerun the gate against that landed SHA" in promotion_path
+    assert "rerun the gate against that landed SHA" in " ".join(promotion_path.split())
     runbook_gate_index = tester_gate.index(command)
     runbook_landing_index = tester_gate.index("Land or read back the candidate")
+    runbook_landed_gate_index = tester_gate.index("--verify-landed-ref origin/main")
     assert "exact would-be `main` promotion commit" in tester_gate
     assert runbook_gate_index < runbook_landing_index
+    assert runbook_landing_index < runbook_landed_gate_index
+    assert runbook_landed_gate_index < tester_gate.index("sync the Blueprint")
+    assert runbook_landed_gate_index < tester_gate.index("api-real-workflow-on")
+    assert runbook_landed_gate_index < tester_gate.index(
+        "Deploy **all three live services**"
+    )
     assert runbook_gate_index < tester_gate.index("sync the Blueprint")
     assert runbook_gate_index < tester_gate.index("api-real-workflow-on")
     assert runbook_gate_index < tester_gate.index("Deploy **all three live services**")
-    assert "rerun the gate against the landed SHA" in tester_gate
+    assert "rerun the gate against the landed SHA" in " ".join(tester_gate.split())
     assert "Production Migration Gate" in manifest
     assert "Candidate migrations" in manifest
     assert "Applied production migrations" in manifest

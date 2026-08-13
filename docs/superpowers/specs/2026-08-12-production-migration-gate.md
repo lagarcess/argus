@@ -27,6 +27,9 @@ service deploy. A runbook reminder alone is not sufficient.
 3. For a production promotion, that candidate is the exact immutable commit
    intended to land on `main`. If landing changes the SHA, the earlier report is
    invalid and the landed commit must be gated before any deploy-capable action.
+   The final gate uses `--verify-landed-ref origin/main`, fetches that branch
+   inside the executable boundary, requires it to equal the candidate, and then
+   repeats production schema parity.
 4. The database connection is supplied explicitly through
    `ARGUS_PRODUCTION_DATABASE_URL`. Dotenv discovery is forbidden.
 5. The exact candidate's existing `render.yaml` `argus-api` `SUPABASE_URL` owns
@@ -78,8 +81,10 @@ The order is fixed:
 3. If the report is blocked, stop. A human may apply approved migrations and
    rerun step 2.
 4. Land the gated candidate without rewriting it and prove `origin/main`
-   resolves to the gated SHA. If it does not, invalidate the report and rerun
-   the gate against the landed SHA while autodeploy remains manual.
+   resolves to the gated SHA with `--verify-landed-ref origin/main`. The gate
+   must fetch the ref itself; stale or unavailable remote state blocks. If the
+   SHA differs, invalidate the report and rerun the gate against the landed SHA
+   while autodeploy remains manual.
 5. Only a passing parity report for the landed candidate allows deployment of
    `argus-api`, `argus-app`, and `argus-backtests`.
 6. Continue with exact-SHA deploy, warmup, canary, and manifest evidence.

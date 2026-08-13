@@ -26,6 +26,10 @@ _MIGRATION_PATH = re.compile(
 )
 _EXACT_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _PROJECT_REF = re.compile(r"^[a-z0-9]{20}$")
+_REMOTE_BRANCH_REF = re.compile(
+    r"^(?P<remote>[A-Za-z0-9][A-Za-z0-9._-]*)/"
+    r"(?P<branch>[A-Za-z0-9][A-Za-z0-9._/-]*)$"
+)
 _RENDER_PATH = "render.yaml"
 
 
@@ -441,12 +445,25 @@ def main(
         required=True,
         help="Path for the JSON release-evidence report.",
     )
+    parser.add_argument(
+        "--verify-landed-ref",
+        metavar="REMOTE/BRANCH",
+        help=(
+            "Fetch and require this remote branch to resolve to the candidate "
+            "before reading production. Use for the final post-landing gate."
+        ),
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
     root = repo_root or Path(__file__).resolve().parents[2]
     source = os.environ if environ is None else environ
 
     try:
         _verify_checkout_head(root, args.candidate_sha)
+        landed_sha = (
+            verify_landed_ref(root, args.candidate_sha, args.verify_landed_ref)
+            if args.verify_landed_ref
+            else None
+        )
         contract = load_gate_contract(root, args.candidate_sha)
         candidate_migrations = read_candidate_migrations(
             root,
@@ -471,6 +488,15 @@ def main(
             target=target,
             candidate_migrations=candidate_migrations,
             applied_migrations=applied_migrations,
+        )
+        report["landing_verification"] = (
+            {
+                "status": "verified",
+                "remote_ref": args.verify_landed_ref,
+                "resolved_sha": landed_sha,
+            }
+            if landed_sha is not None
+            else {"status": "not_requested_pre_landing"}
         )
         exit_code = 0 if report["status"] == "pass" else 1
     except MigrationGateError as exc:
@@ -697,6 +723,49 @@ def _verify_checkout_head(repo_root: Path, candidate_sha: str) -> None:
     )
     if tracked_status.strip():
         raise MigrationGateError("checkout has tracked changes outside the candidate")
+
+
+def verify_landed_ref(
+    repo_root: Path,
+    candidate_sha: str,
+    remote_ref: str,
+) -> str:
+    """Fetch and prove a remote branch resolves to the gated candidate."""
+
+    _verify_candidate_sha(repo_root, candidate_sha)
+    match = _REMOTE_BRANCH_REF.fullmatch(remote_ref)
+    if (
+        match is None
+        or ".." in remote_ref
+        or "@{" in remote_ref
+        or "//" in remote_ref
+        or remote_ref.endswith((".", "/"))
+    ):
+        raise MigrationGateError("landed ref must use a safe REMOTE/BRANCH name")
+    remote = match.group("remote")
+    branch = match.group("branch")
+    tracking_ref = f"refs/remotes/{remote}/{branch}"
+    _run_git(
+        repo_root,
+        "fetch",
+        "--quiet",
+        "--no-tags",
+        remote,
+        f"+refs/heads/{branch}:{tracking_ref}",
+    )
+    resolved = (
+        _run_git(
+            repo_root,
+            "rev-parse",
+            "--verify",
+            f"{tracking_ref}^{{commit}}",
+        )
+        .decode("ascii", errors="strict")
+        .strip()
+    )
+    if resolved != candidate_sha:
+        raise MigrationGateError("landed ref does not match the candidate SHA")
+    return resolved
 
 
 def _read_git_file(repo_root: Path, candidate_sha: str, path: str) -> bytes:

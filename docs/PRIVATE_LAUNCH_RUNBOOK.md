@@ -117,22 +117,26 @@ manifest. Then rerun the same gate. Do not deploy until the rerun reports
 `status=pass`, and attach its JSON as durable release evidence.
 
 4. Land or read back the candidate on `main` without rewriting the gated
-   commit, then prove the landed ref is the same exact SHA:
+   commit. Keep the checkout on the gated candidate and rerun the same
+   executable gate in landed-ref mode:
 
 ```bash
-ARGUS_GATED_CANDIDATE_SHA="$ARGUS_CANDIDATE_SHA"
-git fetch origin main
-ARGUS_LANDED_MAIN_SHA="$(git rev-parse origin/main)"
-test "$ARGUS_LANDED_MAIN_SHA" = "$ARGUS_GATED_CANDIDATE_SHA"
+poetry run python scripts/ops/production_migration_gate.py \
+  --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+  --verify-landed-ref origin/main \
+  --output temp/release-evidence/production-migration-gate.json
 ```
 
-Do not continue on a failed comparison. A squash, rebase, conflict edit, new
-merge commit, or concurrent `main` update invalidates the earlier report. Keep
-all three live triggers manual, check out the exact landed commit, rerun steps
-1 and 2, then rerun the gate against the landed SHA as described in step 3 and
-replace the manifest evidence. When `checksPass` is already live, use only a
-landing method that preserves the pre-gated commit SHA; otherwise code can
-deploy before the landed tree is verified.
+The option fetches `origin/main` inside the gate and blocks before database
+access if the fetch, ref resolution, or exact-SHA comparison fails. It then
+repeats schema parity and records the landing proof in the final JSON. Do not
+continue on any nonzero result. A squash, rebase, conflict edit, new merge
+commit, or concurrent `main` update invalidates the earlier report. Keep all
+three live triggers manual, check out the exact landed commit, rerun steps 1 and
+2, then rerun the gate against the landed SHA as described in step 3 and replace
+the manifest evidence. When `checksPass` is already live, use only a landing
+method that preserves the pre-gated commit SHA; otherwise code can deploy before
+the landed tree is verified.
 
 > [!WARNING]
 > **A Blueprint sync enables autodeploy after #470.** The repository declares

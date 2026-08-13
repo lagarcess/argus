@@ -19,6 +19,7 @@ from scripts.ops.production_migration_gate import (
     read_applied_migrations,
     read_candidate_migrations,
     resolve_production_target,
+    verify_landed_ref,
 )
 
 
@@ -459,11 +460,26 @@ def test_cli_passes_only_when_the_production_ledger_matches(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "push", "-q", "origin", "HEAD:main"],
+        cwd=repo,
+        check=True,
+    )
     output_path = tmp_path / "migration-gate.json"
     connection = _FakeConnection([("20260812000000", "add_release_marker")])
 
     exit_code = main(
-        ["--candidate-sha", candidate_sha, "--output", str(output_path)],
+        [
+            "--candidate-sha",
+            candidate_sha,
+            "--verify-landed-ref",
+            "origin/main",
+            "--output",
+            str(output_path),
+        ],
         environ={
             "ARGUS_PRODUCTION_DATABASE_URL": (
                 "postgresql://postgres:do-not-print@"
@@ -478,7 +494,112 @@ def test_cli_passes_only_when_the_production_ledger_matches(
     assert exit_code == 0
     assert report["status"] == "pass"
     assert report["missing_migrations"] == []
+    assert report["landing_verification"] == {
+        "status": "verified",
+        "remote_ref": "origin/main",
+        "resolved_sha": candidate_sha,
+    }
     assert json.loads(output_path.read_text(encoding="utf-8")) == report
+
+
+def test_verify_landed_ref_fetches_the_remote_before_comparing(tmp_path: Path) -> None:
+    repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "push", "-q", "origin", "HEAD:main"],
+        cwd=repo,
+        check=True,
+    )
+
+    assert verify_landed_ref(repo, candidate_sha, "origin/main") == candidate_sha
+
+
+def test_cli_blocks_when_the_fresh_landed_ref_differs(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "push", "-q", "origin", "HEAD:main"],
+        cwd=repo,
+        check=True,
+    )
+    (repo / "README.md").write_text("advanced remote\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "advance remote"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "push", "-q", "origin", "HEAD:main"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(["git", "checkout", "-q", candidate_sha], cwd=repo, check=True)
+
+    exit_code = main(
+        [
+            "--candidate-sha",
+            candidate_sha,
+            "--verify-landed-ref",
+            "origin/main",
+            "--output",
+            str(tmp_path / "migration-gate.json"),
+        ],
+        environ={
+            "ARGUS_PRODUCTION_DATABASE_URL": (
+                "postgresql://postgres:do-not-print@"
+                f"db.{'a' * 20}.supabase.co:5432/postgres"
+            )
+        },
+        repo_root=repo,
+        connect_factory=lambda *_args, **_kwargs: pytest.fail(
+            "database access must not start"
+        ),
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert report["error"] == "landed ref does not match the candidate SHA"
+
+
+def test_cli_blocks_when_the_landed_ref_cannot_be_fetched(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo, candidate_sha = _candidate_repo(tmp_path, project_ref="a" * 20)
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(tmp_path / "missing.git")],
+        cwd=repo,
+        check=True,
+    )
+
+    exit_code = main(
+        [
+            "--candidate-sha",
+            candidate_sha,
+            "--verify-landed-ref",
+            "origin/main",
+            "--output",
+            str(tmp_path / "migration-gate.json"),
+        ],
+        environ={
+            "ARGUS_PRODUCTION_DATABASE_URL": (
+                "postgresql://postgres:do-not-print@"
+                f"db.{'a' * 20}.supabase.co:5432/postgres"
+            )
+        },
+        repo_root=repo,
+        connect_factory=lambda *_args, **_kwargs: pytest.fail(
+            "database access must not start"
+        ),
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert report["error"] == "Git candidate read failed: git fetch"
 
 
 def test_cli_redacts_database_failures_and_writes_a_blocked_report(

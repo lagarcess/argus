@@ -254,12 +254,24 @@ Use the following progression when moving from integration to `main`:
 6. Record the release manifest, including the migration-gate report, workflow
    task selection, and env fingerprint.
 7. Land only the gated candidate on `main`, without rewriting it, then fetch
-   `origin/main` and prove it resolves to the recorded gate candidate SHA. If
-   the landed `origin/main` SHA differs, the report is invalid: stop every
-   deploy-capable action, keep autodeploy manual, check out the landed commit,
-   and rerun the gate against that landed SHA. Replace the manifest evidence
-   before continuing. When `checksPass` is already live, only a landing method
-   that preserves the pre-gated SHA is allowed.
+   and prove `origin/main` resolves to the recorded gate candidate SHA by
+   rerunning the executable gate in landed-ref mode:
+
+   ```bash
+   poetry run python scripts/ops/production_migration_gate.py \
+     --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+     --verify-landed-ref origin/main \
+     --output temp/release-evidence/production-migration-gate.json
+   ```
+
+   This mode fetches the remote branch itself and fails before database access
+   if the fetch or exact-SHA comparison fails. It then repeats schema parity, so
+   the final report binds both proofs. If the landed `origin/main` SHA differs,
+   the report is invalid: stop every deploy-capable action, keep autodeploy
+   manual, check out the landed commit, and rerun the gate against that landed
+   SHA. Replace the manifest evidence before continuing. When `checksPass` is
+   already live, only a landing method that preserves the pre-gated SHA is
+   allowed.
 8. Update the release/config contract for the target environment.
 9. Promote the live environment so `argus-backtests` runs the intended task
    (`workflow_proof` for proof validation or `run_backtest_job` for real
