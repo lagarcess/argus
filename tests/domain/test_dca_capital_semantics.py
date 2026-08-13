@@ -957,3 +957,35 @@ def test_the_ceiling_refusal_has_one_identity_every_reader_derives_from() -> Non
         unsupported_constraints=[{"category": UNSUPPORTED_DCA_CONTRIBUTION_CEILING}],
     )
     assert deferred == []
+
+
+def test_the_interpreter_prompt_gives_each_money_role_exactly_one_field() -> None:
+    """The prompt cannot offer a choice of field once the field decides the outcome.
+
+    A seed executes and a cap is refused, and which happens is decided by which
+    field the value lands in. While the prompt said a starting principal could
+    go in `initial_capital` *or* `total_capital`, the same words could produce
+    either outcome, so the split this lane introduced was only as reliable as
+    one model's coin flip.
+    """
+    import re
+
+    from argus.agent_runtime import llm_interpreter
+
+    source = pathlib.Path(llm_interpreter.__file__).read_text(encoding="utf-8")
+    # The prompt is written as adjacent string literals, so the assembled text
+    # is what the model reads and what this must assert against.
+    assembled = re.sub(r'"\s*\n\s*"', "", source)
+    guidance = assembled[
+        assembled.index("For DCA, ") : assembled.index("When you set cadence")
+    ]
+
+    # Each role has a destination, and neither destination is optional.
+    assert "initial_capital" in guidance
+    assert "total_capital" in guidance
+    assert "never put one in the other" in guidance
+    for ambiguous in (
+        "initial_capital or total_capital",
+        "total_capital or initial_capital",
+    ):
+        assert ambiguous not in guidance, ambiguous
