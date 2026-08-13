@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import pathlib
 from datetime import date
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -434,3 +435,98 @@ def test_an_unsupported_period_is_refused_rather_than_reported_as_applied() -> N
         )
         assert resolved.cadence == value
         assert resolved.unsupported == []
+
+
+def test_no_card_producer_lets_the_two_roles_collapse() -> None:
+    """One invariant over every path that can mint a recurring card.
+
+    The AST guard catches a cross-role read inside one expression. It cannot
+    catch a field whose *meaning* changed while some writer kept filling it the
+    old way, which is how retest came to fund a plan twice. This drives each
+    producer with a seed and a contribution that are deliberately different and
+    asserts neither ever shows up as the other.
+    """
+    from argus.agent_runtime.confirmation_direct_edit import (
+        direct_edit_confirmation_preparation,
+    )
+    from argus.agent_runtime.retest_confirmation import retest_confirmation_payload
+    from argus.api.chat.confirmation import runtime_confirmation_card
+    from argus.domain.retest_setup import RetestSetup
+
+    SEED, CONTRIBUTION = 7_500.0, 200.0
+    window = {"start": "2024-01-02", "end": "2024-12-31"}
+    strategy = {
+        "strategy_type": "dca_accumulation",
+        "asset_universe": ["AAPL"],
+        "asset_class": "equity",
+        "cadence": "monthly",
+        "capital_amount": CONTRIBUTION,
+        "date_range": dict(window),
+        "extra_parameters": {"field_provenance": {"cadence": "explicit_user"}},
+    }
+
+    produced: dict[str, dict[str, Any]] = {}
+
+    # 1. The conversational path, through the card builder every turn uses.
+    produced["conversational"] = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "confirmation_id": "confirmation-roles",
+                "strategy": strategy,
+                "optional_parameters": {
+                    "initial_capital": {"value": SEED, "source": "user"},
+                },
+                "launch_payload": {"sizing_mode": "capital_amount"},
+            },
+        }
+    )["display_facts"]
+
+    # 2. The typed no-turn edit path.
+    prepared = direct_edit_confirmation_preparation(
+        {
+            "strategy": strategy,
+            "launch_payload": {"sizing_mode": "capital_amount"},
+            "optional_parameters": {},
+        },
+        capital=None,
+        date_window=None,
+        starting_capital=SEED,
+        recurring_contribution=CONTRIBUTION,
+    )
+    assert prepared.confirmation_payload is not None, prepared.error_code
+    launch = prepared.confirmation_payload["launch_payload"]
+    produced["direct_edit"] = {
+        "starting_capital": launch["starting_capital"],
+        "recurring_contribution": launch["recurring_contribution"],
+    }
+
+    # 3. The retest path, rebuilt from a stored run.
+    retest = retest_confirmation_payload(
+        RetestSetup(
+            source_run_id="run-roles",
+            strategy_type="dca_accumulation",
+            symbols=("AAPL",),
+            asset_class="equity",
+            timeframe="1D",
+            original_start=date(2024, 1, 2),
+            original_end=date(2024, 6, 28),
+            start=date(2024, 1, 2),
+            end=date(2024, 12, 31),
+            sizing_mode="capital_amount",
+            benchmark_symbol="SPY",
+            capital_amount=CONTRIBUTION,
+            cadence="monthly",
+            recurring_contribution=CONTRIBUTION,
+            starting_capital=SEED,
+        ),
+        language="en",
+    )
+    produced["retest"] = {
+        "starting_capital": retest["launch_payload"]["starting_capital"],
+        "recurring_contribution": retest["launch_payload"]["recurring_contribution"],
+    }
+
+    for producer, facts in produced.items():
+        assert facts["starting_capital"] == SEED, producer
+        assert facts["recurring_contribution"] == CONTRIBUTION, producer
