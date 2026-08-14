@@ -10,8 +10,8 @@ from tests.evals.measurement_eval_harness import (
     LOCKED_EVAL_CATEGORIES,
     PROSE_JUDGE_RUBRIC_VERSION,
     load_eval_cases,
-    scorecard_for_results,
 )
+from tests.evals.measurement_eval_scorecard import measurement_fixture_case_ids
 
 EXPECTED_LOCKED_CATEGORIES = {
     "messy_english",
@@ -51,6 +51,7 @@ def _walk(value: Any) -> list[tuple[str, Any]]:
 def test_measurement_fixtures_cover_locked_categories_as_data() -> None:
     cases = load_eval_cases()
 
+    assert tuple(case.id for case in cases) == measurement_fixture_case_ids()
     assert LOCKED_EVAL_CATEGORIES == EXPECTED_LOCKED_CATEGORIES
     assert {case.category for case in cases} == EXPECTED_LOCKED_CATEGORIES
     assert {path.stem for path in FIXTURE_DIR.glob("*.yaml")} == (
@@ -1101,6 +1102,74 @@ def test_prose_judge_cases_fail_when_assistant_text_is_missing(monkeypatch: Any)
     assert result["prose_judge"]["failed_criteria"] == ["missing_assistant_text"]
 
 
+def test_prose_judge_route_receipt_is_included_in_case_cost_evidence(
+    monkeypatch: Any,
+) -> None:
+    case = harness.EvalCase(
+        id="prose-judge-cost",
+        category="messy_english",
+        prompt="Explain this simply",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="conversation_followup",
+            capability_verdict="answer_only",
+        ),
+        prose_judge_criteria=("plain_language",),
+    )
+    active_receipts: list[SimpleNamespace] | None = None
+
+    def begin_capture() -> object:
+        nonlocal active_receipts
+        assert active_receipts is None
+        active_receipts = []
+        return object()
+
+    def end_capture(_token: object) -> list[SimpleNamespace]:
+        nonlocal active_receipts
+        assert active_receipts is not None
+        captured = active_receipts
+        active_receipts = None
+        return captured
+
+    def record_receipt(task: str) -> None:
+        assert active_receipts is not None
+        active_receipts.append(
+            SimpleNamespace(as_dict=lambda: {"task": task, "usage_cost_usd": 0.01})
+        )
+
+    def interpret_stage(**_kwargs: Any) -> SimpleNamespace:
+        record_receipt("interpret")
+        return SimpleNamespace(
+            outcome="ready_to_respond",
+            patch={
+                "intent": "conversation_followup",
+                "assistant_response": "A short, plain explanation.",
+            },
+        )
+
+    def judge_prose_quality(**_kwargs: Any) -> dict[str, Any]:
+        record_receipt("prose_judge")
+        return {
+            "pass": True,
+            "failed_criteria": [],
+            "notes": "",
+            "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
+        }
+
+    monkeypatch.setattr(harness, "begin_openrouter_route_receipt_capture", begin_capture)
+    monkeypatch.setattr(harness, "end_openrouter_route_receipt_capture", end_capture)
+    monkeypatch.setattr(harness, "interpret_stage", interpret_stage)
+    monkeypatch.setattr(harness, "judge_prose_quality", judge_prose_quality)
+
+    result = harness.run_eval_case(case)
+
+    assert [receipt["task"] for receipt in result["route_receipts"]] == [
+        "interpret",
+        "prose_judge",
+    ]
+
+
 def test_followup_clarification_runs_clarify_stage(monkeypatch: Any) -> None:
     case = harness.EvalCase(
         id="followup-clarifies",
@@ -1191,51 +1260,6 @@ def test_confirmation_payload_snapshot_uses_distinct_artifact_references() -> No
     assert active is not None
     assert listed.artifact_id == active.artifact_id
     assert listed is not active
-
-
-def test_scorecard_reports_per_category_pass_rates() -> None:
-    results = [
-        {
-            "id": "case-a",
-            "category": "messy_english",
-            "status": "passed",
-        },
-        {
-            "id": "case-b",
-            "category": "messy_english",
-            "status": "failed",
-        },
-        {
-            "id": "case-c",
-            "category": "messy_spanish",
-            "status": "expected_failed",
-        },
-        {
-            "id": "case-d",
-            "category": "messy_spanish",
-            "status": "unexpected_pass",
-        },
-    ]
-
-    scorecard = scorecard_for_results(results)
-
-    assert scorecard["category_pass_rates"]["messy_english"] == {
-        "passed": 1,
-        "failed": 1,
-        "expected_failed": 0,
-        "unexpected_pass": 0,
-        "skipped": 0,
-        "pass_rate": 0.5,
-    }
-    assert scorecard["category_pass_rates"]["messy_spanish"] == {
-        "passed": 0,
-        "failed": 0,
-        "expected_failed": 1,
-        "unexpected_pass": 1,
-        "skipped": 0,
-        "pass_rate": 0.0,
-    }
-    assert scorecard["totals"]["unexpected_pass"] == 1
 
 
 def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:

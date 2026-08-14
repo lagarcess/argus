@@ -194,7 +194,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/auth/guest/link:
+  /api/v1/auth/guest/signup:
     post:
       tags:
       - auth
@@ -202,7 +202,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GuestIdentityLinkRequest'
+              $ref: '#/components/schemas/GuestAccountSignupRequest'
         required: true
       responses:
         '200':
@@ -3016,11 +3016,49 @@ components:
       required:
       - type
       - message
+    GuestAccountSignupRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        password:
+          type: string
+          maxLength: 128
+          minLength: 8
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+      - captcha_token
     GuestAccountSummary:
       properties:
         expires_at:
           type: string
           format: date-time
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
         conversation_limit:
           type: integer
           maximum: 2147483647.0
@@ -3040,6 +3078,7 @@ components:
       type: object
       required:
       - expires_at
+      - conversation_id
       - conversation_limit
       - message_limit
       - simulation_limit
@@ -3120,6 +3159,12 @@ components:
       - conversation_id
     GuestHandoffCreateRequest:
       properties:
+        handoff_kind:
+          type: string
+          enum:
+          - existing_account
+          - new_account_signup
+          default: existing_account
         destination_email:
           type: string
           maxLength: 320
@@ -3148,27 +3193,6 @@ components:
       required:
       - handoff_id
       - expires_at
-    GuestIdentityLinkRequest:
-      properties:
-        email:
-          type: string
-          maxLength: 320
-          minLength: 3
-        password:
-          type: string
-          maxLength: 128
-          minLength: 8
-        refresh_token:
-          anyOf:
-          - type: string
-            maxLength: 4096
-            minLength: 1
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - email
-      - password
     GuestPendingAction:
       properties:
         reason:

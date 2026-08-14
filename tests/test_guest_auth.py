@@ -131,6 +131,50 @@ def test_guest_flag_off_drains_an_existing_verified_guest_session(
     gateway.sign_in_anonymously.assert_not_called()
 
 
+def test_claimed_guest_workspace_is_recoverable_only_on_signup_retry(
+    gateway,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _enable_guest(monkeypatch)
+    gateway.get_auth_user_from_token.return_value = (
+        gateway.sign_in_anonymously.return_value["user"]
+    )
+    gateway.get_active_guest_workspace.return_value = None
+    claimed_workspace = _workspace(_profile()).model_copy(
+        update={
+            "status": "claimed",
+            "claimed_by": "00000000-0000-0000-0000-000000000099",
+            "claimed_at": utcnow(),
+        }
+    )
+    gateway.get_guest_workspace_for_signup_retry.return_value = claimed_workspace
+
+    with (
+        patch.object(api_state, "supabase_gateway", gateway),
+        patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        TestClient(app) as client,
+    ):
+        ordinary = client.get(
+            "/api/v1/me",
+            headers={"Authorization": "Bearer claimed-guest-token"},
+        )
+        signup_retry = client.post(
+            "/api/v1/auth/guest/signup",
+            json={
+                "email": "retry@example.com",
+                "password": "strong-password",
+                "captcha_token": "captcha-proof",
+            },
+            headers={"Authorization": "Bearer claimed-guest-token"},
+        )
+
+    assert ordinary.status_code == 403
+    assert ordinary.json()["code"] == "guest_session_expired"
+    assert signup_retry.status_code == 400
+    assert signup_retry.json()["code"] == "guest_handoff_invalid"
+    gateway.get_guest_workspace_for_signup_retry.assert_called_once()
+
+
 def test_guest_bootstrap_creates_real_anonymous_identity_profile_and_workspace(
     gateway,
     monkeypatch: pytest.MonkeyPatch,

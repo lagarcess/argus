@@ -25,7 +25,7 @@ def test_canary_defaults_to_private_launch_urls() -> None:
     assert (
         'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
     )
-    assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"' in env_source
+    assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"' in env_source
 
 
 def test_canary_requires_auth_and_verifier_inputs_without_echoing_secrets() -> None:

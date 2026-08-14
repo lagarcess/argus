@@ -62,6 +62,7 @@ def _user_response(user: User, context: AccountContext) -> UserResponse:
         guest=(
             {
                 "expires_at": context.expires_at,
+                "conversation_id": context.conversation_id,
                 "conversation_limit": GUEST_CONVERSATION_ALLOWANCE,
                 "message_limit": GUEST_MESSAGE_ALLOWANCE,
                 "simulation_limit": GUEST_SIMULATION_ALLOWANCE,

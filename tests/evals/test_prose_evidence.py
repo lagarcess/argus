@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from tests.evals import measurement_eval_harness as harness
+from tests.evals import measurement_eval_scorecard as scorecard
 from tests.evals.prose_evidence import (
     PROSE_TEXT_RETENTION_LIMIT,
     PROSE_TEXT_RETENTION_TAIL,
@@ -91,7 +92,15 @@ def test_failed_prose_criterion_serializes_the_text_that_produced_it(
     assert result["prose_judge"]["requested_criteria"] == ["honesty"]
 
     # The evidence must survive serialization, not just live in memory.
-    scorecard_path = harness.write_scorecard([result], output_dir=tmp_path)
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", "synthetic_unit_fixture")
+    monkeypatch.setattr(scorecard, "_worktree_is_clean", lambda _root: True)
+    provenance = scorecard.build_scorecard_provenance(evaluation_mode="mocked")
+    scorecard_path = scorecard.write_scorecard(
+        [result],
+        provenance=provenance,
+        output_dir=tmp_path,
+    )
     serialized = json.loads(scorecard_path.read_text(encoding="utf-8"))
     serialized_judge = serialized["results"][0]["prose_judge"]
     assert serialized_judge["failed_criteria"] == ["honesty"]

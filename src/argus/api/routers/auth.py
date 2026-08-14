@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from math import ceil
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.browser_cookies import delete_browser_cookie, set_browser_cookie
 from argus.api.dependencies import (
     _apply_auth_session_cookies,
-    _session_cookie_secure,
     auth_response,
+    browser_cookie_policy,
     current_user,
     problem,
 )
@@ -34,11 +36,11 @@ from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import (
     AccessRequestAccepted,
     AccessRequestCreate,
+    GuestAccountSignupRequest,
     GuestBootstrapRequest,
     GuestHandoffClaimResponse,
     GuestHandoffCreateRequest,
     GuestHandoffCreateResponse,
-    GuestIdentityLinkRequest,
     GuestPendingAction,
     LoginRequest,
     SignupRequest,
@@ -46,7 +48,10 @@ from argus.api.schemas import (
     guest_safe_user,
 )
 from argus.domain.supabase_guest_accounts import EmailAlreadyRegisteredError
-from argus.domain.username_signup import serialized_username_signup
+from argus.domain.username_signup import (
+    serialized_guest_signup,
+    serialized_username_signup,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -326,7 +331,10 @@ def create_guest_handoff(
                 if body.pending_action is not None
                 else None
             ),
-            created_at=datetime.now(timezone.utc),
+            handoff_kind=body.handoff_kind,
+            existing_opaque_secret=(
+                request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip() or None
+            ),
         )
         opaque_secret = str(created.pop("opaque_secret"))
         payload = GuestHandoffCreateResponse(
@@ -342,25 +350,32 @@ def create_guest_handoff(
         status_code=201,
         content=jsonable_encoder(payload.model_dump(mode="json")),
     )
+    cookie_max_age = _GUEST_HANDOFF_MAX_AGE_SECONDS
+    if body.handoff_kind == "new_account_signup":
+        expires_at = payload.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        cookie_max_age = max(
+            1,
+            ceil((expires_at - datetime.now(timezone.utc)).total_seconds()),
+        )
     set_browser_cookie(
         response,
         _GUEST_HANDOFF_COOKIE,
         opaque_secret,
         httponly=True,
-        secure=_session_cookie_secure(request),
-        samesite="lax",
-        max_age=_GUEST_HANDOFF_MAX_AGE_SECONDS,
+        max_age=cookie_max_age,
         path="/api/v1/auth",
+        **browser_cookie_policy(request),
     )
     set_browser_cookie(
         response,
         _GUEST_HANDOFF_ID_COOKIE,
         payload.handoff_id,
         httponly=True,
-        secure=_session_cookie_secure(request),
-        samesite="lax",
-        max_age=_GUEST_HANDOFF_MAX_AGE_SECONDS,
+        max_age=cookie_max_age,
         path="/api/v1/auth",
+        **browser_cookie_policy(request),
     )
     return response
 
@@ -410,8 +425,13 @@ def claim_guest_handoff(
 
     source_user_id, payload = _guest_handoff_claim_payload(request, claimed)
     conversion_visitor_key = visitor_key_for_request(request)
+    account_event = (
+        "account_creation_completed"
+        if claimed.get("handoff_kind") == "new_account_signup"
+        else "existing_account_sign_in_completed"
+    )
     emit_verified_guest_funnel_event(
-        "existing_account_sign_in_completed",
+        account_event,
         user_id=source_user_id,
         visitor_key=conversion_visitor_key,
         conversation_id=payload.conversation_id,
@@ -462,9 +482,8 @@ def _clear_guest_handoff_cookies(request: Request, response: JSONResponse) -> No
             response,
             cookie_name,
             path="/api/v1/auth",
-            secure=_session_cookie_secure(request),
             httponly=True,
-            samesite="lax",
+            **browser_cookie_policy(request),
         )
 
 
@@ -502,6 +521,13 @@ def _guest_handoff_problem(request: Request, raw_code: str) -> HTTPException:
         ),
     }
     code = next((value for value in known if value in raw_code), "guest_handoff_invalid")
+    if code == "guest_handoff_invalid" and raw_code and raw_code != code:
+        # The enumerated map cannot name every failure, so record what it
+        # collapsed rather than reporting a generic invalid handoff.
+        logger.warning(
+            "Guest handoff failure degraded to a generic code",
+            raw_code=raw_code,
+        )
     status, title, detail = known.get(
         code,
         (400, "Invalid Handoff", "This guest handoff is invalid."),
@@ -549,10 +575,10 @@ def _guest_handoff_failure_response(
     return response
 
 
-@router.post("/auth/guest/link")
-def link_guest_identity(
+@router.post("/auth/guest/signup")
+def signup_guest_account(
     request: Request,
-    body: GuestIdentityLinkRequest,
+    body: GuestAccountSignupRequest,
     user: User = Depends(current_user),  # noqa: B008
 ) -> JSONResponse:
     _enforce_browser_auth_origin(request)
@@ -566,22 +592,6 @@ def link_guest_identity(
         )
     guest_context = account_context(request)
     if guest_context.kind != "guest":
-        same_linked_identity = (
-            user.email is not None
-            and user.email.strip().lower() == body.email
-            and api_state.supabase_gateway.guest_identity_link_completed(user.id)
-        )
-        if same_linked_identity:
-            return JSONResponse(
-                jsonable_encoder(
-                    {
-                        "authenticated": True,
-                        "account_kind": "registered",
-                        "user": user.model_dump(mode="json"),
-                        "reconciled": True,
-                    }
-                )
-            )
         raise problem(
             request,
             status_code=409,
@@ -589,68 +599,143 @@ def link_guest_identity(
             title="Account Already Registered",
             detail="This session already belongs to a permanent account.",
         )
+    _enforce_auth_attempt_limit(request, action="signup", email=body.email)
     if not permanent_account_access_allowed(api_state.supabase_gateway, body.email):
-        raise problem(
-            request,
-            status_code=400,
-            code="guest_identity_link_failed",
-            title="Account Creation Failed",
-            detail=(
-                "Argus could not finish this account request. Your conversation "
-                "remains stored; retry to reconcile the account state."
-            ),
+        raise _signup_auth_problem(request)
+
+    handoff_id = request.cookies.get(_GUEST_HANDOFF_ID_COOKIE, "").strip()
+    opaque_secret = request.cookies.get(_GUEST_HANDOFF_COOKIE, "").strip()
+    if not handoff_id or not opaque_secret:
+        # Names which cookie the browser withheld. A cross-site policy or a
+        # tracking-prevention setting drops these silently, and without this the
+        # failure is indistinguishable from an expired handoff.
+        logger.warning(
+            "Guest signup rejected before validation: handoff cookies absent",
+            handoff_id_cookie_present=bool(handoff_id),
+            secret_cookie_present=bool(opaque_secret),
+            cookie_names_seen=sorted(request.cookies),
         )
-    access_token = _request_access_token(request)
-    refresh_token = (body.refresh_token or "").strip() or request.cookies.get(
-        "sb-refresh-token", ""
-    ).strip()
-    if not access_token or not refresh_token:
-        raise problem(
-            request,
-            status_code=401,
-            code="unauthorized",
-            title="Unauthorized",
-            detail="The guest session could not be verified for account creation.",
-        )
+        return _guest_handoff_failure_response(request, "guest_handoff_invalid")
+
     try:
-        result = api_state.supabase_gateway.link_anonymous_identity(
-            access_token=access_token,
-            refresh_token=refresh_token,
+        with serialized_guest_signup(
+            api_state.DATABASE_URL,
             email=body.email,
-            password=body.password,
-        )
-        auth_user = result.get("user")
-        if (
-            not isinstance(auth_user, dict)
-            or str(auth_user.get("id") or "") != user.id
-            or auth_user.get("is_anonymous") is not False
-        ):
-            raise RuntimeError("Provider linked a different identity.")
-        api_state.supabase_gateway.mark_guest_identity_linked(
-            user.id,
-            at=datetime.now(timezone.utc),
-        )
-        profile = api_state.supabase_gateway.get_or_create_profile_for_auth_user(
-            auth_user
-        )
-        payload = dict(result)
-        payload.update(
-            {
-                "authenticated": True,
-                "account_kind": "registered",
-                "user": profile.model_dump(mode="json"),
-            }
-        )
-        emit_guest_funnel_event(
-            account=guest_context,
-            kind="account_creation_completed",
-            user_id=user.id,
-            language=profile.language,
-            surface="account_conversion",
-            capability_category="account",
-            terminal_outcome="completed",
-        )
-        return auth_response(request, payload)
+            username=body.username,
+        ) as prevalidation:
+            handoff = api_state.supabase_gateway.get_guest_signup_handoff(
+                handoff_id=handoff_id,
+                opaque_secret=opaque_secret,
+                source_user_id=user.id,
+                destination_email=body.email,
+                at=datetime.now(timezone.utc),
+            )
+            bound_user_id = str(handoff.get("destination_user_id") or "") or None
+            if prevalidation.auth_user_id is not None:
+                if bound_user_id != prevalidation.auth_user_id:
+                    raise EmailAlreadyRegisteredError
+                if prevalidation.auth_user_confirmed:
+                    try:
+                        result = api_state.supabase_gateway.login(
+                            email=body.email,
+                            password=body.password,
+                            captcha_token=body.captcha_token,
+                        )
+                    except Exception:
+                        raise EmailAlreadyRegisteredError from None
+                    auth_user = result.get("user")
+                    if (
+                        not isinstance(auth_user, dict)
+                        or str(auth_user.get("id") or "") != bound_user_id
+                    ):
+                        raise EmailAlreadyRegisteredError
+                    result["reconciled"] = True
+                else:
+                    auth_user = api_state.supabase_gateway.get_auth_user_by_id(
+                        prevalidation.auth_user_id
+                    )
+                    api_state.supabase_gateway.resend_signup_confirmation(
+                        email=body.email,
+                        captcha_token=body.captcha_token,
+                    )
+                    result = {
+                        "user": auth_user,
+                        "session": None,
+                        "reconciled": True,
+                    }
+            else:
+                if body.username is not None and not prevalidation.username_available:
+                    raise _signup_auth_problem(request)
+                result = api_state.supabase_gateway.signup(
+                    email=body.email,
+                    password=body.password,
+                    captcha_token=body.captcha_token,
+                    display_name=body.display_name,
+                    username=body.username,
+                    language=body.language,
+                    guest_signup_handoff={
+                        "handoff_id": handoff_id,
+                        "proof": str(handoff["proof"]),
+                    },
+                )
+                auth_user = result.get("user")
+                if not isinstance(auth_user, dict):
+                    raise RuntimeError("Provider signup did not return an Auth user.")
+                identities = auth_user.get("identities")
+                destination_user_id = str(auth_user.get("id") or "")
+                if identities == [] or not destination_user_id:
+                    raise EmailAlreadyRegisteredError
+                bound = api_state.supabase_gateway.get_guest_signup_handoff(
+                    handoff_id=handoff_id,
+                    opaque_secret=opaque_secret,
+                    source_user_id=user.id,
+                    destination_email=body.email,
+                    at=datetime.now(timezone.utc),
+                )
+                if str(bound.get("destination_user_id") or "") != destination_user_id:
+                    raise EmailAlreadyRegisteredError
+
+            profile = api_state.supabase_gateway.get_or_create_profile_for_auth_user(
+                auth_user
+            )
+            result["user"] = profile.model_dump(mode="json")
+
+            if not isinstance(result.get("session"), dict):
+                return auth_response(request, result)
+
+            claimed = api_state.supabase_gateway.claim_guest_workspace_handoff(
+                handoff_id=handoff_id,
+                opaque_secret=opaque_secret,
+                destination_user_id=profile.id,
+                allow_same_destination_replay=True,
+            )
+            source_user_id, claim_payload = _guest_handoff_claim_payload(request, claimed)
+            result["guest_claim"] = claim_payload.model_dump(mode="json")
+            if claimed.get("replayed") is not True:
+                conversion_visitor_key = visitor_key_for_request(request)
+                emit_verified_guest_funnel_event(
+                    "account_creation_completed",
+                    user_id=source_user_id,
+                    visitor_key=conversion_visitor_key,
+                    conversation_id=claim_payload.conversation_id,
+                    language=profile.language,
+                    surface="account_conversion",
+                    capability_category="account",
+                    terminal_outcome="completed",
+                )
+                emit_verified_guest_funnel_event(
+                    "temporary_workspace_claimed",
+                    user_id=source_user_id,
+                    visitor_key=conversion_visitor_key,
+                    conversation_id=claim_payload.conversation_id,
+                    language=profile.language,
+                    surface="account_conversion",
+                    capability_category="history",
+                    terminal_outcome="claimed",
+                )
+            response = auth_response(request, result)
+            _clear_guest_handoff_cookies(request, response)
+            return response
     except HTTPException:
         raise
     except EmailAlreadyRegisteredError:
@@ -665,23 +750,7 @@ def link_guest_identity(
             ),
         ) from None
     except Exception:
-        raise problem(
-            request,
-            status_code=400,
-            code="guest_identity_link_failed",
-            title="Account Creation Failed",
-            detail=(
-                "Argus could not finish this account request. Your conversation "
-                "remains stored; retry to reconcile the account state."
-            ),
-        ) from None
-
-
-def _request_access_token(request: Request) -> str:
-    authorization = request.headers.get("authorization", "")
-    if authorization.startswith("Bearer "):
-        return authorization.removeprefix("Bearer ").strip()
-    return request.cookies.get("sb-auth-token", "").strip()
+        raise _signup_auth_problem(request) from None
 
 
 @router.post("/auth/signup")
@@ -815,6 +884,10 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             auth_payload=result,
         )
     try:
+        # Signup can commit in Supabase Auth before this process creates the
+        # matching product profile. A later confirmed login must repair that
+        # crash window before the claim writes profile-owned foreign keys.
+        api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
         claimed = api_state.supabase_gateway.claim_guest_workspace_handoff(
             handoff_id=handoff_id,
             opaque_secret=opaque_secret,
@@ -832,8 +905,13 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
     result["guest_claim"] = claim_payload.model_dump(mode="json")
     if claimed.get("replayed") is not True:
         conversion_visitor_key = visitor_key_for_request(request)
+        account_event = (
+            "account_creation_completed"
+            if claimed.get("handoff_kind") == "new_account_signup"
+            else "existing_account_sign_in_completed"
+        )
         emit_verified_guest_funnel_event(
-            "existing_account_sign_in_completed",
+            account_event,
             user_id=source_user_id,
             visitor_key=conversion_visitor_key,
             conversation_id=claim_payload.conversation_id,

@@ -95,7 +95,12 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
 
 
-def test_guest_and_public_account_access_are_documented_open() -> None:
+def test_guest_and_public_account_access_are_open_in_env_templates() -> None:
+    """Env templates only. Prose claims are owned by the doc-sync suite.
+
+    The former name promised documentation coverage it never had, which is how
+    the docs drifted unnoticed while this stayed green.
+    """
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     web_example = (ROOT / "web" / ".env.local.example").read_text(encoding="utf-8")
 

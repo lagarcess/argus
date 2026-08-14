@@ -345,8 +345,7 @@ def _apply_auth_session_cookies(
     cookie_kwargs: dict[str, Any] = {
         "httponly": True,
         "path": "/",
-        "samesite": "lax",
-        "secure": _session_cookie_secure(request),
+        **browser_cookie_policy(request),
     }
     if isinstance(max_age, int):
         cookie_kwargs["max_age"] = max_age
@@ -355,6 +354,20 @@ def _apply_auth_session_cookies(
         set_browser_cookie(response, "sb-auth-token", access_token, **cookie_kwargs)
     if isinstance(refresh_token, str) and refresh_token:
         set_browser_cookie(response, "sb-refresh-token", refresh_token, **cookie_kwargs)
+
+
+def browser_cookie_policy(request: Request) -> dict[str, Any]:
+    """One owner for how every Argus browser cookie crosses origins.
+
+    The API now shares a registrable domain with the app, so these cookies are
+    first-party and `Lax` would carry them. `None` is kept until a real iOS
+    conversion proves the new domain, since tightening it is a separate change
+    with its own failure mode. `None` requires `Secure`, so plain-http local
+    development keeps `Lax`.
+    """
+
+    secure = _session_cookie_secure(request)
+    return {"secure": secure, "samesite": "none" if secure else "lax"}
 
 
 def _session_cookie_secure(request: Request) -> bool:
@@ -483,6 +496,18 @@ def current_user(request: Request) -> User:
             user_id=auth_user_id,
             at=datetime.now(timezone.utc),
         )
+        if (
+            workspace is None
+            and request.scope.get("path") == "/api/v1/auth/guest/signup"
+        ):
+            # A claim can commit before its response reaches the browser. Keep
+            # that source session valid only for the replay-safe signup route.
+            workspace = (
+                api_state.supabase_gateway.get_guest_workspace_for_signup_retry(
+                    user_id=auth_user_id,
+                    at=datetime.now(timezone.utc),
+                )
+            )
         if workspace is None:
             raise problem(
                 request,

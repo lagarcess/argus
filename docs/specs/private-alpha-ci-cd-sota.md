@@ -654,14 +654,17 @@ Before any guest traffic:
 
 - the exact candidate SHA must pass the local real-Auth/Postgres browser matrix
   in an isolated process;
-- checked-in server/frontend Guest defaults must remain true, explicit false
-  must preserve rollback, and public-account access must remain false;
+- checked-in server/frontend Guest defaults must remain true and explicit false
+  must preserve rollback. Public-account access is no longer held closed here:
+  the founder opened it on 2026-08-12;
 - the branch-deployed canary must prove `/` opens guest chat only in the
-  approved staged mode, while permanent signup/login remains allowlist-gated;
+  approved staged mode, and that permanent signup/login admits an ordinary
+  unlisted email while a disabled row stays blocked;
 - hosted Supabase must explicitly enable anonymous Auth, configure an approved
   CAPTCHA posture, and retain provider plus Argus rate limits;
-- conversion must prove same-UUID linking and atomic existing-account claim
-  without duplicate artifacts, usage, jobs, or pending actions;
+- conversion must prove distinct-UUID ordinary signup and atomic claim, plus
+  atomic existing-account login claim, without duplicate artifacts, usage,
+  jobs, or pending actions;
 - the cleanup dry run and bounded real run must be scheduled with an owner,
   alert on failures/lag, and preserve converted or permanent accounts;
 - guest analytics must stay personless and metadata-only; browser facts cross
@@ -672,9 +675,10 @@ Before any guest traffic:
   single canary's provider-reported latency/cost. Unsupported production
   projections must remain explicitly unmeasured.
 
-Canary failure rolls back presentation first, then server guest bootstrap.
-`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` stays false unless a separate founder
-decision authorizes it. A local Block 4 pass is not “public ready.”
+Canary failure rolls back presentation first, then server guest bootstrap. It
+does not touch `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true`, which the founder
+authorized separately on 2026-08-12; closing public registration again is its
+own founder decision. A local Block 4 pass is not “public ready.”
 
 ## Non-Goals
 
