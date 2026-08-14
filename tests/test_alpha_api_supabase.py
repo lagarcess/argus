@@ -2304,7 +2304,7 @@ def test_signup_emits_product_event_for_public_registration(mock_gateway, monkey
             {
                 "user_id": "user-1",
                 "attributes": {
-                    "surface": "auth_signup",
+                    "surface": "direct_signup",
                     "language": "en",
                 },
             },
@@ -2314,7 +2314,7 @@ def test_signup_emits_product_event_for_public_registration(mock_gateway, monkey
     assert kind == "account_registration_completed"
     assert set(payload.keys()) == {"user_id", "attributes"}
     assert payload["attributes"]["language"] == "en"
-    assert payload["attributes"]["surface"] == "auth_signup"
+    assert payload["attributes"]["surface"] == "direct_signup"
     assert set(payload["attributes"].keys()) == {
         "surface",
         "language",
@@ -4613,3 +4613,24 @@ def test_message_page_transcript_representation_prevents_duplicate_job_projectio
     assert action["id"] == action_message.id
     assert "backtest_job" not in action["metadata"]
     assert len(gateway.context_calls) == 1
+
+
+def test_registration_surfaces_distinguish_guest_conversion_from_direct_signup():
+    """A guest converting and a cold signup are different funnel events.
+
+    Collapsing them to one surface loses the only thing the signal is for:
+    knowing whether the guest path is working.
+    """
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "argus"
+        / "api"
+        / "routers"
+        / "auth.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'surface="guest_conversion"' in source
+    assert 'surface="direct_signup"' in source
+    assert 'surface="auth_signup"' not in source
