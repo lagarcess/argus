@@ -7,7 +7,7 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_measurement_eval_scorecard.py tests/evals/test_measurement_eval_live_environment.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_measurement_eval_dca_semantics.py tests/evals/test_measurement_eval_scorecard.py tests/evals/test_measurement_eval_live_environment.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
   Validates routing, scorecard provenance, live-environment refusal, state,
   full conversation-step manifests, and the seven session trajectories. This
   is the everyday inner-loop check.
@@ -25,6 +25,7 @@ Run the mocked harness checks with:
 ```bash
 poetry run pytest \
   tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_measurement_eval_dca_semantics.py \
   tests/evals/test_measurement_eval_scorecard.py \
   tests/evals/test_measurement_eval_live_environment.py \
   tests/evals/test_chat_runtime_eval_manifest.py \
@@ -194,6 +195,25 @@ typed payload (relationship, anchors, category terms), plus near-miss negatives
 (direct backtest, post-result "what next", capability questions). Discovery
 turns end `ready_to_respond` on both the flag-off recovery path and the flag-on
 search path, so the category holds in any sanctioned live environment.
+
+`dca_capital_semantics` (issue #455) covers the two-role capital model PR #491
+shipped. Both DCA money roles and the period are asserted from the launch
+payload under their own names (`starting_capital`, `recurring_contribution`,
+`cadence`), so a role swap is visible instead of hiding behind a shared
+`capital_amount`. The cases cover the contribution-phrase capture risk ("I'll
+start by putting in $200 a month" is the contribution, never the seed), the
+plan-wide ceiling reading of "I only have $5,000", a stated seed reaching
+`ready_to_run`, a `$0` seed with a below-bankroll-floor contribution, the named
+refusal codes (`contribution_period_exceeds_window`,
+`dca_contribution_zero_is_buy_and_hold`, deferred
+`unsupported_dca_contribution_ceiling`), calendar alignment measuring the
+period against the asked window, and the lane's stated blind spots: a non-zero
+seed, multiple symbols, crypto, and a provider-truncated window. The category
+is typed-only by design: the one-phrase contribution rendering and card row
+copy are frontend facts proven by the #455 browser evidence, and the
+next-session buy rule for non-trading-day contributions is proven by
+`tests/domain/test_dca_trading_day_rule.py`; this category asserts the typed
+facts both of those read from.
 
 ## Prose Judge
 
