@@ -43,6 +43,9 @@ def direct_edit_confirmation_preparation(
     *,
     capital: float | None,
     date_window: dict[str, str] | None,
+    starting_capital: float | None = None,
+    recurring_contribution: float | None = None,
+    contribution_period: str | None = None,
     fee_rate: float | None = None,
     slippage: float | None = None,
     language: str = "en",
@@ -57,17 +60,30 @@ def direct_edit_confirmation_preparation(
     except ValueError:
         return DirectEditPreparation(error_code="confirmation_payload_invalid")
 
+    is_recurring = executable_strategy_type(summary) == "dca_accumulation"
     operations: list[EditOperation] = []
-    if capital is not None:
+    money_edits = (
+        (capital, "capital"),
+        (starting_capital, "starting_capital"),
+        (recurring_contribution, "recurring_contribution"),
+    )
+    if any(value is not None for value, _ in money_edits):
         if str(launch.get("sizing_mode") or "") == "position_size":
             return DirectEditPreparation(error_code="capital_not_applicable")
-        capital_target = (
-            "recurring_contribution"
-            if executable_strategy_type(summary) == "dca_accumulation"
-            else "capital"
-        )
+    # A card edits the money roles its own plan has. The shared bankroll field
+    # cannot reach a recurring plan, and the plan's roles cannot reach a
+    # one-time position, so no value can arrive in the wrong role.
+    for value, target in money_edits:
+        if value is None:
+            continue
+        if is_recurring != (target != "capital"):
+            return DirectEditPreparation(error_code="capital_role_not_applicable")
+        operations.append(EditOperation(op="set", target=target, number=float(value)))
+    if contribution_period is not None:
+        if not is_recurring:
+            return DirectEditPreparation(error_code="capital_role_not_applicable")
         operations.append(
-            EditOperation(op="set", target=capital_target, number=float(capital))
+            EditOperation(op="set", target="cadence", value=contribution_period)
         )
     window_intent: LLMDateRangeIntent | None = None
     if date_window is not None:
@@ -92,13 +108,13 @@ def direct_edit_confirmation_preparation(
         operations,
         current_asset_universe=summary.asset_universe,
     )
-    if any(
-        entry.split(".", 1)[-1] in _COST_EDIT_TARGETS.values()
-        for entry in resolved.unsupported
-    ):
+    refused_targets = {entry.split(".", 1)[-1] for entry in resolved.unsupported}
+    if refused_targets & set(_COST_EDIT_TARGETS.values()):
         # The shared resolver is the one cost gate; a refused rate surfaces as
         # a typed field error instead of a generic invalid-payload conflict.
         return DirectEditPreparation(error_code="unsupported_cost_value")
+    if "cadence" in refused_targets:
+        return DirectEditPreparation(error_code="unsupported_dca_cadence")
     if resolved.unsupported or not resolved.has_changes():
         return DirectEditPreparation(error_code="confirmation_payload_invalid")
     field_provenance = _field_provenance_of(summary)
@@ -118,7 +134,10 @@ def direct_edit_confirmation_preparation(
     state = state.model_copy(
         update={
             "candidate_strategy_draft": summary,
-            "optional_parameter_status": _user_owned_parameter_status(source_payload),
+            "optional_parameter_status": _parameter_status_with_edits(
+                source_payload,
+                resolved=resolved,
+            ),
         }
     )
     result = confirm_stage(
@@ -184,6 +203,23 @@ def _drop_stale_date_evidence(summary: StrategySummary) -> None:
             summary.extra_parameters["evidence_spans"] = cleaned
         else:
             summary.extra_parameters.pop("evidence_spans", None)
+
+
+def _parameter_status_with_edits(
+    source_payload: dict[str, Any],
+    *,
+    resolved: Any,
+) -> dict[str, Any]:
+    """The user-owned parameter state this edit re-confirms against.
+
+    The confirm stage reads a plan's starting capital from here, so an edited
+    seed has to arrive here too. Carrying it only on the draft would leave a
+    second copy nobody reads, and the run would quietly use the old seed.
+    """
+    status = _user_owned_parameter_status(source_payload)
+    if resolved.initial_capital is not None:
+        status["initial_capital"] = float(resolved.initial_capital)
+    return status
 
 
 def _user_owned_parameter_status(source_payload: dict[str, Any]) -> dict[str, Any]:

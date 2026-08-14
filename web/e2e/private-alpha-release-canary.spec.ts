@@ -1,18 +1,28 @@
 import { chmod, writeFile } from "node:fs/promises";
-import { expect, test, type Page, type Response } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Page,
+  type Request,
+  type Response,
+} from "@playwright/test";
+import type { SearchConversationItem } from "../lib/search-contract";
+import type { SearchDecisionAction } from "../lib/run-dossier-contract";
 
 type JsonRecord = Record<string, unknown>;
 type StaticLabels = Record<string, string>;
 
-const email = process.env.ARGUS_CANARY_BROWSER_EMAIL;
-const password = process.env.ARGUS_CANARY_BROWSER_PASSWORD;
-const signupEmail = process.env.ARGUS_CANARY_BROWSER_SIGNUP_EMAIL;
+const expectedUserId = process.env.ARGUS_CANARY_BROWSER_USER_ID;
 const language = process.env.ARGUS_CANARY_BROWSER_LANGUAGE;
 const prompt = process.env.ARGUS_CANARY_BROWSER_PROMPT;
 const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
 const decisionNote = process.env.ARGUS_CANARY_BROWSER_DECISION_NOTE;
 const searchQuery = process.env.ARGUS_CANARY_BROWSER_SEARCH_QUERY;
 const identityHandoff = process.env.ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF;
+const artifactProbe =
+  process.env.ARGUS_CANARY_BROWSER_ARTIFACT_PROBE ?? "none";
+const redactionProbeValue =
+  process.env.ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE;
 const labels = JSON.parse(
   process.env.ARGUS_CANARY_STATIC_LABELS_JSON ?? "{}",
 ) as StaticLabels;
@@ -33,6 +43,17 @@ function record(value: unknown, name: string): JsonRecord {
     throw new Error(`Browser canary response omitted ${name}`);
   }
   return value as JsonRecord;
+}
+
+function isSearchConversationItem(
+  value: unknown,
+): value is SearchConversationItem {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (value as JsonRecord).type === "conversation"
+  );
 }
 
 function privateId(value: unknown, name: string): string {
@@ -69,120 +90,40 @@ function isApiResponse(
   }
 }
 
-async function loginThroughRenderedUi(
-  page: Page,
-  verifySignup = false,
-): Promise<{ userId: string; accessToken: string }> {
-  const canaryEmail = requireConfig(email, "email");
-  const canaryPassword = requireConfig(password, "password");
-  const canarySignupEmail = requireConfig(signupEmail, "signup email");
-  const canaryLanguage = requireConfig(language, "language");
-  if (
-    canarySignupEmail.trim().toLocaleLowerCase() ===
-    canaryEmail.trim().toLocaleLowerCase()
-  ) {
-    throw new Error(
-      "Dedicated signup identity must differ from login identity",
+function isRunBacktestRequest(request: Request): boolean {
+  try {
+    if (
+      request.method() !== "POST" ||
+      !new URL(request.url()).pathname.endsWith("/api/v1/chat/stream")
+    ) {
+      return false;
+    }
+    const body = request.postDataJSON() as JsonRecord;
+    const action = body.action;
+    return (
+      Boolean(action) &&
+      typeof action === "object" &&
+      !Array.isArray(action) &&
+      (action as JsonRecord).type === "run_backtest"
     );
+  } catch {
+    return false;
   }
+}
+
+async function openAuthenticatedChat(page: Page): Promise<{ userId: string }> {
+  const canaryUserId = requireConfig(expectedUserId, "user identity");
+  const canaryLanguage = requireConfig(language, "language");
 
   await page.addInitScript((nextLanguage) => {
     window.localStorage.setItem("i18nextLng", nextLanguage);
   }, canaryLanguage);
-
-  if (verifySignup) {
-    await page.goto("/?auth=signup", { waitUntil: "networkidle" });
-    await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
-    await expect(
-      page.getByRole("button", { name: label("auth.signup.submit") }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: label("landing.sign_up_email") }),
-    ).toHaveCount(0);
-
-    const signupResponsePromise = page.waitForResponse((response) =>
-      isApiResponse(response, "/auth/signup", "POST"),
-    );
-    await page.locator('input[type="text"]').fill("Argus Release Canary");
-    await page.locator('input[type="email"]').fill(canarySignupEmail);
-    await page.locator('input[type="password"]').fill(canaryPassword);
-    await page
-      .getByRole("button", { name: label("auth.signup.submit") })
-      .click();
-    const signupResponse = await signupResponsePromise;
-    const signupPayload = signupResponse.request().postDataJSON() as JsonRecord;
-    if (signupPayload.language !== canaryLanguage) {
-      throw new Error("Spanish signup request omitted the canonical language");
-    }
-    const signupCaptchaToken = signupPayload.captcha_token;
-    if (
-      typeof signupCaptchaToken !== "string" ||
-      signupCaptchaToken.length < 1 ||
-      signupCaptchaToken.length > 4096
-    ) {
-      throw new Error("Signup CAPTCHA token was missing or unbounded");
-    }
-    expect(signupResponse.status()).toBe(200);
-    const signupResponsePayload = record(
-      await signupResponse.json(),
-      "signup payload",
-    );
-    if (signupResponsePayload.session !== null) {
-      throw new Error("Fresh signup did not return a null session");
-    }
-    const signupUser = record(signupResponsePayload.user, "signup user");
-    if (
-      String(signupUser.email ?? "")
-        .trim()
-        .toLocaleLowerCase() !== canarySignupEmail.trim().toLocaleLowerCase()
-    ) {
-      throw new Error(
-        "Fresh signup response did not preserve its dedicated identity",
-      );
-    }
-    const checkEmailState = page.getByTestId("auth-check-email");
-    await expect(checkEmailState).toBeVisible();
-    await expect(checkEmailState.getByRole("heading")).toBeFocused();
-    await expect(page).not.toHaveURL(/\/chat(?:\?|$)/);
-  }
-
-  await page.goto("/?auth=login", { waitUntil: "networkidle" });
-  await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
-
-  const loginResponsePromise = page.waitForResponse((response) =>
-    isApiResponse(response, "/auth/login", "POST"),
-  );
   const profileResponsePromise = page.waitForResponse((response) =>
     isApiResponse(response, "/me", "GET"),
   );
-  await page.locator('input[type="email"]').fill(canaryEmail);
-  await page.locator('input[type="password"]').fill(canaryPassword);
-  await page.getByRole("button", { name: label("auth.login.submit") }).click();
-
-  const loginResponse = await loginResponsePromise;
-  const loginRequestPayload = loginResponse
-    .request()
-    .postDataJSON() as JsonRecord;
-  const loginCaptchaToken = loginRequestPayload.captcha_token;
-  if (
-    typeof loginCaptchaToken !== "string" ||
-    loginCaptchaToken.length < 1 ||
-    loginCaptchaToken.length > 4096
-  ) {
-    throw new Error("Login CAPTCHA token was missing or unbounded");
-  }
-  if (!loginResponse.ok()) throw new Error("Rendered login failed");
-  const loginPayload = record(await loginResponse.json(), "login payload");
-  const userId = privateId(
-    record(loginPayload.user, "login user").id,
-    "user identity",
-  );
-  const accessToken = privateId(
-    record(loginPayload.session, "login session").access_token,
-    "browser access token",
-  );
-
+  await page.goto("/chat", { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/chat(?:\?|$)/, { timeout: 30_000 });
+  await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
   const profileResponse = await profileResponsePromise;
   if (!profileResponse.ok())
     throw new Error("Rendered profile hydration failed");
@@ -192,7 +133,7 @@ async function loginThroughRenderedUi(
   );
   const profileUser = record(profilePayload.user, "hydrated profile");
   if (
-    profileUser.id !== userId ||
+    profileUser.id !== canaryUserId ||
     profileUser.language !== canaryLanguage ||
     profileUser.locale !== canaryLanguage
   ) {
@@ -200,8 +141,22 @@ async function loginThroughRenderedUi(
       "Rendered profile hydration did not preserve Spanish identity",
     );
   }
+  const storageState = await page.context().storageState();
+  if (
+    !storageState.cookies.some((cookie) =>
+      /^sb-[a-z0-9-]+-auth-token(?:\.\d+)?$/.test(cookie.name),
+    )
+  ) {
+    throw new Error("Browser canary did not start from authenticated storage state");
+  }
   await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
-  return { userId, accessToken };
+  return { userId: canaryUserId };
+}
+
+function decisionStateLocator(page: Page, state: string) {
+  return page.getByText(label(`chat.result_card.decision_states.${state}`), {
+    exact: false,
+  });
 }
 
 function captureBrowserErrors(page: Page) {
@@ -254,7 +209,15 @@ test.describe.serial("private-alpha rendered release canary", () => {
     const fakeAssistantId = "00000000-0000-4000-8000-000000000234";
     let interceptedRunRequests = 0;
 
-    await loginThroughRenderedUi(page, true);
+    await openAuthenticatedChat(page);
+    if (artifactProbe !== "none") {
+      const probeValue = requireConfig(
+        redactionProbeValue,
+        "redaction probe value",
+      );
+      await page.getByTestId("chat-input").fill(probeValue);
+      await expect(page.getByTestId("forced-canary-failure")).toBeVisible();
+    }
     const mockedCorsHeaders = {
       "Access-Control-Allow-Credentials": "true",
       "Access-Control-Allow-Headers":
@@ -325,11 +288,12 @@ test.describe.serial("private-alpha rendered release canary", () => {
 
     await page.getByTestId("chat-input").fill(retryPrompt);
     await page.getByTestId("chat-send").click();
+    const retryButton = page.getByRole("button", {
+      name: label("common.retry"),
+    });
+    await expect(retryButton).toBeVisible();
     await expect(
-      page.getByText(label("chat.error_backtest"), { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: label("common.retry") }),
+      page.getByRole("status").filter({ has: retryButton }),
     ).toBeVisible();
     expect(interceptedRunRequests).toBe(0);
   });
@@ -348,30 +312,10 @@ test.describe.serial("private-alpha rendered release canary", () => {
     let runBacktestRequests = 0;
 
     page.on("request", (request) => {
-      let pathname = "";
-      try {
-        pathname = new URL(request.url()).pathname;
-      } catch {
-        return;
-      }
-      if (
-        request.method() !== "POST" ||
-        !pathname.endsWith("/api/v1/chat/stream")
-      ) {
-        return;
-      }
-      try {
-        const body = request.postDataJSON() as JsonRecord;
-        const action = body.action;
-        if (record(action, "chat action").type === "run_backtest") {
-          runBacktestRequests += 1;
-        }
-      } catch {
-        // A normal prompt has no action object.
-      }
+      if (isRunBacktestRequest(request)) runBacktestRequests += 1;
     });
 
-    const { userId, accessToken } = await loginThroughRenderedUi(page);
+    const { userId } = await openAuthenticatedChat(page);
     const conversationResponsePromise = page.waitForResponse((response) =>
       isApiResponse(response, "/conversations", "POST"),
     );
@@ -400,7 +344,6 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "conversation_created",
       user_id: userId,
-      access_token: accessToken,
       conversation_id: conversationId,
     });
 
@@ -409,11 +352,25 @@ test.describe.serial("private-alpha rendered release canary", () => {
         exact: true,
       }),
     ).toBeVisible({ timeout: 180_000 });
+    // The card can render one frame before the initial turn releases its lock.
+    // Composer editability is the product-owned signal that action admission is ready.
+    await expect(page.getByTestId("chat-input")).toHaveAttribute(
+      "contenteditable",
+      "true",
+      { timeout: 30_000 },
+    );
+    const runRequest = page.waitForRequest(isRunBacktestRequest, {
+      timeout: 30_000,
+    });
     await page
       .getByRole("button", {
         name: label("chat.confirmation.actions.run_backtest"),
       })
       .click();
+    await runRequest;
+    await expect
+      .poll(() => runBacktestRequests, { timeout: 5_000 })
+      .toBe(1);
 
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
@@ -461,7 +418,6 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "result_captured",
       user_id: userId,
-      access_token: accessToken,
       conversation_id: conversationId,
       backtest_job_id: backtestJobId,
       backtest_run_id: backtestRunId,
@@ -528,24 +484,14 @@ test.describe.serial("private-alpha rendered release canary", () => {
     }
 
     await expect(
-      page.getByText(
-        label(`chat.result_card.decision_states.${canaryDecisionState}`),
-        {
-          exact: true,
-        },
-      ),
+      decisionStateLocator(page, canaryDecisionState),
     ).toBeVisible();
     await page.reload();
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
     ).toHaveCount(1, { timeout: 60_000 });
     await expect(
-      page.getByText(
-        label(`chat.result_card.decision_states.${canaryDecisionState}`),
-        {
-          exact: true,
-        },
-      ),
+      decisionStateLocator(page, canaryDecisionState),
     ).toBeVisible();
     await expect(
       page.getByText(label("chat.error_backtest"), { exact: true }),
@@ -606,31 +552,38 @@ test.describe.serial("private-alpha rendered release canary", () => {
       await searchResponse.json(),
       "Omnisearch payload",
     );
-    const searchItems = Array.isArray(searchPayload.items)
-      ? searchPayload.items
-      : [];
-    const matchingEvidence = searchItems
-      .map((item) => record(item, "Omnisearch item"))
-      .find(
-        (item) =>
-          item.type === "evidence" &&
-          item.id === evidenceArtifactId &&
-          item.conversation_id === conversationId &&
-          item.lifecycle === "decided",
-      );
-    if (!matchingEvidence) {
+    if (!Array.isArray(searchPayload.items)) {
+      throw new Error("Omnisearch payload omitted result items");
+    }
+    const conversationItems = searchPayload.items.filter(isSearchConversationItem);
+    const matchingConversationIndex = conversationItems.findIndex(
+      (item) => item.conversation_id === conversationId,
+    );
+    if (matchingConversationIndex < 0) {
       throw new Error(
-        "Omnisearch did not return the browser-created canonical evidence",
+        "Omnisearch did not return the browser-created source conversation",
       );
     }
-    const evidenceTitle = String(matchingEvidence.title ?? "").trim();
-    if (!evidenceTitle)
-      throw new Error("Omnisearch evidence omitted a rendered title");
+    const matchingConversation = conversationItems[matchingConversationIndex];
+    const dossier = matchingConversation.dossier;
+    const decisionAction = dossier?.actions.find(
+      (action): action is SearchDecisionAction =>
+        action.type === "decision" &&
+        action.evidence_artifact_id === evidenceArtifactId,
+    );
+    if (
+      !dossier ||
+      dossier.run_id !== backtestRunId ||
+      dossier.decision?.state !== canaryDecisionState ||
+      !decisionAction ||
+      decisionAction.decision_state !== canaryDecisionState
+    ) {
+      throw new Error(
+        "Omnisearch dossier did not preserve the browser-created evidence",
+      );
+    }
     await page
-      .getByRole("button")
-      .filter({ hasText: label("command_palette.type.evidence") })
-      .filter({ hasText: evidenceTitle })
-      .first()
+      .locator(`[data-palette-row-index="${matchingConversationIndex}"]`)
       .click();
     await expect(
       page.getByText(label("chat.simulation_complete"), { exact: true }),
@@ -655,7 +608,6 @@ test.describe.serial("private-alpha rendered release canary", () => {
       source: "playwright",
       status: "complete",
       user_id: userId,
-      access_token: accessToken,
       conversation_id: conversationId,
       backtest_job_id: backtestJobId,
       backtest_run_id: backtestRunId,

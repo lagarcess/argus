@@ -23,9 +23,10 @@ import {
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
-import { cadenceDisplayLabel } from "@/lib/cadence-display";
 import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
+import { contributionPhrase } from "@/lib/contribution-period-display";
+import { formatCurrency } from "@/lib/result-card-display";
 import {
   retestEffectiveDurationLabel,
   retestPeriodFromValue,
@@ -319,7 +320,7 @@ function confirmationCardViewModel(
 ) {
   const rows = confirmation.rows.map((row) => ({
     key: confirmationRowKey(row),
-    row: displayConfirmationRowValue(row, t),
+    row: displayConfirmationRowValue(row, confirmation, t, language),
   }));
   const assetRow = rowForKey(rows, "assets");
   const strategyRow = rowForKey(rows, "strategy");
@@ -327,7 +328,9 @@ function confirmationCardViewModel(
   const startingCapitalRow = rowForKey(rows, "starting_capital");
   const contributionRow = rowForKey(rows, "contribution");
   const assetSymbols = splitSymbolList(assetRow?.value ?? "");
-  const primaryCapitalRow = startingCapitalRow ?? contributionRow;
+  // A recurring plan's headline money is what goes in every period; its
+  // starting capital, usually $0, reads as a detail beneath.
+  const primaryCapitalRow = contributionRow ?? startingCapitalRow;
   const compactPeriod = compactDateRangeDisplay(confirmation.date_range, language);
   const displayPeriodRow =
     periodRow && compactPeriod
@@ -409,17 +412,31 @@ function RetestPeriodDisclosure({
   );
 }
 
+/** Money rows are composed from typed facts, so the amount carries the
+ * viewer's separators and the period reads in the viewer's language. Row
+ * strings stay the fallback for cards persisted before the facts existed. */
 function displayConfirmationRowValue(
   row: StrategyConfirmationPayload["rows"][number],
+  confirmation: StrategyConfirmationPayload,
   t: TFunction,
+  language: string,
 ): StrategyConfirmationPayload["rows"][number] {
-  if (confirmationRowKey(row) !== "cadence") {
-    return row;
+  const key = confirmationRowKey(row);
+  const facts = confirmation.display_facts;
+  if (key === "contribution" && typeof facts?.recurring_contribution === "number") {
+    return {
+      ...row,
+      value: contributionPhrase(
+        formatCurrency(facts.recurring_contribution, language),
+        facts.contribution_period,
+        t,
+      ),
+    };
   }
-  const displayValue = cadenceDisplayLabel(row.value, t);
-  return displayValue && displayValue !== row.value
-    ? { ...row, value: displayValue }
-    : row;
+  if (key === "starting_capital" && typeof facts?.starting_capital === "number") {
+    return { ...row, value: formatCurrency(facts.starting_capital, language) };
+  }
+  return row;
 }
 
 function isConfirmationRow(

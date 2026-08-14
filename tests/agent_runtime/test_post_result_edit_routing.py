@@ -715,7 +715,7 @@ def test_post_result_planned_edit_materializes_full_confirmation(monkeypatch) ->
     assert result.outcome == "ready_for_confirmation"
 
 
-def test_post_result_starting_capital_edit_defers_unexecutable_principal(
+def test_post_result_starting_capital_edit_seeds_the_plan(
     monkeypatch,
 ) -> None:
     """Starting-capital edits keep the DCA anchor (no re-ask for the known
@@ -766,17 +766,19 @@ def test_post_result_starting_capital_edit_defers_unexecutable_principal(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert result.outcome == "needs_clarification"
+    # A recurring plan's starting capital is its own executable role now, so
+    # naming one seeds the plan instead of being deferred as unsupported.
+    assert result.outcome == "ready_for_confirmation"
     assert strategy.strategy_type == "dca_accumulation"
     assert strategy.asset_universe == ["AAPL", "MSFT"]
     assert strategy.cadence == "monthly"
     assert strategy.capital_amount == 500
     assert "capital_amount" not in result.decision.missing_required_fields
     assert strategy.extra_parameters["initial_capital"] == 2000
-    assert "unsupported_dca_starting_principal" in {
-        constraint.category
+    assert not any(
+        constraint.category.startswith("unsupported_dca")
         for constraint in result.decision.unsupported_constraints
-    }
+    )
 
 
 def test_result_followup_asset_swap_with_inferred_target_confirms(

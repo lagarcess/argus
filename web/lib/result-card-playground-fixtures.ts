@@ -352,6 +352,8 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
           benchmark_symbol: "SPY",
           cadence: "monthly",
           capital_amount: 250,
+          recurring_contribution: 250,
+          starting_capital: 0,
         },
         parameters: {
           dca_cadence: "monthly",

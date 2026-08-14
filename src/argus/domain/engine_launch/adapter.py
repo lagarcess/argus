@@ -18,6 +18,11 @@ from argus.domain.backtesting.coverage import (
     apply_coverage_to_config,
     prepare_market_data,
 )
+from argus.domain.dca_capital import (
+    DcaCapitalPlan,
+    build_dca_capital_plan,
+    dca_capital_config_fields,
+)
 from argus.domain.engine import (
     build_result_card,
     build_result_chart,
@@ -451,17 +456,17 @@ def _run_dca_accumulation(
         recorder=recorder,
         prepared_market_data=prepared_market_data,
     )
-    recurring_allocation = resolve_starting_capital(
-        request,
-        initial_price=initial_price,
+    capital_plan = build_dca_capital_plan(
+        starting_capital=request.starting_capital,
+        contribution=resolve_starting_capital(request, initial_price=initial_price),
+        period=resolve_dca_cadence(request.cadence),
     )
-    cadence = resolve_dca_cadence(request.cadence)
+    cadence = capital_plan.period
     config = _build_periodic_config(
         request=request,
         asset_class=asset_class,
         symbols=symbols,
-        recurring_contribution=recurring_allocation,
-        cadence=cadence,
+        capital_plan=capital_plan,
     )
     config = _with_prepared_coverage(config, prepared_market_data)
     _validate_launch_config(config)
@@ -498,9 +503,9 @@ def _run_dca_accumulation(
             },
             "benchmark_symbol": config["benchmark_symbol"],
             "sizing_mode": request.sizing_mode,
-            "capital_amount": recurring_allocation,
-            "recurring_contribution": recurring_allocation,
-            "starting_principal": 0.0,
+            "capital_amount": capital_plan.contribution,
+            "recurring_contribution": capital_plan.contribution,
+            "starting_capital": capital_plan.starting_capital,
             "position_size": request.position_size,
             "cadence": cadence,
             "engine_config": dict(config),
@@ -666,8 +671,7 @@ def _build_periodic_config(
     request: LaunchBacktestRequest,
     asset_class: str,
     symbols: list[str],
-    recurring_contribution: float,
-    cadence: str,
+    capital_plan: DcaCapitalPlan,
 ) -> dict[str, Any]:
     benchmark_symbol = _resolve_request_benchmark(
         request,
@@ -682,14 +686,10 @@ def _build_periodic_config(
         "start_date": request.date_range.start,
         "end_date": request.date_range.end,
         "side": "long",
-        # The shared engine still reads this field as the periodic contribution
-        # for DCA. Keep product-facing names in parameters/envelopes.
-        "starting_capital": recurring_contribution,
         "allocation_method": "equal_weight",
         "benchmark_symbol": benchmark_symbol,
-        "parameters": {"dca_cadence": cadence},
-        "recurring_contribution": recurring_contribution,
-        "starting_principal": 0.0,
+        "parameters": {"dca_cadence": capital_plan.period},
+        **dca_capital_config_fields(capital_plan),
     }
     return _with_execution_realism(config, request)
 
@@ -730,16 +730,6 @@ def _build_launch_result_card(
 
 
 def _validate_launch_config(config: dict[str, Any]) -> None:
-    if config["template"] == "dca_accumulation":
-        validation_config = dict(config)
-        # Shared engine validation treats starting_capital as a one-time bankroll.
-        # Launch DCA uses it as the recurring contribution amount instead.
-        validation_config["starting_capital"] = max(
-            1000.0,
-            float(config["starting_capital"]),
-        )
-        validate_backtest_config(validation_config)
-        return
     validate_backtest_config(config)
 
 
@@ -1153,6 +1143,13 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "invalid_chronological_date_range",
         "future_end_date",
         "invalid_starting_capital",
+        "invalid_recurring_contribution",
+        "dca_capital_role_conflict",
+        "dca_requires_starting_capital_or_contribution",
+        "dca_contribution_zero_is_buy_and_hold",
+        "contribution_period_exceeds_window",
+        "starting_capital_not_applicable",
+        "recurring_contribution_not_applicable",
         "invalid_symbol_count",
         "position_price_required",
         "asset_class_conflict",

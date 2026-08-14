@@ -1076,6 +1076,9 @@ def direct_edit_confirmation(
     preparation = direct_edit_confirmation_preparation(
         source_payload,
         capital=payload.capital,
+        starting_capital=payload.starting_capital,
+        recurring_contribution=payload.recurring_contribution,
+        contribution_period=payload.contribution_period,
         date_window=(
             payload.date_window.model_dump(mode="python")
             if payload.date_window is not None

@@ -18,6 +18,9 @@ from argus.agent_runtime.coverage_recovery import (
     optional_parameter_status_without_coverage_recovery,
 )
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
+from argus.agent_runtime.semantic_integrity import (
+    UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
+)
 from argus.agent_runtime.simplification_option_contract import (
     simplification_option_kind,
 )
@@ -676,7 +679,7 @@ def _blocking_unsupported_constraints(
     return [
         constraint
         for constraint in unsupported_constraints
-        if constraint.get("category") != "unsupported_dca_starting_principal"
+        if constraint.get("category") != UNSUPPORTED_DCA_CONTRIBUTION_CEILING
     ]
 
 

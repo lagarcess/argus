@@ -292,21 +292,46 @@ def _execute_long_only_ledger(
     )
 
 
+def symbol_allocation_capital(config: dict[str, Any], *, symbol_count: int) -> float:
+    """The money one symbol's simulation starts each period with.
+
+    A recurring plan allocates its contribution; every other template allocates
+    its bankroll. One owner, so no caller has to choose between the two names.
+    """
+    from argus.domain.dca_capital import dca_capital_plan_from_config
+
+    divisor = max(symbol_count, 1)
+    if config["template"] == "dca_accumulation":
+        return dca_capital_plan_from_config(config).per_symbol(divisor).contribution
+    return float(config["starting_capital"]) / divisor
+
+
 def _dca_equity_curve(
     *,
     close: pd.Series,
     entries: pd.Series,
     contribution: float,
+    starting_capital: float = 0.0,
     fees: float = 0.0,
     slippage: float = 0.0,
 ) -> tuple[pd.Series, float]:
+    """Value a recurring plan. The seed buys once on the first bar.
+
+    Every dollar is invested on its own date at the fill price after modeled
+    costs, in fractional shares, so no cash waits for a whole share and the
+    invested total is the seed plus one contribution per entry.
+    """
     entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
     fill_price = close * (1.0 + slippage)
     cash_per_share = fill_price * (1.0 + fees)
     shares_bought = (contribution / cash_per_share).where(entry_mask, 0.0)
+    if starting_capital > 0.0 and not close.empty:
+        seed_shares = starting_capital / float(cash_per_share.iloc[0])
+        shares_bought = shares_bought.copy()
+        shares_bought.iloc[0] = float(shares_bought.iloc[0]) + seed_shares
     cumulative_shares = shares_bought.cumsum()
     equity = cumulative_shares * close
-    invested_capital = float(entry_mask.sum()) * contribution
+    invested_capital = starting_capital + float(entry_mask.sum()) * contribution
     if invested_capital <= 0:
         invested_capital = contribution
     return equity.astype(float), invested_capital

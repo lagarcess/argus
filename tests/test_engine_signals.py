@@ -85,8 +85,13 @@ def test_dca_metrics_account_for_each_recurring_contribution(monkeypatch):
             "asset_class": "equity",
             "start_date": "2024-01-01",
             "end_date": "2024-02-29",
-            "starting_capital": 500.0,
             "benchmark_symbol": "AAPL",
+            "parameters": {"dca_cadence": "monthly"},
+            "dca_capital": {
+                "schema_version": "dca_capital_v1",
+                "starting_capital": 0.0,
+                "contribution": 500.0,
+            },
         },
         metrics,
     )
@@ -104,7 +109,7 @@ def test_dca_metrics_account_for_each_recurring_contribution(monkeypatch):
     assert parse_money(left) == 1000.0
     assert parse_money(right) == 1500.0
     assert any(
-        assumption.startswith("Recurring contribution: $500")
+        assumption == "Contribution: $500 monthly"
         for assumption in card["assumptions"]
     )
 
