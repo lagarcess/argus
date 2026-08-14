@@ -2204,6 +2204,9 @@ def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
 
 
 def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatch):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2238,6 +2241,9 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
 
 
 def test_signup_emits_product_event_for_public_registration(mock_gateway, monkeypatch):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     captured_events: list[tuple[str, dict[str, object]]] = []
@@ -2276,7 +2282,7 @@ def test_signup_emits_product_event_for_public_registration(mock_gateway, monkey
             completed=True,
             stage="ready",
             language_confirmed=True,
-            primary_goal="growth",
+            primary_goal="test_stock_idea",
         ),
         created_at=now,
         updated_at=now,
@@ -2306,18 +2312,33 @@ def test_signup_emits_product_event_for_public_registration(mock_gateway, monkey
     ]
     kind, payload = captured_events[0]
     assert kind == "account_registration_completed"
+    assert set(payload.keys()) == {"user_id", "attributes"}
     assert payload["attributes"]["language"] == "en"
     assert payload["attributes"]["surface"] == "auth_signup"
     assert set(payload["attributes"].keys()) == {
         "surface",
         "language",
     }
+    assert not set(payload["attributes"]).intersection(
+        {
+            "assistant_prose",
+            "prompt",
+            "message_history",
+            "capital",
+            "account_balance",
+            "holdings",
+            "email",
+        }
+    )
 
 
 def test_signup_duplicate_obfuscated_user_does_not_emit_product_event(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     captured_events: list[tuple[str, dict[str, object]]] = []
@@ -2357,6 +2378,9 @@ def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2420,6 +2444,9 @@ def test_signup_retry_does_not_reveal_profile_creation_through_username(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2491,6 +2518,9 @@ def test_signup_normalizes_taken_username_before_creating_auth_user_or_profile(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2621,6 +2651,9 @@ def test_public_signup_allowlist_denial_matches_provider_failure(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = False
