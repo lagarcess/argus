@@ -47,6 +47,7 @@ from argus.api.schemas import (
     User,
     guest_safe_user,
 )
+from argus.observability.product_events import capture_product_event
 from argus.domain.supabase_guest_accounts import EmailAlreadyRegisteredError
 from argus.domain.username_signup import (
     serialized_guest_signup,
@@ -699,6 +700,16 @@ def signup_guest_account(
                 auth_user
             )
             result["user"] = profile.model_dump(mode="json")
+            profile_id = str(getattr(profile, "id", "") or "").strip()
+            if profile_id:
+                capture_product_event(
+                    "account_registration_completed",
+                    user_id=profile_id,
+                    attributes={
+                        "surface": "auth_signup",
+                        "language": getattr(profile, "language", None),
+                    },
+                )
 
             if not isinstance(result.get("session"), dict):
                 return auth_response(request, result)

@@ -2237,6 +2237,122 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
     assert response.cookies.get("sb-auth-token") == "access-token-123"
 
 
+def test_signup_emits_product_event_for_public_registration(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    captured_events: list[tuple[str, dict[str, object]]] = []
+
+    def fake_capture_product_event(kind: str, **payload: object) -> None:
+        captured_events.append((kind, dict(payload)))
+
+    monkeypatch.setattr(
+        "argus.api.routers.auth.capture_product_event",
+        fake_capture_product_event,
+    )
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    now = utcnow()
+    mock_gateway.signup.return_value = {
+        "session": {
+            "access_token": "access-token-123",
+            "refresh_token": "refresh-token-123",
+            "expires_in": 3600,
+        },
+        "user": {
+            "id": "user-1",
+            "email": "beta@example.com",
+            "identities": [{"id": "identity-id"}],
+        },
+    }
+    mock_gateway.get_or_create_profile_for_auth_user.return_value = User(
+        id="user-1",
+        email="beta@example.com",
+        username="beta",
+        display_name="Beta",
+        language="en",
+        locale="en-US",
+        theme="dark",
+        is_admin=False,
+        onboarding=OnboardingState(
+            completed=True,
+            stage="ready",
+            language_confirmed=True,
+            primary_goal="growth",
+        ),
+        created_at=now,
+        updated_at=now,
+    )
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "beta@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_events == [
+        (
+            "account_registration_completed",
+            {
+                "user_id": "user-1",
+                "attributes": {
+                    "surface": "auth_signup",
+                    "language": "en",
+                },
+            },
+        ),
+    ]
+    kind, payload = captured_events[0]
+    assert kind == "account_registration_completed"
+    assert payload["attributes"]["language"] == "en"
+    assert payload["attributes"]["surface"] == "auth_signup"
+    assert set(payload["attributes"].keys()) == {
+        "surface",
+        "language",
+    }
+
+
+def test_signup_duplicate_obfuscated_user_does_not_emit_product_event(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    captured_events: list[tuple[str, dict[str, object]]] = []
+
+    def fake_capture_product_event(kind: str, **payload: object) -> None:
+        captured_events.append((kind, dict(payload)))
+
+    monkeypatch.setattr(
+        "argus.api.routers.auth.capture_product_event",
+        fake_capture_product_event,
+    )
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.return_value = {
+        "session": None,
+        "user": {
+            "id": "obfuscated-user-id",
+            "email": "existing@example.com",
+            "identities": [],
+        },
+    }
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "existing@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_events == []
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
+
+
 def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
     mock_gateway,
     monkeypatch,

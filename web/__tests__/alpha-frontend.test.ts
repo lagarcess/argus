@@ -2343,6 +2343,45 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).not.toContain("ThumbsDown");
   });
 
+  test("chat feedback rating is posted directly while dialog remains available for deliberate feedback", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(
+        join(root, "public/locales/en/common.json"),
+        "utf-8",
+      ),
+    );
+    const es = JSON.parse(
+      readFileSync(
+        join(root, "public/locales/es-419/common.json"),
+        "utf-8",
+      ),
+    );
+
+    expect(chat).toContain("const handleMessageFeedback = useCallback");
+    expect(chat).toContain(
+      "void handleMessageFeedback(type, context, rating);",
+    );
+    expect(chat).toContain('type: "general"');
+    expect(chat).toContain(
+      "feedbackContextForSubmission(context, {",
+    );
+    expect(chat).toContain("includeConversationContext: true");
+    expect(chat).toContain("tags: []");
+    expect(chat).toContain("attachmentCount: 0");
+    expect(chat).toContain('t("feedback.rating_message_fallback", { rating })');
+    expect(chat).toContain("openFeedbackDialogState(type, context, rating, conversationId)");
+    expect(
+      en.feedback.rating_message_fallback,
+    ).toContain("{{rating}}");
+    expect(
+      es.feedback.rating_message_fallback,
+    ).toContain("{{rating}}");
+  });
+
   test("chat message feedback controls fill only the selected thumb glyph", () => {
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
