@@ -644,6 +644,38 @@ private-alpha launch; record any override in the release manifest.
   model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
   landing-gate run and every `main` promotion candidate.
 
+### Live eval is a comparison, not a scoreboard
+
+**Founder-locked 2026-08-13.** A red live eval does not by itself block a
+promotion. The question a promotion asks is *"is this worse than what users
+have right now"*, and a suite scored against frozen expectations cannot answer
+it. Expectations drift as decisions land, so a failing check may be a
+regression, a superseded expectation, or model variance, and the three are
+indistinguishable from one run.
+
+So a red candidate run requires a **baseline run at the deployed production
+SHA**, with identical provider modes, and the two are compared:
+
+- **Candidate fails only what production already fails** → not a regression.
+  Promote, and record every failure with its owner in the manifest.
+- **Candidate fails anything production passes** → that is a regression.
+  Do not promote.
+- **Candidate passes what production fails** → an improvement, record it.
+
+Run the baseline from a detached worktree at `origin/main` so the candidate
+tree is untouched, and commit both scorecards as durable evidence.
+
+Why this rule exists: on 2026-08-13 a candidate carrying five user-visible
+fixes was held by twelve failures that all turned out to live in code already
+deployed. The gate was measuring the wrong thing. Twelve failures nobody had
+reported were outranking five defects real users had hit.
+
+The corollary is the more important half: **run the eval before merging**
+anything that touches the interpreter or the edit spine, not only before
+promoting. PR #431 shipped compound editing on 2026-08-11 without one. The
+suite already contained the cases that would have caught it, and had scored
+them 14/14 eight days earlier. That is [#498](https://github.com/lagarcess/argus/issues/498).
+
 ## Guest Staged Rollout
 
 The operational security checklist for later internet-facing Guest exposure is
@@ -655,7 +687,7 @@ Product defaults:
 
 ```bash
 ARGUS_GUEST_ACCESS_ENABLED=true
-ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
+ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true
 NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
 ARGUS_VISITOR_KEY_SECRET=<unique high-entropy environment secret>
 ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
@@ -664,9 +696,12 @@ ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
 Guest access is part of the normal product shape. The two Guest flags are
 default-on emergency kill switches; explicit `false` activates rollback. The
 frontend flag controls presentation only and the API remains authoritative.
-Public-account access remains off, permanent signup/login stays
-allowlist-gated, existing admin/developer behavior is unchanged, and no Create
-account promise is shown.
+Public-account access is open as of 2026-08-12: permanent signup and login
+admit any email without an explicitly disabled allowlist row, the guest surface
+offers account creation, and existing admin/developer behavior is unchanged
+because opening the gate grants no role. That third flag is the one that fails
+closed when unset, so it must be set explicitly on every service that reads it;
+omitting it denies registration rather than opening it.
 
 Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
@@ -734,7 +769,8 @@ Rollback order:
 
 1. set `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`;
 2. set `ARGUS_GUEST_ACCESS_ENABLED=false`;
-3. keep `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`;
+3. leave `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` untouched, because rolling
+   guest access back does not close public registration;
 4. verify the preserved centered auth landing path;
 5. stop new guest creation while retaining existing rows for safe expiry,
    conversion, or bounded cleanup.
@@ -753,7 +789,10 @@ The live `argus-api` plan is `standard`. The live `argus-app` plan is
 `starter`. The requested-role migration and access-request exposure are
 complete after the paid-plan readback and maintenance/private-health probes in
 `docs/release-evidence/public-alpha-readiness.md`. Public account creation is
-still allowlist-gated; `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false`.
+open: the founder set `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` live on
+2026-08-12, recorded in
+`docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`, so
+anyone may register and the allowlist blocks only explicitly disabled rows.
 The evidence records the paid API instance type plus the maintenance and
 private/SSH/local verification controls.
 

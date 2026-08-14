@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -95,7 +96,12 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
 
 
-def test_guest_and_public_account_access_are_documented_open() -> None:
+def test_guest_and_public_account_access_are_open_in_env_templates() -> None:
+    """Env templates only. Prose claims are owned by the doc-sync suite.
+
+    The former name promised documentation coverage it never had, which is how
+    the docs drifted unnoticed while this stayed green.
+    """
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
     web_example = (ROOT / "web" / ".env.local.example").read_text(encoding="utf-8")
 
@@ -193,3 +199,30 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
             )
         for key in service_profile["optional"]:
             assert rendered_env[key].get("sync") is False
+
+
+def test_api_and_app_share_a_registrable_domain() -> None:
+    """The handoff cookie is SameSite=Lax, which only carries first-party.
+
+    Guest conversion broke for every iOS browser on 2026-08-13 because the API
+    sat on a different registrable domain and the cookie was third-party. Move
+    it off arguschat.ai again and every browser silently stops returning it.
+    """
+
+    blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
+    app_origin = re.search(
+        r"key: ARGUS_APP_ORIGIN\s*\n\s*value: (\S+)", blueprint
+    )
+    api_url = re.search(
+        r"key: NEXT_PUBLIC_ARGUS_API_URL\s*\n\s*value: (\S+)", blueprint
+    )
+    assert app_origin and api_url, "render.yaml must declare both hosts"
+
+    def registrable(url: str) -> str:
+        host = urlparse(url).hostname or ""
+        return ".".join(host.split(".")[-2:])
+
+    assert registrable(app_origin.group(1)) == registrable(api_url.group(1)), (
+        "The API must share a registrable domain with the app, or the guest "
+        "handoff cookie becomes third-party and every browser drops it."
+    )

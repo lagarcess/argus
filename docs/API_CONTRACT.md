@@ -1601,10 +1601,16 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - email + password
 
 **Private-alpha access:**
-- Private-alpha signup and login are gated by the server-side Supabase `private_alpha_allowlist` table.
-- `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
-- `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
-- Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is the one gate over permanent
+  signup, login, and authenticated requests, and it has been open in production
+  since 2026-08-12. Public registration is therefore open: the server-side
+  Supabase `private_alpha_allowlist` table admits any email and denies only a
+  row whose `disabled_at` is set. When that flag is off instead, the same table
+  becomes an admission list: only an email whose active row carries `admin`,
+  `developer`, or `user` may enter, so a `requested` row does not admit it.
+- `POST /auth/signup` must apply that gate before calling Supabase Auth signup, so denied emails do not create auth users or profiles.
+- `POST /auth/login` must also apply it before creating a browser session, so denied emails cannot enter the app.
+- Authenticated API requests must also reject users the gate denies, so an existing session cannot keep using access the gate would no longer grant.
 - `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
   `{"email":"person@example.com","language":"en"}` where `language` is exactly
   `en` or `es-419`. Every syntactically valid new, duplicate, approved,
@@ -1617,7 +1623,9 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - An access request may insert only a missing `requested` row with normalized
   email and the requested language. It must never overwrite an existing
   requested, approved, privileged, or disabled row. `requested` and unknown
-  roles do not grant permanent access.
+  roles grant no role elevation. While public registration is open they also
+  withhold nothing, because admission needs only the absence of a disabled row;
+  when the public gate is closed instead, neither role admits the email.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
   method and path. It loads one active requested row and its language, sends
@@ -1724,7 +1732,10 @@ Guest access is additive and server-authoritative.
 `ARGUS_GUEST_ACCESS_ENABLED` defaults to `true`; explicit `false` is the
 emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
 defaults to `true` and controls presentation only. The independent
-`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` policy remains false by default.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` policy has been open in production
+since 2026-08-12, so guests may create permanent accounts. That policy is the
+one flag here that fails closed when unset, so an environment omitting it denies
+permanent accounts rather than allowing them.
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
@@ -1827,9 +1838,10 @@ owner until that claim commits.
 excluded from owner rewriting: they retain anonymous attribution or become
 null through their existing foreign-key behavior.
 
-While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
-remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
-authenticate without role elevation; explicitly disabled rows remain blocked.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` has been live in production since
+2026-08-12, so unlisted ordinary accounts may authenticate without role
+elevation while explicitly disabled rows stay blocked. When that flag is off
+instead, permanent signup and login admit active allowlist roles only.
 Before that flag may be enabled, founder-approved production-parity evidence
 must prove that every enabled permanent Auth provider supplies a verified email
 compatible with profile and allowlist-role rules. Phone, OAuth, or other
@@ -1882,9 +1894,10 @@ the existing localized check-your-email state and must not redirect to chat.
 
 **Private-alpha blocked response:** signup intentionally returns the same
 generic `400 auth_signup_failed` shape used for provider signup failures, while
-still checking the allowlist before calling Supabase Auth signup. Public signup
-attempts must not distinguish unlisted/disabled private-alpha emails from
-listed emails that fail provider signup.
+still checking the allowlist before calling Supabase Auth signup. A caller must
+not be able to tell a denied email from a listed email that failed provider
+signup. Denial means an explicitly disabled row while the public gate is open,
+and an unlisted email as well when it is closed.
 
 When an optional username is supplied, the server trims and case-folds it and
 serializes same-email and same-username signup attempts before checking profile
@@ -2007,9 +2020,10 @@ Supabase Auth without logging or persistence.
 ```
 
 **Private-alpha blocked response:** login intentionally returns the same generic
-`401 unauthorized` shape used for invalid credentials, so public login attempts
-cannot distinguish unlisted/disabled private-alpha emails from listed emails
-with wrong passwords.
+`401 unauthorized` shape used for invalid credentials, so a caller cannot tell a
+denied email from a listed email with a wrong password. Denial means an
+explicitly disabled row while the public gate is open, and an unlisted email as
+well when it is closed.
 
 ```json
 {

@@ -1,12 +1,806 @@
 from __future__ import annotations
 
+import json
+import re
+import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 
+import pytest
+
+from tests.evals.measurement_eval_scorecard import (
+    measurement_fixture_identity_at_git_sha,
+)
+from tests.release_promotion_evidence_support import (
+    assert_main_promotion_baseline_comparison,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
+PUBLIC_ACCOUNT_ACCESS_FLAG = "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"
+# The release profile owns this flag's value. Product truth is where prose states
+# it, and every other doc may point here rather than repeat it.
+CANONICAL_VALUE_DOC = "docs/PRODUCT.md"
+
+# Records of a moment keep the claims they shipped with, because quoting a
+# superseded posture is their job. Everything else under docs/, .agent/, and the
+# repo root is standing guidance a reader consults for current truth, so it is
+# in scope by default rather than by being listed.
+_RECORD_TREES = (
+    "docs/archive/",
+    "docs/release-manifests/",
+    "docs/release-evidence/",
+    "docs/evidence/",
+    "docs/reports/",
+    "docs/qa/",
+)
+_DATED_RECORD = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+# Domain knowledge vendored for agents, not Argus access policy.
+_UNRELATED_TREES = (".agent/skills/",)
+
+# Closed boolean vocabularies, so a new stale sentence is caught by grammar
+# rather than by matching a phrase somebody already wrote. These are read next to
+# the flag name, where "on" would usually be a preposition ("on 2026-08-12") and
+# "enabled"/"disabled" would usually be an Auth provider or an allowlist row.
+_STATE_WORDS = {
+    "true": ("true",),
+    "false": ("false", "off"),
+}
+# A doc may describe the other value only inside a subordinate clause, so it
+# scopes the behavior instead of declaring it. "unless" is deliberately absent:
+# "stays false unless approved" asserts a standing value.
+_SUBORDINATING = re.compile(r"\b(?:if|when|whenever|while|once)\b", re.IGNORECASE)
+_BLOCK_BREAK = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#|```|\|)")
+
+# Prose names this policy without naming the variable, which is how four sites
+# escaped the first pass. A sentence must be about the gate before its state
+# words are read as a claim about the gate.
+_GATE_SUBJECT = re.compile(
+    r"public[-\s]?(?:account|permanent|registration|signup|login)"
+    r"|permanent[-\s]?accounts?\b",
+    re.IGNORECASE,
+)
+# Words that call the gate open or shut, keyed by the value each asserts, so the
+# same reading runs whichever way the profile points. "on" and "closed" are
+# absent because "on 2026-08-12" and "fails closed" are ordinary prose here.
+_GATE_STATE = {
+    "true": re.compile(r"\b(?:true|open|opens|opened|enabled)\b", re.IGNORECASE),
+    "false": re.compile(r"\b(?:false|off|disabled)\b", re.IGNORECASE),
+}
+# Words that cannot be the noun a state word modifies, so a state word followed
+# by one of them, by punctuation, or by nothing is predicative and asserts the
+# gate: "access is disabled", "registration is enabled", "off for new accounts".
+_NOT_A_MODIFIED_NOUN = (
+    r"for|so|and|or|but|to|on|in|of|with|no|not|all|any|every|because|since|"
+    r"unless|while|when|if|then|until|except|by|as|at|from|that|which|it|its|"
+    r"this|these|those|there|here|only|merely|just|simply|still|now|today"
+)
+# Attributive instead: the word modifies the noun after it and describes that
+# noun, not the gate. "an explicitly disabled allowlist row" stays true while the
+# gate is open, and "every enabled permanent Auth provider" is not a gate claim
+# either, which is why both boolean words are safe to read in both directions.
+# Asking what the word modifies replaces enumerating the nouns it might modify.
+_ATTRIBUTIVE = re.compile(
+    rf"[\s-]+(?!(?:{_NOT_A_MODIFIED_NOUN})\b)\w+",
+    re.IGNORECASE,
+)
+# What precedes settles it before what follows has to. A copula makes the word
+# predicative whatever comes next, so "is disabled pending review" is a gate
+# claim even though "pending" could pass for the noun it modifies. A determiner
+# after the copula means the opposite, as in "is a disabled row", so it is
+# excluded rather than read as a claim.
+_PREDICATIVE = re.compile(
+    r"\b(?:is|are|was|were|be|been|being|remains?|stays?|becomes?|became|"
+    r"fails?|defaults?|keeps?|kept)\s+"
+    r"(?!(?:a|an|the)\b)(?:\w+\s+)?$",
+    re.IGNORECASE,
+)
+# "not open" asserts the other state, however far the negator sits from it, so
+# this looks anywhere earlier in the same clause rather than counting words.
+# "not only open" asserts this state, so the additive and emphatic forms are
+# excluded rather than read as negation.
+_NEGATION = re.compile(
+    r"\b(?:not|never|no longer|cannot|without)\b(?!\s+(?:only|merely|just|simply)\b)",
+    re.IGNORECASE,
+)
+# One clause is the unit a claim lives in. Splitting here lets a state word be
+# read whether it sits before or after the account phrase, while keeping a
+# neighbouring flag's value or an unrelated subject out of this claim.
+_CLAUSE_BREAK = re.compile(
+    r",\s+|;\s+|:\s+|\s+(?:and|but|or|so|because|although|though|whereas)\s+",
+    re.IGNORECASE,
+)
+# Another environment variable ends this flag's value: a stale value after one of
+# these belongs to that variable, not to ours.
+_OTHER_ENV_VAR = re.compile(r"\b(?:ARGUS|NEXT_PUBLIC|SUPABASE|OPENROUTER|ALPACA)_\w+")
+# Self-identifying: this term means the gate is shut, whatever the subject.
+_GATE_SHUT_TERM = "allowlist-gated"
+LIVE_EVAL_RESULT_STATUSES = (
+    "passed",
+    "failed",
+    "expected_failed",
+    "unexpected_pass",
+    "skipped",
+)
+
+KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
+    {
+        "2026-06-18-private-alpha-next-ci-cd-sota.md",
+        "2026-06-27-private-alpha-p2-checkpoint.md",
+        "2026-07-14-main-production-promotion.md",
+        "2026-07-10-private-alpha-next-interpret-surface.md",
+        "2026-08-05-main-production-promotion.md",
+        "2026-08-11-main-production-promotion.md",
+        "2026-08-12-main-production-promotion-716221f.md",
+        "2026-08-12-main-production-promotion.md",
+    }
+)
 
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _release_profile_value(key: str) -> str:
+    profile = json.loads(RELEASE_PROFILE_PATH.read_text(encoding="utf-8"))
+    return profile["services"]["api"]["env"][key]
+
+
+def _standing_doc_paths() -> list[Path]:
+    """Every Markdown file whose claims are supposed to be true right now."""
+    candidates = sorted(
+        {
+            *(ROOT / "docs").rglob("*.md"),
+            *ROOT.glob("*.md"),
+            *(ROOT / ".agent").rglob("*.md"),
+        }
+    )
+    return [
+        path
+        for path in candidates
+        if not path.relative_to(ROOT)
+        .as_posix()
+        .startswith(_RECORD_TREES + _UNRELATED_TREES)
+        and not _DATED_RECORD.match(path.name)
+    ]
+
+
+def _claim_sentences(text: str) -> Iterator[str]:
+    """Yield sentences with Markdown wrapping collapsed.
+
+    Blocks break on blank lines, list markers, headings, fences, and table rows
+    so a claim is never read across two unrelated bullets. A fenced block yields
+    one line at a time, because its lines are already separate statements and
+    joining them would read a neighbouring variable's value as this one's.
+    """
+    block: list[str] = []
+    fenced = False
+    for line in text.splitlines() + [""]:
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            if line.strip():
+                yield line.strip()
+            continue
+        if not line.strip() or _BLOCK_BREAK.match(line):
+            if block:
+                yield from re.split(r"(?<=[.;])\s+", " ".join(" ".join(block).split()))
+                block = []
+            if line.strip():
+                block = [line]
+            continue
+        block.append(line)
+
+
+def _declares(position: int | None, scope_at: int | None) -> bool:
+    """Whether a value at `position` states the gate's standing posture.
+
+    A subordinating conjunction opening before it scopes the value to a case
+    instead, which is how a doc keeps describing the off state honestly.
+    """
+    return position is not None and not (scope_at is not None and scope_at < position)
+
+
+def _clauses(sentence: str) -> Iterator[tuple[int, str]]:
+    """Yield (offset, clause) for each clause of `sentence`."""
+    start = 0
+    for gap in _CLAUSE_BREAK.finditer(sentence):
+        if gap.start() > start:
+            yield start, sentence[start : gap.start()]
+        start = gap.end()
+    if start < len(sentence):
+        yield start, sentence[start:]
+
+
+def _flag_value_claim(clause: str, stale_words: tuple[str, ...]) -> int | None:
+    """Where the clause gives this flag the stale value, if it does.
+
+    Only text after the flag name counts, and another environment variable ends
+    the window, so a neighbouring flag's value is never read as this one's.
+    """
+    named = clause.find(PUBLIC_ACCOUNT_ACCESS_FLAG.lower())
+    if named < 0:
+        return None
+    window_end = len(clause)
+    if other := _OTHER_ENV_VAR.search(clause, named + len(PUBLIC_ACCOUNT_ACCESS_FLAG)):
+        window_end = other.start()
+    return min(
+        (
+            match.start()
+            for word in stale_words
+            if (match := re.compile(rf"\b{word}\b").search(clause, named, window_end))
+        ),
+        default=None,
+    )
+
+
+def _gate_state_claim(clause: str, stale_state: re.Pattern[str]) -> int | None:
+    """Where the clause asserts the stale gate state in words, if it does.
+
+    The clause must be about the gate, in either word order, then each state word
+    is judged by how it is used: a copula before it makes it predicative and a
+    claim about the gate, while modifying the noun after it describes that noun.
+    """
+    if not _GATE_SUBJECT.search(clause):
+        return None
+    for match in stale_state.finditer(clause):
+        before = clause[: match.start()]
+        if _NEGATION.search(before):
+            continue
+        if _PREDICATIVE.search(before):
+            return match.start()
+        if _ATTRIBUTIVE.match(clause, match.end()):
+            continue
+        return match.start()
+    return None
+
+
+def _access_claim_contradictions(text: str, declared: str) -> list[str]:
+    """Claims in `text` that a reader would take as the wrong flag value.
+
+    Clauses are read whether or not they name the variable, because prose that
+    describes the policy in words is how most of this drift survived.
+    """
+    stale = "false" if declared == "true" else "true"
+    stale_words = _STATE_WORDS[stale]
+    stale_state = _GATE_STATE[stale]
+
+    found: list[str] = []
+    for sentence in _claim_sentences(text):
+        lowered = sentence.lower()
+
+        # The named flag keeps its value across a whole sentence, because "remains
+        # a separate policy and stays `false`" carries the subject over the
+        # conjunction. Binding the value to the name is what keeps a neighbouring
+        # flag out, so this needs no clause split.
+        sentence_scope = _SUBORDINATING.search(lowered)
+        if _declares(
+            _flag_value_claim(lowered, stale_words),
+            sentence_scope.start() if sentence_scope else None,
+        ):
+            found.append(sentence)
+            continue
+
+        # Prose is read one clause at a time instead, so a state word counts
+        # whether it sits before or after the account phrase, and an unrelated
+        # subject in a neighbouring clause is not dragged in.
+        for offset, clause in _clauses(lowered):
+            # A subordinating conjunction earlier in the sentence scopes this
+            # clause too, so splitting cannot strip an off-case description of
+            # the condition that made it honest.
+            inherited = _SUBORDINATING.search(lowered[:offset])
+            local = _SUBORDINATING.search(clause)
+            scope_at = -1 if inherited else (local.start() if local else None)
+
+            # Runs in both directions: after a rollback to `false`, prose still
+            # calling registration open is the same defect mirrored.
+            if declared == "true" and _GATE_SHUT_TERM in clause:
+                claimed = clause.index(_GATE_SHUT_TERM)
+            else:
+                claimed = _gate_state_claim(clause, stale_state)
+
+            if _declares(claimed, scope_at):
+                found.append(sentence)
+                break
+    return found
+
+
+def test_public_account_access_claim_detector_reads_grammar_not_phrases() -> None:
+    """The guard above is only worth its name if these shapes stay separated."""
+    must_catch = (
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=false`",
+        f"The independent `{PUBLIC_ACCOUNT_ACCESS_FLAG}` policy remains false.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` defaults off and controls accounts.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` stays false unless the founder agrees.",
+        # The named flag keeps its value across a conjunction, so reading prose
+        # clause by clause must not sever the value from the name.
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}` remains a separate policy and stays "
+        "`false` until explicitly approved.",
+        "Public account creation is still allowlist-gated.",
+        "Standing mitigations: allowlist-gated account creation, and Turnstile.",
+        # Shapes that never name the variable, which is how four sites survived
+        # the first pass: DESIGN.md and private-alpha-next-integration.md.
+        "Public account access remains explicitly disabled and founder owned.",
+        "Guest defaults on with rollback; public-account access remains off.",
+        "Rollback is flags first: keep public-account access false.",
+        "Public permanent accounts are disabled, so guest chrome hides signup.",
+        # A denial noun after the state word does not make it the exception when a
+        # function word or punctuation separates them: these shut the gate and
+        # then mention accounts, rather than describing one denied account.
+        "Public account access is disabled for all accounts.",
+        "Public registration is off for new accounts.",
+        "Public signup is disabled, so no accounts can be created.",
+        "Public signup is disabled for new accounts.",
+        # A copula settles it before the following word can pose as the noun
+        # being modified.
+        "Public signup is disabled pending review.",
+        "Public account access is off limits.",
+        "Public account creation is disabled indefinitely.",
+        # The state word may sit before the account phrase, not only after it.
+        "Registration is disabled for public accounts.",
+        # A fenced block declares one value per line.
+        f"```bash\nOTHER_FLAG=true\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=false\n```",
+    )
+    must_allow = (
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}` is off, signup is allowlist-gated.",
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` has been live since 2026-08-12.",
+        # Conditional and procedural off-state guidance stays writable, which is
+        # why the assignment is parsed rather than banned as a substring.
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}=false`, only allowlisted roles enter.",
+        f"When rolling back, set `{PUBLIC_ACCOUNT_ACCESS_FLAG}=false` and redeploy.",
+        # A disabled allowlist row is not a claim that the gate is shut.
+        "Public registration is open. The server turns away only an email "
+        "carrying an explicitly disabled allowlist row.",
+        "Public-account access is an independent gate that fails closed when "
+        "unset, so a deployment omitting the variable denies registration.",
+        # A neighbouring variable's `false` is not this gate's value.
+        f"```bash\n{PUBLIC_ACCOUNT_ACCESS_FLAG}=true\nOTHER_FLAG=false\n```",
+        # Accurate prose may keep the denial exception next to the subject. A
+        # distance rule rejected these and forced authors to pad sentences.
+        "Public signup is open except for explicitly disabled emails.",
+        "Public account creation is open, and only an explicitly disabled row "
+        "is refused.",
+        "Public registration is open, so a disabled allowlist entry is the only "
+        "refusal.",
+        # Negation asserts the open state, so it is not a shut claim.
+        "Public account creation is not disabled.",
+        # A determiner after the copula means the word modifies the noun after
+        # it, so this is one denied account rather than the gate.
+        "Public registration is open, so the only refusal is a disabled "
+        "allowlist entry.",
+        # A neighbouring flag's value is not this flag's, even in one sentence.
+        f"Set `ARGUS_GUEST_ACCESS_ENABLED=false` but keep "
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true`.",
+        # Negation holds however far it sits from the state word.
+        "Public signup is not expected to be open.",
+        "Public registration is not currently expected to remain open.",
+        # The founder-owned precondition in API_CONTRACT.md must never read as a
+        # stale claim, or a later round deletes it to get the suite green.
+        "Before that flag may be enabled, founder-approved evidence must prove "
+        "that every enabled permanent Auth provider supplies a verified email "
+        "compatible with profile and allowlist-role rules.",
+        "Only an explicitly disabled allowlist row blocks signup or login.",
+    )
+
+    for claim in must_catch:
+        assert _access_claim_contradictions(claim, "true"), f"missed: {claim}"
+    for claim in must_allow:
+        assert not _access_claim_contradictions(claim, "true"), f"false alarm: {claim}"
+
+    # The guard inverts with the profile rather than hardcoding today's posture.
+    # A rollback to `false` has to catch open-state prose the same way, or the
+    # docs only derive from the profile in one direction.
+    for claim in (
+        f"`{PUBLIC_ACCOUNT_ACCESS_FLAG}=true` is live.",
+        "Public registration is now open.",
+        "Public account creation is open to anyone.",
+        "Permanent accounts opened to the public.",
+        # A synonym list could not carry these; asking what the word modifies can.
+        "Public registration is enabled.",
+        "Public account access is enabled for everyone.",
+        "Public signup is open for new accounts.",
+        # Additive "not only" asserts the state rather than negating it.
+        "Public signup is not only open; it is unrestricted.",
+        # Mirror of the before-the-phrase case in the rollback direction.
+        "Registration remains open for public accounts.",
+    ):
+        assert _access_claim_contradictions(
+            claim, "false"
+        ), f"missed on rollback: {claim}"
+    for claim in (
+        "Public account creation is still allowlist-gated.",
+        "Public registration is not open.",
+        f"When `{PUBLIC_ACCOUNT_ACCESS_FLAG}=true`, any undisabled email may enter.",
+    ):
+        assert not _access_claim_contradictions(claim, "false"), f"false alarm: {claim}"
+
+
+def test_public_account_access_claims_cannot_contradict_the_release_profile() -> None:
+    """The release profile owns this flag; standing prose only derives from it.
+
+    Prose drifted out of agreement with the deployed flag once already, because
+    nothing connected a sentence to the profile that decides the value.
+    """
+    declared = _release_profile_value(PUBLIC_ACCOUNT_ACCESS_FLAG)
+    assert declared in _STATE_WORDS, (
+        f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in the release profile. "
+        "Add its boolean spelling to _STATE_WORDS before this guard can read it."
+    )
+    declared_assignment = f"{PUBLIC_ACCOUNT_ACCESS_FLAG}={declared}"
+
+    contradictions: list[str] = []
+    for path in _standing_doc_paths():
+        relative = path.relative_to(ROOT).as_posix()
+        contradictions.extend(
+            f"{relative}: {claim}"
+            for claim in _access_claim_contradictions(
+                path.read_text(encoding="utf-8"), declared
+            )
+        )
+
+    assert not contradictions, (
+        f"{PUBLIC_ACCOUNT_ACCESS_FLAG} is `{declared}` in "
+        f"{RELEASE_PROFILE_PATH.name}, so these standing claims are wrong:\n"
+        + "\n".join(f"  - {item}" for item in contradictions)
+    )
+    # One doc states the value; the rest may point at it. Requiring the literal
+    # in every doc that mentions the flag was asking a test to keep copies in
+    # agreement, which is the split-brain shape this repo forbids, and it made a
+    # flag change a hand-edit of every copy.
+    assert declared_assignment in _source(CANONICAL_VALUE_DOC), (
+        f"{CANONICAL_VALUE_DOC} is where prose states this flag's value, so it "
+        f"must say `{declared_assignment}` to match {RELEASE_PROFILE_PATH.name}."
+    )
+def _commit_measurement_fixture_candidate(
+    repository_root: Path,
+    *,
+    case_ids: tuple[str, ...],
+) -> str:
+    fixture_dir = repository_root / "tests" / "evals" / "measurement_cases"
+    fixture_dir.mkdir(parents=True)
+    (fixture_dir / "messy_english.yaml").write_text(
+        json.dumps(
+            {
+                "category": "messy_english",
+                "cases": [{"id": case_id} for case_id in case_ids],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "add", "tests/evals/measurement_cases"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Argus Eval Test",
+            "-c",
+            "user.email=argus-eval@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--quiet",
+            "-m",
+            "test fixture candidate",
+        ],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+    )
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _assert_main_promotion_live_eval_evidence(
+    manifest_path: Path,
+    *,
+    repository_root: Path = ROOT,
+) -> None:
+    manifest = manifest_path.read_text(encoding="utf-8")
+    scorecard_match = re.search(
+        r"^- Live eval scorecard: `([^`]+\.json)`",
+        manifest,
+        re.M,
+    )
+    assert scorecard_match is not None, (
+        f"{manifest_path.name}: missing durable live eval scorecard"
+    )
+    candidate_match = re.search(
+        r"^- (?:Runtime )?Candidate SHA:\s*`([0-9a-f]{40})`",
+        manifest,
+        re.M,
+    )
+    assert candidate_match is not None, f"{manifest_path.name}: missing candidate SHA"
+    scorecard_path = (repository_root / scorecard_match.group(1)).resolve()
+    assert scorecard_path.is_file(), (
+        f"{manifest_path.name}: live eval scorecard does not exist"
+    )
+    assert scorecard_path.is_relative_to(
+        (repository_root / "docs" / "reports" / "evidence").resolve()
+    ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    assert scorecard.get("schema_version") == 2
+    provenance = scorecard.get("provenance", {})
+    assert provenance.get("evaluation_mode") == "live"
+    assert provenance.get("market_data_provider_mode") == "live_provider"
+    assert str(provenance.get("asset_provider_mode") or "").strip()
+    assert provenance.get("candidate_sha") == candidate_match.group(1)
+    assert re.fullmatch(r"\d+\.\d+\.\d+", provenance.get("python_version", ""))
+    assert re.fullmatch(r"[0-9a-f]{64}", provenance.get("fixture_sha256", ""))
+    assert provenance.get("worktree_clean") is True
+    probe = provenance.get("live_market_data_probe", {})
+    assert probe.get("requested_date_range") == {
+        "start": "2024-01-01",
+        "end": "2024-01-10",
+    }
+    assert probe.get("effective_date_range") == {
+        "start": "2024-01-02",
+        "end": "2024-01-10",
+    }
+    assert probe.get("adjustment_reason") == "calendar_alignment"
+    fixture_case_ids = provenance.get("fixture_case_ids")
+    assert (
+        isinstance(fixture_case_ids, list)
+        and fixture_case_ids
+        and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
+        and len(fixture_case_ids) == len(set(fixture_case_ids))
+    ), "live eval scorecard is missing fixture case identities"
+    candidate_fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_match.group(1),
+        repository_root=repository_root,
+    )
+    assert (
+        provenance.get("fixture_sha256") == candidate_fixture_identity.sha256
+        and fixture_case_ids == list(candidate_fixture_identity.case_ids)
+    ), "live eval scorecard does not match the candidate fixture identity"
+    results = scorecard.get("results")
+    assert isinstance(results, list), "live eval scorecard is missing results"
+    assert all(
+        isinstance(result, dict)
+        and isinstance(result.get("id"), str)
+        and isinstance(result.get("category"), str)
+        and result.get("status") in LIVE_EVAL_RESULT_STATUSES
+        for result in results
+    ), "live eval scorecard contains malformed results"
+    result_case_ids = [result["id"] for result in results]
+    assert result_case_ids == fixture_case_ids, (
+        "live eval scorecard does not contain the complete fixture result set"
+    )
+    totals = scorecard.get("totals", {})
+    calculated_totals = {
+        status: sum(result["status"] == status for result in results)
+        for status in LIVE_EVAL_RESULT_STATUSES
+    }
+    assert totals == calculated_totals, (
+        "live eval scorecard totals do not match its complete results"
+    )
+    assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
+    assert totals.get("unexpected_pass") == 0
+
+    # A red candidate is gated by comparison against the deployed build, never
+    # by its own score. Runbook: "Live eval is a comparison, not a scoreboard".
+    if totals.get("failed"):
+        assert_main_promotion_baseline_comparison(
+            manifest,
+            manifest_path,
+            candidate_results=results,
+            repository_root=repository_root,
+        )
+
+
+
+
+def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{'a' * 40}`\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="missing durable live eval scorecard"):
+        _assert_main_promotion_live_eval_evidence(manifest_path)
+
+
+def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
+    tmp_path: Path,
+) -> None:
+    candidate_sha = _commit_measurement_fixture_candidate(
+        tmp_path,
+        case_ids=("case-a", "case-b"),
+    )
+    fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_sha,
+        repository_root=tmp_path,
+    )
+    scorecard_relative_path = (
+        "docs/reports/evidence/promotion/argus-eval-scorecard.json"
+    )
+    scorecard_path = tmp_path / scorecard_relative_path
+    scorecard_path.parent.mkdir(parents=True)
+    scorecard_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "provenance": {
+                    "evaluation_mode": "live",
+                    "market_data_provider_mode": "live_provider",
+                    "asset_provider_mode": "live_provider",
+                    "candidate_sha": candidate_sha,
+                    "python_version": "3.10.20",
+                    "fixture_sha256": fixture_identity.sha256,
+                    "fixture_case_ids": list(fixture_identity.case_ids),
+                    "worktree_clean": True,
+                    "live_market_data_probe": {
+                        "requested_date_range": {
+                            "start": "2024-01-01",
+                            "end": "2024-01-10",
+                        },
+                        "effective_date_range": {
+                            "start": "2024-01-02",
+                            "end": "2024-01-10",
+                        },
+                        "adjustment_reason": "calendar_alignment",
+                    },
+                },
+                "totals": {
+                    "passed": 2,
+                    "failed": 0,
+                    "expected_failed": 0,
+                    "unexpected_pass": 0,
+                    "skipped": 0,
+                },
+                "results": [
+                    {
+                        "id": "case-a",
+                        "category": "messy_english",
+                        "status": "passed",
+                    },
+                    {
+                        "id": "case-b",
+                        "category": "messy_spanish",
+                        "status": "passed",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard_relative_path}`\n",
+        encoding="utf-8",
+    )
+
+    _assert_main_promotion_live_eval_evidence(
+        manifest_path,
+        repository_root=tmp_path,
+    )
+
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    scorecard["totals"]["passed"] = 1
+    scorecard_path.write_text(json.dumps(scorecard), encoding="utf-8")
+    with pytest.raises(AssertionError, match="totals do not match"):
+        _assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
+
+
+def test_main_promotion_manifest_rejects_summary_without_complete_results(
+    tmp_path: Path,
+) -> None:
+    candidate_sha = _commit_measurement_fixture_candidate(
+        tmp_path,
+        case_ids=("case-a", "case-b"),
+    )
+    scorecard_relative_path = (
+        "docs/reports/evidence/promotion/argus-eval-scorecard.json"
+    )
+    scorecard_path = tmp_path / scorecard_relative_path
+    scorecard_path.parent.mkdir(parents=True)
+    scorecard_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "provenance": {
+                    "evaluation_mode": "live",
+                    "market_data_provider_mode": "live_provider",
+                    "asset_provider_mode": "live_provider",
+                    "candidate_sha": candidate_sha,
+                    "python_version": "3.10.20",
+                    "fixture_sha256": "b" * 64,
+                    "fixture_case_ids": ["case-a"],
+                    "worktree_clean": True,
+                    "live_market_data_probe": {
+                        "requested_date_range": {
+                            "start": "2024-01-01",
+                            "end": "2024-01-10",
+                        },
+                        "effective_date_range": {
+                            "start": "2024-01-02",
+                            "end": "2024-01-10",
+                        },
+                        "adjustment_reason": "calendar_alignment",
+                    },
+                },
+                "totals": {
+                    "passed": 1,
+                    "failed": 0,
+                    "expected_failed": 0,
+                    "unexpected_pass": 0,
+                    "skipped": 0,
+                },
+                "results": [
+                    {
+                        "id": "case-a",
+                        "category": "messy_english",
+                        "status": "passed",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "2026-08-13-main-production-promotion.md"
+    manifest_path.write_text(
+        "# Main Production Promotion Manifest\n\n"
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard_relative_path}`\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AssertionError, match="candidate fixture identity"):
+        _assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
+
+
+def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
+    manifest_dir = ROOT / "docs" / "release-manifests"
+    manifests = []
+    for manifest_path in sorted(manifest_dir.glob("*.md")):
+        if manifest_path.name == "TEMPLATE.md":
+            continue
+        manifest = manifest_path.read_text(encoding="utf-8")
+        if (
+            "main-production-promotion" in manifest_path.name
+            or re.search(r"^- Promotion target: `?main`?$", manifest, re.M)
+        ):
+            manifests.append(manifest_path)
+    missing_evidence: set[str] = set()
+    for manifest_path in manifests:
+        try:
+            _assert_main_promotion_live_eval_evidence(manifest_path)
+        except AssertionError as exc:
+            if "missing durable live eval scorecard" not in str(exc):
+                raise
+            missing_evidence.add(manifest_path.name)
+
+    assert missing_evidence == KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL
 
 
 def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
@@ -497,12 +1291,26 @@ def test_eval_docs_document_mocked_first_test_tiers_and_agent_pointer() -> None:
     assert "## Test Tiers" in readme
     assert "**Mocked harness - every change (free, no API calls):**" in readme
     assert "poetry run pytest tests/evals/test_measurement_eval_harness.py" in readme
-    assert "Validates routing, state, full conversation-step manifests" in readme
+    assert "Validates routing, scorecard provenance, live-environment refusal" in readme
+    assert "full conversation-step manifests" in readme
     assert "**Live eval - only the 3 sanctioned moments:**" in readme
     assert "Pre-merge on a PR that changes runtime behavior" in readme
     assert "Main promotion candidate" in readme
     assert "After any model/provider change" in readme
     assert "**Browser QA is also real-API:**" in readme
+    assert "ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider" in readme
+    assert "ARGUS_ASSET_PROVIDER_MODE=live_provider" in readme
+    for provenance_field in (
+        "market_data_provider_mode",
+        "asset_provider_mode",
+        "candidate_sha",
+        "python_version",
+        "fixture_sha256",
+        "fixture_case_ids",
+        "worktree_clean",
+        "live_market_data_probe",
+    ):
+        assert provenance_field in readme
 
     assert "tests/evals/README.md" in agents
     assert "mocked harness" in agents

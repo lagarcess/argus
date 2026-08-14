@@ -20,8 +20,11 @@ remain separate decisions:
 
 - Guest code may integrate without completing this checklist.
 - Internet-facing Guest traffic requires this checklist and founder approval.
-- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains a separate policy and stays
-  `false` until explicitly approved.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is a separate policy that the
+  founder approved and opened in production on 2026-08-12, so this checklist
+  never gated it and does not gate it now; explicit `false` closes it again. The
+  minimum bundle below is still the abuse-control reference for any
+  internet-facing exposure, including registered traffic.
 
 ## Algorithm Decision
 
@@ -149,9 +152,10 @@ support and monitoring recognize them instead of re-diagnosing:
    approval, not debugging.
 2. **Address rotation defeats visitor caps.** A rotating-IP visitor can farm
    fresh guest workspaces. Standing mitigations: Turnstile on hosted guest
-   entry, allowlist-gated account creation, and guest backtests costing
-   in-process compute rather than provider spend. No further code owed at
-   alpha scale.
+   entry and guest backtests costing in-process compute rather than provider
+   spend. Account creation stopped being a mitigation when public registration
+   opened on 2026-08-12, so registered allowances are now the boundary that a
+   rotating visitor reaches instead. No further code owed at alpha scale.
 3. **Account deletion is manual.** The delete-and-return loop is founder
    gated. Acceptable at alpha scale; revisit when self-serve deletion
    ships.

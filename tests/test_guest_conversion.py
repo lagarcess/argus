@@ -198,7 +198,10 @@ def test_guest_creates_http_only_email_bound_handoff_without_account_oracle() ->
     assert "argus-guest-handoff-id=" in set_cookie
     assert "HttpOnly" in set_cookie
     assert "Secure" in set_cookie
+    # Lax only carries this cookie because the API shares a registrable domain
+    # with the app. test_api_and_app_share_a_registrable_domain pins that.
     assert "SameSite=lax" in set_cookie
+    assert "Secure" in set_cookie
     gateway.create_guest_workspace_handoff.assert_called_once()
     call = gateway.create_guest_workspace_handoff.call_args.kwargs
     assert call["source_user_id"] == GUEST_ID
