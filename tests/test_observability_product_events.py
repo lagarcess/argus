@@ -15,6 +15,7 @@ def test_product_event_mapping_covers_measurement_lane_set() -> None:
         "continuity_mismatch": ("recovery", "failed", "continuity"),
         "compare_started": ("compare_started", "started", "result_explanation"),
         "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
+        "account_registration_completed": ("storage", "completed", "guest_acquisition"),
     }
 
     for kind, expected in cases.items():

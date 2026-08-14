@@ -40,7 +40,7 @@
     "src/argus/domain/postgres_search_reader.py": 3349,
     "src/argus/agent_runtime/stages/interpret.py": 3159,
     "src/argus/memory/postgres_store.py": 2984,
-    "web/__tests__/alpha-frontend.test.ts": 2875,
+    "web/__tests__/alpha-frontend.test.ts": 2959,
     "tests/test_supabase_gateway.py": 2695,
     "web/components/chat/ChatInterface.tsx": 2523,
     "tests/domain/test_engine_launch.py": 2474,

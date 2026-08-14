@@ -41,6 +41,7 @@ import {
 import {
   createConversation,
   deleteConversation,
+  postFeedback,
   getBacktestRun,
   listConversations,
   logoutFromApi,
@@ -164,6 +165,7 @@ import ConversationRetrievalState, {
   ConversationRetrievalAnnouncement,
 } from "./ConversationRetrievalState";
 import FeedbackDialog from "../feedback/FeedbackDialog";
+import { feedbackContextForSubmission } from "@/lib/feedback-context";
 import {
   type ChatActionOption,
   type Message,
@@ -960,6 +962,44 @@ export default function ChatInterface() {
           })
         : action.label,
     [t],
+  );
+
+  const handleMessageFeedback = useCallback(
+    async (
+      type: "bug" | "feature" | "general" | "rating",
+      context: Record<string, unknown> | undefined,
+      rating?: "positive" | "negative",
+    ) => {
+      if (type === "rating" && rating) {
+        try {
+          await postFeedback({
+            type: "general",
+            message: t("feedback.rating_message_fallback", { rating }),
+            context: feedbackContextForSubmission(context, {
+              includeConversationContext: true,
+              rating,
+              tags: [],
+              attachmentCount: 0,
+            }),
+          });
+        } catch {
+          showToast(
+            t(
+              "feedback.error",
+              "We could not submit that yet. Please try again.",
+            ),
+            "error",
+          );
+        }
+        return;
+      }
+
+      setFeedbackState(
+        openFeedbackDialogState(type, context, rating, conversationId),
+      );
+      setIsSidebarOpen(false);
+    },
+    [conversationId, showToast, t],
   );
 
   // ── Send message ───────────────────────────────────────────────────────────
@@ -2390,10 +2430,7 @@ export default function ChatInterface() {
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
                             onFeedback={(type, context, rating) => {
-                              setFeedbackState(
-                                openFeedbackDialogState(type, context, rating, conversationId),
-                              );
-                              setIsSidebarOpen(false);
+                              void handleMessageFeedback(type, context, rating);
                             }}
                             onToast={showToast}
                             isLatest={isLatestAi}
