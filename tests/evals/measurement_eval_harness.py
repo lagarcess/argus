@@ -43,6 +43,7 @@ LOCKED_EVAL_CATEGORIES = {
     "backtest_metric_correctness",
     "graceful_recovery",
     "asset_discovery_routing",
+    "dca_capital_semantics",
 }
 PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v1"
 PROSE_JUDGE_RUBRIC = """
@@ -95,6 +96,13 @@ class TypedExpectations:
     adjustment_reason: str | None = None
     benchmark_symbol: str | None = None
     capital_amount: float | None = None
+    # A recurring plan's two money roles and its period are peers with their
+    # own names; capital_amount alone cannot see a role swap.
+    starting_capital: float | None = None
+    recurring_contribution: float | None = None
+    contribution_period: str | None = None
+    launch_validation_code: str | None = None
+    missing_required_fields: tuple[str, ...] = ()
     fee_rate: float | None = None
     slippage: float | None = None
     cost_provenance: dict[str, str] | None = None
@@ -361,6 +369,37 @@ def typed_expectation_failures(
         outcome.get("capital_amount"),
         failures,
     )
+    _compare(
+        "starting_capital",
+        expected.starting_capital,
+        outcome.get("starting_capital"),
+        failures,
+    )
+    _compare(
+        "recurring_contribution",
+        expected.recurring_contribution,
+        outcome.get("recurring_contribution"),
+        failures,
+    )
+    _compare(
+        "contribution_period",
+        expected.contribution_period,
+        outcome.get("contribution_period"),
+        failures,
+    )
+    _compare(
+        "launch_validation_code",
+        expected.launch_validation_code,
+        outcome.get("launch_validation_code"),
+        failures,
+    )
+    if expected.missing_required_fields:
+        _compare(
+            "missing_required_fields",
+            list(expected.missing_required_fields),
+            outcome.get("missing_required_fields"),
+            failures,
+        )
     _compare("fee_rate", expected.fee_rate, outcome.get("fee_rate"), failures)
     _compare("slippage", expected.slippage, outcome.get("slippage"), failures)
     if expected.cost_provenance is not None:
@@ -638,6 +677,13 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             adjustment_reason=expected.get("adjustment_reason"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             capital_amount=expected.get("capital_amount"),
+            starting_capital=expected.get("starting_capital"),
+            recurring_contribution=expected.get("recurring_contribution"),
+            contribution_period=expected.get("contribution_period"),
+            launch_validation_code=expected.get("launch_validation_code"),
+            missing_required_fields=tuple(
+                expected.get("missing_required_fields") or ()
+            ),
             fee_rate=expected.get("fee_rate"),
             slippage=expected.get("slippage"),
             cost_provenance=expected.get("cost_provenance"),
@@ -870,6 +916,16 @@ def _typed_outcome(
         "capital_amount": (
             launch_payload.get("capital_amount") or strategy.get("capital_amount")
         ),
+        # Both DCA money roles come only from the launch payload: they exist
+        # as launch truth or not at all, so a fixture cannot pass by reading
+        # a draft field that never became a fundable plan.
+        "starting_capital": launch_payload.get("starting_capital"),
+        "recurring_contribution": launch_payload.get("recurring_contribution"),
+        "contribution_period": (
+            launch_payload.get("cadence") or strategy.get("cadence")
+        ),
+        "launch_validation_code": final_patch.get("launch_validation_code"),
+        "missing_required_fields": final_patch.get("missing_required_fields"),
         "fee_rate": extra_parameters.get("fee_rate"),
         "slippage": extra_parameters.get("slippage"),
         "cost_provenance": {
