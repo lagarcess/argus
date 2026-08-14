@@ -1,13 +1,25 @@
 {
   "actions": [
     {
+      "id": "run-backtest",
+      "label": "Run backtest",
+      "labelKey": "chat.confirmation.actions.run_backtest",
+      "payload": {
+        "artifact_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
+        "confirmation_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
+        "launch_payload_hash": "d946e9145cce733d"
+      },
+      "presentation": "confirmation",
+      "type": "run_backtest"
+    },
+    {
       "id": "adjust-assumptions",
       "label": "Change assumptions",
       "labelKey": "chat.confirmation.actions.adjust_assumptions",
       "payload": {
-        "artifact_id": "confirmation-455-dca",
-        "confirmation_id": "confirmation-455-dca",
-        "launch_payload_hash": null
+        "artifact_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
+        "confirmation_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
+        "launch_payload_hash": "d946e9145cce733d"
       },
       "presentation": "confirmation",
       "type": "adjust_assumptions"
@@ -17,9 +29,9 @@
       "label": "Cancel",
       "labelKey": "chat.confirmation.actions.cancel",
       "payload": {
-        "artifact_id": "confirmation-455-dca",
-        "confirmation_id": "confirmation-455-dca",
-        "launch_payload_hash": null
+        "artifact_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
+        "confirmation_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
+        "launch_payload_hash": "d946e9145cce733d"
       },
       "presentation": "confirmation",
       "type": "cancel_confirmation"
@@ -34,7 +46,7 @@
     "No slippage",
     "Benchmark: SPY"
   ],
-  "canonical_launch_payload_hash": null,
+  "canonical_launch_payload_hash": "sha256:d946e9145cce733db598e70b7d04b4fdb5480dfaa8aab5d255536750af2ae407",
   "capabilities": {
     "direct_edits": [
       "capital",
@@ -56,7 +68,7 @@
         ]
       },
       "date_window": {
-        "max_end": "2026-08-13",
+        "max_end": "2026-08-14",
         "min_start": "2016-01-01"
       },
       "fees": {
@@ -74,7 +86,7 @@
     },
     "execution_costs_editable": true
   },
-  "confirmation_id": "confirmation-455-dca",
+  "confirmation_id": "confirmation-58741f7f-0d7a-4d4a-bb48-08ee1ef64147",
   "confirmation_state": "active",
   "date_range": {
     "display": "January 2, 2020 - December 31, 2024",
@@ -90,7 +102,7 @@
     "starting_capital": 0.0,
     "timeframe": "1D"
   },
-  "launch_payload_hash": null,
+  "launch_payload_hash": "d946e9145cce733d",
   "rows": [
     {
       "key": "strategy",
@@ -123,8 +135,8 @@
       "value": "$200 monthly"
     }
   ],
-  "status": "needs_change",
-  "statusLabel": "Needs change",
+  "status": "ready_to_run",
+  "statusLabel": "Ready to run",
   "strategy_type": "dca_accumulation",
   "summary": "Ready to test recurring buys for KO over January 2, 2020 - December 31, 2024.",
   "title": "KO recurring buys"

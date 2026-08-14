@@ -6,17 +6,25 @@ Lane branch `claude/issue-455-dca-capital-semantics`, based on
 ## What the browser shows
 
 The card rendered in these captures is not hand-written. It is
-[`dca-confirmation-card.json`](./dca-confirmation-card.json), the payload the
-real backend produced for the founder's own example, a plan that buys $200 of
-Coca-Cola every month, generated through `runtime_confirmation_card` with the
-in-place edit surface enabled. The Playwright spec
+[`dca-confirmation-card.json`](./dca-confirmation-card.json), produced by running
+the real `confirm_stage` on the founder's own example, a plan that buys $200 of
+Coca-Cola every month, and rendering the result through
+`runtime_confirmation_card`. The Playwright spec
 `web/e2e/issue-455-dca-capital-surface.spec.ts` serves that exact file to the
 app, so what the browser renders is backend truth rather than a fixture that
 agrees with it today.
 
+The first version of these captures was wrong, and the founder caught it by
+looking at the pictures. That fixture was built by hand with a stub
+`launch_payload` of `{"sizing_mode": "capital_amount"}`, which failed
+`validate_confirmation_execution_payload`, so every screenshot showed a
+`needs_change` card with no Run button, a state no user sees for a valid plan.
+The card is now generated through the stage itself and is `ready_to_run` with
+`run_backtest` first.
+
 | File | What it shows |
 | :--- | :--- |
-| `browser/card-en-desktop.png` | Two money rows: `Contribution $200 monthly`, `Starting capital $0` |
+| `browser/card-en-desktop.png` | `Ready to run`, `Run backtest` first, and two money rows: `Contribution $200 monthly`, `Starting capital $0` |
 | `browser/card-en-phone.png` | Same two rows at 390px |
 | `browser/card-es-419-desktop.png` | `Aporte $200 cada mes`, `Capital inicial $0` |
 | `browser/card-es-419-phone.png` | Same two rows at 390px |
@@ -25,14 +33,18 @@ agrees with it today.
 | `browser/edit-es-419-desktop.png` | `Capital inicial` and `Aporte` with `cada mes` inline |
 | `browser/edit-es-419-phone.png` | Same drawer at 390px |
 
-Every capture asserts, in the same test that takes it, that the rendered card
-contains none of "cadence", "cadencia", or "frecuencia"; that the drawer holds
-exactly two numeric money inputs; and that they are seeded from the typed
-backend facts (`0`, `200`, `monthly`) rather than parsed from display strings.
+Every capture asserts, in the same test that takes it, that the card is
+`ready_to_run` and shows its Run button; that the rendered card contains none of
+"cadence", "cadencia", or "frecuencia"; that the drawer holds exactly two numeric
+money inputs; and that they are seeded from the typed backend facts (`0`, `200`,
+`monthly`) rather than parsed from display strings.
 
 ## The backend card
 
 ```
+status:  ready_to_run
+actions: run_backtest, adjust_assumptions, cancel_confirmation
+
 rows:
   strategy        | Strategy          | Recurring Buys
   assets          | Assets            | KO

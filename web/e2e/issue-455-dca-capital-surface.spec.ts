@@ -149,11 +149,13 @@ const EXPECTED = {
     startingCapitalLabel: "Starting capital",
     contributionLabel: "Contribution",
     contributionValue: "$200 monthly",
+    runLabel: "Run backtest",
   },
   "es-419": {
     startingCapitalLabel: "Capital inicial",
     contributionLabel: "Aporte",
     contributionValue: "$200 cada mes",
+    runLabel: "Ejecutar backtest",
   },
 } as const;
 
@@ -174,6 +176,13 @@ for (const language of ["en", "es-419"] as const) {
       const cardText = await card.innerText();
 
       const expected = EXPECTED[language];
+      // The card the pictures vouch for is one a user could run. An earlier
+      // fixture was stuck in needs_change, so the screenshots showed a state
+      // no user sees for a valid plan and nothing here noticed.
+      await expect(
+        card.locator('[data-confirmation-status="ready_to_run"]'),
+      ).toBeVisible();
+      expect(cardText).toContain(expected.runLabel);
       expect(cardText).toContain(expected.contributionValue);
       expect(cardText).toContain(expected.startingCapitalLabel);
       // The word this lane removed, in either language's spelling.

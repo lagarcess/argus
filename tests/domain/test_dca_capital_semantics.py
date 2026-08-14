@@ -859,13 +859,23 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
     )
     assert produced is not None
 
+    # Everything a reader of the screenshots would take on faith. The first
+    # version of this guard compared only rows, assumptions, display facts and
+    # two constraint fields, so a fixture stuck in `needs_change` with no
+    # run_backtest action passed it while the pictures showed a state no user
+    # sees for a valid plan.
+    assert produced["status"] == evidence["status"]
+    assert produced["statusLabel"] == evidence["statusLabel"]
+    assert [action["type"] for action in produced["actions"]] == [
+        action["type"] for action in evidence["actions"]
+    ]
     assert produced["rows"] == evidence["rows"]
     assert produced["assumptions"] == evidence["assumptions"]
     assert produced["display_facts"] == evidence["display_facts"]
-    produced_constraints = produced["capabilities"]["edit_constraints"]
-    evidence_constraints = evidence["capabilities"]["edit_constraints"]
-    for field in ("starting_capital", "contribution"):
-        assert produced_constraints[field] == evidence_constraints[field], field
+    assert produced["capabilities"] == evidence["capabilities"]
+    # The card the pictures vouch for has to be one a user could actually run.
+    assert evidence["status"] == "ready_to_run"
+    assert evidence["actions"][0]["type"] == "run_backtest"
 
 
 @pytest.mark.parametrize(
