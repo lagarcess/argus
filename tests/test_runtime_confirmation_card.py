@@ -239,26 +239,32 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
 
     assert card is not None
     assert card["strategy_type"] == "dca_accumulation"
+    # A recurring plan has exactly two money parameters, and the shared
+    # bankroll default is not one of them: nobody stated a seed, so it is $0.
     assert card["display_facts"] == {
         "benchmark_symbol": "BTC",
-        "capital": 500.0,
+        "starting_capital": 0.0,
+        "recurring_contribution": 500.0,
+        "contribution_period": "monthly",
         "fees": 0.0,
         "slippage": 0.0,
         "timeframe": "1D",
     }
+    assert not any(row["key"] == "cadence" for row in card["rows"])
     assert any(
-        row["key"] == "cadence"
-        and row["labelKey"] == "chat.confirmation.rows.cadence"
-        and row["value"] == "Monthly"
+        row["key"] == "starting_capital"
+        and row["labelKey"] == "chat.confirmation.rows.starting_capital"
+        and row["value"] == "$0"
         for row in card["rows"]
     )
     assert any(
         row["key"] == "contribution"
         and row["labelKey"] == "chat.confirmation.rows.contribution"
-        and row["value"] == "$500"
+        and row["value"] == "$500 monthly"
         for row in card["rows"]
     )
-    assert "$500 recurring contribution" in card["assumptions"]
+    assert "$0 starting capital" in card["assumptions"]
+    assert "$500 monthly contribution" in card["assumptions"]
     assert "Daily data" in card["assumptions"]
     assert "1D bars" not in card["assumptions"]
     assert "$10,000 starting capital" not in card["assumptions"]

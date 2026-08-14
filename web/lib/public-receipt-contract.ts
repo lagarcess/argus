@@ -54,7 +54,8 @@ export type PublicReceiptAssumptionKey =
   | "benchmark_same_modeled_costs"
   | "recurring_contribution"
   | "contribution_cadence"
-  | "starting_principal";
+  | "starting_principal"
+  | "fractional_shares";
 
 export type PublicReceiptAssumption = {
   key: PublicReceiptAssumptionKey;

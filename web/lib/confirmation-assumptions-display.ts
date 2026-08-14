@@ -11,6 +11,10 @@ export type ConfirmationDisplayFacts = {
   benchmark_symbol?: string | null;
   /** Typed seed for the direct capital editor; rows carry display text only. */
   capital?: number | null;
+  /** A recurring plan's two money roles, each under its own name. */
+  starting_capital?: number | null;
+  recurring_contribution?: number | null;
+  contribution_period?: string | null;
   data_through?: string | null;
   fees?: number | string | null;
   slippage?: number | string | null;

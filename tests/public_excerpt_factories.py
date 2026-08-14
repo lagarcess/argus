@@ -258,12 +258,14 @@ DCA_CONFIG_SNAPSHOT: dict[str, Any] = {
     "resolved_parameters": {
         "cadence": "monthly",
         "recurring_contribution": 200,
-        "starting_principal": 0.0,
+        "starting_capital": 0.0,
         "engine_config": {
             "template": "dca_accumulation",
-            "starting_capital": 200,
-            "recurring_contribution": 200,
-            "starting_principal": 0.0,
+            "dca_capital": {
+                "schema_version": "dca_capital_v1",
+                "starting_capital": 0.0,
+                "contribution": 200,
+            },
             "parameters": {"dca_cadence": "monthly"},
             "allocation_method": "equal_weight",
             "side": "long",
@@ -360,9 +362,11 @@ ENGINE_CONFIG_SNAPSHOT: dict[str, Any] = {
     "template": "dca_accumulation",
     "symbols": ["AAPL"],
     "parameters": {"dca_cadence": "weekly"},
-    "starting_capital": 500,
-    "recurring_contribution": 500,
-    "starting_principal": 0.0,
+    "dca_capital": {
+        "schema_version": "dca_capital_v1",
+        "starting_capital": 0.0,
+        "contribution": 500,
+    },
     "allocation_method": "equal_weight",
     "side": "long",
 }
@@ -391,12 +395,14 @@ GENERATED_CARD_CONFIG: dict[str, Any] = {
     "start_date": WINDOW_START,
     "end_date": WINDOW_END,
     "side": "long",
-    "starting_capital": 200,
     "allocation_method": "equal_weight",
     "benchmark_symbol": "SPY",
     "parameters": {"dca_cadence": "monthly"},
-    "recurring_contribution": 200,
-    "starting_principal": 0.0,
+    "dca_capital": {
+        "schema_version": "dca_capital_v1",
+        "starting_capital": 0.0,
+        "contribution": 200,
+    },
     "_execution_realism": {"enabled": True, "fee_bps": 10.0, "slippage_bps": 5.0},
 }
 
@@ -463,7 +469,7 @@ GENERATED_CARD_CONFIG_SNAPSHOT: dict[str, Any] = {
     "resolved_parameters": {
         "cadence": "monthly",
         "recurring_contribution": 200,
-        "starting_principal": 0.0,
+        "starting_capital": 0.0,
         "engine_config": GENERATED_CARD_CONFIG,
     },
     "engine_config": GENERATED_CARD_CONFIG,
@@ -524,9 +530,12 @@ def generated_card_config(
         "parameters": {},
     }
     if template == "dca_accumulation":
-        config["starting_capital"] = 200
-        config["recurring_contribution"] = 200
-        config["starting_principal"] = 0.0
+        del config["starting_capital"]
+        config["dca_capital"] = {
+            "schema_version": "dca_capital_v1",
+            "starting_capital": 0.0,
+            "contribution": 200,
+        }
         config["parameters"] = {"dca_cadence": "monthly"}
     if modeled_costs:
         config["_execution_realism"] = {

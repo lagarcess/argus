@@ -74,6 +74,7 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
       { key: "recurring_contribution", value: "1200" },
       { key: "contribution_cadence", value: "monthly" },
       { key: "starting_principal", value: "0" },
+      { key: "fractional_shares" },
       { key: "long_only" },
       { key: "equal_weight" },
       { key: "modeled_fee_bps", value: "10" },
@@ -85,9 +86,9 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
   test("every frozen assumption becomes a sentence, in each language", () => {
     for (const language of ["en", "es-419"] as const) {
       const lines = receiptAssumptions(FROZEN, receiptCopy(language), language);
-      // Two pairs each read as one line, the contribution with its cadence and the
-      // fee with its slippage, so eight frozen facts read as six.
-      expect(lines).toHaveLength(6);
+      // Two pairs each read as one line, the contribution with its cadence and
+      // the fee with its slippage, so nine frozen facts read as seven.
+      expect(lines).toHaveLength(7);
       expect(lines.every((line) => line.trim().length > 0)).toBe(true);
       expect(lines.some((line) => line.includes("{{"))).toBe(false);
     }
@@ -159,7 +160,7 @@ describe("what the run assumed, spoken to whoever opened the link", () => {
     const start = contract.indexOf("PublicReceiptAssumptionKey =");
     const union = contract.slice(start, contract.indexOf(";", start));
     const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
-    expect(keys).toHaveLength(10);
+    expect(keys).toHaveLength(11);
     for (const common of [enCommon, esCommon]) {
       const said = common.receipt.assumptions as Record<string, string>;
       for (const key of keys) {

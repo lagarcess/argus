@@ -213,14 +213,18 @@ def format_recurring_entry_caveat(
     language: str = "en",
 ) -> str:
     display = describe_timeframe(timeframe, language=language)
+    # States the rule the engine actually applies, including what happens when
+    # a contribution falls on a day the market was closed.
     if display.language == "es-419":
         return (
-            "Las entradas recurrentes usan el primer precio "
-            f"{display.recurring_price_label} disponible en cada ventana de cadencia."
+            "Cada aporte compra al primer precio "
+            f"{display.recurring_price_label} disponible de su período, así que "
+            "uno que cae en un día sin mercado compra el siguiente día de mercado."
         )
     return (
-        "Recurring entries use the first available "
-        f"{display.recurring_price_label} price in each cadence window."
+        "Each contribution buys at the first available "
+        f"{display.recurring_price_label} price in its period, so one that falls "
+        "on a non-trading day buys on the next trading day."
     )
 
 

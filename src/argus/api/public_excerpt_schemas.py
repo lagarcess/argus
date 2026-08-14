@@ -120,10 +120,11 @@ AssumptionKey = Literal[
     # says the benchmark carried the same modeled costs the strategy did.
     "benchmark",
     "benchmark_same_modeled_costs",
-    # Recurring contribution runs. The cadence is absent when the run stated none.
+    # Recurring contribution runs. The plan declares all three, so none is absent.
     "recurring_contribution",
     "contribution_cadence",
     "starting_principal",
+    "fractional_shares",
 ]
 
 

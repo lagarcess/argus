@@ -98,10 +98,6 @@ def runtime_confirmation_card(
         _confirmation_row("assets", "Assets", assets),
         _confirmation_row("period", "Period", date_range),
     ]
-    if strategy.get("cadence") and _strategy_type_uses_cadence(canonical_strategy_type):
-        rows.append(
-            _confirmation_row("cadence", "Cadence", str(strategy["cadence"]).title())
-        )
     if strategy.get("entry_logic"):
         rows.append(
             _confirmation_row(
@@ -134,18 +130,29 @@ def runtime_confirmation_card(
         launch_payload=launch_payload,
         strategy_type=canonical_strategy_type,
     )
-    if display_capital is not None:
-        capital_label = (
-            "Contribution"
-            if _strategy_type_uses_cadence(canonical_strategy_type)
-            else "Starting capital"
-        )
+    if _strategy_type_uses_cadence(canonical_strategy_type):
+        # Two rows, exactly the two parameters a recurring plan has. The
+        # contribution is one phrase because nobody has a period on its own.
         rows.append(
             _confirmation_row(
-                "contribution"
-                if _strategy_type_uses_cadence(canonical_strategy_type)
-                else "starting_capital",
-                capital_label,
+                "starting_capital",
+                "Starting capital",
+                f"${_confirmation_dca_starting_capital(optional_parameters):,.0f}",
+            )
+        )
+        if display_capital is not None:
+            rows.append(
+                _confirmation_row(
+                    "contribution",
+                    "Contribution",
+                    _contribution_row_value(display_capital, strategy=strategy),
+                )
+            )
+    elif display_capital is not None:
+        rows.append(
+            _confirmation_row(
+                "starting_capital",
+                "Starting capital",
                 f"${display_capital:,.0f}",
             )
         )
@@ -161,9 +168,19 @@ def runtime_confirmation_card(
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
     )
-    if display_capital is not None:
-        # Typed seed for the direct capital editor; rows carry display strings
-        # only, and the frontend must not parse them back into numbers.
+    # Typed seeds for the direct capital editor; rows carry display strings
+    # only, and the frontend must not parse them back into numbers. A recurring
+    # plan seeds both of its roles under their own names.
+    if _strategy_type_uses_cadence(canonical_strategy_type):
+        display_facts["starting_capital"] = _confirmation_dca_starting_capital(
+            optional_parameters
+        )
+        if display_capital is not None:
+            display_facts["recurring_contribution"] = display_capital
+        contribution_period = _supported_contribution_period(strategy.get("cadence"))
+        if contribution_period is not None:
+            display_facts["contribution_period"] = contribution_period
+    elif display_capital is not None:
         display_facts["capital"] = display_capital
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
@@ -268,7 +285,10 @@ def runtime_confirmation_card(
         if capabilities.get("execution_costs_editable"):
             direct_edits.append("costs")
         capabilities["direct_edits"] = direct_edits
-        capabilities["edit_constraints"] = _edit_constraints(strategy)
+        capabilities["edit_constraints"] = _edit_constraints(
+            strategy,
+            launch_payload=launch_payload,
+        )
     card["capabilities"] = capabilities
     asset_class = _confirmation_asset_class(strategy)
     if asset_class is not None:
@@ -298,7 +318,11 @@ def runtime_confirmation_card(
     return card
 
 
-def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
+def _edit_constraints(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The accepted-value envelope this card's edits must satisfy.
 
     Backend canonical truth: the values are the engine's own bounds, imported
@@ -317,17 +341,70 @@ def _edit_constraints(strategy: dict[str, Any]) -> dict[str, Any]:
     date_window: dict[str, Any] = {"max_end": date.today().isoformat()}
     if str(strategy.get("asset_class") or "") == "equity":
         date_window["min_start"] = ALPACA_EQUITY_HISTORY_START.isoformat()
-    # A recurring contribution reuses the capital field but is exempt from
-    # the bankroll floor (the launch adapter's rule); the ceiling holds.
     capital: dict[str, Any] = {"max": MAX_STARTING_CAPITAL}
-    if str(strategy.get("strategy_type") or "") != "dca_accumulation":
-        capital["min"] = MIN_STARTING_CAPITAL
-    return {
+    constraints: dict[str, Any] = {
         "capital": capital,
         "fees": {"min": 0.0, "max": MAX_FEE_RATE},
         "slippage": {"min": 0.0, "max": MAX_SLIPPAGE_RATE},
         "date_window": date_window,
     }
+    if str(strategy.get("strategy_type") or "") != "dca_accumulation":
+        capital["min"] = MIN_STARTING_CAPITAL
+        return constraints
+
+    # A recurring plan edits two money roles and a period. The seed has no
+    # floor because $0 is its default, and the offered periods are only the
+    # ones that fit the card's own window, so the picker can never present a
+    # pair the engine would refuse.
+    # The contribution advertises no floor for the same reason the seed's is
+    # zero: the plan's rule is "some money", not "at least this much", and
+    # restating it as a number here would be a second, stricter rule.
+    constraints["starting_capital"] = {"min": 0.0, "max": MAX_STARTING_CAPITAL}
+    constraints["contribution"] = {
+        "max": MAX_STARTING_CAPITAL,
+        "periods": _contribution_periods_for_strategy(
+            strategy,
+            launch_payload=launch_payload or {},
+        ),
+    }
+    return constraints
+
+
+def _contribution_periods_for_strategy(
+    strategy: dict[str, Any],
+    *,
+    launch_payload: dict[str, Any],
+) -> list[str]:
+    """Only periods that fit at least once inside this card's window.
+
+    Both windows come from the coverage payload, the same place the request
+    model reads them. A materialized strategy has already had its date range
+    replaced by the served window, so deriving the request from it would
+    advertise fewer periods than the engine actually accepts.
+    """
+    from argus.domain.dca_capital import (
+        contribution_period_window,
+        contribution_periods_for_window,
+    )
+
+    coverage = launch_payload.get("coverage_preflight")
+    coverage = coverage if isinstance(coverage, dict) else {}
+    requested = _coverage_window(coverage.get("requested_date_range"))
+    effective = _coverage_window(coverage.get("effective_date_range"))
+    if effective is None:
+        try:
+            resolved = resolve_date_range(
+                strategy.get("date_range"), today=_confirmation_today()
+            )
+        except (TypeError, ValueError):
+            return []
+        requested, effective = None, (resolved.start, resolved.end)
+    start, end = contribution_period_window(
+        requested=requested,
+        effective=effective,
+        adjustment_reason=coverage.get("adjustment_reason"),
+    )
+    return list(contribution_periods_for_window(start=start, end=end))
 
 
 class DeadConfirmationCardError(ValueError):
@@ -1109,6 +1186,16 @@ def _period_adjustment_from_launch_payload(
     }
 
 
+def _coverage_window(value: Any) -> tuple[date, date] | None:
+    payload = _date_range_payload(value)
+    if payload is None:
+        return None
+    try:
+        return date.fromisoformat(payload["start"]), date.fromisoformat(payload["end"])
+    except ValueError:
+        return None
+
+
 def _date_range_payload(value: Any) -> dict[str, str] | None:
     if not (
         isinstance(value, dict)
@@ -1219,6 +1306,33 @@ def _confirmation_display_capital(
     )
 
 
+def _confirmation_dca_starting_capital(optional_parameters: dict[str, Any]) -> float:
+    """The seed the card shows. Only a stated one counts; the default is $0."""
+    entry = optional_parameters.get("initial_capital")
+    if not isinstance(entry, dict) or str(entry.get("source") or "") != "user":
+        return 0.0
+    value = entry.get("value")
+    if not isinstance(value, int | float) or isinstance(value, bool) or value < 0:
+        return 0.0
+    return float(value)
+
+
+def _supported_contribution_period(value: Any) -> str | None:
+    from argus.domain.dca_capital import supported_contribution_period
+
+    return supported_contribution_period(value)
+
+
+def _contribution_row_value(amount: float, *, strategy: dict[str, Any]) -> str:
+    """The amount and its period as one phrase, never two labelled parameters."""
+    from argus.domain.backtesting.cards import format_contribution_phrase
+
+    period = _supported_contribution_period(strategy.get("cadence"))
+    if period is None:
+        return f"${amount:,.0f}"
+    return format_contribution_phrase(amount=amount, period=period, is_es=False)
+
+
 def _numeric_money_value(value: Any) -> float | None:
     if not isinstance(value, int | float) or isinstance(value, bool):
         return None
@@ -1252,36 +1366,37 @@ def _confirmation_assumptions(
     assumptions: list[str] = []
     strategy_type = executable_strategy_type(strategy)
     strategy_capital = strategy.get("capital_amount")
-    if isinstance(strategy_capital, int | float):
-        if _strategy_type_uses_cadence(strategy_type):
+    if _strategy_type_uses_cadence(strategy_type):
+        # The strip follows the card's two rows, in the same order and with
+        # the same two roles.
+        assumptions.append(
+            _money_assumption(
+                _confirmation_dca_starting_capital(optional_parameters),
+                role="starting_capital",
+                language=language,
+            )
+        )
+        if isinstance(strategy_capital, int | float):
             assumptions.append(
-                _money_assumption(
+                _contribution_assumption(
                     float(strategy_capital),
-                    role="recurring_contribution",
+                    strategy=strategy,
                     language=language,
                 )
             )
-        else:
-            assumptions.append(
-                _money_assumption(
-                    float(strategy_capital),
-                    role="starting_capital",
-                    language=language,
-                )
+    elif isinstance(strategy_capital, int | float):
+        assumptions.append(
+            _money_assumption(
+                float(strategy_capital),
+                role="starting_capital",
+                language=language,
             )
-    initial_capital = _optional_parameter_value(optional_parameters, "initial_capital")
-    if isinstance(initial_capital, int | float) and not isinstance(
-        strategy_capital, int | float
-    ):
-        if _strategy_type_uses_cadence(strategy_type) and strategy.get("capital_amount"):
-            assumptions.append(
-                _money_assumption(
-                    float(strategy["capital_amount"]),
-                    role="recurring_contribution",
-                    language=language,
-                )
-            )
-        else:
+        )
+    else:
+        initial_capital = _optional_parameter_value(
+            optional_parameters, "initial_capital"
+        )
+        if isinstance(initial_capital, int | float):
             assumptions.append(
                 _money_assumption(
                     float(initial_capital),
@@ -1631,6 +1746,15 @@ def _money_assumption(value: float, *, role: str, language: str) -> str:
         else "starting capital"
     )
     return f"${value:,.0f} {label}"
+
+
+def _contribution_assumption(
+    amount: float,
+    *,
+    strategy: dict[str, Any],
+    language: str,
+) -> str:
+    return f"{_contribution_row_value(amount, strategy=strategy)} contribution"
 
 
 def _benchmark_assumption(symbol: str, *, language: str) -> str:

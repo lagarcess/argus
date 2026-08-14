@@ -3781,7 +3781,7 @@ def test_search_retest_preserves_chat_dca_contribution_and_principal(
     assert setup is not None
     assert setup.capital_amount == 500.0
     assert setup.recurring_contribution == 500.0
-    assert setup.starting_principal == 0.0
+    assert setup.starting_capital == 0.0
     assert setup.execution_realism is None
 
 
@@ -3992,10 +3992,10 @@ def test_search_retest_omits_unfaithful_dca_snapshot(
     # distinguish a recurring contribution from a starting principal.
     resolved_parameters = run["config_snapshot"]["resolved_parameters"]
     engine_config = resolved_parameters["engine_config"]
-    for key in ("recurring_contribution", "starting_principal"):
+    for key in ("recurring_contribution", "starting_capital"):
         resolved_parameters.pop(key)
-        engine_config.pop(key)
-        run["config_snapshot"]["engine_config"].pop(key)
+    for config in (engine_config, run["config_snapshot"]["engine_config"]):
+        config.pop("dca_capital", None)
     projected = project_conversation_recall(
         conversation={
             "id": run["conversation_id"],

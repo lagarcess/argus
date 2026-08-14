@@ -1,7 +1,7 @@
 import type { StrategyResultPayload } from "@/components/chat/types";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
-import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 
 type MetricLike = {
@@ -45,8 +45,8 @@ export type ResultCardDisplayCopy = {
   sideLabel: string;
   allocationLabel: string;
   benchmarkLabel: string;
-  cadenceLabel: string;
-  cadenceValueLabel: (cadence: string) => string;
+  /** Amount and period as one phrase, so no surface labels a period alone. */
+  contributionPhrase: (amount: string, period: string) => string;
   contributionLabel: string;
   entryRuleLabel: string;
   exitRuleLabel: string;
@@ -96,8 +96,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   sideLabel: "Side",
   allocationLabel: "Allocation",
   benchmarkLabel: "Benchmark",
-  cadenceLabel: "Cadence",
-  cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence) ?? cadence,
+  contributionPhrase: (amount, period) => contributionPhrase(amount, period),
   contributionLabel: "Contribution",
   entryRuleLabel: "Entry rule",
   exitRuleLabel: "Exit rule",
@@ -428,8 +427,12 @@ function executionFacts(
           value: withBenchmarkCostTreatment(benchmark, result, copy),
         }
       : undefined,
-    contribution?.cadence ? { label: copy.cadenceLabel, value: contribution.cadence } : undefined,
-    contribution?.amount ? { label: copy.contributionLabel, value: contribution.amount } : undefined,
+    contribution?.startingCapital
+      ? { label: copy.startingCapitalLabel, value: contribution.startingCapital }
+      : undefined,
+    contribution?.amount
+      ? { label: copy.contributionLabel, value: contribution.amount }
+      : undefined,
     entryRule ? { label: copy.entryRuleLabel, value: entryRule } : undefined,
     exitRule ? { label: copy.exitRuleLabel, value: exitRule } : undefined,
     ...executionCostDetails(result, copy),
@@ -600,15 +603,23 @@ function contributionFromStructuredFacts(
   locale?: string,
   copy = defaultResultCardDisplayCopy,
 ) {
-  const rawCadence =
+  const rawPeriod =
     stringValue(resolvedParameters?.cadence) ?? stringValue(parameters?.dca_cadence);
-  if (!rawCadence) return undefined;
+  if (!rawPeriod) return undefined;
 
-  const cadence = copy.cadenceValueLabel(rawCadence);
-  const amount = numberValue(resolvedParameters?.capital_amount);
+  // One phrase, because nobody has a period without an amount. The seed is the
+  // plan's other role and gets its own row.
+  const amount = numberValue(resolvedParameters?.recurring_contribution);
+  const startingCapital = numberValue(resolvedParameters?.starting_capital);
   return {
-    cadence,
-    amount: amount == null ? undefined : formatCurrency(amount, locale),
+    amount:
+      amount == null
+        ? undefined
+        : copy.contributionPhrase(formatCurrency(amount, locale), rawPeriod),
+    startingCapital:
+      startingCapital == null
+        ? undefined
+        : formatCurrency(startingCapital, locale),
   };
 }
 
@@ -775,7 +786,7 @@ function benchmarkDisplayValue(
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number, locale = "en-US", currency = "USD") {
+export function formatCurrency(value: number, locale = "en-US", currency = "USD") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,

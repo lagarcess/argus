@@ -34,11 +34,13 @@ def test_timeframe_caveats_use_single_display_boundary() -> None:
     assert format_timeframe_data_caveat("2h") == "2-hour data only."
     assert (
         format_recurring_entry_caveat("1D")
-        == "Recurring entries use the first available daily price in each cadence window."
+        == "Each contribution buys at the first available daily price in its period, "
+        "so one that falls on a non-trading day buys on the next trading day."
     )
     assert (
         format_recurring_entry_caveat("15m")
-        == "Recurring entries use the first available 15-minute price in each cadence window."
+        == "Each contribution buys at the first available 15-minute price in its period, "
+        "so one that falls on a non-trading day buys on the next trading day."
     )
 
 
@@ -49,7 +51,8 @@ def test_legacy_data_caveat_cleanup_is_centralized_compatibility() -> None:
         normalize_legacy_data_caveat(
             "Recurring entries use the first available bar in each cadence window."
         )
-        == "Recurring entries use the first available daily price in each cadence window."
+        == "Each contribution buys at the first available daily price in its period, "
+        "so one that falls on a non-trading day buys on the next trading day."
     )
 
 

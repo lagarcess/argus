@@ -165,7 +165,6 @@ export type StrategyConfirmationRowKey =
   | "strategy"
   | "assets"
   | "period"
-  | "cadence"
   | "buy_rule"
   | "exit_rule"
   | "starting_capital"
@@ -263,6 +262,11 @@ export type StrategyConfirmationCapabilities = {
    * it. Rates are decimals; dates are ISO. */
   edit_constraints?: {
     capital?: { min?: number; max?: number };
+    /** A recurring plan's two money roles, named so neither can stand in for
+     * the other. `periods` lists only the contribution periods that fit this
+     * card's window at least once. */
+    starting_capital?: { min?: number; max?: number };
+    contribution?: { min?: number; max?: number; periods?: string[] };
     fees?: { min?: number; max?: number };
     slippage?: { min?: number; max?: number };
     date_window?: { min_start?: string; max_end?: string };
@@ -273,6 +277,9 @@ export type StrategyConfirmationCapabilities = {
  * Costs are decimal rates, converted from the editor's percent inputs. */
 export type ConfirmationDirectEditPayload = {
   capital?: number;
+  starting_capital?: number;
+  recurring_contribution?: number;
+  contribution_period?: string;
   date_window?: { start: string; end: string };
   fee_rate?: number;
   slippage?: number;
