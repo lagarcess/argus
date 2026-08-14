@@ -21,10 +21,12 @@ This runbook is for the first trusted-user internet tests on Render.
 ## Launch URLs
 
 - App: `https://arguschat.ai`
-- API: `https://argus-ohr5.onrender.com`. Founder decision, 2026-08-11: keep
-  this hostname for the active promotion and revisit a custom API hostname
-  deliberately later. Users do not see the API hostname. Moving to a host such
-  as `api.arguschat.ai` requires an `argus-app` rebuild because
+- API: `https://api.arguschat.ai`, moved 2026-08-13 and live. It must stay on a
+  subdomain of the app's registrable domain: the guest handoff cookie is
+  `SameSite=Lax`, so on `onrender.com` it was third-party and every iOS browser
+  dropped it, which broke guest conversion for every user until the move.
+  `test_api_and_app_share_a_registrable_domain` pins the two hosts together.
+  Changing the host requires an `argus-app` rebuild, because
   `NEXT_PUBLIC_ARGUS_API_URL` is baked into the web bundle at build time.
 
 ## Before Tester Sessions
