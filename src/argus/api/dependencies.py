@@ -359,15 +359,13 @@ def _apply_auth_session_cookies(
 def browser_cookie_policy(request: Request) -> dict[str, Any]:
     """One owner for how every Argus browser cookie crosses origins.
 
-    The API now shares a registrable domain with the app, so these cookies are
-    first-party and `Lax` would carry them. `None` is kept until a real iOS
-    conversion proves the new domain, since tightening it is a separate change
-    with its own failure mode. `None` requires `Secure`, so plain-http local
-    development keeps `Lax`.
+    `Lax` depends on the API sharing a registrable domain with the app, which
+    is what makes these cookies first-party. Move the API off that domain and
+    every browser silently stops returning them; the release-contract test
+    that pins the two hosts together is the guard against that.
     """
 
-    secure = _session_cookie_secure(request)
-    return {"secure": secure, "samesite": "none" if secure else "lax"}
+    return {"secure": _session_cookie_secure(request), "samesite": "lax"}
 
 
 def _session_cookie_secure(request: Request) -> bool:
