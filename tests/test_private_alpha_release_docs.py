@@ -812,17 +812,19 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert ".github/local-smoke.sh --expected-sha" in runbook
     assert 'ARGUS_CANARY_SHA="$(git rev-parse HEAD)"' in runbook
     assert (
-        "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json" in runbook
+        "ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/release-coherence.json"
+        in runbook
     )
     assert (
-        "ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json"
+        "ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/authenticated-browser-capture.json"
         in runbook
     )
     assert "scripts/ops/canary_capture_replay.py" in runbook
     assert "Do not rerun the charged journey to collect a capture" in runbook
     assert "Docker is optional" in runbook
-    assert "private-alpha-canary-evidence" in runbook
-    assert "authoritative Spanish release journey" in runbook
+    assert "private-alpha-release-coherence-evidence" in runbook
+    assert "private-alpha-authenticated-browser-evidence" in runbook
+    assert "both authoritative canary surfaces" in runbook
     assert "docs/release-manifests/TEMPLATE.md" in runbook
     assert "release manifest" in runbook
     assert "rollback target" in runbook
@@ -831,7 +833,8 @@ def test_private_launch_runbook_documents_ci_cd_release_gate() -> None:
     assert "workflow_env_status" in runbook
     assert "workflow_runtime_provider_mode=live_provider" in runbook
     assert "workflow_runtime_proof=ready" in runbook
-    assert "deployed Spanish signup/login browser" in runbook
+    assert "never\n  visits the signup or login page" in runbook
+    assert "Canary identity, session rotation, and revocation" in runbook
     assert "workflow-service proof" in runbook
     assert "approver" in runbook
 
