@@ -207,7 +207,7 @@ describe("result card playground", () => {
       resultCardPlaygroundFixtures.find((fixture) => fixture.id === "dca-result")!.result,
     );
     expect(dca.hero.value).toBe("$1,000");
-    expect(dca.hero.detail).toBe("$0 change · 0.0% total return");
+    expect(dca.hero.detail).toBe("$0 change · 0.0% return on contributions");
     expect(dca.hero.tone).toBe("neutral");
     expect(dca.benchmark.value).toBe("In line with SPY");
     expect(dca.timeframeDisplay).toBe("Daily data");

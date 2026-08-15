@@ -30,6 +30,7 @@ export type ResultCardDisplayCopy = {
   gainNoun: string;
   lossNoun: string;
   totalReturnSuffix: string;
+  contributionReturnSuffix: string;
   benchmarkUnavailable: string;
   percentagePoints: (value: string) => string;
   inLineWith: (symbol: string) => string;
@@ -82,6 +83,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   gainNoun: "gain",
   lossNoun: "loss",
   totalReturnSuffix: "total return",
+  contributionReturnSuffix: "return on contributions",
   benchmarkUnavailable: "Benchmark unavailable",
   percentagePoints: (value) => `${value} percentage points`,
   inLineWith: (symbol) => `In line with ${symbol}`,
@@ -299,6 +301,13 @@ export function heroDeltaEvidenceView(
   ]);
   const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
   const totalReturnValue = normalizeSignedPercent(totalReturn?.value);
+  const isContributionReturn =
+    totalReturn?.key === "contribution_return_pct" ||
+    [
+      copy.contributionReturnLabel.toLowerCase(),
+      "return on contributions",
+      "retorno sobre aportes",
+    ].includes((totalReturn?.label ?? "").toLowerCase());
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
   const benchmarkSymbol = facts.benchmark ?? benchmarkSymbolFromMetric(benchmark);
@@ -307,7 +316,13 @@ export function heroDeltaEvidenceView(
     hero: {
       value: parsedEndingValue?.endingDisplay ?? endingValue?.value ?? copy.unavailable,
       label: copy.endingValueLabel,
-      detail: heroDetail(parsedEndingValue?.change, totalReturnValue, copy, options?.locale),
+      detail: heroDetail(
+        parsedEndingValue?.change,
+        totalReturnValue,
+        copy,
+        options?.locale,
+        isContributionReturn ? copy.contributionReturnSuffix : undefined,
+      ),
       tone,
       // Unavailable values must read as absent, never as a healthy metric.
       unavailable: !(parsedEndingValue?.endingDisplay ?? endingValue?.value),
@@ -738,15 +753,17 @@ function heroDetail(
   totalReturn: string | undefined,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  returnSuffix?: string,
 ) {
+  const suffix = returnSuffix ?? copy.totalReturnSuffix;
   const returnLabel = totalReturn ?? copy.returnUnavailable;
   if (change == null) return returnLabel;
   if (Math.abs(change) < 0.5) {
-    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${copy.totalReturnSuffix}`;
+    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
   }
   const sign = change > 0 ? "+" : "-";
   const noun = change > 0 ? copy.gainNoun : copy.lossNoun;
-  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${copy.totalReturnSuffix}`;
+  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${suffix}`;
 }
 
 function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {

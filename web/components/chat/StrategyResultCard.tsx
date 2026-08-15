@@ -656,6 +656,10 @@ function resultDisplayCopy(
       "chat.result_card.total_return_suffix",
       "total return",
     ),
+    contributionReturnSuffix: t(
+      "chat.result_card.contribution_return_suffix",
+      "return on contributions",
+    ),
     benchmarkUnavailable: t(
       "chat.result_card.benchmark_unavailable",
       "Benchmark unavailable",

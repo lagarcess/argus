@@ -627,6 +627,7 @@
       "gain": "gain",
       "loss": "loss",
       "total_return_suffix": "total return",
+      "contribution_return_suffix": "return on contributions",
       "benchmark_unavailable": "Benchmark unavailable",
       "percentage_points": "{{value}} percentage points",
       "in_line_with": "In line with {{symbol}}",

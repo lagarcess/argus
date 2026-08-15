@@ -6,8 +6,10 @@ import {
 } from "@/lib/public-receipt-contract";
 import {
   displayResultMetricLabel,
+  heroDeltaEvidenceView,
   resultMetricDisplayOrder,
 } from "@/lib/result-card-display";
+import { resultCardPlaygroundFixtures } from "@/lib/result-card-playground-fixtures";
 
 // A recurring plan's return row is its own key with its own name, so a
 // consumer keyed on total_return_pct can never silently receive it.
@@ -40,6 +42,16 @@ describe("contribution return display contract", () => {
         { copy: { contributionReturnLabel: "Retorno sobre aportes" } },
       ),
     ).toBe("Retorno sobre aportes");
+  });
+
+  test("the hero sub-line names contributions, not total return", () => {
+    const dca = resultCardPlaygroundFixtures.find(
+      (fixture) => fixture.id === "dca-result",
+    );
+    expect(dca).toBeDefined();
+    const hero = heroDeltaEvidenceView(dca!.result);
+    expect(hero.hero.detail).toContain("return on contributions");
+    expect(hero.hero.detail).not.toContain("total return");
   });
 
   test("is the receipt headline when a run froze it", () => {
