@@ -1417,13 +1417,10 @@ def _confirmation_assumptions(
     )
     if execution_costs is not None:
         assumptions.append(_execution_cost_assumption(execution_costs, language=language))
-    else:
-        fees = _optional_parameter_value(optional_parameters, "fees")
-        if fees in (0, 0.0, "0", "0.0"):
-            assumptions.append("No fees")
-        slippage = _optional_parameter_value(optional_parameters, "slippage")
-        if slippage in (0, 0.0, "0", "0.0"):
-            assumptions.append("No slippage")
+    # No prose for the zero-cost case: `display_facts` already carries `fees`
+    # and `slippage` whenever they are zero, and the card localizes them from
+    # there. A second English copy of the same fact is what put "No fees" on a
+    # Spanish card (#434).
     benchmark_assumption = _confirmation_benchmark_assumption(
         strategy=strategy,
         optional_parameters=optional_parameters,

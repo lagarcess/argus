@@ -147,3 +147,40 @@ founder requirement outright.
   `test_engine_launch.py`.
 - `ruff check .`: passed.
 - `scripts/check_modularity_budget.py`: no violations.
+
+## Reconciliation, 2026-08-14 (#434)
+
+`dca-confirmation-card.json` lost two rows from its `assumptions` array:
+`"No fees"` and `"No slippage"`. They were English literals baked by the
+backend beside `display_facts.fees` and `display_facts.slippage`, which already
+carried the same truth as typed values. The card localizes from the typed facts,
+so a Spanish workspace showed those two rows in English while the rest of the
+strip was Spanish.
+
+The screenshots under `browser/` still vouch for what they always did. They were
+captured on an English workspace, where the card renders those rows from the
+typed facts and reads identically; `display_facts` in this fixture is unchanged.
+Only the backend's redundant second copy is gone. The array here was regenerated
+from the real `confirm_stage`, not hand-edited.
+
+## Reconciliation, 2026-08-15 (time-bombed guard)
+
+`capabilities.edit_constraints.date_window.max_end` in the fixture held the
+literal date the evidence was captured on. The confirm stage sets that bound to
+`date.today()`, so the equality check passed only while the runner's clock read
+the capture date and failed on the first UTC rollover. It broke CI on an
+unrelated PR the next morning.
+
+The bound is now `<capture-date>` in the fixture, and the guard compares the
+capabilities shape without it while asserting separately that the produced bound
+is today. Nothing about the captured card changed; the guard stopped asserting a
+fact that expires.
+
+## Convergence note, 2026-08-15
+
+PR #513 landed a second fix for the same #512 time bomb: it kept the real capture
+date in the fixture and pinned the confirm stage's clock to it. Reconciling PR
+#507 kept the placeholder plus the separate "the produced bound is today"
+assertion, and removed the pinned clock. Pinning means the guard never exercises
+the real today-derived behaviour, which is the thing most likely to break; one
+mechanism now owns the date, and it is the one that still watches the clock.

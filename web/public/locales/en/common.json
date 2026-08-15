@@ -363,6 +363,7 @@
       "artifact_action_retry_rebuilt_confirmation": "I still have that failed setup. I rebuilt the draft so you can review the card and retry when you are ready.",
       "artifact_action_retry_inactive": "That retry is no longer attached to an active failed run. Use the latest retry action or confirm the setup you want to run.",
       "execution_data_unavailable": "The setup is still here, but I could not get {{dataLabel}} for that run right now. Try again, change the dates, or choose a different supported asset.",
+      "backtest_capacity_exceeded": "Argus is already running as many backtests as it can right now, so this one did not start. Nothing broke and nothing was lost: your setup is exactly as you left it. Run it again in a few minutes.",
       "data_kind": {
         "benchmark": "benchmark data",
         "market": "market data"

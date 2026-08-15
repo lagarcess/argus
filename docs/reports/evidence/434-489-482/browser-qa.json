@@ -1,0 +1,68 @@
+{
+  "captured_at": "2026-08-14",
+  "stack": {
+    "backend": "this worktree, fastapi dev on 127.0.0.1:8010",
+    "frontend": "this worktree, next dev on 127.0.0.1:3010",
+    "mode": "ARGUS_PERSISTENCE_MODE=memory, ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture, ARGUS_MOCK_AUTH=true, real OpenRouter provider",
+    "note": "No env file was written. Values were injected into the launched processes only."
+  },
+  "cases": [
+    {
+      "issue": 434,
+      "language": "es-419",
+      "prompt": "Quiero probar comprar y mantener AAPL desde enero 2023 hasta diciembre 2023 con 10000 dolares",
+      "backend_confirmation_card": {
+        "assumptions": ["$10,000 starting capital", "Datos diarios", "Benchmark: SPY"],
+        "display_facts": {"timeframe": "1D", "fees": 0.0, "slippage": 0.0, "benchmark_symbol": "SPY", "capital": 10000.0}
+      },
+      "rendered_strip": "Acciones · Datos diarios · Sin comisiones · Sin deslizamiento · Referencia: SPY",
+      "rendered_assertions": {"Sin comisiones": true, "Sin deslizamiento": true, "No fees": false, "No slippage": false},
+      "reads": "The English cost literals are gone from the backend strip. The card states the same truth from display_facts, in Spanish."
+    },
+    {
+      "issue": 434,
+      "language": "en",
+      "prompt": "Compare Apple with SPY over the last 12 months.",
+      "rendered_strip": "Stocks · Daily data · Through Aug 13 · No fees · No slippage · Benchmark: SPY",
+      "reads": "English parity: the same typed facts render the English wording, so removing the backend literals cost the English reader nothing."
+    },
+    {
+      "issue": 489,
+      "language": "es-419",
+      "forced_condition": "ARGUS_OPENROUTER_CLARIFICATION_TIMEOUT_SECONDS=1, so the LLM clarifier times out and the deterministic fallback fires",
+      "prompt": "Mejor pruebalo con barras de 5 minutos",
+      "stream": {
+        "clarification": {"kind": "unsupported_recovery", "reason_code": "unsupported_strategy_logic", "prompt_source": "degraded_fallback"},
+        "persisted_assistant_prompt": "Argus can't run that rule directly yet. Which supported direction should I use: Use a supported RSI threshold rule, Compare with buy and hold, or Use a supported moving-average crossover?"
+      },
+      "rendered": "Argus todavía no puede ejecutar esa regla directamente. ¿Qué camino quieres usar: Usar una regla RSI compatible, Comparar con comprar y mantener, o Usar un cruce de medias móviles compatible?",
+      "reads": "This is the whole seam in one turn. The deterministic path fired, the persisted prose is English, the typed contract carries the reason code, and the reader gets Spanish."
+    },
+    {
+      "issue": 489,
+      "language": "es-419",
+      "forced_condition": "same",
+      "prompt": "Prueba comprar y mantener AAPL en 2023 con 5 dolares",
+      "stream": {
+        "clarification": {"kind": "unsupported_recovery", "reason_code": "unsupported_starting_capital", "prompt_source": "degraded_fallback"},
+        "persisted_assistant_prompt": "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?"
+      },
+      "rendered": "El capital inicial debe estar entre $1,000 y $100,000,000. ¿Qué monto dentro de ese rango quieres usar?"
+    },
+    {
+      "issue": 489,
+      "language": "en",
+      "forced_condition": "same",
+      "prompt": "Test buy and hold on AAPL in 2023 with 5 dollars",
+      "rendered": "Starting capital must be between $1,000 and $100,000,000. What amount in that range should I use?",
+      "reads": "English parity for the same degraded shape."
+    },
+    {
+      "issue": 482,
+      "status": "not captured in the browser",
+      "reason": "Capacity admission lives behind Supabase persistence: _maybe_create_shadow_job raises 'Supabase persistence is required for shadow backtest jobs' without a gateway, and this lane's local stack is memory-mode. Standing one up needs generated env files, which this lane was told not to write, and pointing at hosted Supabase would write to production.",
+      "proven_instead": "tests/agent_runtime/test_capacity_refusal_copy.py drives the real admission_rejection_envelope for both per_user_capacity and global_capacity through the real execute_stage, and web/__tests__/workspace-language-prose.test.ts renders the resulting recovery code through the real frontend renderer against both bundles.",
+      "founder_repro": "Run a Supabase-backed QA stack with ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT=0 and press Run backtest."
+    }
+  ]
+}

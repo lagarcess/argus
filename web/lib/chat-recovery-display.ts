@@ -6,6 +6,29 @@ import { isRetryAction } from "@/lib/chat-retry-actions";
 const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
 const NO_PROGRESS_ACTION_ID_PREFIX = "no-progress-";
 
+/**
+ * Reason codes whose localized sentence is complete without a list of options.
+ * Mirrors SELF_SUFFICIENT_UNSUPPORTED_REASON_CODES in the backend contract: the
+ * backend emits a typed contract for exactly these without options, so refusing
+ * to render one here would drop the reader back onto the persisted English.
+ */
+const SELF_SUFFICIENT_UNSUPPORTED_REASON_CODES = new Set([
+  "future_performance",
+  "unsupported_time_granularity",
+  "unsupported_starting_capital",
+]);
+
+function unsupportedRecoveryIsRenderable(
+  reasonCode: string | undefined,
+  optionCount: number,
+): boolean {
+  return (
+    optionCount > 0 ||
+    (reasonCode !== undefined &&
+      SELF_SUFFICIENT_UNSUPPORTED_REASON_CODES.has(reasonCode))
+  );
+}
+
 export type RecoveryDisplay =
   | {
       kind: "recovery_code";
@@ -266,11 +289,11 @@ function unsupportedRecoveryDisplay(
         }))
         .slice(0, 3)
     : [];
-  if (options.length === 0) {
-    return null;
-  }
   const facts = recordOrNull(intent.facts);
   const reasonCode = unsupportedReasonCode(facts);
+  if (!unsupportedRecoveryIsRenderable(reasonCode, options.length)) {
+    return null;
+  }
   const bounds = unsupportedNumericBounds(facts, reasonCode);
   return {
     kind: "unsupported_recovery",
@@ -604,12 +627,12 @@ function unsupportedRecoveryDisplayFromClarification(
         }))
         .slice(0, 3)
     : [];
-  if (options.length === 0) {
-    return null;
-  }
   const payload = recordOrNull(clarification.payload);
   const rawValue = stringOrNull(payload?.raw_value);
   const reasonCode = stringOrNull(clarification.reason_code) ?? undefined;
+  if (!unsupportedRecoveryIsRenderable(reasonCode, options.length)) {
+    return null;
+  }
   const bounds = unsupportedNumericBounds(payload, reasonCode, true);
   return {
     kind: "unsupported_recovery",
