@@ -835,6 +835,22 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
         ).read_text()
     )
 
+    import argus.api.chat.confirmation as confirmation_module
+
+    # The card's date ceiling is "today", so this comparison only holds on the
+    # capture day unless the clock is pinned to the date the evidence froze.
+    # The evidence file is the one owner of that date.
+    capture_date = date.fromisoformat(
+        evidence["capabilities"]["edit_constraints"]["date_window"]["max_end"]
+    )
+
+    class _EvidenceCaptureDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return capture_date
+
+    monkeypatch.setattr(confirmation_module, "date", _EvidenceCaptureDate)
+
     state = RunState.new(current_user_message="", recent_thread_history=[])
     state = state.model_copy(
         update={
