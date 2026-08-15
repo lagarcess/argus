@@ -230,7 +230,7 @@ describe("metric labels", () => {
     const start = contract.indexOf("PublicReceiptMetricKey =");
     const union = contract.slice(start, contract.indexOf(";", start));
     const keys = [...union.matchAll(/"(\w+)"/g)].map((match) => match[1]);
-    expect(keys).toHaveLength(6);
+    expect(keys).toHaveLength(7);
     // The card's own benchmark row is a sentence, so the payload carries the two
     // numbers behind it instead. Both need a label like every other key.
     expect(keys).toContain("benchmark_return_pct");

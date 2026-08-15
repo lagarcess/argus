@@ -363,7 +363,11 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       statusLabel: "Simulation Complete",
       metrics: [
         { label: "Ending value", value: "$1,000 -> $1,000" },
-        { label: "Total return", value: "0.0%" },
+        {
+          key: "contribution_return_pct",
+          label: "Return on contributions",
+          value: "0.0%",
+        },
         { label: "Compared with SPY", value: "In line with SPY" },
         { label: "Worst drop", value: "-2.2%" },
       ],

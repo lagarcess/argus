@@ -276,7 +276,8 @@ export function benchmarkVerdict(
     frozenDelta !== null
       ? parse(frozenDelta)
       : (() => {
-          const mine = find("total_return_pct");
+          const mine =
+            find("total_return_pct") ?? find("contribution_return_pct");
           const left = mine ? parse(mine) : null;
           const right = theirs ? parse(theirs) : null;
           return left === null || right === null ? null : left - right;

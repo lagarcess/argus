@@ -628,6 +628,10 @@ function resultDisplayCopy(
   return {
     endingValueLabel: t("chat.result_card.ending_value", "Ending value"),
     totalReturnLabel: t("chat.result_card.total_return", "Total return"),
+    contributionReturnLabel: t(
+      "chat.result_card.contribution_return",
+      "Return on contributions",
+    ),
     comparedWithBenchmarkLabel: t(
       "chat.result_card.compared_with_benchmark",
       "Compared with benchmark",

@@ -18,6 +18,7 @@ type ActionLike = {
 export type ResultCardDisplayCopy = {
   endingValueLabel: string;
   totalReturnLabel: string;
+  contributionReturnLabel: string;
   comparedWithBenchmarkLabel: string;
   comparedWithSymbolLabel: (symbol: string) => string;
   worstDropLabel: string;
@@ -69,6 +70,7 @@ export type ResultCardDisplayOptions = {
 export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   endingValueLabel: "Ending value",
   totalReturnLabel: "Total return",
+  contributionReturnLabel: "Return on contributions",
   comparedWithBenchmarkLabel: "Compared with benchmark",
   comparedWithSymbolLabel: (symbol) => `Compared with ${symbol}`,
   worstDropLabel: "Worst drop",
@@ -140,9 +142,11 @@ export function resultMetricDisplayOrder(metric: MetricLike) {
   }
   if (
     metric.key === "total_return_pct" ||
+    metric.key === "contribution_return_pct" ||
     metric.label === "Total Return (%)" ||
     metric.label === "Total Return" ||
-    metric.label === "Total return"
+    metric.label === "Total return" ||
+    metric.label === "Return on contributions"
   ) {
     return 1;
   }
@@ -171,6 +175,9 @@ export function displayResultMetricLabel(
   options?: ResultCardDisplayOptions,
 ) {
   const copy = resultCardCopy(options);
+  if (metric.key === "contribution_return_pct") {
+    return copy.contributionReturnLabel;
+  }
   if (
     metric.key === "total_return_pct" ||
     metric.label === "Total Return (%)" ||
@@ -280,6 +287,9 @@ export function heroDeltaEvidenceView(
     "Total return",
     "Total Return",
     "Total Return (%)",
+    copy.contributionReturnLabel,
+    "Return on contributions",
+    "Retorno sobre aportes",
   ]);
   const benchmark = findBenchmarkMetric(result, copy);
   const worstDrop = findMetric(result, [
