@@ -1,0 +1,37 @@
+{
+  "label": "after",
+  "audit_example": {
+    "total_return_pct": -28.0,
+    "contribution_return_pct": null,
+    "return_basis": "contributions",
+    "annualized_return_pct": -100.0,
+    "profit": -56.0,
+    "benchmark_return_pct": 0.0,
+    "delta_vs_benchmark_pct": -28.0,
+    "max_drawdown_pct": -36.0,
+    "volatility_pct": 183.3,
+    "sharpe_ratio": -13.75,
+    "win_rate": null,
+    "profit_factor": null,
+    "total_trades": 2,
+    "peak_value": 180.0,
+    "lowest_value": 80.0
+  },
+  "six_month_monthly_dca": {
+    "total_return_pct": 6.65,
+    "contribution_return_pct": null,
+    "return_basis": "contributions",
+    "annualized_return_pct": 25.19,
+    "profit": 3988.95,
+    "benchmark_return_pct": 2.4,
+    "delta_vs_benchmark_pct": 4.25,
+    "max_drawdown_pct": -8.05,
+    "volatility_pct": 18.31,
+    "sharpe_ratio": 1.09,
+    "win_rate": null,
+    "profit_factor": null,
+    "total_trades": 6,
+    "peak_value": 67025.35,
+    "lowest_value": 9804.65
+  }
+}
