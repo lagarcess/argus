@@ -162,3 +162,16 @@ captured on an English workspace, where the card renders those rows from the
 typed facts and reads identically; `display_facts` in this fixture is unchanged.
 Only the backend's redundant second copy is gone. The array here was regenerated
 from the real `confirm_stage`, not hand-edited.
+
+## Reconciliation, 2026-08-15 (time-bombed guard)
+
+`capabilities.edit_constraints.date_window.max_end` in the fixture held the
+literal date the evidence was captured on. The confirm stage sets that bound to
+`date.today()`, so the equality check passed only while the runner's clock read
+the capture date and failed on the first UTC rollover. It broke CI on an
+unrelated PR the next morning.
+
+The bound is now `<capture-date>` in the fixture, and the guard compares the
+capabilities shape without it while asserting separately that the produced bound
+is today. Nothing about the captured card changed; the guard stopped asserting a
+fact that expires.

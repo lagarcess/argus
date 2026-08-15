@@ -10,6 +10,7 @@ would have to swap them consistently everywhere to survive.
 from __future__ import annotations
 
 import ast
+import copy
 import pathlib
 from datetime import date
 from typing import Any
@@ -807,6 +808,12 @@ def test_a_card_never_offers_a_money_bound_the_request_model_refuses(
     assert not accepts(seed=0.0, contribution=0.0)
 
 
+def _capabilities_without_max_end(card: dict[str, Any]) -> dict[str, Any]:
+    capabilities = copy.deepcopy(card["capabilities"])
+    capabilities["edit_constraints"]["date_window"].pop("max_end", None)
+    return capabilities
+
+
 def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -872,7 +879,15 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
     assert produced["rows"] == evidence["rows"]
     assert produced["assumptions"] == evidence["assumptions"]
     assert produced["display_facts"] == evidence["display_facts"]
-    assert produced["capabilities"] == evidence["capabilities"]
+    # The editable date window's upper bound is today by construction, so a
+    # frozen copy of it in the fixture stops matching the moment the clock
+    # rolls over. Compare the shape, and hold the bound to what it means.
+    assert _capabilities_without_max_end(produced) == _capabilities_without_max_end(
+        evidence
+    )
+    assert produced["capabilities"]["edit_constraints"]["date_window"]["max_end"] == (
+        date.today().isoformat()
+    )
     # The card the pictures vouch for has to be one a user could actually run.
     assert evidence["status"] == "ready_to_run"
     assert evidence["actions"][0]["type"] == "run_backtest"
