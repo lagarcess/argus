@@ -260,18 +260,23 @@ def test_the_seed_buys_on_day_one_and_contributions_follow(seed: float) -> None:
     close = pd.Series([10.0, 20.0, 20.0, 20.0], index=index, dtype=float)
     entries = pd.Series([True, True, False, False], index=index, dtype=bool)
 
-    equity, invested = _dca_equity_curve(
+    result = _dca_equity_curve(
         close=close,
         entries=entries,
         contribution=200.0,
         starting_capital=seed,
     )
+    equity = result.equity_curve
 
     # Day one buys the seed and the first contribution at $10 a share.
     assert equity.iloc[0] == pytest.approx(seed + 200.0)
     # The second contribution buys at $20; everything bought at $10 doubled.
     assert equity.iloc[1] == pytest.approx((seed + 200.0) * 2.0 + 200.0)
-    assert invested == pytest.approx(seed + 400.0)
+    assert result.invested_capital == pytest.approx(seed + 400.0)
+    # The declared deposits are the same cash the curve invested, dated.
+    assert result.external_flows.tolist() == pytest.approx(
+        [seed + 200.0, 200.0, 0.0, 0.0]
+    )
 
 
 def test_changing_only_the_seed_changes_only_the_seed_s_contribution_to_equity() -> None:
@@ -280,15 +285,19 @@ def test_changing_only_the_seed_changes_only_the_seed_s_contribution_to_equity()
     close = pd.Series([10.0, 10.0, 10.0], index=index, dtype=float)
     entries = pd.Series([True, True, True], index=index, dtype=bool)
 
-    without_seed, invested_without = _dca_equity_curve(
+    without_seed = _dca_equity_curve(
         close=close, entries=entries, contribution=200.0, starting_capital=0.0
     )
-    with_seed, invested_with = _dca_equity_curve(
+    with_seed = _dca_equity_curve(
         close=close, entries=entries, contribution=200.0, starting_capital=5_000.0
     )
 
-    assert (with_seed - without_seed).round(6).eq(5_000.0).all()
-    assert invested_with - invested_without == pytest.approx(5_000.0)
+    assert (
+        (with_seed.equity_curve - without_seed.equity_curve).round(6).eq(5_000.0).all()
+    )
+    assert with_seed.invested_capital - without_seed.invested_capital == pytest.approx(
+        5_000.0
+    )
 
 
 def test_narrowing_a_window_narrows_the_offered_periods() -> None:

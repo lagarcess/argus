@@ -68,14 +68,14 @@ def build_result_chart(
         )
         if is_dca:
             assert symbol_dca_plan is not None
-            symbol_equity, _ = _dca_equity_curve(
+            symbol_equity = _dca_equity_curve(
                 close=close,
                 entries=entries,
                 contribution=symbol_dca_plan.contribution,
                 starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
-            )
+            ).equity_curve
         else:
             symbol_equity = _execute_long_only_ledger(
                 execution_events=execution_events,

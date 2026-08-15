@@ -98,9 +98,15 @@ def build_result_card(
             "label": "Valor final" if is_es else "Ending value",
             "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
         },
+        # A recurring plan's ratio is money-on-money over contributed cash,
+        # not a time return on one bankroll, so it carries its own key and name.
         {
-            "key": "total_return_pct",
-            "label": "Retorno total" if is_es else "Total return",
+            "key": "contribution_return_pct" if is_dca else "total_return_pct",
+            "label": (
+                ("Retorno sobre aportes" if is_es else "Return on contributions")
+                if is_dca
+                else ("Retorno total" if is_es else "Total return")
+            ),
             "value": f"{performance['total_return_pct']:+.1f}%",
         },
         {

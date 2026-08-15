@@ -168,12 +168,15 @@ def test_metric_and_chart_equity_assignments_share_execution_ledger() -> None:
     assert _assignment_producers(
         runner.compute_alpha_metrics, "gross_symbol_execution"
     ) == ["_execute_long_only_ledger()"]
+    assert _assignment_producers(runner.compute_alpha_metrics, "dca_result") == [
+        "_dca_equity_curve()"
+    ]
     assert _assignment_producers(runner.compute_alpha_metrics, "symbol_equity") == [
-        "_dca_equity_curve()",
+        "dca_result.equity_curve",
         "symbol_execution.equity_curve",
     ]
     assert _assignment_producers(charts.build_result_chart, "symbol_equity") == [
-        "_dca_equity_curve()",
+        "_dca_equity_curve().equity_curve",
         "_execute_long_only_ledger().equity_curve",
     ]
     assert "vbt.Portfolio.from_signals" not in _called_functions(
