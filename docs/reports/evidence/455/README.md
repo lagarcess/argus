@@ -175,3 +175,12 @@ The bound is now `<capture-date>` in the fixture, and the guard compares the
 capabilities shape without it while asserting separately that the produced bound
 is today. Nothing about the captured card changed; the guard stopped asserting a
 fact that expires.
+
+## Convergence note, 2026-08-15
+
+PR #513 landed a second fix for the same #512 time bomb: it kept the real capture
+date in the fixture and pinned the confirm stage's clock to it. Reconciling PR
+#507 kept the placeholder plus the separate "the produced bound is today"
+assertion, and removed the pinned clock. Pinning means the guard never exercises
+the real today-derived behaviour, which is the thing most likely to break; one
+mechanism now owns the date, and it is the one that still watches the clock.
