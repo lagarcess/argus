@@ -23,7 +23,11 @@ MEASURED_ROOTS = (
 FINGERPRINT_PATH = Path(".agent/interpreter_prompt_fingerprint.json")
 
 _MESSAGE_CONSTRUCTORS = frozenset({"SystemMessage", "HumanMessage", "AIMessage"})
-_PROMPT_FUNCTION_SUFFIXES = ("_prompt", "_instructions", "_directive")
+_PROMPT_FUNCTION_SUFFIXES = ("_prompt", "_instructions", "_directive", "_clause")
+# String constants like DISCOVERY_ACT_GUIDANCE are concatenated into the
+# interpreter's system prompt by name, so the prompt builder's own hash does
+# not move when they change; they are hashed at their definition instead.
+_GUIDANCE_CONSTANT_SUFFIX = "_GUIDANCE"
 
 
 def _callee_name(node: ast.Call) -> str:
@@ -57,6 +61,20 @@ def _model_facing_strings(tree: ast.AST) -> list[tuple[str, str]]:
                 body = _joined_constants(node)
                 if body:
                     found.append((f"def {node.name}", body))
+            continue
+
+        if isinstance(node, ast.Assign):
+            target_names = [
+                target.id for target in node.targets if isinstance(target, ast.Name)
+            ]
+            if (
+                len(target_names) == 1
+                and target_names[0].endswith(_GUIDANCE_CONSTANT_SUFFIX)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and node.value.value
+            ):
+                found.append((target_names[0], node.value.value))
             continue
 
         if not isinstance(node, ast.Call):

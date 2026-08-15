@@ -101,8 +101,15 @@ def _run_stage(interpretation: LLMInterpretationResponse, message: str) -> Any:
     )
 
 
-def test_knowledge_turn_with_resolved_asset_is_not_interrogated() -> None:
-    # The production shape: statistics question, model resolves SPY, answers.
+def test_knowledge_turn_with_resolved_asset_is_not_interrogated(monkeypatch) -> None:
+    # The production shape: statistics question, model resolves SPY, and the
+    # knowledge classifier confirms the user wants statistics, not a run.
+    from argus.agent_runtime import knowledge_answer as ka
+
+    async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
+        return ka.KnowledgeQueryExtraction(question_kind="market_stats", symbols=["SPY"])
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
     interpretation = StructuredInterpretation(
         intent="unsupported_or_out_of_scope",
         task_relation="new_task",
@@ -126,6 +133,82 @@ def test_knowledge_turn_with_resolved_asset_is_not_interrogated() -> None:
     # interrogation or a bare admission.
     assert result.decision.reason_codes == ["knowledge_answer_market_stats"]
     assert "SPY" in str(result.stage_patch.get("assistant_response"))
+
+
+def test_unsupported_run_request_keeps_recovery_route_and_run_facts(
+    monkeypatch,
+) -> None:
+    # "Backtest weekly options on Apple over 2024": the model types the
+    # unsupported route but omits the constraint payload. The turn must reach
+    # unsupported recovery with the user's asset and window intact, never a
+    # knowledge answer voiced from the underlying stock's statistics.
+    from argus.agent_runtime import knowledge_answer as ka
+
+    async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
+        return ka.KnowledgeQueryExtraction(question_kind="none")
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
+    interpretation = StructuredInterpretation(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        user_goal_summary="Backtest weekly options on Apple over 2024",
+        semantic_turn_act="unsupported_request",
+        requires_clarification=False,
+        assistant_response="Argus cannot run options strategies yet.",
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="SPY",
+        ),
+    )
+    result = _run_stage(
+        interpretation,
+        "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+    )
+
+    assert result.outcome == "needs_clarification"
+    constraints = result.decision.unsupported_constraints
+    assert [constraint.category for constraint in constraints] == [
+        "unsupported_strategy_logic"
+    ]
+    assert constraints[0].simplification_options
+    assert "unsupported_request_recovery_materialized" in result.decision.reason_codes
+    draft = result.decision.candidate_strategy_draft
+    assert draft.asset_universe == ["AAPL"]
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert draft.comparison_baseline == "SPY"
+    assert draft.strategy_type is None
+
+
+def test_unsupported_capability_question_without_run_facts_stays_prose(
+    monkeypatch,
+) -> None:
+    # "Can Argus trade options?" carries no asset, window, or capital; the
+    # honest capability answer must stay prose instead of an interrogation.
+    from argus.agent_runtime import knowledge_answer as ka
+
+    async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
+        return ka.KnowledgeQueryExtraction(question_kind="none")
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
+    interpretation = StructuredInterpretation(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        user_goal_summary="Asks whether Argus can trade options",
+        semantic_turn_act="unsupported_request",
+        requires_clarification=False,
+        assistant_response="Argus cannot trade or test options strategies yet.",
+        candidate_strategy_draft=StrategySummary(),
+    )
+    result = _run_stage(interpretation, "can you trade options for me?")
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.unsupported_constraints == []
+    assert (
+        "unsupported_request_recovery_materialized"
+        not in result.decision.reason_codes
+    )
 
 
 def test_strategy_intent_with_one_ticker_still_routes_to_strategy() -> None:
