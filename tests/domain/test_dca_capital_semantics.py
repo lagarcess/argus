@@ -828,7 +828,6 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
     """
     import json
 
-    import argus.api.chat.confirmation as confirmation_module
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
     )
@@ -845,7 +844,9 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
         ).read_text()
     )
 
-    # The card's date ceiling is "today", so the comparison only holds on the
+    import argus.api.chat.confirmation as confirmation_module
+
+    # The card's date ceiling is "today", so this comparison only holds on the
     # capture day unless the clock is pinned to the date the evidence froze.
     # The evidence file is the one owner of that date.
     capture_date = date.fromisoformat(

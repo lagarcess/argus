@@ -678,6 +678,40 @@ promoting. PR #431 shipped compound editing on 2026-08-11 without one. The
 suite already contained the cases that would have caught it, and had scored
 them 14/14 eight days earlier. That is [#498](https://github.com/lagarcess/argus/issues/498).
 
+### What the run costs, measured
+
+One full 60-case suite is **$1.33** and **29 minutes** (2026-08-14, `eaf5d52b`).
+Confirmation-edit cases are the expensive ones at ~$0.05 each against a $0.022
+mean, because they burn the tier-3 interpreter across multiple turns.
+
+That price is low enough to gate on the full suite directly rather than
+maintain a cheaper subset, so there are no coverage gaps to reason about.
+
+**Two runs of the same commit produced identical failure sets**, 17 of 60, with
+no case differing in either direction. Treat a single flipped case as signal
+and re-run to confirm rather than assuming variance.
+
+### Model-facing text is frozen against a scorecard
+
+`tests/test_interpreter_prompt_freeze.py` fingerprints every piece of text the
+interpretation model reads: prompt builders and Pydantic
+`Field(description=...)` across the eval-reachable tree. It costs nothing and
+runs in about a second, so it is the cheap layer that decides when the paid one
+has to run.
+
+Changing that text requires a live eval on the branch, its scorecard committed
+under `docs/reports/evidence/`, a case-by-case comparison against the scorecard
+named in `.agent/interpreter_prompt_fingerprint.json`, and a regenerated
+fingerprint. Because the fingerprint is a single file recording one measured
+state, **only one lane may hold this surface at a time**; two concurrent prompt
+lanes conflict on it and neither measures the combined result.
+
+Why this exists: PR #491 rewrote the shared prompt for a DCA change on
+2026-08-14. Its own tests passed, CI went 6/6 green, and it regressed asset
+extraction, start-date preservation, and discovery routing in three unrelated
+places. No unit test sends a message through a model, so nothing but the paid
+eval could have caught it, and that ran after the merge.
+
 ## Guest Staged Rollout
 
 The operational security checklist for later internet-facing Guest exposure is
