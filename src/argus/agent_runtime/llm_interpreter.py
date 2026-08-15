@@ -48,8 +48,8 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
     materialized_artifact_edit_targets,
-    stated_edit_operations,
 )
+from argus.agent_runtime.interpreter.edit_completion import stated_edit_operations
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
     _comparison_baseline_has_trusted_provenance,
