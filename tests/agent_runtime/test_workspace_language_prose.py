@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from argus.agent_runtime.clarification_contract import (
     intent_clarification_fallback,
     typed_clarification_contract,

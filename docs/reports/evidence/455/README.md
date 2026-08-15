@@ -147,3 +147,18 @@ founder requirement outright.
   `test_engine_launch.py`.
 - `ruff check .`: passed.
 - `scripts/check_modularity_budget.py`: no violations.
+
+## Reconciliation, 2026-08-14 (#434)
+
+`dca-confirmation-card.json` lost two rows from its `assumptions` array:
+`"No fees"` and `"No slippage"`. They were English literals baked by the
+backend beside `display_facts.fees` and `display_facts.slippage`, which already
+carried the same truth as typed values. The card localizes from the typed facts,
+so a Spanish workspace showed those two rows in English while the rest of the
+strip was Spanish.
+
+The screenshots under `browser/` still vouch for what they always did. They were
+captured on an English workspace, where the card renders those rows from the
+typed facts and reads identically; `display_facts` in this fixture is unchanged.
+Only the backend's redundant second copy is gone. The array here was regenerated
+from the real `confirm_stage`, not hand-edited.

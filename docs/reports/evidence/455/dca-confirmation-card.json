@@ -42,8 +42,6 @@
     "$0 starting capital",
     "$200 monthly contribution",
     "Daily data",
-    "No fees",
-    "No slippage",
     "Benchmark: SPY"
   ],
   "canonical_launch_payload_hash": "sha256:d946e9145cce733db598e70b7d04b4fdb5480dfaa8aab5d255536750af2ae407",

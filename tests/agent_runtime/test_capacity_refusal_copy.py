@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.state.models import RunState
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
