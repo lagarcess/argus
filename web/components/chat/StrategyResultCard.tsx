@@ -628,6 +628,10 @@ function resultDisplayCopy(
   return {
     endingValueLabel: t("chat.result_card.ending_value", "Ending value"),
     totalReturnLabel: t("chat.result_card.total_return", "Total return"),
+    contributionReturnLabel: t(
+      "chat.result_card.contribution_return",
+      "Return on contributions",
+    ),
     comparedWithBenchmarkLabel: t(
       "chat.result_card.compared_with_benchmark",
       "Compared with benchmark",
@@ -651,6 +655,10 @@ function resultDisplayCopy(
     totalReturnSuffix: t(
       "chat.result_card.total_return_suffix",
       "total return",
+    ),
+    contributionReturnSuffix: t(
+      "chat.result_card.contribution_return_suffix",
+      "return on contributions",
     ),
     benchmarkUnavailable: t(
       "chat.result_card.benchmark_unavailable",

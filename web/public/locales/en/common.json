@@ -503,6 +503,7 @@
         "lowest_value": "Lowest value",
         "final_value": "Final value",
         "total_return": "Total return",
+        "contribution_return_pct": "Return on contributions",
         "benchmark_return": "Benchmark return",
         "benchmark_delta": "Against benchmark",
         "benchmark_symbol": "Benchmark",
@@ -603,6 +604,7 @@
     "result_card": {
       "ending_value": "Ending value",
       "total_return": "Total return",
+      "contribution_return": "Return on contributions",
       "compared_with_benchmark": "Compared with benchmark",
       "compared_with_symbol": "Compared with {{symbol}}",
       "worst_drop": "Worst drop",
@@ -625,6 +627,7 @@
       "gain": "gain",
       "loss": "loss",
       "total_return_suffix": "total return",
+      "contribution_return_suffix": "return on contributions",
       "benchmark_unavailable": "Benchmark unavailable",
       "percentage_points": "{{value}} percentage points",
       "in_line_with": "In line with {{symbol}}",
@@ -1208,6 +1211,7 @@
     "match_count_other": "{{count}} matches",
     "metric_labels": {
       "benchmark_return_pct": "Benchmark return",
+      "contribution_return_pct": "Return on contributions",
       "delta_vs_benchmark_pct": "Against benchmark",
       "excess_return_pct": "Against benchmark",
       "max_drawdown_pct": "Worst drop",
@@ -1575,6 +1579,7 @@
     "metric_labels": {
       "cash_value": "Ending value",
       "total_return_pct": "Total return",
+      "contribution_return_pct": "Return on contributions",
       "max_drawdown_pct": "Worst dip",
       "win_rate": "Win rate",
       "benchmark_return_pct": "Benchmark",

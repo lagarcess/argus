@@ -1413,6 +1413,7 @@ Metrics are grouped into categories.
 ## Performance Metrics
 ```json
 {
+  "return_basis": "fixed_capital",
   "total_return_pct": 18.4,
   "benchmark_return_pct": 12.1,
   "delta_vs_benchmark_pct": 6.3,
@@ -1480,9 +1481,64 @@ frequency owned by the market-data coverage boundary: crypto uses continuous
 24/7 time, currency pairs use the current provider's continuous calendar, and
 equities use 252 sessions plus the real session durations supplied by the same
 market calendar, including early closes and provider-emitted partial final
-candles. Daily equity uses 252 observations per year. This time-basis correction
-does not redefine DCA contribution-return semantics; that remains a separate
-metric-contract decision.
+candles. Daily equity uses 252 observations per year.
+
+### Return basis
+
+Every performance block declares how its returns relate to capital under
+`return_basis`:
+
+- `"fixed_capital"`: one bankroll invested at the start. `total_return_pct`
+  is the time return on that starting capital.
+- `"contributions"`: a recurring plan (`dca_accumulation`) funded by dated
+  deposits. `total_return_pct` is a simple money-on-money ratio, ending
+  nominal equity divided by total contributed cash minus one, in percent.
+  Deposit dates and exposure time are deliberately not part of this number.
+
+The two bases are different economic quantities and must never share a
+comparison column: a surface that compares runs across templates must
+partition by `return_basis` (or by the result-card row key below) before
+placing values side by side. `benchmark_return_pct` and
+`delta_vs_benchmark_pct` always use the run's own basis; a contributions-basis
+benchmark receives the identical dated deposit stream, amounts, and modeled
+cost rates as the strategy, which is what keeps the delta valid within one
+run. Stored runs persisted before this field exists carry no `return_basis`;
+readers must treat a missing value on a `dca_accumulation` run as
+`"contributions"` and as `"fixed_capital"` otherwise.
+
+The result card states the basis in its row contract: a fixed-capital run's
+return row uses key `total_return_pct` and the "Total return" label, while a
+contributions run's return row uses key `contribution_return_pct` and the
+"Return on contributions" / "Retorno sobre aportes" label. Exactly one of the
+two rows exists per card, so a consumer keyed on either row cannot silently
+receive the other basis. Public excerpts freeze the same row keys.
+
+### Contributions-basis annual return and risk
+
+For `return_basis: "contributions"`, `annualized_return_pct` is the
+money-weighted annual rate (a dated-cash-flow IRR): the single rate `r`
+solving `sum(deposit_i * (1 + r) ** years_i) = ending nominal equity`, where
+`years_i` is the elapsed calendar time from each deposit's bar timestamp to
+the final bar timestamp at 365.2425 days per year. Deposits land on their
+entry bars; the day-one seed is a deposit on the first bar. The deposit
+stream followed by one terminal value has a single sign change, so the rate
+is unique when it exists. When no rate above -100% can reproduce the ending
+value the limit `-100.0` is reported, and a rate too large to carry meaning
+is `null`; consumers must hide a `null` annual rate, never substitute zero.
+For a single-deposit run this formula reduces exactly to the fixed-capital
+elapsed-time annualization above.
+
+Contributions-basis risk and efficiency statistics measure investment
+performance, never deposits. Period returns subtract each bar's external
+deposit before the ratio (`(equity[t] - deposit[t]) / equity[t-1] - 1`), and
+`max_drawdown_pct` reads the wealth index compounded from those
+flow-adjusted returns rather than the nominal equity curve. `volatility_pct`
+and `sharpe_ratio` consume the same flow-adjusted series. Nominal equity
+still owns `profit`, ending value, `portfolio_value_range`, and the chart:
+nominal dollars and performance returns are different series, and a deposit
+step in the chart is correct cash while a deposit-driven return would be a
+lie. `win_rate` and `profit_factor` are `null` for contributions runs
+because an accumulation plan never closes a position.
 
 ## Benchmark Defaults
 - **equity** -> `SPY`

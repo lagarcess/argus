@@ -7,6 +7,7 @@ const MAX_DOSSIER_METRICS = 4;
 
 const METRIC_FALLBACKS: Record<string, string> = {
   benchmark_return_pct: "Benchmark return",
+  contribution_return_pct: "Return on contributions",
   delta_vs_benchmark_pct: "Against benchmark",
   excess_return_pct: "Against benchmark",
   max_drawdown_pct: "Worst drop",

@@ -37,15 +37,18 @@ class PublicExcerptDateRange(BaseModel):
     end: str
 
 
-# Exactly what a receipt can carry, and nothing aspirational. The first four are
+# Exactly what a receipt can carry, and nothing aspirational. The first five are
 # the result card's own row keys; the last two are read from the run's metrics
 # because the card renders that comparison as an English sentence rather than a
-# number. A key the projection does not know is refused rather than dropped, and
+# number. `contribution_return_pct` is the recurring-plan headline: a simple
+# return on contributed cash, never comparable with `total_return_pct`. A key
+# the projection does not know is refused rather than dropped, and
 # `tests/test_public_excerpt_language.py` drives the production generator across
 # every executable template to keep this set honest.
 MetricKey = Literal[
     "cash_value",
     "total_return_pct",
+    "contribution_return_pct",
     "max_drawdown_pct",
     "win_rate",
     "benchmark_return_pct",

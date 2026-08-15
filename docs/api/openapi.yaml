@@ -4186,6 +4186,7 @@ components:
           enum:
           - cash_value
           - total_return_pct
+          - contribution_return_pct
           - max_drawdown_pct
           - win_rate
           - benchmark_return_pct

@@ -503,6 +503,7 @@
         "lowest_value": "Valor más bajo",
         "final_value": "Valor final",
         "total_return": "Retorno total",
+        "contribution_return_pct": "Retorno sobre aportes",
         "benchmark_return": "Retorno de referencia",
         "benchmark_delta": "Frente a la referencia",
         "benchmark_symbol": "Referencia",
@@ -603,6 +604,7 @@
     "result_card": {
       "ending_value": "Valor final",
       "total_return": "Rendimiento total",
+      "contribution_return": "Retorno sobre aportes",
       "compared_with_benchmark": "Comparado con referencia",
       "compared_with_symbol": "Comparado con {{symbol}}",
       "worst_drop": "Peor caída",
@@ -625,6 +627,7 @@
       "gain": "ganancia",
       "loss": "pérdida",
       "total_return_suffix": "rendimiento total",
+      "contribution_return_suffix": "retorno sobre aportes",
       "benchmark_unavailable": "Referencia no disponible",
       "percentage_points": "{{value}} puntos porcentuales",
       "in_line_with": "En línea con {{symbol}}",
@@ -1208,6 +1211,7 @@
     "match_count_other": "{{count}} coincidencias",
     "metric_labels": {
       "benchmark_return_pct": "Rendimiento de referencia",
+      "contribution_return_pct": "Retorno sobre aportes",
       "delta_vs_benchmark_pct": "Contra referencia",
       "excess_return_pct": "Contra referencia",
       "max_drawdown_pct": "Peor caída",
@@ -1575,6 +1579,7 @@
     "metric_labels": {
       "cash_value": "Valor final",
       "total_return_pct": "Retorno total",
+      "contribution_return_pct": "Retorno sobre aportes",
       "max_drawdown_pct": "Peor caída",
       "win_rate": "Aciertos",
       "benchmark_return_pct": "Referencia",

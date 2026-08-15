@@ -18,6 +18,7 @@ type ActionLike = {
 export type ResultCardDisplayCopy = {
   endingValueLabel: string;
   totalReturnLabel: string;
+  contributionReturnLabel: string;
   comparedWithBenchmarkLabel: string;
   comparedWithSymbolLabel: (symbol: string) => string;
   worstDropLabel: string;
@@ -29,6 +30,7 @@ export type ResultCardDisplayCopy = {
   gainNoun: string;
   lossNoun: string;
   totalReturnSuffix: string;
+  contributionReturnSuffix: string;
   benchmarkUnavailable: string;
   percentagePoints: (value: string) => string;
   inLineWith: (symbol: string) => string;
@@ -69,6 +71,7 @@ export type ResultCardDisplayOptions = {
 export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   endingValueLabel: "Ending value",
   totalReturnLabel: "Total return",
+  contributionReturnLabel: "Return on contributions",
   comparedWithBenchmarkLabel: "Compared with benchmark",
   comparedWithSymbolLabel: (symbol) => `Compared with ${symbol}`,
   worstDropLabel: "Worst drop",
@@ -80,6 +83,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   gainNoun: "gain",
   lossNoun: "loss",
   totalReturnSuffix: "total return",
+  contributionReturnSuffix: "return on contributions",
   benchmarkUnavailable: "Benchmark unavailable",
   percentagePoints: (value) => `${value} percentage points`,
   inLineWith: (symbol) => `In line with ${symbol}`,
@@ -140,9 +144,11 @@ export function resultMetricDisplayOrder(metric: MetricLike) {
   }
   if (
     metric.key === "total_return_pct" ||
+    metric.key === "contribution_return_pct" ||
     metric.label === "Total Return (%)" ||
     metric.label === "Total Return" ||
-    metric.label === "Total return"
+    metric.label === "Total return" ||
+    metric.label === "Return on contributions"
   ) {
     return 1;
   }
@@ -171,6 +177,9 @@ export function displayResultMetricLabel(
   options?: ResultCardDisplayOptions,
 ) {
   const copy = resultCardCopy(options);
+  if (metric.key === "contribution_return_pct") {
+    return copy.contributionReturnLabel;
+  }
   if (
     metric.key === "total_return_pct" ||
     metric.label === "Total Return (%)" ||
@@ -280,6 +289,9 @@ export function heroDeltaEvidenceView(
     "Total return",
     "Total Return",
     "Total Return (%)",
+    copy.contributionReturnLabel,
+    "Return on contributions",
+    "Retorno sobre aportes",
   ]);
   const benchmark = findBenchmarkMetric(result, copy);
   const worstDrop = findMetric(result, [
@@ -289,6 +301,13 @@ export function heroDeltaEvidenceView(
   ]);
   const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
   const totalReturnValue = normalizeSignedPercent(totalReturn?.value);
+  const isContributionReturn =
+    totalReturn?.key === "contribution_return_pct" ||
+    [
+      copy.contributionReturnLabel.toLowerCase(),
+      "return on contributions",
+      "retorno sobre aportes",
+    ].includes((totalReturn?.label ?? "").toLowerCase());
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
   const benchmarkSymbol = facts.benchmark ?? benchmarkSymbolFromMetric(benchmark);
@@ -297,7 +316,13 @@ export function heroDeltaEvidenceView(
     hero: {
       value: parsedEndingValue?.endingDisplay ?? endingValue?.value ?? copy.unavailable,
       label: copy.endingValueLabel,
-      detail: heroDetail(parsedEndingValue?.change, totalReturnValue, copy, options?.locale),
+      detail: heroDetail(
+        parsedEndingValue?.change,
+        totalReturnValue,
+        copy,
+        options?.locale,
+        isContributionReturn ? copy.contributionReturnSuffix : undefined,
+      ),
       tone,
       // Unavailable values must read as absent, never as a healthy metric.
       unavailable: !(parsedEndingValue?.endingDisplay ?? endingValue?.value),
@@ -728,15 +753,17 @@ function heroDetail(
   totalReturn: string | undefined,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  returnSuffix?: string,
 ) {
+  const suffix = returnSuffix ?? copy.totalReturnSuffix;
   const returnLabel = totalReturn ?? copy.returnUnavailable;
   if (change == null) return returnLabel;
   if (Math.abs(change) < 0.5) {
-    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${copy.totalReturnSuffix}`;
+    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
   }
   const sign = change > 0 ? "+" : "-";
   const noun = change > 0 ? copy.gainNoun : copy.lossNoun;
-  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${copy.totalReturnSuffix}`;
+  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${suffix}`;
 }
 
 function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
