@@ -48,7 +48,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
     materialized_artifact_edit_targets,
-    stated_cost_edit_operations,
+    stated_edit_operations,
 )
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
@@ -456,6 +456,10 @@ class OpenRouterStructuredInterpreter:
             request,
             asset_resolution_context=asset_resolution_context,
         )
+        # The last raw interpretation still names what the user asked to
+        # change; the terminal edit-planner fallback needs it so a plan that
+        # covers only part of the request cannot be accepted (issue #498).
+        last_raw_response: LLMInterpretationResponse | None = None
         if self.model_name is None:
             candidate_models = candidate_models or []
             for index, candidate_model in enumerate(candidate_models):
@@ -469,6 +473,7 @@ class OpenRouterStructuredInterpreter:
                     )
                     if not isinstance(response, LLMInterpretationResponse):
                         continue
+                    last_raw_response = response
                     response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=candidate_model,
@@ -495,6 +500,11 @@ class OpenRouterStructuredInterpreter:
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
                 require_failure_edit_evidence=True,
+                primary_draft=(
+                    last_raw_response.candidate_strategy_draft
+                    if last_raw_response is not None
+                    else None
+                ),
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
@@ -529,6 +539,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    last_raw_response = response
                     record_openrouter_route_receipt(
                         task="interpretation",
                         model_name=self.model_name,
@@ -592,6 +603,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    last_raw_response = response
                     record_openrouter_route_receipt(
                         task="interpretation",
                         model_name=fallback_model_name,
@@ -630,6 +642,11 @@ class OpenRouterStructuredInterpreter:
             request=request,
             preferred_model=fallback_model_name or primary_model_name,
             require_failure_edit_evidence=True,
+            primary_draft=(
+                last_raw_response.candidate_strategy_draft
+                if last_raw_response is not None
+                else None
+            ),
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
@@ -3473,7 +3490,7 @@ async def _plan_pending_artifact_assumption_edit(
         language=request.user.language_preference,
         required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
         materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
-        stated_cost_operations=stated_cost_edit_operations(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
+        stated_operations=stated_edit_operations(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
     )
     # fmt: on
     if plan is None:

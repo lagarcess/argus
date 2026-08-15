@@ -12,6 +12,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     EditOperation,
     ResolvedArtifactEdit,
     _apply_legacy_flat_edit_fields,
+    accepted_operations_partially_materialized,
     apply_edit_operations,
     resolved_asset_operation_symbols,
     typed_unapplied_operations,
@@ -37,6 +38,7 @@ from argus.agent_runtime.interpreter.shared import (
     carries_broader_edit_than_dates,
 )
 from argus.agent_runtime.llm_interpreter_types import (
+    LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
@@ -608,26 +610,85 @@ def _stated_cost_changes(
     return changes
 
 
-def stated_cost_edit_operations(
+def stated_edit_operations(
     draft: LLMStrategyDraft | None,
     *,
     current_strategy: StrategySummary | None,
     request: InterpretationRequest | None,
 ) -> list[EditOperation]:
-    """Typed cost operations for the planner to fall back on (§3.2).
+    """Typed operations for facts the primary read extracted (§3.2 union).
 
-    Values come from the primary interpretation's typed extraction, so the
-    plan completion stays deterministic; the applier still validates each
-    value and the card discloses anything it refuses.
+    The primary interpretation and the plan are independent structured reads
+    of the same turn; a fact either one extracted must reach the operation
+    set, or one model's blind spot silently halves a compound edit (issue
+    #498). Values come from the primary interpretation's typed extraction, so
+    completion stays deterministic; the applier still validates each value.
     """
 
     if draft is None:
         return []
-    return [
+    operations = [
         EditOperation(op="set", target=_STATED_COST_TARGETS[field_name], number=value)
         for field_name, value in _stated_cost_changes(
             draft, current_strategy=current_strategy, request=request
         ).items()
+    ]
+    required = _required_edit_targets_from_primary_draft(
+        draft, current_strategy=current_strategy, request=request
+    )
+    if "benchmark" in required:
+        benchmark = _normalized_ticker_symbol(draft.comparison_baseline)
+        if benchmark:
+            operations.append(
+                EditOperation(op="set", target="benchmark", value=benchmark)
+            )
+    if "date_window" in required:
+        intent = draft.date_range_intent or _explicit_range_intent(draft.date_range)
+        if intent is not None:
+            operations.append(
+                EditOperation(op="set", target="date_window", date_window=intent)
+            )
+    if "asset" in required:
+        operations.extend(_stated_asset_operations(draft))
+    return operations
+
+
+def _explicit_range_intent(date_range: Any) -> LLMDateRangeIntent | None:
+    if not isinstance(date_range, dict):
+        return None
+    start = str(date_range.get("start") or "").strip() or None
+    end = str(date_range.get("end") or "").strip() or None
+    if start is None and end is None:
+        return None
+    return LLMDateRangeIntent(
+        kind="explicit_range", start=start, end=end, confidence=1.0
+    )
+
+
+def _stated_asset_operations(draft: LLMStrategyDraft) -> list[EditOperation]:
+    inclusions = normalized_asset_symbols(draft.asset_inclusions)
+    exclusions = normalized_asset_symbols(draft.asset_exclusions)
+    if inclusions or exclusions:
+        operations = []
+        if inclusions:
+            operations.append(
+                EditOperation(op="add", target="asset", symbols=inclusions)
+            )
+        if exclusions:
+            operations.append(
+                EditOperation(op="remove", target="asset", symbols=exclusions)
+            )
+        return operations
+    operation = normalized_asset_universe_operation(draft.asset_universe_operation)
+    universe = normalized_asset_symbols(draft.asset_universe)
+    if operation is None or not universe:
+        return []
+    return [
+        EditOperation(
+            op="replace" if operation == "replace" else "add",
+            target="asset",
+            symbols=universe,
+        )
     ]
 
 
@@ -787,6 +848,19 @@ _MATERIALIZED_FIELD_TARGETS = {
 }
 
 
+def _disclosed_unapplied_targets(draft: LLMStrategyDraft) -> set[str]:
+    """Targets whose refusal already rides the card as a typed disclosure."""
+
+    disclosure = draft.extra_parameters.get("edit_disclosure")
+    if not isinstance(disclosure, dict):
+        return set()
+    return {
+        str(entry.get("target"))
+        for entry in disclosure.get("unapplied") or []
+        if isinstance(entry, dict) and entry.get("target")
+    }
+
+
 def _planned_whole_universe_asset_symbols(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -848,7 +922,7 @@ def materialized_artifact_edit_targets(
 ) -> set[str] | None:
     """Return requested deltas that survive the exact materialization path."""
 
-    draft, field_provenance, _ = _materialized_artifact_edit(
+    draft, field_provenance, _, resolved = _materialized_artifact_edit(
         plan,
         request=request,
         asset_symbol_resolver=asset_symbol_resolver,
@@ -861,6 +935,13 @@ def materialized_artifact_edit_targets(
     }
     if draft.date_range_intent is not None:
         materialized_targets.add("date_window")
+    if resolved is not None and accepted_operations_partially_materialized(
+        resolved,
+        materialized_targets | _disclosed_unapplied_targets(draft),
+    ):
+        # An accepted operation vanished while its siblings landed; a card
+        # carrying half of a compound request must never ship (issue #498).
+        return None
     if primary_draft is None:
         return materialized_targets
     current_strategy = _current_artifact_strategy(request)
@@ -1390,7 +1471,12 @@ def _materialized_artifact_edit(
     request: InterpretationRequest,
     asset_symbol_resolver: Callable[[str], str | None] | None,
     primary_draft: LLMStrategyDraft | None,
-) -> tuple[LLMStrategyDraft, dict[str, str], dict[str, Any]]:
+) -> tuple[
+    LLMStrategyDraft,
+    dict[str, str],
+    dict[str, Any],
+    ResolvedArtifactEdit | None,
+]:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     current_strategy = _current_artifact_strategy(request)
     if current_strategy is not None and current_strategy.strategy_type:
@@ -1439,7 +1525,7 @@ def _materialized_artifact_edit(
         # The typed record rides the draft so the card can disclose it even
         # though card turns drop assistant prose.
         draft.extra_parameters["edit_disclosure"] = {"unapplied": unapplied}
-    return draft, field_provenance, extra_parameters
+    return draft, field_provenance, extra_parameters, resolved
 
 
 def _response_from_artifact_assumption_edit_plan(
@@ -1459,7 +1545,7 @@ def _response_from_artifact_assumption_edit_plan(
             else None
         )
     )
-    draft, field_provenance, extra_parameters = _materialized_artifact_edit(
+    draft, field_provenance, extra_parameters, _ = _materialized_artifact_edit(
         plan,
         request=request,
         asset_symbol_resolver=asset_symbol_resolver,

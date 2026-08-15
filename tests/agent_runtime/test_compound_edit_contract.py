@@ -13,7 +13,7 @@ import asyncio
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     EditOperation,
-    _completed_with_stated_cost_operations,
+    _completed_with_stated_operations,
     plan_artifact_assumption_edit,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
@@ -294,7 +294,7 @@ class TestStatedCostsCannotDropSilently:
             _current_artifact_strategy,
             _required_edit_targets_from_primary_draft,
             materialized_artifact_edit_targets,
-            stated_cost_edit_operations,
+            stated_edit_operations,
         )
 
         request = _request(self.MESSAGE)
@@ -325,7 +325,7 @@ class TestStatedCostsCannotDropSilently:
                             candidate, request=request, primary_draft=primary
                         )
                     ),
-                    stated_cost_operations=stated_cost_edit_operations(
+                    stated_operations=stated_edit_operations(
                         primary, current_strategy=current, request=request
                     ),
                 )
@@ -357,13 +357,13 @@ class TestStatedCostsCannotDropSilently:
             operations=[EditOperation(op="set", target="capital", number=9000)],
             assistant_response="Which slippage did you mean?",
         )
-        assert _completed_with_stated_cost_operations(clarification, stated) is (
+        assert _completed_with_stated_operations(clarification, stated) is (
             clarification
         )
         flat_only = ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm", initial_capital=9000
         )
-        assert _completed_with_stated_cost_operations(flat_only, stated) is flat_only
+        assert _completed_with_stated_operations(flat_only, stated) is flat_only
 
     def test_over_cap_stated_cost_is_disclosed_not_stalled(self) -> None:
         """The free-form route's cost audit refuses an unmodelable stated
