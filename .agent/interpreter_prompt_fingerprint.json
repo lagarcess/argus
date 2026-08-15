@@ -1,0 +1,61 @@
+{
+  "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
+  "last_measured": {
+    "commit": "eaf5d52b9f29266ee98af9458d061ad04d577e49",
+    "scorecard": "docs/reports/evidence/2026-08-15-interpreter-prompt-freeze/live-eval-scorecard.json",
+    "passed": 43,
+    "failed": 17
+  },
+  "surface": {
+    "src/argus/agent_runtime/interpreter/audits.py": {
+      "entries": 42,
+      "chars": 7391,
+      "sha256": "a48f72abb1f9e788afdc996289a3b3a3513881dad44ff7aca7825549f5b0e0e1"
+    },
+    "src/argus/agent_runtime/interpreter/focused_extraction.py": {
+      "entries": 4,
+      "chars": 7248,
+      "sha256": "6552d6a466954532a89181903f175dae66564300c24ada5cdc7f6472032c752e"
+    },
+    "src/argus/agent_runtime/llm_clarifier.py": {
+      "entries": 6,
+      "chars": 5573,
+      "sha256": "15ec1bdd530ac63e0d1a66bbf5e2c6687535cc89746b5f676b09168ff24b3ff5"
+    },
+    "src/argus/agent_runtime/llm_interpreter.py": {
+      "entries": 3,
+      "chars": 20900,
+      "sha256": "b6ccc08100f01e427b5d91e482be47efb17cbea1f68f57feccf55b7bf3cfd58c"
+    },
+    "src/argus/agent_runtime/llm_interpreter_types.py": {
+      "entries": 38,
+      "chars": 9072,
+      "sha256": "89aab2bcc83554f12ad624fafcbe659583ace82e45a8167729baa70133390a5b"
+    },
+    "src/argus/agent_runtime/research_grounded.py": {
+      "entries": 3,
+      "chars": 1868,
+      "sha256": "af6520a67ca45ae10f5b746508cd4dedf0e0d292e5b0b997f05a95b899c10e3b"
+    },
+    "src/argus/agent_runtime/result_followups.py": {
+      "entries": 11,
+      "chars": 1969,
+      "sha256": "d288cf8becc776cebe35f75a503a2992e5e7855fcd95f9f5a231e51924c3b2c4"
+    },
+    "src/argus/agent_runtime/stages/execute.py": {
+      "entries": 2,
+      "chars": 1584,
+      "sha256": "46c86259f37db7b674728bd358277bd369e96a4f399df32235e0ecd33511d92d"
+    },
+    "src/argus/agent_runtime/stages/explain.py": {
+      "entries": 10,
+      "chars": 1295,
+      "sha256": "7f817d3989813e4061a9e45099839fc8bc14bff4c87eeb4ee7bca774bc846260"
+    },
+    "src/argus/agent_runtime/stages/interpret_types.py": {
+      "entries": 2,
+      "chars": 713,
+      "sha256": "15f28666f1e0a1b154a8706ca90ebef8e4799ae3198187b052ff8db741d18347"
+    }
+  }
+}
