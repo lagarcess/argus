@@ -375,6 +375,36 @@ class TestFlagOnPipeline:
         assert provider.calls == []
 
 
+class TestPayloadGate:
+    """Issue #344: the typed payload routes; the act label alone is not the
+    gate, because a discovery request is often also a genuine question."""
+
+    @pytest.mark.asyncio()
+    async def test_filled_payload_routes_with_a_non_discovery_act(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        decision = _decision().model_copy(
+            update={"semantic_turn_act": "educational_question"}
+        )
+        result = await _run(decision)
+        assert result is not None
+        assert result.patch["discovery"]["kind"] == "asset_discovery"
+        assert provider.calls
+
+    @pytest.mark.asyncio()
+    async def test_typed_act_without_payload_keeps_target_missing_recovery(
+        self, flag_on: pytest.MonkeyPatch
+    ) -> None:
+        provider = _FakeProvider(_packet())
+        _wire(flag_on, provider=provider, extraction=_extraction())
+        decision = _decision().model_copy(update={"asset_discovery": None})
+        result = await _run(decision)
+        assert result.patch["recovery"]["code"] == "discovery_target_missing"
+        assert provider.calls == []
+
+
 class TestCheapVerifiedRows:
     """Spec §3: cheap verified rows are the default; search is the exception."""
 

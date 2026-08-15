@@ -166,6 +166,29 @@ class TestDiscoveryRouteFlagOff:
         )
 
 
+class TestPayloadGatedStageRouting:
+    """Issue #344: a filled payload owns the turn even when the scripted
+    interpretation carries a non-discovery act, proving the stage gate does
+    not depend on the interpreter-level act normalization."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_discovery(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", "false")
+
+    def test_filled_payload_routes_despite_educational_act(self) -> None:
+        response = _discovery_interpretation().model_copy(
+            update={"semantic_turn_act": "educational_question"}
+        )
+        result = _run(
+            message="find me cryptos that are trending",
+            response=response,
+        )
+        assert result.outcome == "ready_to_respond"
+        patch = result.patch
+        assert patch["recovery"]["code"] == "discovery_unavailable"
+        assert patch["asset_discovery"] is not None
+
+
 class TestNonDiscoveryTurnsStayOut:
     def test_generic_try_next_does_not_enter_discovery(self) -> None:
         response = StructuredInterpretation(

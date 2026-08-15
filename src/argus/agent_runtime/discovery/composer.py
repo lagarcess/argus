@@ -64,12 +64,16 @@ async def discovery_stage_result_if_applicable(
 ) -> StageResult | None:
     """Own every asset_discovery turn; other turns pass through untouched.
 
-    The typed act is the single routing condition. Deterministic code owns the
-    Search call, candidate validation, and every bound; LLM calls only extract
-    from typed inputs and voice validated facts.
+    The typed payload is the routing condition; the act label alone still
+    enters so a payloadless typed act keeps its target-missing recovery.
+    Deterministic code owns the Search call, candidate validation, and every
+    bound; LLM calls only extract from typed inputs and voice validated facts.
     """
 
-    if decision.semantic_turn_act != "asset_discovery":
+    if (
+        decision.asset_discovery is None
+        and decision.semantic_turn_act != "asset_discovery"
+    ):
         return None
     return await discovery_operation_result(
         decision=decision,

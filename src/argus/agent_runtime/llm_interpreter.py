@@ -22,6 +22,10 @@ from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
     preserve_typed_discovery_act,
+    response_without_unroutable_discovery_payload,
+)
+from argus.agent_runtime.interpreter.discovery_focused_read import (
+    focused_discovery_payload_response,
 )
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
     BENCHMARK_LANGUAGE_GUIDANCE,
@@ -2231,8 +2235,20 @@ async def _response_ready_for_runtime(
         asset_resolution_context=asset_resolution_context,
         normalize=_normalize_response_for_runtime_context,
     )
+    if discovery_response is None:
+        recovered = await focused_discovery_payload_response(
+            response=response, request=request
+        )
+        if recovered is not None:
+            discovery_response = discovery_response_ready_for_runtime(
+                response=recovered,
+                request=request,
+                asset_resolution_context=asset_resolution_context,
+                normalize=_normalize_response_for_runtime_context,
+            )
     if discovery_response is not None:
         return discovery_response
+    response = response_without_unroutable_discovery_payload(response)
     return await _audited_response_ready_for_runtime(
         response=response,
         preferred_model=preferred_model,
