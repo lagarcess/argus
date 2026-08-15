@@ -520,24 +520,36 @@ def _stage_result(
     interpretation: StructuredInterpretation,
     query: KnowledgeQueryExtraction,
     user: UserState,
+    decision: InterpretDecision | None = None,
 ) -> StageResult:
-    decision = InterpretDecision(
-        intent="conversation_followup",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary=interpretation.user_goal_summary,
-        candidate_strategy_draft=StrategySummary(),
-        missing_required_fields=[],
-        optional_parameter_opportunity=[],
-        confidence=0.85,
-        arbitration_mode="deterministic",
-        reason_codes=[reason_code],
-        effective_response_profile=resolve_effective_response_profile(
-            user=user,
-            explicit_overrides=None,
-        ),
-        semantic_turn_act="educational_question",
-    )
+    if decision is not None:
+        # A typed entry keeps its identity; the serving path only adds its
+        # reason code (#344: relabeling dropped the discovery payload).
+        decision = decision.model_copy(
+            update={
+                "reason_codes": list(
+                    dict.fromkeys([*decision.reason_codes, reason_code])
+                )
+            }
+        )
+    else:
+        decision = InterpretDecision(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary=interpretation.user_goal_summary,
+            candidate_strategy_draft=StrategySummary(),
+            missing_required_fields=[],
+            optional_parameter_opportunity=[],
+            confidence=0.85,
+            arbitration_mode="deterministic",
+            reason_codes=[reason_code],
+            effective_response_profile=resolve_effective_response_profile(
+                user=user,
+                explicit_overrides=None,
+            ),
+            semantic_turn_act="educational_question",
+        )
     stage_patch: dict[str, Any] = {"assistant_response": answer}
     sidecar = _try_next_sidecar(
         query=query,

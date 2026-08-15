@@ -335,17 +335,22 @@ class LLMInterpretationResponse(BaseModel):
     asset_discovery: AssetDiscoveryRequest | None = Field(
         default=None,
         description=(
-            "Typed payload required when semantic_turn_act=asset_discovery: the "
-            "user explicitly asks Argus to find, discover, or list assets by "
-            "category ('what cybersecurity stocks could I test?'), by peer "
-            "similarity ('companies like Nvidia'), or for comparison candidates "
-            "('what else in Costco's category could I compare?'), in any "
-            "language. Set relationship to category, peer, or comparison; put "
-            "the plain category phrase in category_description; put known "
-            "anchor tickers in anchor_symbols; leave candidate_strategy_draft "
-            "empty for these turns. Ordinary 'what should I try next?' "
-            "follow-ups, capability questions, and direct backtest requests are "
-            "NOT asset discovery."
+            "Independent of semantic_turn_act, answer one extra question for "
+            "every turn: does the user ask Argus to find, discover, list, or "
+            "search for which assets exist — by category ('what cybersecurity "
+            "stocks could I test?', 'find me cryptos that are trending'), by "
+            "peer similarity ('companies like Nvidia'), or for comparison "
+            "candidates ('what else in Costco's category could I compare?'), "
+            "in any language? If yes, fill this payload even when the turn is "
+            "also a question and you chose educational_question or another "
+            "act; the runtime routes discovery from this payload, not from "
+            "the act label. Set relationship to category, peer, or "
+            "comparison; put the plain category phrase in "
+            "category_description; put known anchor tickers in "
+            "anchor_symbols; leave candidate_strategy_draft empty for these "
+            "turns. Leave this null for ordinary 'what should I try next?' "
+            "follow-ups, for questions about whether Argus supports finding "
+            "assets, and for direct requests to test a named asset."
         ),
     )
     result_followup_focus: ResultFollowupFocus | None = None

@@ -54,50 +54,7 @@ async def test_discovery_payload_restores_missing_semantic_act_without_strategy_
 
     assert repaired.semantic_turn_act == "asset_discovery"
     assert repaired.asset_discovery == discovery
-    assert "typed_discovery_act_restored" in repaired.reason_codes
-
-
-@pytest.mark.asyncio
-async def test_discovery_payload_does_not_override_an_explicit_other_act(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime import llm_interpreter as interpreter_module
-    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
-
-    response = LLMInterpretationResponse(
-        intent="conversation_followup",
-        task_relation="new_task",
-        user_goal_summary="Explain diversification.",
-        semantic_turn_act="educational_question",
-        asset_discovery=AssetDiscoveryRequest(
-            relationship="category",
-            category_description="technology stocks",
-            asset_class_hint="equity",
-            needs_current_facts=False,
-        ),
-    )
-
-    async def audited_response(**kwargs):
-        return kwargs["response"]
-
-    monkeypatch.setattr(
-        interpreter_module,
-        "_audited_response_ready_for_runtime",
-        audited_response,
-    )
-
-    repaired = await interpreter_module._response_ready_for_runtime(
-        response=response,
-        preferred_model="test-model",
-        request=InterpretationRequest(
-            current_user_message="Explain diversification.",
-            recent_thread_history=[],
-            latest_task_snapshot=None,
-            user=UserState(user_id="u1"),
-        ),
-    )
-
-    assert repaired.semantic_turn_act == "educational_question"
+    assert "discovery_payload_act_promoted" in repaired.reason_codes
 
 
 @pytest.mark.asyncio
