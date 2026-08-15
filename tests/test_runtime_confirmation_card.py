@@ -136,13 +136,15 @@ def test_retest_confirmation_projects_typed_period_and_normal_run_label() -> Non
         ),
         ("starting_capital", "$1,000"),
     ]
+    # The zero-cost truth is a typed fact, never backend prose: the card
+    # localizes `fees`/`slippage` at the presentation boundary (#434).
     assert card["assumptions"] == [
         "$1,000 starting capital",
         "Daily data",
-        "No fees",
-        "No slippage",
         "Benchmark: SPY",
     ]
+    assert card["display_facts"]["fees"] == 0
+    assert card["display_facts"]["slippage"] == 0
 
 
 def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
@@ -162,9 +164,10 @@ def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
         "slippage": 0.0,
         "timeframe": "1D",
     }
-    assert "No fees" in card["assumptions"]
-    assert "No slippage" in card["assumptions"]
-    assert not any("Modeled costs" in item for item in card["assumptions"])
+    assert not any(
+        "fee" in item.lower() or "slippage" in item.lower()
+        for item in card["assumptions"]
+    )
 
 
 def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
@@ -183,9 +186,10 @@ def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
     assert card is not None
     assert card["display_facts"]["fees"] == 0.0
     assert card["display_facts"]["slippage"] == 0.0
-    assert "No fees" in card["assumptions"]
-    assert "No slippage" in card["assumptions"]
-    assert not any("Modeled costs" in item for item in card["assumptions"])
+    assert not any(
+        "fee" in item.lower() or "slippage" in item.lower()
+        for item in card["assumptions"]
+    )
 
 
 def test_runtime_confirmation_card_flag_on_shows_draft_costs_without_launch_payload(
@@ -462,6 +466,7 @@ def test_runtime_confirmation_card_shows_execution_realism_values(
     assert "No slippage" not in card["assumptions"]
 
 
+
 def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -> None:
     card = runtime_confirmation_card(
         {
@@ -543,9 +548,14 @@ def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -
     }
     assert "$100,000 starting capital" in card["assumptions"]
     assert "Datos diarios" in card["assumptions"]
-    assert "No fees" in card["assumptions"]
-    assert "No slippage" in card["assumptions"]
     assert "Benchmark: BTC" in card["assumptions"]
+    # #434: the strip used to carry "No fees" and "No slippage" in English on a
+    # Spanish turn. The zero-cost truth now travels only as a typed fact, which
+    # the card localizes.
+    assert "No fees" not in card["assumptions"]
+    assert "No slippage" not in card["assumptions"]
+    assert card["display_facts"]["fees"] == 0
+    assert card["display_facts"]["slippage"] == 0
 
 
 def test_runtime_confirmation_card_localizes_spanish_indicator_rules() -> None:

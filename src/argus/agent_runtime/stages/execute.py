@@ -13,7 +13,7 @@ from argus.agent_runtime.coverage_recovery import (
     safe_capability_context,
 )
 from argus.agent_runtime.recovery.policy import should_retry
-from argus.agent_runtime.recovery_messages import recovery_state
+from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     indicator_threshold_rule,
@@ -111,6 +111,33 @@ def execute_stage(
         retryable = bool(envelope.get("retryable"))
         capability_context = dict(envelope.get("capability_context") or {})
         conversion_failure_code = public_failure_code(capability_context)
+        if _is_capacity_refusal(capability_context):
+            # Capacity refuses before a job exists, so nothing ran and nothing
+            # can be retried in-loop. The user is being asked to wait, which is
+            # a different fact from a failure, and carries its own typed code.
+            capacity_prompt = recovery_message(
+                "backtest_capacity_exceeded",
+                retryable=True,
+            )
+            return StageResult(
+                outcome="execution_failed_recoverably",
+                stage_patch={
+                    "tool_call_records": records,
+                    "failure_classification": failure_classification,
+                    "assistant_prompt": capacity_prompt,
+                    "final_response_payload": {"error": capacity_prompt},
+                    "recovery": recovery_state(
+                        "backtest_capacity_exceeded",
+                        retryable=True,
+                    ),
+                    **_failed_action_reference_patch(
+                        payload=payload,
+                        failure_classification=failure_classification,
+                        error=capacity_prompt,
+                        retryable=True,
+                    ),
+                },
+            )
         if is_approved_window_drift(capability_context):
             return StageResult(
                 outcome="ready_for_confirmation",
@@ -617,6 +644,14 @@ def _recoverable_execution_prompt(
         f"The {draft_label} setup is still here, but I could not get {data_label} "
         "for that run right now. Try again, change the dates, or choose a different "
         "supported asset."
+    )
+
+
+def _is_capacity_refusal(capability_context: dict[str, Any]) -> bool:
+    return (
+        str(capability_context.get("execution_status") or "").strip() == "rejected"
+        and str(capability_context.get("failure_code") or "").strip()
+        == "backtest_capacity_exceeded"
     )
 
 
