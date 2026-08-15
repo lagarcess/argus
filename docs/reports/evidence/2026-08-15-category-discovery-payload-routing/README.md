@@ -85,6 +85,28 @@ None of the three flips reproduces deterministically at this commit, and
 each also passed at least one full run here, so all three read as
 serving-day boundary variance, not effects of this change.
 
+## Baseline-vs-head distribution for the action-chip flip
+
+Because `action_chip_change_asset_remove_aapl_issue_188` failed both full
+runs here while passing at the baseline scorecard, it was settled by
+comparison rather than head-only re-probes: 20 interleaved attempts in one
+session (2026-08-15, same live provider modes, alternating one baseline
+attempt and one head attempt per round), each in a frozen worktree of its
+commit.
+
+| side | pass rate | rounds 1-10 |
+|---|---|---|
+| baseline `c2dbddd7` | 2/10 | F P F F F F F F F P |
+| head `9586a78d` | 5/10 | P F P P F F F P F P |
+
+Every failure on both sides carries the identical signature
+(`intent: conversation_followup` instead of `backtest_execution`, AAPL
+retained). The baseline is not materially better; in this session it is
+worse, and its full-run PASS reads as a favorable draw from an unstable
+case. The case sits on a serving boundary at both commits, so this change
+neither caused the instability nor resolves it, and PR #510's fix for
+this specific case is itself boundary-dependent at the merged tree.
+
 ## Provenance
 
 - Fix commit and both runs: `9586a78d` (`fix(discovery): route discovery
