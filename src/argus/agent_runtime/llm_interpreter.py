@@ -1226,6 +1226,10 @@ def _suspicious_extracted_asset_symbols(
             continue
         if symbol in grounded_symbols or symbol in context_symbols:
             continue
+        if provider_context_assets.preflight_record_supports_symbol(
+            response.candidate_strategy_draft, symbol
+        ):
+            continue
         if _provider_exact_ticker_supports_extracted_symbol(
             symbol,
             provider_ticker_symbol_map=provider_ticker_symbol_map,

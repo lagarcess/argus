@@ -1,21 +1,46 @@
 {
   "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
   "last_measured": {
-    "commit": "eaf5d52b9f29266ee98af9458d061ad04d577e49",
-    "scorecard": "docs/reports/evidence/2026-08-15-interpreter-prompt-freeze/live-eval-scorecard.json",
-    "passed": 43,
-    "failed": 17
+    "commit": "9409599a6c5f753e5295c561f3811fb181d00e6a",
+    "scorecard": "docs/reports/evidence/2026-08-15-discovery-asset-blockers/live-eval-scorecard.json",
+    "passed": 53,
+    "failed": 7
   },
   "surface": {
+    "src/argus/agent_runtime/discovery/prompt_guidance.py": {
+      "entries": 1,
+      "chars": 2663,
+      "sha256": "bc38b0db2e5df7a13fa337ae17231bc30b84d9d02f80ae5bc1977228926ff453"
+    },
     "src/argus/agent_runtime/interpreter/audits.py": {
       "entries": 42,
       "chars": 7391,
       "sha256": "a48f72abb1f9e788afdc996289a3b3a3513881dad44ff7aca7825549f5b0e0e1"
     },
+    "src/argus/agent_runtime/interpreter/benchmark_prompt_guidance.py": {
+      "entries": 1,
+      "chars": 1297,
+      "sha256": "2c6400bc91448115021ec9a9643cecce4256219692c6c123c5a4b31b20e6414c"
+    },
+    "src/argus/agent_runtime/interpreter/execution_cost_capability.py": {
+      "entries": 1,
+      "chars": 962,
+      "sha256": "736d0e580651317633a94ff73aadb391d2262ca70626a360ca7356408b576f3e"
+    },
     "src/argus/agent_runtime/interpreter/focused_extraction.py": {
       "entries": 4,
       "chars": 7248,
       "sha256": "6552d6a466954532a89181903f175dae66564300c24ada5cdc7f6472032c752e"
+    },
+    "src/argus/agent_runtime/interpreter/signal_rule.py": {
+      "entries": 1,
+      "chars": 784,
+      "sha256": "71164b2801ce907421f94ec4fe3b2ab1546943580a8240451335c0db2a8c26d7"
+    },
+    "src/argus/agent_runtime/interpreter/unsupported_admission.py": {
+      "entries": 2,
+      "chars": 2370,
+      "sha256": "b873f42ff8e2d008e67107062139de4c7df3094d5f60e481def990dde264e9a4"
     },
     "src/argus/agent_runtime/llm_clarifier.py": {
       "entries": 6,

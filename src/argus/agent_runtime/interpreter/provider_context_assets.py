@@ -326,6 +326,31 @@ def resolved_asset_records_from_strategy_context(strategy: Any) -> list[dict[str
     return [record for record in records if isinstance(record, dict)]
 
 
+def preflight_record_supports_symbol(strategy: Any, symbol: str) -> bool:
+    """Whether a runtime-owned preflight record grounds ``symbol``.
+
+    These records exist only when the provider catalog resolved a mention the
+    preflight read from the current message, so they are current-message
+    evidence that does not depend on a second provider round-trip.
+    """
+
+    return any(
+        _provider_record_matches_symbol(record, symbol)
+        for record in resolved_asset_records_from_strategy_context(strategy)
+    )
+
+
+def canonical_symbol_from_preflight_records(strategy: Any, raw_text: str) -> str | None:
+    """Canonical symbol for a mention a runtime preflight record grounds."""
+
+    for record in resolved_asset_records_from_strategy_context(strategy):
+        if _provider_record_matches_symbol(record, raw_text):
+            canonical = str(record.get("symbol") or "").strip().upper()
+            if canonical:
+                return canonical
+    return None
+
+
 def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:
     """Symbols of the interpreter's provider-grounded current-turn asset records."""
 

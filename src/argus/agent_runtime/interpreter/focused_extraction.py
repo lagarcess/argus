@@ -17,6 +17,7 @@ from langchain_core.messages import (
     SystemMessage,
 )
 
+from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
@@ -278,6 +279,10 @@ def _merge_focused_repair_with_base(
             and draft.extra_parameters.get(field_name) == marker[0]
         ):
             draft._validated_execution_cost_evidence[field_name] = marker
+    assets_reconciled = _reconcile_repaired_assets_with_provider_grounding(
+        draft=draft,
+        base=base,
+    )
     if not repaired.user_goal_summary and base_response.user_goal_summary:
         repaired.user_goal_summary = base_response.user_goal_summary
     repaired.reason_codes = list(
@@ -287,6 +292,11 @@ def _merge_focused_repair_with_base(
                 *repaired.reason_codes,
                 "focused_repair_preserved_structured_context",
                 *(
+                    ["focused_repair_assets_reconciled_with_provider_context"]
+                    if assets_reconciled
+                    else []
+                ),
+                *(
                     ["focused_repair_from_unsupported_context"]
                     if _base_response_was_unsupported(base_response)
                     else []
@@ -295,6 +305,45 @@ def _merge_focused_repair_with_base(
         )
     )
     return repaired
+
+
+def _reconcile_repaired_assets_with_provider_grounding(
+    *,
+    draft: LLMStrategyDraft,
+    base: LLMStrategyDraft,
+) -> bool:
+    """A focused re-read never degrades a provider-grounded asset.
+
+    The repair's statements win field-general, but its asset list is a second
+    read of the same mentions the runtime preflight already resolved through
+    the provider catalog. An entry that matches one of those records is the
+    same mention, so it takes the record's canonical symbol; entries matching
+    no record are genuinely new statements and pass through untouched.
+    """
+    if not draft.asset_universe:
+        return False
+    reconciled: list[str] = []
+    changed = False
+    for value in draft.asset_universe:
+        raw_text = str(value or "").strip()
+        if not raw_text:
+            changed = True
+            continue
+        symbol = (
+            provider_context_assets.canonical_symbol_from_preflight_records(
+                base, raw_text
+            )
+            or raw_text
+        )
+        if symbol != raw_text:
+            changed = True
+        if symbol not in reconciled:
+            reconciled.append(symbol)
+        else:
+            changed = True
+    if changed:
+        draft.asset_universe = reconciled
+    return changed
 
 
 def _base_response_was_unsupported(response: LLMInterpretationResponse) -> bool:

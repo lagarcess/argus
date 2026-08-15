@@ -201,14 +201,14 @@ async def knowledge_answer_stage_result(
         # Flag off, the widened entry does not exist: only the legacy
         # knowledge shapes reach the pre-rail answerer.
         return None
-    # A provider-resolved asset on a knowledge turn IS the interpreter's own
-    # classification: the user is asking about that asset. No second LLM call.
-    query = _query_from_interpretation(interpretation)
-    if query is None:
-        query = await _classify_question(
-            message=state.current_user_message,
-            language=user.language_preference,
-        )
+    # The classifier owns the stats-vs-run boundary: an unsupported_request
+    # turn with a resolved asset may be a statistics question (answer it from
+    # data) or a request to run something Argus cannot execute (never answer
+    # that with underlying stats; it must keep its recovery route).
+    query = await _classify_question(
+        message=state.current_user_message,
+        language=user.language_preference,
+    )
     if query is None or query.question_kind in ("concept", "none"):
         return None
     answer: str | None = None
@@ -237,33 +237,6 @@ async def knowledge_answer_stage_result(
         interpretation=interpretation,
         query=query,
         user=user,
-    )
-
-
-def _query_from_interpretation(
-    interpretation: StructuredInterpretation,
-) -> KnowledgeQueryExtraction | None:
-    # A resolved asset alone does not establish market_stats: educational
-    # turns can receive one through provider-context enrichment ("What is
-    # SPY?"), and those must keep the interpreter's concept explanation. The
-    # shortcut applies only to unsupported_request turns, where the
-    # interpreter has already ruled the concept answer out; the ambiguous
-    # educational slice goes through the bounded classifier instead.
-    if interpretation.semantic_turn_act != "unsupported_request":
-        return None
-    draft = interpretation.candidate_strategy_draft
-    symbols = [
-        str(symbol).strip().upper()
-        for symbol in draft.asset_universe or []
-        if str(symbol).strip()
-    ]
-    if not symbols:
-        return None
-    raw_window = draft.extra_parameters.get("date_range_raw_text")
-    return KnowledgeQueryExtraction(
-        question_kind="market_stats",
-        symbols=symbols,
-        date_range_raw_text=(str(raw_window) if raw_window not in (None, "") else None),
     )
 
 

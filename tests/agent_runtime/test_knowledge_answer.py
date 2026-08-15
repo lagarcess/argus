@@ -207,6 +207,52 @@ def test_palette_rendering_enforces_emphasis() -> None:
     )
 
 
+def test_unsupported_run_request_is_never_answered_with_asset_stats(
+    monkeypatch,
+) -> None:
+    # "Backtest weekly options on apple over 2024" arrives typed
+    # unsupported_request with AAPL restored by the audits. The classifier
+    # rules it a run request, so the knowledge answerer must decline instead
+    # of voicing the underlying stock's statistics as a fake options result.
+    calls: list[str] = []
+
+    async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
+        calls.append("classified")
+        return ka.KnowledgeQueryExtraction(question_kind="none")
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
+
+    run_request = _interpretation(
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        )
+    )
+    result = _run(
+        run_request,
+        "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+    )
+
+    assert result is None
+    # The asset shortcut is gone: the classifier always owns this boundary.
+    assert calls == ["classified"]
+
+
+def test_unsupported_turn_with_unavailable_classifier_declines(
+    monkeypatch,
+) -> None:
+    # No classification, no claim: falling back to asset statistics would
+    # fabricate an answer for a request the interpreter already ruled
+    # unsupported.
+    async def classify(**_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
+
+    assert _run(_interpretation()) is None
+
+
 def test_educational_turn_with_enriched_asset_uses_the_classifier(
     monkeypatch,
 ) -> None:
