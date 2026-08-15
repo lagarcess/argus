@@ -9,6 +9,8 @@ import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 import type { MemoryRecallItem } from "@/lib/memory-recalls";
 
 export type StrategyResultMetric = {
+  /** The card row's stable key, e.g. total_return_pct or contribution_return_pct. */
+  key?: string;
   label: string;
   value: string;
 };

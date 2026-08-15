@@ -828,6 +828,7 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
     """
     import json
 
+    import argus.api.chat.confirmation as confirmation_module
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
     )
@@ -843,6 +844,20 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
             / "docs/reports/evidence/455/dca-confirmation-card.json"
         ).read_text()
     )
+
+    # The card's date ceiling is "today", so the comparison only holds on the
+    # capture day unless the clock is pinned to the date the evidence froze.
+    # The evidence file is the one owner of that date.
+    capture_date = date.fromisoformat(
+        evidence["capabilities"]["edit_constraints"]["date_window"]["max_end"]
+    )
+
+    class _EvidenceCaptureDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return capture_date
+
+    monkeypatch.setattr(confirmation_module, "date", _EvidenceCaptureDate)
 
     state = RunState.new(current_user_message="", recent_thread_history=[])
     state = state.model_copy(
