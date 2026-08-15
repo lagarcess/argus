@@ -710,3 +710,47 @@ class TestAcceptedOperationsLandOrFailLoudly:
         draft = response.candidate_strategy_draft
         assert draft.comparison_baseline == "QQQ"
         assert (draft.date_range or {}).get("start") == "2026-04-01"
+
+    def test_completion_emits_a_receipt_naming_the_targets(self) -> None:
+        """The union is a redundancy layer over the planner; every injection
+        must be observable or planner decay hides behind the safety net."""
+        from argus.agent_runtime.artifact_edit_planner import (
+            _completed_with_stated_operations,
+        )
+        from loguru import logger as loguru_logger
+
+        stated = [EditOperation(op="set", target="benchmark", value="QQQ")]
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch", endpoint="start", start="2026-04-01"
+                    ),
+                )
+            ],
+        )
+        captured: list[str] = []
+        handler_id = loguru_logger.add(
+            lambda message: captured.append(str(message)), level="INFO"
+        )
+        try:
+            completed = _completed_with_stated_operations(plan, stated)
+            covered = _completed_with_stated_operations(completed, stated)
+        finally:
+            loguru_logger.remove(handler_id)
+
+        assert {operation.target for operation in completed.operations} == {
+            "date_window",
+            "benchmark",
+        }
+        assert covered is completed
+        receipts = [
+            line for line in captured if "Artifact edit plan completed" in line
+        ]
+        assert len(receipts) == 1, (
+            "one receipt per injection, none when the plan already covers"
+        )
+        assert "benchmark" in receipts[0]

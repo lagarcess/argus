@@ -4,6 +4,7 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, Literal, get_args
 
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.artifacts.asset_edits import (
@@ -391,6 +392,17 @@ def _completed_with_stated_operations(
         )
     if not additions:
         return plan
+    completed_targets = sorted({addition.target for addition in additions})
+    # The union is a redundancy layer over the planner; an unmeasured
+    # completion would hide planner decay, so every injection is a receipt.
+    logger.info(
+        "Artifact edit plan completed from primary extraction targets={} "
+        "planned_operation_count={}",
+        completed_targets,
+        len(plan.operations),
+        completed_targets=completed_targets,
+        planned_operation_count=len(plan.operations),
+    )
     return plan.model_copy(update={"operations": [*plan.operations, *additions]})
 
 
