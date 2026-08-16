@@ -1,0 +1,1076 @@
+{
+ "case_id": "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+ "attempt": "a",
+ "status": "failed",
+ "failed_checks": [
+  "capability_verdict: expected 'needs_clarification', got 'unsupported'",
+  "launch_validation_code: expected 'dca_contribution_zero_is_buy_and_hold', got None",
+  "stage_outcomes: expected ['ready_for_confirmation', 'needs_clarification'], got ['needs_clarification', 'await_user_reply']",
+  "requested_field: expected 'capital_amount', got None"
+ ],
+ "typed_outcome": {
+  "intent": "strategy_drafting",
+  "stage_outcomes": [
+   "needs_clarification",
+   "await_user_reply"
+  ],
+  "assets": [
+   "SPY"
+  ],
+  "asset_class": "equity",
+  "requested_strategy_template": null,
+  "strategy_type": "dca_accumulation",
+  "entry_rule": null,
+  "exit_rule": null,
+  "rule_spec": null,
+  "date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "requested_date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "effective_date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "adjustment_reason": null,
+  "benchmark_symbol": "SPY",
+  "capital_amount": 0.0,
+  "starting_capital": null,
+  "recurring_contribution": null,
+  "contribution_period": "monthly",
+  "launch_validation_code": null,
+  "missing_required_fields": [],
+  "fee_rate": null,
+  "slippage": null,
+  "cost_provenance": {},
+  "launch_execution_realism": null,
+  "capability_verdict": "unsupported",
+  "requested_field": null,
+  "clarification": {
+   "kind": "unsupported_recovery",
+   "reason_code": "unsupported_dca_contribution_ceiling",
+   "prompt_source": "llm_generated",
+   "requested_field": "unsupported_constraints",
+   "requested_fields": [
+    "unsupported_constraints"
+   ],
+   "semantic_needs": [
+    "simplification_choice"
+   ],
+   "payload": {
+    "strategy": {
+     "raw_user_phrasing": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "requested_strategy_template": null,
+     "strategy_type": "dca_accumulation",
+     "strategy_thesis": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "asset_universe": [
+      "SPY"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": "monthly",
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": 0.0,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "SPY",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "SPY",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "medium"
+      }
+     ],
+     "extra_parameters": {
+      "recurring_contribution": 0.0,
+      "provider_resolved_assets": [
+       {
+        "raw_text": "SPY",
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "name": "State Street SPDR S&P 500 ETF Trust",
+        "raw_symbol": "SPY",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.ARCA"
+       }
+      ],
+      "total_budget": 5000.0,
+      "initial_capital": 5000.0,
+      "total_capital": 5000.0,
+      "language": "en",
+      "date_range_raw_text": "2024",
+      "date_range_intent": {
+       "kind": "calendar_year",
+       "start": null,
+       "end": null,
+       "day_offset": null,
+       "count": null,
+       "unit": null,
+       "anchor": null,
+       "year": 2024,
+       "endpoint": null,
+       "confidence": 0.9,
+       "evidence": "2024"
+      },
+      "evidence_spans": {
+       "strategy_type": "monthly recurring plan",
+       "asset_universe": "SPY",
+       "date_range": "for 2024",
+       "initial_capital": "$5,000 to start",
+       "cadence": "monthly",
+       "date_range_raw_text": "2024",
+       "capital_amount": "$5,000 to start",
+       "recurring_contribution": "$0 added each month"
+      },
+      "recurring_cadence": "monthly",
+      "field_provenance": {
+       "cadence": "explicit_user",
+       "initial_capital": "starting_capital",
+       "recurring_contribution": "explicit_user",
+       "total_capital": "total_budget"
+      },
+      "raw_strategy_type": "dca_accumulation"
+     }
+    },
+    "raw_value": "$5,000 total budget"
+   },
+   "options": [
+    {
+     "id": "option_0",
+     "replacement_values": {
+      "ignore_initial_capital": true
+     },
+     "compatibility_label": "Run recurring buys only"
+    },
+    {
+     "id": "option_1",
+     "replacement_values": {
+      "initial_capital": 5000.0
+     },
+     "compatibility_label": "Use it as starting capital"
+    },
+    {
+     "id": "buy_and_hold",
+     "replacement_values": {
+      "strategy_type": "buy_and_hold",
+      "initial_capital": 5000.0
+     },
+     "compatibility_label": "Use buy and hold with starting capital"
+    }
+   ]
+  },
+  "semantic_turn_act": "new_idea",
+  "asset_discovery": null
+ },
+ "route_receipts": [
+  {
+   "task": "interpretation_repair",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMAssetMentionExtraction",
+   "latency_ms": 1320,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 802,
+    "completion_tokens": 46,
+    "total_tokens": 848,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0009831,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:47:38.636289+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMInterpretationResponse",
+   "latency_ms": 14121,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 9598,
+    "completion_tokens": 1942,
+    "total_tokens": 11540,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0166509,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:47:53.354188+00:00"
+  },
+  {
+   "task": "interpretation_repair",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "FocusedStrategyExtraction",
+   "latency_ms": 3899,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 3485,
+    "completion_tokens": 398,
+    "total_tokens": 3883,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00521685,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:47:58.028286+00:00"
+  },
+  {
+   "task": "field_fidelity",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "StatedRunFieldFidelityAudit",
+   "latency_ms": 1418,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 2303,
+    "completion_tokens": 93,
+    "total_tokens": 2396,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00297685,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:48:00.444489+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "DcaContractAudit",
+   "latency_ms": 11193,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1252,
+    "completion_tokens": 1439,
+    "total_tokens": 2691,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0049609,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:48:14.542520+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "anthropic/claude-haiku-4.5",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "DcaContractAudit",
+   "latency_ms": 4415,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": true,
+   "token_usage": {
+    "prompt_tokens": 1385,
+    "completion_tokens": 468,
+    "total_tokens": 1853,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.003725,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:48:18.958460+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "DcaContributionRoleAudit",
+   "latency_ms": 9900,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1079,
+    "completion_tokens": 1269,
+    "total_tokens": 2348,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00431965,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:48:28.859391+00:00"
+  },
+  {
+   "task": "clarification",
+   "tier": "chat",
+   "model": "deepseek/deepseek-v4-flash",
+   "fallback_model": "qwen/qwen3.5-9b",
+   "mode": "json_schema",
+   "schema_name": "ClarificationResponse",
+   "latency_ms": 2156,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1918,
+    "completion_tokens": 109,
+    "total_tokens": 2027,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00029904,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:48:31.025583+00:00"
+  }
+ ],
+ "trace": [
+  {
+   "seam": "raw_model_response",
+   "n": 0,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "new_task",
+    "requires_clarification": false,
+    "user_goal_summary": "Set up a monthly recurring plan on SPY for 2024 with $5000 starting capital and $0 monthly additions.",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "language": "en",
+     "requested_strategy_template": null,
+     "strategy_type": "dca_accumulation",
+     "strategy_thesis": null,
+     "asset_universe": [
+      "SPY"
+     ],
+     "asset_inclusions": [],
+     "asset_exclusions": [],
+     "asset_universe_operation": null,
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": "monthly",
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": null,
+     "date_range_raw_text": null,
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": null,
+     "initial_capital": 5000.0,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "field_provenance": {
+      "cadence": "explicit_user",
+      "initial_capital": "starting_capital"
+     },
+     "evidence_spans": {
+      "strategy_type": "monthly recurring plan",
+      "asset_universe": "SPY",
+      "date_range": "for 2024",
+      "initial_capital": "$5,000 to start",
+      "cadence": "monthly"
+     },
+     "extra_parameters": {
+      "recurring_contribution": 0
+     }
+    },
+    "missing_required_fields": [],
+    "assistant_response": "I've prepared a draft for your monthly recurring plan on SPY covering 2024, starting with $5,000 and adding nothing each month.",
+    "uses_latest_result_context": false,
+    "confidence": 0.9,
+    "reason_codes": [],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "new_idea",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "none"
+   }
+  },
+  {
+   "seam": "after_normalize_for_runtime_context",
+   "n": 1,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "asset_universe": [
+    "SPY"
+   ],
+   "asset_exclusions": [],
+   "asset_universe_operation": null,
+   "intent": "strategy_drafting",
+   "act": "new_idea",
+   "reason_codes": []
+  },
+  {
+   "seam": "after_normalize_for_runtime_context",
+   "n": 2,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "asset_universe": [
+    "SPY"
+   ],
+   "asset_exclusions": [],
+   "asset_universe_operation": null,
+   "intent": "backtest_execution",
+   "act": "new_idea",
+   "reason_codes": [
+    "focused_strategy_extraction_repair",
+    "focused_repair_preserved_structured_context"
+   ]
+  },
+  {
+   "seam": "after_response_ready",
+   "n": 3,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "new_task",
+    "requires_clarification": true,
+    "user_goal_summary": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "language": "en",
+     "requested_strategy_template": null,
+     "strategy_type": "dca_accumulation",
+     "strategy_thesis": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "asset_universe": [
+      "SPY"
+     ],
+     "asset_inclusions": [],
+     "asset_exclusions": [],
+     "asset_universe_operation": null,
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": "monthly",
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "date_range_raw_text": "2024",
+     "date_range_intent": {
+      "kind": "calendar_year",
+      "start": null,
+      "end": null,
+      "day_offset": null,
+      "count": null,
+      "unit": null,
+      "anchor": null,
+      "year": 2024,
+      "endpoint": null,
+      "confidence": 0.9,
+      "evidence": "2024"
+     },
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": 0.0,
+     "initial_capital": 5000.0,
+     "total_capital": 5000.0,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "field_provenance": {
+      "cadence": "explicit_user",
+      "initial_capital": "starting_capital",
+      "recurring_contribution": "explicit_user",
+      "total_capital": "total_budget"
+     },
+     "evidence_spans": {
+      "strategy_type": "monthly recurring plan",
+      "asset_universe": "SPY",
+      "date_range": "for 2024",
+      "initial_capital": "$5,000 to start",
+      "cadence": "monthly",
+      "date_range_raw_text": "2024",
+      "capital_amount": "$5,000 to start",
+      "recurring_contribution": "$0 added each month"
+     },
+     "extra_parameters": {
+      "recurring_contribution": 0,
+      "provider_resolved_assets": [
+       {
+        "raw_text": "SPY",
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "name": "State Street SPDR S&P 500 ETF Trust",
+        "raw_symbol": "SPY",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.ARCA"
+       }
+      ],
+      "total_budget": 5000.0
+     }
+    },
+    "missing_required_fields": [
+     "capital_amount"
+    ],
+    "assistant_response": null,
+    "uses_latest_result_context": null,
+    "confidence": 0.9,
+    "reason_codes": [
+     "focused_strategy_extraction_repair",
+     "focused_repair_preserved_structured_context",
+     "stated_run_field_fidelity_audit",
+     "dca_total_budget_role_audited"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "new_idea",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": null
+   }
+  },
+  {
+   "seam": "structured_interpretation",
+   "n": 4,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "new_task",
+    "requires_clarification": true,
+    "user_goal_summary": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "requested_strategy_template": null,
+     "strategy_type": "dca_accumulation",
+     "strategy_thesis": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "asset_universe": [
+      "SPY"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": "monthly",
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "SPY",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "SPY",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "medium"
+      }
+     ],
+     "extra_parameters": {
+      "recurring_contribution": 0.0,
+      "provider_resolved_assets": [
+       {
+        "raw_text": "SPY",
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "name": "State Street SPDR S&P 500 ETF Trust",
+        "raw_symbol": "SPY",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.ARCA"
+       }
+      ],
+      "total_budget": 5000.0,
+      "initial_capital": 5000.0,
+      "total_capital": 5000.0,
+      "language": "en",
+      "date_range_raw_text": "2024",
+      "date_range_intent": {
+       "kind": "calendar_year",
+       "start": null,
+       "end": null,
+       "day_offset": null,
+       "count": null,
+       "unit": null,
+       "anchor": null,
+       "year": 2024,
+       "endpoint": null,
+       "confidence": 0.9,
+       "evidence": "2024"
+      },
+      "evidence_spans": {
+       "strategy_type": "monthly recurring plan",
+       "asset_universe": "SPY",
+       "date_range": "for 2024",
+       "initial_capital": "$5,000 to start",
+       "cadence": "monthly",
+       "date_range_raw_text": "2024",
+       "capital_amount": "$5,000 to start",
+       "recurring_contribution": "$0 added each month"
+      },
+      "recurring_cadence": "monthly",
+      "field_provenance": {
+       "cadence": "explicit_user",
+       "initial_capital": "starting_capital",
+       "recurring_contribution": "explicit_user",
+       "total_capital": "total_budget"
+      },
+      "raw_strategy_type": "dca_accumulation"
+     }
+    },
+    "missing_required_fields": [
+     "capital_amount"
+    ],
+    "assistant_response": null,
+    "confidence": 0.9,
+    "reason_codes": [
+     "focused_strategy_extraction_repair",
+     "focused_repair_preserved_structured_context",
+     "stated_run_field_fidelity_audit",
+     "dca_total_budget_role_audited"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "new_idea",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": null,
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "knowledge_answer_claim",
+   "n": 5,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "claimed": false,
+   "outcome": null,
+   "patch": null
+  },
+  {
+   "seam": "interpretation_entering_stage_routing",
+   "n": 6,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "new_task",
+    "requires_clarification": true,
+    "user_goal_summary": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "requested_strategy_template": null,
+     "strategy_type": "dca_accumulation",
+     "strategy_thesis": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "asset_universe": [
+      "SPY"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": "monthly",
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "SPY",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "SPY",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "medium"
+      }
+     ],
+     "extra_parameters": {
+      "recurring_contribution": 0.0,
+      "provider_resolved_assets": [
+       {
+        "raw_text": "SPY",
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "name": "State Street SPDR S&P 500 ETF Trust",
+        "raw_symbol": "SPY",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.ARCA"
+       }
+      ],
+      "total_budget": 5000.0,
+      "initial_capital": 5000.0,
+      "total_capital": 5000.0,
+      "language": "en",
+      "date_range_raw_text": "2024",
+      "date_range_intent": {
+       "kind": "calendar_year",
+       "start": null,
+       "end": null,
+       "day_offset": null,
+       "count": null,
+       "unit": null,
+       "anchor": null,
+       "year": 2024,
+       "endpoint": null,
+       "confidence": 0.9,
+       "evidence": "2024"
+      },
+      "evidence_spans": {
+       "strategy_type": "monthly recurring plan",
+       "asset_universe": "SPY",
+       "date_range": "for 2024",
+       "initial_capital": "$5,000 to start",
+       "cadence": "monthly",
+       "date_range_raw_text": "2024",
+       "capital_amount": "$5,000 to start",
+       "recurring_contribution": "$0 added each month"
+      },
+      "recurring_cadence": "monthly",
+      "field_provenance": {
+       "cadence": "explicit_user",
+       "initial_capital": "starting_capital",
+       "recurring_contribution": "explicit_user",
+       "total_capital": "total_budget"
+      },
+      "raw_strategy_type": "dca_accumulation"
+     }
+    },
+    "missing_required_fields": [
+     "capital_amount"
+    ],
+    "assistant_response": null,
+    "confidence": 0.9,
+    "reason_codes": [
+     "focused_strategy_extraction_repair",
+     "focused_repair_preserved_structured_context",
+     "stated_run_field_fidelity_audit",
+     "dca_total_budget_role_audited"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "new_idea",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": null,
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "final_stage_result",
+   "n": 7,
+   "message": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+   "outcome": "needs_clarification",
+   "patch": {
+    "normalized_signals": {},
+    "intent": "strategy_drafting",
+    "task_relation": "new_task",
+    "requires_clarification": true,
+    "user_goal_summary": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "requested_strategy_template": null,
+     "strategy_type": "dca_accumulation",
+     "strategy_thesis": "Set up a monthly recurring plan on SPY for 2024: $5,000 to start and $0 added each month.",
+     "asset_universe": [
+      "SPY"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": "monthly",
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": 0.0,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "SPY",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "SPY",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "medium"
+      }
+     ],
+     "extra_parameters": {
+      "recurring_contribution": 0.0,
+      "provider_resolved_assets": [
+       {
+        "raw_text": "SPY",
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "name": "State Street SPDR S&P 500 ETF Trust",
+        "raw_symbol": "SPY",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.ARCA"
+       }
+      ],
+      "total_budget": 5000.0,
+      "initial_capital": 5000.0,
+      "total_capital": 5000.0,
+      "language": "en",
+      "date_range_raw_text": "2024",
+      "date_range_intent": {
+       "kind": "calendar_year",
+       "start": null,
+       "end": null,
+       "day_offset": null,
+       "count": null,
+       "unit": null,
+       "anchor": null,
+       "year": 2024,
+       "endpoint": null,
+       "confidence": 0.9,
+       "evidence": "2024"
+      },
+      "evidence_spans": {
+       "strategy_type": "monthly recurring plan",
+       "asset_universe": "SPY",
+       "date_range": "for 2024",
+       "initial_capital": "$5,000 to start",
+       "cadence": "monthly",
+       "date_range_raw_text": "2024",
+       "capital_amount": "$5,000 to start",
+       "recurring_contribution": "$0 added each month"
+      },
+      "recurring_cadence": "monthly",
+      "field_provenance": {
+       "cadence": "explicit_user",
+       "initial_capital": "starting_capital",
+       "recurring_contribution": "explicit_user",
+       "total_capital": "total_budget"
+      },
+      "raw_strategy_type": "dca_accumulation"
+     }
+    },
+    "missing_required_fields": [],
+    "optional_parameter_status": {
+     "optional_parameter_opportunity": [
+      "initial_capital",
+      "timeframe",
+      "fees",
+      "slippage",
+      "engine_options"
+     ],
+     "user_preference_overridden_for_turn": false,
+     "confidence": 0.9,
+     "arbitration_mode": "structured_arbitration",
+     "ambiguous_fields": [],
+     "unsupported_constraints": [
+      {
+       "category": "unsupported_dca_contribution_ceiling",
+       "raw_value": "$5,000 total budget",
+       "explanation": "I understand $5,000 as a total budget, but a recurring plan cannot stop partway through its window yet. Starting capital and the contribution both run for the whole window.",
+       "simplification_options": [
+        {
+         "label": "Run recurring buys only",
+         "replacement_values": {
+          "ignore_initial_capital": true
+         }
+        },
+        {
+         "label": "Use it as starting capital",
+         "replacement_values": {
+          "initial_capital": 5000.0
+         }
+        },
+        {
+         "label": "Use buy and hold with starting capital",
+         "replacement_values": {
+          "strategy_type": "buy_and_hold",
+          "initial_capital": 5000.0
+         }
+        }
+       ]
+      }
+     ],
+     "initial_capital": 5000.0
+    },
+    "effective_response_profile": {
+     "effective_tone": "friendly",
+     "effective_verbosity": "medium",
+     "effective_expertise_mode": "beginner"
+    },
+    "reason_codes": [
+     "llm_interpreter_used",
+     "semantic_date_constraint_preserved",
+     "semantic_dca_contribution_ceiling_deferred",
+     "semantic_recurring_contribution_preserved",
+     "semantic_recurring_cadence_preserved",
+     "default_benchmark_applied",
+     "focused_strategy_extraction_repair",
+     "focused_repair_preserved_structured_context",
+     "stated_run_field_fidelity_audit",
+     "dca_total_budget_role_audited"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [
+     {
+      "category": "unsupported_dca_contribution_ceiling",
+      "raw_value": "$5,000 total budget",
+      "explanation": "I understand $5,000 as a total budget, but a recurring plan cannot stop partway through its window yet. Starting capital and the contribution both run for the whole window.",
+      "simplification_options": [
+       {
+        "label": "Run recurring buys only",
+        "replacement_values": {
+         "ignore_initial_capital": true
+        }
+       },
+       {
+        "label": "Use it as starting capital",
+        "replacement_values": {
+         "initial_capital": 5000.0
+        }
+       },
+       {
+        "label": "Use buy and hold with starting capital",
+        "replacement_values": {
+         "strategy_type": "buy_and_hold",
+         "initial_capital": 5000.0
+        }
+       }
+      ]
+     }
+    ],
+    "resolution_provenance": [
+     {
+      "field": "asset_universe[0]",
+      "raw_text": "SPY",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "SPY",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "medium"
+     }
+    ],
+    "semantic_turn_act": "new_idea",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "asset_discovery": null
+   }
+  }
+ ]
+}

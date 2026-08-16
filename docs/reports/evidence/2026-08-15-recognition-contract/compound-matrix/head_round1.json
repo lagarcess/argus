@@ -1,0 +1,334 @@
+[
+ {
+  "case": "t1_remove",
+  "tier": "t1",
+  "language": "en",
+  "prompt": "remove AAPL",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "MSFT",
+    "NVDA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t1_add",
+  "tier": "t1",
+  "language": "en",
+  "prompt": "add TSLA",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "TSLA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t1_replace",
+  "tier": "t1",
+  "language": "en",
+  "prompt": "replace MSFT with GOOGL",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "GOOGL",
+    "NVDA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t1_benchmark",
+  "tier": "t1",
+  "language": "en",
+  "prompt": "change the benchmark to QQQ",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+   ],
+   "benchmark": "QQQ",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t1_date",
+  "tier": "t1",
+  "language": "en",
+  "prompt": "change the dates to 2023",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2023-01-01",
+   "end": "2023-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t1_capital",
+  "tier": "t1",
+  "language": "en",
+  "prompt": "make it $5,000",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+   ],
+   "benchmark": "SPY",
+   "capital": 5000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t2_remove_add",
+  "tier": "t2",
+  "language": "en",
+  "prompt": "remove AAPL and add TSLA",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "MSFT",
+    "NVDA",
+    "TSLA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t2_bench_date",
+  "tier": "t2",
+  "language": "en",
+  "prompt": "change the benchmark to QQQ and change the start to April 1, 2024",
+  "passed": false,
+  "failed_checks": [
+   "benchmark",
+   "start",
+   "assets_kept"
+  ],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "QQQ"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t2_es_remove_capital",
+  "tier": "t2",
+  "language": "es-419",
+  "prompt": "quita AAPL y cambia el capital a $2,500",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "MSFT",
+    "NVDA"
+   ],
+   "benchmark": "SPY",
+   "capital": 2500.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t3_remove_add_date",
+  "tier": "t3",
+  "language": "en",
+  "prompt": "remove AAPL, add TSLA, and change the start to April 1, 2024",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "MSFT",
+    "NVDA",
+    "TSLA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-04-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t3_messy_four_ops",
+  "tier": "t3",
+  "language": "en",
+  "prompt": "ok so ummm drop AAPL, throw in TSLA and GOOGL instead, make the benchmark QQQ and lets do $10k",
+  "passed": false,
+  "failed_checks": [
+   "assets",
+   "benchmark",
+   "capital",
+   "stage_not_confirmation_ready"
+  ],
+  "observed": {
+   "assets": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+   ],
+   "benchmark": "SPY",
+   "capital": 1000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_to_respond"
+   ],
+   "intent": "conversation_followup",
+   "reason_codes_present": true
+  }
+ },
+ {
+  "case": "t3_es_four_ops",
+  "tier": "t3",
+  "language": "es-419",
+  "prompt": "quita AAPL, agrega TSLA, cambia el benchmark a QQQ y usa $5,000",
+  "passed": true,
+  "failed_checks": [],
+  "observed": {
+   "assets": [
+    "MSFT",
+    "NVDA",
+    "TSLA"
+   ],
+   "benchmark": "QQQ",
+   "capital": 5000.0,
+   "start": "2024-01-01",
+   "end": "2024-12-31",
+   "stage_outcomes": [
+    "needs_clarification",
+    "await_user_reply",
+    "ready_for_confirmation",
+    "await_approval"
+   ],
+   "intent": "backtest_execution",
+   "reason_codes_present": true
+  }
+ }
+]

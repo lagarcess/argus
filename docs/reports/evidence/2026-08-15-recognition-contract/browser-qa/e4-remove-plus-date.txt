@@ -1,0 +1,10 @@
+scenario: E4 "remove AAPL and change the start to April 1 2026" (card period was 2024)
+turn 1 DOM: clarification (correct all-or-nothing): "start in April 2026 conflicts with the available
+  data ending in December 2024" — card unchanged, nothing half-applied
+turn 2 ("April 1 2026 through December 31 2026") DOM: future-window refusal (end date is future vs
+  Aug 2026 clock) — defensible; FINDING(minor): voiced options repeat "Test it over a historical
+  period" twice in one sentence
+turn 3 ("April 1 2026 through July 30 2026") DOM: new card AAPL / MSFT / NVDA — Apr 1, 2026 → Jul 30, 2026
+  FINDING(major): the date landed but the REMOVE from the compound was dropped across the
+  clarification detour — AAPL is back on the card with no disclosure
+follow-up: single-turn valid variant driven separately (e4b) to isolate the cross-turn surface

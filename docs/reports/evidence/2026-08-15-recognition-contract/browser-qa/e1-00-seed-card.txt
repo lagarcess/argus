@@ -1,0 +1,9 @@
+scenario: E1 remove AAPL — seed turn
+prompt: "Buy and hold AAPL, MSFT and NVDA for 2024 with $1,000"
+DOM extract (chat main):
+AAPL / MSFT / NVDA
+Buy and Hold — Ready to run
+STARTING CAPITAL $1,000
+PERIOD Jan 2, 2024 → Dec 31, 2024
+Stocks · Daily data · No fees · No slippage · Benchmark: SPY
+Actions: Edit capital / Edit dates / Edit costs / Run backtest / Change assumptions / Cancel

@@ -5,6 +5,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from loguru import logger
 
@@ -131,6 +132,116 @@ def _asset_universe_operation_clarification_draft(
         if position_evidence:
             clarification.evidence_spans = {"position_size": position_evidence}
     return clarification
+
+
+# The only acts whose bare answers this guard may rewrite; any other act
+# fails closed, not open.
+_BARE_ANSWER_ELIGIBLE_ACTS = frozenset({"answer_pending_need", "refine_current_idea"})
+
+
+def _bare_asset_answer_without_unevidenced_operation(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    resolve_asset_candidate: Callable[..., Any],
+) -> LLMInterpretationResponse:
+    """Type a bare asset answer to the asset slot as that asset's inclusion (#190).
+
+    A reply that resolves entirely as one asset carried no words that could
+    express an operation, so a guessed "replace" label and an empty universe
+    are both unevidenced shapes of the same answer, and the product rule is
+    append. answer_pending_need continue turns take the provider-resolution
+    append corridor; refine_current_idea turns reach the edit planner, whose
+    stated-operation union injects the inclusion as an add. A model-labelled
+    "append" is already the product rule and is left untouched.
+    """
+    draft = response.candidate_strategy_draft
+    if _selected_requested_field_base(request) != "asset_universe":
+        return response
+    if response.semantic_turn_act not in _BARE_ANSWER_ELIGIBLE_ACTS:
+        return response
+    if response.asset_discovery is not None:
+        return response
+    if draft.asset_exclusions:
+        return response
+    operation_label = normalized_asset_universe_operation(draft.asset_universe_operation)
+    if operation_label != "replace" and draft.asset_universe:
+        # Only a wipe-shaped guess or a truly bare draft needs the rewrite;
+        # append and unlabeled non-empty shapes already route correctly.
+        return response
+    prior = _current_artifact_strategy(request)
+    prior_symbols = {
+        symbol
+        for value in (prior.asset_universe if prior is not None else [])
+        if (symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    if len(prior_symbols) <= 1:
+        return response
+    answer = request.current_user_message.strip()
+    if not answer:
+        return response
+    try:
+        resolution = resolve_asset_candidate(
+            answer,
+            field="asset_universe[0]",
+            source="user_mention",
+        )
+    except ValueError:
+        return response
+    if (
+        resolution is None
+        or getattr(resolution, "status", None) != "resolved"
+        or resolution.asset is None
+    ):
+        return response
+    symbol = resolution.asset.canonical_symbol
+    if symbol in prior_symbols:
+        return response
+    draft_symbols = {
+        draft_symbol
+        for value in draft.asset_universe
+        if (draft_symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    if draft_symbols - {symbol}:
+        return response
+    # An inclusion role naming exactly the answered symbol is the same bare
+    # shape; anything beyond it means the turn stated more than the mention.
+    inclusion_symbols = {
+        inclusion_symbol
+        for value in draft.asset_inclusions
+        if (inclusion_symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    if inclusion_symbols - {symbol}:
+        return response
+    field_provenance = dict(draft.field_provenance or {})
+    field_provenance["asset_inclusions"] = "explicit_user"
+    field_provenance.pop("asset_universe_operation", None)
+    updated_draft = draft.model_copy(
+        update={
+            "asset_universe": [symbol],
+            "asset_inclusions": [symbol],
+            "asset_universe_operation": None,
+            "field_provenance": field_provenance,
+        }
+    )
+    logger.info(
+        "Bare asset answer typed as inclusion symbol={}",
+        symbol,
+        symbol=symbol,
+    )
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": updated_draft,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "bare_asset_answer_typed_as_inclusion",
+                    ]
+                )
+            ),
+        }
+    )
 
 
 def _plain_requested_asset_answer_can_use_provider_resolution(

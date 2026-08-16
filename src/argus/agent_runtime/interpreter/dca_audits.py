@@ -349,3 +349,127 @@ def _move_dca_total_budget_out_of_recurring_amount(
     extra_parameters = dict(draft.extra_parameters or {})
     extra_parameters["total_budget"] = total_budget
     draft.extra_parameters = extra_parameters
+
+
+def total_budget_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    audit: Any,
+) -> LLMInterpretationResponse:
+    """Apply a total_budget_not_recurring verdict without re-roling typed money.
+
+    An explicit seed keeps ``initial_capital`` whatever the sidecar says, and
+    a capital amount the primary typed as the contribution (or a differing
+    amount beside a present ``recurring_contribution``) is an explicit money
+    role a budget claim with no third amount cannot re-role. Only a
+    role-ambiguous amount becomes the budget, and the plan then asks for the
+    monthly amount instead of funding the budget as a contribution.
+    """
+    if not audit.total_budget_not_recurring:
+        return response
+    draft = response.candidate_strategy_draft.model_copy(deep=True)
+    seed_provenance = str(
+        (draft.field_provenance or {}).get("initial_capital") or ""
+    ).casefold()
+    if draft.initial_capital is not None and seed_provenance in {
+        "starting_capital",
+        "explicit_user",
+    }:
+        capital_provenance = str(
+            (draft.field_provenance or {}).get("capital_amount") or ""
+        ).casefold()
+        capital_is_typed_contribution = (
+            draft.recurring_contribution is not None
+            or capital_provenance
+            in {"recurring_contribution", "explicit_recurring_contribution"}
+        )
+        if (
+            draft.capital_amount is None
+            or draft.capital_amount == draft.initial_capital
+            or capital_is_typed_contribution
+        ):
+            # A duplicated seed copy is cleared; typed contributions survive.
+            if draft.capital_amount == draft.initial_capital:
+                draft.capital_amount = None
+                draft.sizing_mode = None
+                field_provenance = dict(draft.field_provenance or {})
+                field_provenance.pop("capital_amount", None)
+                draft.field_provenance = field_provenance
+            return response.model_copy(
+                update={
+                    "candidate_strategy_draft": draft,
+                    "reason_codes": list(
+                        dict.fromkeys(
+                            [
+                                *response.reason_codes,
+                                "dca_seed_provenance_kept_over_budget_audit",
+                            ]
+                        )
+                    ),
+                }
+            )
+        total_budget = float(draft.capital_amount)
+        draft.total_capital = total_budget
+        draft.capital_amount = None
+        draft.sizing_mode = None
+        field_provenance = dict(draft.field_provenance or {})
+        field_provenance.pop("capital_amount", None)
+        field_provenance["total_capital"] = "total_budget"
+        draft.extra_parameters = {
+            **(draft.extra_parameters or {}),
+            "total_budget": total_budget,
+        }
+        audit_reason_codes = [
+            "dca_seed_provenance_kept_over_budget_audit",
+            "dca_total_budget_role_audited",
+        ]
+        if (
+            not audit.recurring_contribution_explicit
+            and draft.recurring_contribution == total_budget
+        ):
+            draft.recurring_contribution = None
+            field_provenance.pop("recurring_contribution", None)
+            audit_reason_codes.append("dca_budget_recurring_copy_cleared")
+        draft.field_provenance = field_provenance
+        return _budget_clarification_response(
+            response=response, draft=draft, audit_reason_codes=audit_reason_codes
+        )
+    _move_dca_total_budget_out_of_recurring_amount(draft)
+    audit_reason_codes = ["dca_total_budget_role_audited"]
+    if (
+        not audit.recurring_contribution_explicit
+        and draft.recurring_contribution is not None
+        and draft.recurring_contribution == draft.total_capital
+    ):
+        # A contribution equal to the budget is the same money re-roled; it
+        # must not hide the missing amount.
+        draft.recurring_contribution = None
+        field_provenance = dict(draft.field_provenance or {})
+        field_provenance.pop("recurring_contribution", None)
+        draft.field_provenance = field_provenance
+        audit_reason_codes.append("dca_budget_recurring_copy_cleared")
+    return _budget_clarification_response(
+        response=response, draft=draft, audit_reason_codes=audit_reason_codes
+    )
+
+
+def _budget_clarification_response(
+    *,
+    response: LLMInterpretationResponse,
+    draft: Any,
+    audit_reason_codes: list[str],
+) -> LLMInterpretationResponse:
+    return response.model_copy(
+        update={
+            "intent": "strategy_drafting",
+            "requires_clarification": True,
+            "candidate_strategy_draft": draft,
+            "missing_required_fields": list(
+                dict.fromkeys([*response.missing_required_fields, "capital_amount"])
+            ),
+            "assistant_response": None,
+            "reason_codes": list(
+                dict.fromkeys([*response.reason_codes, *audit_reason_codes])
+            ),
+        }
+    )

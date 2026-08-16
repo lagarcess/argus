@@ -1,0 +1,27 @@
+scenario: L1 "backtest weekly options on apple from 2024-01-01 to 2024-12-31" — repeated attempts
+attempt 1 DOM: "Actualmente Argus no puede probar estrategias con opciones semanales. ¿Quieres usar
+  la opción de buy and hold en AAPL?"
+  score: limit named ✓ · AAPL kept ✓ · window echoed ✗ · runnable offered ✓
+  FINDING(minor): recovery prose in SPANISH for an English turn (mirror of E5's break: fallback
+  prose follows persisted UI language, not the user's message language)
+attempt 2 DOM: "Actualmente Argus no puede ejecutar backtests de opciones semanales. Pero puedo
+  simular la compra y tenencia de acciones de Apple en ese mismo periodo (enero a diciembre 2024)
+  como alternativa. ¿Te parece bien esa dirección?"
+  score: limit named ✓ · AAPL kept ✓ · window echoed ✓ · runnable offered ✓ — FULL recovery
+  (language again Spanish-for-English — consistent with persisted UI language, looks deterministic)
+attempt 3 DOM: "Argus no puede probar opciones semanales directamente. ¿Quieres probar la estrategia
+  de compra y mantenimiento (buy and hold) de AAPL para el mismo periodo?"
+  score: limit named ✓ · AAPL kept ✓ · window by reference ✓ · runnable offered ✓ — FULL recovery
+attempt 4 DOM: "Actualmente Argus prueba estrategias con acciones, no con opciones semanales.
+  ¿Te gustaría probar una de estas alternativas para AAPL en ese mismo periodo?" + THREE runnable
+  chips (Usar una regla RSI compatible / Comparar con comprar y mantener / Usar un cruce de medias
+  móviles compatible)
+  score: limit named ✓ · AAPL kept ✓ · window by reference ✓ · runnable offered ✓✓✓ — FULL recovery
+attempt 5 DOM: "Actualmente no puedo probar opciones semanales directamente. ¿Te gustaría probar una
+  de estas alternativas para AAPL en el mismo período?" + same three runnable chips
+  score: limit named ✓ · AAPL kept ✓ · window by reference ✓ · runnable offered ✓ — FULL recovery
+
+TALLY (5 attempts, fresh chats): limit named 5/5 · AAPL kept 5/5 · runnable offered 5/5 ·
+window echoed 4/5 (attempt 1 omitted it). Better than the expected ~2-in-5; consistent with both
+58/2 full runs where this case passed. Consistent blemish across all 5: recovery prose in Spanish
+for English turns (persisted UI language wins over message language on this path).

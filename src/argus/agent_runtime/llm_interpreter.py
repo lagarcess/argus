@@ -120,6 +120,7 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
     _dca_draft_has_recurring_amount,
     _dca_total_budget_source,
     _move_dca_total_budget_out_of_recurring_amount,
+    total_budget_audited_response,
     _response_from_dca_contract_audit,
     _response_needs_dca_contribution_role_audit,
     _response_needs_strategy_family_continuity_audit,
@@ -193,6 +194,7 @@ from argus.agent_runtime.interpreter import (
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
+    _bare_asset_answer_without_unevidenced_operation,
     _log_runtime_readiness_step,
     _plain_requested_asset_answer_can_use_provider_resolution,
 )
@@ -2148,30 +2150,7 @@ async def _dca_contribution_role_audited_response(
                 ),
             }
         )
-    if not audit.total_budget_not_recurring:
-        return response
-    draft = response.candidate_strategy_draft.model_copy(deep=True)
-    _move_dca_total_budget_out_of_recurring_amount(draft)
-    missing_required_fields = list(
-        dict.fromkeys([*response.missing_required_fields, "capital_amount"])
-    )
-    return response.model_copy(
-        update={
-            "intent": "strategy_drafting",
-            "requires_clarification": True,
-            "candidate_strategy_draft": draft,
-            "missing_required_fields": missing_required_fields,
-            "assistant_response": None,
-            "reason_codes": list(
-                dict.fromkeys(
-                    [
-                        *response.reason_codes,
-                        "dca_total_budget_role_audited",
-                    ]
-                )
-            ),
-        }
-    )
+    return total_budget_audited_response(response=response, audit=audit)
 
 
 async def _pending_response_option_selected_response(
@@ -2266,6 +2245,11 @@ async def _audited_response_ready_for_runtime(
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(
         response, request=request, asset_resolution_context=asset_resolution_context
+    )
+    response = _bare_asset_answer_without_unevidenced_operation(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
     )
     _log_runtime_readiness_step("started", response=response)
     planned_artifact_edit = await _ready_active_artifact_edit_planned_response(
