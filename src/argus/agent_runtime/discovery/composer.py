@@ -220,6 +220,34 @@ async def discovery_operation_result(
         uncorroborated_count=len(uncorroborated),
     )
     if not validated:
+        # The search found real names we cannot offer. Never dead-end here:
+        # name what came back, then answer the same question from verified
+        # rows the resolver does accept. Falling through spends one cheap
+        # naming call and no second search.
+        usage["zero_validated_fallback"] = "attempted"
+        logger.info(
+            "Grounded discovery found no offerable candidate; falling through "
+            "to resolver-verified rows",
+            extracted_count=len(extraction.candidates),
+            unverified_count=len(unverified),
+            uncorroborated_count=len(uncorroborated),
+        )
+        fallback = await _model_knowledge_result(
+            decision=decision,
+            request=request,
+            max_candidates=config.max_candidates,
+            current_user_message=current_user_message,
+            language=language,
+            can_request_search=False,
+            usage=usage,
+            found_unusable_names=unverified,
+            found_unmatched_names=uncorroborated,
+            recovery_on_empty=False,
+        )
+        if fallback is not None:
+            usage["zero_validated_fallback"] = "served"
+            return fallback
+        usage["zero_validated_fallback"] = "empty"
         return await _recovery_result(
             decision=decision,
             code="discovery_no_verified_candidates",
@@ -288,11 +316,22 @@ async def _model_knowledge_result(
     current_user_message: str,
     language: str,
     can_request_search: bool,
-) -> StageResult:
+    usage: dict[str, Any] | None = None,
+    found_unusable_names: list[str] | None = None,
+    found_unmatched_names: list[str] | None = None,
+    recovery_on_empty: bool = True,
+) -> StageResult | None:
     """Model knowledge in, resolver-verified rows out; zero sources in the
-    sidecar is the ungrounded marker (derived, never asserted)."""
+    sidecar is the ungrounded marker (derived, never asserted).
+
+    ``recovery_on_empty=False`` makes this a fallback the caller can decline:
+    it returns None instead of owning the turn, so a grounded search that
+    found nothing offerable keeps its own recovery voice.
+    """
     extraction = await name_candidates(request=request, language=language)
     if extraction is None:
+        if not recovery_on_empty:
+            return None
         return await _recovery_result(
             decision=decision,
             code="discovery_suggestions_unavailable",
@@ -310,6 +349,8 @@ async def _model_knowledge_result(
         require_source_evidence=False,
     )
     if not validated:
+        if not recovery_on_empty:
+            return None
         return await _recovery_result(
             decision=decision,
             code="discovery_no_verified_candidates",
@@ -319,6 +360,10 @@ async def _model_knowledge_result(
             unverified_names=unverified,
             uncorroborated_names=uncorroborated,
         )
+    # A name the search surfaced is the user's own subject by construction:
+    # they asked for the category it came back under, so it is named without
+    # the message-echo gate the ordinary drop lists go through.
+    searched_names = list(found_unusable_names or []) + list(found_unmatched_names or [])
     voiced = await _voiced_discovery_response(
         request=request,
         candidates=validated,
@@ -332,8 +377,11 @@ async def _model_knowledge_result(
         current_user_message=current_user_message,
         language=language,
         grounded=False,
+        searched_names=searched_names,
     )
     if not voiced:
+        if not recovery_on_empty:
+            return None
         return await _recovery_result(
             decision=decision,
             code="discovery_suggestions_unavailable",
@@ -356,11 +404,18 @@ async def _model_knowledge_result(
         unverified_count=len(unverified),
         uncorroborated_count=len(uncorroborated),
         can_request_search=can_request_search,
+        searched_name_count=len(searched_names),
     )
+    stage_patch: dict[str, Any] = {
+        "assistant_response": voiced,
+        "discovery": sidecar,
+    }
+    if usage is not None:
+        stage_patch["discovery_usage"] = usage
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={"assistant_response": voiced, "discovery": sidecar},
+        stage_patch=stage_patch,
     )
 
 
@@ -636,6 +691,7 @@ async def _voiced_discovery_response(
     current_user_message: str,
     language: str,
     grounded: bool = True,
+    searched_names: list[str] | None = None,
 ) -> str | None:
     candidate_lines = "\n".join(
         f"- {item.symbol} ({item.name}, {item.asset_class}): {item.reason_text}"
@@ -646,6 +702,17 @@ async def _voiced_discovery_response(
         freshness = packet.retrieved_at.date().isoformat()
         facts.append(
             f"Sources were retrieved on {freshness} from {len(packet.results)} pages."
+        )
+    elif searched_names:
+        # Naming the search's own findings is the difference between a dead
+        # end and progress, so this fact is stated as required, not offered.
+        facts.append(
+            "A current-sources search for this request returned these names: "
+            + ", ".join(searched_names)
+            + ". None of them could be confirmed as an asset Argus can test, so "
+            "none are offered below. You MUST name them and say plainly that "
+            "they could not be confirmed as testable here. The candidates above "
+            "are a different, verified set from your general knowledge."
         )
     else:
         facts.append(
@@ -669,7 +736,11 @@ async def _voiced_discovery_response(
                 "answer came from current sources or general knowledge. Write "
                 "ONE short framing sentence answering the user's discovery "
                 "request; add one brief sentence about the dropped names only "
-                "if the facts mention any. Do not list or name the candidates, "
+                "if the facts mention any. When the facts say a search "
+                "returned names that could not be confirmed, name those names "
+                "first and say they are not testable here, then frame the "
+                "verified rows as what you can test instead. Do not list or "
+                "name the candidates, "
                 "do not restate where the answer came from, never add assets "
                 "beyond the verified list, never rank or recommend buying, "
                 "never mention providers or internal tools."

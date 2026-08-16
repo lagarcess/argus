@@ -151,7 +151,34 @@ def _rail_may_claim_clarification(
         return False
     if not interpretation.requires_clarification:
         return False
-    return _execution_evidence_is_only_a_default(interpretation.candidate_strategy_draft)
+    if not _execution_evidence_is_only_a_default(interpretation.candidate_strategy_draft):
+        return False
+    if _draft_carries_a_stated_test_window(interpretation.candidate_strategy_draft):
+        # "Compare PLTR to LMT" states no window, which is what made it a
+        # question wearing a strategy's clothes. A user who names the period
+        # has described a test, so the turn keeps its strategy route and its
+        # unsupported-recovery contract instead of being answered with stats.
+        logger.info(
+            "Research rail claim declined: the draft carries a user-stated window",
+            date_range=getattr(
+                interpretation.candidate_strategy_draft, "date_range", None
+            ),
+            failure_classification="rail_claim_declined_stated_window",
+        )
+        return False
+    return True
+
+
+def _draft_carries_a_stated_test_window(strategy: Any) -> bool:
+    """Whether the draft carries a period the user named for a test.
+
+    Typed field only: the interpreter fills date_range from the user's own
+    words, so this reads a structured fact and never inspects the message.
+    """
+    value = getattr(strategy, "date_range", None)
+    if isinstance(value, dict):
+        return any(str(item or "").strip() for item in value.values())
+    return bool(str(value or "").strip())
 
 
 def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
@@ -304,7 +331,27 @@ async def _market_stats_answer(
     if not symbols:
         return None
     symbol = symbols[0]
-    window = resolve_date_range(query.date_range_raw_text or draft.date_range or None)
+    # The interpreter's typed window is structured and already validated; the
+    # classifier's raw text is free prose that only parses in one shape, so
+    # letting it win silently loses windows like "from 2024-01-01 to
+    # 2024-12-31" to the trailing-year default.
+    requested_period = str(query.date_range_raw_text or "").strip()
+    window = resolve_date_range(draft.date_range or query.date_range_raw_text or None)
+    if window.used_default and requested_period:
+        # A substituted window is a deterministic compensation for a period
+        # this layer could not parse, and the figures below are voiced as the
+        # answer either way. Unrecorded, that substitution is invisible.
+        logger.info(
+            "Knowledge answer window defaulted despite a stated period "
+            "requested_period={} symbol={} window={}",
+            requested_period,
+            symbol,
+            window.label,
+            requested_period=requested_period,
+            symbol=symbol,
+            resolved_window=window.label,
+            failure_classification="knowledge_answer_period_defaulted",
+        )
     try:
         # Lazy: the API import boundary keeps the backtest compute stack out
         # of startup; these load only when a market-stats answer actually runs.
