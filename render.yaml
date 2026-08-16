@@ -170,7 +170,7 @@ services:
       - key: NEXT_PUBLIC_ENABLE_SPANISH
         value: "true"
       - key: NEXT_PUBLIC_ARGUS_API_URL
-        value: https://argus-ohr5.onrender.com/api/v1
+        value: https://api.arguschat.ai/api/v1
       - key: NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY
         sync: false
       - key: NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL
