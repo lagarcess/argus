@@ -2151,6 +2151,36 @@ async def _dca_contribution_role_audited_response(
     if not audit.total_budget_not_recurring:
         return response
     draft = response.candidate_strategy_draft.model_copy(deep=True)
+    seed_provenance = str(
+        (draft.field_provenance or {}).get("initial_capital") or ""
+    ).casefold()
+    if draft.initial_capital is not None and seed_provenance in {
+        "starting_capital",
+        "explicit_user",
+    }:
+        # The primary read typed this money as a seed with explicit provenance
+        # ("$5,000 to start"). A contrary sidecar read must not re-type the
+        # seed as a budget; it may only stop a duplicated amount from
+        # masquerading as the recurring contribution.
+        if draft.capital_amount == draft.initial_capital:
+            draft.capital_amount = None
+            draft.sizing_mode = None
+            field_provenance = dict(draft.field_provenance or {})
+            field_provenance.pop("capital_amount", None)
+            draft.field_provenance = field_provenance
+        return response.model_copy(
+            update={
+                "candidate_strategy_draft": draft,
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "dca_seed_provenance_kept_over_budget_audit",
+                        ]
+                    )
+                ),
+            }
+        )
     _move_dca_total_budget_out_of_recurring_amount(draft)
     missing_required_fields = list(
         dict.fromkeys([*response.missing_required_fields, "capital_amount"])

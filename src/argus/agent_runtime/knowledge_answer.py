@@ -54,6 +54,10 @@ _KNOWLEDGE_INTENTS = frozenset(
 )
 # Acts owned by other surfaces (discovery, results, cards) never route here.
 _KNOWLEDGE_ACTS = frozenset({"educational_question", "unsupported_request"})
+# Routes on the typed payload, not the act label: an unsupported_request turn
+# carrying unsupported_constraints is a refusal decision with recovery options,
+# never a question the knowledge/research rail may answer with stats.
+_UNSUPPORTED_PAYLOAD_REASON_CODE = "unsupported_payload_kept_recovery_route"
 _SEARCH_MAX_RESULTS = 5
 
 
@@ -147,9 +151,7 @@ def _rail_may_claim_clarification(
         return False
     if not interpretation.requires_clarification:
         return False
-    return _execution_evidence_is_only_a_default(
-        interpretation.candidate_strategy_draft
-    )
+    return _execution_evidence_is_only_a_default(interpretation.candidate_strategy_draft)
 
 
 def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
@@ -173,6 +175,24 @@ async def knowledge_answer_stage_result(
         # A reply to a pending question belongs to whoever asked it.
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
+        return None
+    if interpretation.unsupported_constraints and (
+        interpretation.semantic_turn_act == "unsupported_request"
+        or (
+            interpretation.semantic_turn_act is None
+            and interpretation.intent == "unsupported_or_out_of_scope"
+        )
+    ):
+        # A typed refusal payload owns its recovery route: the primary read
+        # already named what cannot run and the nearest supported alternative,
+        # so a message-only classifier must not answer the turn as a question.
+        if _UNSUPPORTED_PAYLOAD_REASON_CODE not in interpretation.reason_codes:
+            interpretation.reason_codes.append(_UNSUPPORTED_PAYLOAD_REASON_CODE)
+        logger.info(
+            "Knowledge claim stood down for a typed unsupported payload " "categories={}",
+            [item.category for item in interpretation.unsupported_constraints],
+            categories=[item.category for item in interpretation.unsupported_constraints],
+        )
         return None
     rail_claim = _rail_may_claim_clarification(interpretation)
     if (
@@ -527,9 +547,7 @@ def _stage_result(
         # reason code (#344: relabeling dropped the discovery payload).
         decision = decision.model_copy(
             update={
-                "reason_codes": list(
-                    dict.fromkeys([*decision.reason_codes, reason_code])
-                )
+                "reason_codes": list(dict.fromkeys([*decision.reason_codes, reason_code]))
             }
         )
     else:

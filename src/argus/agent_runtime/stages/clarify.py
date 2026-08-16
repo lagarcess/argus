@@ -691,7 +691,11 @@ def _dca_execution_details_are_still_missing(
     if strategy.strategy_type != "dca_accumulation":
         return False
     executable_fields = {"asset_universe", "date_range", "capital_amount", "cadence"}
-    return bool(executable_fields.intersection(requested_fields))
+    missing = executable_fields.intersection(requested_fields)
+    # The ceiling refusal is about the contribution amount: when that amount is
+    # the only missing detail, deferring the refusal would ask for a number
+    # while hiding that the user's stated money was heard as a plan-wide cap.
+    return bool(missing - {"capital_amount"})
 
 
 def _simplification_options(

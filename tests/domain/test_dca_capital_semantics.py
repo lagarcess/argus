@@ -954,10 +954,14 @@ def test_a_stated_cap_is_never_hidden_by_a_stated_seed(
 def test_the_ceiling_refusal_has_one_identity_every_reader_derives_from() -> None:
     """A rename must not silently switch off the reader that defers it.
 
-    The clarify stage suppresses this constraint while execution details are
-    still missing, so an incomplete request collects them before hearing about
-    the cap. Renaming the category without sweeping that predicate added an
-    avoidable recovery round.
+    The clarify stage suppresses this constraint while a non-amount execution
+    detail is still missing, so an incomplete request collects those before
+    hearing about the cap. The contribution amount itself never defers it: the
+    ceiling refusal is about that amount, and deferring it would ask for a
+    number while hiding that the user's stated money was heard as a plan-wide
+    cap (the eval case `dca_capital_semantics_only_have_amount_is_ceiling`
+    was unreachable under the wider deferral). Renaming the category without
+    sweeping this predicate added an avoidable recovery round.
     """
     from argus.agent_runtime.semantic_integrity import (
         UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
@@ -985,12 +989,19 @@ def test_the_ceiling_refusal_has_one_identity_every_reader_derives_from() -> Non
             )
         }
     )
+    ceiling_constraint = {"category": UNSUPPORTED_DCA_CONTRIBUTION_CEILING}
     deferred = clarify._blocking_unsupported_constraints(
         state=state,
-        requested_fields=["capital_amount"],
-        unsupported_constraints=[{"category": UNSUPPORTED_DCA_CONTRIBUTION_CEILING}],
+        requested_fields=["capital_amount", "date_range"],
+        unsupported_constraints=[ceiling_constraint],
     )
     assert deferred == []
+    surfaced = clarify._blocking_unsupported_constraints(
+        state=state,
+        requested_fields=["capital_amount"],
+        unsupported_constraints=[ceiling_constraint],
+    )
+    assert surfaced == [ceiling_constraint]
 
 
 def test_the_interpreter_prompt_gives_each_money_role_exactly_one_field() -> None:

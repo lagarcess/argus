@@ -134,10 +134,22 @@ def response_with_provider_context_assets(
             asset_classes.add(asset_class)
 
     draft = response.candidate_strategy_draft.model_copy(deep=True)
+    # A typed exclusion outranks a mention: "remove AAPL" mentions AAPL, and
+    # injecting that mention as a traded asset manufactures a universe/exclusion
+    # contradiction the edit pipeline later refuses to materialize.
+    excluded_symbols = {
+        str(value).strip().upper()
+        for value in draft.asset_exclusions
+        if str(value).strip()
+    }
+    traded_symbols = [
+        symbol for symbol in resolved_symbols if symbol not in excluded_symbols
+    ]
+    exclusion_respected = len(traded_symbols) != len(resolved_symbols)
     draft_assets = [
         str(value).strip() for value in draft.asset_universe if str(value).strip()
     ]
-    context_is_partial = len(draft_assets) > len(resolved_symbols) and any(
+    context_is_partial = len(draft_assets) > len(traded_symbols) and any(
         not any(
             _provider_record_matches_symbol(record, draft_asset)
             for record in resolved_records
@@ -146,11 +158,11 @@ def response_with_provider_context_assets(
     )
     preserved_fuller_draft = context_is_partial
     if not context_is_partial:
-        draft.asset_universe = resolved_symbols
+        draft.asset_universe = traded_symbols
     else:
         draft_symbols = {value.upper() for value in draft_assets}
         draft.asset_universe = [
-            *[symbol for symbol in resolved_symbols if symbol not in draft_symbols],
+            *[symbol for symbol in traded_symbols if symbol not in draft_symbols],
             *draft_assets,
         ]
         ambiguous_fields.append(
@@ -173,7 +185,8 @@ def response_with_provider_context_assets(
     if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response
-        draft.asset_universe = resolved_symbols
+        if traded_symbols:
+            draft.asset_universe = traded_symbols
         preserved_fuller_draft = False
         ambiguous_fields = []
     if (
@@ -184,10 +197,19 @@ def response_with_provider_context_assets(
     ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
+    if exclusion_respected:
+        update["reason_codes"] = list(
+            dict.fromkeys(
+                [
+                    *response.reason_codes,
+                    "context_asset_injection_respected_exclusion",
+                ]
+            )
+        )
     resolved_missing_asset = (
         response.intent in {"strategy_drafting", "backtest_execution"}
         and "asset_universe" in response.missing_required_fields
-        and bool(resolved_symbols)
+        and bool(traded_symbols)
         and not ambiguous_fields
         and not preserved_fuller_draft
         and all_traded_asset_mentions_accounted_for is True
@@ -210,7 +232,7 @@ def response_with_provider_context_assets(
                 "reason_codes": list(
                     dict.fromkeys(
                         [
-                            *response.reason_codes,
+                            *(update.get("reason_codes") or response.reason_codes),
                             "provider_context_resolved_missing_asset",
                         ]
                     )
@@ -221,7 +243,7 @@ def response_with_provider_context_assets(
         update["reason_codes"] = list(
             dict.fromkeys(
                 [
-                    *response.reason_codes,
+                    *(update.get("reason_codes") or response.reason_codes),
                     "provider_context_partial_preserved_fuller_draft",
                 ]
             )
