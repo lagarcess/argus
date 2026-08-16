@@ -46,9 +46,7 @@ def test_canary_defaults_to_private_launch_urls() -> None:
 
     assert 'APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"' in source
     assert 'API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"' in source
-    assert (
-        'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
-    )
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
     assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"' in env_source
 
 
@@ -644,9 +642,10 @@ def test_browser_matches_decision_state_inside_its_localized_template() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
     assert "function decisionStateLocator" in browser_source
-    assert "exact: false" in browser_source.split(
-        "function decisionStateLocator", 1
-    )[1].split("\n}", 1)[0]
+    assert (
+        "exact: false"
+        in browser_source.split("function decisionStateLocator", 1)[1].split("\n}", 1)[0]
+    )
     assert browser_source.count("decisionStateLocator(page, canaryDecisionState)") == 2
 
 
@@ -673,7 +672,9 @@ def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     assert "Omnisearch did not reopen the canonical source conversation" in browser_source
 
 
-def test_api_postcondition_derives_omnisearch_identity_from_conversation_dossier() -> None:
+def test_api_postcondition_derives_omnisearch_identity_from_conversation_dossier() -> (
+    None
+):
     source = _source(".github/canary-render.sh")
     postconditions = source.split("verify_api_postconditions() {", 1)[1].split(
         "\nservice_role_curl()", 1

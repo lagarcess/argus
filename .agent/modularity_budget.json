@@ -102,7 +102,7 @@
     "tests/test_public_alpha_render_load_hardening.py": 1071,
     "tests/test_public_excerpt_api.py": 1005,
     "tests/test_public_excerpt_receipts.py": 1124,
-    "tests/test_render_canary_script.py": 1179,
+    "tests/test_render_canary_script.py": 1180,
     "tests/test_render_workflow_execution.py": 1956,
     "tests/test_retest_action.py": 1225,
     "tests/test_runtime_confirmation_card.py": 1084,
