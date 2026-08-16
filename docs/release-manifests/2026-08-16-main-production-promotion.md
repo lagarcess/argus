@@ -11,6 +11,15 @@
   web/public render.yaml supabase/` is empty, so the tree the eval measured is
   the tree that ships.
 - Source branch: `codex/private-alpha-next`
+- Final shipping tip at landing: `738fd53952988f2fb51c5b0df20f22d8c65c5d40`, which adds
+  only the staged promotion evidence commit on top of `830a9688`.
+  `git diff 6e7d52e6 738fd539 -- src/ web/app web/components web/lib web/public
+  render.yaml supabase/` is empty, so the measured tree is still the tree that
+  shipped. Commits ahead of production at landing: 100.
+- Landed on `main` as merge commit `3134388255ad74161cecee7b37622c67a09f0840`
+  (PR #518, merge method, parents `78c2d6c2` and `738fd539`; landed tree is
+  byte-identical to the candidate tree). Landed-ref migration gate rerun at the
+  landed SHA: `status=pass`, `landing_verification.status=verified`.
 - Rollback target: `78c2d6c264c660483ab5deb8ea197077945a7755`
 - Commits ahead of production at cut: 99
 - Approver: founder, 2026-08-16
@@ -151,32 +160,110 @@ To be completed by the operator at deploy time for all three services:
 Workflow service in a Blueprint, so `argus-backtests` requires its own
 verification rather than being assumed from the other two.
 
-- [ ] `argus-api` deployed at candidate SHA
-- [ ] `argus-app` deployed at candidate SHA
-- [ ] `argus-backtests` workflow version at candidate SHA
-- [ ] Autodeploy state recorded for all three
+- [x] `argus-api` deployed at candidate SHA: deploy `dep-da10j3s9v7es73ab3amg`,
+      status `live`, commit `3134388255ad74161cecee7b37622c67a09f0840`
+- [x] `argus-app` deployed at candidate SHA: deploy `dep-da10jttbedkc73bovs3g`,
+      status `live`, commit `3134388255ad74161cecee7b37622c67a09f0840`
+- [x] `argus-backtests` workflow version at candidate SHA: version
+      `wfv-da10kspt0dsc73aoign0`, status `ready`, commit `3134388`
+- [x] Autodeploy state recorded for all three: `off` on `argus-api`,
+      `argus-app`, and `argus-backtests`; all three deployed explicitly in the
+      runbook order with no Blueprint sync
+- Deploy readback: `deploy/deploy-status.txt`. Render workflow runtime proof,
+  run separately per the 2026-08-12 disposition:
+  `deploy/workflow-runtime-proof.json` (`status=succeeded`,
+  `provider_mode=live_provider`)
 
 ## Environment Proof
 
-- [ ] Render readback audit run and drift reported by named key, not by count
+- [x] Render readback audit run and drift reported by named key, not by count:
+      `release-config-audit --expect-mode real-workflow` reported every env key
+      `ok` on all three services (zero env drift), API mode pairs matched
+      real-workflow, `workflow_env_status=ready`. The only drift rows were
+      `autoDeployTrigger expected=checksPass actual=off` on all three services,
+      the deliberate accepted state below. Warmup components (API health,
+      readiness, stale-job scan with zero stale, frontend, mode readback) all
+      passed; the monolithic wrapper stops at that accepted audit reading and
+      was not recorded as green (`deploy/warmup-components.txt`).
 
 No environment change is required by this promotion. `autoDeployTrigger` is
 expected to read `off` on all three services against a repository value of
 `checksPass`. That is deliberate and accepted, not drift to correct.
+
+## Canary, both surfaces
+
+Run 2026-08-16 as dispatched `Private Alpha Canary` workflow run
+[31967388628](https://github.com/lagarcess/argus/actions/runs/31967388628) at
+head `31343882`, with the dedicated canary identity.
+
+- **Authenticated browser journey: PASSED.** Spanish Golden Path completed one
+  real workflow backtest at the exact deployed SHA, zero console and page
+  errors, finalized evidence identity, decision captured
+  (`canary/authenticated-browser.json`).
+- **Release coherence: FAILED at `warmup: warmup_probe_failed`, structurally.**
+  Its own pre-warmup probes passed: all three deployed SHAs matched `31343882`,
+  health, readiness, stale-job scan, and frontend green. The wrapper then
+  stopped because the config audit folds the three accepted
+  `autoDeployTrigger off vs checksPass` rows into its overall status. This
+  surface cannot report green while live triggers are deliberately manual
+  against a repository value of `checksPass`; the same is true for every
+  scheduled canary run until the founder either enables `checksPass` on all
+  three or the audit learns an accepted-manual state. The two sub-proofs the
+  surface never reached were covered separately: the Render workflow runtime
+  proof passed (`deploy/workflow-runtime-proof.json`), and the API
+  signup-denial probe was deliberately not reproduced by hand outside the
+  script's cleanup traps, so it remains outstanding for the first green
+  coherence run (`canary/release-coherence.json`,
+  `canary/release-coherence-capture.json`).
+
+A local coherence attempt before the dispatch failed identically, and a local
+browser-journey attempt failed closed at
+`browser_auth: canary_identity_is_not_dedicated` because the dedicated canary
+credentials exist only in GitHub secrets; both recorded in the operator log,
+neither spent a paid journey.
 
 ## Post-Deploy Verification
 
 Run against production before announcing. These are the behaviors this
 promotion claims, and each failed before it.
 
-- [ ] On a card with three assets, "remove AAPL" removes it and re-runs
-- [ ] "add TSLA" keeps all four
-- [ ] "remove AAPL and replace with TSLA and GOOGL" lands every operation
-- [ ] "find me trending crypto" returns searched rows, not an explanation
-- [ ] The same in Spanish
-- [ ] A DCA run's return row reads as return on contributions
+Run 2026-08-16 against production at `31343882` by scripted Playwright with an
+operator session; captures in `post-deploy/`. Note the identity confound: the
+operator account is admin on hosted, so admin-gated memory exposure is in play
+for these draws while the eval identities never had it.
+
+- [x] On a card with three assets, "remove AAPL" removes it and re-runs:
+      MSFT+NVDA card re-ran to completion, +96.1% (`check1/`)
+- [x] "add TSLA" keeps all four: AAPL, MSFT, NVDA, TSLA re-ran, +72.4%
+      (`check2/`)
+- [x] "remove AAPL and replace with TSLA and GOOGL" lands every operation:
+      MSFT, NVDA, TSLA, GOOGL re-ran, +72.9% (`check3/`)
+- [ ] "find me trending crypto" returns searched rows, not an explanation:
+      0 of 3 draws rendered rows in English. Every draw did execute the search
+      (real trending names surfaced: Worldcoin, Lighter, Pudgy Penguins), so the
+      #515 routing fix is live, but none of the serving day's English candidates
+      resolved to a tradable asset and the turn ended in a re-ask
+      (`check4/`, `check4b/`, `check4c/`)
+- [x] The same in Spanish: searched row rendered, `Probar AAVE/USD` with price,
+      volume, and sources, 5 fuentes (`check5b/`; first Spanish draw captured
+      mid-stream and is inconclusive, kept for completeness)
+- [x] A DCA run's return row reads as return on contributions: card reads
+      "+10.2% retorno sobre aportes" with $500 monthly and $0 starting capital
+      (`check6/`). Observation, not part of this check: the Quick read prose
+      under that card mixed English into a Spanish workspace, the #507 prose
+      class on the DCA readout path
 - [ ] "backtest weekly options on apple from 2024-01-01 to 2024-12-31" names
-      the limit and keeps the asset and window
+      the limit and keeps the asset and window: 1 of 3 draws correct (named
+      the equities-only limit, kept AAPL and offered the same period). The
+      other 2 draws returned a fabricated "weekly options strategy" stat
+      readout over a trailing year ending on the serving date, the
+      knowledge-answer hijack class; the gate's English eval case passed at the
+      candidate, so this residual is distributional in production
+      (`check7/`, `check7b/`, `check7c/`)
+
+Five of seven verified; the two open boxes are measured distributions recorded
+above, in the same defect classes the manifest already names as residuals, and
+neither is a candidate-only regression relative to the gate evidence.
 
 ## Release Decision
 

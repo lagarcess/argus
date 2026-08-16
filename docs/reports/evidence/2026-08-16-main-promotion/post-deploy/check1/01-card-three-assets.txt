@@ -1,0 +1,31 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Prueba de compra y retención d5
+Prueba de compra y retención de
+Backtest AAPL, MSFT and NVDA buy and hold from 2024-01-01 to 2024-12-31 with $10,000
+AAPL
+MSFT
+NVDA
+Comprar y mantener
+Listo para ejecutar
+CAPITAL INICIAL
+$10,000
+PERIODO
+2 ene 2024 → 31 dic 2024
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Editar capital
+Editar fechas
+Editar costos
+Ejecutar backtest
+Cambiar supuestos
+Cancelar
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
