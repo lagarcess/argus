@@ -19,6 +19,10 @@ cases:
         anchor_symbols: []
         category_description_includes_any: ["cybersecurity", "cyber"]
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -34,6 +38,10 @@ cases:
         relationship: peer
         anchor_symbols: ["NVDA"]
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -49,6 +57,10 @@ cases:
         relationship: comparison
         anchor_symbols: ["COST"]
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -65,6 +77,10 @@ cases:
         anchor_symbols: []
         category_description_includes_any: ["ciberseguridad", "cybersecurity", "cyber"]
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria:
         ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
@@ -84,6 +100,10 @@ cases:
         category_description_includes_any: ["ipo", "public"]
         needs_current_facts: true
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -102,6 +122,11 @@ cases:
         category_description_includes_any: ["trend", "crypto"]
         needs_current_facts: true
       stage_outcomes: ["ready_to_respond"]
+      # This case passed both promotion runs while the live reply named
+      # nothing and offered nothing. Routing was never the failure.
+      offered:
+        actionable: true
+        min_discovery_rows: 1
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -125,6 +150,10 @@ cases:
         category_description_includes_any: ["pharma", "pharmaceutical"]
         needs_current_facts: true
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -143,6 +172,10 @@ cases:
         category_description_includes_any: ["pharma", "pharmaceutical"]
         needs_current_facts: true
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 
@@ -169,6 +202,10 @@ cases:
         category_description_includes_any: ["farmac", "pharma"]
         needs_current_facts: true
       stage_outcomes: ["ready_to_respond"]
+      # A discovery turn that names nothing and offers
+      # nothing is a dead end, however it routed.
+      offered:
+        actionable: true
     prose_judge:
       criteria:
         ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
