@@ -155,7 +155,7 @@ def _bare_asset_answer_without_unevidenced_operation(
         return response
     if response.semantic_turn_act != "answer_pending_need":
         return response
-    if draft.asset_inclusions or draft.asset_exclusions:
+    if draft.asset_exclusions:
         return response
     prior = _current_artifact_strategy(request)
     prior_symbols = {
@@ -191,6 +191,15 @@ def _bare_asset_answer_without_unevidenced_operation(
         if (draft_symbol := _normalized_ticker_symbol(value)) is not None
     }
     if draft_symbols - {symbol}:
+        return response
+    # An inclusion role naming exactly the answered symbol is the same bare
+    # shape; anything beyond it means the turn stated more than the mention.
+    inclusion_symbols = {
+        inclusion_symbol
+        for value in draft.asset_inclusions
+        if (inclusion_symbol := _normalized_ticker_symbol(value)) is not None
+    }
+    if inclusion_symbols - {symbol}:
         return response
     field_provenance = dict(draft.field_provenance or {})
     field_provenance.pop("asset_universe_operation", None)

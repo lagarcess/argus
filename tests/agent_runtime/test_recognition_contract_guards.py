@@ -532,6 +532,24 @@ class TestBareAssetAnswerOperationLabel:
 
         return resolve
 
+    def test_a_bare_answer_typed_as_its_own_inclusion_is_still_bare(self) -> None:
+        """Live tip4 trace: the model sometimes types the bare answer as
+        asset_inclusions=["TSLA"] alongside the guessed replace label; an
+        inclusion naming exactly the answered symbol is the same bare shape."""
+        from argus.agent_runtime.interpreter.readiness_helpers import (
+            _bare_asset_answer_without_unevidenced_operation,
+        )
+
+        updated = _bare_asset_answer_without_unevidenced_operation(
+            response=self._response(asset_inclusions=["TSLA"]),
+            request=self._request(),
+            resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+        )
+        draft = updated.candidate_strategy_draft
+        assert draft.asset_universe_operation is None
+        assert draft.asset_inclusions == ["TSLA"]
+        assert "bare_asset_answer_operation_label_ignored" in updated.reason_codes
+
     def test_a_guessed_label_on_a_bare_answer_is_cleared(self) -> None:
         from argus.agent_runtime.interpreter.readiness_helpers import (
             _bare_asset_answer_without_unevidenced_operation,
