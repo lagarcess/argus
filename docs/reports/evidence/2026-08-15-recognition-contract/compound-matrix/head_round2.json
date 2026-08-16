@@ -301,25 +301,29 @@
   "tier": "t3",
   "language": "es-419",
   "prompt": "quita AAPL, agrega TSLA, cambia el benchmark a QQQ y usa $5,000",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+   "assets",
+   "benchmark",
+   "capital",
+   "stage_not_confirmation_ready"
+  ],
   "observed": {
    "assets": [
+    "AAPL",
     "MSFT",
-    "NVDA",
-    "TSLA"
+    "NVDA"
    ],
-   "benchmark": "QQQ",
-   "capital": 5000.0,
+   "benchmark": "SPY",
+   "capital": 1000.0,
    "start": "2024-01-01",
    "end": "2024-12-31",
    "stage_outcomes": [
     "needs_clarification",
     "await_user_reply",
-    "ready_for_confirmation",
-    "await_approval"
+    "ready_to_respond"
    ],
-   "intent": "backtest_execution",
+   "intent": "conversation_followup",
    "reason_codes_present": true
   }
  }

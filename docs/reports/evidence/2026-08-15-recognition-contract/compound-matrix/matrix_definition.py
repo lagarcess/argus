@@ -29,6 +29,18 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(Path(".env"), override=False)
 
+import argus  # noqa: E402
+
+_EXPECTED_SIDE = sys.argv[2] if len(sys.argv) > 2 else ""
+_SIDE_ARG = sys.argv[1] if len(sys.argv) > 1 else ""
+_IS_BASELINE = "baseline" in (_SIDE_ARG, _EXPECTED_SIDE)
+_ARGUS_PATH = str(Path(argus.__file__).resolve())
+if _IS_BASELINE:
+    assert "argus-baseline" in _ARGUS_PATH, f"baseline side imported {_ARGUS_PATH}"
+else:
+    assert "argus-baseline" not in _ARGUS_PATH, f"head side imported {_ARGUS_PATH}"
+print(f"import-provenance ok: {_ARGUS_PATH}", file=sys.stderr)
+
 from tests.evals.measurement_eval_harness import (  # noqa: E402
     load_eval_cases,
     run_eval_case,

@@ -4,10 +4,14 @@
   "tier": "t1",
   "language": "en",
   "prompt": "remove AAPL",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+   "assets",
+   "stage_not_confirmation_ready"
+  ],
   "observed": {
    "assets": [
+    "AAPL",
     "MSFT",
     "NVDA"
    ],
@@ -18,10 +22,9 @@
    "stage_outcomes": [
     "needs_clarification",
     "await_user_reply",
-    "ready_for_confirmation",
-    "await_approval"
+    "ready_to_respond"
    ],
-   "intent": "backtest_execution",
+   "intent": "conversation_followup",
    "reason_codes_present": true
   }
  },
@@ -197,17 +200,22 @@
   "tier": "t2",
   "language": "en",
   "prompt": "change the benchmark to QQQ and change the start to April 1, 2024",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+   "benchmark",
+   "start",
+   "assets_kept"
+  ],
   "observed": {
    "assets": [
     "AAPL",
     "MSFT",
-    "NVDA"
+    "NVDA",
+    "QQQ"
    ],
-   "benchmark": "QQQ",
+   "benchmark": "SPY",
    "capital": 1000.0,
-   "start": "2024-04-01",
+   "start": "2024-01-01",
    "end": "2024-12-31",
    "stage_outcomes": [
     "needs_clarification",
@@ -250,28 +258,25 @@
   "tier": "t3",
   "language": "en",
   "prompt": "remove AAPL, add TSLA, and change the start to April 1, 2024",
-  "passed": false,
-  "failed_checks": [
-   "assets",
-   "start",
-   "stage_not_confirmation_ready"
-  ],
+  "passed": true,
+  "failed_checks": [],
   "observed": {
    "assets": [
-    "AAPL",
     "MSFT",
-    "NVDA"
+    "NVDA",
+    "TSLA"
    ],
    "benchmark": "SPY",
    "capital": 1000.0,
-   "start": "2024-01-01",
+   "start": "2024-04-01",
    "end": "2024-12-31",
    "stage_outcomes": [
     "needs_clarification",
     "await_user_reply",
-    "ready_to_respond"
+    "ready_for_confirmation",
+    "await_approval"
    ],
-   "intent": "conversation_followup",
+   "intent": "backtest_execution",
    "reason_codes_present": true
   }
  },
@@ -311,25 +316,29 @@
   "tier": "t3",
   "language": "es-419",
   "prompt": "quita AAPL, agrega TSLA, cambia el benchmark a QQQ y usa $5,000",
-  "passed": true,
-  "failed_checks": [],
+  "passed": false,
+  "failed_checks": [
+   "assets",
+   "benchmark",
+   "capital",
+   "stage_not_confirmation_ready"
+  ],
   "observed": {
    "assets": [
+    "AAPL",
     "MSFT",
-    "NVDA",
-    "TSLA"
+    "NVDA"
    ],
-   "benchmark": "QQQ",
-   "capital": 5000.0,
+   "benchmark": "SPY",
+   "capital": 1000.0,
    "start": "2024-01-01",
    "end": "2024-12-31",
    "stage_outcomes": [
     "needs_clarification",
     "await_user_reply",
-    "ready_for_confirmation",
-    "await_approval"
+    "ready_to_respond"
    ],
-   "intent": "backtest_execution",
+   "intent": "conversation_followup",
    "reason_codes_present": true
   }
  }
