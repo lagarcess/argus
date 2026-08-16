@@ -220,7 +220,6 @@ class TestReviewHardening:
         # The resolver owns the displayed identity even when it corroborates.
         assert validated[0].name == "CrowdStrike Holdings"
 
-
     def test_ticker_collision_with_an_unrelated_company_is_dropped(self) -> None:
         """A real ticker paired with a different company must not be selectable.
 
@@ -337,3 +336,96 @@ class TestReviewHardening:
         )
         assert [item.symbol for item in validated] == ["CSCO"]
         assert len(unverified) == 2
+
+
+def _crypto_extraction() -> DiscoveryExtraction:
+    return DiscoveryExtraction(
+        candidates=[
+            ExtractedCandidate(
+                name="Ethereum",
+                symbol_guess="ETH",
+                reason_text="trending",
+                source_indices=[0],
+            ),
+            ExtractedCandidate(
+                name="Worldcoin",
+                symbol_guess="WLD",
+                reason_text="trending",
+                source_indices=[0],
+            ),
+        ]
+    )
+
+
+def test_pair_named_crypto_is_not_treated_as_a_mismatch() -> None:
+    # Kraken names most rows "ETH/USD", which says nothing about the entity.
+    # Judging "Ethereum" against it can only fail, and every coin called by
+    # its proper name was being dropped as a wrong-entity match.
+    def resolve(symbol: str) -> Any:
+        return _Asset(canonical_symbol=symbol, asset_class="crypto", name=f"{symbol}/USD")
+
+    validated, unverified, uncorroborated = validated_candidates(
+        _crypto_extraction(),
+        packet=_packet(),
+        resolve=resolve,
+        max_candidates=5,
+        asset_class_hint="crypto",
+    )
+
+    assert [item.symbol for item in validated] == ["ETH", "WLD"]
+    assert uncorroborated == []
+    assert unverified == []
+
+
+def test_a_listed_asset_we_cannot_price_is_not_offered() -> None:
+    # WLD and PENGU resolve in the catalog and return no bars. Offering them
+    # would move the dead end to the moment the user taps the row.
+    def resolve(symbol: str) -> Any:
+        return _Asset(canonical_symbol=symbol, asset_class="crypto", name=f"{symbol}/USD")
+
+    validated, unverified, uncorroborated = validated_candidates(
+        _crypto_extraction(),
+        packet=_packet(),
+        resolve=resolve,
+        max_candidates=5,
+        asset_class_hint="crypto",
+        is_priceable=lambda symbol, asset_class: symbol != "WLD",
+    )
+
+    assert [item.symbol for item in validated] == ["ETH"]
+    # Named with the true reason: we could not confirm it as testable.
+    assert unverified == ["Worldcoin"]
+    assert uncorroborated == []
+
+
+def test_a_real_company_name_still_has_to_corroborate() -> None:
+    # The pair-shorthand relaxation must not weaken the collision gate that
+    # keeps a gold miner from answering a Tron question.
+    extraction = DiscoveryExtraction(
+        candidates=[
+            ExtractedCandidate(
+                name="Tron",
+                symbol_guess="TRX",
+                reason_text="trending",
+                source_indices=[0],
+            )
+        ]
+    )
+
+    def resolve(symbol: str) -> Any:
+        return _Asset(
+            canonical_symbol=symbol,
+            asset_class="equity",
+            name="Barrick Gold Corporation",
+        )
+
+    validated, _unverified, uncorroborated = validated_candidates(
+        extraction,
+        packet=_packet(),
+        resolve=resolve,
+        max_candidates=5,
+        asset_class_hint=None,
+    )
+
+    assert validated == []
+    assert uncorroborated == ["Tron"]

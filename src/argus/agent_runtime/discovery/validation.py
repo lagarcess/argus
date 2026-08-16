@@ -5,6 +5,7 @@ from typing import Any, Callable
 from loguru import logger
 
 from argus.agent_runtime.asset_text_grounding import (
+    asset_name_is_pair_shorthand,
     text_corroborates_resolved_asset,
 )
 from argus.agent_runtime.discovery.contracts import (
@@ -46,6 +47,12 @@ def _resolution_matches_request(
     named_entity = "".join(char for char in display_name if char.isalnum()).upper()
     bare_symbol = "".join(char for char in symbol_guess if char.isalnum()).upper()
     if named_entity and named_entity != bare_symbol:
+        if asset_name_is_pair_shorthand(resolved):
+            # "ETH/USD" names no entity, so "Ethereum" can never match it and
+            # every coin called by its proper name would be dropped as a
+            # mismatch. With no name evidence either way, the request's own
+            # class is the only signal, exactly as for a bare ticker.
+            return asset_class_hint is None or asset_class == asset_class_hint
         return text_corroborates_resolved_asset(display_name, resolved)
     # The extraction named no entity beyond the ticker, so there is nothing to
     # corroborate against. The request's own class hint is the only remaining
@@ -61,6 +68,7 @@ def validated_candidates(
     max_candidates: int,
     asset_class_hint: str | None = None,
     require_source_evidence: bool = True,
+    is_priceable: Callable[[str, str], bool] | None = None,
 ) -> tuple[list[ValidatedCandidate], list[str], list[str]]:
     """Independently verify every extracted candidate before it can act.
 
@@ -136,6 +144,18 @@ def validated_candidates(
         # Grounded means source-backed: a resolvable ticker with no surviving
         # source evidence must not become selectable.
         if require_source_evidence and not valid_source_indices:
+            _note_unverified(unverified, display_name or symbol_guess)
+            continue
+        if is_priceable is not None and not is_priceable(canonical, str(asset_class)):
+            # The catalog lists it, but a row we cannot price is a row we
+            # cannot backtest. Offering it would only move the dead end to
+            # the moment the user taps it.
+            logger.info(
+                "Discovery candidate dropped: listed but no price history",
+                symbol=canonical,
+                extracted_name=display_name,
+                asset_class=str(asset_class),
+            )
             _note_unverified(unverified, display_name or symbol_guess)
             continue
         seen_symbols.add(canonical)

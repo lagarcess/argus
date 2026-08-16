@@ -211,6 +211,7 @@ async def discovery_operation_result(
             resolve=resolve_asset,
             max_candidates=config.max_candidates,
             asset_class_hint=request.asset_class_hint,
+            is_priceable=_candidate_is_priceable,
         )
     )
     usage.update(
@@ -240,8 +241,10 @@ async def discovery_operation_result(
             language=language,
             can_request_search=False,
             usage=usage,
+            # Only names we genuinely could not offer. A name dropped because
+            # it resolved to a different entity says nothing true about the
+            # asset the user meant, and calling it untestable would be false.
             found_unusable_names=unverified,
-            found_unmatched_names=uncorroborated,
             recovery_on_empty=False,
         )
         if fallback is not None:
@@ -318,7 +321,6 @@ async def _model_knowledge_result(
     can_request_search: bool,
     usage: dict[str, Any] | None = None,
     found_unusable_names: list[str] | None = None,
-    found_unmatched_names: list[str] | None = None,
     recovery_on_empty: bool = True,
 ) -> StageResult | None:
     """Model knowledge in, resolver-verified rows out; zero sources in the
@@ -340,13 +342,18 @@ async def _model_knowledge_result(
             language=language,
         )
     packet = _model_knowledge_packet()
-    validated, unverified, uncorroborated = validated_candidates(
-        extraction,
-        packet=packet,
-        resolve=resolve_asset,
-        max_candidates=max_candidates,
-        asset_class_hint=request.asset_class_hint,
-        require_source_evidence=False,
+    # Sync resolver and price-probe lookups: off the loop, or naming rows
+    # stalls every other stream on this worker.
+    validated, unverified, uncorroborated = await asyncio.to_thread(
+        lambda: validated_candidates(
+            extraction,
+            packet=packet,
+            resolve=resolve_asset,
+            max_candidates=max_candidates,
+            asset_class_hint=request.asset_class_hint,
+            require_source_evidence=False,
+            is_priceable=_candidate_is_priceable,
+        )
     )
     if not validated:
         if not recovery_on_empty:
@@ -363,7 +370,7 @@ async def _model_knowledge_result(
     # A name the search surfaced is the user's own subject by construction:
     # they asked for the category it came back under, so it is named without
     # the message-echo gate the ordinary drop lists go through.
-    searched_names = list(found_unusable_names or []) + list(found_unmatched_names or [])
+    searched_names = list(found_unusable_names or [])
     voiced = await _voiced_discovery_response(
         request=request,
         candidates=validated,
@@ -417,6 +424,36 @@ async def _model_knowledge_result(
         decision=decision,
         stage_patch=stage_patch,
     )
+
+
+_PRICEABILITY_PROBE_DAYS = 30
+
+
+def _candidate_is_priceable(symbol: str, asset_class: str) -> bool:
+    """Can Argus actually pull bars for this row?
+
+    The catalog and the price feed do not agree: Kraken lists coins we have
+    no history for, and a row the user taps has to survive the backtest, not
+    just the resolver. One short recent window is the cheapest honest test.
+    """
+    from datetime import timedelta
+
+    from argus.domain.market_data.provider import fetch_price_series
+
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=_PRICEABILITY_PROBE_DAYS)
+    try:
+        series = fetch_price_series(symbol, asset_class, start, end, "1d")
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(
+            "Discovery priceability probe failed",
+            symbol=symbol,
+            asset_class=asset_class,
+            error=str(exc),
+        )
+        return False
+    values = series.tolist() if hasattr(series, "tolist") else list(series or [])
+    return sum(1 for value in values if value is not None) >= 2
 
 
 def _model_knowledge_packet() -> SearchResultPacket:
