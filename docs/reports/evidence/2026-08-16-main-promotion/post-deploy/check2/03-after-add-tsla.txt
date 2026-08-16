@@ -1,0 +1,138 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Prueba de compra y retención de
+Prueba de compra y retención de ya está lista.
+Backtest AAPL, MSFT and NVDA buy and hold from 2024-01-01 to 2024-12-31 with $10,000
+AAPL
+MSFT
+NVDA
+Comprar y mantener
+Ejecución completa
+CAPITAL INICIAL
+$10,000
+PERIODO
+2 ene 2024 → 31 dic 2024
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Ejecutar backtest
+AAPL
+MSFT
+NVDA
+Comprar y mantener
+
+2 ene 2024 → 31 dic 2024 · Datos diarios
+
+Simulación completa
+	
+	
+
+	
+	
+TradingView Lightweight Charts
+1M
+3M
+Todo
+Detalles del rango
+
+Período visible: 2 ene 2024 al 31 dic 2024.
+
+Valor final
+
+$17,571
+
++$7,571 ganancia · +75.7% rendimiento total
+
+Comparado con SPY
+Superó por 51.7 puntos porcentuales
+Peor caída
+-19.8%
+
+Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+
+Ver detalles
+Explicar resultado
+Ajustar idea
+Agregar decisión
+LECTURA RÁPIDA
+
+Entre el 2 de enero y el 31 de diciembre de 2024, una cartera de igual peso en AAPL, MSFT y NVDA, comprada al inicio y mantenida hasta el cierre, rindió un +75.7%. Eso superó al SPY por 51.7 puntos porcentuales, que cerró el año en +24.0%. Es un resultado limpio de comprar y mantener, sin comisiones ni deslizamiento, y usando solo datos diarios. La comparación es de retorno, no de atribución causal
+
+add TSLA
+AAPL
+MSFT
+NVDA
+TSLA
+Comprar y mantener
+Ejecución completa
+CAPITAL INICIAL
+$10,000
+PERIODO
+2 ene 2024 → 31 dic 2024
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Ejecutar backtest
+AAPL
+MSFT
+NVDA
+TSLA
+Comprar y mantener
+
+2 ene 2024 → 31 dic 2024 · Datos diarios
+
+Simulación completa
+	
+	
+
+	
+	
+TradingView Lightweight Charts
+1M
+3M
+Todo
+Detalles del rango
+
+Período visible: 2 ene 2024 al 31 dic 2024.
+
+Valor final
+
+$17,241
+
++$7,241 ganancia · +72.4% rendimiento total
+
+Comparado con SPY
+Superó por 48.4 puntos porcentuales
+Peor caída
+-21.1%
+
+Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+
+Ver detalles
+Explicar resultado
+Ajustar idea
+Agregar decisión
+LECTURA RÁPIDA
+
+La cartera de AAPL, MSFT, NVDA y TSLA en compra y retención durante 2024 rindió un 72.4%, superando al SPY por 48.4 puntos porcentuales
+
+Se probó comprar y mantener AAPL, MSFT, NVDA y TSLA en partes iguales desde el 2 de enero hasta el 31 de diciembre de 2024, con un capital inicial de 10,000 USD
+El rendimiento combinado de estos cuatro activos duplicó con creces el del índice de referencia, lo que sugiere que una selección concentrada en tecnología de gran capitalización tuvo un año excepcional
+Se asume rebalanceo de peso igual al inicio y sin comisiones ni deslizamiento
+Este resultado es una comparación de retornos, no una atribución causal; solo se usaron datos diarios
+QUÉ PROBAR DESPUÉS
+↳
+Probar otro rango de fechas·Superó la referencia por 48.4 puntos
+↳
+Probar el mismo enfoque en un activo similar·MSFT
+↳
+Probar compras mensuales recurrentes
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

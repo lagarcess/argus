@@ -1,0 +1,76 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Compra recurrente de SPY
+Compra recurrente de SPY ya está lista.
+DCA $500 monthly into SPY from 2024-01-01 to 2024-12-31
+SPY
+Compras recurrentes
+Ejecución completa
+APORTE
+$500 cada mes
+PERIODO
+2 ene 2024 → 31 dic 2024
+Capital inicial
+$0
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Ejecutar backtest
+SPY
+Compras recurrentes
+
+2 ene 2024 → 31 dic 2024 · Datos diarios
+
+Simulación completa
+	
+	
+
+	
+	
+TradingView Lightweight Charts
+3M
+Todo
+Detalles del rango
+
+Período visible: 2 ene 2024 al 31 dic 2024.
+
+Valor final
+
+$6,614
+
++$614 ganancia · +10.2% retorno sobre aportes
+
+Comparado con SPY
+En línea con la referencia
+Peor caída
+-8.4%
+
+Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+
+Ver detalles
+Explicar resultado
+Ajustar idea
+Agregar decisión
+LECTURA RÁPIDA
+
+The strategy returned 10.2% while SPY returned 10.2% for the comparison window, so it was effectively in line with the benchmark.
+
+Tested: SPY recurring buys over 2 de enero de 2024 al 31 de diciembre de 2024. Rule: buy recurring contributions on a monthly cadence and hold.
+What that means: Use this as an evidence check for the confirmed rule before refining it.
+Assumptions: Aporte: $500 cada mes. Capital inicial: $0. Fracciones de acciones, nada queda en efectivo. User-set options: date range, temporalidad, benchmark symbol, capital amount, starting capital, cadence.
+Keep in mind: This is a return comparison, not causal attribution. Solo datos diarios. Cada aporte compra al primer precio diario disponible de su período, así que uno que cae en un día sin mercado compra el siguiente día de...
+QUÉ PROBAR DESPUÉS
+↳
+Probar otro rango de fechas
+↳
+Probar el mismo enfoque en un activo similar
+↳
+Probar otro calendario de aportes
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

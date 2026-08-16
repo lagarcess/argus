@@ -1,0 +1,153 @@
+Argus private-launch warmup
+Timeout: 180s
+
+Warming API health: https://api.arguschat.ai/health
+OK: API health responded
+Warming product readiness: https://api.arguschat.ai/internal/readiness?force=true
+OK: product readiness responded
+Checking for stale queued/running backtest jobs
+destructive database target: database_host=aws-1-us-east-2.pooler.supabase.com supabase_host=lgdhvepyrzbnscqssgqq.supabase.co
+{"error_count": 0, "errors": [], "reconciled_count": 0, "scanned_count": 0, "stale_count": 0, "status": "ready", "thresholds": {"queued_age_seconds": 900, "running_age_seconds": 900}, "unresolved_count": 0, "unresolved_jobs": []}
+Warming frontend: https://arguschat.ai
+OK: frontend responded
+Checking release config for API mode: real-workflow
+Argus release config audit
+expected_mode=real-workflow
+release_profile_status=ready
+release_profile_hash=535a9b2f2f1026db945decd7bc2005043d3b09843776a2cd38a73506a52db9ba
+ok argus-api:ALPACA_PAPER_TRADING=true
+ok argus-api:APP_ENV=production
+ok argus-api:ARGUS_APP_ORIGIN=https://arguschat.ai
+ok argus-api:ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=true
+ok argus-api:ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT=10
+ok argus-api:ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT=5
+ok argus-api:ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=true
+ok argus-api:ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT=2
+ok argus-api:ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT=1
+ok argus-api:ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job
+ok argus-api:ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true
+ok argus-api:ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof
+ok argus-api:ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b
+ok argus-api:ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash
+ok argus-api:ARGUS_CHECKPOINTER_MODE=postgres
+ok argus-api:ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash
+ok argus-api:ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b
+ok argus-api:ARGUS_CONTEXT_PACKETS_ENABLED=true
+ok argus-api:ARGUS_CONTEXT_PACKET_BUDGET_SECONDS=4
+ok argus-api:ARGUS_CORS_ALLOW_ORIGINS=https://argus-app-suz5.onrender.com,https://arguschat.ai,https://www.arguschat.ai
+ok argus-api:ARGUS_DEV_MEMORY_FALLBACK=false
+ok argus-api:ARGUS_DISCOVERY_SEARCH_PROVIDER=perplexity_direct
+ok argus-api:ARGUS_ENABLE_EXECUTION_REALISM=true
+ok argus-api:ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false
+ok argus-api:ARGUS_ENABLE_PERSONALIZATION_MEMORY=true
+ok argus-api:ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED=false
+ok argus-api:ARGUS_IN_PLACE_CARD_EDITS_ENABLED=true
+ok argus-api:ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider
+ok argus-api:ARGUS_MEMORY_EMBEDDING_DIMENSIONS=1024
+ok argus-api:ARGUS_MEMORY_EMBEDDING_MODEL=pplx-embed-v1-0.6b
+ok argus-api:ARGUS_MEMORY_EMBEDDING_TIMEOUT_SECONDS=8.0
+ok argus-api:ARGUS_MEMORY_VECTOR_COLLECTION=argus_memory_vectors
+ok argus-api:ARGUS_MOCK_AUTH=false
+ok argus-api:ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30
+ok argus-api:ARGUS_PERSISTENCE_MODE=supabase
+ok argus-api:ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true
+ok argus-api:ARGUS_READINESS_ASSET_TIMEOUT_SECONDS=25
+ok argus-api:ARGUS_RESEARCH_GLOBAL_DAILY_CEILING=5000
+ok argus-api:ARGUS_RESEARCH_RAIL_ENABLED=true
+ok argus-api:ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS=15
+ok argus-api:ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS=180
+ok argus-api:ARGUS_STRUCTURED_FALLBACK_MODEL=anthropic/claude-haiku-4.5
+ok argus-api:ARGUS_STRUCTURED_MODEL=x-ai/grok-4.3
+ok argus-api:ARGUS_TITLE_AUTOGEN_ENABLED=true
+ok argus-api:ARGUS_TITLE_AUTOGEN_TIMEOUT_MS=250
+ok argus-api:ARGUS_UTILITY_FALLBACK_MODEL=qwen/qwen3.5-9b
+ok argus-api:ARGUS_UTILITY_MODEL=google/gemini-2.5-flash-lite
+ok argus-api:MARKET_DATA_CACHE_TTL=43200
+ok argus-api:POETRY_VERSION=2.1.3
+ok argus-api:POSTHOG_REGION=us
+ok argus-api:ALPACA_API_KEY=<redacted-present>
+ok argus-api:ALPACA_SECRET_KEY=<redacted-present>
+ok argus-api:ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD=<redacted-present>
+ok argus-api:ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY=<redacted-present>
+ok argus-api:ARGUS_OPS_TOKEN=<redacted-present>
+ok argus-api:ARGUS_PROD_OPENROUTER_API_KEY=<redacted-present>
+ok argus-api:ARGUS_VISITOR_KEY_SECRET=<present>
+ok argus-api:DATABASE_URL=<redacted-present>
+ok argus-api:PERPLEXITY_API_KEY=<present>
+ok argus-api:POSTHOG_PROJECT_TOKEN=<present>
+ok argus-api:RENDER_API_KEY=<redacted-present>
+ok argus-api:SUPABASE_ANON_KEY=<present>
+ok argus-api:SUPABASE_JWT_SECRET=<redacted-present>
+ok argus-api:SUPABASE_SERVICE_ROLE_KEY=<redacted-present>
+ok argus-api:SUPABASE_URL=<present>
+ok argus-api:ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=true
+ok argus-api:ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=true
+ok argus-api:ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true
+ok argus-api:RENDER_API_KEY=<redacted-present>
+ok argus-app:ARGUS_APP_ORIGIN=https://arguschat.ai
+ok argus-app:NEXT_PUBLIC_APP_ENV=production
+ok argus-app:NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL=support@get-argus.com
+ok argus-app:NEXT_PUBLIC_ENABLE_SPANISH=true
+ok argus-app:NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED=false
+ok argus-app:NEXT_PUBLIC_MOCK_AUTH=false
+ok argus-app:NEXT_PUBLIC_OMNISEARCH_ENABLED=true
+ok argus-app:NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=true
+ok argus-app:NEXT_PUBLIC_ARGUS_API_URL=<present>
+ok argus-app:NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY=<present>
+ok argus-app:NEXT_PUBLIC_SUPABASE_ANON_KEY=<present>
+ok argus-app:NEXT_PUBLIC_SUPABASE_URL=<present>
+drift argus-api:autoDeployTrigger expected=checksPass actual=off
+drift argus-app:autoDeployTrigger expected=checksPass actual=off
+drift argus-backtests:autoDeployTrigger expected=checksPass actual=off
+ok argus-backtests:ALPACA_PAPER_TRADING=true
+ok argus-backtests:APP_ENV=production
+ok argus-backtests:ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300
+ok argus-backtests:ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b
+ok argus-backtests:ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash
+ok argus-backtests:ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash
+ok argus-backtests:ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b
+ok argus-backtests:ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider
+ok argus-backtests:ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30
+ok argus-backtests:ARGUS_RENDER_WORKFLOW_PROOF_TASK=argus-backtests/workflow_proof
+ok argus-backtests:ARGUS_STRUCTURED_FALLBACK_MODEL=anthropic/claude-haiku-4.5
+ok argus-backtests:ARGUS_STRUCTURED_MODEL=x-ai/grok-4.3
+ok argus-backtests:ARGUS_UTILITY_FALLBACK_MODEL=qwen/qwen3.5-9b
+ok argus-backtests:ARGUS_UTILITY_MODEL=google/gemini-2.5-flash-lite
+ok argus-backtests:ARGUS_WORKFLOW_PROOF_PLAN=starter
+ok argus-backtests:ENABLE_MARKET_DATA_CACHE=false
+ok argus-backtests:POETRY_VERSION=2.1.3
+ok argus-backtests:ALPACA_API_KEY=<redacted-present>
+ok argus-backtests:ALPACA_SECRET_KEY=<redacted-present>
+ok argus-backtests:ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY=<redacted-present>
+ok argus-backtests:ARGUS_PROD_OPENROUTER_API_KEY=<redacted-present>
+ok argus-backtests:ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>
+ok argus-backtests:APP_ENV=production
+ok argus-backtests:ARGUS_WORKFLOW_DATABASE_URL=<redacted-present>
+ok argus-backtests:ARGUS_RENDER_WORKFLOW_PROOF_TASK=argus-backtests/workflow_proof
+ok argus-backtests:ARGUS_WORKFLOW_PROOF_PLAN=starter
+ok argus-backtests:POETRY_VERSION=2.1.3
+ok argus-backtests:ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300
+ok argus-backtests:ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider
+ok argus-backtests:ENABLE_MARKET_DATA_CACHE=false
+ok argus-backtests:ALPACA_API_KEY=<redacted-present>
+ok argus-backtests:ALPACA_SECRET_KEY=<redacted-present>
+ok argus-backtests:ALPACA_PAPER_TRADING=true
+ok argus-backtests:ARGUS_PROD_OPENROUTER_API_KEY=<redacted-present>
+ok argus-backtests:ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY=<redacted-present>
+ok argus-backtests:ARGUS_UTILITY_MODEL=google/gemini-2.5-flash-lite
+ok argus-backtests:ARGUS_UTILITY_FALLBACK_MODEL=qwen/qwen3.5-9b
+ok argus-backtests:ARGUS_CHAT_MODEL=deepseek/deepseek-v4-flash
+ok argus-backtests:ARGUS_CHAT_FALLBACK_MODEL=qwen/qwen3.5-9b
+ok argus-backtests:ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=30
+ok argus-backtests:ARGUS_STRUCTURED_MODEL=x-ai/grok-4.3
+ok argus-backtests:ARGUS_STRUCTURED_FALLBACK_MODEL=anthropic/claude-haiku-4.5
+ok argus-backtests:ARGUS_CONTEXT_MODEL=openai/gpt-oss-120b
+ok argus-backtests:ARGUS_CONTEXT_FALLBACK_MODEL=deepseek/deepseek-v4-flash
+workflow_task=argus-backtests/workflow_proof
+real_workflow_task=argus-backtests/run_backtest_job
+env_fingerprint=20bccad6829431999f21c11fd010068ac0c46c39a2bd30f15dcb3345ca981b81
+workflow_env_fingerprint=f27047f438bbf0cf8fef87f6af86667c2b6d4aabe0f95211778cf1ff7bb57d1e
+autodeploy_fingerprint=9423f7276c20d3a3f2a86f1081da71d5936eb00af05d46c290ba2000d2fb5e41
+workflow_env_status=ready
+autodeploy_status=drift
+status=drift
