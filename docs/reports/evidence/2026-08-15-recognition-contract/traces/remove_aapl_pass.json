@@ -1,0 +1,1005 @@
+{
+ "case_id": "action_chip_change_asset_remove_aapl_issue_188",
+ "attempt": "a",
+ "status": "passed",
+ "failed_checks": [],
+ "typed_outcome": {
+  "intent": "backtest_execution",
+  "stage_outcomes": [
+   "needs_clarification",
+   "await_user_reply",
+   "ready_for_confirmation",
+   "await_approval"
+  ],
+  "assets": [
+   "MSFT",
+   "NVDA"
+  ],
+  "asset_class": "equity",
+  "requested_strategy_template": null,
+  "strategy_type": "buy_and_hold",
+  "entry_rule": null,
+  "exit_rule": null,
+  "rule_spec": null,
+  "date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "requested_date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "effective_date_range": {
+   "start": "2024-01-02",
+   "end": "2024-12-31"
+  },
+  "adjustment_reason": "calendar_alignment",
+  "benchmark_symbol": "SPY",
+  "capital_amount": 1000.0,
+  "starting_capital": null,
+  "recurring_contribution": null,
+  "contribution_period": null,
+  "launch_validation_code": null,
+  "missing_required_fields": [],
+  "fee_rate": null,
+  "slippage": null,
+  "cost_provenance": {},
+  "launch_execution_realism": null,
+  "capability_verdict": "executable",
+  "requested_field": null,
+  "clarification": null,
+  "semantic_turn_act": "answer_pending_need",
+  "asset_discovery": null
+ },
+ "route_receipts": [
+  {
+   "task": "clarification",
+   "tier": "chat",
+   "model": "deepseek/deepseek-v4-flash",
+   "fallback_model": "qwen/qwen3.5-9b",
+   "mode": "json_schema",
+   "schema_name": "ClarificationResponse",
+   "latency_ms": 2188,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1690,
+    "completion_tokens": 120,
+    "total_tokens": 1810,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0002702,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:02.306751+00:00"
+  },
+  {
+   "task": "interpretation_repair",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMAssetMentionExtraction",
+   "latency_ms": 1141,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 778,
+    "completion_tokens": 46,
+    "total_tokens": 824,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0009531,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:03.449365+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMInterpretationResponse",
+   "latency_ms": 17727,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 10400,
+    "completion_tokens": 1985,
+    "total_tokens": 12385,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0177609,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:22.002826+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 5525,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 3084,
+    "completion_tokens": 585,
+    "total_tokens": 3669,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0051159,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:27.998794+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "anthropic/claude-haiku-4.5",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 4235,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": true,
+   "token_usage": {
+    "prompt_tokens": 3912,
+    "completion_tokens": 357,
+    "total_tokens": 4269,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.005697,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:33.803105+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "AssetAnswerCandidateAudit",
+   "latency_ms": 7070,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1232,
+    "completion_tokens": 689,
+    "total_tokens": 1921,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0030609,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:40.940257+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "anthropic/claude-haiku-4.5",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "AssetAnswerCandidateAudit",
+   "latency_ms": 3653,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": true,
+   "token_usage": {
+    "prompt_tokens": 1354,
+    "completion_tokens": 320,
+    "total_tokens": 1674,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.002954,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:44.594659+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 3364,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 3084,
+    "completion_tokens": 332,
+    "total_tokens": 3416,
+    "cached_tokens": 3072,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0014594,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:48.025313+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "anthropic/claude-haiku-4.5",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 3450,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": true,
+   "token_usage": {
+    "prompt_tokens": 3912,
+    "completion_tokens": 315,
+    "total_tokens": 4227,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.005487,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:34:51.543160+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMInterpretationResponse",
+   "latency_ms": 14952,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 4599,
+    "completion_tokens": 1857,
+    "total_tokens": 6456,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.01025685,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:35:06.563855+00:00"
+  },
+  {
+   "task": "field_fidelity",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "StatedRunFieldFidelityAudit",
+   "latency_ms": 1017,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1988,
+    "completion_tokens": 49,
+    "total_tokens": 2037,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0024731,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:35:07.582276+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 4554,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 3065,
+    "completion_tokens": 519,
+    "total_tokens": 3584,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00492715,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:35:12.139720+00:00"
+  }
+ ],
+ "trace": [
+  {
+   "seam": "raw_model_response",
+   "n": 0,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "refine",
+    "requires_clarification": false,
+    "user_goal_summary": "Remove AAPL from the assets in the buy and hold strategy",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "language": "en",
+     "requested_strategy_template": null,
+     "strategy_type": "buy_and_hold",
+     "strategy_thesis": "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024.",
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_inclusions": [],
+     "asset_exclusions": [
+      "AAPL"
+     ],
+     "asset_universe_operation": "replace",
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "date_range_raw_text": null,
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": 1000.0,
+     "recurring_contribution": null,
+     "initial_capital": null,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "field_provenance": {},
+     "evidence_spans": {
+      "asset_universe": "remove AAPL"
+     },
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": null,
+    "uses_latest_result_context": null,
+    "confidence": 0.8,
+    "reason_codes": [],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "refine_current_idea",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "pending_refinement"
+   }
+  },
+  {
+   "seam": "after_response_ready",
+   "n": 1,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "refine",
+    "requires_clarification": false,
+    "user_goal_summary": "Remove AAPL from the buy and hold strategy assets",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "language": null,
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": null,
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_inclusions": [],
+     "asset_exclusions": [
+      "AAPL"
+     ],
+     "asset_universe_operation": "replace",
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "date_range_raw_text": null,
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": null,
+     "initial_capital": null,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": "eval-confirm-aapl-msft-nvda-2024",
+     "field_provenance": {},
+     "evidence_spans": {
+      "asset_exclusions": "remove AAPL"
+     },
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": null,
+    "uses_latest_result_context": null,
+    "confidence": 0.85,
+    "reason_codes": [],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "refine_current_idea",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "active_confirmation"
+   }
+  },
+  {
+   "seam": "structured_interpretation",
+   "n": 2,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "refine",
+    "requires_clarification": false,
+    "user_goal_summary": "Remove AAPL from the buy and hold strategy assets",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": "remove AAPL",
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": "eval-confirm-aapl-msft-nvda-2024",
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "MSFT",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "MSFT",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      },
+      {
+       "field": "asset_universe[1]",
+       "raw_text": "NVDA",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "NVDA",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      }
+     ],
+     "extra_parameters": {
+      "asset_universe_operation": "replace",
+      "evidence_spans": {
+       "asset_exclusions": "remove AAPL"
+      }
+     }
+    },
+    "missing_required_fields": [],
+    "assistant_response": null,
+    "confidence": 0.85,
+    "reason_codes": [],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "refine_current_idea",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "active_confirmation",
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "knowledge_answer_claim",
+   "n": 3,
+   "message": "remove AAPL",
+   "claimed": false,
+   "outcome": null,
+   "patch": null
+  },
+  {
+   "seam": "interpretation_entering_stage_routing",
+   "n": 4,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "refine",
+    "requires_clarification": false,
+    "user_goal_summary": "Remove AAPL from the buy and hold strategy assets",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": "remove AAPL",
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": "eval-confirm-aapl-msft-nvda-2024",
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "MSFT",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "MSFT",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      },
+      {
+       "field": "asset_universe[1]",
+       "raw_text": "NVDA",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "NVDA",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      }
+     ],
+     "extra_parameters": {
+      "asset_universe_operation": "replace",
+      "evidence_spans": {
+       "asset_exclusions": "remove AAPL"
+      }
+     }
+    },
+    "missing_required_fields": [],
+    "assistant_response": null,
+    "confidence": 0.85,
+    "reason_codes": [],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "refine_current_idea",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "active_confirmation",
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "interpretation_entering_stage_routing",
+   "n": 5,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "backtest_execution",
+    "task_relation": "continue",
+    "requires_clarification": false,
+    "user_goal_summary": "User changed a visible confirmation assumption.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": "buy_and_hold",
+     "strategy_thesis": null,
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [],
+     "extra_parameters": {
+      "asset_universe_operation": "replace",
+      "field_provenance": {
+       "asset_universe": "explicit_user"
+      }
+     }
+    },
+    "missing_required_fields": [],
+    "assistant_response": null,
+    "confidence": 0.8,
+    "reason_codes": [
+     "artifact_assumption_edit_planned"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "active_confirmation",
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "final_stage_result",
+   "n": 6,
+   "message": "remove AAPL",
+   "outcome": "ready_for_confirmation",
+   "patch": {
+    "normalized_signals": {},
+    "intent": "backtest_execution",
+    "task_relation": "continue",
+    "requires_clarification": false,
+    "user_goal_summary": "User changed a visible confirmation assumption.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": "buy_and_hold",
+     "strategy_thesis": "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024.",
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": 1000.0,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "MSFT",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "MSFT",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      },
+      {
+       "field": "asset_universe[1]",
+       "raw_text": "NVDA",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "NVDA",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      }
+     ],
+     "extra_parameters": {
+      "artifact_patch": {
+       "source": "llm_patch",
+       "changed_fields": [
+        "asset_universe"
+       ],
+       "asset_universe_operation": "replace"
+      },
+      "field_provenance": {
+       "asset_universe": "explicit_user"
+      }
+     }
+    },
+    "missing_required_fields": [],
+    "optional_parameter_status": {
+     "optional_parameter_opportunity": [
+      "initial_capital",
+      "timeframe",
+      "fees",
+      "slippage",
+      "engine_options"
+     ],
+     "user_preference_overridden_for_turn": false,
+     "confidence": 0.8,
+     "arbitration_mode": "structured_arbitration",
+     "ambiguous_fields": [],
+     "unsupported_constraints": []
+    },
+    "effective_response_profile": {
+     "effective_tone": "friendly",
+     "effective_verbosity": "medium",
+     "effective_expertise_mode": "beginner"
+    },
+    "reason_codes": [
+     "llm_interpreter_used",
+     "semantic_date_constraint_preserved",
+     "artifact_assumption_edit_planned"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "resolution_provenance": [
+     {
+      "field": "asset_universe[0]",
+      "raw_text": "MSFT",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "MSFT",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     },
+     {
+      "field": "asset_universe[1]",
+      "raw_text": "NVDA",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "NVDA",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     }
+    ],
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "final_stage_result",
+   "n": 7,
+   "message": "remove AAPL",
+   "outcome": "ready_for_confirmation",
+   "patch": {
+    "normalized_signals": {},
+    "intent": "backtest_execution",
+    "task_relation": "continue",
+    "requires_clarification": false,
+    "user_goal_summary": "User changed a visible confirmation assumption.",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": "buy_and_hold",
+     "strategy_thesis": "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024.",
+     "asset_universe": [
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": 1000.0,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "MSFT",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "MSFT",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      },
+      {
+       "field": "asset_universe[1]",
+       "raw_text": "NVDA",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "NVDA",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      }
+     ],
+     "extra_parameters": {
+      "artifact_patch": {
+       "source": "llm_patch",
+       "changed_fields": [
+        "asset_universe"
+       ],
+       "asset_universe_operation": "replace"
+      },
+      "field_provenance": {
+       "asset_universe": "explicit_user"
+      }
+     }
+    },
+    "missing_required_fields": [],
+    "optional_parameter_status": {
+     "optional_parameter_opportunity": [
+      "initial_capital",
+      "timeframe",
+      "fees",
+      "slippage",
+      "engine_options"
+     ],
+     "user_preference_overridden_for_turn": false,
+     "confidence": 0.8,
+     "arbitration_mode": "structured_arbitration",
+     "ambiguous_fields": [],
+     "unsupported_constraints": []
+    },
+    "effective_response_profile": {
+     "effective_tone": "friendly",
+     "effective_verbosity": "medium",
+     "effective_expertise_mode": "beginner"
+    },
+    "reason_codes": [
+     "llm_interpreter_used",
+     "semantic_date_constraint_preserved",
+     "artifact_assumption_edit_planned"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "resolution_provenance": [
+     {
+      "field": "asset_universe[0]",
+      "raw_text": "MSFT",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "MSFT",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     },
+     {
+      "field": "asset_universe[1]",
+      "raw_text": "NVDA",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "NVDA",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     }
+    ],
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "asset_discovery": null
+   }
+  }
+ ]
+}

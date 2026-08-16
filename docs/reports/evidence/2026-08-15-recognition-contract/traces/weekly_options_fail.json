@@ -1,0 +1,598 @@
+{
+ "case_id": "graceful_recovery_weekly_options_aapl",
+ "attempt": "a",
+ "status": "failed",
+ "failed_checks": [
+  "intent: expected 'unsupported_or_out_of_scope', got 'conversation_followup'",
+  "capability_verdict: expected 'unsupported', got 'answer_only'",
+  "assets: expected ['AAPL'], got []",
+  "asset_class: expected 'equity', got None",
+  "date_range: expected {'start': '2024-01-01', 'end': '2024-12-31'}, got None",
+  "benchmark_symbol: expected 'SPY', got None",
+  "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_to_respond']"
+ ],
+ "typed_outcome": {
+  "intent": "conversation_followup",
+  "stage_outcomes": [
+   "ready_to_respond"
+  ],
+  "assets": [],
+  "asset_class": null,
+  "requested_strategy_template": null,
+  "strategy_type": null,
+  "entry_rule": null,
+  "exit_rule": null,
+  "rule_spec": null,
+  "date_range": null,
+  "requested_date_range": null,
+  "effective_date_range": null,
+  "adjustment_reason": null,
+  "benchmark_symbol": null,
+  "capital_amount": null,
+  "starting_capital": null,
+  "recurring_contribution": null,
+  "contribution_period": null,
+  "launch_validation_code": null,
+  "missing_required_fields": [],
+  "fee_rate": null,
+  "slippage": null,
+  "cost_provenance": {},
+  "launch_execution_realism": null,
+  "capability_verdict": "answer_only",
+  "requested_field": null,
+  "clarification": null,
+  "semantic_turn_act": "educational_question",
+  "asset_discovery": null
+ },
+ "route_receipts": [
+  {
+   "task": "interpretation_repair",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMAssetMentionExtraction",
+   "latency_ms": 845,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 798,
+    "completion_tokens": 37,
+    "total_tokens": 835,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0009556,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:35:55.383893+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMInterpretationResponse",
+   "latency_ms": 10493,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 9590,
+    "completion_tokens": 1947,
+    "total_tokens": 11537,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.016855,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:36:07.684996+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "DcaContractAudit",
+   "latency_ms": 3255,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1261,
+    "completion_tokens": 466,
+    "total_tokens": 1727,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00253965,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:36:11.691815+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "anthropic/claude-haiku-4.5",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "DcaContractAudit",
+   "latency_ms": 3709,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": true,
+   "token_usage": {
+    "prompt_tokens": 1411,
+    "completion_tokens": 386,
+    "total_tokens": 1797,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.003341,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:36:15.402209+00:00"
+  },
+  {
+   "task": "knowledge_route",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ResearchQueryExtraction",
+   "latency_ms": 1459,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1308,
+    "completion_tokens": 97,
+    "total_tokens": 1405,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0016759,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:36:16.863558+00:00"
+  },
+  {
+   "task": "knowledge_voicing",
+   "tier": "chat",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "qwen/qwen3.5-9b",
+   "mode": "json_schema",
+   "schema_name": "VoicedAnswer",
+   "latency_ms": 1212,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 628,
+    "completion_tokens": 88,
+    "total_tokens": 716,
+    "cached_tokens": 128,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0008706,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:36:19.593518+00:00"
+  }
+ ],
+ "trace": [
+  {
+   "seam": "raw_model_response",
+   "n": 0,
+   "message": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+   "data": {
+    "intent": "unsupported_or_out_of_scope",
+    "task_relation": "new_task",
+    "requires_clarification": false,
+    "user_goal_summary": "Backtest weekly options on Apple (AAPL) from 2024-01-01 through 2024-12-31",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+     "language": "en",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": null,
+     "asset_universe": [
+      "AAPL"
+     ],
+     "asset_inclusions": [],
+     "asset_exclusions": [],
+     "asset_universe_operation": null,
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "date_range_raw_text": "from 2024-01-01 through 2024-12-31",
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": null,
+     "initial_capital": null,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "field_provenance": {},
+     "evidence_spans": {
+      "asset_universe": "apple",
+      "date_range": "from 2024-01-01 through 2024-12-31"
+     },
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Argus does not support backtesting options strategies such as weekly options on Apple. It only runs long-only backtests on equities, crypto, and currency pairs using strategies like buy and hold or indicator rules. Would you like to test a simple buy and hold on AAPL over those exact dates instead?",
+    "uses_latest_result_context": false,
+    "confidence": 0.9,
+    "reason_codes": [
+     "unsupported_options_trading"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [
+     {
+      "category": "strategy_type",
+      "raw_value": "weekly options",
+      "explanation": "Weekly options backtesting is not supported; Argus handles only long-only equity, crypto, and currency pair strategies with buy and hold, DCA, or indicator threshold rules.",
+      "simplification_options": [
+       {
+        "label": "Buy and hold AAPL over the same dates",
+        "replacement_values": {
+         "strategy_type": "buy_and_hold",
+         "asset_universe": [
+          "AAPL"
+         ],
+         "date_range": {
+          "start": "2024-01-01",
+          "end": "2024-12-31"
+         }
+        }
+       }
+      ],
+      "simplification_labels": []
+     }
+    ],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "unsupported_request",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "none"
+   }
+  },
+  {
+   "seam": "after_response_ready",
+   "n": 1,
+   "message": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+   "data": {
+    "intent": "unsupported_or_out_of_scope",
+    "task_relation": "new_task",
+    "requires_clarification": false,
+    "user_goal_summary": "Backtest weekly options on Apple (AAPL) from 2024-01-01 through 2024-12-31",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+     "language": "en",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": null,
+     "asset_universe": [
+      "AAPL"
+     ],
+     "asset_inclusions": [],
+     "asset_exclusions": [],
+     "asset_universe_operation": null,
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "date_range_raw_text": "from 2024-01-01 through 2024-12-31",
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": null,
+     "initial_capital": null,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "field_provenance": {},
+     "evidence_spans": {
+      "asset_universe": "apple",
+      "date_range": "from 2024-01-01 through 2024-12-31"
+     },
+     "extra_parameters": {
+      "provider_resolved_assets": [
+       {
+        "raw_text": "apple",
+        "symbol": "AAPL",
+        "asset_class": "equity",
+        "name": "Apple Inc. Common Stock",
+        "raw_symbol": "AAPL",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.NASDAQ"
+       }
+      ]
+     }
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Argus does not support backtesting options strategies such as weekly options on Apple. It only runs long-only backtests on equities, crypto, and currency pairs using strategies like buy and hold or indicator rules. Would you like to test a simple buy and hold on AAPL over those exact dates instead?",
+    "uses_latest_result_context": false,
+    "confidence": 0.9,
+    "reason_codes": [
+     "unsupported_options_trading",
+     "unsupported_request_default_benchmark_applied"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [
+     {
+      "category": "strategy_type",
+      "raw_value": "weekly options",
+      "explanation": "Weekly options backtesting is not supported; Argus handles only long-only equity, crypto, and currency pair strategies with buy and hold, DCA, or indicator threshold rules.",
+      "simplification_options": [
+       {
+        "label": "Buy and hold AAPL over the same dates",
+        "replacement_values": {
+         "strategy_type": "buy_and_hold",
+         "asset_universe": [
+          "AAPL"
+         ],
+         "date_range": {
+          "start": "2024-01-01",
+          "end": "2024-12-31"
+         }
+        }
+       }
+      ],
+      "simplification_labels": []
+     }
+    ],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "unsupported_request",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "none"
+   }
+  },
+  {
+   "seam": "structured_interpretation",
+   "n": 2,
+   "message": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+   "data": {
+    "intent": "unsupported_or_out_of_scope",
+    "task_relation": "new_task",
+    "requires_clarification": false,
+    "user_goal_summary": "Backtest weekly options on Apple (AAPL) from 2024-01-01 through 2024-12-31",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+     "asset_universe": [
+      "AAPL"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "apple",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "AAPL",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "medium"
+      }
+     ],
+     "extra_parameters": {
+      "provider_resolved_assets": [
+       {
+        "raw_text": "apple",
+        "symbol": "AAPL",
+        "asset_class": "equity",
+        "name": "Apple Inc. Common Stock",
+        "raw_symbol": "AAPL",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.NASDAQ"
+       }
+      ],
+      "language": "en",
+      "date_range_raw_text": "from 2024-01-01 through 2024-12-31",
+      "evidence_spans": {
+       "asset_universe": "apple",
+       "date_range": "from 2024-01-01 through 2024-12-31"
+      }
+     }
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Argus does not support backtesting options strategies such as weekly options on Apple. It only runs long-only backtests on equities, crypto, and currency pairs using strategies like buy and hold or indicator rules. Would you like to test a simple buy and hold on AAPL over those exact dates instead?",
+    "confidence": 0.9,
+    "reason_codes": [
+     "unsupported_options_trading",
+     "unsupported_request_default_benchmark_applied"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [
+     {
+      "category": "strategy_type",
+      "raw_value": "weekly options",
+      "explanation": "Weekly options backtesting is not supported; Argus handles only long-only equity, crypto, and currency pair strategies with buy and hold, DCA, or indicator threshold rules.",
+      "simplification_options": [
+       {
+        "label": "Buy and hold AAPL over the same dates",
+        "replacement_values": {
+         "strategy_type": "buy_and_hold",
+         "asset_universe": [
+          "AAPL"
+         ],
+         "date_range": {
+          "start": "2024-01-01",
+          "end": "2024-12-31"
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "unsupported_request",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "none",
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "knowledge_answer_claim",
+   "n": 3,
+   "message": "please backtest weekly options on apple from 2024-01-01 through 2024-12-31",
+   "claimed": true,
+   "outcome": "ready_to_respond",
+   "patch": {
+    "normalized_signals": {},
+    "intent": "conversation_followup",
+    "task_relation": "continue",
+    "requires_clarification": false,
+    "user_goal_summary": "Backtest weekly options on Apple (AAPL) from 2024-01-01 through 2024-12-31",
+    "detected_user_language": null,
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": null,
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": null,
+     "asset_universe": [],
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [],
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "optional_parameter_status": {
+     "optional_parameter_opportunity": [],
+     "user_preference_overridden_for_turn": false,
+     "confidence": 0.85,
+     "arbitration_mode": "deterministic",
+     "ambiguous_fields": [],
+     "unsupported_constraints": []
+    },
+    "effective_response_profile": {
+     "effective_tone": "friendly",
+     "effective_verbosity": "medium",
+     "effective_expertise_mode": "beginner"
+    },
+    "reason_codes": [
+     "knowledge_answer_market_stats"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "resolution_provenance": [],
+    "semantic_turn_act": "educational_question",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "asset_discovery": null,
+    "assistant_response": "Over the past year AAPL rose **32.07 %** from 231.65 to 305.94.\n\n- The biggest drop from any peak was **13.76 %** (max drawdown).\n- Price swings averaged **24.91 %** a year (annualized volatility).\n- The test covered **251** trading days.\n\n*These numbers describe past price moves only.*",
+    "next_experiments": {
+     "version": "argus_next_experiments/v1",
+     "rows": [
+      {
+       "kind": "compare_buy_and_hold",
+       "label": "Compare with buy and hold",
+       "label_key": "chat.next_experiments.labels.compare_buy_and_hold",
+       "localized_label": "Compare with buy and hold"
+      },
+      {
+       "kind": "recurring_monthly_buys",
+       "label": "Try monthly recurring buys",
+       "label_key": "chat.next_experiments.labels.recurring_monthly_buys",
+       "localized_label": "Try monthly recurring buys"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
