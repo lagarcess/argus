@@ -77,7 +77,7 @@ class RetestSetup:
     position_size: float | None = None
     cadence: str | None = None
     recurring_contribution: float | None = None
-    starting_principal: float | None = None
+    starting_capital: float | None = None
     entry_rule: dict[str, Any] | None = None
     exit_rule: dict[str, Any] | None = None
     rule_spec: dict[str, Any] | None = None
@@ -280,27 +280,30 @@ def retest_setup_from_run(
     if strategy_type == "dca_accumulation":
         if cadence not in RETEST_CADENCES:
             return None
+        resolved_plan = _stored_dca_capital_plan(resolved_engine_config)
+        snapshot_plan = _stored_dca_capital_plan(snapshot_engine_config)
         recurring_contribution = _consistent_number(
             resolved_parameters.get("recurring_contribution"),
-            resolved_engine_config.get("recurring_contribution"),
-            snapshot_engine_config.get("recurring_contribution"),
+            resolved_plan.contribution if resolved_plan else None,
+            snapshot_plan.contribution if snapshot_plan else None,
         )
-        starting_principal = _consistent_number(
-            resolved_parameters.get("starting_principal"),
-            resolved_engine_config.get("starting_principal"),
-            snapshot_engine_config.get("starting_principal"),
+        starting_capital = _consistent_number(
+            resolved_parameters.get("starting_capital"),
+            resolved_plan.starting_capital if resolved_plan else None,
+            snapshot_plan.starting_capital if snapshot_plan else None,
             allow_zero=True,
         )
         if (
             recurring_contribution is None
-            or starting_principal != 0
+            or starting_capital is None
+            or starting_capital < 0
             or capital_amount != recurring_contribution
         ):
             return None
     else:
         cadence = None
         recurring_contribution = None
-        starting_principal = None
+        starting_capital = None
 
     execution_realism_valid, execution_realism = _consistent_mapping(
         resolved_engine_config.get("_execution_realism"),
@@ -328,7 +331,7 @@ def retest_setup_from_run(
         position_size=position_size,
         cadence=cadence,
         recurring_contribution=recurring_contribution,
-        starting_principal=starting_principal,
+        starting_capital=starting_capital,
         entry_rule=_mapping_or_none(resolved_strategy.get("entry_rule")),
         exit_rule=_mapping_or_none(resolved_strategy.get("exit_rule")),
         rule_spec=_mapping_or_none(
@@ -429,6 +432,21 @@ def _consistent_mapping(*values: object) -> tuple[bool, dict[str, Any] | None]:
     if any(value != mappings[0] for value in mappings[1:]):
         return False, None
     return True, mappings[0]
+
+
+def _stored_dca_capital_plan(engine_config: Mapping[str, Any]) -> Any | None:
+    """The stored config's plan, read through its own owner or refused."""
+    from argus.domain.dca_capital import (
+        DcaCapitalError,
+        dca_capital_plan_from_config,
+    )
+
+    if not engine_config:
+        return None
+    try:
+        return dca_capital_plan_from_config(dict(engine_config))
+    except DcaCapitalError:
+        return None
 
 
 def _consistent_number(*values: object, allow_zero: bool = False) -> float | None:

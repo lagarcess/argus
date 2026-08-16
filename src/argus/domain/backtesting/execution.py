@@ -38,6 +38,19 @@ class LongOnlyExecutionResult:
     closed_trades: tuple[ClosedTrade, ...]
 
 
+@dataclass(frozen=True)
+class DcaSimulationResult:
+    """One owner for a recurring plan's equity and the cash that funded it.
+
+    ``external_flows`` holds the deposit landing on each bar, so metric code
+    can subtract exactly the cash this curve invested and nothing else.
+    """
+
+    equity_curve: pd.Series
+    invested_capital: float
+    external_flows: pd.Series
+
+
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
     if not _execution_realism_feature_enabled():
         return {"enabled": False, "fees": 0.0, "slippage": 0.0}
@@ -292,21 +305,55 @@ def _execute_long_only_ledger(
     )
 
 
+def symbol_allocation_capital(config: dict[str, Any], *, symbol_count: int) -> float:
+    """The money one symbol's simulation starts each period with.
+
+    A recurring plan allocates its contribution; every other template allocates
+    its bankroll. One owner, so no caller has to choose between the two names.
+    """
+    from argus.domain.dca_capital import dca_capital_plan_from_config
+
+    divisor = max(symbol_count, 1)
+    if config["template"] == "dca_accumulation":
+        return dca_capital_plan_from_config(config).per_symbol(divisor).contribution
+    return float(config["starting_capital"]) / divisor
+
+
 def _dca_equity_curve(
     *,
     close: pd.Series,
     entries: pd.Series,
     contribution: float,
+    starting_capital: float = 0.0,
     fees: float = 0.0,
     slippage: float = 0.0,
-) -> tuple[pd.Series, float]:
+) -> DcaSimulationResult:
+    """Value a recurring plan. The seed buys once on the first bar.
+
+    Every dollar is invested on its own date at the fill price after modeled
+    costs, in fractional shares, so no cash waits for a whole share and the
+    invested total is the seed plus one contribution per entry. The flow
+    series records the same deposits the curve invests, bar by bar.
+    """
     entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
     fill_price = close * (1.0 + slippage)
     cash_per_share = fill_price * (1.0 + fees)
     shares_bought = (contribution / cash_per_share).where(entry_mask, 0.0)
+    external_flows = pd.Series(contribution, index=close.index, dtype=float).where(
+        entry_mask, 0.0
+    )
+    if starting_capital > 0.0 and not close.empty:
+        seed_shares = starting_capital / float(cash_per_share.iloc[0])
+        shares_bought = shares_bought.copy()
+        shares_bought.iloc[0] = float(shares_bought.iloc[0]) + seed_shares
+        external_flows.iloc[0] = float(external_flows.iloc[0]) + starting_capital
     cumulative_shares = shares_bought.cumsum()
     equity = cumulative_shares * close
-    invested_capital = float(entry_mask.sum()) * contribution
+    invested_capital = starting_capital + float(entry_mask.sum()) * contribution
     if invested_capital <= 0:
         invested_capital = contribution
-    return equity.astype(float), invested_capital
+    return DcaSimulationResult(
+        equity_curve=equity.astype(float),
+        invested_capital=invested_capital,
+        external_flows=external_flows,
+    )

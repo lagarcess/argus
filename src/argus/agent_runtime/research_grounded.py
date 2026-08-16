@@ -120,6 +120,7 @@ async def grounded_result(
     interpretation: StructuredInterpretation,
     state: RunState,
     user: UserState,
+    decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     spec = RESEARCH_CONFIG_SPECS[shape]
     publisher_sources_required = requires_publisher_sources(query)
@@ -160,6 +161,7 @@ async def grounded_result(
                 interpretation=interpretation,
                 state=state,
                 user=user,
+                decision=decision,
                 reason="not_configured",
             )
         try:
@@ -174,6 +176,7 @@ async def grounded_result(
                 interpretation=interpretation,
                 state=state,
                 user=user,
+                decision=decision,
                 reason=exc.reason,
             )
         retry_prompt: str | None = None
@@ -240,6 +243,7 @@ async def grounded_result(
                 interpretation=interpretation,
                 state=state,
                 user=user,
+                decision=decision,
                 reason="missing_public_sources",
             )
         cache_put(
@@ -262,6 +266,7 @@ async def grounded_result(
             interpretation=interpretation,
             state=state,
             user=user,
+            decision=decision,
             reason="missing_public_sources",
         )
     return _packet_stage_result(
@@ -277,6 +282,7 @@ async def grounded_result(
         question_kind=query.question_kind,
         period_start_date=_coerce_date(query.period_start_date),
         question_as_of_date=question_as_of_date,
+        decision=decision,
     )
 
 
@@ -294,6 +300,7 @@ def _packet_stage_result(
     question_kind: str | None = None,
     period_start_date: date | None = None,
     question_as_of_date: date | None = None,
+    decision: InterpretDecision | None = None,
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
@@ -371,6 +378,7 @@ def _packet_stage_result(
         period_of_interest=period_of_interest,
         degraded_code=degraded_code,
         question_kind=question_kind,
+        decision=decision,
         period_start_date=period_start_date,
         question_as_of_date=question_as_of_date,
     )
@@ -383,6 +391,7 @@ def thorough_job_result(
     interpretation: StructuredInterpretation,
     user: UserState,
     message: str,
+    decision: InterpretDecision | None = None,
 ) -> StageResult:
     """Thorough runs never block chat: the stage returns a typed job request
     and the API layer owns submission, polling, and the follow-up message
@@ -416,6 +425,7 @@ def thorough_job_result(
             question_kind=query.question_kind,
             period_start_date=_coerce_date(query.period_start_date),
             question_as_of_date=datetime.now(timezone.utc).date(),
+            decision=decision,
         )
     subject_labels = ", ".join(f"{s['name']} [{s['symbol']}]" for s in subjects[:3])
     if language == "es-419":
@@ -430,8 +440,11 @@ def thorough_job_result(
             + (f" on {subject_labels}" if subject_labels else "")
             + ". I'll post the result here when it's ready."
         )
-    decision = research_decision(
-        interpretation, user, f"research_answer_{capability_class}"
+    decision = carried_decision(
+        decision,
+        interpretation=interpretation,
+        user=user,
+        reason_code=f"research_answer_{capability_class}",
     )
     return StageResult(
         outcome="ready_to_respond",
@@ -470,6 +483,7 @@ async def off_coverage_result(
     interpretation: StructuredInterpretation,
     state: RunState,
     user: UserState,
+    decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     """Crypto and currency pairs degrade honestly: Argus's own provider data
     for figures, an explicit coverage note, and a runnable next step."""
@@ -520,6 +534,7 @@ async def off_coverage_result(
         cache_status="bypass",
         degraded_code="asset_class_not_covered",
         period_of_interest=query.period_of_interest,
+        decision=decision,
     )
 
 
@@ -530,6 +545,7 @@ async def exhausted_result(
     interpretation: StructuredInterpretation,
     state: RunState,
     user: UserState,
+    decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     """Ceiling exhaustion is an honest, localized note, not a silent
     disappearance: the answer still comes from Argus's own data or model
@@ -577,6 +593,7 @@ async def exhausted_result(
         cache_status="bypass",
         degraded_code="research_capacity_exhausted",
         period_of_interest=query.period_of_interest,
+        decision=decision,
     )
 
 
@@ -588,6 +605,7 @@ def unavailable_result(
     state: RunState,
     user: UserState,
     reason: str,
+    decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     del state
     language = language_tag(user.language_preference)
@@ -617,6 +635,7 @@ def unavailable_result(
         cache_status="bypass",
         degraded_code=f"research_unavailable_{reason}",
         period_of_interest=query.period_of_interest,
+        decision=decision,
     )
 
 
@@ -1182,6 +1201,31 @@ def research_failure_note(language: str) -> str:
     )
 
 
+def carried_decision(
+    decision: InterpretDecision | None,
+    *,
+    interpretation: StructuredInterpretation,
+    user: UserState,
+    reason_code: str,
+) -> InterpretDecision:
+    """The typed decision is the turn's identity; a serving operation may add
+    its reason code but never relabel the act or drop the discovery payload.
+
+    A rail diversion that rebuilt the decision used to overwrite a typed
+    asset_discovery turn with semantic_turn_act=educational_question and
+    asset_discovery=None (#344): the user's request survived, its identity
+    did not."""
+    if decision is None:
+        return research_decision(interpretation, user, reason_code)
+    return decision.model_copy(
+        update={
+            "reason_codes": list(
+                dict.fromkeys([*decision.reason_codes, reason_code])
+            )
+        }
+    )
+
+
 def research_decision(
     interpretation: StructuredInterpretation,
     user: UserState,
@@ -1349,9 +1393,13 @@ def research_stage_result(
     question_kind: str | None = None,
     period_start_date: date | str | None = None,
     question_as_of_date: date | str | None = None,
+    decision: InterpretDecision | None = None,
 ) -> StageResult:
-    decision = research_decision(
-        interpretation, user, f"research_answer_{capability_class}"
+    decision = carried_decision(
+        decision,
+        interpretation=interpretation,
+        user=user,
+        reason_code=f"research_answer_{capability_class}",
     )
     stage_patch: dict[str, Any] = {
         "assistant_response": answer,

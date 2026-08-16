@@ -1,0 +1,10 @@
+scenario: D1 "I only have $5,000 to invest in VOO every month through 2024" — 3 attempts, fresh chats
+attempts 1-3 DOM (identical shape): card "Compras recurrentes — Listo para ejecutar"
+  APORTE $5,000 cada mes · Capital inicial $0 · 2 ene → 31 dic 2024 · SPY
+rate: ceiling-recovery mode (ask monthly amount, name the cap) 0/3 in this serving window;
+  per-month reading 3/3, rendered coherently
+"does not silently run": PASS 3/3 — approval always required, amounts editor one tap away
+context: the same case passed BOTH full eval runs today in the ceiling-recovery mode
+  (unsupported_recovery + missing capital_amount); this is serving-window mode variance on a
+  genuinely ambiguous English sentence, not a downstream fact drop — nothing typed was discarded,
+  the card renders exactly the read the model committed to

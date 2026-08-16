@@ -4,6 +4,7 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, Literal, get_args
 
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.artifacts.asset_edits import (
@@ -44,6 +45,7 @@ class EditOperation(BaseModel):
         "benchmark",
         "date_window",
         "capital",
+        "starting_capital",
         "recurring_contribution",
         "cadence",
         "timeframe",
@@ -167,7 +169,7 @@ async def plan_artifact_assumption_edit(
     required_targets: set[str] | None = None,
     materialized_targets_for_plan: Callable[[ArtifactAssumptionEditPlan], set[str] | None]
     | None = None,
-    stated_cost_operations: Sequence[EditOperation] | None = None,
+    stated_operations: Sequence[EditOperation] | None = None,
 ) -> ArtifactAssumptionEditPlan | None:
     if not current_user_message.strip():
         return None
@@ -198,7 +200,17 @@ async def plan_artifact_assumption_edit(
             continue
         if not isinstance(plan, ArtifactAssumptionEditPlan):
             continue
-        plan = _completed_with_stated_cost_operations(plan, stated_cost_operations or ())
+        plan = _completed_with_stated_operations(
+            plan,
+            stated_operations or (),
+            # An empty or inapplicable plan protects no flat content, so the
+            # primary read's typed operations may become the whole plan.
+            allow_empty_operations=not _has_supported_edit(
+                plan,
+                prior_strategy=prior_strategy,
+                active_confirmation=active_confirmation,
+            ),
+        )
         if plan.outcome == "ready_to_confirm" and not _has_supported_edit(
             plan,
             prior_strategy=prior_strategy,
@@ -340,25 +352,37 @@ def _artifact_assumption_edit_messages(
 _FLAT_PLAN_COST_FIELDS = {"fees": "fee_rate", "slippage": "slippage"}
 
 
-def _completed_with_stated_cost_operations(
+def _completed_with_stated_operations(
     plan: ArtifactAssumptionEditPlan,
-    stated_cost_operations: Sequence[EditOperation],
+    stated_operations: Sequence[EditOperation],
+    *,
+    allow_empty_operations: bool = False,
 ) -> ArtifactAssumptionEditPlan:
-    """Carry a stated cost the plan left out into the operation list (§3.2).
+    """Carry a stated change the plan left out into the operation list (§3.2).
 
+    The primary interpretation and the plan are independent structured reads
+    of the same turn; a target either read extracted must enter the pipeline.
     The applier validates every value and the card discloses anything it
     refuses, so completion decides only whether the request enters the
-    pipeline, never how it lands. Flat-only plans stay untouched because the
-    legacy application path would ignore their non-cost flat fields once an
-    operation list exists.
+    pipeline, never how it lands. Material flat-only plans stay untouched
+    because the legacy application path would ignore their non-cost flat
+    fields once an operation list exists; ``allow_empty_operations`` marks a
+    plan whose flat content is immaterial, where nothing can be lost.
+    ``capital`` and ``starting_capital`` are one slot, so either one already
+    present covers a stated op for the other.
     """
 
-    if plan.outcome != "ready_to_confirm" or not plan.operations:
+    if plan.outcome != "ready_to_confirm":
         return plan
-    present_targets = {operation.target for operation in plan.operations}
+    if not plan.operations and not allow_empty_operations:
+        return plan
+    present_targets = {
+        _APPLIED_TARGET_ALIASES.get(operation.target, operation.target)
+        for operation in plan.operations
+    }
     additions: list[EditOperation] = []
-    for stated in stated_cost_operations:
-        if stated.target in present_targets:
+    for stated in stated_operations:
+        if _APPLIED_TARGET_ALIASES.get(stated.target, stated.target) in present_targets:
             continue
         flat_value = getattr(plan, _FLAT_PLAN_COST_FIELDS.get(stated.target, ""), None)
         additions.append(
@@ -368,6 +392,17 @@ def _completed_with_stated_cost_operations(
         )
     if not additions:
         return plan
+    completed_targets = sorted({addition.target for addition in additions})
+    # The union is a redundancy layer over the planner; an unmeasured
+    # completion would hide planner decay, so every injection is a receipt.
+    logger.info(
+        "Artifact edit plan completed from primary extraction targets={} "
+        "planned_operation_count={}",
+        completed_targets,
+        len(plan.operations),
+        completed_targets=completed_targets,
+        planned_operation_count=len(plan.operations),
+    )
     return plan.model_copy(update={"operations": [*plan.operations, *additions]})
 
 
@@ -537,7 +572,16 @@ def _unique_models(preferred_model: str) -> list[str]:
     return ordered
 
 
-_NUMBER_TARGETS = {"capital", "recurring_contribution", "fees", "slippage"}
+# ``capital`` and ``starting_capital`` both land in the plan's non-recurring
+# money, which is the bankroll for a one-time position and the seed for a
+# recurring plan. A card has one shape, so the slot has one meaning on it.
+_NUMBER_TARGETS = {
+    "capital",
+    "starting_capital",
+    "recurring_contribution",
+    "fees",
+    "slippage",
+}
 _INDICATOR_PARAMETER_TARGETS = {
     "indicator_entry_threshold": "entry_threshold",
     "indicator_exit_threshold": "exit_threshold",
@@ -547,6 +591,71 @@ _TEXT_TARGETS = {"cadence", "timeframe"}
 
 
 _DROPPED_COST_TARGETS = {"fee_rate": "fees", "slippage": "slippage"}
+
+# ``capital`` and ``starting_capital`` write the same materialized slot.
+_APPLIED_TARGET_ALIASES = {"starting_capital": "capital"}
+
+# Strategy-summary provenance keys mapped to the operation targets they prove.
+_SUMMARY_PROVENANCE_TARGETS = {
+    "asset_universe": "asset",
+    "comparison_baseline": "benchmark",
+    "date_range": "date_window",
+    "initial_capital": "capital",
+    "recurring_contribution": "recurring_contribution",
+    "cadence": "cadence",
+    "timeframe": "timeframe",
+    "fee_rate": "fees",
+    "slippage": "slippage",
+}
+
+
+def accepted_operation_targets(resolved: "ResolvedArtifactEdit") -> set[str]:
+    """Targets of every operation the applier accepted, in materialized names."""
+
+    targets: set[str] = set()
+    for entry in resolved.applied:
+        _, _, target = str(entry).partition(".")
+        target = target or str(entry)
+        targets.add(_APPLIED_TARGET_ALIASES.get(target, target))
+    return targets
+
+
+def materialized_strategy_summary_targets(
+    field_provenance: dict[str, str],
+) -> set[str]:
+    """Operation targets a strategy-summary application actually wrote."""
+
+    targets = {
+        target
+        for key, target in _SUMMARY_PROVENANCE_TARGETS.items()
+        if key in field_provenance
+    }
+    capital_source = field_provenance.get("capital_amount")
+    if capital_source == "starting_capital":
+        targets.add("capital")
+    elif capital_source == "recurring_contribution":
+        targets.add("recurring_contribution")
+    if "indicator_parameters" in field_provenance:
+        targets.update(_INDICATOR_PARAMETER_TARGETS)
+    return targets
+
+
+def accepted_operations_partially_materialized(
+    resolved: "ResolvedArtifactEdit",
+    covered_targets: set[str],
+) -> bool:
+    """True when some accepted operations landed and others silently vanished.
+
+    Every operation the applier accepted must appear in the materialized
+    result or be typed as unapplied; a card carrying some of a compound
+    request while dropping the rest must never ship (issue #498). An
+    application that materializes nothing is not partial: the caller's
+    all-refused handling owns that turn.
+    """
+
+    accepted = accepted_operation_targets(resolved)
+    missing = accepted - covered_targets
+    return bool(missing) and bool(accepted & covered_targets)
 
 
 def typed_unapplied_operations(
@@ -694,7 +803,7 @@ def apply_edit_operations(
         if target in _NUMBER_TARGETS:
             if op in {"set", "replace"} and operation.number is not None:
                 amount = float(operation.number)
-                if target == "capital":
+                if target in {"capital", "starting_capital"}:
                     resolved.initial_capital = amount
                 elif target == "recurring_contribution":
                     resolved.recurring_contribution_amount = amount
@@ -734,7 +843,14 @@ def apply_edit_operations(
             if op in {"set", "replace"} and (operation.value or "").strip():
                 cleaned = operation.value.strip()
                 if target == "cadence":
-                    resolved.cadence = cleaned
+                    # The applier drops a period it does not support, so an
+                    # unsupported one is refused here rather than reported as
+                    # applied and then silently discarded.
+                    period = _supported_dca_cadence_value(cleaned)
+                    if period is None:
+                        resolved.unsupported.append(f"{op}.{target}")
+                        continue
+                    resolved.cadence = period
                 else:
                     resolved.timeframe = cleaned
                 resolved.applied.append(f"set.{target}")

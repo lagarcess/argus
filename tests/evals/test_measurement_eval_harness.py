@@ -22,6 +22,7 @@ EXPECTED_LOCKED_CATEGORIES = {
     "backtest_metric_correctness",
     "graceful_recovery",
     "asset_discovery_routing",
+    "dca_capital_semantics",
 }
 
 PHRASE_ASSERTION_KEYS = {

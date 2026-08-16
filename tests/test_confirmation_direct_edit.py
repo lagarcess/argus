@@ -239,13 +239,24 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
         _confirmation_payload(strategy_type="dca_accumulation", cadence="weekly"),
     )
 
-    # A recurring contribution is exempt from the bankroll floor (the launch
-    # adapter's rule), so an ordinary small DCA amount stays valid here.
-    response = _direct_edit(
+    # The shared bankroll field cannot reach a recurring plan at all: its two
+    # money roles are named, so nothing arrives in the wrong one.
+    refused = _direct_edit(
         client,
         conversation["id"],
         CONFIRMATION_ID,
         {"capital": 250},
+    )
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "capital_role_not_applicable"
+
+    # A recurring contribution is exempt from the bankroll floor, so an
+    # ordinary small DCA amount stays valid here.
+    response = _direct_edit(
+        client,
+        conversation["id"],
+        CONFIRMATION_ID,
+        {"recurring_contribution": 250},
     )
     assert response.status_code == 200, response.text
     message = response.json()["message"]
@@ -257,11 +268,14 @@ def test_dca_capital_edit_sets_the_recurring_contribution_role() -> None:
     assert provenance["capital_amount"] == "recurring_contribution"
     card = message["metadata"]["confirmation_card"]
     contribution_rows = [row for row in card["rows"] if row["key"] == "contribution"]
-    assert contribution_rows and contribution_rows[0]["value"] == "$250"
+    assert contribution_rows and contribution_rows[0]["value"] == "$250 weekly"
     constraints = card["capabilities"]["edit_constraints"]
-    assert (
-        "min" not in constraints["capital"]
-    ), "a recurring card must not advertise the bankroll floor"
+    assert constraints["starting_capital"]["min"] == 0.0
+    assert constraints["contribution"]["periods"]
+    # Neither money floor is restated on a recurring card: the bankroll band is
+    # not the plan's rule, and "some money" is not a number a client can hold.
+    assert "min" not in constraints["capital"]
+    assert "min" not in constraints["contribution"]
 
 
 def test_direct_edit_matches_the_conversational_edit_artifact() -> None:
@@ -646,3 +660,56 @@ def test_card_advertises_the_engine_envelope() -> None:
     assert (
         constraints["date_window"]["min_start"] == ALPACA_EQUITY_HISTORY_START.isoformat()
     )
+
+
+def test_an_edited_starting_capital_reaches_the_run_it_will_fund() -> None:
+    """The seed has to arrive where the launch payload reads it.
+
+    Storing it only on the draft left a second copy nobody read: the endpoint
+    answered 200 while the run kept the old seed, so the user's edit was
+    silently discarded.
+    """
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(
+        client,
+        conversation["id"],
+        _confirmation_payload(strategy_type="dca_accumulation", cadence="monthly"),
+    )
+
+    for seed in (5_000, 0, 250):
+        response = _direct_edit(
+            client,
+            conversation["id"],
+            CONFIRMATION_ID,
+            {"starting_capital": seed, "recurring_contribution": 200},
+        )
+        assert response.status_code == 200, response.text
+        metadata = response.json()["message"]["metadata"]
+        launch = metadata["confirmation_payload"]["launch_payload"]
+        assert launch["starting_capital"] == seed
+        assert launch["recurring_contribution"] == 200
+        card = metadata["confirmation_card"]
+        assert card["display_facts"]["starting_capital"] == seed
+        rows = {row["key"]: row["value"] for row in card["rows"]}
+        assert rows["starting_capital"] == f"${seed:,.0f}"
+
+
+def test_an_unsupported_contribution_period_is_refused_not_ignored() -> None:
+    client = _client()
+    conversation = _conversation(client)
+    _plant_confirmation(
+        client,
+        conversation["id"],
+        _confirmation_payload(strategy_type="dca_accumulation", cadence="monthly"),
+    )
+
+    response = _direct_edit(
+        client,
+        conversation["id"],
+        CONFIRMATION_ID,
+        {"contribution_period": "fortnightly"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "unsupported_dca_cadence"

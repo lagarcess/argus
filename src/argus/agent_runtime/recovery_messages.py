@@ -33,6 +33,7 @@ RecoveryMessageCode = Literal[
     "artifact_action_retry_rebuilt_confirmation",
     "artifact_action_retry_inactive",
     "execution_data_unavailable",
+    "backtest_capacity_exceeded",
     "run_result_withheld",
     "discovery_unavailable",
     "discovery_search_failed",
@@ -166,6 +167,11 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "The setup is still here, but I could not get {data_label} for that run "
         "right now. Try again, change the dates, or choose a different supported "
         "asset."
+    ),
+    "backtest_capacity_exceeded": (
+        "Argus is already running as many backtests as it can right now, so this "
+        "one did not start. Nothing broke and nothing was lost: your setup is "
+        "exactly as you left it. Run it again in a few minutes."
     ),
     "run_result_withheld": (
         "This run stopped before its result could be saved, so there is no "

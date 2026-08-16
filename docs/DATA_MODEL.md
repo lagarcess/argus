@@ -1124,10 +1124,13 @@ list models.
 
 `assumptions` keys are `long_only`, `equal_weight`, `no_costs`, `modeled_fee_bps`,
 `modeled_slippage_bps`, `benchmark`, `benchmark_same_modeled_costs`,
-`recurring_contribution`, `contribution_cadence`, and `starting_principal`. Costs
-are read from the frozen run config rather than through the live execution-realism
-flag, so a flag flipped after the run cannot rewrite what the receipt says the run
-assumed.
+`recurring_contribution`, `contribution_cadence`, `starting_principal`, and
+`fractional_shares`. The four recurring keys are read together from the run's
+declared capital plan, so the receipt states the same two money roles and the
+same fill model the engine executed; `starting_principal` keeps its frozen
+public name while the plan owns what that number is. Costs are read from the
+frozen run config rather than through the live execution-realism flag, so a flag
+flipped after the run cannot rewrite what the receipt says the run assumed.
 
 `MetricKey` is `cash_value`, `total_return_pct`, `max_drawdown_pct`, `win_rate`,
 `benchmark_return_pct`, and `delta_vs_benchmark_pct`. The first four are the result

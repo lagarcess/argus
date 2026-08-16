@@ -207,14 +207,19 @@ describe("result card playground", () => {
       resultCardPlaygroundFixtures.find((fixture) => fixture.id === "dca-result")!.result,
     );
     expect(dca.hero.value).toBe("$1,000");
-    expect(dca.hero.detail).toBe("$0 change · 0.0% total return");
+    expect(dca.hero.detail).toBe("$0 change · 0.0% return on contributions");
     expect(dca.hero.tone).toBe("neutral");
     expect(dca.benchmark.value).toBe("In line with SPY");
     expect(dca.timeframeDisplay).toBe("Daily data");
     expect(dca.details).toContainEqual({ label: "Total contributed", value: "$1,000" });
     expect(dca.details).not.toContainEqual({ label: "Starting capital", value: "$1,000" });
-    expect(dca.details).toContainEqual({ label: "Cadence", value: "Monthly" });
-    expect(dca.details).toContainEqual({ label: "Contribution", value: "$250" });
+    // One phrase, not a labelled amount beside a labelled period.
+    expect(dca.details).toContainEqual({ label: "Starting capital", value: "$0" });
+    expect(dca.details).toContainEqual({
+      label: "Contribution",
+      value: "$250 monthly",
+    });
+    expect(dca.details.map((detail) => detail.label)).not.toContain("Cadence");
 
     const spanishDca = heroDeltaEvidenceView(
       resultCardPlaygroundFixtures.find((fixture) => fixture.id === "dca-result")!.result,
@@ -222,17 +227,17 @@ describe("result card playground", () => {
         copy: {
           ...defaultResultCardDisplayCopy,
           totalContributedLabel: "Total aportado",
-          cadenceLabel: "Cadencia",
-          cadenceValueLabel: (cadence) =>
-            cadence === "monthly" ? "Mensual" : cadence,
-          contributionLabel: "Contribución",
+          startingCapitalLabel: "Capital inicial",
+          contributionPhrase: (amount, period) =>
+            `${amount} ${period === "monthly" ? "cada mes" : period}`,
+          contributionLabel: "Aporte",
         },
         locale: "es-419",
       },
     );
     expect(spanishDca.details).toContainEqual({
-      label: "Cadencia",
-      value: "Mensual",
+      label: "Aporte",
+      value: "$250 cada mes",
     });
 
     const compactProductionShape = heroDeltaEvidenceView({

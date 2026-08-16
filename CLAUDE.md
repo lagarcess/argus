@@ -20,6 +20,11 @@ Focus review on:
 - Argus language-agnostic runtime spine;
 - no regex, hardcoded language gates, or shortcut routing before LLM
   interpretation;
+- changes to model-facing text, the interpreter's prompt and the response
+  schema's field descriptions, which move behavior on every turn and require a
+  committed scorecard showing no regression (AGENTS.md Never-Violate 12);
+- deterministic layers that compensate for an unreliable model read without
+  recording when they fire;
 - backend canonical truth and Supabase persistence ownership;
 - frontend rendering backend-provided state instead of inventing state;
 - API contract and OpenAPI/doc consistency;

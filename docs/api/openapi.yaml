@@ -2525,6 +2525,21 @@ components:
           - type: number
             exclusiveMinimum: 0.0
           - type: 'null'
+        starting_capital:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+        recurring_contribution:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        contribution_period:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
         date_window:
           anyOf:
           - $ref: '#/components/schemas/ConfirmationDirectEditWindow'
@@ -2543,15 +2558,19 @@ components:
       description: 'Edit the pending confirmation''s capital, dates, or costs without a turn.
 
 
-        At least one field is required. Capital is the starting capital, or the
+        At least one field is required. ``capital`` is the one-time starting
 
-        recurring contribution when the pending strategy is a recurring-buy plan,
+        capital of a non-recurring plan. A recurring plan names its two money roles
 
-        matching the money-role semantics of the conversational path. Costs are
+        separately, ``starting_capital`` and ``recurring_contribution``, because
 
-        decimal rates (0.002 is 0.2 percent); zero explicitly clears a cost. The
+        neither may ever stand in for the other; sending ``capital`` for one is
 
-        slippage cap is enforced by the shared edit resolver, not re-stated here.'
+        refused rather than guessed at. Costs are decimal rates (0.002 is 0.2
+
+        percent); zero explicitly clears a cost. The slippage cap is enforced by
+
+        the shared edit resolver, not re-stated here.'
     ConfirmationDirectEditResponse:
       properties:
         message:
@@ -4030,6 +4049,7 @@ components:
           - recurring_contribution
           - contribution_cadence
           - starting_principal
+          - fractional_shares
         value:
           anyOf:
           - type: string
@@ -4166,6 +4186,7 @@ components:
           enum:
           - cash_value
           - total_return_pct
+          - contribution_return_pct
           - max_drawdown_pct
           - win_rate
           - benchmark_return_pct

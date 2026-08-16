@@ -168,12 +168,15 @@ def test_metric_and_chart_equity_assignments_share_execution_ledger() -> None:
     assert _assignment_producers(
         runner.compute_alpha_metrics, "gross_symbol_execution"
     ) == ["_execute_long_only_ledger()"]
+    assert _assignment_producers(runner.compute_alpha_metrics, "dca_result") == [
+        "_dca_equity_curve()"
+    ]
     assert _assignment_producers(runner.compute_alpha_metrics, "symbol_equity") == [
-        "_dca_equity_curve()",
+        "dca_result.equity_curve",
         "symbol_execution.equity_curve",
     ]
     assert _assignment_producers(charts.build_result_chart, "symbol_equity") == [
-        "_dca_equity_curve()",
+        "_dca_equity_curve().equity_curve",
         "_execute_long_only_ledger().equity_curve",
     ]
     assert "vbt.Portfolio.from_signals" not in _called_functions(
@@ -1207,12 +1210,14 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
         "start_date": "2025-01-01",
         "end_date": "2025-12-31",
         "side": "long",
-        "starting_capital": 500,
         "allocation_method": "equal_weight",
         "benchmark_symbol": "SPY",
         "parameters": {"dca_cadence": "monthly"},
-        "recurring_contribution": 500,
-        "starting_principal": 0.0,
+        "dca_capital": {
+            "schema_version": "dca_capital_v1",
+            "starting_capital": 0.0,
+            "contribution": 500.0,
+        },
     }
     metrics = {
         "aggregate": {
@@ -1228,19 +1233,20 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
 
     card = engine.build_result_card(config, metrics)
     assert card["assumptions"] == [
-        "Recurring contribution: $500 monthly",
-        "Starting principal: $0",
+        "Contribution: $500 monthly",
+        "Starting capital: $0",
+        "Fractional shares, nothing left as cash",
         "Long-only",
         "Equal weight",
         "No fees/slippage",
         "Benchmark: SPY",
     ]
-    assert not any("Starting capital" in item for item in card["assumptions"])
 
     spanish_card = engine.build_result_card(config, metrics, language="es-419")
     assert spanish_card["assumptions"] == [
-        "Aporte recurrente: $500 mensual",
+        "Aporte: $500 cada mes",
         "Capital inicial: $0",
+        "Fracciones de acciones, nada queda en efectivo",
         "Solo largo",
         "Peso igual",
         "Sin comisiones/deslizamiento",
@@ -1414,7 +1420,9 @@ def test_validate_template_parameters_rejects_invalid_value():
         "benchmark_symbol": "SPY",
         "parameters": {"dca_cadence": "hourly"},  # Only daily/weekly/monthly allowed
     }
-    with pytest.raises(ValueError, match="unsupported_parameter_value_dca_cadence"):
+    # One rule, one code: the capital plan owns which periods exist, so the
+    # registry's generic parameter refusal never fires for this field.
+    with pytest.raises(ValueError, match="unsupported_dca_cadence"):
         engine.validate_backtest_config(config)
 
 

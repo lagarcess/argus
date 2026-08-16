@@ -54,6 +54,10 @@ _KNOWLEDGE_INTENTS = frozenset(
 )
 # Acts owned by other surfaces (discovery, results, cards) never route here.
 _KNOWLEDGE_ACTS = frozenset({"educational_question", "unsupported_request"})
+# Routes on the typed payload, not the act label: an unsupported_request turn
+# carrying unsupported_constraints is a refusal decision with recovery options,
+# never a question the knowledge/research rail may answer with stats.
+_UNSUPPORTED_PAYLOAD_REASON_CODE = "unsupported_payload_kept_recovery_route"
 _SEARCH_MAX_RESULTS = 5
 
 
@@ -147,9 +151,7 @@ def _rail_may_claim_clarification(
         return False
     if not interpretation.requires_clarification:
         return False
-    return _execution_evidence_is_only_a_default(
-        interpretation.candidate_strategy_draft
-    )
+    return _execution_evidence_is_only_a_default(interpretation.candidate_strategy_draft)
 
 
 def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
@@ -173,6 +175,18 @@ async def knowledge_answer_stage_result(
         # A reply to a pending question belongs to whoever asked it.
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
+        return None
+    if interpretation.unsupported_constraints:
+        # A typed refusal payload owns its recovery route: the primary read
+        # already named what cannot run and the nearest supported alternative,
+        # so a message-only classifier must not answer the turn as a question.
+        if _UNSUPPORTED_PAYLOAD_REASON_CODE not in interpretation.reason_codes:
+            interpretation.reason_codes.append(_UNSUPPORTED_PAYLOAD_REASON_CODE)
+        logger.info(
+            "Knowledge claim stood down for a typed unsupported payload " "categories={}",
+            [item.category for item in interpretation.unsupported_constraints],
+            categories=[item.category for item in interpretation.unsupported_constraints],
+        )
         return None
     rail_claim = _rail_may_claim_clarification(interpretation)
     if (
@@ -201,14 +215,14 @@ async def knowledge_answer_stage_result(
         # Flag off, the widened entry does not exist: only the legacy
         # knowledge shapes reach the pre-rail answerer.
         return None
-    # A provider-resolved asset on a knowledge turn IS the interpreter's own
-    # classification: the user is asking about that asset. No second LLM call.
-    query = _query_from_interpretation(interpretation)
-    if query is None:
-        query = await _classify_question(
-            message=state.current_user_message,
-            language=user.language_preference,
-        )
+    # The classifier owns the stats-vs-run boundary: an unsupported_request
+    # turn with a resolved asset may be a statistics question (answer it from
+    # data) or a request to run something Argus cannot execute (never answer
+    # that with underlying stats; it must keep its recovery route).
+    query = await _classify_question(
+        message=state.current_user_message,
+        language=user.language_preference,
+    )
     if query is None or query.question_kind in ("concept", "none"):
         return None
     answer: str | None = None
@@ -237,33 +251,6 @@ async def knowledge_answer_stage_result(
         interpretation=interpretation,
         query=query,
         user=user,
-    )
-
-
-def _query_from_interpretation(
-    interpretation: StructuredInterpretation,
-) -> KnowledgeQueryExtraction | None:
-    # A resolved asset alone does not establish market_stats: educational
-    # turns can receive one through provider-context enrichment ("What is
-    # SPY?"), and those must keep the interpreter's concept explanation. The
-    # shortcut applies only to unsupported_request turns, where the
-    # interpreter has already ruled the concept answer out; the ambiguous
-    # educational slice goes through the bounded classifier instead.
-    if interpretation.semantic_turn_act != "unsupported_request":
-        return None
-    draft = interpretation.candidate_strategy_draft
-    symbols = [
-        str(symbol).strip().upper()
-        for symbol in draft.asset_universe or []
-        if str(symbol).strip()
-    ]
-    if not symbols:
-        return None
-    raw_window = draft.extra_parameters.get("date_range_raw_text")
-    return KnowledgeQueryExtraction(
-        question_kind="market_stats",
-        symbols=symbols,
-        date_range_raw_text=(str(raw_window) if raw_window not in (None, "") else None),
     )
 
 
@@ -547,24 +534,34 @@ def _stage_result(
     interpretation: StructuredInterpretation,
     query: KnowledgeQueryExtraction,
     user: UserState,
+    decision: InterpretDecision | None = None,
 ) -> StageResult:
-    decision = InterpretDecision(
-        intent="conversation_followup",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary=interpretation.user_goal_summary,
-        candidate_strategy_draft=StrategySummary(),
-        missing_required_fields=[],
-        optional_parameter_opportunity=[],
-        confidence=0.85,
-        arbitration_mode="deterministic",
-        reason_codes=[reason_code],
-        effective_response_profile=resolve_effective_response_profile(
-            user=user,
-            explicit_overrides=None,
-        ),
-        semantic_turn_act="educational_question",
-    )
+    if decision is not None:
+        # A typed entry keeps its identity; the serving path only adds its
+        # reason code (#344: relabeling dropped the discovery payload).
+        decision = decision.model_copy(
+            update={
+                "reason_codes": list(dict.fromkeys([*decision.reason_codes, reason_code]))
+            }
+        )
+    else:
+        decision = InterpretDecision(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary=interpretation.user_goal_summary,
+            candidate_strategy_draft=StrategySummary(),
+            missing_required_fields=[],
+            optional_parameter_opportunity=[],
+            confidence=0.85,
+            arbitration_mode="deterministic",
+            reason_codes=[reason_code],
+            effective_response_profile=resolve_effective_response_profile(
+                user=user,
+                explicit_overrides=None,
+            ),
+            semantic_turn_act="educational_question",
+        )
     stage_patch: dict[str, Any] = {"assistant_response": answer}
     sidecar = _try_next_sidecar(
         query=query,

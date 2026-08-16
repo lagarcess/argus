@@ -238,7 +238,14 @@ def test_inconsistent_dca_snapshot_has_no_retest_setup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run = _persisted_run(monkeypatch, _DCA)
-    run["config_snapshot"]["engine_config"] = {"recurring_contribution": 999.0}
+    run["config_snapshot"]["engine_config"] = {
+        "parameters": {"dca_cadence": "monthly"},
+        "dca_capital": {
+            "schema_version": "dca_capital_v1",
+            "starting_capital": 0.0,
+            "contribution": 999.0,
+        },
+    }
 
     assert retest_setup_from_run(run, today=_TODAY) is None
 
@@ -501,3 +508,43 @@ def test_unavailable_currency_pair_timeframe_has_no_fake_repair(
     assert action.state == "cant_do_it"
     assert action.reason_code == "provider_timeframe_unavailable"
     assert action.repair is None
+
+
+@pytest.mark.parametrize("seed", [0.0, 7_500.0])
+def test_a_retest_carries_both_money_roles_of_the_stored_plan(seed: float) -> None:
+    """Retesting a recurring plan must not refund or double-spend its seed.
+
+    `initial_capital` means the seed for a recurring plan, so writing the
+    contribution there would fund the run twice over, and omitting the seed
+    from the launch payload would silently drop it.
+    """
+    from argus.agent_runtime.retest_confirmation import retest_confirmation_payload
+    from argus.domain.retest_setup import RetestSetup
+
+    setup = RetestSetup(
+        source_run_id="run-455",
+        strategy_type="dca_accumulation",
+        symbols=("AAPL",),
+        asset_class="equity",
+        timeframe="1D",
+        original_start=date(2024, 1, 2),
+        original_end=date(2024, 6, 28),
+        start=date(2024, 1, 2),
+        end=date(2024, 12, 31),
+        sizing_mode="capital_amount",
+        benchmark_symbol="SPY",
+        capital_amount=200.0,
+        cadence="monthly",
+        recurring_contribution=200.0,
+        starting_capital=seed,
+    )
+
+    payload = retest_confirmation_payload(setup, language="en")
+
+    launch = payload["launch_payload"]
+    assert launch["starting_capital"] == seed
+    assert launch["recurring_contribution"] == 200.0
+    assert launch["capital_amount"] == 200.0
+    initial_capital = payload["optional_parameters"]["initial_capital"]
+    assert initial_capital["value"] == seed
+    assert initial_capital["source"] == "user"

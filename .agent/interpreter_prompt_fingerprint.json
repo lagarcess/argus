@@ -1,0 +1,91 @@
+{
+  "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
+  "last_measured": {
+    "commit": "9586a78d9707acea556541b922b4de144440aa5b",
+    "scorecard": "docs/reports/evidence/2026-08-15-category-discovery-payload-routing/live-eval-scorecard-run2.json",
+    "passed": 49,
+    "failed": 11
+  },
+  "surface": {
+    "src/argus/agent_runtime/discovery/prompt_guidance.py": {
+      "entries": 1,
+      "chars": 2106,
+      "sha256": "4b388924ec901e60bc6e79033287d6af18b6d77d319e9600e15387e301b6f5d7"
+    },
+    "src/argus/agent_runtime/interpreter/audits.py": {
+      "entries": 42,
+      "chars": 7391,
+      "sha256": "a48f72abb1f9e788afdc996289a3b3a3513881dad44ff7aca7825549f5b0e0e1"
+    },
+    "src/argus/agent_runtime/interpreter/benchmark_prompt_guidance.py": {
+      "entries": 1,
+      "chars": 1297,
+      "sha256": "2c6400bc91448115021ec9a9643cecce4256219692c6c123c5a4b31b20e6414c"
+    },
+    "src/argus/agent_runtime/interpreter/discovery_focused_read.py": {
+      "entries": 2,
+      "chars": 1805,
+      "sha256": "1f8080fa6828678be712bac05db634a2a0563e4df744152fe18e68b99626e841"
+    },
+    "src/argus/agent_runtime/interpreter/execution_cost_capability.py": {
+      "entries": 1,
+      "chars": 962,
+      "sha256": "736d0e580651317633a94ff73aadb391d2262ca70626a360ca7356408b576f3e"
+    },
+    "src/argus/agent_runtime/interpreter/focused_extraction.py": {
+      "entries": 4,
+      "chars": 7248,
+      "sha256": "6552d6a466954532a89181903f175dae66564300c24ada5cdc7f6472032c752e"
+    },
+    "src/argus/agent_runtime/interpreter/signal_rule.py": {
+      "entries": 1,
+      "chars": 784,
+      "sha256": "71164b2801ce907421f94ec4fe3b2ab1546943580a8240451335c0db2a8c26d7"
+    },
+    "src/argus/agent_runtime/interpreter/unsupported_admission.py": {
+      "entries": 2,
+      "chars": 2370,
+      "sha256": "b873f42ff8e2d008e67107062139de4c7df3094d5f60e481def990dde264e9a4"
+    },
+    "src/argus/agent_runtime/llm_clarifier.py": {
+      "entries": 6,
+      "chars": 5573,
+      "sha256": "15ec1bdd530ac63e0d1a66bbf5e2c6687535cc89746b5f676b09168ff24b3ff5"
+    },
+    "src/argus/agent_runtime/llm_interpreter.py": {
+      "entries": 3,
+      "chars": 20900,
+      "sha256": "b6ccc08100f01e427b5d91e482be47efb17cbea1f68f57feccf55b7bf3cfd58c"
+    },
+    "src/argus/agent_runtime/llm_interpreter_types.py": {
+      "entries": 38,
+      "chars": 9378,
+      "sha256": "0811efd906b093f07881cf44dcfdd9871bd6593b75b2d2c379663901f565f12c"
+    },
+    "src/argus/agent_runtime/research_grounded.py": {
+      "entries": 3,
+      "chars": 1868,
+      "sha256": "af6520a67ca45ae10f5b746508cd4dedf0e0d292e5b0b997f05a95b899c10e3b"
+    },
+    "src/argus/agent_runtime/result_followups.py": {
+      "entries": 11,
+      "chars": 1969,
+      "sha256": "d288cf8becc776cebe35f75a503a2992e5e7855fcd95f9f5a231e51924c3b2c4"
+    },
+    "src/argus/agent_runtime/stages/execute.py": {
+      "entries": 2,
+      "chars": 1584,
+      "sha256": "46c86259f37db7b674728bd358277bd369e96a4f399df32235e0ecd33511d92d"
+    },
+    "src/argus/agent_runtime/stages/explain.py": {
+      "entries": 10,
+      "chars": 1295,
+      "sha256": "7f817d3989813e4061a9e45099839fc8bc14bff4c87eeb4ee7bca774bc846260"
+    },
+    "src/argus/agent_runtime/stages/interpret_types.py": {
+      "entries": 2,
+      "chars": 713,
+      "sha256": "15f28666f1e0a1b154a8706ca90ebef8e4799ae3198187b052ff8db741d18347"
+    }
+  }
+}

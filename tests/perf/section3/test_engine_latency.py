@@ -78,10 +78,14 @@ def _config() -> dict[str, object]:
         "start_date": "2023-01-01",
         "end_date": "2025-12-30",
         "side": "long",
-        "starting_capital": 100000,
         "allocation_method": "equal_weight",
         "benchmark_symbol": "SPY",
-        "parameters": {},
+        "parameters": {"dca_cadence": "weekly"},
+        "dca_capital": {
+            "schema_version": "dca_capital_v1",
+            "starting_capital": 0.0,
+            "contribution": 100000.0,
+        },
     }
 
 

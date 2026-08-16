@@ -32,7 +32,6 @@ def _response_intent_with_raw_value(raw_value: str) -> dict:
 
 def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
     prose = _unsupported_recovery_fallback(
-        language="en",
         response_intent=_response_intent_with_raw_value(
             "invalid_chronological_date_range"
         ),
@@ -45,27 +44,30 @@ def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
 
 
 @pytest.mark.parametrize(
-    ("language", "expected_generic_subject"),
-    [("en", "that rule"), ("es-419", "that rule")],
-)
-@pytest.mark.parametrize(
     "raw_value",
     ["User wants to invest $500", "MACD golden cross", "BTC_USDT"],
 )
 def test_issue_453_generic_raw_value_never_renders_as_subject(
-    language: str,
-    expected_generic_subject: str,
     raw_value: str,
 ) -> None:
+    """This fallback is English compatibility prose and no longer takes a
+    language, so there is no bilingual claim to make here.
+
+    It used to be parametrized over `en` and `es-419` with the same English
+    expectation in both rows, which read as Spanish coverage and proved nothing
+    (#489). The real bilingual property, that the reader sees Spanish, is
+    asserted at the seam in `test_workspace_language_prose.py` and at the
+    presentation boundary in the frontend suite.
+    """
+
     prose = _unsupported_recovery_fallback(
-        language=language,
         response_intent=_response_intent_with_raw_value(raw_value),
         strategy=StrategySummary(asset_universe=["NVDA"]),
     )
 
     assert prose is not None
     assert raw_value not in prose
-    assert expected_generic_subject in prose
+    assert "that rule" in prose
 
 
 def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> None:
@@ -79,7 +81,6 @@ def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> 
         del constraint["category"]
 
     prose = _unsupported_recovery_fallback(
-        language="en",
         response_intent=intent,
         strategy=StrategySummary(asset_universe=["WMT"]),
     )
@@ -96,7 +97,6 @@ def test_explanation_sentence_never_renders_as_subject() -> None:
     not a name; sentence punctuation disqualifies a subject."""
 
     prose = _unsupported_recovery_fallback(
-        language="en",
         response_intent=_response_intent_with_raw_value(
             "The requested assumption change needs clarification."
         ),

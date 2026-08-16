@@ -44,7 +44,7 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
         ),
         f"{_LABEL_KEY_PREFIX}adjust_signal_periods": "Test different signal periods",
         f"{_LABEL_KEY_PREFIX}adjust_contribution_cadence": (
-            "Test a different contribution cadence"
+            "Test a different contribution schedule"
         ),
         f"{_LABEL_KEY_PREFIX}compare_buy_and_hold": "Compare with buy and hold",
     },
@@ -73,7 +73,7 @@ NEXT_EXPERIMENT_ACTION_LABELS: dict[str, dict[str, str]] = {
         ),
         f"{_LABEL_KEY_PREFIX}adjust_signal_periods": "Probar otros períodos de la señal",
         f"{_LABEL_KEY_PREFIX}adjust_contribution_cadence": (
-            "Probar otra cadencia de aportes"
+            "Probar otro calendario de aportes"
         ),
         f"{_LABEL_KEY_PREFIX}compare_buy_and_hold": "Comparar con comprar y mantener",
     },
@@ -95,7 +95,7 @@ NEXT_EXPERIMENT_SHORT_LABELS: dict[str, dict[str, str]] = {
         "supported_rsi_or_ma_rule": "Simplify the rule",
         "adjust_indicator_thresholds": "Other thresholds",
         "adjust_signal_periods": "Other signal periods",
-        "adjust_contribution_cadence": "Other cadence",
+        "adjust_contribution_cadence": "How often",
         "compare_buy_and_hold": "Compare with holding",
     },
     "es-419": {
@@ -108,7 +108,7 @@ NEXT_EXPERIMENT_SHORT_LABELS: dict[str, dict[str, str]] = {
         "supported_rsi_or_ma_rule": "Simplificar la regla",
         "adjust_indicator_thresholds": "Otros umbrales",
         "adjust_signal_periods": "Otros períodos",
-        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_contribution_cadence": "Cada cuánto",
         "compare_buy_and_hold": "Comparar con mantener",
     },
 }

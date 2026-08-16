@@ -24,6 +24,7 @@ ProductEventKind = Literal[
     "receipt_revoked",
     "receipt_viewed",
     "receipt_try_argus",
+    "account_registration_completed",
 ]
 
 _PRODUCT_EVENT_MAP: dict[ProductEventKind, tuple[EventType, EventAction, FeatureArea]] = {
@@ -39,6 +40,7 @@ _PRODUCT_EVENT_MAP: dict[ProductEventKind, tuple[EventType, EventAction, Feature
     "receipt_revoked": ("storage", "redacted", "evidence_capture"),
     "receipt_viewed": ("system", "completed", "guest_acquisition"),
     "receipt_try_argus": ("system", "started", "guest_acquisition"),
+    "account_registration_completed": ("storage", "completed", "guest_acquisition"),
 }
 
 

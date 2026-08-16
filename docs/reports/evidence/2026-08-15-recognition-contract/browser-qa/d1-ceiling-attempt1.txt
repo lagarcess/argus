@@ -1,0 +1,6 @@
+scenario: D1 "I only have $5,000 to invest in VOO every month through 2024" — attempt 1
+DOM: card "Compras recurrentes — Listo para ejecutar" APORTE $5,000 cada mes · Capital inicial $0
+  · 2 ene → 31 dic 2024 · SPY; amounts editor expanded (Capital inicial / Aporte / cadence chips)
+observation: model committed to the per-month reading (sentence is genuinely ambiguous in English);
+  card renders that reading coherently; nothing runs without approval. The ceiling-recovery mode
+  (ask the monthly amount, name the $5,000 cap) is the eval-locked reading — sampling more attempts.

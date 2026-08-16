@@ -64,7 +64,11 @@ export default function ReceiptBody({
   // rendered from the key here, in the viewer's language, as the facts above are.
   const metricLabel = (entry: { key: string }) =>
     (copy.metric_labels as Record<string, string>)[entry.key] ?? entry.key;
-  const headline = metric("total_return_pct", "total_return");
+  const headline = metric(
+    "total_return_pct",
+    "contribution_return_pct",
+    "total_return",
+  );
   const drawdown = metric("max_drawdown_pct", "max_drawdown");
   const isNegative = Boolean(headline?.value.trim().startsWith("-"));
 

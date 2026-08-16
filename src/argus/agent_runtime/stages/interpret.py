@@ -31,7 +31,11 @@ from argus.agent_runtime.coverage_recovery import (
 )
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.interpreter import provider_context_assets
+from argus.agent_runtime.interpreter.unsupported_request_context import (
+    materialized_unsupported_request_constraint,
+)
 from argus.agent_runtime.interpreter.unsupported_admission import (
+    strategy_draft_future_horizon,
     strategy_route_admission_result,
     strategy_route_flags_with_future_precedence,
 )
@@ -903,6 +907,21 @@ async def _stage_result_from_interpretation(
             unsupported_constraints = _dedupe_unsupported_constraints(
                 [*unsupported_constraints, strategy_logic_constraint]
             )
+    unsupported_recovery_reason_codes: list[str] = []
+    materialized_unsupported_constraint = materialized_unsupported_request_constraint(
+        interpretation=interpretation,
+        strategy=strategy,
+        existing_constraints=unsupported_constraints,
+        has_future_horizon=strategy_draft_future_horizon(strategy) is not None,
+        contract=capability_contract,
+    )
+    if materialized_unsupported_constraint is not None:
+        unsupported_constraints = _dedupe_unsupported_constraints(
+            [*unsupported_constraints, materialized_unsupported_constraint]
+        )
+        unsupported_recovery_reason_codes.append(
+            "unsupported_request_recovery_materialized"
+        )
     missing_required_fields = _missing_fields_for_interpretation(
         interpretation=interpretation,
         strategy=strategy,
@@ -1029,6 +1048,7 @@ async def _stage_result_from_interpretation(
             *artifact_target_reason_codes,
             *hidden_context_guard_reason_codes,
             *pending_date_edit_reason_codes,
+            *unsupported_recovery_reason_codes,
             *post_validation_reason_codes,
             *interpretation.reason_codes,
         ],

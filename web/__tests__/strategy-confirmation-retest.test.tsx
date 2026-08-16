@@ -56,7 +56,6 @@ function confirmation(retestPeriod: RetestPeriodFixture): RetestConfirmationFixt
       { key: "strategy", label: "Strategy", value: "Buy and hold" },
       { key: "starting_capital", label: "Starting capital", value: "$10,000" },
       { key: "period", label: "Period", value: "provider-owned period" },
-      { key: "cadence", label: "Cadence", value: "monthly" },
     ],
     assumptions: ["This fallback must not replace typed facts"],
     actions: [
@@ -117,7 +116,6 @@ describe("Retest confirmation period disclosure", () => {
 
     // Retest changes only the period; unrelated rows and assumptions survive.
     expect(html).toContain("$10,000");
-    expect(html).toContain("Monthly");
     expect(html).toContain("Daily data");
     expect(html).toContain("No fees");
     expect(html).toContain("No slippage");

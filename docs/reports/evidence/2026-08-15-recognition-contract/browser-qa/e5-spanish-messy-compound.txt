@@ -1,0 +1,11 @@
+scenario: E5 Spanish messy 4-op compound
+prompt: "bueno mira, quita AAPL, mejor agrega TSLA y GOOGL, cambia el benchmark a QQQ y pon $8,000"
+turn 1 DOM: model collapsed the compound into a whole-set read (TSLA, GOOGL only);
+  asset_role_constraints REFUSED the materialization (backend log receipt) -> no card rewrite,
+  assistant asked to confirm instead. FINDING(minor): the confirmation question rendered in
+  ENGLISH on a Spanish turn ("Got it—swap AAPL for..."); UI chrome itself correctly Spanish.
+turn 2 ("sí, pero mantén MSFT y NVDA también") DOM: new card
+  MSFT / NVDA / TSLA / GOOGL — Comprar y mantener — Listo para ejecutar
+  CAPITAL INICIAL $8,000 · PERIODO 2 ene 2024 → 31 dic 2024 · Referencia: QQQ
+verdict: PASS with one extra turn — all four operations landed, AAPL out, un-named members kept,
+  guard blocked the wrong-card path; language break in the fallback prose reported

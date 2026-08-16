@@ -363,6 +363,7 @@
       "artifact_action_retry_rebuilt_confirmation": "Todavía tengo esa configuración fallida. Reconstruí el borrador para que puedas revisar la tarjeta y reintentar cuando estés listo.",
       "artifact_action_retry_inactive": "Ese reintento ya no está conectado a una ejecución fallida activa. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
       "execution_data_unavailable": "La configuración sigue aquí, pero no pude obtener {{dataLabel}} para esa simulación en este momento. Inténtalo de nuevo, cambia las fechas o elige otro activo compatible.",
+      "backtest_capacity_exceeded": "Argus ya está corriendo todas las pruebas que puede en este momento, así que esta no se inició. Nada falló y nada se perdió: tu configuración quedó tal como la dejaste. Vuelve a ejecutarla en unos minutos.",
       "data_kind": {
         "benchmark": "datos de referencia",
         "market": "datos de mercado"
@@ -381,9 +382,9 @@
       "asset_target": "¿Qué activo quieres probar?",
       "assumption": "¿Qué supuesto quieres ajustar?",
       "assumption_for_asset": "¿Qué supuesto quieres ajustar para {{symbol}}?",
-      "sizing_amount_schedule": "¿Cuánto quieres invertir en cada compra y con qué frecuencia?",
+      "sizing_amount_schedule": "¿Cuánto quieres invertir en cada compra y cada cuánto?",
       "sizing_amount": "¿Cuánto quieres invertir?",
-      "schedule": "¿Con qué frecuencia quieres hacer las compras?",
+      "schedule": "¿Cada cuánto quieres hacer las compras?",
       "rule_definition": "¿Qué regla de entrada o salida quieres probar?",
       "refinement": "¿Qué quieres ajustar de esta idea?",
       "refinement_for_asset": "¿Qué quieres cambiar, comparar o poner a prueba ahora para {{assetText}}?",
@@ -503,6 +504,7 @@
         "lowest_value": "Valor más bajo",
         "final_value": "Valor final",
         "total_return": "Retorno total",
+        "contribution_return_pct": "Retorno sobre aportes",
         "benchmark_return": "Retorno de referencia",
         "benchmark_delta": "Frente a la referencia",
         "benchmark_symbol": "Referencia",
@@ -528,13 +530,6 @@
       "equity": "Acciones",
       "crypto": "Cripto",
       "currency_pair": "Par de divisas"
-    },
-    "cadence": {
-      "daily": "Diaria",
-      "weekly": "Semanal",
-      "biweekly": "Quincenal",
-      "monthly": "Mensual",
-      "quarterly": "Trimestral"
     },
     "view_details": "Ver detalles",
     "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
@@ -610,6 +605,7 @@
     "result_card": {
       "ending_value": "Valor final",
       "total_return": "Rendimiento total",
+      "contribution_return": "Retorno sobre aportes",
       "compared_with_benchmark": "Comparado con referencia",
       "compared_with_symbol": "Comparado con {{symbol}}",
       "worst_drop": "Peor caída",
@@ -632,6 +628,7 @@
       "gain": "ganancia",
       "loss": "pérdida",
       "total_return_suffix": "rendimiento total",
+      "contribution_return_suffix": "retorno sobre aportes",
       "benchmark_unavailable": "Referencia no disponible",
       "percentage_points": "{{value}} puntos porcentuales",
       "in_line_with": "En línea con {{symbol}}",
@@ -646,7 +643,6 @@
         "side": "Dirección",
         "allocation": "Asignación",
         "benchmark": "Referencia",
-        "cadence": "Cadencia",
         "contribution": "Contribución",
         "entry_rule": "Regla de entrada",
         "exit_rule": "Regla de salida",
@@ -782,7 +778,6 @@
         "strategy": "Estrategia",
         "assets": "Activos",
         "period": "Periodo",
-        "cadence": "Frecuencia",
         "buy_rule": "Regla de compra",
         "exit_rule": "Regla de salida",
         "starting_capital": "Capital inicial",
@@ -812,7 +807,7 @@
         "edit_contribution": "Editar aporte",
         "edit_dates": "Editar fechas",
         "capital_label": "Capital inicial",
-        "contribution_label": "Aporte por compra",
+        "contribution_label": "Aporte",
         "start_label": "Fecha de inicio",
         "end_label": "Fecha de fin",
         "apply": "Aplicar",
@@ -828,15 +823,22 @@
           "provider_history_start": "Los datos de esta prueba comienzan después; elige una fecha de inicio igual o posterior a {{min}}.",
           "no_common_data": "Estos activos no comparten datos suficientes para ese periodo.",
           "invalid_contribution": "Cada aporte debe estar entre {{min}} y {{max}}.",
-          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo."
-        }
+          "confirmation_changed": "Otro cambio llegó al mismo tiempo. Intenta de nuevo.",
+          "invalid_seed": "El capital inicial debe estar entre {{min}} y {{max}}.",
+          "dca_needs_money": "Define un capital inicial, un aporte, o ambos.",
+          "dca_contribution_zero": "Sin aporte esto es comprar y mantener el capital inicial. Agrega un aporte, o pruébalo como comprar y mantener.",
+          "contribution_period_exceeds_window": "Ese período no cabe en las fechas de la prueba. Elige un período más corto o un rango de fechas más largo."
+        },
+        "edit_money": "Editar montos",
+        "starting_capital_label": "Capital inicial",
+        "period_label": "Cada cuánto"
       },
       "edit_disclosure": {
         "unapplied": "No pude cambiar {{targets}}; el resto quedó aplicado abajo.",
         "targets": {
           "asset": "los activos",
           "benchmark": "el benchmark",
-          "cadence": "la frecuencia",
+          "cadence": "el período del aporte",
           "capital": "el capital inicial",
           "date_window": "las fechas",
           "fees": "las comisiones",
@@ -844,10 +846,18 @@
           "slippage": "el deslizamiento",
           "strategy_family": "la estrategia",
           "timeframe": "el intervalo",
-          "generic": "esa parte"
+          "generic": "esa parte",
+          "starting_capital": "el capital inicial"
         }
       },
-      "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}."
+      "benchmark_adjustment": "{{target}} no está disponible en nuestro proveedor de datos, así que la comparación es contra {{benchmark}}.",
+      "contribution_periods": {
+        "daily": "cada día",
+        "weekly": "cada semana",
+        "biweekly": "cada dos semanas",
+        "monthly": "cada mes",
+        "quarterly": "cada trimestre"
+      }
     },
     "next_experiments": {
       "section": "Qué probar después",
@@ -861,7 +871,7 @@
         "supported_rsi_or_ma_rule": "Simplificar a una regla RSI o SMA/EMA compatible",
         "adjust_indicator_thresholds": "Probar otros umbrales del indicador",
         "adjust_signal_periods": "Probar otros períodos de la señal",
-        "adjust_contribution_cadence": "Probar otra cadencia de aportes",
+        "adjust_contribution_cadence": "Probar otro calendario de aportes",
         "compare_buy_and_hold": "Comparar con comprar y mantener",
         "recurring_monthly_buys": "Probar compras mensuales recurrentes"
       },
@@ -871,7 +881,7 @@
         "deep_drawdown": "La peor caída fue {{drawdown}}%"
       },
       "labels_short": {
-        "adjust_contribution_cadence": "Otra cadencia",
+        "adjust_contribution_cadence": "Cada cuánto",
         "adjust_indicator_thresholds": "Otros umbrales",
         "adjust_signal_periods": "Otros períodos",
         "change_date_range": "Otras fechas",
@@ -1202,6 +1212,7 @@
     "match_count_other": "{{count}} coincidencias",
     "metric_labels": {
       "benchmark_return_pct": "Rendimiento de referencia",
+      "contribution_return_pct": "Retorno sobre aportes",
       "delta_vs_benchmark_pct": "Contra referencia",
       "excess_return_pct": "Contra referencia",
       "max_drawdown_pct": "Peor caída",
@@ -1554,7 +1565,8 @@
       "benchmark_same_modeled_costs": "Comparado con {{symbol}}, mismos costos",
       "recurring_contribution": "${{amount}} cada vez",
       "recurring_contribution_cadence": "${{amount}} {{cadence}}",
-      "starting_principal": "${{amount}} al inicio"
+      "starting_principal": "${{amount}} al inicio",
+      "fractional_shares": "Fracciones de acciones, nada queda en efectivo"
     },
     "strategy_type_values": {
       "buy and hold": "Comprar y mantener",
@@ -1568,6 +1580,7 @@
     "metric_labels": {
       "cash_value": "Valor final",
       "total_return_pct": "Retorno total",
+      "contribution_return_pct": "Retorno sobre aportes",
       "max_drawdown_pct": "Peor caída",
       "win_rate": "Aciertos",
       "benchmark_return_pct": "Referencia",

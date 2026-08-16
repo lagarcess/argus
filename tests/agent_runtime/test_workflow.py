@@ -1016,7 +1016,7 @@ def test_workflow_publishes_pending_response_intent_options_for_recovery() -> No
         },
     )
     constraint = UnsupportedConstraint(
-        category="unsupported_dca_starting_principal",
+        category="unsupported_dca_contribution_ceiling",
         raw_value="$9,000 contribution cap",
         explanation=(
             "The DCA engine can run the recurring contribution but not the cap."

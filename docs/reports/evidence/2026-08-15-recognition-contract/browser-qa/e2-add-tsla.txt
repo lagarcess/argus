@@ -1,0 +1,4 @@
+scenario: E2 "add TSLA" on live AAPL/MSFT/NVDA card
+edit turn DOM extract: new card AAPL / MSFT / NVDA / TSLA — Buy and Hold — Ready to run
+  $1,000 · Jan 2, 2024 → Dec 31, 2024 · Benchmark: SPY (all preserved)
+verdict: PASS — four assets, none dropped

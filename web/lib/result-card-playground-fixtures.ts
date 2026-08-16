@@ -352,6 +352,8 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
           benchmark_symbol: "SPY",
           cadence: "monthly",
           capital_amount: 250,
+          recurring_contribution: 250,
+          starting_capital: 0,
         },
         parameters: {
           dca_cadence: "monthly",
@@ -361,7 +363,11 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       statusLabel: "Simulation Complete",
       metrics: [
         { label: "Ending value", value: "$1,000 -> $1,000" },
-        { label: "Total return", value: "0.0%" },
+        {
+          key: "contribution_return_pct",
+          label: "Return on contributions",
+          value: "0.0%",
+        },
         { label: "Compared with SPY", value: "In line with SPY" },
         { label: "Worst drop", value: "-2.2%" },
       ],

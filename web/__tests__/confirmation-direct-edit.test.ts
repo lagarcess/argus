@@ -106,7 +106,9 @@ describe("confirmation direct edit surface", () => {
 
   test("input seeds come from typed fields, never parsed display strings", () => {
     const editor = source("components/chat/ConfirmationDirectEdit.tsx");
-    expect(editor).toContain("display_facts?.capital");
+    expect(editor).toContain("facts?.capital");
+    expect(editor).toContain("facts?.recurring_contribution");
+    expect(editor).toContain("facts?.starting_capital");
     expect(editor).toContain("date_range?.start");
     expect(editor).toContain("costEditDraftFromDisplayFacts");
     expect(editor).not.toContain("rows.find");
@@ -206,5 +208,20 @@ describe("confirmation direct edit surface", () => {
     // refused, not that the card died; the copy says retry, not give up.
     const component = source("components/chat/ConfirmationDirectEdit.tsx");
     expect(component).toContain('case "confirmation_changed"');
+  });
+});
+
+describe("issue 455: the period picker never chooses for the user", () => {
+  test("shows the card's own period even when the served window no longer holds it", () => {
+    const editor = source("components/chat/ConfirmationDirectEdit.tsx");
+    // The draft is the card's period, full stop. Falling back to the first
+    // offered option would silently replace a period the user chose.
+    expect(editor).toContain(
+      'setPeriodDraft(facts?.contribution_period ?? periodOptions[0] ?? "")',
+    );
+    expect(editor).not.toContain("periodOptions.includes(period) ? period");
+    // A period the window no longer holds is still shown, so the select can
+    // render the truth rather than quietly moving off it.
+    expect(editor).toContain("cardPeriod && !offeredPeriods.includes(cardPeriod)");
   });
 });

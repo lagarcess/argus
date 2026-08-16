@@ -1,7 +1,7 @@
 import type { StrategyResultPayload } from "@/components/chat/types";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
-import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 
 type MetricLike = {
@@ -18,6 +18,7 @@ type ActionLike = {
 export type ResultCardDisplayCopy = {
   endingValueLabel: string;
   totalReturnLabel: string;
+  contributionReturnLabel: string;
   comparedWithBenchmarkLabel: string;
   comparedWithSymbolLabel: (symbol: string) => string;
   worstDropLabel: string;
@@ -29,6 +30,7 @@ export type ResultCardDisplayCopy = {
   gainNoun: string;
   lossNoun: string;
   totalReturnSuffix: string;
+  contributionReturnSuffix: string;
   benchmarkUnavailable: string;
   percentagePoints: (value: string) => string;
   inLineWith: (symbol: string) => string;
@@ -45,8 +47,8 @@ export type ResultCardDisplayCopy = {
   sideLabel: string;
   allocationLabel: string;
   benchmarkLabel: string;
-  cadenceLabel: string;
-  cadenceValueLabel: (cadence: string) => string;
+  /** Amount and period as one phrase, so no surface labels a period alone. */
+  contributionPhrase: (amount: string, period: string) => string;
   contributionLabel: string;
   entryRuleLabel: string;
   exitRuleLabel: string;
@@ -69,6 +71,7 @@ export type ResultCardDisplayOptions = {
 export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   endingValueLabel: "Ending value",
   totalReturnLabel: "Total return",
+  contributionReturnLabel: "Return on contributions",
   comparedWithBenchmarkLabel: "Compared with benchmark",
   comparedWithSymbolLabel: (symbol) => `Compared with ${symbol}`,
   worstDropLabel: "Worst drop",
@@ -80,6 +83,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   gainNoun: "gain",
   lossNoun: "loss",
   totalReturnSuffix: "total return",
+  contributionReturnSuffix: "return on contributions",
   benchmarkUnavailable: "Benchmark unavailable",
   percentagePoints: (value) => `${value} percentage points`,
   inLineWith: (symbol) => `In line with ${symbol}`,
@@ -96,8 +100,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   sideLabel: "Side",
   allocationLabel: "Allocation",
   benchmarkLabel: "Benchmark",
-  cadenceLabel: "Cadence",
-  cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence) ?? cadence,
+  contributionPhrase: (amount, period) => contributionPhrase(amount, period),
   contributionLabel: "Contribution",
   entryRuleLabel: "Entry rule",
   exitRuleLabel: "Exit rule",
@@ -141,9 +144,11 @@ export function resultMetricDisplayOrder(metric: MetricLike) {
   }
   if (
     metric.key === "total_return_pct" ||
+    metric.key === "contribution_return_pct" ||
     metric.label === "Total Return (%)" ||
     metric.label === "Total Return" ||
-    metric.label === "Total return"
+    metric.label === "Total return" ||
+    metric.label === "Return on contributions"
   ) {
     return 1;
   }
@@ -172,6 +177,9 @@ export function displayResultMetricLabel(
   options?: ResultCardDisplayOptions,
 ) {
   const copy = resultCardCopy(options);
+  if (metric.key === "contribution_return_pct") {
+    return copy.contributionReturnLabel;
+  }
   if (
     metric.key === "total_return_pct" ||
     metric.label === "Total Return (%)" ||
@@ -281,6 +289,9 @@ export function heroDeltaEvidenceView(
     "Total return",
     "Total Return",
     "Total Return (%)",
+    copy.contributionReturnLabel,
+    "Return on contributions",
+    "Retorno sobre aportes",
   ]);
   const benchmark = findBenchmarkMetric(result, copy);
   const worstDrop = findMetric(result, [
@@ -290,6 +301,13 @@ export function heroDeltaEvidenceView(
   ]);
   const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
   const totalReturnValue = normalizeSignedPercent(totalReturn?.value);
+  const isContributionReturn =
+    totalReturn?.key === "contribution_return_pct" ||
+    [
+      copy.contributionReturnLabel.toLowerCase(),
+      "return on contributions",
+      "retorno sobre aportes",
+    ].includes((totalReturn?.label ?? "").toLowerCase());
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
   const benchmarkSymbol = facts.benchmark ?? benchmarkSymbolFromMetric(benchmark);
@@ -298,7 +316,13 @@ export function heroDeltaEvidenceView(
     hero: {
       value: parsedEndingValue?.endingDisplay ?? endingValue?.value ?? copy.unavailable,
       label: copy.endingValueLabel,
-      detail: heroDetail(parsedEndingValue?.change, totalReturnValue, copy, options?.locale),
+      detail: heroDetail(
+        parsedEndingValue?.change,
+        totalReturnValue,
+        copy,
+        options?.locale,
+        isContributionReturn ? copy.contributionReturnSuffix : undefined,
+      ),
       tone,
       // Unavailable values must read as absent, never as a healthy metric.
       unavailable: !(parsedEndingValue?.endingDisplay ?? endingValue?.value),
@@ -428,8 +452,12 @@ function executionFacts(
           value: withBenchmarkCostTreatment(benchmark, result, copy),
         }
       : undefined,
-    contribution?.cadence ? { label: copy.cadenceLabel, value: contribution.cadence } : undefined,
-    contribution?.amount ? { label: copy.contributionLabel, value: contribution.amount } : undefined,
+    contribution?.startingCapital
+      ? { label: copy.startingCapitalLabel, value: contribution.startingCapital }
+      : undefined,
+    contribution?.amount
+      ? { label: copy.contributionLabel, value: contribution.amount }
+      : undefined,
     entryRule ? { label: copy.entryRuleLabel, value: entryRule } : undefined,
     exitRule ? { label: copy.exitRuleLabel, value: exitRule } : undefined,
     ...executionCostDetails(result, copy),
@@ -600,15 +628,23 @@ function contributionFromStructuredFacts(
   locale?: string,
   copy = defaultResultCardDisplayCopy,
 ) {
-  const rawCadence =
+  const rawPeriod =
     stringValue(resolvedParameters?.cadence) ?? stringValue(parameters?.dca_cadence);
-  if (!rawCadence) return undefined;
+  if (!rawPeriod) return undefined;
 
-  const cadence = copy.cadenceValueLabel(rawCadence);
-  const amount = numberValue(resolvedParameters?.capital_amount);
+  // One phrase, because nobody has a period without an amount. The seed is the
+  // plan's other role and gets its own row.
+  const amount = numberValue(resolvedParameters?.recurring_contribution);
+  const startingCapital = numberValue(resolvedParameters?.starting_capital);
   return {
-    cadence,
-    amount: amount == null ? undefined : formatCurrency(amount, locale),
+    amount:
+      amount == null
+        ? undefined
+        : copy.contributionPhrase(formatCurrency(amount, locale), rawPeriod),
+    startingCapital:
+      startingCapital == null
+        ? undefined
+        : formatCurrency(startingCapital, locale),
   };
 }
 
@@ -717,15 +753,17 @@ function heroDetail(
   totalReturn: string | undefined,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  returnSuffix?: string,
 ) {
+  const suffix = returnSuffix ?? copy.totalReturnSuffix;
   const returnLabel = totalReturn ?? copy.returnUnavailable;
   if (change == null) return returnLabel;
   if (Math.abs(change) < 0.5) {
-    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${copy.totalReturnSuffix}`;
+    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
   }
   const sign = change > 0 ? "+" : "-";
   const noun = change > 0 ? copy.gainNoun : copy.lossNoun;
-  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${copy.totalReturnSuffix}`;
+  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${suffix}`;
 }
 
 function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
@@ -775,7 +813,7 @@ function benchmarkDisplayValue(
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number, locale = "en-US", currency = "USD") {
+export function formatCurrency(value: number, locale = "en-US", currency = "USD") {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,

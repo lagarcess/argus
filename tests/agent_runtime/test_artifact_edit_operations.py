@@ -485,9 +485,10 @@ async def test_required_benchmark_accepts_materialized_legacy_flat_plan(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_issue_339_compound_edit_retries_partial_plan_and_applies_both_changes(
+async def test_issue_339_compound_edit_completes_partial_plan_and_applies_both_changes(
     monkeypatch,
 ):
+    """A plan that omits a typed primary fact is completed, not retried (#498)."""
     from argus.agent_runtime import llm_interpreter
 
     monkeypatch.setattr(
@@ -567,7 +568,7 @@ async def test_issue_339_compound_edit_retries_partial_plan_and_applies_both_cha
         ),
     )
 
-    assert seen_models == ["partial-model", "complete-model"]
+    assert seen_models == ["partial-model"]
     assert response is not None
     assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
     assert response.candidate_strategy_draft.date_range == {"start": "2026-04-01"}
@@ -900,14 +901,15 @@ async def test_issue_339_partial_date_requires_only_changed_endpoints(
         ),
     )
 
-    assert seen_models == (
-        ["primary-model", "fallback-model"] if expects_date_change else ["primary-model"]
-    )
+    assert seen_models == ["primary-model"]
+    assert response is not None
+    assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
     if expects_date_change:
-        assert response is None
-    else:
-        assert response is not None
-        assert response.candidate_strategy_draft.comparison_baseline == "QQQ"
+        # The changed endpoint the primary read extracted is completed into
+        # the plan and applied, never dropped or retried into a fallback.
+        draft_range = response.candidate_strategy_draft.date_range or {}
+        for endpoint, value in (date_range or {}).items():
+            assert draft_range.get(endpoint) == value
 
 
 @pytest.mark.asyncio

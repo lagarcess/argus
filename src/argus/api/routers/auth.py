@@ -52,6 +52,7 @@ from argus.domain.username_signup import (
     serialized_guest_signup,
     serialized_username_signup,
 )
+from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -90,6 +91,24 @@ def _signup_auth_problem(request: Request) -> HTTPException:
         code="auth_signup_failed",
         title="Signup Failed",
         detail="Signup failed. Please try again.",
+    )
+
+
+def _emit_account_registration_completed_event(
+    profile: User | object,
+    *,
+    surface: str,
+) -> None:
+    profile_id = str(getattr(profile, "id", "") or "").strip()
+    if not profile_id:
+        return
+    capture_product_event(
+        "account_registration_completed",
+        user_id=profile_id,
+        attributes={
+            "surface": surface,
+            "language": getattr(profile, "language", None),
+        },
     )
 
 
@@ -699,6 +718,9 @@ def signup_guest_account(
                 auth_user
             )
             result["user"] = profile.model_dump(mode="json")
+            _emit_account_registration_completed_event(
+                profile, surface="guest_conversion"
+            )
 
             if not isinstance(result.get("session"), dict):
                 return auth_response(request, result)
@@ -793,7 +815,13 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             # Supabase uses an empty identity list for its obfuscated existing-user
             # response. Persisting that fake user would reveal the account exists.
             if identities != []:
-                api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
+                profile = api_state.supabase_gateway.get_or_create_profile_for_auth_user(
+                    auth_user
+                )
+                _emit_account_registration_completed_event(
+                    profile,
+                    surface="direct_signup",
+                )
             return auth_response(request, result)
     except HTTPException:
         raise

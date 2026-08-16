@@ -20,13 +20,16 @@ from argus.domain.backtesting.execution import (
     _execute_long_only_ledger,
     _execution_fill_count,
     _execution_realism_settings,
+    symbol_allocation_capital,
 )
 from argus.domain.backtesting.metrics import (
+    _compute_dca_metrics,
     _compute_metrics,
     _compute_metrics_from_equity,
     portfolio_value_summary,
 )
 from argus.domain.backtesting.signals import _build_signals
+from argus.domain.dca_capital import dca_capital_plan_from_config
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series
 
 _MIN_BENCHMARK_OBSERVATION_COVERAGE = 0.8
@@ -129,14 +132,24 @@ def compute_alpha_metrics(
     symbol_equity_curves: list[pd.Series] = []
     benchmark_equity_curves: list[pd.Series] = []
     gross_symbol_equity_curves: list[pd.Series] = []
+    symbol_external_flows: list[pd.Series] = []
     closed_trades: list[ClosedTrade] = []
     gross_closed_trades: list[ClosedTrade] = []
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
-    allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
     has_modeled_costs = _execution_realism_has_costs(realism)
     is_dca = config["template"] == "dca_accumulation"
+    # A DCA config declares its two money roles; every other template funds
+    # one bankroll. Neither shape can read the other's field.
+    dca_plan = dca_capital_plan_from_config(config) if is_dca else None
+    symbol_dca_plan = (
+        dca_plan.per_symbol(len(config["symbols"])) if dca_plan is not None else None
+    )
+    allocation_capital = symbol_allocation_capital(
+        config,
+        symbol_count=len(config["symbols"]),
+    )
 
     for symbol in config["symbols"]:
         if prepared_market_data is None:
@@ -200,35 +213,45 @@ def compute_alpha_metrics(
             benchmark_curve["equity_curve"], index=close.index, dtype=float
         )
         if is_dca:
-            symbol_equity, invested_capital = _dca_equity_curve(
+            assert symbol_dca_plan is not None
+            dca_result = _dca_equity_curve(
                 close=close,
                 entries=entries,
-                contribution=allocation_capital,
+                contribution=symbol_dca_plan.contribution,
+                starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
             )
-            benchmark_equity, benchmark_invested_capital = _dca_equity_curve(
+            symbol_equity = dca_result.equity_curve
+            benchmark_result = _dca_equity_curve(
                 close=benchmark_normalized,
                 entries=entries,
-                contribution=allocation_capital,
+                contribution=symbol_dca_plan.contribution,
+                starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
             )
+            benchmark_equity = benchmark_result.equity_curve
             if has_modeled_costs:
-                gross_symbol_equity, _ = _dca_equity_curve(
+                gross_result = _dca_equity_curve(
                     close=close,
                     entries=entries,
-                    contribution=allocation_capital,
+                    contribution=symbol_dca_plan.contribution,
+                    starting_capital=symbol_dca_plan.starting_capital,
                 )
-                gross_symbol_equity_curves.append(gross_symbol_equity)
-            invested_capital = max(invested_capital, benchmark_invested_capital)
-            by_symbol[symbol] = _compute_metrics_from_equity(
+                gross_symbol_equity_curves.append(gross_result.equity_curve)
+            symbol_external_flows.append(dca_result.external_flows)
+            invested_capital = max(
+                dca_result.invested_capital,
+                benchmark_result.invested_capital,
+            )
+            by_symbol[symbol] = _compute_dca_metrics(
                 strategy_equity=symbol_equity,
                 benchmark_equity=benchmark_equity,
+                external_flows=dca_result.external_flows,
                 invested_capital=invested_capital,
                 time_basis=symbol_time_basis,
                 trade_count=_execution_fill_count(execution_events, side="buy"),
-                closed_trade_pnls=[],
             )
         else:
             if symbol_execution is None:
@@ -280,15 +303,25 @@ def compute_alpha_metrics(
         prepared_market_data=prepared_market_data,
     )
     aggregate_closed_trade_pnls = [trade.net_pnl for trade in closed_trades]
+    aggregate_external_flows: pd.Series | None = None
     if is_dca:
-        aggregate_invested = allocation_capital * max(trade_count, 1)
-        aggregate_metrics = _compute_metrics_from_equity(
+        assert dca_plan is not None
+        # Contributions are already per symbol, so they scale with the summed
+        # fill count; the seed is one whole-plan amount and is added once.
+        aggregate_invested = dca_plan.starting_capital + allocation_capital * max(
+            trade_count, 1
+        )
+        aggregate_external_flows = _aggregate_external_flows(
+            symbol_external_flows,
+            aggregate_strategy_equity.index,
+        )
+        aggregate_metrics = _compute_dca_metrics(
             strategy_equity=aggregate_strategy_equity,
             benchmark_equity=aggregate_benchmark_equity,
+            external_flows=aggregate_external_flows,
             invested_capital=aggregate_invested,
             time_basis=aggregate_time_basis,
             trade_count=trade_count,
-            closed_trade_pnls=[],
         )
     else:
         aggregate_invested = float(config["starting_capital"])
@@ -312,14 +345,29 @@ def compute_alpha_metrics(
             )
     if has_modeled_costs and gross_symbol_equity_curves:
         gross_aggregate_equity = _sum_without_edge_backfill(gross_symbol_equity_curves)
-        gross_metrics = _compute_metrics_from_equity(
-            strategy_equity=gross_aggregate_equity,
-            benchmark_equity=aggregate_benchmark_equity,
-            invested_capital=aggregate_invested,
-            time_basis=aggregate_time_basis,
-            trade_count=trade_count,
-            closed_trade_pnls=[trade.net_pnl for trade in gross_closed_trades],
-        )
+        if is_dca:
+            # Contribution amounts do not depend on modeled costs, so the
+            # gross side reuses the same deposit schedule.
+            gross_metrics = _compute_dca_metrics(
+                strategy_equity=gross_aggregate_equity,
+                benchmark_equity=aggregate_benchmark_equity,
+                external_flows=_aggregate_external_flows(
+                    symbol_external_flows,
+                    gross_aggregate_equity.index,
+                ),
+                invested_capital=aggregate_invested,
+                time_basis=aggregate_time_basis,
+                trade_count=trade_count,
+            )
+        else:
+            gross_metrics = _compute_metrics_from_equity(
+                strategy_equity=gross_aggregate_equity,
+                benchmark_equity=aggregate_benchmark_equity,
+                invested_capital=aggregate_invested,
+                time_basis=aggregate_time_basis,
+                trade_count=trade_count,
+                closed_trade_pnls=[trade.net_pnl for trade in gross_closed_trades],
+            )
         aggregate_metrics.setdefault("performance", {})["execution_realism"] = (
             _execution_realism_performance_summary(
                 realism=realism,
@@ -363,6 +411,29 @@ def _sum_without_edge_backfill(curves: list[pd.Series]) -> pd.Series:
     if aligned.empty:
         raise ValueError("market_data_unavailable")
     return aligned.sum(axis=1)
+
+
+def _aggregate_external_flows(
+    flow_curves: list[pd.Series],
+    target_index: pd.Index,
+) -> pd.Series:
+    """Sum per-symbol deposit schedules onto the aggregate equity index.
+
+    A deposit on a bar the aggregate index dropped still bought shares, so
+    it rolls forward to the next bar the aggregate keeps.
+    """
+    combined = pd.concat(flow_curves, axis=1).sort_index().fillna(0.0).sum(axis=1)
+    cumulative = combined.cumsum()
+    aligned_cumulative = (
+        cumulative.reindex(cumulative.index.union(target_index))
+        .ffill()
+        .reindex(target_index)
+        .fillna(0.0)
+    )
+    flows = aligned_cumulative.diff()
+    if len(flows) > 0:
+        flows.iloc[0] = float(aligned_cumulative.iloc[0])
+    return flows.astype(float)
 
 
 def _execution_realism_has_costs(realism: dict[str, float | bool]) -> bool:

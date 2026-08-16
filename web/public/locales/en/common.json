@@ -363,6 +363,7 @@
       "artifact_action_retry_rebuilt_confirmation": "I still have that failed setup. I rebuilt the draft so you can review the card and retry when you are ready.",
       "artifact_action_retry_inactive": "That retry is no longer attached to an active failed run. Use the latest retry action or confirm the setup you want to run.",
       "execution_data_unavailable": "The setup is still here, but I could not get {{dataLabel}} for that run right now. Try again, change the dates, or choose a different supported asset.",
+      "backtest_capacity_exceeded": "Argus is already running as many backtests as it can right now, so this one did not start. Nothing broke and nothing was lost: your setup is exactly as you left it. Run it again in a few minutes.",
       "data_kind": {
         "benchmark": "benchmark data",
         "market": "market data"
@@ -503,6 +504,7 @@
         "lowest_value": "Lowest value",
         "final_value": "Final value",
         "total_return": "Total return",
+        "contribution_return_pct": "Return on contributions",
         "benchmark_return": "Benchmark return",
         "benchmark_delta": "Against benchmark",
         "benchmark_symbol": "Benchmark",
@@ -528,13 +530,6 @@
       "equity": "Stocks",
       "crypto": "Crypto",
       "currency_pair": "Currency Pair"
-    },
-    "cadence": {
-      "daily": "Daily",
-      "weekly": "Weekly",
-      "biweekly": "Biweekly",
-      "monthly": "Monthly",
-      "quarterly": "Quarterly"
     },
     "view_details": "View details",
     "new_chat_ready": "New chat ready. What idea should we test?",
@@ -610,6 +605,7 @@
     "result_card": {
       "ending_value": "Ending value",
       "total_return": "Total return",
+      "contribution_return": "Return on contributions",
       "compared_with_benchmark": "Compared with benchmark",
       "compared_with_symbol": "Compared with {{symbol}}",
       "worst_drop": "Worst drop",
@@ -632,6 +628,7 @@
       "gain": "gain",
       "loss": "loss",
       "total_return_suffix": "total return",
+      "contribution_return_suffix": "return on contributions",
       "benchmark_unavailable": "Benchmark unavailable",
       "percentage_points": "{{value}} percentage points",
       "in_line_with": "In line with {{symbol}}",
@@ -646,7 +643,6 @@
         "side": "Side",
         "allocation": "Allocation",
         "benchmark": "Benchmark",
-        "cadence": "Cadence",
         "contribution": "Contribution",
         "entry_rule": "Entry rule",
         "exit_rule": "Exit rule",
@@ -782,7 +778,6 @@
         "strategy": "Strategy",
         "assets": "Assets",
         "period": "Period",
-        "cadence": "Cadence",
         "buy_rule": "Buy rule",
         "exit_rule": "Exit rule",
         "starting_capital": "Starting capital",
@@ -828,15 +823,22 @@
           "provider_history_start": "Data for this test starts later; pick a start date on or after {{min}}.",
           "no_common_data": "These assets do not share enough data for that window.",
           "invalid_contribution": "Each contribution must be between {{min}} and {{max}}.",
-          "confirmation_changed": "Another change landed at the same time. Try again."
-        }
+          "confirmation_changed": "Another change landed at the same time. Try again.",
+          "invalid_seed": "Starting capital must be between {{min}} and {{max}}.",
+          "dca_needs_money": "Set a starting capital, a contribution, or both.",
+          "dca_contribution_zero": "With no contribution this is a buy and hold of the starting capital. Add a contribution, or test it as buy and hold.",
+          "contribution_period_exceeds_window": "That period does not fit inside the tested dates. Pick a shorter period or a longer date range."
+        },
+        "edit_money": "Edit amounts",
+        "starting_capital_label": "Starting capital",
+        "period_label": "How often"
       },
       "edit_disclosure": {
         "unapplied": "I could not change {{targets}}; the rest is applied below.",
         "targets": {
           "asset": "the assets",
           "benchmark": "the benchmark",
-          "cadence": "the cadence",
+          "cadence": "the contribution period",
           "capital": "the starting capital",
           "date_window": "the dates",
           "fees": "the fees",
@@ -844,10 +846,18 @@
           "slippage": "the slippage",
           "strategy_family": "the strategy",
           "timeframe": "the timeframe",
-          "generic": "that part"
+          "generic": "that part",
+          "starting_capital": "the starting capital"
         }
       },
-      "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead."
+      "benchmark_adjustment": "{{target}} isn't available from our data provider, so this compares against {{benchmark}} instead.",
+      "contribution_periods": {
+        "daily": "daily",
+        "weekly": "weekly",
+        "biweekly": "every two weeks",
+        "monthly": "monthly",
+        "quarterly": "quarterly"
+      }
     },
     "next_experiments": {
       "section": "Try next",
@@ -861,7 +871,7 @@
         "supported_rsi_or_ma_rule": "Simplify into a supported RSI or SMA/EMA rule",
         "adjust_indicator_thresholds": "Test different indicator thresholds",
         "adjust_signal_periods": "Test different signal periods",
-        "adjust_contribution_cadence": "Test a different contribution cadence",
+        "adjust_contribution_cadence": "Test a different contribution schedule",
         "compare_buy_and_hold": "Compare with buy and hold",
         "recurring_monthly_buys": "Try monthly recurring buys"
       },
@@ -871,7 +881,7 @@
         "deep_drawdown": "Worst drop was {{drawdown}}%"
       },
       "labels_short": {
-        "adjust_contribution_cadence": "Other cadence",
+        "adjust_contribution_cadence": "How often",
         "adjust_indicator_thresholds": "Other thresholds",
         "adjust_signal_periods": "Other signal periods",
         "change_date_range": "Different dates",
@@ -1202,6 +1212,7 @@
     "match_count_other": "{{count}} matches",
     "metric_labels": {
       "benchmark_return_pct": "Benchmark return",
+      "contribution_return_pct": "Return on contributions",
       "delta_vs_benchmark_pct": "Against benchmark",
       "excess_return_pct": "Against benchmark",
       "max_drawdown_pct": "Worst drop",
@@ -1554,7 +1565,8 @@
       "benchmark_same_modeled_costs": "Compared with {{symbol}}, same costs",
       "recurring_contribution": "${{amount}} each time",
       "recurring_contribution_cadence": "${{amount}} {{cadence}}",
-      "starting_principal": "${{amount}} to start"
+      "starting_principal": "${{amount}} to start",
+      "fractional_shares": "Fractional shares, nothing left as cash"
     },
     "strategy_type_values": {
       "buy and hold": "Buy and hold",
@@ -1568,6 +1580,7 @@
     "metric_labels": {
       "cash_value": "Ending value",
       "total_return_pct": "Total return",
+      "contribution_return_pct": "Return on contributions",
       "max_drawdown_pct": "Worst dip",
       "win_rate": "Win rate",
       "benchmark_return_pct": "Benchmark",
