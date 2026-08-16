@@ -193,6 +193,7 @@ from argus.agent_runtime.interpreter import (
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
+    _bare_asset_answer_without_unevidenced_operation,
     _log_runtime_readiness_step,
     _plain_requested_asset_answer_can_use_provider_resolution,
 )
@@ -2182,6 +2183,21 @@ async def _dca_contribution_role_audited_response(
             }
         )
     _move_dca_total_budget_out_of_recurring_amount(draft)
+    audit_reason_codes = ["dca_total_budget_role_audited"]
+    if (
+        not audit.recurring_contribution_explicit
+        and draft.recurring_contribution is not None
+        and draft.recurring_contribution == draft.total_capital
+    ):
+        # The audit just concluded no explicit recurring contribution exists,
+        # so a contribution equal to the budget is the same money re-roled by
+        # a repair schema that has no budget slot; keeping it would report a
+        # complete plan and hide the missing amount.
+        draft.recurring_contribution = None
+        field_provenance = dict(draft.field_provenance or {})
+        field_provenance.pop("recurring_contribution", None)
+        draft.field_provenance = field_provenance
+        audit_reason_codes.append("dca_budget_recurring_copy_cleared")
     missing_required_fields = list(
         dict.fromkeys([*response.missing_required_fields, "capital_amount"])
     )
@@ -2196,7 +2212,7 @@ async def _dca_contribution_role_audited_response(
                 dict.fromkeys(
                     [
                         *response.reason_codes,
-                        "dca_total_budget_role_audited",
+                        *audit_reason_codes,
                     ]
                 )
             ),
@@ -2296,6 +2312,11 @@ async def _audited_response_ready_for_runtime(
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(
         response, request=request, asset_resolution_context=asset_resolution_context
+    )
+    response = _bare_asset_answer_without_unevidenced_operation(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
     )
     _log_runtime_readiness_step("started", response=response)
     planned_artifact_edit = await _ready_active_artifact_edit_planned_response(

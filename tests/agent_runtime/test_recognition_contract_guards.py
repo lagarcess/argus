@@ -411,3 +411,153 @@ async def test_dca_budget_audit_cannot_retype_an_explicit_seed(monkeypatch) -> N
     assert "dca_seed_provenance_kept_over_budget_audit" in audited.reason_codes
     assert "dca_total_budget_role_audited" not in audited.reason_codes
     assert "capital_amount" not in audited.missing_required_fields
+
+
+@pytest.mark.asyncio
+async def test_dca_budget_audit_clears_the_fabricated_recurring_copy(
+    monkeypatch,
+) -> None:
+    """Ceiling case, run-2 signature: the focused repair's schema has no
+    budget slot, so it re-typed "$5,000 total" as recurring_contribution=5000
+    and the plan reported nothing missing. When the audit concludes no
+    explicit contribution exists, a contribution equal to the budget is the
+    same money re-roled and must not survive as a fundable plan."""
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, model_name
+        assert schema_name == "DcaContributionRoleAudit"
+        return interpreter_module.DcaContributionRoleAudit(
+            recurring_contribution_explicit=False,
+            total_budget_not_recurring=True,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    message = (
+        "I only have $5,000 to invest. Can you test putting money into VOO "
+        "every month through 2024?"
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="Monthly plan bounded by a total budget.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            asset_universe=["VOO"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=5000.0,
+            recurring_contribution=5000.0,
+            total_capital=5000.0,
+            field_provenance={
+                "total_capital": "explicit_user",
+                "recurring_contribution": "explicit_user",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    audited = await interpreter_module._dca_contribution_role_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = audited.candidate_strategy_draft
+    assert draft.recurring_contribution is None
+    assert draft.capital_amount is None
+    assert draft.total_capital == 5000.0
+    assert "capital_amount" in audited.missing_required_fields
+    assert "dca_budget_recurring_copy_cleared" in audited.reason_codes
+
+
+class TestBareAssetAnswerOperationLabel:
+    """Bare-ticker case (#190): 'TSLA' answering the asset slot carries no
+    words that could express an operation, so a filled
+    asset_universe_operation is an unevidenced single-choice guess; trusting
+    a guessed 'replace' wiped a multi-asset card."""
+
+    @staticmethod
+    def _request() -> InterpretationRequest:
+        return _card_request("TSLA")
+
+    @staticmethod
+    def _response(**draft_overrides: Any) -> LLMInterpretationResponse:
+        draft = {
+            "raw_user_phrasing": "TSLA",
+            "asset_universe": ["TSLA"],
+            "asset_universe_operation": "replace",
+            **draft_overrides,
+        }
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="continue",
+            user_goal_summary="User answered the asset chip with Tesla.",
+            candidate_strategy_draft=LLMStrategyDraft(**draft),
+            semantic_turn_act="answer_pending_need",
+        )
+
+    @staticmethod
+    def _resolver(symbol_map: dict[str, str]):
+        class _Asset:
+            def __init__(self, symbol: str) -> None:
+                self.canonical_symbol = symbol
+                self.asset_class = "equity"
+
+        class _Resolution:
+            def __init__(self, symbol: str) -> None:
+                self.status = "resolved"
+                self.asset = _Asset(symbol)
+
+        def resolve(query: str, *, field: str, source: str):
+            del field, source
+            normalized = query.strip().upper()
+            if normalized in symbol_map:
+                return _Resolution(symbol_map[normalized])
+            raise ValueError("invalid_symbol")
+
+        return resolve
+
+    def test_a_guessed_label_on_a_bare_answer_is_cleared(self) -> None:
+        from argus.agent_runtime.interpreter.readiness_helpers import (
+            _bare_asset_answer_without_unevidenced_operation,
+        )
+
+        updated = _bare_asset_answer_without_unevidenced_operation(
+            response=self._response(),
+            request=self._request(),
+            resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+        )
+        draft = updated.candidate_strategy_draft
+        assert draft.asset_universe_operation is None
+        assert draft.asset_universe == ["TSLA"]
+        assert "bare_asset_answer_operation_label_ignored" in updated.reason_codes
+
+    def test_an_answer_with_more_than_the_bare_mention_keeps_its_label(self) -> None:
+        from argus.agent_runtime.interpreter.readiness_helpers import (
+            _bare_asset_answer_without_unevidenced_operation,
+        )
+
+        request = _card_request("replace them all with TSLA")
+        updated = _bare_asset_answer_without_unevidenced_operation(
+            response=self._response(),
+            request=request,
+            resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+        )
+        draft = updated.candidate_strategy_draft
+        assert draft.asset_universe_operation == "replace"
+        assert "bare_asset_answer_operation_label_ignored" not in updated.reason_codes
