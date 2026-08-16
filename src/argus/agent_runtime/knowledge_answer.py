@@ -169,6 +169,24 @@ def _rail_may_claim_clarification(
     return True
 
 
+def _describes_a_test_it_cannot_run(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    """A typed refusal that already names what to run over what period.
+
+    Typed fields only: the act label plus the draft the interpreter filled
+    from the user's own words. Nothing here reads the message.
+    """
+    if interpretation.semantic_turn_act != "unsupported_request":
+        return False
+    draft = interpretation.candidate_strategy_draft
+    has_asset = any(
+        str(symbol or "").strip()
+        for symbol in (getattr(draft, "asset_universe", None) or [])
+    )
+    return has_asset and _draft_carries_a_stated_test_window(draft)
+
+
 def _draft_carries_a_stated_test_window(strategy: Any) -> bool:
     """Whether the draft carries a period the user named for a test.
 
@@ -213,6 +231,23 @@ async def knowledge_answer_stage_result(
             "Knowledge claim stood down for a typed unsupported payload " "categories={}",
             [item.category for item in interpretation.unsupported_constraints],
             categories=[item.category for item in interpretation.unsupported_constraints],
+        )
+        return None
+    if _describes_a_test_it_cannot_run(interpretation):
+        # unsupported_request is a knowledge act so plain capability questions
+        # can be answered. A turn that already describes a test, a resolved
+        # asset plus a window the user named, is not asking a question: it is
+        # a refusal decision with recovery options. Whether the primary read
+        # also filled unsupported_constraints is a coin flip, so the typed
+        # facts of the turn decide the route rather than one classifier call.
+        if _UNSUPPORTED_PAYLOAD_REASON_CODE not in interpretation.reason_codes:
+            interpretation.reason_codes.append(_UNSUPPORTED_PAYLOAD_REASON_CODE)
+        logger.info(
+            "Knowledge claim stood down for an unsupported request that "
+            "describes a test assets={} date_range={}",
+            list(getattr(interpretation.candidate_strategy_draft, "asset_universe", [])),
+            getattr(interpretation.candidate_strategy_draft, "date_range", None),
+            failure_classification="unsupported_execution_kept_recovery_route",
         )
         return None
     rail_claim = _rail_may_claim_clarification(interpretation)
