@@ -532,6 +532,26 @@ class TestBareAssetAnswerOperationLabel:
 
         return resolve
 
+    def _assert_typed_as_inclusion(self, updated: Any) -> None:
+        draft = updated.candidate_strategy_draft
+        assert draft.asset_universe_operation is None
+        assert draft.asset_universe == ["TSLA"]
+        assert draft.asset_inclusions == ["TSLA"]
+        assert "bare_asset_answer_typed_as_inclusion" in updated.reason_codes
+
+    def test_a_guessed_replace_label_becomes_an_inclusion(self) -> None:
+        from argus.agent_runtime.interpreter.readiness_helpers import (
+            _bare_asset_answer_without_unevidenced_operation,
+        )
+
+        self._assert_typed_as_inclusion(
+            _bare_asset_answer_without_unevidenced_operation(
+                response=self._response(),
+                request=self._request(),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            )
+        )
+
     def test_a_bare_answer_typed_as_its_own_inclusion_is_still_bare(self) -> None:
         """Live tip4 trace: the model sometimes types the bare answer as
         asset_inclusions=["TSLA"] alongside the guessed replace label; an
@@ -540,30 +560,48 @@ class TestBareAssetAnswerOperationLabel:
             _bare_asset_answer_without_unevidenced_operation,
         )
 
-        updated = _bare_asset_answer_without_unevidenced_operation(
-            response=self._response(asset_inclusions=["TSLA"]),
-            request=self._request(),
-            resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+        self._assert_typed_as_inclusion(
+            _bare_asset_answer_without_unevidenced_operation(
+                response=self._response(asset_inclusions=["TSLA"]),
+                request=self._request(),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            )
         )
-        draft = updated.candidate_strategy_draft
-        assert draft.asset_universe_operation is None
-        assert draft.asset_inclusions == ["TSLA"]
-        assert "bare_asset_answer_operation_label_ignored" in updated.reason_codes
 
-    def test_a_guessed_label_on_a_bare_answer_is_cleared(self) -> None:
+    def test_an_empty_universe_bare_answer_is_typed_instead_of_requestioned(
+        self,
+    ) -> None:
+        """Live A/B mode: a truly bare draft (empty universe, no label) used
+        to fall into a second add-or-replace question; #190 says the answer
+        appends."""
         from argus.agent_runtime.interpreter.readiness_helpers import (
             _bare_asset_answer_without_unevidenced_operation,
         )
 
-        updated = _bare_asset_answer_without_unevidenced_operation(
-            response=self._response(),
-            request=self._request(),
-            resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+        self._assert_typed_as_inclusion(
+            _bare_asset_answer_without_unevidenced_operation(
+                response=self._response(asset_universe=[], asset_universe_operation=None),
+                request=self._request(),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            )
         )
-        draft = updated.candidate_strategy_draft
-        assert draft.asset_universe_operation is None
-        assert draft.asset_universe == ["TSLA"]
-        assert "bare_asset_answer_operation_label_ignored" in updated.reason_codes
+
+    def test_a_refine_act_does_not_block_the_bare_shape(self) -> None:
+        from argus.agent_runtime.interpreter.readiness_helpers import (
+            _bare_asset_answer_without_unevidenced_operation,
+        )
+
+        response = self._response()
+        response = response.model_copy(
+            update={"semantic_turn_act": "refine_current_idea"}
+        )
+        self._assert_typed_as_inclusion(
+            _bare_asset_answer_without_unevidenced_operation(
+                response=response,
+                request=self._request(),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            )
+        )
 
     def test_an_answer_with_more_than_the_bare_mention_keeps_its_label(self) -> None:
         from argus.agent_runtime.interpreter.readiness_helpers import (
@@ -578,4 +616,4 @@ class TestBareAssetAnswerOperationLabel:
         )
         draft = updated.candidate_strategy_draft
         assert draft.asset_universe_operation == "replace"
-        assert "bare_asset_answer_operation_label_ignored" not in updated.reason_codes
+        assert "bare_asset_answer_typed_as_inclusion" not in updated.reason_codes

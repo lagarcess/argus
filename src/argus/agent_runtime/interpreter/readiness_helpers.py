@@ -134,26 +134,35 @@ def _asset_universe_operation_clarification_draft(
     return clarification
 
 
+# Acts whose deterministic follow-through owns the turn outright; a bare
+# mention on those surfaces is not an asset-slot answer.
+_BARE_ANSWER_INELIGIBLE_ACTS = frozenset(
+    {"approval", "retry_failed_action", "result_followup", "unsupported_request"}
+)
+
+
 def _bare_asset_answer_without_unevidenced_operation(
     *,
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
     resolve_asset_candidate: Callable[..., Any],
 ) -> LLMInterpretationResponse:
-    """Clear a guessed operation label from a bare asset answer (#190).
+    """Type a bare asset answer to the asset slot as that asset's inclusion (#190).
 
     When the whole reply resolves as one asset, the turn carried no words that
-    could express an operation, so a filled asset_universe_operation is an
-    unevidenced single-choice guess; trusting a guessed "replace" made "TSLA"
-    wipe a multi-asset card. With the label cleared, the deterministic
-    provider-resolution append corridor owns the turn.
+    could express an operation, so every label the model guessed around it —
+    a "replace" that would wipe a multi-asset card, a refine act, an empty
+    universe that would trigger a second add-or-replace question — is
+    unevidenced. The product rule is append: the answer becomes a typed
+    inclusion with no operation label, and the deterministic append corridors
+    route it.
     """
     draft = response.candidate_strategy_draft
-    if normalized_asset_universe_operation(draft.asset_universe_operation) is None:
-        return response
     if _selected_requested_field_base(request) != "asset_universe":
         return response
-    if response.semantic_turn_act != "answer_pending_need":
+    if response.semantic_turn_act in _BARE_ANSWER_INELIGIBLE_ACTS:
+        return response
+    if response.asset_discovery is not None:
         return response
     if draft.asset_exclusions:
         return response
@@ -201,16 +210,26 @@ def _bare_asset_answer_without_unevidenced_operation(
     }
     if inclusion_symbols - {symbol}:
         return response
+    already_bare = (
+        draft.asset_universe == [symbol]
+        and draft.asset_inclusions == [symbol]
+        and normalized_asset_universe_operation(draft.asset_universe_operation) is None
+    )
+    if already_bare:
+        return response
     field_provenance = dict(draft.field_provenance or {})
+    field_provenance["asset_inclusions"] = "explicit_user"
     field_provenance.pop("asset_universe_operation", None)
     updated_draft = draft.model_copy(
         update={
+            "asset_universe": [symbol],
+            "asset_inclusions": [symbol],
             "asset_universe_operation": None,
             "field_provenance": field_provenance,
         }
     )
     logger.info(
-        "Bare asset answer: unevidenced operation label cleared symbol={}",
+        "Bare asset answer typed as inclusion symbol={}",
         symbol,
         symbol=symbol,
     )
@@ -221,7 +240,7 @@ def _bare_asset_answer_without_unevidenced_operation(
                 dict.fromkeys(
                     [
                         *response.reason_codes,
-                        "bare_asset_answer_operation_label_ignored",
+                        "bare_asset_answer_typed_as_inclusion",
                     ]
                 )
             ),
