@@ -1,0 +1,4 @@
+scenario: E3 "remove AAPL and replace with TSLA and GOOGL"
+edit turn DOM extract: new card MSFT / NVDA / TSLA / GOOGL — Ready to run
+  $1,000 · Jan 2, 2024 → Dec 31, 2024 · Benchmark: SPY (preserved)
+verdict: PASS — swap lands both ops, un-named card members kept

@@ -1,0 +1,9 @@
+scenario: E1 "remove AAPL" on live AAPL/MSFT/NVDA card
+edit turn DOM extract: prior card relabeled "Updated"; new card:
+  MSFT / NVDA — Buy and Hold — Ready to run
+  STARTING CAPITAL $1,000 · PERIOD Jan 2, 2024 → Dec 31, 2024 · Benchmark: SPY
+re-run (clicked Run backtest) DOM extract:
+  card state "Run complete"; result "Simulation Complete"
+  Ending value $1,961 · +96.1% total return · Beat SPY by 72.1 pts
+  QUICK TAKE: "equal-weight buy-and-hold of MSFT and NVDA from January 2, 2024 to December 31, 2024"
+verdict: PASS — AAPL absent from card, executed run, and result prose; every other fact preserved
