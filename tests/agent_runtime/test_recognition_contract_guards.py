@@ -1060,3 +1060,77 @@ class TestContextExclusionMatchingAndReceipts:
             include_unsupported_request=True,
         )
         assert normalized.candidate_strategy_draft.asset_universe == ["AAPL"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "money",
+    [
+        {
+            "capital_amount": 200.0,
+            "field_provenance": {"capital_amount": "recurring_contribution"},
+        },
+        {"capital_amount": 200.0, "recurring_contribution": 200.0},
+    ],
+    ids=["provenance-typed", "recurring-field"],
+)
+async def test_a_typed_contribution_survives_a_wrong_budget_verdict(
+    monkeypatch, money
+) -> None:
+    """Re-measurement regression: on 'start with $5,000 and add $200 monthly'
+    a wrong sidecar budget verdict must not re-role the typed contribution
+    into a total budget; both explicit money roles outrank the sidecar."""
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, model_name
+        assert schema_name == "DcaContributionRoleAudit"
+        return interpreter_module.DcaContributionRoleAudit(
+            recurring_contribution_explicit=False,
+            total_budget_not_recurring=True,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module, "invoke_openrouter_json_schema", fake_json_schema
+    )
+    message = "Start with $5,000 in SPY and contribute $200 every month in 2024."
+    provenance = {
+        "initial_capital": "starting_capital",
+        "cadence": "explicit_user",
+        **money.pop("field_provenance", {}),
+    }
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="Seed plus monthly contribution.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            asset_universe=["SPY"],
+            asset_class="equity",
+            cadence="monthly",
+            initial_capital=5000.0,
+            field_provenance=provenance,
+            **money,
+        ),
+        semantic_turn_act="new_idea",
+    )
+    audited = await interpreter_module._dca_contribution_role_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+    draft = audited.candidate_strategy_draft
+    assert draft.initial_capital == 5000.0
+    assert draft.capital_amount == 200.0
+    assert draft.total_capital is None
+    assert "capital_amount" not in audited.missing_required_fields
+    assert "dca_seed_provenance_kept_over_budget_audit" in audited.reason_codes
