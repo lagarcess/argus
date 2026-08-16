@@ -31,6 +31,7 @@ from argus.agent_runtime.state.models import (
     RunState,
     StrategySummary,
 )
+from loguru import logger
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
 ARTIFACT_EDIT_CLARIFICATION_FIELDS = {"assumption", "refinement"}
@@ -88,10 +89,12 @@ async def clarify_stage_async(
         unsupported_constraints=unsupported_constraints,
         optional_parameter_choices=optional_parameter_choices,
     )
-    unsupported_constraints = _blocking_unsupported_constraints(
-        state=state,
-        requested_fields=requested_fields,
-        unsupported_constraints=unsupported_constraints,
+    unsupported_constraints, deferred_constraint_categories = (
+        _blocking_unsupported_constraints(
+            state=state,
+            requested_fields=requested_fields,
+            unsupported_constraints=unsupported_constraints,
+        )
     )
 
     if coverage_recovery is not None:
@@ -144,6 +147,7 @@ async def clarify_stage_async(
                     if generated.used_degraded_fallback
                     else "llm_generated"
                 ),
+                deferred_constraint_categories=deferred_constraint_categories,
             )
         )
         return StageResult(
@@ -204,6 +208,7 @@ async def clarify_stage_async(
                     if generated.used_degraded_fallback
                     else "llm_generated"
                 ),
+                deferred_constraint_categories=deferred_constraint_categories,
             )
         )
         return StageResult(
@@ -248,6 +253,7 @@ async def clarify_stage_async(
                     response_intent=response_intent,
                     requested_field=requested_field,
                     prompt_source="degraded_fallback",
+                    deferred_constraint_categories=deferred_constraint_categories,
                 )
             )
         return StageResult(
@@ -290,6 +296,7 @@ async def clarify_stage_async(
                     if generated.used_degraded_fallback
                     else "llm_generated"
                 ),
+                deferred_constraint_categories=deferred_constraint_categories,
             )
         )
         return StageResult(
@@ -459,6 +466,7 @@ def _clarification_sidecar_patch(
     response_intent: dict[str, object],
     requested_field: str | None,
     prompt_source: ClarificationPromptSource,
+    deferred_constraint_categories: list[str] | None = None,
 ) -> dict[str, object]:
     clarification = typed_clarification_contract(
         response_intent=response_intent,
@@ -466,7 +474,15 @@ def _clarification_sidecar_patch(
         strategy=state.candidate_strategy_draft,
         prompt_source=prompt_source,
     )
-    return {"clarification": clarification} if clarification is not None else {}
+    if clarification is None:
+        return {}
+    if deferred_constraint_categories:
+        # Turn-correlated receipt for a typed constraint this stage withheld
+        # from the user-facing turn.
+        clarification["deferred_unsupported_categories"] = list(
+            deferred_constraint_categories
+        )
+    return {"clarification": clarification}
 
 
 def _response_intent(
@@ -671,16 +687,37 @@ def _blocking_unsupported_constraints(
     state: RunState,
     requested_fields: list[str],
     unsupported_constraints: list[dict[str, object]],
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], list[str]]:
+    """Return the constraints that block this turn and the categories deferred.
+
+    A deferral deletes a typed model fact from the user-facing turn, so it
+    must leave a turn-correlated receipt (AGENTS.md: an unmeasured
+    compensation layer hides model decay); the caller stamps the deferred
+    categories into the clarification sidecar.
+    """
     if not unsupported_constraints:
-        return []
+        return [], []
     if not _dca_execution_details_are_still_missing(state, requested_fields):
-        return unsupported_constraints
-    return [
+        return unsupported_constraints, []
+    blocking = [
         constraint
         for constraint in unsupported_constraints
         if constraint.get("category") != UNSUPPORTED_DCA_CONTRIBUTION_CEILING
     ]
+    deferred = sorted(
+        {
+            str(constraint.get("category"))
+            for constraint in unsupported_constraints
+            if constraint.get("category") == UNSUPPORTED_DCA_CONTRIBUTION_CEILING
+        }
+    )
+    if deferred:
+        logger.info(
+            "Clarify deferred unsupported constraints categories={}",
+            deferred,
+            categories=deferred,
+        )
+    return blocking, deferred
 
 
 def _dca_execution_details_are_still_missing(

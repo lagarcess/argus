@@ -4,8 +4,18 @@ The single-choice ``asset_universe_operation`` label cannot say whether
 "replace" meant "this is the whole new set" or "swap these members"; the
 typed inclusion/exclusion roles can. These helpers let roles outrank carried
 or context-injected ``asset_universe`` copies and prove a materialization
-satisfies the roles, with a receipt whenever they override or refuse
-(AGENTS.md: redundancy over a model read must be observable).
+satisfies the roles.
+
+Every symbol in an accepted materialization must trace to typed evidence: the
+current card, a typed inclusion, or a grounded member of the flat request. A
+mere message mention is never enough to add an asset, and a typed exclusion
+is never enough to remove one unless the message or the card grounds it
+(callers own that grounding gate). Overrides log here and the accepted plan's
+response carries ``asset_exclusions_outranked_universe_copy``; refusals fall
+through to the operation-clarification fallback, whose
+``asset_universe_operation_needs_clarification`` reason code is the
+turn-correlated receipt for this module's refusal (AGENTS.md: redundancy over
+a model read must be observable).
 """
 
 from __future__ import annotations
@@ -47,9 +57,16 @@ def asset_role_constraints_satisfied(
     """Prove a materialization satisfies the typed asset roles.
 
     When exclusions name current card members, the user said what leaves and
-    everything un-named stays, whatever the operation label says ("remove
-    AAPL and replace with TSLA and GOOGL" keeps MSFT). The label breaks ties
-    only where the roles are silent: a replace with pure keep-out exclusions
+    everything un-named stays, whatever the operation label says. This swap
+    reading deliberately outranks the whole-set reading of "replace": the two
+    are indistinguishable at the typed level ("drop AAPL, just use TSLA from
+    now on" and "remove AAPL and replace with TSLA and GOOGL" produce the
+    same role shape with opposite intents), the locked eval fixture
+    `action_chip_change_asset_compound_replace_issue_188` encodes the swap
+    reading, and the failure modes are asymmetric: swap-precedence worst-case
+    re-asks a whole-set turn, while replace-precedence worst-case silently
+    wipes card members the user never named. The label breaks ties only
+    where the roles are silent: a replace with pure keep-out exclusions
     states the whole new set, and anything else licenses no drop at all.
     """
 
@@ -59,9 +76,14 @@ def asset_role_constraints_satisfied(
         if symbol in current or symbol in grounded or symbol in primary_inclusions
     }
     removed = current - materialized
+    # A materialized symbol needs a typed role or a grounded flat request;
+    # a bare message mention ("worse than NVDA lately") never adds an asset.
     unexplained = materialized - (
-        current | primary_inclusions | grounded_primary_requested | grounded
+        current | primary_inclusions | grounded_primary_requested
     )
+    # Every requested addition that survives the exclusions must land;
+    # otherwise half of a compound add vanishes with no disclosure.
+    dropped_requested = (grounded_primary_requested - primary_exclusions) - materialized
     card_exclusions = primary_exclusions & current
     if card_exclusions:
         role_ok = removed <= primary_exclusions
@@ -75,6 +97,7 @@ def asset_role_constraints_satisfied(
         bool(materialized)
         and materialized != current
         and primary_inclusions <= materialized
+        and not dropped_requested
         and not (primary_exclusions & materialized)
         and not unexplained
         and role_ok
@@ -82,13 +105,15 @@ def asset_role_constraints_satisfied(
     if not matches:
         logger.info(
             "Artifact edit role constraints refused a materialization "
-            "inclusions_landed={} exclusions_left={} removals_licensed={} "
-            "unexplained={}",
+            "inclusions_landed={} requested_landed={} exclusions_left={} "
+            "removals_licensed={} unexplained={}",
             primary_inclusions <= materialized,
+            not dropped_requested,
             not (primary_exclusions & materialized),
             role_ok,
             sorted(unexplained),
             inclusions_landed=primary_inclusions <= materialized,
+            requested_landed=not dropped_requested,
             exclusions_left=not (primary_exclusions & materialized),
             removals_licensed=role_ok,
             unexplained=sorted(unexplained),

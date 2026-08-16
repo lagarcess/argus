@@ -136,20 +136,27 @@ def response_with_provider_context_assets(
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     # A typed exclusion outranks a mention: "remove AAPL" mentions AAPL, and
     # injecting that mention as a traded asset manufactures a universe/exclusion
-    # contradiction the edit pipeline later refuses to materialize.
+    # contradiction the edit pipeline later refuses to materialize. Exclusions
+    # arrive in the user's own words ("Apple", "BTC-USD"), so they match
+    # against the full provider record, never by raw symbol equality.
+    exclusion_texts = [
+        str(value).strip() for value in draft.asset_exclusions if str(value).strip()
+    ]
     excluded_symbols = {
-        str(value).strip().upper()
-        for value in draft.asset_exclusions
-        if str(value).strip()
+        str(record.get("symbol") or "").strip().upper()
+        for record in resolved_records
+        if any(
+            _provider_record_matches_symbol(record, exclusion_text)
+            for exclusion_text in exclusion_texts
+        )
     }
     traded_symbols = [
         symbol for symbol in resolved_symbols if symbol not in excluded_symbols
     ]
-    exclusion_respected = len(traded_symbols) != len(resolved_symbols)
     draft_assets = [
         str(value).strip() for value in draft.asset_universe if str(value).strip()
     ]
-    context_is_partial = len(draft_assets) > len(traded_symbols) and any(
+    context_is_partial = len(draft_assets) > len(resolved_symbols) and any(
         not any(
             _provider_record_matches_symbol(record, draft_asset)
             for record in resolved_records
@@ -182,13 +189,23 @@ def response_with_provider_context_assets(
         draft.extra_parameters = extra_parameters
 
     # Unsupported turns borrow resolved assets only; never escalate a refusal.
+    # When every resolved mention is excluded, the refusal still needs its
+    # asset facts for the recovery route; the edit pipeline's exclusions-win
+    # guards own the contradiction, not this borrow.
     if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response
-        if traded_symbols:
-            draft.asset_universe = traded_symbols
+        draft.asset_universe = traded_symbols or resolved_symbols
         preserved_fuller_draft = False
         ambiguous_fields = []
+    # The receipt asserts the outcome, not the attempt: it fires only when an
+    # excluded symbol was resolved and is absent from the final universe.
+    final_universe_symbols = {
+        str(value).strip().upper() for value in draft.asset_universe if str(value).strip()
+    }
+    exclusion_respected = bool(excluded_symbols) and not (
+        excluded_symbols & final_universe_symbols
+    )
     if (
         not ambiguous_fields
         and not preserved_fuller_draft

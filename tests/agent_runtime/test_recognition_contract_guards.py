@@ -617,3 +617,446 @@ class TestBareAssetAnswerOperationLabel:
         draft = updated.candidate_strategy_draft
         assert draft.asset_universe_operation == "replace"
         assert "bare_asset_answer_typed_as_inclusion" not in updated.reason_codes
+
+
+class TestBareAssetAnswerGatesArePinned:
+    """Review round 1, finding 4: every eligibility gate survived mutation.
+    One negative per gate, each asserting the response is returned unchanged
+    and no receipt is stamped, so deleting any gate fails a test."""
+
+    _resolver = staticmethod(TestBareAssetAnswerOperationLabel._resolver)
+    _response = staticmethod(TestBareAssetAnswerOperationLabel._response)
+
+    @staticmethod
+    def _guard():
+        from argus.agent_runtime.interpreter.readiness_helpers import (
+            _bare_asset_answer_without_unevidenced_operation,
+        )
+
+        return _bare_asset_answer_without_unevidenced_operation
+
+    def _assert_untouched(self, updated: Any, response: Any) -> None:
+        assert updated is response
+        assert "bare_asset_answer_typed_as_inclusion" not in updated.reason_codes
+
+    def test_wrong_requested_field_is_untouched(self) -> None:
+        request = _card_request("TSLA")
+        request = InterpretationRequest(
+            user=request.user,
+            current_user_message=request.current_user_message,
+            recent_thread_history=[],
+            latest_task_snapshot=request.latest_task_snapshot,
+            selected_thread_metadata={
+                "requested_field": "date_range",
+                "last_stage_outcome": "await_user_reply",
+            },
+        )
+        response = self._response()
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=request,
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    @pytest.mark.parametrize(
+        "act",
+        ["approval", "retry_failed_action", "new_idea", "educational_question", None],
+    )
+    def test_acts_outside_the_allow_list_fail_closed(self, act) -> None:
+        response = self._response().model_copy(update={"semantic_turn_act": act})
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    def test_a_typed_discovery_payload_is_untouched(self) -> None:
+        from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+
+        response = self._response().model_copy(
+            update={
+                "asset_discovery": AssetDiscoveryRequest(
+                    relationship="peer", anchor_symbols=["TSLA"]
+                )
+            }
+        )
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    def test_typed_exclusions_are_untouched(self) -> None:
+        response = self._response(asset_exclusions=["AAPL"])
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    @pytest.mark.parametrize("label", [None, "append"])
+    def test_non_replace_labels_with_a_universe_are_untouched(self, label) -> None:
+        """An append label is already the product rule, and an unlabeled
+        non-empty draft takes the provider-resolution corridor unmodified;
+        only a wipe-shaped replace guess or a truly bare draft rewrites."""
+        response = self._response(asset_universe_operation=label)
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    def test_a_single_asset_card_is_untouched(self) -> None:
+        request = InterpretationRequest(
+            user=UserState(user_id="user-recognition"),
+            current_user_message="TSLA",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                )
+            ),
+            selected_thread_metadata={
+                "requested_field": "asset_universe",
+                "last_stage_outcome": "await_user_reply",
+            },
+        )
+        response = self._response()
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=request,
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    def test_an_unresolvable_answer_is_untouched(self) -> None:
+        response = self._response()
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({}),
+            ),
+            response,
+        )
+
+    def test_an_answer_already_on_the_card_is_untouched(self) -> None:
+        response = self._response(asset_universe=["MSFT"])
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("MSFT"),
+                resolve_asset_candidate=self._resolver({"MSFT": "MSFT"}),
+            ),
+            response,
+        )
+
+    def test_a_draft_naming_more_than_the_answer_is_untouched(self) -> None:
+        response = self._response(asset_universe=["TSLA", "GOOGL"])
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+    def test_inclusions_beyond_the_answer_are_untouched(self) -> None:
+        response = self._response(asset_inclusions=["TSLA", "GOOGL"])
+        self._assert_untouched(
+            self._guard()(
+                response=response,
+                request=_card_request("TSLA"),
+                resolve_asset_candidate=self._resolver({"TSLA": "TSLA"}),
+            ),
+            response,
+        )
+
+
+class TestRoleConstraintEvidenceBounds:
+    """Review round 1, findings 2/5/11: a materialized symbol needs typed
+    evidence, a requested addition must land, and the swap-over-whole-set
+    precedence is a written decision."""
+
+    @staticmethod
+    def _satisfied(**overrides: Any) -> bool:
+        from argus.agent_runtime.interpreter.asset_role_constraints import (
+            asset_role_constraints_satisfied,
+        )
+
+        params: dict[str, Any] = {
+            "materialized": set(),
+            "current": set(),
+            "primary_requested": set(),
+            "primary_inclusions": set(),
+            "primary_exclusions": set(),
+            "grounded": set(),
+            "operation": None,
+            "planned_asset_replacement": False,
+        }
+        params.update(overrides)
+        return asset_role_constraints_satisfied(**params)
+
+    def test_a_mention_is_not_an_addition(self) -> None:
+        """'remove AAPL, it has been worse than NVDA lately' must not ship
+        NVDA: grounded mentions are never acceptance slack."""
+        assert not self._satisfied(
+            materialized={"MSFT", "NVDA"},
+            current={"AAPL", "MSFT"},
+            primary_exclusions={"AAPL"},
+            grounded={"AAPL", "NVDA"},
+        )
+
+    def test_a_requested_addition_must_land(self) -> None:
+        """'add TSLA and GOOGL and drop AAPL' with GOOGL missing from the
+        materialization is refused; with both landed it is accepted."""
+        common: dict[str, Any] = {
+            "current": {"AAPL", "MSFT"},
+            "primary_requested": {"TSLA", "GOOGL"},
+            "primary_exclusions": {"AAPL"},
+            "grounded": {"AAPL", "TSLA", "GOOGL"},
+        }
+        assert not self._satisfied(materialized={"MSFT", "TSLA"}, **common)
+        assert self._satisfied(materialized={"MSFT", "TSLA", "GOOGL"}, **common)
+
+    def test_swap_precedence_over_whole_set_is_the_written_decision(self) -> None:
+        """'drop AAPL, just use TSLA from now on' is refused and re-asked:
+        the typed shape is identical to the locked compound-swap fixture
+        with the opposite intent, and a re-ask beats a silent wipe. The
+        module docstring owns this decision."""
+        assert not self._satisfied(
+            materialized={"TSLA"},
+            current={"AAPL", "MSFT"},
+            primary_requested={"TSLA"},
+            primary_inclusions={"TSLA"},
+            primary_exclusions={"AAPL"},
+            grounded={"AAPL", "TSLA"},
+            operation="replace",
+        )
+
+    def test_the_model_cannot_license_its_own_removal(self, monkeypatch) -> None:
+        """Review finding 9: a hallucinated exclusion echoed into the
+        universe copy must still need message or card grounding."""
+        from argus.agent_runtime.interpreter import artifact_assumption_edit
+
+        monkeypatch.setattr(
+            artifact_assumption_edit,
+            "_grounded_asset_symbols_from_message",
+            lambda *_args, **_kwargs: set(),
+        )
+        primary = LLMStrategyDraft(
+            raw_user_phrasing="make the rebalance monthly",
+            asset_universe=["AAPL", "MSFT", "NVDA"],
+            asset_exclusions=["NVDA"],
+            asset_universe_operation="replace",
+            field_provenance={"asset_universe": "explicit_user"},
+        )
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[EditOperation(op="remove", target="asset", symbols=["NVDA"])],
+        )
+        assert (
+            artifact_assumption_edit.materialized_artifact_edit_targets(
+                plan,
+                request=_card_request("make the rebalance monthly"),
+                primary_draft=primary,
+            )
+            is None
+        )
+
+
+@pytest.mark.asyncio
+async def test_dca_seed_with_a_differing_budget_moves_the_budget(monkeypatch) -> None:
+    """Review round 1, finding 1: '$20,000 to invest, starting with $5,000,
+    buying monthly' must not fund a $20,000 monthly contribution. The seed
+    keeps its role, the budget moves to total_capital, and the monthly
+    amount is asked for."""
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, model_name
+        assert schema_name == "DcaContributionRoleAudit"
+        return interpreter_module.DcaContributionRoleAudit(
+            recurring_contribution_explicit=False,
+            total_budget_not_recurring=True,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module, "invoke_openrouter_json_schema", fake_json_schema
+    )
+    message = (
+        "I have $20,000 to invest over 2024, starting with $5,000 in VOO "
+        "today, buying monthly"
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="Budget with a seed and monthly buys.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            asset_universe=["VOO"],
+            asset_class="equity",
+            cadence="monthly",
+            initial_capital=5000.0,
+            capital_amount=20000.0,
+            field_provenance={
+                "initial_capital": "starting_capital",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+    audited = await interpreter_module._dca_contribution_role_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+    draft = audited.candidate_strategy_draft
+    assert draft.initial_capital == 5000.0
+    assert draft.total_capital == 20000.0
+    assert draft.capital_amount is None
+    assert audited.requires_clarification is True
+    assert "capital_amount" in audited.missing_required_fields
+    assert "dca_seed_provenance_kept_over_budget_audit" in audited.reason_codes
+    assert "dca_total_budget_role_audited" in audited.reason_codes
+
+
+def test_the_veto_routes_on_the_payload_alone(monkeypatch) -> None:
+    """Review round 1, finding 6: a typed refusal payload owns its recovery
+    route whatever act the model guessed; educational_question was one
+    relabel away from the Trace-2 stats hijack."""
+
+    async def _must_not_classify(**_kwargs: Any):
+        raise AssertionError("a constraint-carrying turn must not be classified")
+
+    monkeypatch.setattr(ka, "_classify_question", _must_not_classify)
+    monkeypatch.setattr(ka, "research_rail_enabled", lambda: False)
+    interpretation = _unsupported_interpretation(
+        semantic_turn_act="educational_question",
+        intent="conversation_followup",
+    )
+    assert _run_knowledge(interpretation) is None
+    assert "unsupported_payload_kept_recovery_route" in interpretation.reason_codes
+
+
+class TestContextExclusionMatchingAndReceipts:
+    """Review round 1, findings 3/7/8: exclusion matching uses the provider
+    record, the receipt asserts the outcome, and unsupported turns keep
+    their asset facts."""
+
+    APPLE_SPAN_ROW = {
+        "raw_text": "Apple",
+        "role": "traded_asset",
+        "status": "resolved",
+        "symbol": "AAPL",
+        "asset_class": "equity",
+        "name": "Apple Inc. Common Stock",
+        "raw_symbol": "AAPL",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.NASDAQ",
+    }
+    BTC_ROW = {
+        "raw_text": "BTC-USD",
+        "role": "traded_asset",
+        "status": "resolved",
+        "symbol": "BTC",
+        "asset_class": "crypto",
+        "name": "Bitcoin / US Dollar",
+        "raw_symbol": "BTC/USD",
+        "provider": "alpaca",
+        "exchange": "AssetExchange.CRYPTO",
+    }
+
+    def test_an_exclusion_in_the_users_words_is_matched(self) -> None:
+        normalized = response_with_provider_context_assets(
+            _exclusion_response(asset_exclusions=["Apple"]),
+            asset_resolution_context=_context([dict(self.APPLE_SPAN_ROW)]),
+        )
+        assert normalized.candidate_strategy_draft.asset_universe == []
+        assert "context_asset_injection_respected_exclusion" in normalized.reason_codes
+
+    def test_a_dash_form_crypto_exclusion_is_matched(self) -> None:
+        normalized = response_with_provider_context_assets(
+            _exclusion_response(asset_exclusions=["BTC-USD"]),
+            asset_resolution_context=_context([dict(self.BTC_ROW)]),
+        )
+        assert normalized.candidate_strategy_draft.asset_universe == []
+        assert "context_asset_injection_respected_exclusion" in normalized.reason_codes
+
+    def test_the_receipt_asserts_the_outcome_not_the_attempt(self) -> None:
+        """When the partial-preserve branch keeps the model-authored copy of
+        the excluded symbol, no receipt may claim the exclusion was
+        respected."""
+        normalized = response_with_provider_context_assets(
+            _exclusion_response(
+                raw_user_phrasing="keep my AAPL and MSFT basket, minus AAPL",
+                asset_universe=["AAPL", "MSFT"],
+            ),
+            asset_resolution_context=_context([dict(AAPL_ROW)]),
+        )
+        assert normalized.candidate_strategy_draft.asset_universe == [
+            "AAPL",
+            "MSFT",
+        ]
+        assert (
+            "context_asset_injection_respected_exclusion" not in normalized.reason_codes
+        )
+
+    def test_filtering_does_not_fabricate_a_partial_context(self) -> None:
+        """An unrelated draft asset plus an excluded mention must not ask the
+        user to clarify the asset they just excluded."""
+        normalized = response_with_provider_context_assets(
+            _exclusion_response(asset_universe=["GLD"]),
+            asset_resolution_context=_context([dict(AAPL_ROW)]),
+        )
+        assert normalized.requires_clarification is False
+        assert normalized.ambiguous_fields == []
+
+    def test_an_all_excluded_unsupported_turn_keeps_its_asset_facts(self) -> None:
+        """Review finding 3: the refusal recovery needs the asset; an empty
+        universe dissolves the turn into chat."""
+        response = LLMInterpretationResponse(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            user_goal_summary="Unsupported request naming one asset.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                asset_universe=["AAPL"],
+                asset_exclusions=["AAPL"],
+            ),
+            semantic_turn_act="unsupported_request",
+        )
+        normalized = response_with_provider_context_assets(
+            response,
+            asset_resolution_context=_context([dict(AAPL_ROW)]),
+            include_unsupported_request=True,
+        )
+        assert normalized.candidate_strategy_draft.asset_universe == ["AAPL"]

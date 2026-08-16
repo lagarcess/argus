@@ -134,11 +134,11 @@ def _asset_universe_operation_clarification_draft(
     return clarification
 
 
-# Acts whose deterministic follow-through owns the turn outright; a bare
-# mention on those surfaces is not an asset-slot answer.
-_BARE_ANSWER_INELIGIBLE_ACTS = frozenset(
-    {"approval", "retry_failed_action", "result_followup", "unsupported_request"}
-)
+# The only acts whose bare answers this guard may rewrite: the ones the
+# downstream routes are verified to serve (the provider-resolution append
+# corridor for answer_pending_need, the planner's stated-operation union for
+# refine_current_idea). A tenth act fails closed, not open.
+_BARE_ANSWER_ELIGIBLE_ACTS = frozenset({"answer_pending_need", "refine_current_idea"})
 
 
 def _bare_asset_answer_without_unevidenced_operation(
@@ -150,21 +150,29 @@ def _bare_asset_answer_without_unevidenced_operation(
     """Type a bare asset answer to the asset slot as that asset's inclusion (#190).
 
     When the whole reply resolves as one asset, the turn carried no words that
-    could express an operation, so every label the model guessed around it —
-    a "replace" that would wipe a multi-asset card, a refine act, an empty
-    universe that would trigger a second add-or-replace question — is
-    unevidenced. The product rule is append: the answer becomes a typed
-    inclusion with no operation label, and the deterministic append corridors
-    route it.
+    could express an operation, so a guessed "replace" label (which would wipe
+    a multi-asset card) and an empty universe (which would trigger a second
+    add-or-replace question) are both unevidenced shapes of the same answer.
+    The product rule is append. Routing after the rewrite: an
+    answer_pending_need continue turn takes the deterministic
+    provider-resolution append corridor; a refine_current_idea turn reaches
+    the edit planner, whose stated-operation union injects the typed
+    inclusion as an add. A model-labelled "append" is already the product
+    rule and is deliberately left untouched.
     """
     draft = response.candidate_strategy_draft
     if _selected_requested_field_base(request) != "asset_universe":
         return response
-    if response.semantic_turn_act in _BARE_ANSWER_INELIGIBLE_ACTS:
+    if response.semantic_turn_act not in _BARE_ANSWER_ELIGIBLE_ACTS:
         return response
     if response.asset_discovery is not None:
         return response
     if draft.asset_exclusions:
+        return response
+    operation_label = normalized_asset_universe_operation(draft.asset_universe_operation)
+    if operation_label != "replace" and draft.asset_universe:
+        # Only a wipe-shaped guess or a truly bare draft needs the rewrite;
+        # append and unlabeled non-empty shapes already route correctly.
         return response
     prior = _current_artifact_strategy(request)
     prior_symbols = {
@@ -209,13 +217,6 @@ def _bare_asset_answer_without_unevidenced_operation(
         if (inclusion_symbol := _normalized_ticker_symbol(value)) is not None
     }
     if inclusion_symbols - {symbol}:
-        return response
-    already_bare = (
-        draft.asset_universe == [symbol]
-        and draft.asset_inclusions == [symbol]
-        and normalized_asset_universe_operation(draft.asset_universe_operation) is None
-    )
-    if already_bare:
         return response
     field_provenance = dict(draft.field_provenance or {})
     field_provenance["asset_inclusions"] = "explicit_user"

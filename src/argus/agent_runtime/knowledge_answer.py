@@ -176,13 +176,7 @@ async def knowledge_answer_stage_result(
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
         return None
-    if interpretation.unsupported_constraints and (
-        interpretation.semantic_turn_act == "unsupported_request"
-        or (
-            interpretation.semantic_turn_act is None
-            and interpretation.intent == "unsupported_or_out_of_scope"
-        )
-    ):
+    if interpretation.unsupported_constraints:
         # A typed refusal payload owns its recovery route: the primary read
         # already named what cannot run and the nearest supported alternative,
         # so a message-only classifier must not answer the turn as a question.

@@ -293,9 +293,7 @@ def test_changing_only_the_seed_changes_only_the_seed_s_contribution_to_equity()
         close=close, entries=entries, contribution=200.0, starting_capital=5_000.0
     )
 
-    assert (
-        (with_seed.equity_curve - without_seed.equity_curve).round(6).eq(5_000.0).all()
-    )
+    assert (with_seed.equity_curve - without_seed.equity_curve).round(6).eq(5_000.0).all()
     assert with_seed.invested_capital - without_seed.invested_capital == pytest.approx(
         5_000.0
     )
@@ -344,9 +342,7 @@ def test_every_request_refusal_reaches_the_card_under_its_own_name() -> None:
             "date_range": {"start": "2024-01-02", "end": "2024-01-22"}
         },
         "dca_capital_role_conflict": {"recurring_contribution": 999.0},
-        "future_end_date": {
-            "date_range": {"start": "2024-01-02", "end": "2999-12-31"}
-        },
+        "future_end_date": {"date_range": {"start": "2024-01-02", "end": "2999-12-31"}},
         "invalid_chronological_date_range": {
             "date_range": {"start": "2024-12-31", "end": "2024-01-02"}
         },
@@ -576,9 +572,21 @@ _THREE_WEEKS = {"start": "2024-12-10", "end": "2024-12-31"}
     ("label", "date_range", "requested", "reason", "fits"),
     [
         # Nudging a boundary to the nearest session leaves a month a month.
-        ("calendar alignment", _JANUARY_SERVED, _JANUARY_ASKED, "calendar_alignment", True),
+        (
+            "calendar alignment",
+            _JANUARY_SERVED,
+            _JANUARY_ASKED,
+            "calendar_alignment",
+            True,
+        ),
         # Truncating a year to three weeks does not, so the served window rules.
-        ("provider truncation", _THREE_WEEKS, _YEAR, "provider_coverage_adjustment", False),
+        (
+            "provider truncation",
+            _THREE_WEEKS,
+            _YEAR,
+            "provider_coverage_adjustment",
+            False,
+        ),
         # A truncation that still leaves room stays runnable.
         ("truncation with room", _YEAR, _YEAR, "provider_coverage_adjustment", True),
         # With no coverage at all the request's own window is the only truth.
@@ -722,7 +730,9 @@ def test_a_card_never_offers_a_period_the_request_model_refuses(
             continue
         accepted.add(period)
 
-    assert offered == accepted, f"{reason}: card offers {offered}, engine takes {accepted}"
+    assert (
+        offered == accepted
+    ), f"{reason}: card offers {offered}, engine takes {accepted}"
 
 
 def test_a_card_never_offers_a_money_bound_the_request_model_refuses(
@@ -943,9 +953,7 @@ def test_a_stated_cap_is_never_hidden_by_a_stated_seed(
     )
 
     assert report.optional_parameter_values.get("initial_capital") == expects_seed
-    refused = {
-        constraint.category for constraint in report.unsupported_constraints
-    }
+    refused = {constraint.category for constraint in report.unsupported_constraints}
     assert (
         UNSUPPORTED_DCA_CONTRIBUTION_CEILING in refused
     ) is expects_ceiling_refusal, extra
@@ -990,18 +998,21 @@ def test_the_ceiling_refusal_has_one_identity_every_reader_derives_from() -> Non
         }
     )
     ceiling_constraint = {"category": UNSUPPORTED_DCA_CONTRIBUTION_CEILING}
-    deferred = clarify._blocking_unsupported_constraints(
+    deferred, deferred_categories = clarify._blocking_unsupported_constraints(
         state=state,
         requested_fields=["capital_amount", "date_range"],
         unsupported_constraints=[ceiling_constraint],
     )
     assert deferred == []
-    surfaced = clarify._blocking_unsupported_constraints(
+    # The deferral deletes a typed model fact; the receipt names what it hid.
+    assert deferred_categories == [UNSUPPORTED_DCA_CONTRIBUTION_CEILING]
+    surfaced, surfaced_categories = clarify._blocking_unsupported_constraints(
         state=state,
         requested_fields=["capital_amount"],
         unsupported_constraints=[ceiling_constraint],
     )
     assert surfaced == [ceiling_constraint]
+    assert surfaced_categories == []
 
 
 def test_the_interpreter_prompt_gives_each_money_role_exactly_one_field() -> None:
