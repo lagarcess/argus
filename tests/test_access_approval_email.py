@@ -109,36 +109,45 @@ class _StatefulApprovalGateway:
 
         normalized = self._normalize(email)
         delivery = self.deliveries.get(normalized)
+        claim = self.claims.get(normalized)
         if (
             self.role not in {"requested", "user"}
             or self.disabled
             or language != self.language
         ):
             return False
-        if delivery is not None:
+
+        def _matches(record: dict[str, object]) -> bool:
             return (
-                delivery["language"] == language
-                and delivery["content_version"] == content_version
-                and delivery["subject"] == subject
+                record["language"] == language
+                and record["content_version"] == content_version
+                and record["subject"] == subject
             )
-        if self.role == "user":
-            return False
 
-        claim = self.claims.get(normalized)
-        if claim is None or claim["claim_token"] != claim_token:
-            return False
+        if claim_token is None:
+            # An open claim means a send is owed; only a finished grant replays.
+            if claim is not None or self.role != "user":
+                return False
+            return delivery is not None and _matches(delivery)
 
-        self.deliveries[normalized] = {
-            "recipient_email": normalized,
-            "language": language,
-            "content_version": content_version,
-            "subject": subject,
-            "provider_receipt": provider_receipt,
-            "sent_at": "2026-08-12T14:27:17Z",
-        }
-        self.claims.pop(normalized)
-        self.role = "user"
-        return True
+        if claim is not None:
+            if claim["claim_token"] != claim_token or not _matches(claim):
+                return False
+            self.deliveries[normalized] = {
+                "recipient_email": normalized,
+                "language": language,
+                "content_version": content_version,
+                "subject": subject,
+                "provider_receipt": provider_receipt,
+                "sent_at": "2026-08-12T14:27:17Z",
+            }
+            self.claims.pop(normalized)
+            self.role = "user"
+            return True
+
+        if self.role != "user":
+            return False
+        return delivery is not None and _matches(delivery)
 
 
 class _FakeSMTP:

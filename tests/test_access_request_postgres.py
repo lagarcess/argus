@@ -285,7 +285,7 @@ def test_pending_claim_reuses_token_inside_window_and_blocks_after_expiry() -> N
         _cleanup_access_rows(email)
 
 
-def test_pending_claim_freezes_eligibility_until_completion() -> None:
+def test_open_claim_never_blocks_operator_lifecycle_and_fails_closed() -> None:
     email = _random_email()
     try:
         with psycopg.connect(DSN, autocommit=True) as connection:
@@ -294,22 +294,33 @@ def test_pending_claim_freezes_eligibility_until_completion() -> None:
                 claim_token = _claim_token(cursor, email=email)
 
                 cursor.execute("set role service_role")
-                for statement in (
-                    "update public.private_alpha_allowlist set language = 'es-419' "
-                    "where email = %s",
+                cursor.execute(
                     "update public.private_alpha_allowlist set disabled_at = now() "
                     "where email = %s",
-                    "delete from public.private_alpha_allowlist where email = %s",
-                ):
-                    with pytest.raises(psycopg.errors.CheckViolation):
-                        cursor.execute(statement, (email,))
+                    (email,),
+                )
                 cursor.execute("reset role")
 
+                # The edited row invalidates the open claim at completion time
+                # instead of the claim freezing the row.
                 assert _complete_welcome(
                     cursor,
                     email=email,
                     claim_token=claim_token,
-                ) == (True,)
+                ) == (False,)
+
+                cursor.execute("set role service_role")
+                cursor.execute(
+                    "delete from public.private_alpha_allowlist where email = %s",
+                    (email,),
+                )
+                cursor.execute("reset role")
+                cursor.execute(
+                    "select count(*) from public.private_alpha_allowlist "
+                    "where email = %s",
+                    (email,),
+                )
+                assert cursor.fetchone() == (0,)
     finally:
         _cleanup_access_rows(email)
 
@@ -552,13 +563,13 @@ def test_completion_constraint_failure_rolls_back_new_delivery_and_promotion() -
                 assert cursor.fetchone() == (0,)
                 cursor.execute(
                     """
-                    select consumed_at is null
+                    select count(*)
                     from public.private_alpha_access_welcome_claims
                     where recipient_email = %s
                     """,
                     (email,),
                 )
-                assert cursor.fetchone() == (True,)
+                assert cursor.fetchone() == (1,)
     finally:
         _cleanup_access_rows(email)
 
@@ -613,13 +624,13 @@ def test_completion_records_delivery_and_promotes_atomically() -> None:
                 )
                 cursor.execute(
                     """
-                    select consumed_at is not null
+                    select count(*)
                     from public.private_alpha_access_welcome_claims
                     where recipient_email = %s
                     """,
                     (email,),
                 )
-                assert cursor.fetchone() == (True,)
+                assert cursor.fetchone() == (0,)
     finally:
         _cleanup_access_rows(email)
 
@@ -770,13 +781,13 @@ def test_concurrent_claims_reuse_one_durable_send_identity() -> None:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    select count(*), bool_and(consumed_at is null)
+                    select count(*)
                     from public.private_alpha_access_welcome_claims
                     where recipient_email = %s
                     """,
                     (email,),
                 )
-                assert cursor.fetchone() == (1, True)
+                assert cursor.fetchone() == (1,)
     finally:
         _cleanup_access_rows(email)
 

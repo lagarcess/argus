@@ -288,11 +288,18 @@ emergency rollback. The probe never calls the signup provider or CAPTCHA, so it
 cannot create an auth identity. `verify_no_signup_auth_identity` asserts that
 none exists before the canary stages the same row as an active `requested` row
 and calls the protected access-approval operation. That operation sends the real
-localized welcome, writes its immutable delivery record, and promotes the row
-to `user` atomically. A unique generated address scoped to the run identity
+localized welcome, records the provider-accepted delivery, and promotes the row
+to `user` atomically; the canary then reads the delivery row back and requires
+a provider receipt stamped inside this run, so a stopped-sending regression
+cannot score green. A unique generated address scoped to the run identity
 forces every canary attempt through the first-send path instead of delivery
 replay. The exit trap deletes any resulting auth identity and allowlist row,
-then reads back that no matching auth identity remains. Do not move this probe
+removes the run's claim and delivery rows through the service-reachable
+`delete_private_alpha_access_welcome_artifacts` cleanup, then reads back that
+no matching auth identity remains. If an approval fails after its claim is
+written, the claim blocks that address's SMTP for 24 hours and the daily
+maintenance pass releases it after 48; an operator can release immediately with
+`release_expired_private_alpha_access_welcome_claims()`. Do not move this probe
 into Playwright, enable its temporary identity for browser use, or weaken
 Turnstile anywhere deployed.
 
@@ -584,7 +591,8 @@ URL instead of returning an error.
 
 ### Requested Access Promotion
 
-Promote an active `requested` row only through
+Promote an active `requested` row only through the ops route owned by
+`ACCESS_REQUEST_APPROVE_PATH` in `src/argus/api/ops_contract.py`,
 `POST /internal/access-requests/approve`. Never PATCH
 `private_alpha_allowlist.role` to `user` directly. The protected operation sends
 the localized access welcome, records the provider-accepted delivery, and then
@@ -615,12 +623,13 @@ pathlib.Path(sys.argv[1]).write_text(
     encoding="utf-8",
 )
 PY
+APPROVE_PATH="$(python3 -c 'import sys; sys.path.insert(0, "src"); from argus.api.ops_contract import ACCESS_REQUEST_APPROVE_PATH; print(ACCESS_REQUEST_APPROVE_PATH)')"
 curl -q --fail --silent --show-error \
   --config "$OPS_CURL_CONFIG" \
   -X POST \
   -H "Content-Type: application/json" \
   --data-binary "@$APPROVAL_REQUEST" \
-  "${ARGUS_PRIVATE_LAUNCH_API_URL}/internal/access-requests/approve" \
+  "${ARGUS_PRIVATE_LAUNCH_API_URL}${APPROVE_PATH}" \
   > "$APPROVAL_RESPONSE"
 python3 - "$APPROVAL_RESPONSE" <<'PY'
 import json

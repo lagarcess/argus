@@ -8,11 +8,15 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from loguru import logger
 from pydantic import ValidationError
 
 from argus.api import state as api_state
 from argus.api.guest_access import permanent_account_access_allowed
-from argus.api.ops_contract import REQUESTED_SIGNUP_DENIAL_PATH
+from argus.api.ops_contract import (
+    ACCESS_REQUEST_APPROVE_PATH,
+    REQUESTED_SIGNUP_DENIAL_PATH,
+)
 from argus.api.schemas import AccessApprovalRequest, AccessApprovalResponse, Language
 from argus.domain.access_approval_email import (
     ACCESS_WELCOME_CONTENT_VERSION,
@@ -175,35 +179,40 @@ def _approval_signup_url() -> str:
     return f"{origin}/?auth=signup"
 
 
-def _complete_recorded_access_welcome(email: str) -> bool:
-    if api_state.supabase_gateway is None:
+def _approval_unavailable(stage: str) -> HTTPException:
+    # Spec item 14 forbids logging the body, address, receipt, or token; the
+    # stage alone still separates a provider outage from an RPC rejection.
+    logger.exception("access approval failed", stage=stage)
+    return HTTPException(status_code=503, detail=_APPROVAL_UNAVAILABLE_DETAIL)
+
+
+async def _completed_access_welcome_replay(email: str) -> bool:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
         return False
     try:
-        existing = api_state.supabase_gateway.get_private_alpha_access_welcome_delivery(
-            email
+        existing = await asyncio.to_thread(
+            gateway.get_private_alpha_access_welcome_delivery, email
         )
         if existing is None:
             return False
-        completed = api_state.supabase_gateway.complete_private_alpha_access_welcome(
-            email=email,
-            language=existing["language"],
-            content_version=existing["content_version"],
-            subject=existing["subject"],
-            provider_receipt=existing["provider_receipt"],
-            claim_token=None,
+        return bool(
+            await asyncio.to_thread(
+                gateway.complete_private_alpha_access_welcome,
+                email=email,
+                language=existing["language"],
+                content_version=existing["content_version"],
+                subject=existing["subject"],
+                provider_receipt=existing["provider_receipt"],
+                claim_token=None,
+            )
         )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=_APPROVAL_UNAVAILABLE_DETAIL,
-        ) from None
-    if not completed:
-        raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
-    return True
+    except Exception as exc:
+        raise _approval_unavailable("delivery_replay") from exc
 
 
 @router.post(
-    "/internal/access-requests/approve",
+    ACCESS_REQUEST_APPROVE_PATH,
     response_model=AccessApprovalResponse,
     dependencies=[Depends(_require_ops_authorization)],
 )
@@ -212,22 +221,20 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
         body = AccessApprovalRequest.model_validate(await request.json())
     except (json.JSONDecodeError, UnicodeDecodeError, ValidationError):
         raise HTTPException(status_code=422, detail="Invalid request body.") from None
-    if api_state.supabase_gateway is None:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
         raise HTTPException(status_code=503, detail=_APPROVAL_UNAVAILABLE_DETAIL)
-    if _complete_recorded_access_welcome(body.email):
+    if await _completed_access_welcome_replay(body.email):
         return AccessApprovalResponse()
 
     try:
-        requested = api_state.supabase_gateway.get_requested_private_alpha_access(
-            body.email
+        requested = await asyncio.to_thread(
+            gateway.get_requested_private_alpha_access, body.email
         )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=_APPROVAL_UNAVAILABLE_DETAIL,
-        ) from None
+    except Exception as exc:
+        raise _approval_unavailable("eligibility") from exc
     if requested is None:
-        if _complete_recorded_access_welcome(body.email):
+        if await _completed_access_welcome_replay(body.email):
             return AccessApprovalResponse()
         raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
 
@@ -238,19 +245,17 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
             language=language,
             signup_url=signup_url,
         )
-        claim = api_state.supabase_gateway.claim_private_alpha_access_welcome(
+        claim = await asyncio.to_thread(
+            gateway.claim_private_alpha_access_welcome,
             email=body.email,
             language=language,
             content_version=ACCESS_WELCOME_CONTENT_VERSION,
             subject=content.subject,
         )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=_APPROVAL_UNAVAILABLE_DETAIL,
-        ) from None
+    except Exception as exc:
+        raise _approval_unavailable("claim") from exc
     if claim is None:
-        if _complete_recorded_access_welcome(body.email):
+        if await _completed_access_welcome_replay(body.email):
             return AccessApprovalResponse()
         raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
     claim_token = claim.get("claim_token")
@@ -258,20 +263,19 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
         raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
 
     try:
-        result = send_access_welcome_email(
+        result = await asyncio.to_thread(
+            send_access_welcome_email,
             recipient=body.email,
             language=language,
             signup_url=signup_url,
             claim_token=claim_token,
         )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=_APPROVAL_UNAVAILABLE_DETAIL,
-        ) from None
+    except Exception as exc:
+        raise _approval_unavailable("smtp") from exc
 
     try:
-        completed = api_state.supabase_gateway.complete_private_alpha_access_welcome(
+        completed = await asyncio.to_thread(
+            gateway.complete_private_alpha_access_welcome,
             email=body.email,
             language=language,
             content_version=result.content_version,
@@ -279,11 +283,8 @@ async def approve_access_request(request: Request) -> AccessApprovalResponse:
             provider_receipt=result.provider_receipt,
             claim_token=claim_token,
         )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=_APPROVAL_UNAVAILABLE_DETAIL,
-        ) from None
+    except Exception as exc:
+        raise _approval_unavailable("completion") from exc
     if not completed:
         raise HTTPException(status_code=409, detail=_INELIGIBLE_DETAIL)
     return AccessApprovalResponse()

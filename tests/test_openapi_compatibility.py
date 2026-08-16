@@ -8,6 +8,10 @@ from pathlib import Path
 import pytest
 import yaml
 from argus.api import openapi_compat
+from argus.api.ops_contract import (
+    ACCESS_REQUEST_APPROVE_PATH,
+    REQUESTED_SIGNUP_DENIAL_PATH,
+)
 from argus.api.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,9 +39,7 @@ def test_search_declares_bounded_visible_conversation_recall(
     generated: dict,
 ) -> None:
     operation = generated["paths"]["/api/v1/search"]["get"]
-    parameters = {
-        parameter["name"]: parameter for parameter in operation["parameters"]
-    }
+    parameters = {parameter["name"]: parameter for parameter in operation["parameters"]}
 
     query = parameters["q"]
     assert query["in"] == "query"
@@ -77,9 +79,7 @@ def test_decision_note_write_schema_caps_new_notes_without_narrowing_reads(
 ) -> None:
     schemas = generated["components"]["schemas"]
     create_note = schemas["DecisionNoteCreate"]["properties"]["note"]["anyOf"][0]
-    dossier_note = schemas["SearchDossierDecision"]["properties"]["note"][
-        "anyOf"
-    ][0]
+    dossier_note = schemas["SearchDossierDecision"]["properties"]["note"]["anyOf"][0]
     action_note = schemas["SearchDecisionAction"]["properties"]["note"]["anyOf"][0]
 
     assert create_note["maxLength"] == 500
@@ -131,8 +131,8 @@ def test_exclusions_are_exactly_the_named_operations(checked: dict) -> None:
         {
             ("get", "/health"),
             ("get", "/internal/readiness"),
-            ("post", "/internal/access-requests/approve"),
-            ("post", "/internal/canary/requested-signup-denial"),
+            ("post", ACCESS_REQUEST_APPROVE_PATH),
+            ("post", REQUESTED_SIGNUP_DENIAL_PATH),
             ("post", "/api/v1/dev/reset"),
         }
     )
@@ -149,10 +149,10 @@ def test_access_request_is_public_but_internal_ops_routes_are_exactly_excluded(
 ) -> None:
     assert "post" in generated["paths"]["/api/v1/auth/access-requests"]
     assert "post" in checked["paths"]["/api/v1/auth/access-requests"]
-    assert "post" in generated["paths"]["/internal/access-requests/approve"]
-    assert checked.get("paths", {}).get("/internal/access-requests/approve") is None
-    assert "post" in generated["paths"]["/internal/canary/requested-signup-denial"]
-    assert checked.get("paths", {}).get("/internal/canary/requested-signup-denial") is None
+    assert "post" in generated["paths"][ACCESS_REQUEST_APPROVE_PATH]
+    assert checked.get("paths", {}).get(ACCESS_REQUEST_APPROVE_PATH) is None
+    assert "post" in generated["paths"][REQUESTED_SIGNUP_DENIAL_PATH]
+    assert checked.get("paths", {}).get(REQUESTED_SIGNUP_DENIAL_PATH) is None
 
 
 def test_access_request_contract_requires_acceptance_and_documents_failures(
@@ -164,9 +164,7 @@ def test_access_request_contract_requires_acceptance_and_documents_failures(
         assert schema["required"] == ["accepted"]
         assert "default" not in schema["properties"]["accepted"]
 
-        responses = document["paths"]["/api/v1/auth/access-requests"]["post"][
-            "responses"
-        ]
+        responses = document["paths"]["/api/v1/auth/access-requests"]["post"]["responses"]
         assert set(responses) == {"202", "403", "422", "429", "503"}
         for status_code in ("403", "429", "503"):
             assert (
@@ -367,9 +365,7 @@ def test_openapi_contract_exposes_lazy_run_dossier_history(
         {"$ref": "#/components/schemas/RunDossier"},
         {"type": "null"},
     ]
-    assert {"dossier", "total_runs", "decided_runs"}.issubset(
-        search_item["required"]
-    )
+    assert {"dossier", "total_runs", "decided_runs"}.issubset(search_item["required"])
     assert "actions" not in search_item["properties"]
 
 
@@ -414,9 +410,9 @@ def test_openapi_exposes_conversation_activity_and_read_contract(
         assert "activity" not in history_item["required"]
 
         activity_path = document["paths"][path]
-        assert activity_path["get"]["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"] == {"$ref": "#/components/schemas/ConversationActivity"}
+        assert activity_path["get"]["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": "#/components/schemas/ConversationActivity"}
         assert set(activity_path["get"]["responses"]) == {
             "200",
             "404",
@@ -431,9 +427,12 @@ def test_openapi_exposes_conversation_activity_and_read_contract(
             {"$ref": "#/components/schemas/ConversationActivityMarkRead"},
         ]
         assert request["discriminator"]["propertyName"] == "action"
-        assert schemas["ConversationActivityMarkRead"]["properties"][
-            "through_attention_cursor"
-        ]["anyOf"][0]["maxLength"] == 256
+        assert (
+            schemas["ConversationActivityMarkRead"]["properties"][
+                "through_attention_cursor"
+            ]["anyOf"][0]["maxLength"]
+            == 256
+        )
         assert set(patch["responses"]) == {
             "200",
             "403",
@@ -443,7 +442,10 @@ def test_openapi_exposes_conversation_activity_and_read_contract(
             "500",
             "503",
         }
-        for method, statuses in (("get", ("404",)), ("patch", ("403", "404", "409", "422"))):
+        for method, statuses in (
+            ("get", ("404",)),
+            ("patch", ("403", "404", "409", "422")),
+        ):
             for status in statuses:
                 assert activity_path[method]["responses"][status]["content"][
                     "application/json"

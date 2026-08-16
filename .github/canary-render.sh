@@ -33,6 +33,7 @@ CHECKED_OUT_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 HARNESS_SHA="${ARGUS_CANARY_HARNESS_SHA:-$CHECKED_OUT_SHA}"
 ALLOW_HARNESS_MISMATCH="${ARGUS_CANARY_ALLOW_HARNESS_MISMATCH:-false}"
 SURFACE="${ARGUS_CANARY_SURFACE:-}"
+CANARY_RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 ARTIFACT_PROBE="${ARGUS_CANARY_BROWSER_ARTIFACT_PROBE:-none}"
 REDACTION_PROBE_VALUE="${ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE:-}"
 SIMULATE_REDACTION_FAILURE="${ARGUS_CANARY_REDACT_SIMULATE_FAILURE:-false}"
@@ -1566,7 +1567,22 @@ if (
 PY
 }
 
+resolve_approve_path() {
+  python3 - <<'PY'
+import sys
+
+sys.path.insert(0, "src")
+from argus.api.ops_contract import ACCESS_REQUEST_APPROVE_PATH
+
+print(ACCESS_REQUEST_APPROVE_PATH)
+PY
+}
+
 approve_requested_signup_allowlist() {
+  local approve_path
+  if ! approve_path="$(resolve_approve_path)" || [ -z "$approve_path" ]; then
+    return 1
+  fi
   if ! CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_APPROVAL_REQUEST" <<'PY'
 import json
 import os
@@ -1587,7 +1603,7 @@ PY
     -X POST \
     -H "Content-Type: application/json" \
     --data-binary "@$SIGNUP_APPROVAL_REQUEST" \
-    "${API_URL}/internal/access-requests/approve" \
+    "${API_URL}${approve_path}" \
     > "$SIGNUP_ALLOWLIST_RESPONSE" &&
     python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
 import json
@@ -1607,10 +1623,80 @@ if (
 PY
 }
 
+verify_welcome_delivery_recorded() {
+  local encoded_email
+  if ! encoded_email="$(encoded_signup_email)"; then
+    return 1
+  fi
+  service_role_curl \
+    "${SUPABASE_URL}/rest/v1/private_alpha_access_welcome_deliveries?recipient_email=eq.${encoded_email}&select=recipient_email,provider_receipt,sent_at" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" \
+      CANARY_RUN_STARTED_AT="$CANARY_RUN_STARTED_AT" \
+      python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import datetime
+import json
+import os
+import pathlib
+import sys
+
+rows = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+started = datetime.datetime.fromisoformat(
+    os.environ["CANARY_RUN_STARTED_AT"].replace("Z", "+00:00")
+)
+if not isinstance(rows, list) or len(rows) != 1:
+    raise SystemExit("welcome delivery read-back did not find exactly one row")
+row = rows[0]
+if row.get("recipient_email") != target:
+    raise SystemExit("welcome delivery read-back returned a different recipient")
+receipt = row.get("provider_receipt")
+if not isinstance(receipt, str) or not receipt.strip():
+    raise SystemExit("welcome delivery read-back has no provider receipt")
+sent_raw = row.get("sent_at")
+if not isinstance(sent_raw, str):
+    raise SystemExit("welcome delivery read-back has no sent_at")
+sent = datetime.datetime.fromisoformat(sent_raw.replace("Z", "+00:00"))
+if sent < started:
+    raise SystemExit("welcome delivery read-back predates this canary run")
+PY
+}
+
+cleanup_welcome_artifacts() {
+  CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL" python3 - "$SIGNUP_APPROVAL_REQUEST" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+normalized_email = os.environ["CANARY_SIGNUP_EMAIL"].strip().casefold()
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps({"p_email": normalized_email}, separators=(",", ":")),
+    encoding="utf-8",
+)
+PY
+  service_role_curl \
+    -X POST \
+    -H "Content-Type: application/json" \
+    --data-binary "@$SIGNUP_APPROVAL_REQUEST" \
+    "${SUPABASE_URL}/rest/v1/rpc/delete_private_alpha_access_welcome_artifacts" \
+    > "$SIGNUP_ALLOWLIST_RESPONSE" &&
+    python3 - "$SIGNUP_ALLOWLIST_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+if payload is not True:
+    raise SystemExit("welcome artifact cleanup was refused")
+PY
+}
+
 prepare_signup_identity() {
   SIGNUP_IDENTITY_SETUP_ATTEMPTED="true"
   delete_signup_auth_identity &&
     delete_signup_allowlist &&
+    cleanup_welcome_artifacts &&
     insert_disabled_signup_allowlist
 }
 
@@ -1618,6 +1704,7 @@ cleanup_signup_identity() {
   local cleanup_failed=0
   delete_signup_auth_identity || cleanup_failed=1
   delete_signup_allowlist || cleanup_failed=1
+  cleanup_welcome_artifacts || cleanup_failed=1
   return "$cleanup_failed"
 }
 
@@ -1836,6 +1923,9 @@ run_release_coherence_surface() {
   fi
   if ! approve_requested_signup_allowlist; then
     fail_canary "auth" "requested_signup_approval_failed"
+  fi
+  if ! verify_welcome_delivery_recorded; then
+    fail_canary "auth" "welcome_delivery_not_recorded"
   fi
   CANARY_STATUS="passed"
   CANARY_CAPTURE_WRITE_STATUS="not_written_success"

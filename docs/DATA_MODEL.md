@@ -317,12 +317,13 @@ and login; it should not be exposed as a frontend product surface.
   `disabled_at`; when it is closed, neither role admits the email.
 - The ops approval action uses `claim_private_alpha_access_welcome` to lock and
   revalidate the active requested row before SMTP. It then sends the localized
-  welcome and uses `complete_private_alpha_access_welcome` to consume the claim,
-  record the accepted delivery, and promote `requested` to `user` atomically
-  while `disabled_at` remains null.
-- A before-update guard rejects any direct transition into an enabled `user`
-  state unless a matching welcome-delivery row already exists. It does not
-  alter inserts, admin/developer roles, disabling, or an already-active user.
+  welcome and uses `complete_private_alpha_access_welcome` to record the
+  accepted delivery, delete the claim, and promote `requested` to `user`
+  atomically while `disabled_at` remains null.
+- A before-update guard rejects only the direct `requested` to enabled `user`
+  promotion when no matching welcome-delivery row exists. Revoking with
+  `disabled_at`, re-enabling an existing `user`, language edits, inserts,
+  deletes, and admin/developer roles never touch it.
 - There is no invite dashboard, referral system, public invite-code flow,
   pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
@@ -342,9 +343,10 @@ and login; it should not be exposed as a frontend product surface.
 
 ## 6.1 private_alpha_access_welcome_deliveries
 
-Private, immutable evidence that Argus's single access-welcome message was
-accepted by the transactional email provider. This is operational support
-truth, not a browser-facing notification or marketing-email ledger.
+Private evidence that Argus's access-welcome message for the recipient's
+latest grant was accepted by the transactional email provider. This is
+operational support truth, not a browser-facing notification or
+marketing-email ledger.
 
 ### Fields
 - `recipient_email`: `text` (Primary Key, normalized with
@@ -358,26 +360,30 @@ truth, not a browser-facing notification or marketing-email ledger.
 - `created_at`: `timestamptz`
 
 ### Invariants and access
-- `recipient_email` permits at most one access-welcome delivery record. The
-  fixed content version and stored language, subject, and provider receipt are
-  durable evidence for support readback.
-- Records are append-only for application roles. RLS is enabled with no
-  policies. `PUBLIC`, `anon`, and `authenticated` have no table privileges;
-  `service_role` receives only `SELECT`. Delivery insertion belongs to the
-  completion RPC.
+- `recipient_email` permits at most one access-welcome delivery record. It
+  records the latest grant: a fresh approval of a re-requested email replaces
+  the stored language, subject, provider receipt, and `sent_at` in the same
+  completion that sends the new welcome.
+- Writes belong to the RPCs. RLS is enabled with no policies. `PUBLIC`,
+  `anon`, and `authenticated` have no table privileges; `service_role`
+  receives only `SELECT` plus execute on the security-definer RPCs below.
 - `complete_private_alpha_access_welcome(email, language, content_version,
   subject, provider_receipt, claim_token)` is the service-role-only,
-  security-definer completion boundary with an empty search path. A first
-  completion validates and consumes the matching claim, inserts the delivery,
-  and promotes only an active `requested` row in the same transaction. A replay
-  of an already-active `user` needs no claim and returns success only when the
-  delivery row exists; conflicting language, content version, or subject is
-  rejected.
-- `require_private_alpha_access_welcome_delivery` is a before-update trigger on
-  `private_alpha_allowlist`. A row becoming an enabled `user` from a non-user
-  or disabled state must already have a matching delivery record. Browser
-  roles cannot execute either function, and `service_role` may execute only
-  the claim and completion RPCs directly.
+  security-definer completion boundary with an empty search path. A completion
+  with a claim token validates the matching claim, upserts the delivery,
+  deletes the claim, and promotes only an active `requested` row in the same
+  transaction. A replay with a null token returns success only for an active
+  `user` with no open claim and a matching delivery row; conflicting language,
+  content version, or subject is rejected.
+- `require_private_alpha_access_welcome_delivery` is a before-update trigger
+  on `private_alpha_allowlist` scoped to the promotion edge: only a
+  `requested` row becoming an enabled `user` must already have a matching
+  delivery record. No other lifecycle transition can fire it, so it needs no
+  backfill for rows that predate it.
+- `delete_private_alpha_access_welcome_artifacts(email)` is the
+  service-role-executable orphan cleanup: it removes claim and delivery rows
+  only when no allowlist row exists for the email. The canary teardown and
+  offboarding repairs use it; it refuses while the email is still listed.
 
 ## 6.2 private_alpha_access_welcome_claims
 
@@ -393,19 +399,27 @@ queue, scheduler, or general mail system.
 - `subject`: `text` (1 to 200 characters)
 - `claim_token`: `uuid` (Unique opaque send identity)
 - `claimed_at`: `timestamptz`
-- `consumed_at`: `timestamptz` (Nullable until atomic completion)
 
 ### Invariants and access
+- A claim exists only between claim and completion; completion deletes it, so
+  the email's primary key is free for a later grant.
 - The claim RPC row-locks the allowlist row and accepts only the exact active
   `requested` language and fixed content contract. A compatible retry before
-  24 hours reuses the same token. At or after 24 hours, an unconsumed claim
-  remains durable but cannot authorize SMTP again.
-- An unconsumed claim freezes recipient, role, language, and disabled state on
-  the matching allowlist row. Completion consumes the claim before promoting
-  the row, inside the same transaction.
+  24 hours reuses the same token. At or after 24 hours, an open claim cannot
+  authorize SMTP again; the approval returns 409 until the claim is released.
+- `release_expired_private_alpha_access_welcome_claims()` is the
+  service-role-executable release: it deletes claims older than 48 hours (a
+  full provider idempotency window plus one scheduled-maintenance day of
+  margin). `scripts/ops/scheduled_maintenance.py` runs it daily, and an
+  operator can call it directly to unstick an approval immediately. A release
+  can produce one duplicate welcome if the original send succeeded and only
+  its completion was lost; that trade replaces a permanent lockout.
+- Completion revalidates role, language, and disabled state under the row
+  lock, so an allowlist row edited while a claim is open makes that claim fail
+  closed at completion instead of freezing the row.
 - RLS is enabled with no policies. All table privileges are revoked from
   browser and service API roles. `service_role` can reach claim state only
-  through the tightly granted security-definer claim and completion RPCs.
+  through the tightly granted security-definer RPCs.
 
 ---
 

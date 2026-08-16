@@ -220,6 +220,23 @@ def test_gateway_completes_access_welcome_through_rpc(
             "p_claim_token": "11111111-1111-4111-8111-111111111111",
         },
     )
+
+
+def test_gateway_releases_expired_access_welcome_claims_through_rpc() -> None:
+    rpc = MagicMock()
+    rpc.execute.return_value.data = 3
+    client = MagicMock()
+    client.rpc.return_value = rpc
+    gateway = SupabaseGateway(client=client)
+
+    released = gateway.release_expired_private_alpha_access_welcome_claims()
+
+    assert released == 3
+    client.rpc.assert_called_once_with(
+        "release_expired_private_alpha_access_welcome_claims",
+        {},
+    )
+
     rpc.execute.assert_called_once_with()
 
 

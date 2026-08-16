@@ -444,6 +444,13 @@ class SupabaseGateway(
         ).execute()
         return result.data is True
 
+    def release_expired_private_alpha_access_welcome_claims(self) -> int:
+        result = self.client.rpc(
+            "release_expired_private_alpha_access_welcome_claims",
+            {},
+        ).execute()
+        return int(result.data or 0)
+
     def login(
         self,
         email: str,

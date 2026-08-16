@@ -1755,20 +1755,27 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   the provider's 24-hour idempotency window may send the localized welcome to
   `${ARGUS_APP_ORIGIN}/?auth=signup`.
 - Compatible retries inside that window reuse the same durable claim token and
-  therefore the same SMTP idempotency key. An unconsumed claim at or beyond 24
-  hours fails closed without SMTP and requires manual provider reconciliation;
-  the operation does not create a fresh claim automatically. While a claim is
-  unconsumed, relevant allowlist eligibility fields cannot change.
-- The completion RPC validates and consumes the claim, records the
-  provider-accepted delivery, and promotes
+  therefore the same SMTP idempotency key. An open claim at or beyond 24 hours
+  fails closed without SMTP; the operation does not create a fresh claim
+  automatically. The `release_expired_private_alpha_access_welcome_claims()`
+  RPC is the executable reconciliation path: `service_role` may call it, the
+  scheduled maintenance pass runs it daily, and it deletes claims older than
+  48 hours so the next approval mints a fresh claim. Editing an allowlist row
+  while a claim is open does not fail; the edited state simply makes that
+  claim fail closed at completion.
+- The completion RPC validates the claim, records the provider-accepted
+  delivery, deletes the claim, and promotes
   `role=requested AND disabled_at IS NULL` to `role=user` in one transaction.
   The protected operation plus its claim and completion RPCs are the sole
   `requested`-to-`user` promotion boundary; operational callers must not patch
-  that role directly.
-- The normalized recipient has at most one durable access-welcome delivery
-  record. A repeated approval that finds the record calls the same completion
-  RPC without a claim and without calling SMTP, so it can finish an interrupted
-  promotion and returns the unchanged `{"approved":true}` response. Delivery
+  that role directly. The route path is owned by
+  `ACCESS_REQUEST_APPROVE_PATH` in `src/argus/api/ops_contract.py`.
+- The normalized recipient has at most one access-welcome delivery record,
+  describing the latest grant. A repeated approval of an already-active
+  `user` replays the recorded completion without calling SMTP and returns the
+  unchanged `{"approved":true}` response. A fresh `requested` row for an email
+  with an older delivery record is a new grant: the approval sends a new
+  localized welcome and the completion replaces the stored delivery. Delivery
   existence alone
   never grants access: the RPC still rejects missing, disabled, privileged, or
   otherwise ineligible allowlist rows. Missing configuration, missing or

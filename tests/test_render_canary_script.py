@@ -231,7 +231,13 @@ def test_release_coherence_denies_disabled_signup_before_welcome_approval() -> N
     )
     assert approval_curl_line.startswith("curl -q ")
     assert '--config "$OPS_CURL_CONFIG"' in approval_body
-    assert '"${API_URL}/internal/access-requests/approve"' in approval_body
+    assert '"${API_URL}${approve_path}"' in approval_body
+    assert "/internal/access-requests/approve" not in shell_source
+    resolver_body = _shell_function(shell_source, "resolve_approve_path")
+    assert "from argus.api.ops_contract import ACCESS_REQUEST_APPROVE_PATH" in (
+        resolver_body
+    )
+    assert 'approve_path="$(resolve_approve_path)"' in approval_body
     assert 'CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in approval_body
     assert ".strip().casefold()" in approval_body
     assert '--data-binary "@$SIGNUP_APPROVAL_REQUEST"' in approval_body
@@ -250,6 +256,7 @@ def test_release_coherence_denies_disabled_signup_before_welcome_approval() -> N
         < release_body.index("verify_no_signup_auth_identity")
         < release_body.index("stage_requested_signup_allowlist")
         < release_body.index("approve_requested_signup_allowlist")
+        < release_body.index("verify_welcome_delivery_recorded")
     )
     assert "run_browser_canary" not in release_body
 
@@ -260,6 +267,38 @@ def test_release_coherence_denies_disabled_signup_before_welcome_approval() -> N
     assert "if ! env -u ARGUS_OPS_TOKEN" in shell_source
     assert "-u SUPABASE_SERVICE_ROLE_KEY" in shell_source
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
+
+
+def test_release_coherence_reads_the_delivery_back_and_cleans_artifacts() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    release_body = shell_source.split("run_release_coherence_surface() {", 1)[1].split(
+        "\n}", 1
+    )[0]
+    readback_body = _shell_function(shell_source, "verify_welcome_delivery_recorded")
+    artifacts_body = _shell_function(shell_source, "cleanup_welcome_artifacts")
+    cleanup_body = _shell_function(shell_source, "cleanup_signup_identity")
+    prepare_body = _shell_function(shell_source, "prepare_signup_identity")
+
+    # The HTTP 200 alone cannot distinguish a real send from a no-send
+    # replay; the canary must read the delivery row written by this run.
+    assert 'fail_canary "auth" "welcome_delivery_not_recorded"' in release_body
+    assert "private_alpha_access_welcome_deliveries" in readback_body
+    assert "provider_receipt" in readback_body
+    assert "sent_at" in readback_body
+    assert "CANARY_RUN_STARTED_AT" in readback_body
+    assert "sent < started" in readback_body
+    assert 'CANARY_RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"' in shell_source
+
+    # Every row the canary writes must be deletable by the canary itself.
+    assert "delete_private_alpha_access_welcome_artifacts" in artifacts_body
+    assert "service_role_curl" in artifacts_body
+    assert "welcome artifact cleanup was refused" in artifacts_body
+    assert cleanup_body.index("delete_signup_allowlist") < cleanup_body.index(
+        "cleanup_welcome_artifacts"
+    )
+    assert prepare_body.index("delete_signup_allowlist") < prepare_body.index(
+        "cleanup_welcome_artifacts"
+    )
 
 
 def test_approval_response_validators_require_exact_boolean_shape(
