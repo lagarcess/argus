@@ -187,6 +187,7 @@ export function receiptAssumptions(
       case "long_only":
       case "equal_weight":
       case "no_costs":
+      case "fractional_shares":
         lines.push(said[assumption.key]);
         break;
       case "modeled_fee_bps": {
@@ -275,7 +276,8 @@ export function benchmarkVerdict(
     frozenDelta !== null
       ? parse(frozenDelta)
       : (() => {
-          const mine = find("total_return_pct");
+          const mine =
+            find("total_return_pct") ?? find("contribution_return_pct");
           const left = mine ? parse(mine) : null;
           const right = theirs ? parse(theirs) : null;
           return left === null || right === null ? null : left - right;

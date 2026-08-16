@@ -6,6 +6,7 @@ copy (Response Voice Contract violation) attached to strategy-rule options
 for what is actually a date problem.
 """
 
+import pytest
 from argus.agent_runtime.clarification_contract import _unsupported_recovery_fallback
 from argus.agent_runtime.stages.confirm import _launch_validation_failure
 from argus.agent_runtime.state.models import StrategySummary
@@ -31,7 +32,6 @@ def _response_intent_with_raw_value(raw_value: str) -> dict:
 
 def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
     prose = _unsupported_recovery_fallback(
-        language="en",
         response_intent=_response_intent_with_raw_value(
             "invalid_chronological_date_range"
         ),
@@ -43,15 +43,31 @@ def test_internal_reason_code_never_renders_as_sentence_subject() -> None:
     assert "_" not in prose
 
 
-def test_user_phrase_raw_value_still_renders_as_subject() -> None:
+@pytest.mark.parametrize(
+    "raw_value",
+    ["User wants to invest $500", "MACD golden cross", "BTC_USDT"],
+)
+def test_issue_453_generic_raw_value_never_renders_as_subject(
+    raw_value: str,
+) -> None:
+    """This fallback is English compatibility prose and no longer takes a
+    language, so there is no bilingual claim to make here.
+
+    It used to be parametrized over `en` and `es-419` with the same English
+    expectation in both rows, which read as Spanish coverage and proved nothing
+    (#489). The real bilingual property, that the reader sees Spanish, is
+    asserted at the seam in `test_workspace_language_prose.py` and at the
+    presentation boundary in the frontend suite.
+    """
+
     prose = _unsupported_recovery_fallback(
-        language="en",
-        response_intent=_response_intent_with_raw_value("MACD golden cross"),
+        response_intent=_response_intent_with_raw_value(raw_value),
         strategy=StrategySummary(asset_universe=["NVDA"]),
     )
 
     assert prose is not None
-    assert "MACD golden cross" in prose
+    assert raw_value not in prose
+    assert "that rule" in prose
 
 
 def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> None:
@@ -65,7 +81,6 @@ def test_uncategorized_constraint_asks_for_the_rule_not_a_capability_limit() -> 
         del constraint["category"]
 
     prose = _unsupported_recovery_fallback(
-        language="en",
         response_intent=intent,
         strategy=StrategySummary(asset_universe=["WMT"]),
     )
@@ -82,7 +97,6 @@ def test_explanation_sentence_never_renders_as_subject() -> None:
     not a name; sentence punctuation disqualifies a subject."""
 
     prose = _unsupported_recovery_fallback(
-        language="en",
         response_intent=_response_intent_with_raw_value(
             "The requested assumption change needs clarification."
         ),
@@ -92,20 +106,6 @@ def test_explanation_sentence_never_renders_as_subject() -> None:
     assert prose is not None
     assert "needs clarification" not in prose
     assert "that rule" in prose
-
-
-def test_uppercase_underscore_symbol_still_renders_as_subject() -> None:
-    """User-typed pair symbols such as BTC_USDT are their own words, not
-    internal reason codes, and must keep rendering in the clarifier prose."""
-
-    prose = _unsupported_recovery_fallback(
-        language="en",
-        response_intent=_response_intent_with_raw_value("BTC_USDT"),
-        strategy=StrategySummary(asset_universe=["NVDA"]),
-    )
-
-    assert prose is not None
-    assert "BTC_USDT" in prose
 
 
 def test_chronological_validation_failure_reasks_dates_not_strategy_rule() -> None:

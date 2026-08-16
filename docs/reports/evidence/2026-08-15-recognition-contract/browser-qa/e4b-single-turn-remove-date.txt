@@ -1,0 +1,5 @@
+scenario: E4b single-turn valid variant "remove AAPL and change the dates to 2023"
+edit turn DOM extract: new card MSFT / NVDA — Ready to run
+  $1,000 · PERIOD Jan 3, 2023 → Dec 29, 2023 (calendar-aligned) · Benchmark: SPY
+verdict: PASS — both operations land in one turn; isolates e4's finding to the
+  cross-turn clarification surface

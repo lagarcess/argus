@@ -92,18 +92,6 @@ def _to_date(value: str | date | datetime) -> date:
     return value
 
 
-def _periods_per_year(timeframe: str) -> float:
-    mapping = {
-        "1D": 252.0,
-        "1h": 24.0 * 365.0,
-        "2h": 12.0 * 365.0,
-        "4h": 6.0 * 365.0,
-        "6h": 4.0 * 365.0,
-        "12h": 2.0 * 365.0,
-    }
-    return mapping[timeframe]
-
-
 def _vbt_freq(timeframe: str) -> str:
     mapping = {
         "1D": "1D",
@@ -163,6 +151,25 @@ def _normalize_execution_realism(raw: Any) -> dict[str, Any]:
     }
 
 
+def _validate_config_capital(config: dict[str, Any]) -> None:
+    """One capital gate. A DCA run's floor is its plan, not the bankroll band.
+
+    The bankroll band answers "is this a fundable one-time position", which a
+    recurring plan seeded at $0 is not; the plan's own rules answer it instead.
+    """
+    from argus.domain.dca_capital import dca_capital_plan_from_config
+
+    if config["template"] == "dca_accumulation":
+        dca_capital_plan_from_config(config)
+        return
+    if (
+        not MIN_STARTING_CAPITAL
+        <= float(config["starting_capital"])
+        <= MAX_STARTING_CAPITAL
+    ):
+        raise ValueError("invalid_starting_capital")
+
+
 def normalize_backtest_config(
     payload: dict[str, Any],
     *,
@@ -216,10 +223,23 @@ def normalize_backtest_config(
             payload.get("_execution_realism")
         )
 
-    # Task 3: Handle DCA cadence
     if config["template"] == "dca_accumulation":
+        from argus.domain.dca_capital import (
+            build_dca_capital_plan,
+            dca_capital_config_fields,
+        )
+
         cadence = (payload.get("parameters") or {}).get("dca_cadence") or "weekly"
         config["parameters"]["dca_cadence"] = cadence.lower()
+        # This request shape has one money field, and for DCA it has always
+        # meant the per-period contribution; the seed enters through the
+        # launch path's declared plan instead.
+        plan = build_dca_capital_plan(
+            starting_capital=0.0,
+            contribution=config.pop("starting_capital"),
+            period=config["parameters"]["dca_cadence"],
+        )
+        config.update(dca_capital_config_fields(plan))
 
     return config
 
@@ -231,12 +251,7 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
         raise ValueError("unsupported_side")
     if config["allocation_method"] != "equal_weight":
         raise ValueError("unsupported_allocation_method")
-    if (
-        not MIN_STARTING_CAPITAL
-        <= float(config["starting_capital"])
-        <= MAX_STARTING_CAPITAL
-    ):
-        raise ValueError("invalid_starting_capital")
+    _validate_config_capital(config)
     if len(config["symbols"]) < 1 or len(config["symbols"]) > 5:
         raise ValueError("invalid_symbol_count")
     if config["timeframe"] not in ALLOWED_TIMEFRAMES:

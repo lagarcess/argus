@@ -548,7 +548,10 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
             model = payload["model"]
             posts.append((schema_name, model))
             content = "{}"
-            if schema_name == "LLMAssetMentionExtraction":
+            if (
+                schema_name == "LLMAssetMentionExtraction"
+                and model == "structured/fallback"
+            ):
                 content = json.dumps(
                     {
                         "asset_mentions": [],
@@ -638,7 +641,7 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
         (receipt.schema_name, receipt.model, receipt.outcome)
         for receipt in receipts[:-1]
     ] == [
-        ("LLMAssetMentionExtraction", "structured/primary", "succeeded"),
+        ("LLMAssetMentionExtraction", "structured/primary", "failed"),
         ("LLMAssetMentionExtraction", "structured/fallback", "succeeded"),
         ("LLMInterpretationResponse", "structured/primary", "failed"),
         ("LLMInterpretationResponse", "structured/fallback", "failed"),

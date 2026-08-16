@@ -54,7 +54,8 @@ export type PublicReceiptAssumptionKey =
   | "benchmark_same_modeled_costs"
   | "recurring_contribution"
   | "contribution_cadence"
-  | "starting_principal";
+  | "starting_principal"
+  | "fractional_shares";
 
 export type PublicReceiptAssumption = {
   key: PublicReceiptAssumptionKey;
@@ -74,6 +75,7 @@ export type PublicReceiptAssumption = {
 export type PublicReceiptMetricKey =
   | "cash_value"
   | "total_return_pct"
+  | "contribution_return_pct"
   | "max_drawdown_pct"
   | "win_rate"
   | "benchmark_return_pct"
@@ -197,7 +199,12 @@ export async function fetchPublicReceipt(
 export function headlineReceiptMetric(
   payload: PublicReceiptPayload,
 ): PublicReceiptMetric | null {
-  const preferred: PublicReceiptMetricKey[] = ["total_return_pct"];
+  // A run freezes exactly one of these: total_return_pct for one-bankroll
+  // templates, contribution_return_pct for recurring plans.
+  const preferred: PublicReceiptMetricKey[] = [
+    "total_return_pct",
+    "contribution_return_pct",
+  ];
   for (const key of preferred) {
     const match = payload.metrics.find((metric) => metric.key === key);
     if (match) return match;

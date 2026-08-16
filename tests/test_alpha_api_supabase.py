@@ -173,6 +173,7 @@ def test_guest_account_response_contract_is_typed_and_exact() -> None:
         account_kind="guest",
         guest=GuestAccountSummary(
             expires_at=now + timedelta(days=7),
+            conversation_id="00000000-0000-0000-0000-000000000002",
             conversation_limit=1,
             message_limit=10,
             simulation_limit=1,
@@ -1011,6 +1012,7 @@ def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
         account_kind="guest",
         guest=GuestAccountSummary(
             expires_at=now + timedelta(days=7),
+            conversation_id="00000000-0000-0000-0000-000000000002",
             conversation_limit=1,
             message_limit=10,
             simulation_limit=1,
@@ -2202,6 +2204,9 @@ def test_feedback_quota_exceeded_returns_retry_after(mock_gateway):
 
 
 def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatch):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2235,10 +2240,57 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
     assert response.cookies.get("sb-auth-token") == "access-token-123"
 
 
+
+
+def test_signup_duplicate_obfuscated_user_does_not_emit_product_event(
+    mock_gateway,
+    monkeypatch,
+):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    captured_events: list[tuple[str, dict[str, object]]] = []
+
+    def fake_capture_product_event(kind: str, **payload: object) -> None:
+        captured_events.append((kind, dict(payload)))
+
+    monkeypatch.setattr(
+        "argus.api.routers.auth.capture_product_event",
+        fake_capture_product_event,
+    )
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.return_value = {
+        "session": None,
+        "user": {
+            "id": "obfuscated-user-id",
+            "email": "existing@example.com",
+            "identities": [],
+        },
+    }
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "existing@example.com",
+            "password": "password123",
+            "captcha_token": "captcha-proof",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_events == []
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
+
+
 def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2302,6 +2354,9 @@ def test_signup_retry_does_not_reveal_profile_creation_through_username(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2373,6 +2428,9 @@ def test_signup_normalizes_taken_username_before_creating_auth_user_or_profile(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
@@ -2503,6 +2561,9 @@ def test_public_signup_allowlist_denial_matches_provider_failure(
     mock_gateway,
     monkeypatch,
 ):
+    from argus.api.routers import auth as auth_router
+
+    auth_router.reset_auth_attempt_limiter_for_tests()
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = False

@@ -61,6 +61,11 @@ class LaunchBacktestRequest(BaseModel):
     sizing_mode: SizingMode
     capital_amount: float | None = None
     position_size: float | None = None
+    # The recurring plan's two money roles. ``capital_amount`` carries the
+    # contribution for DCA because every stored card already does; the seed has
+    # its own field so neither role can be read off the other.
+    starting_capital: float | None = None
+    recurring_contribution: float | None = None
     cadence: Cadence | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     risk_rules: list[dict[str, Any]] = Field(default_factory=list)
@@ -77,6 +82,18 @@ class LaunchBacktestRequest(BaseModel):
         self.symbols = _normalize_symbols(self.symbols, fallback_symbol=self.symbol)
         self.language = self.language.strip() or "en"
 
+        if self.strategy_type == "dca_accumulation":
+            if self.cadence is None:
+                raise ValueError("cadence_required")
+            self._reconcile_dca_capital_roles()
+        else:
+            if self.cadence is not None:
+                raise ValueError("cadence_not_applicable")
+            if self.starting_capital is not None:
+                raise ValueError("starting_capital_not_applicable")
+            if self.recurring_contribution is not None:
+                raise ValueError("recurring_contribution_not_applicable")
+
         if self.sizing_mode == "capital_amount":
             if self.capital_amount is None:
                 raise ValueError("capital_amount_required")
@@ -88,12 +105,6 @@ class LaunchBacktestRequest(BaseModel):
             if self.capital_amount is not None:
                 raise ValueError("capital_amount_not_applicable")
 
-        if self.strategy_type == "dca_accumulation":
-            if self.cadence is None:
-                raise ValueError("cadence_required")
-        elif self.cadence is not None:
-            raise ValueError("cadence_not_applicable")
-
         try:
             start = date.fromisoformat(self.date_range.start)
             end = date.fromisoformat(self.date_range.end)
@@ -101,6 +112,7 @@ class LaunchBacktestRequest(BaseModel):
             raise ValueError("invalid_date_range") from exc
         validate_backtest_date_window(start=start, end=end)
 
+        requested_start, requested_end = start, end
         if self.requested_date_range is not None:
             try:
                 requested_start = date.fromisoformat(self.requested_date_range.start)
@@ -112,7 +124,74 @@ class LaunchBacktestRequest(BaseModel):
                 end=requested_end,
             )
 
+        if self.cadence is not None:
+            from argus.domain.dca_capital import (
+                contribution_period_window,
+                validate_contribution_period_fits_window,
+            )
+
+            # The card advertises which periods it will accept from the same
+            # owner, so the two cannot offer and refuse the same period.
+            window_start, window_end = contribution_period_window(
+                requested=(requested_start, requested_end),
+                effective=(start, end),
+                adjustment_reason=(
+                    self.coverage_preflight.adjustment_reason
+                    if self.coverage_preflight is not None
+                    else None
+                ),
+            )
+            validate_contribution_period_fits_window(
+                self.cadence,
+                start=window_start,
+                end=window_end,
+            )
+
         return self
+
+    def _reconcile_dca_capital_roles(self) -> None:
+        """Pin the contribution to one value both spellings agree on.
+
+        ``capital_amount`` is the older spelling of the contribution and stored
+        cards still carry it. Where both are present they must state the same
+        number, so neither spelling can quietly override the other, and the
+        seed is never consulted to fill either one.
+        """
+        if self.sizing_mode == "position_size":
+            if self.recurring_contribution is not None:
+                raise ValueError("recurring_contribution_not_applicable")
+            return
+        if (
+            self.recurring_contribution is not None
+            and self.capital_amount is not None
+            and float(self.recurring_contribution) != float(self.capital_amount)
+        ):
+            raise ValueError("dca_capital_role_conflict")
+        if self.recurring_contribution is None:
+            self.recurring_contribution = self.capital_amount
+        elif self.capital_amount is None:
+            self.capital_amount = self.recurring_contribution
+
+
+def launch_request_error_code(exc: Exception) -> str:
+    """Recover this model's own refusal code from a wrapped ValueError.
+
+    The model raises ``ValueError("<code>")``; pydantic keeps that exception in
+    the error's ``ctx``, so the code is read from there. One owner, because an
+    enumerated copy silently degrades every code nobody remembered to add, and
+    there were two such copies before this existed.
+    """
+    errors = getattr(exc, "errors", None)
+    if not callable(errors):
+        return "missing_rule_group"
+    for error in errors():
+        if error.get("type") != "value_error":
+            continue
+        source = (error.get("ctx") or {}).get("error")
+        code = str(source) if source is not None else ""
+        if code and code.replace("_", "").isalnum():
+            return code
+    return "missing_rule_group"
 
 
 def _normalize_symbols(symbols: list[str], *, fallback_symbol: str) -> list[str]:

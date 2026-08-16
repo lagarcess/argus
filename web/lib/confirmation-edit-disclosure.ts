@@ -19,6 +19,7 @@ const TARGET_LABEL_KEYS: Record<string, string> = {
   fees: "chat.confirmation.edit_disclosure.targets.fees",
   recurring_contribution:
     "chat.confirmation.edit_disclosure.targets.recurring_contribution",
+  starting_capital: "chat.confirmation.edit_disclosure.targets.starting_capital",
   slippage: "chat.confirmation.edit_disclosure.targets.slippage",
   strategy_family: "chat.confirmation.edit_disclosure.targets.strategy_family",
   timeframe: "chat.confirmation.edit_disclosure.targets.timeframe",

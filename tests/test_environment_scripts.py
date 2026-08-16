@@ -423,12 +423,12 @@ def test_render_web_declares_exact_server_only_https_app_origin() -> None:
     assert api_env["ARGUS_CORS_ALLOW_ORIGINS"]["value"] == transition_origins
     assert web_env["ARGUS_APP_ORIGIN"]["value"] == "https://arguschat.ai"
     assert web_env["NEXT_PUBLIC_ARGUS_API_URL"]["value"] == (
-        "https://argus-ohr5.onrender.com/api/v1"
+        "https://api.arguschat.ai/api/v1"
     )
     assert "ARGUS_APP_ORIGIN" in _contract_array("ARGUS_RENDER_WEB_ENV")
     assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_contract
     assert (
-        'ARGUS_PRIVATE_LAUNCH_API_URL="https://argus-ohr5.onrender.com"'
+        'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"'
         in env_contract
     )
     assert f'ARGUS_PRIVATE_LAUNCH_CORS_ORIGINS="{transition_origins}"' in env_contract
@@ -1100,7 +1100,7 @@ def test_warmup_script_defaults_to_private_launch_render_urls() -> None:
     env_contract = ENV_CONTRACT.read_text()
 
     assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_contract
-    assert "https://argus-ohr5.onrender.com" in env_contract
+    assert "https://api.arguschat.ai" in env_contract
     assert "ARGUS_PRIVATE_LAUNCH_APP_URL" in warmup
     assert "ARGUS_PRIVATE_LAUNCH_API_URL" in warmup
     assert "/health" in warmup
@@ -1184,8 +1184,8 @@ def test_private_launch_runbook_uses_real_workflow_readiness_gate() -> None:
     assert ".github/warmup-render.sh --expect-mode real-workflow" in before_sessions
     assert ".github/canary-render.sh" in before_sessions
     assert (
-        "API deploy-status, app deploy-status, workflow version status, local smoke, warmup, the "
-        "authoritative Spanish release canary, and the release manifest"
+        "API deploy-status, app deploy-status, workflow version status, local smoke, warmup, both "
+        "canary surfaces, and the release manifest"
         in normalized_before_sessions
     )
     assert "both scripts pass" not in before_sessions

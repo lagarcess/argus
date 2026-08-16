@@ -47,12 +47,10 @@ async def provider_asset_resolution_context_for_request(
             continue
         if not isinstance(extraction, LLMAssetMentionExtraction):
             continue
-        context = provider_asset_resolution_context_from_extraction(
+        return provider_asset_resolution_context_from_extraction(
             extraction,
             resolve_asset_candidate=resolve_asset_candidate,
         )
-        if context is not None:
-            return context
     return None
 
 
@@ -82,7 +80,9 @@ def provider_asset_resolution_context_from_extraction(
     extraction: LLMAssetMentionExtraction,
     *,
     resolve_asset_candidate: Callable[..., AssetResolution],
-) -> str | None:
+) -> str:
+    """Serialize every valid extraction, including a complete empty scan."""
+
     rows: list[dict[str, object]] = []
     all_traded_asset_mentions_accounted_for = (
         extraction.all_traded_asset_mentions_included
@@ -159,8 +159,6 @@ def provider_asset_resolution_context_from_extraction(
             rows.append(row)
         elif role in {"traded_asset", "unknown"}:
             all_traded_asset_mentions_accounted_for = False
-    if not rows and all_traded_asset_mentions_accounted_for:
-        return None
     payload = {
         "asset_resolution_candidates": rows,
         "all_traded_asset_mentions_accounted_for": (

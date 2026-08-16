@@ -374,8 +374,9 @@ def admitted_or_blocked_confirmation_result(
             values=optional_parameter_values,
         )
     )
-    if assistant_response:
-        blocked_patch["assistant_response"] = assistant_response
+    # Clarification owns the refusal copy. The interpreter's acknowledgement
+    # has not passed deterministic admission and cannot reach the user.
+    blocked_patch["assistant_response"] = None
     return StageResult(
         outcome="needs_clarification",
         decision=blocked_decision,

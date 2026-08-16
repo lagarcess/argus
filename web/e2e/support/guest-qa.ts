@@ -205,6 +205,7 @@ export type GuestMe = {
   };
   guest: {
     expires_at: string;
+    conversation_id: string | null;
     message_limit: number;
     simulation_limit: number;
     feedback_limit: number;
@@ -313,7 +314,7 @@ export type SafeEvidence = {
   check4_initial_confirmation: SafeConfirmationEvidence | null;
   check4_refined_confirmation: SafeConfirmationEvidence | null;
   simulation_usage_matches: boolean;
-  same_uuid_conversion: boolean;
+  distinct_uuid_conversion: boolean;
   new_account_resume_count: number;
   existing_claim_owner_changed: boolean;
   existing_claim_duplicate_count: number;
@@ -3374,7 +3375,7 @@ export function emptyEvidence(): SafeEvidence {
     check4_initial_confirmation: null,
     check4_refined_confirmation: null,
     simulation_usage_matches: false,
-    same_uuid_conversion: false,
+    distinct_uuid_conversion: false,
     new_account_resume_count: 0,
     existing_claim_owner_changed: false,
     existing_claim_duplicate_count: 0,

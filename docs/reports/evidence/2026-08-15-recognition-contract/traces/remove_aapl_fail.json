@@ -1,0 +1,854 @@
+{
+ "case_id": "action_chip_change_asset_remove_aapl_issue_188",
+ "attempt": "c",
+ "status": "failed",
+ "failed_checks": [
+  "intent: expected 'backtest_execution', got 'conversation_followup'",
+  "capability_verdict: expected 'executable', got 'answer_only'",
+  "assets: expected ['MSFT', 'NVDA'], got ['AAPL', 'MSFT', 'NVDA']",
+  "effective_date_range: expected {'start': '2024-01-02', 'end': '2024-12-31'}, got {'start': '2024-01-01', 'end': '2024-12-31'}",
+  "adjustment_reason: expected 'calendar_alignment', got None",
+  "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'ready_to_respond']"
+ ],
+ "typed_outcome": {
+  "intent": "conversation_followup",
+  "stage_outcomes": [
+   "needs_clarification",
+   "await_user_reply",
+   "ready_to_respond"
+  ],
+  "assets": [
+   "AAPL",
+   "MSFT",
+   "NVDA"
+  ],
+  "asset_class": "equity",
+  "requested_strategy_template": null,
+  "strategy_type": "buy_and_hold",
+  "entry_rule": null,
+  "exit_rule": null,
+  "rule_spec": null,
+  "date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "requested_date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "effective_date_range": {
+   "start": "2024-01-01",
+   "end": "2024-12-31"
+  },
+  "adjustment_reason": null,
+  "benchmark_symbol": "SPY",
+  "capital_amount": 1000.0,
+  "starting_capital": null,
+  "recurring_contribution": null,
+  "contribution_period": null,
+  "launch_validation_code": null,
+  "missing_required_fields": [
+   "asset_universe"
+  ],
+  "fee_rate": null,
+  "slippage": null,
+  "cost_provenance": {},
+  "launch_execution_realism": null,
+  "capability_verdict": "answer_only",
+  "requested_field": "asset_universe",
+  "clarification": null,
+  "semantic_turn_act": "answer_pending_need",
+  "asset_discovery": null
+ },
+ "route_receipts": [
+  {
+   "task": "clarification",
+   "tier": "chat",
+   "model": "deepseek/deepseek-v4-flash",
+   "fallback_model": "qwen/qwen3.5-9b",
+   "mode": "json_schema",
+   "schema_name": "ClarificationResponse",
+   "latency_ms": 1684,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 1690,
+    "completion_tokens": 72,
+    "total_tokens": 1762,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.00025676,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:41:12.754203+00:00"
+  },
+  {
+   "task": "interpretation_repair",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMAssetMentionExtraction",
+   "latency_ms": 1035,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 778,
+    "completion_tokens": 37,
+    "total_tokens": 815,
+    "cached_tokens": 768,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0002586,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:41:13.791569+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "LLMInterpretationResponse",
+   "latency_ms": 12538,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 10400,
+    "completion_tokens": 1775,
+    "total_tokens": 12175,
+    "cached_tokens": 10368,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0065511,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:41:26.789444+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "x-ai/grok-4.3",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 5684,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": false,
+   "token_usage": {
+    "prompt_tokens": 3084,
+    "completion_tokens": 664,
+    "total_tokens": 3748,
+    "cached_tokens": 192,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.0053134,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:41:32.475182+00:00"
+  },
+  {
+   "task": "interpretation",
+   "tier": "structured",
+   "model": "anthropic/claude-haiku-4.5",
+   "fallback_model": "anthropic/claude-haiku-4.5",
+   "mode": "json_schema",
+   "schema_name": "ArtifactAssumptionEditPlan",
+   "latency_ms": 3738,
+   "outcome": "succeeded",
+   "failure_mode": null,
+   "fallback_used": true,
+   "token_usage": {
+    "prompt_tokens": 3912,
+    "completion_tokens": 376,
+    "total_tokens": 4288,
+    "cached_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "usage_cost_usd": 0.005792,
+   "context_packet_ids": [],
+   "created_at": "2026-08-16T00:41:37.960941+00:00"
+  }
+ ],
+ "trace": [
+  {
+   "seam": "raw_model_response",
+   "n": 0,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "strategy_drafting",
+    "task_relation": "refine",
+    "requires_clarification": false,
+    "user_goal_summary": "Remove AAPL from the asset universe of the current buy and hold strategy",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "language": "en",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": null,
+     "asset_universe": [],
+     "asset_inclusions": [],
+     "asset_exclusions": [
+      "AAPL"
+     ],
+     "asset_universe_operation": "replace",
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": null,
+     "date_range_raw_text": null,
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": null,
+     "initial_capital": null,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "field_provenance": {
+      "asset_exclusions": "explicit_user"
+     },
+     "evidence_spans": {
+      "asset_exclusions": "remove AAPL"
+     },
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Removing AAPL from the assets.",
+    "uses_latest_result_context": false,
+    "confidence": 0.9,
+    "reason_codes": [],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "refine_current_idea",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "pending_refinement"
+   }
+  },
+  {
+   "seam": "after_normalize_for_runtime_context",
+   "n": 1,
+   "message": "remove AAPL",
+   "asset_universe": [
+    "AAPL"
+   ],
+   "asset_exclusions": [
+    "AAPL"
+   ],
+   "asset_universe_operation": "replace",
+   "intent": "strategy_drafting",
+   "act": "refine_current_idea",
+   "reason_codes": []
+  },
+  {
+   "seam": "artifact_edit_planner",
+   "n": 2,
+   "message": "remove AAPL",
+   "required_targets": [
+    "asset"
+   ],
+   "stated_operations": [
+    {
+     "op": "remove",
+     "target": "asset",
+     "symbols": [
+      "AAPL"
+     ],
+     "value": null,
+     "number": null,
+     "date_window": null,
+     "strategy_template": null,
+     "entry_rule": null,
+     "exit_rule": null
+    }
+   ],
+   "raw_plans": [
+    {
+     "model_name": "x-ai/grok-4.3",
+     "plan": {
+      "outcome": "ready_to_confirm",
+      "operations": [
+       {
+        "op": "remove",
+        "target": "asset",
+        "symbols": [
+         "AAPL"
+        ],
+        "value": null,
+        "number": null,
+        "date_window": null,
+        "strategy_template": null,
+        "entry_rule": null,
+        "exit_rule": null
+       }
+      ],
+      "user_goal_summary": "remove AAPL",
+      "asset_universe": [],
+      "asset_universe_operation": null,
+      "comparison_baseline": null,
+      "initial_capital": null,
+      "recurring_contribution_amount": null,
+      "cadence": null,
+      "timeframe": null,
+      "fee_rate": null,
+      "slippage": null,
+      "missing_required_fields": [],
+      "assistant_response": null,
+      "confidence": 0.9
+     }
+    },
+    {
+     "model_name": "anthropic/claude-haiku-4.5",
+     "plan": {
+      "outcome": "ready_to_confirm",
+      "operations": [
+       {
+        "op": "remove",
+        "target": "asset",
+        "symbols": [
+         "AAPL"
+        ],
+        "value": null,
+        "number": null,
+        "date_window": null,
+        "strategy_template": null,
+        "entry_rule": null,
+        "exit_rule": null
+       }
+      ],
+      "user_goal_summary": "Remove AAPL from the traded assets, keeping MSFT and NVDA.",
+      "asset_universe": [
+       "MSFT",
+       "NVDA"
+      ],
+      "asset_universe_operation": null,
+      "comparison_baseline": null,
+      "initial_capital": null,
+      "recurring_contribution_amount": null,
+      "cadence": null,
+      "timeframe": null,
+      "fee_rate": null,
+      "slippage": null,
+      "missing_required_fields": [],
+      "assistant_response": null,
+      "confidence": 1.0
+     }
+    }
+   ],
+   "verdicts": [
+    {
+     "has_supported_edit": true,
+     "completed_operations": [
+      {
+       "op": "remove",
+       "target": "asset",
+       "symbols": [
+        "AAPL"
+       ],
+       "value": null,
+       "number": null,
+       "date_window": null,
+       "strategy_template": null,
+       "entry_rule": null,
+       "exit_rule": null
+      }
+     ],
+     "materialized_targets": null
+    },
+    {
+     "has_supported_edit": true,
+     "completed_operations": [
+      {
+       "op": "remove",
+       "target": "asset",
+       "symbols": [
+        "AAPL"
+       ],
+       "value": null,
+       "number": null,
+       "date_window": null,
+       "strategy_template": null,
+       "entry_rule": null,
+       "exit_rule": null
+      }
+     ],
+     "materialized_targets": null
+    }
+   ],
+   "planner_result": null
+  },
+  {
+   "seam": "after_response_ready",
+   "n": 3,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "conversation_followup",
+    "task_relation": "continue",
+    "requires_clarification": true,
+    "user_goal_summary": "Remove AAPL from the asset universe of the current buy and hold strategy",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "language": null,
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": null,
+     "asset_universe": [],
+     "asset_inclusions": [],
+     "asset_exclusions": [],
+     "asset_universe_operation": null,
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "indicator": null,
+     "indicator_period": null,
+     "entry_threshold": null,
+     "exit_threshold": null,
+     "date_range": null,
+     "date_range_raw_text": null,
+     "date_range_intent": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "recurring_contribution": null,
+     "initial_capital": null,
+     "total_capital": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "field_provenance": {},
+     "evidence_spans": {},
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Do you want to add those assets to the current strategy, or replace the current assets with them?",
+    "uses_latest_result_context": false,
+    "confidence": 0.9,
+    "reason_codes": [
+     "asset_universe_operation_needs_clarification"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "answer_pending_need",
+    "asset_discovery": null,
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "pending_refinement"
+   }
+  },
+  {
+   "seam": "structured_interpretation",
+   "n": 4,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "conversation_followup",
+    "task_relation": "continue",
+    "requires_clarification": true,
+    "user_goal_summary": "Remove AAPL from the asset universe of the current buy and hold strategy",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": "remove AAPL",
+     "asset_universe": [],
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [],
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Do you want to add those assets to the current strategy, or replace the current assets with them?",
+    "confidence": 0.9,
+    "reason_codes": [
+     "asset_universe_operation_needs_clarification"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "pending_refinement",
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "knowledge_answer_claim",
+   "n": 5,
+   "message": "remove AAPL",
+   "claimed": false,
+   "outcome": null,
+   "patch": null
+  },
+  {
+   "seam": "interpretation_entering_stage_routing",
+   "n": 6,
+   "message": "remove AAPL",
+   "data": {
+    "intent": "conversation_followup",
+    "task_relation": "continue",
+    "requires_clarification": true,
+    "user_goal_summary": "Remove AAPL from the asset universe of the current buy and hold strategy",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": null,
+     "strategy_thesis": "remove AAPL",
+     "asset_universe": [],
+     "asset_class": null,
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": null,
+     "sizing_mode": null,
+     "capital_amount": null,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": null,
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [],
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [],
+    "assistant_response": "Do you want to add those assets to the current strategy, or replace the current assets with them?",
+    "confidence": 0.9,
+    "reason_codes": [
+     "asset_universe_operation_needs_clarification"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "response_profile_overrides": {
+     "tone": null,
+     "verbosity": null,
+     "expertise_mode": null
+    },
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "artifact_target": "pending_refinement",
+    "asset_discovery": null
+   }
+  },
+  {
+   "seam": "final_stage_result",
+   "n": 7,
+   "message": "remove AAPL",
+   "outcome": "ready_to_respond",
+   "patch": {
+    "normalized_signals": {},
+    "intent": "conversation_followup",
+    "task_relation": "continue",
+    "requires_clarification": true,
+    "user_goal_summary": "Remove AAPL from the asset universe of the current buy and hold strategy",
+    "detected_user_language": "en",
+    "candidate_strategy_draft": {
+     "raw_user_phrasing": "remove AAPL",
+     "requested_strategy_template": null,
+     "strategy_type": "buy_and_hold",
+     "strategy_thesis": "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024.",
+     "asset_universe": [
+      "AAPL",
+      "MSFT",
+      "NVDA"
+     ],
+     "asset_class": "equity",
+     "timeframe": null,
+     "cadence": null,
+     "entry_logic": null,
+     "exit_logic": null,
+     "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "sizing_mode": null,
+     "capital_amount": 1000.0,
+     "position_size": null,
+     "risk_rules": [],
+     "assumptions": [],
+     "comparison_baseline": "SPY",
+     "refinement_of": null,
+     "entry_rule": null,
+     "exit_rule": null,
+     "rule_spec": null,
+     "resolution_provenance": [
+      {
+       "field": "asset_universe[0]",
+       "raw_text": "AAPL",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "AAPL",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      },
+      {
+       "field": "asset_universe[1]",
+       "raw_text": "MSFT",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "MSFT",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      },
+      {
+       "field": "asset_universe[2]",
+       "raw_text": "NVDA",
+       "source": "llm_extraction",
+       "candidate_kind": "asset",
+       "resolution_status": "resolved",
+       "canonical_symbol": "NVDA",
+       "asset_class": "equity",
+       "validated_by": "provider_catalog",
+       "confidence": "high"
+      }
+     ],
+     "extra_parameters": {}
+    },
+    "missing_required_fields": [
+     "asset_universe"
+    ],
+    "optional_parameter_status": {
+     "optional_parameter_opportunity": [
+      "initial_capital",
+      "timeframe",
+      "fees",
+      "slippage",
+      "engine_options"
+     ],
+     "user_preference_overridden_for_turn": false,
+     "confidence": 0.9,
+     "arbitration_mode": "structured_arbitration",
+     "ambiguous_fields": [],
+     "unsupported_constraints": []
+    },
+    "effective_response_profile": {
+     "effective_tone": "friendly",
+     "effective_verbosity": "medium",
+     "effective_expertise_mode": "beginner"
+    },
+    "reason_codes": [
+     "llm_interpreter_used",
+     "semantic_date_constraint_preserved",
+     "asset_universe_operation_needs_clarification"
+    ],
+    "ambiguous_fields": [],
+    "unsupported_constraints": [],
+    "resolution_provenance": [
+     {
+      "field": "asset_universe[0]",
+      "raw_text": "AAPL",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "AAPL",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     },
+     {
+      "field": "asset_universe[1]",
+      "raw_text": "MSFT",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "MSFT",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     },
+     {
+      "field": "asset_universe[2]",
+      "raw_text": "NVDA",
+      "source": "llm_extraction",
+      "candidate_kind": "asset",
+      "resolution_status": "resolved",
+      "canonical_symbol": "NVDA",
+      "asset_class": "equity",
+      "validated_by": "provider_catalog",
+      "confidence": "high"
+     }
+    ],
+    "semantic_turn_act": "answer_pending_need",
+    "result_followup_focus": null,
+    "result_followup_fact_key": null,
+    "capability_question_focus": null,
+    "context_question_focus": null,
+    "asset_discovery": null,
+    "assistant_response": "Do you want to add those assets to the current strategy, or replace the current assets with them?",
+    "response_intent": {
+     "kind": "clarification",
+     "semantic_needs": [
+      "asset_target"
+     ],
+     "requested_fields": [
+      "asset_universe"
+     ],
+     "facts": {
+      "strategy": {
+       "raw_user_phrasing": "remove AAPL",
+       "requested_strategy_template": null,
+       "strategy_type": "buy_and_hold",
+       "strategy_thesis": "Buy and hold AAPL, MSFT, and NVDA for calendar year 2024.",
+       "asset_universe": [
+        "AAPL",
+        "MSFT",
+        "NVDA"
+       ],
+       "asset_class": "equity",
+       "timeframe": null,
+       "cadence": null,
+       "entry_logic": null,
+       "exit_logic": null,
+       "date_range": {
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+       },
+       "sizing_mode": null,
+       "capital_amount": 1000.0,
+       "position_size": null,
+       "risk_rules": [],
+       "assumptions": [],
+       "comparison_baseline": "SPY",
+       "refinement_of": null,
+       "entry_rule": null,
+       "exit_rule": null,
+       "rule_spec": null,
+       "resolution_provenance": [
+        {
+         "field": "asset_universe[0]",
+         "raw_text": "AAPL",
+         "source": "llm_extraction",
+         "candidate_kind": "asset",
+         "resolution_status": "resolved",
+         "canonical_symbol": "AAPL",
+         "asset_class": "equity",
+         "validated_by": "provider_catalog",
+         "confidence": "high"
+        },
+        {
+         "field": "asset_universe[1]",
+         "raw_text": "MSFT",
+         "source": "llm_extraction",
+         "candidate_kind": "asset",
+         "resolution_status": "resolved",
+         "canonical_symbol": "MSFT",
+         "asset_class": "equity",
+         "validated_by": "provider_catalog",
+         "confidence": "high"
+        },
+        {
+         "field": "asset_universe[2]",
+         "raw_text": "NVDA",
+         "source": "llm_extraction",
+         "candidate_kind": "asset",
+         "resolution_status": "resolved",
+         "canonical_symbol": "NVDA",
+         "asset_class": "equity",
+         "validated_by": "provider_catalog",
+         "confidence": "high"
+        }
+       ],
+       "extra_parameters": {}
+      },
+      "current_user_message": "",
+      "language": "en",
+      "progress_outcome": "no_progress"
+     },
+     "options": [
+      {
+       "id": "supply_missing_value",
+       "label": "Provide the missing value",
+       "replacement_values": {
+        "requested_field": "asset_universe"
+       }
+      },
+      {
+       "id": "keep_unchanged",
+       "label": "Keep the idea unchanged",
+       "replacement_values": {
+        "no_progress_action": "keep_unchanged"
+       }
+      },
+      {
+       "id": "cancel",
+       "label": "Cancel this flow",
+       "replacement_values": {
+        "no_progress_action": "cancel"
+       }
+      }
+     ]
+    },
+    "requested_field": "asset_universe"
+   }
+  }
+ ]
+}

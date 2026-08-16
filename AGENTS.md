@@ -416,6 +416,8 @@ These principles come from the recent modular monolith / LangGraph migration pla
 
 - **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, localized stop-word or alias tables, display-label token matching, or legacy NLU shortcuts before the interpreter. Offline fallback choices must use typed action metadata such as button ids or `replacement_values`, not per-language phrasebooks.
 - **Deterministic guardrails after interpretation**: Code validates facts the LLM cannot own: asset resolution, provider availability, same-asset constraints, max symbol limits, date/data windows, executable indicator support, benchmark defaults, and required fields.
+- **Model-facing text is shared and measured**: The interpreter's system prompt and the response schema's field descriptions steer every interpreted turn, so a change made for one surface moves behavior on all of them. PR #491 rewrote the prompt for a DCA change and regressed asset extraction, start-date preservation, and discovery routing; unit tests and CI stayed green because no unit test sends a message through a model. This text is therefore frozen against a committed scorecard (Never-Violate Standard 12). Prefer deterministic grounding after interpretation whenever code can own the fact; reach for prompt text only when it cannot.
+- **Redundancy over an LLM read must be observable**: Where deterministic code compensates for an unreliable model read, such as taking the union of two independent structured reads of the same turn, it must record when it fires. An unmeasured compensation layer hides model decay instead of surfacing it.
 - **One active chat brain**: The LangGraph runtime is the only active conversational runtime. Do not restore or recreate a parallel legacy orchestrator, state machine, or second intent taxonomy.
 - **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns current product persistence such as messages, conversations, backtest runs, feedback, and usage counters, plus read-compatible legacy Strategy and Collection rows.
 - **Supabase product records are durable artifacts**: Messages store assistant/user text and structured metadata. Backtest runs store immutable result truth. Legacy Strategy and Collection records remain readable, but no current writer creates or manages them.
@@ -912,6 +914,14 @@ Never do this:
     re-verify the mission and affected evidence before completion. Do not rebase
     a published or evidenced lane, and do not use `main` as the ordinary worker
     base.
+12. **Model-Facing Text Is Measured**: Prompt builders and Pydantic
+    `Field(description=...)` in the eval-reachable tree are fingerprinted by
+    `tests/test_interpreter_prompt_freeze.py`. Changing any of it requires a
+    live measurement eval on the branch, its scorecard committed under
+    `docs/reports/evidence/`, a case-by-case comparison against the scorecard
+    named in `.agent/interpreter_prompt_fingerprint.json` showing no
+    regression, and a regenerated fingerprint. One lane owns this surface at a
+    time. See "Model-Facing Text" under Runtime Migration Principles.
 
 ---
 

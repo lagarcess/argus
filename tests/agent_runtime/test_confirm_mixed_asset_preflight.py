@@ -254,7 +254,9 @@ def test_confirm_rejects_mixed_assets_before_coverage_fetch(
         asset_class=asset_class,
         capital_amount=1_000,
         cadence=cadence,
-        date_range={"start": "2024-01-01", "end": "2024-01-05"},
+        # Long enough to hold one whole contribution period, so the mixed-asset
+        # refusal is what this test measures rather than a window refusal.
+        date_range={"start": "2024-01-01", "end": "2024-01-31"},
     )
 
     result = confirm_stage(

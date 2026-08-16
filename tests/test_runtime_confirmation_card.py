@@ -136,13 +136,15 @@ def test_retest_confirmation_projects_typed_period_and_normal_run_label() -> Non
         ),
         ("starting_capital", "$1,000"),
     ]
+    # The zero-cost truth is a typed fact, never backend prose: the card
+    # localizes `fees`/`slippage` at the presentation boundary (#434).
     assert card["assumptions"] == [
         "$1,000 starting capital",
         "Daily data",
-        "No fees",
-        "No slippage",
         "Benchmark: SPY",
     ]
+    assert card["display_facts"]["fees"] == 0
+    assert card["display_facts"]["slippage"] == 0
 
 
 def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
@@ -162,9 +164,10 @@ def test_runtime_confirmation_card_flag_off_never_advertises_modeled_costs(
         "slippage": 0.0,
         "timeframe": "1D",
     }
-    assert "No fees" in card["assumptions"]
-    assert "No slippage" in card["assumptions"]
-    assert not any("Modeled costs" in item for item in card["assumptions"])
+    assert not any(
+        "fee" in item.lower() or "slippage" in item.lower()
+        for item in card["assumptions"]
+    )
 
 
 def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
@@ -183,9 +186,10 @@ def test_runtime_confirmation_card_flag_off_ignores_stale_launch_payload_costs(
     assert card is not None
     assert card["display_facts"]["fees"] == 0.0
     assert card["display_facts"]["slippage"] == 0.0
-    assert "No fees" in card["assumptions"]
-    assert "No slippage" in card["assumptions"]
-    assert not any("Modeled costs" in item for item in card["assumptions"])
+    assert not any(
+        "fee" in item.lower() or "slippage" in item.lower()
+        for item in card["assumptions"]
+    )
 
 
 def test_runtime_confirmation_card_flag_on_shows_draft_costs_without_launch_payload(
@@ -239,26 +243,32 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
 
     assert card is not None
     assert card["strategy_type"] == "dca_accumulation"
+    # A recurring plan has exactly two money parameters, and the shared
+    # bankroll default is not one of them: nobody stated a seed, so it is $0.
     assert card["display_facts"] == {
         "benchmark_symbol": "BTC",
-        "capital": 500.0,
+        "starting_capital": 0.0,
+        "recurring_contribution": 500.0,
+        "contribution_period": "monthly",
         "fees": 0.0,
         "slippage": 0.0,
         "timeframe": "1D",
     }
+    assert not any(row["key"] == "cadence" for row in card["rows"])
     assert any(
-        row["key"] == "cadence"
-        and row["labelKey"] == "chat.confirmation.rows.cadence"
-        and row["value"] == "Monthly"
+        row["key"] == "starting_capital"
+        and row["labelKey"] == "chat.confirmation.rows.starting_capital"
+        and row["value"] == "$0"
         for row in card["rows"]
     )
     assert any(
         row["key"] == "contribution"
         and row["labelKey"] == "chat.confirmation.rows.contribution"
-        and row["value"] == "$500"
+        and row["value"] == "$500 monthly"
         for row in card["rows"]
     )
-    assert "$500 recurring contribution" in card["assumptions"]
+    assert "$0 starting capital" in card["assumptions"]
+    assert "$500 monthly contribution" in card["assumptions"]
     assert "Daily data" in card["assumptions"]
     assert "1D bars" not in card["assumptions"]
     assert "$10,000 starting capital" not in card["assumptions"]
@@ -456,6 +466,7 @@ def test_runtime_confirmation_card_shows_execution_realism_values(
     assert "No slippage" not in card["assumptions"]
 
 
+
 def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -> None:
     card = runtime_confirmation_card(
         {
@@ -537,9 +548,14 @@ def test_runtime_confirmation_card_emits_typed_spanish_confirmation_artifact() -
     }
     assert "$100,000 starting capital" in card["assumptions"]
     assert "Datos diarios" in card["assumptions"]
-    assert "No fees" in card["assumptions"]
-    assert "No slippage" in card["assumptions"]
     assert "Benchmark: BTC" in card["assumptions"]
+    # #434: the strip used to carry "No fees" and "No slippage" in English on a
+    # Spanish turn. The zero-cost truth now travels only as a typed fact, which
+    # the card localizes.
+    assert "No fees" not in card["assumptions"]
+    assert "No slippage" not in card["assumptions"]
+    assert card["display_facts"]["fees"] == 0
+    assert card["display_facts"]["slippage"] == 0
 
 
 def test_runtime_confirmation_card_localizes_spanish_indicator_rules() -> None:

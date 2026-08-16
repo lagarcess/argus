@@ -132,16 +132,19 @@ async def discovery_turn_stage_result(
         return await discovery_stage_result_for(
             interpretation=interpretation, decision=decision, state=state, user=user
         )
-    if decision.semantic_turn_act != "asset_discovery":
+    if (
+        decision.asset_discovery is None
+        and decision.semantic_turn_act != "asset_discovery"
+    ):
         return None
     query = await _classify_research_question(
         message=state.current_user_message,
         language=user.language_preference,
     )
     request = decision.asset_discovery
-    if query is None or not _is_research_shaped(query.question_kind):
-        # Classifier unavailable, or it agrees the turn is discovery-shaped:
-        # the find operation runs with the interpreter's typed request, so a
+    if query is None or query.question_kind not in _TYPED_DISCOVERY_DIVERT_KINDS:
+        # Classifier unavailable, or the turn stays discovery-shaped: the
+        # find operation runs with the interpreter's typed request, so a
         # routing hiccup can never lose a discovery turn.
         from argus.agent_runtime.research_find import find_assets_stage_result
 
@@ -162,16 +165,23 @@ async def discovery_turn_stage_result(
     )
 
 
-# Kinds that divert a typed discovery act into grounded research. The
-# interpreter's act says "the user wants assets"; the classifier says what
-# kind of answer that is. Only a bare ask for names stays with the find
-# operation, because only that ask wants names and nothing else: a screen
-# must apply its conditions and a sector question must report the sector.
-_FIND_OPERATION_KINDS = frozenset({"find_assets"})
-
-
-def _is_research_shaped(question_kind: str) -> bool:
-    return question_kind not in _FIND_OPERATION_KINDS | {"concept", "none"}
+# Kinds that divert a typed discovery act into grounded research: shapes
+# whose answer is genuinely something other than candidate assets (a named
+# comparison, one company's story, a quote, holdings, stats, news). Survey
+# kinds (screening, sector_radar, market_pulse) deliberately do NOT divert a
+# typed discovery turn: "find me stocks that recently IPO'ed" states a
+# condition and is still an ask for candidate assets, and the discovery
+# escalation chip promises the discovery surface, not a narrative (#344).
+_TYPED_DISCOVERY_DIVERT_KINDS = frozenset(
+    {
+        "live_quote",
+        "company_lookup",
+        "cross_company",
+        "etf_constituents",
+        "market_stats",
+        "current_external",
+    }
+)
 
 
 async def _dispatch(
@@ -185,7 +195,11 @@ async def _dispatch(
 ) -> StageResult | None:
     if query.question_kind in ("market_stats", "current_external"):
         return await _legacy_kind_result(
-            query=query, interpretation=interpretation, state=state, user=user
+            query=query,
+            interpretation=interpretation,
+            state=state,
+            user=user,
+            decision=decision,
         )
     if query.question_kind in _MARKET_SURVEY_KINDS:
         if not state.research_allowance_available:
@@ -195,6 +209,7 @@ async def _dispatch(
                 interpretation=interpretation,
                 state=state,
                 user=user,
+                decision=decision,
             )
         return await grounded.grounded_result(
             query=query,
@@ -203,6 +218,7 @@ async def _dispatch(
             interpretation=interpretation,
             state=state,
             user=user,
+            decision=decision,
         )
     if query.question_kind == "find_assets":
         from argus.agent_runtime.research_find import find_assets_stage_result
@@ -225,6 +241,7 @@ async def _dispatch(
             interpretation=interpretation,
             state=state,
             user=user,
+            decision=decision,
         )
     if not state.research_allowance_available:
         return await grounded.exhausted_result(
@@ -233,6 +250,7 @@ async def _dispatch(
             interpretation=interpretation,
             state=state,
             user=user,
+            decision=decision,
         )
     shape = grounded.shape_for_query(query)
     if shape == "thorough":
@@ -242,6 +260,7 @@ async def _dispatch(
             interpretation=interpretation,
             user=user,
             message=state.current_user_message,
+            decision=decision,
         )
     return await grounded.grounded_result(
         query=query,
@@ -250,6 +269,7 @@ async def _dispatch(
         interpretation=interpretation,
         state=state,
         user=user,
+        decision=decision,
     )
 
 
@@ -389,6 +409,7 @@ async def _legacy_kind_result(
     interpretation: StructuredInterpretation,
     state: RunState,
     user: UserState,
+    decision: InterpretDecision | None = None,
 ) -> StageResult | None:
     # Lazy import: knowledge_answer imports this module, so the reverse edge
     # must stay function-scoped.
@@ -425,4 +446,5 @@ async def _legacy_kind_result(
         interpretation=interpretation,
         query=legacy,
         user=user,
+        decision=decision,
     )

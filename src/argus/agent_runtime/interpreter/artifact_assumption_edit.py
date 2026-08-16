@@ -9,9 +9,9 @@ from typing import Any
 
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
-    EditOperation,
     ResolvedArtifactEdit,
     _apply_legacy_flat_edit_fields,
+    accepted_operations_partially_materialized,
     apply_edit_operations,
     resolved_asset_operation_symbols,
     typed_unapplied_operations,
@@ -22,6 +22,10 @@ from argus.agent_runtime.artifacts.asset_edits import (
 )
 from argus.agent_runtime.asset_text_grounding import (
     provider_grounded_asset_evidence_from_text,
+)
+from argus.agent_runtime.interpreter.asset_role_constraints import (
+    asset_role_constraints_satisfied,
+    primary_assets_with_exclusions_removed,
 )
 from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     ground_planned_execution_costs,
@@ -608,29 +612,6 @@ def _stated_cost_changes(
     return changes
 
 
-def stated_cost_edit_operations(
-    draft: LLMStrategyDraft | None,
-    *,
-    current_strategy: StrategySummary | None,
-    request: InterpretationRequest | None,
-) -> list[EditOperation]:
-    """Typed cost operations for the planner to fall back on (§3.2).
-
-    Values come from the primary interpretation's typed extraction, so the
-    plan completion stays deterministic; the applier still validates each
-    value and the card discloses anything it refuses.
-    """
-
-    if draft is None:
-        return []
-    return [
-        EditOperation(op="set", target=_STATED_COST_TARGETS[field_name], number=value)
-        for field_name, value in _stated_cost_changes(
-            draft, current_strategy=current_strategy, request=request
-        ).items()
-    ]
-
-
 def asset_edit_symbol_resolver(
     resolve_asset_candidate: ResolveAssetCandidate,
 ) -> Callable[[str], str | None]:
@@ -787,6 +768,19 @@ _MATERIALIZED_FIELD_TARGETS = {
 }
 
 
+def _disclosed_unapplied_targets(draft: LLMStrategyDraft) -> set[str]:
+    """Targets whose refusal already rides the card as a typed disclosure."""
+
+    disclosure = draft.extra_parameters.get("edit_disclosure")
+    if not isinstance(disclosure, dict):
+        return set()
+    return {
+        str(entry.get("target"))
+        for entry in disclosure.get("unapplied") or []
+        if isinstance(entry, dict) and entry.get("target")
+    }
+
+
 def _planned_whole_universe_asset_symbols(
     plan: ArtifactAssumptionEditPlan,
     *,
@@ -848,7 +842,7 @@ def materialized_artifact_edit_targets(
 ) -> set[str] | None:
     """Return requested deltas that survive the exact materialization path."""
 
-    draft, field_provenance, _ = _materialized_artifact_edit(
+    draft, field_provenance, _, resolved = _materialized_artifact_edit(
         plan,
         request=request,
         asset_symbol_resolver=asset_symbol_resolver,
@@ -861,6 +855,13 @@ def materialized_artifact_edit_targets(
     }
     if draft.date_range_intent is not None:
         materialized_targets.add("date_window")
+    if resolved is not None and accepted_operations_partially_materialized(
+        resolved,
+        materialized_targets | _disclosed_unapplied_targets(draft),
+    ):
+        # An accepted operation vanished while its siblings landed; a card
+        # carrying half of a compound request must never ship (issue #498).
+        return None
     if primary_draft is None:
         return materialized_targets
     current_strategy = _current_artifact_strategy(request)
@@ -934,19 +935,24 @@ def materialized_artifact_edit_targets(
         )
     )
     materialized_assets = set(normalized_asset_symbols(draft.asset_universe))
-    primary_assets = set(normalized_asset_symbols(primary_draft.asset_universe))
+    # The card-resolved carve-out sees the raw universe copy, so an echoed
+    # exclusion still needs message or card grounding.
+    primary_assets_raw = set(normalized_asset_symbols(primary_draft.asset_universe))
     card_resolved_asset_exclusions = (
-        (primary_asset_exclusions & current_assets) - primary_assets
+        (primary_asset_exclusions & current_assets) - primary_assets_raw
         if primary_carries_explicit_asset_request
         and primary_asset_operation in {"append", "replace"}
         else set()
+    )
+    primary_assets = primary_assets_with_exclusions_removed(
+        primary_assets_raw,
+        primary_asset_exclusions,
     )
     if (
         not primary_asset_inclusions <= provider_grounded_asset_symbols
         or not primary_asset_exclusions
         <= provider_grounded_asset_symbols | card_resolved_asset_exclusions
         or primary_asset_inclusions & primary_asset_exclusions
-        or primary_assets & primary_asset_exclusions
     ):
         return None
     additions = materialized_assets - current_assets
@@ -1057,29 +1063,15 @@ def _materialized_target_matches_primary_delta(
             materialized_draft.asset_universe_operation
         )
         if primary_inclusions or primary_exclusions:
-            expected_from_typed_roles = set(current)
-            grounded_primary_requested = {
-                symbol
-                for symbol in primary_requested
-                if symbol in current or symbol in grounded or symbol in primary_inclusions
-            }
-            if operation == "replace":
-                expected_from_typed_roles = grounded_primary_requested
-            elif (
-                operation is None
-                and planned_asset_replacement
-                and primary_inclusions
-                and (not primary_exclusions or bool(primary_requested))
-            ):
-                expected_from_typed_roles = grounded_primary_requested
-            elif operation == "append":
-                expected_from_typed_roles.update(grounded_primary_requested)
-            expected_from_typed_roles.update(primary_inclusions)
-            expected_from_typed_roles.difference_update(primary_exclusions)
-            return (
-                bool(materialized)
-                and materialized != current
-                and materialized == expected_from_typed_roles
+            return asset_role_constraints_satisfied(
+                materialized=materialized,
+                current=current,
+                primary_requested=primary_requested,
+                primary_inclusions=primary_inclusions,
+                primary_exclusions=primary_exclusions,
+                grounded=grounded,
+                operation=operation,
+                planned_asset_replacement=planned_asset_replacement,
             )
         requested = primary_requested | grounded
         if not requested or materialized == current:
@@ -1390,7 +1382,12 @@ def _materialized_artifact_edit(
     request: InterpretationRequest,
     asset_symbol_resolver: Callable[[str], str | None] | None,
     primary_draft: LLMStrategyDraft | None,
-) -> tuple[LLMStrategyDraft, dict[str, str], dict[str, Any]]:
+) -> tuple[
+    LLMStrategyDraft,
+    dict[str, str],
+    dict[str, Any],
+    ResolvedArtifactEdit | None,
+]:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     current_strategy = _current_artifact_strategy(request)
     if current_strategy is not None and current_strategy.strategy_type:
@@ -1439,7 +1436,7 @@ def _materialized_artifact_edit(
         # The typed record rides the draft so the card can disclose it even
         # though card turns drop assistant prose.
         draft.extra_parameters["edit_disclosure"] = {"unapplied": unapplied}
-    return draft, field_provenance, extra_parameters
+    return draft, field_provenance, extra_parameters, resolved
 
 
 def _response_from_artifact_assumption_edit_plan(
@@ -1459,7 +1456,7 @@ def _response_from_artifact_assumption_edit_plan(
             else None
         )
     )
-    draft, field_provenance, extra_parameters = _materialized_artifact_edit(
+    draft, field_provenance, extra_parameters, _ = _materialized_artifact_edit(
         plan,
         request=request,
         asset_symbol_resolver=asset_symbol_resolver,
@@ -1479,9 +1476,7 @@ def _response_from_artifact_assumption_edit_plan(
             # (the #271 contract), as it does for refusals without a typed
             # record (an indicator op dropped after the resolver).
             disclosure_record = draft.extra_parameters.get("edit_disclosure")
-            discloses_impossible_change = isinstance(
-                disclosure_record, dict
-            ) and any(
+            discloses_impossible_change = isinstance(disclosure_record, dict) and any(
                 isinstance(entry, dict)
                 and entry.get("target") not in ("fees", "slippage")
                 for entry in disclosure_record.get("unapplied") or []
@@ -1517,6 +1512,13 @@ def _response_from_artifact_assumption_edit_plan(
                 disclosure = {"unapplied": []}
                 draft.extra_parameters["edit_disclosure"] = disclosure
             disclosure["note"] = note
+        applied_reason_codes = ["artifact_assumption_edit_planned"]
+        if primary_draft is not None and (
+            set(normalized_asset_symbols(primary_draft.asset_universe))
+            & set(normalized_asset_symbols(primary_draft.asset_exclusions))
+        ):
+            # Turn-correlated receipt: the exclusions-outrank override fired.
+            applied_reason_codes.append("asset_exclusions_outranked_universe_copy")
         return LLMInterpretationResponse(
             intent="backtest_execution",
             task_relation="continue",
@@ -1528,7 +1530,7 @@ def _response_from_artifact_assumption_edit_plan(
             candidate_strategy_draft=draft,
             assistant_response=plan.assistant_response,
             confidence=plan.confidence,
-            reason_codes=["artifact_assumption_edit_planned"],
+            reason_codes=applied_reason_codes,
             semantic_turn_act="answer_pending_need",
             artifact_target=artifact_target,
         )

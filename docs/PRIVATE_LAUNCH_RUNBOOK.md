@@ -21,25 +21,33 @@ This runbook is for the first trusted-user internet tests on Render.
 ## Launch URLs
 
 - App: `https://arguschat.ai`
-- API: `https://argus-ohr5.onrender.com`. Founder decision, 2026-08-11: keep
-  this hostname for the active promotion and revisit a custom API hostname
-  deliberately later. Users do not see the API hostname. Moving to a host such
-  as `api.arguschat.ai` requires an `argus-app` rebuild because
+- API: `https://api.arguschat.ai`, moved 2026-08-13 and live. It must stay on a
+  subdomain of the app's registrable domain: the guest handoff cookie is
+  `SameSite=Lax`, so on `onrender.com` it was third-party and every iOS browser
+  dropped it, which broke guest conversion for every user until the move.
+  `test_api_and_app_share_a_registrable_domain` pins the two hosts together.
+  Changing the host requires an `argus-app` rebuild, because
   `NEXT_PUBLIC_ARGUS_API_URL` is baked into the web bundle at build time.
 
 ## Before Tester Sessions
 
 The promotion target is `main`, but `codex/private-alpha-next` remains the
 integration staging branch until the founder approves promotion. Do not merge
-to `main` or open a release PR before that approval. After the approved commit
-lands on the configured deployment branch, use the live Render deploy mode the
-founder deliberately approved. Manual deployment remains valid until the
-founder explicitly enables `checksPass` for all three services. Every candidate
-still follows the gate below and needs a release manifest before testers are
-invited; start from
+to `main` or open a release PR before that approval. Use the live Render deploy
+mode the founder deliberately approved. Manual deployment remains valid until
+the founder explicitly enables `checksPass` for all three services. Every
+candidate still follows the gate below and needs a release manifest before
+testers are invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
 API/web env fingerprint, workflow-service proof, canary evidence, rollback
 target, autodeploy proof for all three services, and approver.
+
+The candidate below must be the exact would-be `main` promotion commit: the
+immutable commit produced from current `main` and the approved integration tree
+that will actually land and deploy. A worker or integration head is not
+sufficient when the landing method creates a different commit. If the landing
+method cannot preserve a pre-gated SHA, keep all three live autodeploy triggers
+manual through step 4 and gate the landed SHA before any deploy-capable action.
 
 Local preflight doctrine:
 
@@ -56,15 +64,90 @@ Local preflight doctrine:
 1. Confirm the local checkout is the candidate commit you intend to promote:
 
 ```bash
-git status --short
+git status --short --untracked-files=no
 git rev-parse HEAD
 ```
+
+The status command must show no tracked changes, and the SHA must be the exact
+candidate. The migration gate enforces both before it opens a database
+connection.
 
 2. Run the local predeploy smoke gate before any internet-facing canary:
 
 ```bash
 .github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
 ```
+
+3. After selecting production as the target and recording the intended config
+   and deploy mode without changing it, run the production migration gate
+   before any operation that can deploy a service, including a Blueprint sync
+   or a change to autodeploy configuration. Export the production direct or
+   session-pooler URL from the operator secret store under the gate-only name
+   below. The URL must not contain query parameters or a fragment because libpq
+   can use them to override the validated host or user. Do not put it on the
+   command line or rely on a dotenv file. Download the current production
+   project's root CA from Supabase Database Settings and provide its absolute
+   path. The gate forces `sslmode=verify-full`; it cannot fall back to a
+   plaintext connection.
+
+```bash
+export ARGUS_PRODUCTION_DATABASE_URL="<production direct or session-pooler URL>"
+export ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT="<absolute path to production Supabase CA>"
+ARGUS_CANDIDATE_SHA="$(git rev-parse HEAD)"
+poetry run python scripts/ops/production_migration_gate.py \
+  --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+  --output temp/release-evidence/production-migration-gate.json
+```
+
+The gate reads every migration from the exact candidate Git tree, verifies the
+production Supabase project, opens a read-only database session, and compares
+the full candidate list with the version, name, and parsed statement arrays in
+`supabase_migrations.schema_migrations`. Read the candidate, applied, missing,
+unexpected, name-drift, and content-drift lists in the JSON. Candidate and
+applied records expose statement counts and statement-array SHA-256 digests.
+`status=pass` is required before continuing. A missing migration is a stop even
+when its safety classification is additive. An unreadable ledger, unexpected
+production migration, duplicate version, name mismatch, missing statement
+history, or statement content drift is also a stop.
+
+The gate never applies migrations. If it reports a gap, stop the promotion. A
+human reviews the exact pinned SQL and classification. The automated
+classification is conservative: ambiguous top-level SQL becomes
+`contract-replacing`, and the report does not replace inspection of the live
+objects the migration will touch. Use these requirements:
+
+- `additive` may be considered for live application after rollback review;
+- `contract-replacing` needs an expand/contract compatibility plan or a
+  maintenance window;
+- `destructive` needs a maintenance window, backup/readback plan, and explicit
+  founder approval.
+
+Apply only approved files out of band, in repository order. Record the file
+hash, ledger before and after, and affected-object readback in the release
+manifest. Then rerun the same gate. Do not deploy until the rerun reports
+`status=pass`, and attach its JSON as durable release evidence.
+
+4. Land or read back the candidate on `main` without rewriting the gated
+   commit. Keep the checkout on the gated candidate and rerun the same
+   executable gate in landed-ref mode:
+
+```bash
+poetry run python scripts/ops/production_migration_gate.py \
+  --candidate-sha "$ARGUS_CANDIDATE_SHA" \
+  --verify-landed-ref origin/main \
+  --output temp/release-evidence/production-migration-gate.json
+```
+
+The option fetches `origin/main` inside the gate and blocks before database
+access if the fetch, ref resolution, or exact-SHA comparison fails. It then
+repeats schema parity and records the landing proof in the final JSON. Do not
+continue on any nonzero result. A squash, rebase, conflict edit, new merge
+commit, or concurrent `main` update invalidates the earlier report. Keep all
+three live triggers manual, check out the exact landed commit, rerun steps 1 and
+2, then rerun the gate against the landed SHA as described in step 3 and replace
+the manifest evidence. When `checksPass` is already live, use only a landing
+method that preserves the pre-gated commit SHA; otherwise code can deploy before
+the landed tree is verified.
 
 > [!WARNING]
 > **A Blueprint sync enables autodeploy after #470.** The repository declares
@@ -76,11 +159,11 @@ git rev-parse HEAD
 > API sync reads the same target from the release profile and turns it on for
 > `argus-backtests`. The normal three-service configuration sync can therefore
 > enable autodeploy for all three as a side effect of syncing configuration,
-> not as the result of a fresh deployment decision. Before step 3, obtain an
+> not as the result of a fresh deployment decision. Before step 5, obtain an
 > explicit founder decision to enable autodeploy. Without that decision, keep
 > all three live triggers manual and deploy all three services explicitly.
 
-3. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
+5. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
    `argus-app` config drift needs reconciliation. Render Blueprints cannot
    declare the `argus-backtests` Workflow service. Its release contract is held
    in four separate places that must agree:
@@ -89,36 +172,34 @@ git rev-parse HEAD
    - `.github/render-env-sync.sh workflow-runtime` applies that target through
      the Render Workflow API;
    - `release-config-audit` reads the live Workflow configuration back;
-   - steps 8 and 9 deploy `argus-backtests` and prove its ready version matches
+   - steps 10 and 11 deploy `argus-backtests` and prove its ready version matches
      the same candidate as the API and app.
 
    If any one of these four controls drifts, `argus-backtests` can stay stale
    even while the API and app advance, which is the failure caught on
    2026-08-11.
-4. Confirm Render is updating the existing `argus-app` and `argus-api` services.
+6. Confirm Render is updating the existing `argus-app` and `argus-api` services.
    Stop if Render proposes duplicate services.
-5. Confirm the live deploy mode matches the deliberate founder decision and is
+7. Confirm the live deploy mode matches the deliberate founder decision and is
    uniform across `argus-api`, `argus-app`, and the Git-linked
    `argus-backtests` Workflow: either all three are manual (`off`) or all three
    use `checksPass`. Never enable autodeploy for only a subset of the three.
    The repository target is not proof that live enablement was approved.
-6. Export local ops and canary secrets, or keep these in the root `.env` file
+8. Export local ops and canary secrets, or keep these in the root `.env` file
    and let the scripts load them:
 
 ```bash
 export ARGUS_OPS_TOKEN="..."
 export ARGUS_CANARY_EMAIL="..."
-export ARGUS_CANARY_PASSWORD="..."
 export ARGUS_CANARY_SUPABASE_URL="https://lgdhvepyrzbnscqssgqq.supabase.co"
 export ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="..."
 ```
 
 For local founder/operator runs, `.github/canary-render.sh` also accepts
-`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` and `SUPABASE_URL` /
-`SUPABASE_SERVICE_ROLE_KEY` from the root `.env`. The `ARGUS_CANARY_*` names
-remain the preferred GitHub Actions secret names.
+`MOCK_USER_EMAIL`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` from the root
+`.env`. The `ARGUS_CANARY_*` names remain the preferred GitHub Actions names.
 
-7. Confirm the API is in real-workflow private-alpha validation mode. This mode
+9. Confirm the API is in real-workflow private-alpha validation mode. This mode
    keeps the API lean and sends `Run backtest` through the durable Render
    Workflow job path:
 
@@ -128,7 +209,7 @@ remain the preferred GitHub Actions secret names.
 
 Restart `argus-api` after changing Render env values.
 
-8. Deploy **all three live services** from the candidate commit:
+10. Deploy **all three live services** from the candidate commit:
    `argus-api`, then `argus-app`, then **`argus-backtests`**.
 
    When all three live triggers use `checksPass`, a commit on the configured
@@ -144,7 +225,7 @@ Restart `argus-api` after changing Render env values.
    every time, and never let a promotion finish with the three on different
    commits.
 
-9. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
+11. Confirm the live `argus-api`, `argus-app`, and `argus-backtests` deploy
    commits match the candidate commit you intend to test and that their latest
    versions are ready:
 
@@ -167,7 +248,7 @@ canary resolvers require that prefix to match the exact API/web commit. They do
 not trust mutable workflow env markers, so checks-passing and manual releases
 use the same version-owned proof.
 
-10. Run the product warmup script and verify the API stayed in real workflow
+12. Run the product warmup script and verify the API stayed in real workflow
    mode. When Supabase verifier credentials are present, this also runs the
    stale queued/running job scan:
 
@@ -182,45 +263,130 @@ Local and dev-agent work runs backtests in-process on local compute; the mode
 scripts pin dispatch off (dev hard-off, QA default-off with explicit
 pre-export opt-in).
 
-11. Run the authoritative Spanish release journey with privacy-safe evidence.
-This is the only release canary: it checks the exact deployed SHA, the real
-Render workflow, finalized evidence identity, explicit decision capture, reload
-hydration, Omnisearch provenance, and the deployed Spanish signup/login browser
-path. It uses `ARGUS_CANARY_*` credentials when set and otherwise the local
-`MOCK_USER_EMAIL` / `MOCK_USER_PASSWORD` aliases.
+13. Run both authoritative canary surfaces with privacy-safe evidence. They are
+separate fail-red jobs, so one cannot hide or relabel a failure in the other.
 
-The disabled-email denial check runs at the API layer, not in the browser.
-Before the check, the canary creates a `user` allowlist row with `disabled_at`
-set. `.github/canary-requested-signup-denial.py` sends that address to the
+- **Release coherence** checks the exact deployed SHA across API, app, and
+  `argus-backtests`; runs the release-config audit, warmup, and live-provider
+  workflow proof; and keeps the direct API signup-denial probe plus the
+  access-approval welcome-email proof.
+- **Authenticated browser journey** starts from a private Playwright storage
+  state, loads the Spanish chat directly, completes one real backtest, records
+  the decision, reloads the result, and reopens it through Omnisearch. It never
+  visits the signup or login page. It rechecks three-service deployed-SHA
+  coherence immediately before minting the session and after the canonical
+  postconditions, so a rollout during the journey cannot inherit the earlier
+  release label.
+
+The disabled-email denial check belongs only to release coherence. The runner
+creates a `user` allowlist row with `disabled_at` set, then
+`.github/canary-requested-signup-denial.py` sends that address to the
 ops-authenticated route owned by `REQUESTED_SIGNUP_DENIAL_PATH` in
 `src/argus/api/ops_contract.py` and requires `200 {"denied": true}`. This proves
 the disabled row is blocked with public access on and with the allowlist-only
 emergency rollback. The probe never calls the signup provider or CAPTCHA, so it
 cannot create an auth identity. `verify_no_signup_auth_identity` asserts that
-none exists before the canary stages the same row as an active `requested` row and
-calls the protected access-approval operation. That operation sends the real
+none exists before the canary stages the same row as an active `requested` row
+and calls the protected access-approval operation. That operation sends the real
 localized welcome, writes its immutable delivery record, and promotes the row
-to `user` atomically before browser signup. A unique generated address forces
-every canary attempt through the first-send path instead of delivery replay.
-The exit trap deletes any resulting auth identity and allowlist row, then
-reads back that no matching auth identity remains. Do not move this check back
-into Playwright and do not weaken Turnstile anywhere deployed.
+to `user` atomically. A unique generated address scoped to the run identity
+forces every canary attempt through the first-send path instead of delivery
+replay. The exit trap deletes any resulting auth identity and allowlist row,
+then reads back that no matching auth identity remains. Do not move this probe
+into Playwright, enable its temporary identity for browser use, or weaken
+Turnstile anywhere deployed.
 
-For a local founder/operator run, generate a fresh non-secret nonce for every
+For a local release-coherence run, generate a fresh non-secret nonce for every
 attempt. Local mode is available only when both GitHub run identity variables
 are absent. Do not combine the local nonce with GitHub identity variables or
 override the generated signup email.
 
 ```bash
-cd web && bun install --frozen-lockfile && bunx playwright install chromium
-cd ..
 mkdir -p temp/release-evidence
+ARGUS_CANARY_SURFACE=release-coherence \
 ARGUS_CANARY_LOCAL_RUN_NONCE="$(poetry run python -c 'import secrets; print(secrets.token_hex(12))')" \
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
-ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/canary-es-419.json \
-ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/canary-es-419-capture.json \
+ARGUS_CANARY_HARNESS_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/release-coherence.json \
+ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/release-coherence-capture.json \
 .github/canary-render.sh
 ```
+
+For a local authenticated-browser run, install the pinned browser dependencies
+first and use the dedicated canary identity described below:
+
+```bash
+cd web && bun install --frozen-lockfile && bunx playwright install chromium
+cd ..
+ARGUS_CANARY_SURFACE=authenticated-browser-journey \
+ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_HARNESS_SHA="$(git rev-parse HEAD)" \
+ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/authenticated-browser.json \
+ARGUS_CANARY_CAPTURE_PATH=temp/release-evidence/authenticated-browser-capture.json \
+.github/canary-render.sh
+```
+
+### Canary identity, session rotation, and revocation
+
+`ARGUS_CANARY_EMAIL` must identify a dedicated Supabase Auth user. It must never
+be an admin, developer, employee account, or real user. Its enabled
+`private_alpha_allowlist` row must have exactly `role=user`, and its Auth user
+app metadata must contain `source=private-alpha-canary`. Its exact `profiles`
+row must also have `is_admin=false`; changing an allowlist role does not prove
+that a previously elevated profile lost its privilege. App metadata is
+operator-owned; do not use user-editable metadata for this marker. The canary
+fails closed if any of those facts are not true.
+
+Provisioning is a one-time manual action for identity rotation. Generate a new
+address matching
+`private-alpha-canary+<32-lowercase-hex>@get-argus.com`, write it directly to
+the GitHub `ARGUS_CANARY_EMAIL` secret without echoing it, and dispatch the
+candidate branch with `canary_identity_action=provision`. That action is never
+available to the schedule. It accepts only the canary-specific address shape,
+refuses to relabel an existing unknown user, creates a confirmed non-anonymous
+Auth user with app metadata `source=private-alpha-canary`, records Spanish in
+Auth user metadata, and creates the enabled `role=user` allowlist row. For a new
+identity, it then mints a one-time session and calls Argus's authenticated
+`GET /api/v1/me` endpoint so the normal backend profile owner creates the
+profile. The setup session is revoked before the action requires the exact
+profile row to have `is_admin=false`. It prints no email, user id, token, or
+service-role value. Later manual and scheduled runs use the default
+`canary_identity_action=validate` and fail closed on drift.
+
+After the new identity completes a normal browser canary, revoke the prior
+identity using the emergency sequence below. Do not leave two active canary
+identities as an informal fallback.
+
+No long-lived browser state or password is stored in GitHub. On every browser
+run, the service-role step generates and verifies a one-time magic link for the
+dedicated identity, serializes the resulting least-privilege session to a mode
+`0600` Playwright storage-state file, and passes only that file and the expected
+user id into the browser process. The browser process explicitly has the
+service-role variables removed. This is the routine rotation: every run gets a
+fresh session.
+
+The browser surface revokes that session with local scope before it records
+success. The exit trap retries revocation on every earlier failure path, then
+deletes both the storage-state file and its private token handoff. Argus also
+checks the Supabase session id on authenticated API requests, so a removed
+session stops being an active Argus session. A revocation failure is an
+`Authenticated browser journey` failure, never a passed artifact with a red
+process exit.
+
+For emergency revocation:
+
+1. Disable the canary allowlist row.
+2. In Supabase Auth, revoke every session for the dedicated user and confirm no
+   `auth.sessions` row remains for its user id.
+3. Delete the dedicated Auth user only after session revocation is confirmed.
+4. Remove or replace `ARGUS_CANARY_EMAIL` in GitHub Actions.
+5. Provision a new dedicated `role=user` identity with
+   Auth app metadata `source=private-alpha-canary`, update the GitHub value, and
+   run a manual canary before restoring the schedule.
+
+Do not use deletion alone as immediate revocation. A previously issued access
+token can remain cryptographically valid until expiry even after its Auth user
+is deleted.
 
 If a canary fails after warmup passed, do not redeploy one-off fixes in a loop.
 The first authoritative run writes the sanitized capture beside the human-safe
@@ -236,13 +402,12 @@ If the failure happened before any final response existed, keep the capture as
 diagnostic evidence and inspect the hashed labels, failure stage, API logs, and
 route-receipt summary instead of forcing a replay or spending a second journey.
 
-Read the failure stage and reason before treating a canary red as a product
-regression. `browser_auth` / `captcha_challenge_timeout` means the rendered
-client never reached the auth API because the Turnstile challenge did not
-complete, which is a harness limit on headless runners, not a product defect.
-`browser` / `rendered_golden_path_failed` is the journey itself failing after
-auth succeeded. Do not retry a challenge timeout: a headless runner cannot
-solve it, so a retry only doubles the run.
+Read the job name, failure stage, and reason before treating a canary red as a
+product regression. `Release coherence` owns deployment, config, warmup,
+provider, and API signup-denial failures. `Authenticated browser journey` owns
+session creation, the rendered Golden Path, the real backtest, and browser/API
+postconditions. A browser job must never report a Turnstile challenge timeout,
+because it does not cross an auth form.
 
 If the exact candidate reaches the API but returns the normal interpreter
 recovery response, keep the failed capture and evidence. Record the safe HTTP
@@ -261,8 +426,8 @@ cd web && bun run test:e2e e2e/chat-action-recovery.spec.ts --project=chromium
 ```
 
 Only send the app URL to testers after API deploy-status, app deploy-status,
-workflow version status, local smoke, warmup, the authoritative Spanish release
-canary, and the release manifest all pass against the intended candidate commit.
+workflow version status, local smoke, warmup, both canary surfaces, and the
+release manifest all pass against the intended candidate commit.
 If any service reports a different commit, deploy the candidate branch before
 continuing. If
 warmup fails, do not invite testers yet. Check Render service status and redeploy
@@ -276,55 +441,51 @@ canary variables above plus `RENDER_API_KEY` and `ARGUS_WORKFLOW_DATABASE_URL`,
 then use the scheduled or manually dispatched `Private Alpha Canary` workflow.
 Set `ARGUS_WORKFLOW_DATABASE_URL` from the `.env`/`.env.example` mapping to
 `SUPABASE_POSTGRES_TRANSACTION_POOLER_URL`; do not use the session pooler for
-short-lived workflow tasks. That workflow runs the local smoke gate, warmup,
-and the authoritative Spanish release journey. The real backtest in that journey
-is the live-provider drift check: it runs on `argus-backtests`, while
+short-lived workflow tasks. The two jobs report independently. Release
+coherence owns warmup and the provider/config proof. The real backtest in the
+browser journey runs on `argus-backtests`, while
 `release-config-audit --expect-mode real-workflow` proves the workflow env itself
 is using `live_provider`. Warmup then runs the deployed `workflow_proof` task and requires
 `workflow_runtime_provider_mode=live_provider` and
 `workflow_runtime_proof=ready`, proving effective workflow runtime rather than
-only saved Render env vars. It uploads the `private-alpha-canary-evidence`
-artifact containing Spanish release evidence plus its exit-code file, and it does
-not deploy or configure analytics. On failure it also uploads
-`private-alpha-canary-failure-capture` and `private-alpha-canary-browser-context`,
-the second holding Playwright's error context for the browser phase. The canary
-script masks its own credentials out of those browser files before it exits,
-because Playwright's error context records every rendered input value. Secrets
-are scoped to the operational steps that need them; install and artifact upload
-steps do not receive canary credentials or service-role keys.
+only saved Render env vars. The jobs upload
+`private-alpha-release-coherence-evidence` and
+`private-alpha-authenticated-browser-evidence`, each with its own exit file.
+Their failure captures are separate. The browser job can also upload
+`private-alpha-authenticated-browser-context` after its redaction sentinel is
+present.
 
-The canary runs in two halves, and which half a file lands in decides whether a
-fix to it is already live.
+The canary script masks the email, any legacy password present in an operator
+environment, the session access and refresh tokens, serialized auth-cookie
+values, and the artifact probe value before it creates
+`web/temp/playwright-results/.redacted`. The workflow keeps the sentinel gate:
+if redaction did not run or failed, it logs
+`browser_context_upload=skipped_unredacted` and does not upload browser context.
+The storage state and private handoff are temporary files outside the artifact
+paths and are deleted on exit.
 
-Everything up to and including the resolver runs from the ref the run started
-on: Checkout, Set up Python, Set up Bun, Install Render CLI, and the first part
-of "Resolve deployed canary release". That step runs
-`.github/render-env-sync.sh`, which sources `.github/argus-env.sh`, then
-`.github/canary-deployed-sha.py`, and only after that does it
-`git checkout --detach` onto the deployed SHA. The other pre-detach steps pin
-their versions inline and read no repo file.
+To prove this control, manually dispatch from the candidate branch twice. Use
+`browser_artifact_probe=redacted` first. The browser job must fail deliberately,
+the probe value must be masked in its context, and the sentinel-gated context
+upload must occur. Then use `browser_artifact_probe=unredacted`. Redaction fails
+deliberately, no sentinel is written, and the context upload must be skipped.
+Both are expected red proof runs. Never use a real credential as the probe.
 
-Everything after the detach runs from the deployed release: the dependency
-installs, the Spanish static UI assertions, `.github/local-smoke.sh`,
-`.github/warmup-render.sh`, `.github/canary-render.sh` and everything it calls
-(`.github/canary-browser.sh`, `.github/canary-requested-signup-denial.py`,
-`.github/private-alpha-release-profile.py`), and the `web/e2e` specs.
+Trigger choice controls which harness is exercised:
 
-`.github/render-env-sync.sh` is in both halves. The resolver calls it directly
-before the detach, and `warmup-render.sh` and `canary-render.sh` call it again
-after, so one job runs that same file from two different trees.
+- A schedule checks out `main`, resolves the coherent production SHA, and
+  detaches to that deployed commit. The harness SHA and deployed SHA must match.
+- A `workflow_dispatch` keeps the selected branch checked out while the resolver
+  records the exact coherent production SHA separately. Only dispatch may run a
+  branch harness against a different deployed target, and both SHAs are written
+  to the evidence.
 
-The starting ref depends on the trigger. A scheduled run takes the workflow YAML
-and the initial checkout from `main`, because cron only executes the default
-branch's YAML. A manual dispatch takes both from the ref selected for the
-dispatch, because the Checkout step uses `github.sha`. The detach happens either
-way.
-
-So a resolver or workflow-YAML fix is live on the next scheduled run as soon as
-it is on `main`, and can be exercised before that by dispatching the workflow
-from its own branch. A fix to any post-detach script, which is most of the
-canary harness, changes nothing until `main` is deployed to Render. Check which
-half a file is in before reading a merge as a fix.
+This means a branch dispatch can prove a canary-harness fix before promotion,
+while still testing the exact production deployment. Merging the fix only into
+`codex/private-alpha-next` does not change scheduled runs. The scheduled canary
+uses the fix only after the production promotion reaches `main`; a still-red
+schedule before that promotion is the old deployed harness, not evidence that
+the branch fix failed.
 
 After the gate passes, copy the relevant command output and canary evidence into
 a candidate manifest based on `docs/release-manifests/TEMPLATE.md`. The
@@ -574,6 +735,72 @@ private-alpha launch; record any override in the release manifest.
   model spend). Unset/`0` keeps evals mocked. Set it for the pre-merge
   landing-gate run and every `main` promotion candidate.
 
+### Live eval is a comparison, not a scoreboard
+
+**Founder-locked 2026-08-13.** A red live eval does not by itself block a
+promotion. The question a promotion asks is *"is this worse than what users
+have right now"*, and a suite scored against frozen expectations cannot answer
+it. Expectations drift as decisions land, so a failing check may be a
+regression, a superseded expectation, or model variance, and the three are
+indistinguishable from one run.
+
+So a red candidate run requires a **baseline run at the deployed production
+SHA**, with identical provider modes, and the two are compared:
+
+- **Candidate fails only what production already fails** → not a regression.
+  Promote, and record every failure with its owner in the manifest.
+- **Candidate fails anything production passes** → that is a regression.
+  Do not promote.
+- **Candidate passes what production fails** → an improvement, record it.
+
+Run the baseline from a detached worktree at `origin/main` so the candidate
+tree is untouched, and commit both scorecards as durable evidence.
+
+Why this rule exists: on 2026-08-13 a candidate carrying five user-visible
+fixes was held by twelve failures that all turned out to live in code already
+deployed. The gate was measuring the wrong thing. Twelve failures nobody had
+reported were outranking five defects real users had hit.
+
+The corollary is the more important half: **run the eval before merging**
+anything that touches the interpreter or the edit spine, not only before
+promoting. PR #431 shipped compound editing on 2026-08-11 without one. The
+suite already contained the cases that would have caught it, and had scored
+them 14/14 eight days earlier. That is [#498](https://github.com/lagarcess/argus/issues/498).
+
+### What the run costs, measured
+
+One full 60-case suite is **$1.33** and **29 minutes** (2026-08-14, `eaf5d52b`).
+Confirmation-edit cases are the expensive ones at ~$0.05 each against a $0.022
+mean, because they burn the tier-3 interpreter across multiple turns.
+
+That price is low enough to gate on the full suite directly rather than
+maintain a cheaper subset, so there are no coverage gaps to reason about.
+
+**Two runs of the same commit produced identical failure sets**, 17 of 60, with
+no case differing in either direction. Treat a single flipped case as signal
+and re-run to confirm rather than assuming variance.
+
+### Model-facing text is frozen against a scorecard
+
+`tests/test_interpreter_prompt_freeze.py` fingerprints every piece of text the
+interpretation model reads: prompt builders and Pydantic
+`Field(description=...)` across the eval-reachable tree. It costs nothing and
+runs in about a second, so it is the cheap layer that decides when the paid one
+has to run.
+
+Changing that text requires a live eval on the branch, its scorecard committed
+under `docs/reports/evidence/`, a case-by-case comparison against the scorecard
+named in `.agent/interpreter_prompt_fingerprint.json`, and a regenerated
+fingerprint. Because the fingerprint is a single file recording one measured
+state, **only one lane may hold this surface at a time**; two concurrent prompt
+lanes conflict on it and neither measures the combined result.
+
+Why this exists: PR #491 rewrote the shared prompt for a DCA change on
+2026-08-14. Its own tests passed, CI went 6/6 green, and it regressed asset
+extraction, start-date preservation, and discovery routing in three unrelated
+places. No unit test sends a message through a model, so nothing but the paid
+eval could have caught it, and that ran after the merge.
+
 ## Guest Staged Rollout
 
 The operational security checklist for later internet-facing Guest exposure is
@@ -585,7 +812,7 @@ Product defaults:
 
 ```bash
 ARGUS_GUEST_ACCESS_ENABLED=true
-ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false
+ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true
 NEXT_PUBLIC_GUEST_ACCESS_ENABLED=true
 ARGUS_VISITOR_KEY_SECRET=<unique high-entropy environment secret>
 ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
@@ -594,9 +821,12 @@ ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING=500
 Guest access is part of the normal product shape. The two Guest flags are
 default-on emergency kill switches; explicit `false` activates rollback. The
 frontend flag controls presentation only and the API remains authoritative.
-Public-account access remains off, permanent signup/login stays
-allowlist-gated, existing admin/developer behavior is unchanged, and no Create
-account promise is shown.
+Public-account access is open as of 2026-08-12: permanent signup and login
+admit any email without an explicitly disabled allowlist row, the guest surface
+offers account creation, and existing admin/developer behavior is unchanged
+because opening the gate grants no role. That third flag is the one that fails
+closed when unset, so it must be set explicitly on every service that reads it;
+omitting it denies registration rather than opening it.
 
 Hosted Supabase prerequisites are external operations and must be recorded in
 the release manifest: anonymous Auth enabled, approved CAPTCHA configuration,
@@ -646,12 +876,13 @@ revalidation, and Auth-row deletion are one database transaction. Claimed
 source identities use a fifteen-minute reconciliation grace; incomplete
 bootstrap identities use five minutes.
 
-Conversion safety is non-negotiable: new accounts link the anonymous identity
-in place; existing accounts use the email-hash-bound one-time handoff that
-login claims before returning a permanent session. Guest
-usage never merges into registered hour/day counters. Cleanup re-verifies
-anonymous and unclaimed truth and must not delete a converted or permanent
-account.
+Conversion safety is non-negotiable: new accounts use ordinary signup to create
+a different permanent Auth identity, then claim the complete guest graph
+through the workspace-lifetime, email-hash-bound handoff. Existing accounts use
+the short-lived handoff that login claims before returning a permanent session.
+Guest usage never merges into registered hour/day counters. Cleanup
+re-verifies anonymous source truth and must not delete a permanent account or
+the transferred graph.
 
 Guest funnel capture uses the shared metadata-only server envelope. Only the two
 typed browser-owned facts cross `POST /api/v1/analytics/guest-events`; PostHog
@@ -663,7 +894,8 @@ Rollback order:
 
 1. set `NEXT_PUBLIC_GUEST_ACCESS_ENABLED=false`;
 2. set `ARGUS_GUEST_ACCESS_ENABLED=false`;
-3. keep `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`;
+3. leave `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` untouched, because rolling
+   guest access back does not close public registration;
 4. verify the preserved centered auth landing path;
 5. stop new guest creation while retaining existing rows for safe expiry,
    conversion, or bounded cleanup.
@@ -682,7 +914,10 @@ The live `argus-api` plan is `standard`. The live `argus-app` plan is
 `starter`. The requested-role migration and access-request exposure are
 complete after the paid-plan readback and maintenance/private-health probes in
 `docs/release-evidence/public-alpha-readiness.md`. Public account creation is
-still allowlist-gated; `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` remains `false`.
+open: the founder set `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` live on
+2026-08-12, recorded in
+`docs/release-manifests/2026-08-12-main-production-promotion-716221f.md`, so
+anyone may register and the allowlist blocks only explicitly disabled rows.
 The evidence records the paid API instance type plus the maintenance and
 private/SSH/local verification controls.
 

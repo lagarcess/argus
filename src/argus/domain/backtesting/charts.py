@@ -5,18 +5,19 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import vectorbt as vbt
 
-from argus.domain.backtesting.config import _vbt_freq
 from argus.domain.backtesting.coverage import PreparedMarketData
 from argus.domain.backtesting.execution import (
     ExecutionEvent,
     _build_long_only_execution_ledger,
     _dca_equity_curve,
+    _execute_long_only_ledger,
     _execution_realism_settings,
+    symbol_allocation_capital,
 )
 from argus.domain.backtesting.metrics import portfolio_value_summary
 from argus.domain.backtesting.signals import _build_signals
+from argus.domain.dca_capital import dca_capital_plan_from_config
 from argus.domain.market_data import fetch_ohlcv
 from argus.domain.strategy_capabilities import resolve_result_chart_exploration_policy
 
@@ -32,9 +33,17 @@ def build_result_chart(
 
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
-    allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
     is_dca = config["template"] == "dca_accumulation"
+    symbol_dca_plan = (
+        dca_capital_plan_from_config(config).per_symbol(len(config["symbols"]))
+        if is_dca
+        else None
+    )
+    allocation_capital = symbol_allocation_capital(
+        config,
+        symbol_count=len(config["symbols"]),
+    )
     symbol_equity_curves: list[pd.Series] = []
     events: dict[str, dict[str, set[str]]] = {}
 
@@ -58,27 +67,23 @@ def build_result_chart(
             allow_accumulation=is_dca,
         )
         if is_dca:
-            symbol_equity, _ = _dca_equity_curve(
+            assert symbol_dca_plan is not None
+            symbol_equity = _dca_equity_curve(
                 close=close,
                 entries=entries,
-                contribution=allocation_capital,
+                contribution=symbol_dca_plan.contribution,
+                starting_capital=symbol_dca_plan.starting_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
-            )
+            ).equity_curve
         else:
-            portfolio = vbt.Portfolio.from_signals(
+            symbol_equity = _execute_long_only_ledger(
+                execution_events=execution_events,
                 close=close,
-                entries=entries,
-                exits=exits,
+                initial_capital=allocation_capital,
                 fees=float(realism["fees"]),
                 slippage=float(realism["slippage"]),
-                init_cash=allocation_capital,
-                freq=_vbt_freq(config["timeframe"]),
-                accumulate=False,
-            )
-            symbol_equity = pd.Series(
-                portfolio.value().values, index=close.index, dtype=float
-            )
+            ).equity_curve
         symbol_equity_curves.append(symbol_equity)
         _collect_execution_fill_events(
             events, symbol=symbol, execution_events=execution_events

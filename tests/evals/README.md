@@ -7,9 +7,10 @@ assistant phrasing.
 ## Test Tiers
 
 - **Mocked harness - every change (free, no API calls):**
-  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
-  Validates routing, state, full conversation-step manifests, and the seven
-  session trajectories. This is the everyday inner-loop check.
+  `poetry run pytest tests/evals/test_measurement_eval_harness.py tests/evals/test_measurement_eval_dca_semantics.py tests/evals/test_measurement_eval_scorecard.py tests/evals/test_measurement_eval_live_environment.py tests/evals/test_chat_runtime_eval_manifest.py tests/evals/test_chat_runtime_trajectory_harness.py`
+  Validates routing, scorecard provenance, live-environment refusal, state,
+  full conversation-step manifests, and the seven session trajectories. This
+  is the everyday inner-loop check.
 - **Live eval - only the 3 sanctioned moments:**
   1. Pre-merge on a PR that changes runtime behavior.
   2. Main promotion candidate.
@@ -24,6 +25,9 @@ Run the mocked harness checks with:
 ```bash
 poetry run pytest \
   tests/evals/test_measurement_eval_harness.py \
+  tests/evals/test_measurement_eval_dca_semantics.py \
+  tests/evals/test_measurement_eval_scorecard.py \
+  tests/evals/test_measurement_eval_live_environment.py \
   tests/evals/test_chat_runtime_eval_manifest.py \
   tests/evals/test_chat_runtime_trajectory_harness.py \
   -q
@@ -70,16 +74,28 @@ API-contract approval gate.
 Run the live harness with:
 
 ```bash
-ARGUS_RUN_LIVE_EVALS=1 ARGUS_EVAL_ENV_FILE=<path> poetry run pytest tests/evals/test_measurement_eval_live.py -q
+ARGUS_RUN_LIVE_EVALS=1 \
+ARGUS_EVAL_ENV_FILE=<path> \
+ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
+ARGUS_ASSET_PROVIDER_MODE=live_provider \
+poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
 
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
+Once `ARGUS_RUN_LIVE_EVALS=1` is set, missing provider credentials fail the
+run instead of turning the requested gate into a green skip.
 The live harness keeps bar data in the configured market-data mode but uses a
 provider-backed asset catalog for company-name grounding. Set
 `ARGUS_ASSET_PROVIDER_MODE=recorded_provider_fixture` with a provider-shaped
 `ARGUS_ASSET_FIXTURE_PATH` for deterministic catalog input; otherwise the
 sanctioned live run requires Alpaca asset-catalog credentials.
+
+The market-data provider mode must be explicit. Before the first LLM call, the
+suite asks the configured provider for a fixed equity window that begins on the
+2024-01-01 market holiday. A valid live environment starts on 2024-01-02 with
+`calendar_alignment`. Synthetic daily data starts on 2024-01-01 and stops the
+suite before it can spend tokens or write a scorecard.
 
 ## When to Run
 
@@ -107,6 +123,24 @@ temp/argus_eval_scorecards/
 scorecards include per-category totals and pass rates. Seven-session scorecards
 include stable trajectory labels, operation names, and failure prefixes only;
 they omit prompts, SSE payloads, route receipts, and runtime identifiers.
+
+Measurement scorecards use schema version 2 and cannot be written without this
+validated `provenance` object:
+
+- `market_data_provider_mode`
+- `asset_provider_mode`
+- `candidate_sha`
+- `python_version`
+- `fixture_sha256`
+- `fixture_case_ids`
+- `worktree_clean`
+- `live_market_data_probe` for a live run
+
+The writer rechecks the provider modes, SHA, Python version, fixture hash,
+fixture case identities, and clean worktree immediately before serialization.
+If any value changed during the run, it emits no scorecard. A live scorecard
+also requires every fixture case exactly once, `market_data_provider_mode`
+set to `live_provider`, and the successful calendar probe.
 
 Expected-fail cases never count as passes. They are reported separately so
 known broken behavior stays visible.
@@ -161,6 +195,25 @@ typed payload (relationship, anchors, category terms), plus near-miss negatives
 (direct backtest, post-result "what next", capability questions). Discovery
 turns end `ready_to_respond` on both the flag-off recovery path and the flag-on
 search path, so the category holds in any sanctioned live environment.
+
+`dca_capital_semantics` (issue #455) covers the two-role capital model PR #491
+shipped. Both DCA money roles and the period are asserted from the launch
+payload under their own names (`starting_capital`, `recurring_contribution`,
+`cadence`), so a role swap is visible instead of hiding behind a shared
+`capital_amount`. The cases cover the contribution-phrase capture risk ("I'll
+start by putting in $200 a month" is the contribution, never the seed), the
+plan-wide ceiling reading of "I only have $5,000", a stated seed reaching
+`ready_to_run`, a `$0` seed with a below-bankroll-floor contribution, the named
+refusal codes (`contribution_period_exceeds_window`,
+`dca_contribution_zero_is_buy_and_hold`, deferred
+`unsupported_dca_contribution_ceiling`), calendar alignment measuring the
+period against the asked window, and the lane's stated blind spots: a non-zero
+seed, multiple symbols, crypto, and a provider-truncated window. The category
+is typed-only by design: the one-phrase contribution rendering and card row
+copy are frontend facts proven by the #455 browser evidence, and the
+next-session buy rule for non-trading-day contributions is proven by
+`tests/domain/test_dca_trading_day_rule.py`; this category asserts the typed
+facts both of those read from.
 
 ## Prose Judge
 

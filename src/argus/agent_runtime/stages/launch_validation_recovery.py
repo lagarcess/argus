@@ -42,16 +42,22 @@ def _validate_launch_envelope(request: LaunchBacktestRequest) -> None:
         MIN_STARTING_CAPITAL,
     )
     from argus.domain.backtesting.date_window import validate_backtest_date_window
+    from argus.domain.dca_capital import build_dca_capital_plan
 
-    if request.capital_amount is not None:
+    if request.strategy_type == "dca_accumulation":
+        # The plan owns both money roles and their rules, so the card gate and
+        # the engine gate cannot disagree about what a fundable plan is. A
+        # position-sized contribution is only a number once the price is
+        # fetched, so the adapter runs the same gate then.
+        if request.sizing_mode == "capital_amount":
+            build_dca_capital_plan(
+                starting_capital=request.starting_capital,
+                contribution=request.recurring_contribution,
+                period=request.cadence,
+            )
+    elif request.capital_amount is not None:
         amount = float(request.capital_amount)
-        # The launch adapter's rule: the band applies to a one-time bankroll;
-        # a recurring contribution reuses the field but is exempt from the
-        # floor and keeps the ceiling (_validate_launch_config in
-        # engine_launch/adapter.py).
-        recurring = request.strategy_type == "dca_accumulation"
-        floor = 0.0 if recurring else MIN_STARTING_CAPITAL
-        if amount > MAX_STARTING_CAPITAL or amount < floor or amount <= 0.0:
+        if not MIN_STARTING_CAPITAL <= amount <= MAX_STARTING_CAPITAL:
             raise ValueError("invalid_starting_capital")
     validate_backtest_date_window(
         start=date.fromisoformat(request.date_range.start),
@@ -64,6 +70,7 @@ def _tagged_launch_validation_failure(
     *,
     raw_value: Any | None = None,
     optional_parameter_status: dict[str, Any] | None = None,
+    capital_role: str | None = None,
 ) -> dict[str, Any]:
     """Every launch validation failure names its code in the patch, so the
     typed edit endpoints can answer with the exact refusal instead of a
@@ -72,6 +79,7 @@ def _tagged_launch_validation_failure(
         error_code,
         raw_value=raw_value,
         optional_parameter_status=optional_parameter_status,
+        capital_role=capital_role,
     )
     failure["launch_validation_code"] = error_code
     return failure
@@ -82,6 +90,7 @@ def _launch_validation_failure(
     *,
     raw_value: Any | None = None,
     optional_parameter_status: dict[str, Any] | None = None,
+    capital_role: str | None = None,
 ) -> dict[str, Any]:
     if error_code == "unsupported_timeframe":
         return {
@@ -118,6 +127,29 @@ def _launch_validation_failure(
             MIN_STARTING_CAPITAL,
         )
 
+        if capital_role == "recurring_contribution":
+            status = dict(optional_parameter_status or {})
+            raw_constraints = status.get("unsupported_constraints", [])
+            constraints = []
+            if isinstance(raw_constraints, list):
+                constraints = [
+                    item
+                    for item in raw_constraints
+                    if isinstance(item, dict)
+                    and item.get("category") != "unsupported_starting_capital"
+                ]
+            if constraints:
+                status["unsupported_constraints"] = constraints
+            else:
+                status.pop("unsupported_constraints", None)
+            return {
+                "outcome": "needs_clarification",
+                "missing_required_fields": ["capital_amount"],
+                "requested_field": "capital_amount",
+                "assistant_prompt": None,
+                "optional_parameter_status": status,
+            }
+
         return {
             "outcome": "needs_clarification",
             "missing_required_fields": ["capital_amount"],
@@ -128,6 +160,8 @@ def _launch_validation_failure(
                 {
                     "category": "unsupported_starting_capital",
                     "raw_value": raw_value or error_code,
+                    "minimum": MIN_STARTING_CAPITAL,
+                    "maximum": MAX_STARTING_CAPITAL,
                     "explanation": (
                         "The backtest engine accepts starting capital between "
                         f"${MIN_STARTING_CAPITAL:,.0f} and "
@@ -140,6 +174,69 @@ def _launch_validation_failure(
                             "replacement_values": {"capital_amount": 10000},
                         },
                         {"label": "Choose a different amount"},
+                    ],
+                },
+            ),
+        }
+    if error_code in {
+        "invalid_recurring_contribution",
+        "dca_requires_starting_capital_or_contribution",
+    }:
+        # Both are money the plan does not have, so both just ask for the
+        # amount. The bankroll floor is not this field's rule, so its numbers
+        # stay out of the ask and no unsupported surface is raised.
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["capital_amount"],
+            "requested_field": "capital_amount",
+            "assistant_prompt": None,
+            "optional_parameter_status": dict(optional_parameter_status or {}),
+        }
+    if error_code == "dca_contribution_zero_is_buy_and_hold":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["capital_amount"],
+            "requested_field": "capital_amount",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                dict(optional_parameter_status or {}),
+                {
+                    "category": "dca_contribution_zero_is_buy_and_hold",
+                    "raw_value": raw_value or "0",
+                    "explanation": (
+                        "A recurring plan with nothing added each period is a "
+                        "buy and hold of the starting capital, not a recurring "
+                        "plan. Add a contribution, or test it as buy and hold."
+                    ),
+                    "simplification_options": [
+                        {"label": "Add a recurring contribution"},
+                        {
+                            "label": "Test it as buy and hold",
+                            "replacement_values": {"strategy_type": "buy_and_hold"},
+                        },
+                    ],
+                },
+            ),
+        }
+    if error_code == "contribution_period_exceeds_window":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["cadence"],
+            "requested_field": "cadence",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                dict(optional_parameter_status or {}),
+                {
+                    "category": "contribution_period_exceeds_window",
+                    "raw_value": raw_value or error_code,
+                    "explanation": (
+                        "The contribution period has to fit inside the tested "
+                        "window at least once. A monthly contribution needs at "
+                        "least one month of window."
+                    ),
+                    "simplification_options": [
+                        {"label": "Choose a shorter contribution period"},
+                        {"label": "Test a longer date range"},
                     ],
                 },
             ),

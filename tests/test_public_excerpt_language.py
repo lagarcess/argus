@@ -132,7 +132,7 @@ def test_every_assumption_the_generator_can_write_has_a_typed_fact() -> None:
     run than the app was.
     """
     card = build_generated_artifact(language="en").payload["result_card"]
-    assert len(card["assumptions"]) == 6
+    assert len(card["assumptions"]) == 7
     payload = _payload(
         artifact=build_generated_artifact(language="en"),
         run_config_snapshot=GENERATED_CARD_CONFIG_SNAPSHOT,
@@ -141,6 +141,7 @@ def test_every_assumption_the_generator_can_write_has_a_typed_fact() -> None:
         ("recurring_contribution", "200"),
         ("contribution_cadence", "monthly"),
         ("starting_principal", "0"),
+        ("fractional_shares", None),
         ("long_only", None),
         ("equal_weight", None),
         ("modeled_fee_bps", "10"),
@@ -180,8 +181,10 @@ def test_assumption_values_carry_no_locale_formatting() -> None:
     """
     large = {
         **ENGINE_CONFIG_SNAPSHOT,
-        "starting_capital": 25_000,
-        "recurring_contribution": 25_000,
+        "dca_capital": {
+            **ENGINE_CONFIG_SNAPSHOT["dca_capital"],
+            "contribution": 25_000,
+        },
     }
     values = dict(_assumption_pairs(_payload(run_config_snapshot=large)))
     assert values["recurring_contribution"] == "25000"
@@ -201,6 +204,7 @@ def test_the_assumption_key_set_is_closed() -> None:
         "recurring_contribution",
         "contribution_cadence",
         "starting_principal",
+        "fractional_shares",
     }
     with pytest.raises(ValidationError):
         PublicExcerptAssumption(key="whatever_the_run_wrote", value="anything")
@@ -220,7 +224,7 @@ def test_a_recurring_run_with_no_contribution_amount_refuses() -> None:
     without_amount = {
         key: value
         for key, value in ENGINE_CONFIG_SNAPSHOT.items()
-        if key not in {"starting_capital", "recurring_contribution"}
+        if key != "dca_capital"
     }
     with pytest.raises(PublicExcerptSourceError):
         _payload(run_config_snapshot=without_amount)

@@ -33,7 +33,10 @@ from argus.domain.backtesting.confirmation_preflight import (
     prepare_confirmation_launch,
 )
 from argus.domain.engine_launch.display import format_data_through_label
-from argus.domain.engine_launch.models import LaunchBacktestRequest
+from argus.domain.engine_launch.models import (
+    LaunchBacktestRequest,
+    launch_request_error_code,
+)
 from argus.domain.engine_launch.strategies import validate_launch_supported
 from argus.domain.market_data.capabilities import (
     fetch_alpaca_market_clock,
@@ -213,10 +216,22 @@ def _validated_launch_payload(
     except ValidationError as exc:
         return _tagged_launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
+        error_code = str(exc)
+        raw_value = (
+            launch_payload.get("capital_amount")
+            if error_code == "invalid_starting_capital"
+            else launch_payload.get("timeframe")
+        )
         return _tagged_launch_validation_failure(
-            str(exc),
-            raw_value=launch_payload.get("timeframe"),
+            error_code,
+            raw_value=raw_value,
             optional_parameter_status=state.optional_parameter_status,
+            capital_role=(
+                "recurring_contribution"
+                if error_code == "invalid_starting_capital"
+                and launch_payload.get("strategy_type") == "dca_accumulation"
+                else None
+            ),
         )
     except Exception:
         return _tagged_launch_validation_failure("missing_rule_group")
@@ -334,17 +349,7 @@ def _confirmation_payload_language(confirmation_payload: dict[str, Any]) -> str:
 
 
 def _validation_error_code(exc: ValidationError) -> str:
-    text = str(exc)
-    for code in (
-        "future_end_date",
-        "invalid_chronological_date_range",
-        "invalid_date_range",
-        "capital_amount_required",
-        "position_size_required",
-    ):
-        if code in text:
-            return code
-    return "missing_rule_group"
+    return launch_request_error_code(exc)
 
 
 def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, Any]:

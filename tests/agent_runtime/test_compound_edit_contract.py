@@ -13,7 +13,7 @@ import asyncio
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     EditOperation,
-    _completed_with_stated_cost_operations,
+    _completed_with_stated_operations,
     plan_artifact_assumption_edit,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
@@ -294,7 +294,9 @@ class TestStatedCostsCannotDropSilently:
             _current_artifact_strategy,
             _required_edit_targets_from_primary_draft,
             materialized_artifact_edit_targets,
-            stated_cost_edit_operations,
+        )
+        from argus.agent_runtime.interpreter.edit_completion import (
+            stated_edit_operations,
         )
 
         request = _request(self.MESSAGE)
@@ -325,7 +327,7 @@ class TestStatedCostsCannotDropSilently:
                             candidate, request=request, primary_draft=primary
                         )
                     ),
-                    stated_cost_operations=stated_cost_edit_operations(
+                    stated_operations=stated_edit_operations(
                         primary, current_strategy=current, request=request
                     ),
                 )
@@ -357,13 +359,13 @@ class TestStatedCostsCannotDropSilently:
             operations=[EditOperation(op="set", target="capital", number=9000)],
             assistant_response="Which slippage did you mean?",
         )
-        assert _completed_with_stated_cost_operations(clarification, stated) is (
+        assert _completed_with_stated_operations(clarification, stated) is (
             clarification
         )
         flat_only = ArtifactAssumptionEditPlan(
             outcome="ready_to_confirm", initial_capital=9000
         )
-        assert _completed_with_stated_cost_operations(flat_only, stated) is flat_only
+        assert _completed_with_stated_operations(flat_only, stated) is flat_only
 
     def test_over_cap_stated_cost_is_disclosed_not_stalled(self) -> None:
         """The free-form route's cost audit refuses an unmodelable stated
@@ -491,3 +493,264 @@ class TestStatedCostsCannotDropSilently:
             "coverage guards against silence; a refusal recorded for card "
             "disclosure is not silence"
         )
+
+
+class TestAcceptedOperationsLandOrFailLoudly:
+    """Issue #498: every operation the planner accepted appears in the
+    resulting card, or the whole request fails loudly. Partial application
+    is unrepresentable: the materializer refuses a plan whose accepted
+    operations do not all land, and the union of the primary read and the
+    plan completes a half-built operation list before it can ship."""
+
+    MESSAGE = "change the benchmark to QQQ and change the start to April 1, 2026"
+
+    @staticmethod
+    def _unresolvable_date_op() -> EditOperation:
+        # Accepted by the applier (a date_window payload exists), refused by
+        # date resolution (an endpoint patch with no date to patch in).
+        return EditOperation(
+            op="set",
+            target="date_window",
+            date_window=LLMDateRangeIntent(kind="endpoint_patch", endpoint="start"),
+        )
+
+    @staticmethod
+    def _indicator_op() -> EditOperation:
+        # Accepted by the applier, dropped by materialization on a card whose
+        # strategy has no active RSI confirmation.
+        return EditOperation(
+            op="set", target="indicator_entry_threshold", number=25
+        )
+
+    def test_partially_materialized_plan_is_refused(self) -> None:
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            materialized_artifact_edit_targets,
+        )
+
+        request = _request(self.MESSAGE)
+        for vanishing in (self._unresolvable_date_op(), self._indicator_op()):
+            plan = ArtifactAssumptionEditPlan(
+                outcome="ready_to_confirm",
+                operations=[
+                    EditOperation(op="set", target="benchmark", value="QQQ"),
+                    vanishing,
+                ],
+            )
+            assert (
+                materialized_artifact_edit_targets(plan, request=request) is None
+            ), f"{vanishing.target}: a half-materialized plan must be refused"
+
+    def test_fully_refused_plan_is_not_partial(self) -> None:
+        """All-or-nothing: when nothing lands, the all-refused handling owns
+        the turn (the #271 clarification), not the partial refusal."""
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            materialized_artifact_edit_targets,
+        )
+
+        request = _request("set the RSI entry to 25")
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[self._indicator_op()],
+        )
+        covered = materialized_artifact_edit_targets(plan, request=request)
+        assert covered == set()
+        response = _response_from_artifact_assumption_edit_plan(
+            plan=plan, request=request
+        )
+        assert response.requires_clarification is True
+
+    def test_planner_refuses_every_partially_materializing_candidate(self) -> None:
+        import argus.agent_runtime.artifact_edit_planner as planner_module
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            _current_artifact_strategy,
+            materialized_artifact_edit_targets,
+        )
+
+        request = _request(self.MESSAGE)
+        current = _current_artifact_strategy(request)
+        partial = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="set", target="benchmark", value="QQQ"),
+                self._unresolvable_date_op(),
+            ],
+        )
+
+        async def fake_invoke(**kwargs):
+            return partial
+
+        original = planner_module.invoke_openrouter_json_schema
+        planner_module.invoke_openrouter_json_schema = fake_invoke
+        try:
+            plan = asyncio.run(
+                plan_artifact_assumption_edit(
+                    current_user_message=self.MESSAGE,
+                    prior_strategy=current.model_dump(mode="json"),
+                    active_confirmation=None,
+                    preferred_model="test-model",
+                    materialized_targets_for_plan=(
+                        lambda candidate: materialized_artifact_edit_targets(
+                            candidate, request=request
+                        )
+                    ),
+                )
+            )
+        finally:
+            planner_module.invoke_openrouter_json_schema = original
+
+        assert plan is None, (
+            "an accepted operation that cannot materialize fails the whole "
+            "plan; no model may ship the applicable half"
+        )
+
+    def test_offline_planned_edit_declines_partial_application(self) -> None:
+        from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_continuity import (
+            planned_active_confirmation_edit_interpretation,
+        )
+
+        snapshot = _snapshot()
+
+        async def half_plan(**kwargs):
+            return ArtifactAssumptionEditPlan(
+                outcome="ready_to_confirm",
+                operations=[
+                    EditOperation(op="set", target="benchmark", value="QQQ"),
+                    self._unresolvable_date_op(),
+                ],
+            )
+
+        interpretation = asyncio.run(
+            planned_active_confirmation_edit_interpretation(
+                snapshot=snapshot,
+                current_user_message=self.MESSAGE,
+                resolve_asset_candidate=lambda *a, **k: None,
+                plan_artifact_assumption_edit_fn=half_plan,
+            )
+        )
+        assert interpretation is None, (
+            "the offline continuity path must decline a half-applied summary, "
+            "not issue a card missing part of the request"
+        )
+
+    def test_primary_read_completes_a_plan_that_dropped_a_half(self) -> None:
+        """The union of the two structured reads: a typed fact the primary
+        interpretation extracted enters a plan that omitted it."""
+        import argus.agent_runtime.artifact_edit_planner as planner_module
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            _current_artifact_strategy,
+            _required_edit_targets_from_primary_draft,
+            materialized_artifact_edit_targets,
+        )
+        from argus.agent_runtime.interpreter.edit_completion import (
+            stated_edit_operations,
+        )
+        from argus.agent_runtime.llm_interpreter_types import LLMStrategyDraft
+
+        request = _request(self.MESSAGE)
+        current = _current_artifact_strategy(request)
+        primary = LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            date_range_intent=LLMDateRangeIntent(
+                kind="endpoint_patch", endpoint="start", start="2026-04-01"
+            ),
+            field_provenance={
+                "comparison_baseline": "explicit_user",
+                "date_range": "explicit_user",
+            },
+        )
+        benchmark_dropped = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch", endpoint="start", start="2026-04-01"
+                    ),
+                )
+            ],
+        )
+
+        async def fake_invoke(**kwargs):
+            return benchmark_dropped
+
+        original = planner_module.invoke_openrouter_json_schema
+        planner_module.invoke_openrouter_json_schema = fake_invoke
+        try:
+            plan = asyncio.run(
+                plan_artifact_assumption_edit(
+                    current_user_message=self.MESSAGE,
+                    prior_strategy=current.model_dump(mode="json"),
+                    active_confirmation=None,
+                    preferred_model="test-model",
+                    required_targets=_required_edit_targets_from_primary_draft(
+                        primary, current_strategy=current, request=request
+                    ),
+                    materialized_targets_for_plan=(
+                        lambda candidate: materialized_artifact_edit_targets(
+                            candidate, request=request, primary_draft=primary
+                        )
+                    ),
+                    stated_operations=stated_edit_operations(
+                        primary, current_strategy=current, request=request
+                    ),
+                )
+            )
+        finally:
+            planner_module.invoke_openrouter_json_schema = original
+
+        assert plan is not None
+        assert {operation.target for operation in plan.operations} == {
+            "date_window",
+            "benchmark",
+        }
+        response = _response_from_artifact_assumption_edit_plan(
+            plan=plan, request=request
+        )
+        draft = response.candidate_strategy_draft
+        assert draft.comparison_baseline == "QQQ"
+        assert (draft.date_range or {}).get("start") == "2026-04-01"
+
+    def test_completion_emits_a_receipt_naming_the_targets(self) -> None:
+        """The union is a redundancy layer over the planner; every injection
+        must be observable or planner decay hides behind the safety net."""
+        from argus.agent_runtime.artifact_edit_planner import (
+            _completed_with_stated_operations,
+        )
+        from loguru import logger as loguru_logger
+
+        stated = [EditOperation(op="set", target="benchmark", value="QQQ")]
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(
+                    op="set",
+                    target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch", endpoint="start", start="2026-04-01"
+                    ),
+                )
+            ],
+        )
+        captured: list[str] = []
+        handler_id = loguru_logger.add(
+            lambda message: captured.append(str(message)), level="INFO"
+        )
+        try:
+            completed = _completed_with_stated_operations(plan, stated)
+            covered = _completed_with_stated_operations(completed, stated)
+        finally:
+            loguru_logger.remove(handler_id)
+
+        assert {operation.target for operation in completed.operations} == {
+            "date_window",
+            "benchmark",
+        }
+        assert covered is completed
+        receipts = [
+            line for line in captured if "Artifact edit plan completed" in line
+        ]
+        assert len(receipts) == 1, (
+            "one receipt per injection, none when the plan already covers"
+        )
+        assert "benchmark" in receipts[0]

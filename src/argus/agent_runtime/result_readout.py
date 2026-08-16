@@ -295,7 +295,7 @@ def _optional_parameters_from_request(request: dict[str, Any]) -> dict[str, Any]
         ("capital_amount", "Starting capital"),
         ("starting_capital", "Starting capital"),
         ("position_size", "Position size"),
-        ("cadence", "Cadence"),
+        ("cadence", "Contribution period"),
     ):
         if key in request and request.get(key) not in (None, ""):
             parameters[key] = {"label": label, "source": "user"}

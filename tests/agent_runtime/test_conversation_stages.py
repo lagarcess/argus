@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -218,7 +219,7 @@ def test_clarify_dca_missing_execution_fields_win_over_total_budget_constraint()
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$200,000 starting principal",
                 "explanation": (
                     "The current DCA backtest can only execute the recurring "
@@ -270,7 +271,7 @@ def test_clarify_dca_missing_period_wins_over_total_budget_constraint() -> None:
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$5,000 contribution cap",
                 "explanation": (
                     "The current DCA backtest can only execute the recurring "
@@ -521,7 +522,8 @@ def test_clarify_unsupported_recovery_llm_failure_uses_structured_fallback() -> 
     assert result.outcome == "await_user_reply"
     assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
     assert "could not phrase" not in prompt
-    assert "ATR 14" in prompt
+    assert "ATR 14" not in prompt
+    assert "that rule" in prompt
     assert "TSLA" in prompt
     assert "Use a supported RSI threshold rule" in prompt
     assert "Compare with buy and hold" in prompt
@@ -588,9 +590,7 @@ def test_clarify_spanish_unsupported_recovery_fallback_uses_structured_options()
         "buy_and_hold",
         "moving_average_crossover",
     ]
-    assert [
-        option["id"] for option in result.patch["response_intent"]["options"]
-    ] == [
+    assert [option["id"] for option in result.patch["response_intent"]["options"]] == [
         "rsi_threshold",
         "buy_and_hold",
         "moving_average_crossover",
@@ -623,7 +623,7 @@ def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$3,000 contribution cap",
                 "explanation": (
                     "I understand $3,000 as a contribution cap, but the current "
@@ -654,7 +654,7 @@ def test_clarify_uses_generator_for_dca_cap_recovery_after_execution_fields_are_
     assert result.patch["assistant_prompt"] == clarifier.question
     assert len(clarifier.requests) == 1
     assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
-        "unsupported_dca_starting_principal"
+        "unsupported_dca_contribution_ceiling"
     )
     prompt = result.patch["assistant_prompt"]
     assert "recurring-buy" in prompt
@@ -952,9 +952,10 @@ def test_clarify_unsupported_timeframe_persists_typed_actions_with_llm_voice() -
         "slippage": 0.0005,
         "timeframe": "5m",
     }
-    assert [
-        option["id"] for option in result.patch["response_intent"]["options"]
-    ] == ["option_0", "option_1"]
+    assert [option["id"] for option in result.patch["response_intent"]["options"]] == [
+        "option_0",
+        "option_1",
+    ]
     assert result.patch["clarification"] == {
         "kind": "unsupported_recovery",
         "reason_code": "unsupported_time_granularity",
@@ -1034,9 +1035,9 @@ def test_clarify_unsupported_timeframe_degraded_fallback_is_typed_and_truthful(
     assert result.patch["clarification"]["reason_code"] == (
         "unsupported_time_granularity"
     )
-    assert [
-        option["id"] for option in result.patch["response_intent"]["options"]
-    ] == [option["id"] for option in result.patch["clarification"]["options"]]
+    assert [option["id"] for option in result.patch["response_intent"]["options"]] == [
+        option["id"] for option in result.patch["clarification"]["options"]
+    ]
 
 
 def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None:
@@ -1201,30 +1202,46 @@ def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
         response_intent={
             "kind": "unsupported_recovery",
             "facts": {
+                "strategy": {
+                    "strategy_thesis": "Use sentiment as the entry signal for Apple.",
+                    "asset_universe": ["AAPL"],
+                    "date_range": "past year",
+                    "entry_logic": "news sentiment turns positive",
+                },
                 "unsupported_constraints": [
                     {
                         "category": "unsupported_strategy_logic",
                         "raw_value": "news sentiment turns positive",
-                        "explanation": (
-                            "Sentiment/news signals are not executable yet."
-                        ),
+                        "explanation": ("Sentiment/news signals are not executable yet."),
                     }
-                ]
+                ],
             },
         },
     )
 
     messages = clarifier._messages(request)
     system_prompt = messages[0].content
-    context = messages[1].content
+    context = json.loads(messages[1].content)
 
     assert "unsupported_recovery" in system_prompt
-    assert "asset, period, and unsupported rule" in system_prompt
+    assert "typed capability cause" in system_prompt
     assert "simplification_options" in system_prompt
     assert "Do not claim the unsupported part is executable" in system_prompt
-    assert "AAPL" in context
-    assert "news sentiment turns positive" in context
-    assert "Sentiment/news signals are not executable yet." not in context
+    assert context["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
+    assert "strategy_thesis" not in context["candidate_strategy_draft"]
+    assert "entry_logic" not in context["candidate_strategy_draft"]
+    assert "strategy_thesis" not in context["response_intent"]["facts"]["strategy"]
+    assert "entry_logic" not in context["response_intent"]["facts"]["strategy"]
+    assert context["unsupported_constraints"][0] == {
+        "category": "unsupported_strategy_logic",
+        "simplification_options": [
+            {"label": "Use a supported RSI threshold rule"},
+            {"label": "Compare with buy and hold"},
+        ],
+    }
+    assert context["response_intent"]["facts"]["unsupported_constraints"] == [
+        {"category": "unsupported_strategy_logic"}
+    ]
 
 
 def test_clarifier_system_prompt_keeps_vague_ideas_on_supported_proxies() -> None:
@@ -2996,7 +3013,7 @@ def test_confirm_stage_blocks_carried_dca_cap_before_ready_card() -> None:
     state.optional_parameter_status = {
         "unsupported_constraints": [
             {
-                "category": "unsupported_dca_starting_principal",
+                "category": "unsupported_dca_contribution_ceiling",
                 "raw_value": "$3,000 cap",
                 "explanation": (
                     "The recurring-buy launch can use the per-buy amount and "
@@ -3016,7 +3033,7 @@ def test_confirm_stage_blocks_carried_dca_cap_before_ready_card() -> None:
     assert "confirmation_payload" not in result.patch
     assert result.patch["requested_field"] == "unsupported_constraints"
     constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
-    assert constraint["category"] == "unsupported_dca_starting_principal"
+    assert constraint["category"] == "unsupported_dca_contribution_ceiling"
     assert any(
         option["label"] == "Run recurring buys only"
         for option in constraint["simplification_options"]

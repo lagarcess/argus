@@ -4,11 +4,10 @@ import asyncio
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-import yaml
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
@@ -29,6 +28,10 @@ from argus.llm.openrouter import (
 )
 from pydantic import BaseModel, Field
 
+from tests.evals.measurement_eval_scorecard import (
+    FIXTURE_DIR,
+    measurement_fixture_documents,
+)
 from tests.evals.prose_evidence import judged_prose_evidence
 
 LOCKED_EVAL_CATEGORIES = {
@@ -40,9 +43,8 @@ LOCKED_EVAL_CATEGORIES = {
     "backtest_metric_correctness",
     "graceful_recovery",
     "asset_discovery_routing",
+    "dca_capital_semantics",
 }
-FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
-SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 PROSE_JUDGE_RUBRIC_VERSION = "argus-prose-quality-v1"
 PROSE_JUDGE_RUBRIC = """
 Version: argus-prose-quality-v1
@@ -94,6 +96,13 @@ class TypedExpectations:
     adjustment_reason: str | None = None
     benchmark_symbol: str | None = None
     capital_amount: float | None = None
+    # A recurring plan's two money roles and its period are peers with their
+    # own names; capital_amount alone cannot see a role swap.
+    starting_capital: float | None = None
+    recurring_contribution: float | None = None
+    contribution_period: str | None = None
+    launch_validation_code: str | None = None
+    missing_required_fields: tuple[str, ...] = ()
     fee_rate: float | None = None
     slippage: float | None = None
     cost_provenance: dict[str, str] | None = None
@@ -133,8 +142,7 @@ class ProseJudgeResponse(BaseModel):
 
 def load_eval_cases(path: Path = FIXTURE_DIR) -> list[EvalCase]:
     cases: list[EvalCase] = []
-    for fixture_path in sorted(path.glob("*.yaml")):
-        payload = yaml.safe_load(fixture_path.read_text(encoding="utf-8"))
+    for fixture_path, payload in measurement_fixture_documents(path):
         category = str(payload["category"])
         if category not in LOCKED_EVAL_CATEGORIES:
             raise ValueError(f"unknown eval category: {category}")
@@ -246,10 +254,19 @@ def run_eval_case(
             judge_result = _missing_prose_judge_result()
             failed_checks.append("prose_judge:missing_assistant_text")
         else:
-            judge_result = judge_prose_quality(
-                case=case,
-                assistant_text=assistant_text,
-            )
+            judge_route_token = begin_openrouter_route_receipt_capture()
+            try:
+                judge_result = judge_prose_quality(
+                    case=case,
+                    assistant_text=assistant_text,
+                )
+            finally:
+                route_receipts.extend(
+                    receipt.as_dict()
+                    for receipt in end_openrouter_route_receipt_capture(
+                        judge_route_token
+                    )
+                )
             if not judge_result["pass"]:
                 failed_checks.extend(
                     f"prose_judge:{criterion}"
@@ -352,6 +369,37 @@ def typed_expectation_failures(
         outcome.get("capital_amount"),
         failures,
     )
+    _compare(
+        "starting_capital",
+        expected.starting_capital,
+        outcome.get("starting_capital"),
+        failures,
+    )
+    _compare(
+        "recurring_contribution",
+        expected.recurring_contribution,
+        outcome.get("recurring_contribution"),
+        failures,
+    )
+    _compare(
+        "contribution_period",
+        expected.contribution_period,
+        outcome.get("contribution_period"),
+        failures,
+    )
+    _compare(
+        "launch_validation_code",
+        expected.launch_validation_code,
+        outcome.get("launch_validation_code"),
+        failures,
+    )
+    if expected.missing_required_fields:
+        _compare(
+            "missing_required_fields",
+            list(expected.missing_required_fields),
+            outcome.get("missing_required_fields"),
+            failures,
+        )
     _compare("fee_rate", expected.fee_rate, outcome.get("fee_rate"), failures)
     _compare("slippage", expected.slippage, outcome.get("slippage"), failures)
     if expected.cost_provenance is not None:
@@ -403,54 +451,6 @@ def typed_expectation_failures(
     return failures
 
 
-def scorecard_for_results(results: list[dict[str, Any]]) -> dict[str, Any]:
-    by_category: dict[str, dict[str, int | float]] = {}
-    for result in results:
-        category = str(result["category"])
-        bucket = by_category.setdefault(
-            category,
-            {
-                "passed": 0,
-                "failed": 0,
-                "expected_failed": 0,
-                "unexpected_pass": 0,
-                "skipped": 0,
-                "pass_rate": 0.0,
-            },
-        )
-        status = str(result["status"])
-        if status not in bucket:
-            status = "failed"
-        bucket[status] = int(bucket[status]) + 1
-
-    for bucket in by_category.values():
-        denominator = sum(
-            int(bucket[status])
-            for status in ("passed", "failed", "expected_failed", "unexpected_pass")
-        )
-        bucket["pass_rate"] = (
-            0.0 if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
-        )
-
-    return {
-        "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "category_pass_rates": by_category,
-        "totals": {
-            "passed": sum(int(item["passed"]) for item in by_category.values()),
-            "failed": sum(int(item["failed"]) for item in by_category.values()),
-            "expected_failed": sum(
-                int(item["expected_failed"]) for item in by_category.values()
-            ),
-            "unexpected_pass": sum(
-                int(item["unexpected_pass"]) for item in by_category.values()
-            ),
-            "skipped": sum(int(item["skipped"]) for item in by_category.values()),
-        },
-        "results": results,
-    }
-
-
 def blocking_eval_results(
     results: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -469,17 +469,6 @@ def expected_fail_issue_for_result(result: dict[str, Any]) -> str | None:
         return None
     issue = expected_fail.get("issue")
     return issue if isinstance(issue, str) and issue else None
-
-
-def write_scorecard(
-    results: list[dict[str, Any]], *, output_dir: Path = SCORECARD_DIR
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    scorecard = scorecard_for_results(results)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    path = output_dir / f"argus-eval-scorecard-{stamp}.json"
-    path.write_text(json.dumps(scorecard, indent=2, sort_keys=True), encoding="utf-8")
-    return path
 
 
 def judge_prose_quality(*, case: EvalCase, assistant_text: str) -> dict[str, Any]:
@@ -688,6 +677,13 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             adjustment_reason=expected.get("adjustment_reason"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             capital_amount=expected.get("capital_amount"),
+            starting_capital=expected.get("starting_capital"),
+            recurring_contribution=expected.get("recurring_contribution"),
+            contribution_period=expected.get("contribution_period"),
+            launch_validation_code=expected.get("launch_validation_code"),
+            missing_required_fields=tuple(
+                expected.get("missing_required_fields") or ()
+            ),
             fee_rate=expected.get("fee_rate"),
             slippage=expected.get("slippage"),
             cost_provenance=expected.get("cost_provenance"),
@@ -920,6 +916,16 @@ def _typed_outcome(
         "capital_amount": (
             launch_payload.get("capital_amount") or strategy.get("capital_amount")
         ),
+        # Both DCA money roles come only from the launch payload: they exist
+        # as launch truth or not at all, so a fixture cannot pass by reading
+        # a draft field that never became a fundable plan.
+        "starting_capital": launch_payload.get("starting_capital"),
+        "recurring_contribution": launch_payload.get("recurring_contribution"),
+        "contribution_period": (
+            launch_payload.get("cadence") or strategy.get("cadence")
+        ),
+        "launch_validation_code": final_patch.get("launch_validation_code"),
+        "missing_required_fields": final_patch.get("missing_required_fields"),
         "fee_rate": extra_parameters.get("fee_rate"),
         "slippage": extra_parameters.get("slippage"),
         "cost_provenance": {

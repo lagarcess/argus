@@ -134,6 +134,25 @@ def response_with_provider_context_assets(
             asset_classes.add(asset_class)
 
     draft = response.candidate_strategy_draft.model_copy(deep=True)
+    # A typed exclusion outranks a mention: "remove AAPL" mentions AAPL, and
+    # injecting that mention as a traded asset manufactures a universe/exclusion
+    # contradiction the edit pipeline later refuses to materialize. Exclusions
+    # arrive in the user's own words ("Apple", "BTC-USD"), so they match
+    # against the full provider record, never by raw symbol equality.
+    exclusion_texts = [
+        str(value).strip() for value in draft.asset_exclusions if str(value).strip()
+    ]
+    excluded_symbols = {
+        str(record.get("symbol") or "").strip().upper()
+        for record in resolved_records
+        if any(
+            _provider_record_matches_symbol(record, exclusion_text)
+            for exclusion_text in exclusion_texts
+        )
+    }
+    traded_symbols = [
+        symbol for symbol in resolved_symbols if symbol not in excluded_symbols
+    ]
     draft_assets = [
         str(value).strip() for value in draft.asset_universe if str(value).strip()
     ]
@@ -146,11 +165,11 @@ def response_with_provider_context_assets(
     )
     preserved_fuller_draft = context_is_partial
     if not context_is_partial:
-        draft.asset_universe = resolved_symbols
+        draft.asset_universe = traded_symbols
     else:
         draft_symbols = {value.upper() for value in draft_assets}
         draft.asset_universe = [
-            *[symbol for symbol in resolved_symbols if symbol not in draft_symbols],
+            *[symbol for symbol in traded_symbols if symbol not in draft_symbols],
             *draft_assets,
         ]
         ambiguous_fields.append(
@@ -170,12 +189,23 @@ def response_with_provider_context_assets(
         draft.extra_parameters = extra_parameters
 
     # Unsupported turns borrow resolved assets only; never escalate a refusal.
+    # When every resolved mention is excluded, the refusal still needs its
+    # asset facts for the recovery route; the edit pipeline's exclusions-win
+    # guards own the contradiction, not this borrow.
     if response.intent == "unsupported_or_out_of_scope":
         if not resolved_symbols:
             return response
-        draft.asset_universe = resolved_symbols
+        draft.asset_universe = traded_symbols or resolved_symbols
         preserved_fuller_draft = False
         ambiguous_fields = []
+    # The receipt asserts the outcome, not the attempt: it fires only when an
+    # excluded symbol was resolved and is absent from the final universe.
+    final_universe_symbols = {
+        str(value).strip().upper() for value in draft.asset_universe if str(value).strip()
+    }
+    exclusion_respected = bool(excluded_symbols) and not (
+        excluded_symbols & final_universe_symbols
+    )
     if (
         not ambiguous_fields
         and not preserved_fuller_draft
@@ -184,10 +214,19 @@ def response_with_provider_context_assets(
     ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
+    if exclusion_respected:
+        update["reason_codes"] = list(
+            dict.fromkeys(
+                [
+                    *response.reason_codes,
+                    "context_asset_injection_respected_exclusion",
+                ]
+            )
+        )
     resolved_missing_asset = (
         response.intent in {"strategy_drafting", "backtest_execution"}
         and "asset_universe" in response.missing_required_fields
-        and bool(resolved_symbols)
+        and bool(traded_symbols)
         and not ambiguous_fields
         and not preserved_fuller_draft
         and all_traded_asset_mentions_accounted_for is True
@@ -210,7 +249,7 @@ def response_with_provider_context_assets(
                 "reason_codes": list(
                     dict.fromkeys(
                         [
-                            *response.reason_codes,
+                            *(update.get("reason_codes") or response.reason_codes),
                             "provider_context_resolved_missing_asset",
                         ]
                     )
@@ -221,7 +260,7 @@ def response_with_provider_context_assets(
         update["reason_codes"] = list(
             dict.fromkeys(
                 [
-                    *response.reason_codes,
+                    *(update.get("reason_codes") or response.reason_codes),
                     "provider_context_partial_preserved_fuller_draft",
                 ]
             )
@@ -324,6 +363,31 @@ def resolved_asset_records_from_strategy_context(strategy: Any) -> list[dict[str
     if not isinstance(records, list):
         return []
     return [record for record in records if isinstance(record, dict)]
+
+
+def preflight_record_supports_symbol(strategy: Any, symbol: str) -> bool:
+    """Whether a runtime-owned preflight record grounds ``symbol``.
+
+    These records exist only when the provider catalog resolved a mention the
+    preflight read from the current message, so they are current-message
+    evidence that does not depend on a second provider round-trip.
+    """
+
+    return any(
+        _provider_record_matches_symbol(record, symbol)
+        for record in resolved_asset_records_from_strategy_context(strategy)
+    )
+
+
+def canonical_symbol_from_preflight_records(strategy: Any, raw_text: str) -> str | None:
+    """Canonical symbol for a mention a runtime preflight record grounds."""
+
+    for record in resolved_asset_records_from_strategy_context(strategy):
+        if _provider_record_matches_symbol(record, raw_text):
+            canonical = str(record.get("symbol") or "").strip().upper()
+            if canonical:
+                return canonical
+    return None
 
 
 def resolved_asset_symbols_from_strategy_context(strategy: Any) -> list[str]:

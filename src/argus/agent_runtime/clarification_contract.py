@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any, Literal
 
 from argus.agent_runtime.recovery_messages import recovery_message
@@ -12,6 +13,21 @@ OFFLINE_CLARIFICATION_FALLBACK = recovery_message(
 )
 
 ClarificationPromptSource = Literal["llm_generated", "degraded_fallback"]
+
+# Coverage recovery always has something true to say, so a missing or unusable
+# coverage code still names the condition rather than falling through to prose.
+GENERIC_COVERAGE_REASON_CODE = "insufficient_common_data"
+
+# Reason codes whose sentence is complete without a list of options. Every
+# other unsupported reason asks the user to pick a direction, so it has nothing
+# to say until options exist.
+SELF_SUFFICIENT_UNSUPPORTED_REASON_CODES = frozenset(
+    {
+        "future_performance",
+        "unsupported_time_granularity",
+        "unsupported_starting_capital",
+    }
+)
 
 
 def offline_clarification_fallback(
@@ -45,12 +61,10 @@ def typed_clarification_contract(
     kind = response_intent.get("kind")
     if kind == "coverage_recovery":
         options = _typed_options(response_intent)
-        coverage = _coverage_facts(response_intent)
-        if not options or coverage is None:
-            return None
+        coverage = _coverage_facts(response_intent) or {}
         return {
             "kind": "coverage_recovery",
-            "reason_code": coverage["code"],
+            "reason_code": coverage.get("code") or GENERIC_COVERAGE_REASON_CODE,
             "prompt_source": prompt_source,
             "requested_field": None,
             "requested_fields": _requested_fields(response_intent),
@@ -63,21 +77,25 @@ def typed_clarification_contract(
         }
     if kind == "unsupported_recovery":
         options = _typed_options(response_intent)
-        if not options:
+        reason_code = _unsupported_reason_code(response_intent)
+        if not options and reason_code not in SELF_SUFFICIENT_UNSUPPORTED_REASON_CODES:
             return None
         semantic_needs = _semantic_needs(response_intent)
+        payload: dict[str, Any] = {
+            "strategy": _strategy_payload(response_intent, strategy),
+            "raw_value": _unsupported_raw_value(response_intent),
+        }
+        if reason_code == "unsupported_starting_capital":
+            payload.update(_unsupported_numeric_bounds(response_intent))
         return {
             "kind": "unsupported_recovery",
-            "reason_code": _unsupported_reason_code(response_intent),
+            "reason_code": reason_code,
             "prompt_source": prompt_source,
             "requested_field": requested_field or "unsupported_constraints",
             "requested_fields": _requested_fields(response_intent)
             or ["unsupported_constraints"],
             "semantic_needs": semantic_needs,
-            "payload": {
-                "strategy": _strategy_payload(response_intent, strategy),
-                "raw_value": _unsupported_raw_value(response_intent),
-            },
+            "payload": payload,
             "options": options,
         }
     if kind != "clarification":
@@ -119,12 +137,25 @@ def intent_clarification_fallback(
     response_intent: dict[str, Any] | None,
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
+    """Compatibility prose for persisted messages.
+
+    This text is English by construction and never decides what a reader sees:
+    the localized surface renders the typed contract from
+    `typed_clarification_contract` instead. `language` is accepted for existing
+    callers and deliberately does not choose words, because a per-language copy
+    table in the runtime is what `docs/CONVERSATIONAL_RUNTIME.md` forbids.
+
+    The invariant that keeps a Spanish reader out of English: this function
+    returns text only where `typed_clarification_contract` returns a contract,
+    so localized copy always exists for whatever was persisted. Guarded by
+    `tests/agent_runtime/test_workspace_language_prose.py`.
+    """
+
     if not isinstance(response_intent, dict):
         return None
     if response_intent.get("kind") == "coverage_recovery":
         coverage = _coverage_facts(response_intent)
         code = coverage.get("code") if coverage is not None else None
-        _ = language
         if code == "no_common_data_window":
             return (
                 "Those assets and the benchmark do not share a usable data window. "
@@ -136,7 +167,6 @@ def intent_clarification_fallback(
         )
     if response_intent.get("kind") == "unsupported_recovery":
         return _unsupported_recovery_fallback(
-            language=language,
             response_intent=response_intent,
             strategy=strategy,
         )
@@ -146,7 +176,6 @@ def intent_clarification_fallback(
     if not isinstance(needs, list) or not needs:
         return None
     symbol = _primary_symbol(strategy)
-    _ = language
     if "period" in needs:
         return f"What date window should I use{_en_asset_suffix(symbol)}?"
     if "asset_target" in needs:
@@ -168,11 +197,9 @@ def intent_clarification_fallback(
 
 def _unsupported_recovery_fallback(
     *,
-    language: str | None,
     response_intent: dict[str, Any],
     strategy: StrategySummary | dict[str, Any] | None,
 ) -> str | None:
-    _ = language
     reason_code = _unsupported_reason_code(response_intent)
     if reason_code == "future_performance":
         options = _option_labels(response_intent)
@@ -193,10 +220,13 @@ def _unsupported_recovery_fallback(
                 "Choose daily or 1-hour bars."
             )
         return "That bar size is not supported. Choose daily or 1-hour bars."
+    if reason_code == "unsupported_starting_capital":
+        return _starting_capital_bounds_fallback(
+            bounds=_unsupported_numeric_bounds(response_intent),
+        )
     options = _option_labels(response_intent)
     if not options:
         return None
-    raw_value = _unsupported_raw_value(response_intent)
     symbol = _primary_symbol(strategy)
     joined_options = _join_options(options)
     symbol_suffix = f" for {symbol}" if symbol else ""
@@ -212,9 +242,8 @@ def _unsupported_recovery_fallback(
             f"What rule should I test{symbol_suffix}? "
             f"Which supported direction should I use: {joined_options}?"
         )
-    subject = raw_value or "that rule"
     return (
-        f"Argus can't run {subject} directly yet{symbol_suffix}. "
+        f"Argus can't run that rule directly yet{symbol_suffix}. "
         f"Which supported direction should I use: {joined_options}?"
     )
 
@@ -288,6 +317,69 @@ def _unsupported_raw_value(response_intent: dict[str, Any]) -> str | None:
         if value and not _looks_like_internal_code(value):
             return value
     return None
+
+
+def _unsupported_numeric_bounds(response_intent: dict[str, Any]) -> dict[str, float]:
+    facts = response_intent.get("facts")
+    if not isinstance(facts, dict):
+        return {}
+    constraints = facts.get("unsupported_constraints")
+    if not isinstance(constraints, list):
+        return {}
+    for constraint in constraints:
+        if not isinstance(constraint, dict):
+            continue
+        if constraint.get("category") != "unsupported_starting_capital":
+            continue
+        return validated_starting_capital_bounds(constraint)
+    return {}
+
+
+def validated_starting_capital_bounds(
+    constraint: dict[str, Any],
+) -> dict[str, float]:
+    minimum = _finite_number(constraint.get("minimum"))
+    if minimum is None:
+        return {}
+    if "maximum" not in constraint:
+        return {"minimum": minimum}
+    maximum = _finite_number(constraint.get("maximum"))
+    if maximum is None or minimum > maximum:
+        return {}
+    return {"minimum": minimum, "maximum": maximum}
+
+
+def _finite_number(value: Any) -> float | None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    numeric_value = float(value)
+    return numeric_value if isfinite(numeric_value) else None
+
+
+def _starting_capital_bounds_fallback(
+    *,
+    bounds: dict[str, float],
+) -> str:
+    minimum = bounds.get("minimum")
+    maximum = bounds.get("maximum")
+    if minimum is not None and maximum is not None:
+        minimum_text = _usd_amount(minimum)
+        maximum_text = _usd_amount(maximum)
+        return (
+            f"Starting capital must be between {minimum_text} and {maximum_text}. "
+            "What amount in that range should I use?"
+        )
+    if minimum is not None:
+        minimum_text = _usd_amount(minimum)
+        return (
+            f"Starting capital must be at least {minimum_text}. "
+            "What amount should I use?"
+        )
+    return "What starting capital amount should I use?"
+
+
+def _usd_amount(value: float) -> str:
+    return f"${value:,.0f}"
 
 
 def _unsupported_reason_code(response_intent: dict[str, Any]) -> str:

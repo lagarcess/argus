@@ -228,6 +228,91 @@ def test_discovery_shaped_turn_runs_the_find_operation_with_the_typed_request(
     assert research["follow_up"]["open_thread"]["category"] == "cybersecurity stocks"
 
 
+def test_screening_classification_keeps_a_typed_discovery_turn_on_the_find_op(
+    monkeypatch,
+) -> None:
+    """Issue #344: 'find me stocks that recently IPO'ed' states a condition,
+    so the classifier reads screening; the turn is still an ask for candidate
+    assets and must keep the discovery surface, not become a narrative."""
+    _classify(
+        monkeypatch,
+        question_kind="screening",
+        symbols=[],
+        screening_criteria=["recently IPO'ed"],
+    )
+    provider = _FakeSearchProvider(_search_packet())
+    _wire_find(monkeypatch, provider=provider)
+
+    result = asyncio.run(
+        ra.discovery_turn_stage_result(
+            interpretation=_interpretation(),
+            decision=_decision(
+                relationship="category",
+                category_description="stocks that recently IPO'ed",
+            ),
+            state=_state("find me stocks that have recently IPO'ed"),
+            user=USER,
+        )
+    )
+    assert result is not None
+    assert provider.calls, "the find operation must run the search"
+    assert result.stage_patch["discovery"]["candidates"]
+    patch = result.patch
+    assert patch["semantic_turn_act"] == "asset_discovery"
+    assert patch["asset_discovery"] is not None
+
+
+def test_diverted_discovery_turn_keeps_its_typed_identity(monkeypatch) -> None:
+    """A legitimate diversion (named comparison) may serve grounded research,
+    but the patch keeps the typed act and payload instead of relabeling the
+    turn educational_question (#344 macro class)."""
+    _classify(
+        monkeypatch,
+        question_kind="cross_company",
+        symbols=["NFLX", "AAPL"],
+    )
+    result = asyncio.run(
+        ra.discovery_turn_stage_result(
+            interpretation=_interpretation(),
+            decision=_decision(anchor_symbols=["NFLX"]),
+            state=_state("Compare Netflix against Apple"),
+            user=USER,
+        )
+    )
+    assert result is not None
+    assert "research_job_request" in result.stage_patch
+    patch = result.patch
+    assert patch["semantic_turn_act"] == "asset_discovery"
+    assert patch["asset_discovery"] is not None
+    assert any(
+        code.startswith("research_answer_") for code in patch["reason_codes"]
+    ), patch["reason_codes"]
+
+
+def test_filled_payload_enters_the_rail_with_a_non_discovery_act(monkeypatch) -> None:
+    """Issue #344: the typed payload is the rail's discovery gate; an
+    educational act label on the same turn does not lose it."""
+    _classify(monkeypatch, question_kind="find_assets", symbols=[])
+    provider = _FakeSearchProvider(_search_packet())
+    _wire_find(monkeypatch, provider=provider)
+
+    decision = _decision(
+        relationship="category",
+        category_description="cybersecurity stocks",
+    ).model_copy(update={"semantic_turn_act": "educational_question"})
+    result = asyncio.run(
+        ra.discovery_turn_stage_result(
+            interpretation=_interpretation(),
+            decision=decision,
+            state=_state("Find me cybersecurity stocks"),
+            user=USER,
+        )
+    )
+    assert result is not None
+    assert provider.calls, "the find operation must run the search"
+    assert result.stage_patch["discovery"]["candidates"]
+
+
 def test_classifier_failure_never_loses_a_discovery_turn(monkeypatch) -> None:
     async def broken(**_kwargs: Any):
         return None

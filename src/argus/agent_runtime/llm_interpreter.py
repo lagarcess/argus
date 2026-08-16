@@ -22,6 +22,10 @@ from argus.agent_runtime.discovery.prompt_guidance import DISCOVERY_ACT_GUIDANCE
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     discovery_response_ready_for_runtime,
     preserve_typed_discovery_act,
+    response_without_unroutable_discovery_payload,
+)
+from argus.agent_runtime.interpreter.discovery_focused_read import (
+    focused_discovery_payload_response,
 )
 from argus.agent_runtime.interpreter.benchmark_prompt_guidance import (
     BENCHMARK_LANGUAGE_GUIDANCE,
@@ -48,8 +52,8 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (  # noqa: 
     _response_from_artifact_assumption_edit_plan,
     asset_edit_symbol_resolver as _asset_edit_symbol_resolver,
     materialized_artifact_edit_targets,
-    stated_cost_edit_operations,
 )
+from argus.agent_runtime.interpreter.edit_completion import stated_edit_operations
 from argus.agent_runtime.interpreter.asset_grounding import (  # noqa: F401
     _artifact_target_from_response,
     _comparison_baseline_has_trusted_provenance,
@@ -116,6 +120,7 @@ from argus.agent_runtime.interpreter.dca_audits import (  # noqa: F401
     _dca_draft_has_recurring_amount,
     _dca_total_budget_source,
     _move_dca_total_budget_out_of_recurring_amount,
+    total_budget_audited_response,
     _response_from_dca_contract_audit,
     _response_needs_dca_contribution_role_audit,
     _response_needs_strategy_family_continuity_audit,
@@ -189,6 +194,7 @@ from argus.agent_runtime.interpreter import (
 from argus.agent_runtime.interpreter.readiness_helpers import (  # noqa: F401
     _active_artifact_asset_universe_operation_needs_planner,
     _asset_universe_operation_clarification_response,
+    _bare_asset_answer_without_unevidenced_operation,
     _log_runtime_readiness_step,
     _plain_requested_asset_answer_can_use_provider_resolution,
 )
@@ -456,6 +462,10 @@ class OpenRouterStructuredInterpreter:
             request,
             asset_resolution_context=asset_resolution_context,
         )
+        # The last raw interpretation still names what the user asked to
+        # change; the terminal edit-planner fallback needs it so a plan that
+        # covers only part of the request cannot be accepted (issue #498).
+        last_raw_response: LLMInterpretationResponse | None = None
         if self.model_name is None:
             candidate_models = candidate_models or []
             for index, candidate_model in enumerate(candidate_models):
@@ -469,6 +479,7 @@ class OpenRouterStructuredInterpreter:
                     )
                     if not isinstance(response, LLMInterpretationResponse):
                         continue
+                    last_raw_response = response
                     response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=candidate_model,
@@ -495,6 +506,11 @@ class OpenRouterStructuredInterpreter:
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
                 require_failure_edit_evidence=True,
+                primary_draft=(
+                    last_raw_response.candidate_strategy_draft
+                    if last_raw_response is not None
+                    else None
+                ),
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
@@ -529,6 +545,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    last_raw_response = response
                     record_openrouter_route_receipt(
                         task="interpretation",
                         model_name=self.model_name,
@@ -592,6 +609,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    last_raw_response = response
                     record_openrouter_route_receipt(
                         task="interpretation",
                         model_name=fallback_model_name,
@@ -630,6 +648,11 @@ class OpenRouterStructuredInterpreter:
             request=request,
             preferred_model=fallback_model_name or primary_model_name,
             require_failure_edit_evidence=True,
+            primary_draft=(
+                last_raw_response.candidate_strategy_draft
+                if last_raw_response is not None
+                else None
+            ),
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
@@ -909,15 +932,20 @@ class OpenRouterStructuredInterpreter:
             "user provides exact dates. For recurring buys, extract cadence as daily, weekly, "
             "biweekly, monthly, or quarterly and never invent capital_amount. For DCA, "
             "capital_amount means "
-            "the recurring contribution. If the user gives both a starting principal or total "
-            "budget and a recurring contribution, put the recurring amount in capital_amount "
-            "and put the starting principal in initial_capital or total_capital. If the user "
-            "gives only a total budget, leave capital_amount null and set initial_capital or "
-            "total_capital. When you set a recurring capital_amount, set "
+            "the recurring contribution, and the two other money roles have one field "
+            "each. Money the user puts in at the start goes in initial_capital. "
+            "Money that caps the whole plan, a total budget, an available-cash "
+            "ceiling, or a maximum invested, goes in total_capital. These are "
+            "different facts with different outcomes, so never put one in the "
+            "other's field: a starting amount is executed, a cap is not. If the "
+            "user gives a starting amount and a recurring contribution, set "
+            "capital_amount and initial_capital. If the user gives only a total "
+            "budget, leave capital_amount null and set total_capital. When you set "
+            "a recurring capital_amount, set "
             "field_provenance.capital_amount='recurring_contribution' only if the user "
             "explicitly stated that recurring contribution in the message; use "
-            "'total_capital' when the number is merely a total budget, available cash, or "
-            "starting principal. When you set cadence, set "
+            "'starting_capital' when the number is money put in at the start and "
+            "'total_capital' when it is a budget or cap. When you set cadence, set "
             "field_provenance.cadence='explicit_user' only when the user explicitly "
             "stated the purchase schedule in the current message or visible active "
             "draft context. Never infer monthly from a multi-year date range.\n\n"
@@ -1203,6 +1231,10 @@ def _suspicious_extracted_asset_symbols(
         if symbol in raw_tokens or f"${symbol}" in raw_tokens or folded in cashtag_tokens:
             continue
         if symbol in grounded_symbols or symbol in context_symbols:
+            continue
+        if provider_context_assets.preflight_record_supports_symbol(
+            response.candidate_strategy_draft, symbol
+        ):
             continue
         if _provider_exact_ticker_supports_extracted_symbol(
             symbol,
@@ -2118,30 +2150,7 @@ async def _dca_contribution_role_audited_response(
                 ),
             }
         )
-    if not audit.total_budget_not_recurring:
-        return response
-    draft = response.candidate_strategy_draft.model_copy(deep=True)
-    _move_dca_total_budget_out_of_recurring_amount(draft)
-    missing_required_fields = list(
-        dict.fromkeys([*response.missing_required_fields, "capital_amount"])
-    )
-    return response.model_copy(
-        update={
-            "intent": "strategy_drafting",
-            "requires_clarification": True,
-            "candidate_strategy_draft": draft,
-            "missing_required_fields": missing_required_fields,
-            "assistant_response": None,
-            "reason_codes": list(
-                dict.fromkeys(
-                    [
-                        *response.reason_codes,
-                        "dca_total_budget_role_audited",
-                    ]
-                )
-            ),
-        }
-    )
+    return total_budget_audited_response(response=response, audit=audit)
 
 
 async def _pending_response_option_selected_response(
@@ -2205,8 +2214,20 @@ async def _response_ready_for_runtime(
         asset_resolution_context=asset_resolution_context,
         normalize=_normalize_response_for_runtime_context,
     )
+    if discovery_response is None:
+        recovered = await focused_discovery_payload_response(
+            response=response, request=request
+        )
+        if recovered is not None:
+            discovery_response = discovery_response_ready_for_runtime(
+                response=recovered,
+                request=request,
+                asset_resolution_context=asset_resolution_context,
+                normalize=_normalize_response_for_runtime_context,
+            )
     if discovery_response is not None:
         return discovery_response
+    response = response_without_unroutable_discovery_payload(response)
     return await _audited_response_ready_for_runtime(
         response=response,
         preferred_model=preferred_model,
@@ -2224,6 +2245,11 @@ async def _audited_response_ready_for_runtime(
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(
         response, request=request, asset_resolution_context=asset_resolution_context
+    )
+    response = _bare_asset_answer_without_unevidenced_operation(
+        response=response,
+        request=request,
+        resolve_asset_candidate=_resolve_asset_candidate,
     )
     _log_runtime_readiness_step("started", response=response)
     planned_artifact_edit = await _ready_active_artifact_edit_planned_response(
@@ -3181,10 +3207,22 @@ async def _repair_incomplete_strategy_extraction(
             continue
         if not _focused_strategy_extraction_has_material_fields(extraction):
             continue
+        base_response = failed_response
+        if _request_has_active_strategy_context(
+            request
+        ) and _selected_requested_field_base(request):
+            pending_draft = _pending_strategy_draft_from_request_or_response(
+                response=failed_response,
+                request=request,
+            )
+            if pending_draft is not None:
+                base_response = failed_response.model_copy(
+                    update={"candidate_strategy_draft": pending_draft}
+                )
         response = _response_from_focused_strategy_extraction(
             extraction=extraction,
             request=request,
-            base_response=failed_response,
+            base_response=base_response,
         )
         response = _normalize_response_for_runtime_context(
             response,
@@ -3456,7 +3494,7 @@ async def _plan_pending_artifact_assumption_edit(
         language=request.user.language_preference,
         required_targets=_required_edit_targets_from_primary_draft(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
         materialized_targets_for_plan=lambda candidate: materialized_artifact_edit_targets(candidate, request=request, asset_symbol_resolver=resolver, resolve_asset_candidate=_resolve_asset_candidate, primary_draft=primary_draft),
-        stated_cost_operations=stated_cost_edit_operations(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
+        stated_operations=stated_edit_operations(primary_draft, current_strategy=_current_artifact_strategy(request), request=request),
     )
     # fmt: on
     if plan is None:
@@ -4804,6 +4842,15 @@ def _structured_interpretation_has_required_shape(
         and not _llm_strategy_draft_has_extractable_fields(
             response.candidate_strategy_draft
         )
+    ):
+        return False
+    if (
+        response.intent == "unsupported_or_out_of_scope"
+        and response.semantic_turn_act == "unsupported_request"
+        and _request_has_active_strategy_context(request)
+        and _selected_requested_field_base(request)
+        and _request_current_turn_has_material_execution_evidence(request)
+        and not response.unsupported_constraints
     ):
         return False
     if (

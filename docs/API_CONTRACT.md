@@ -1413,6 +1413,7 @@ Metrics are grouped into categories.
 ## Performance Metrics
 ```json
 {
+  "return_basis": "fixed_capital",
   "total_return_pct": 18.4,
   "benchmark_return_pct": 12.1,
   "delta_vs_benchmark_pct": 6.3,
@@ -1446,6 +1447,98 @@ Metrics are grouped into categories.
   "average_holding_period_days": 6.2
 }
 ```
+
+`win_rate` and `profit_factor` are nullable closed-trade metrics. A completed
+trade is one canonical long-only position with an executed open fill and an
+executed close fill. Open positions do not enter either metric. `win_rate` is
+winning completed trades divided by all completed trades, so a breakeven trade
+is closed but is not a win. `profit_factor` is gross positive realized P&L
+divided by absolute gross negative realized P&L after modeled fees and
+slippage. It is `null` when there are no completed trades or no losing trade,
+and it is `0.0` when completed trades lose money without any winning trade.
+`total_trades` retains its existing executed-fill meaning; it is not a count of
+completed positions. If a close and a new open share one timestamp, the
+canonical ledger applies the close before the open. The same ordered fills own
+both portfolio equity and closed-trade P&L.
+
+For example, an open buy-and-hold position persists:
+
+```json
+{
+  "win_rate": null,
+  "total_trades": 1,
+  "profit_factor": null
+}
+```
+
+Annual return uses the elapsed calendar time between the first and last
+effective market-data timestamps, with 365.2425 calendar days per year.
+Irregular gaps therefore remain elapsed time instead of being compressed into
+adjacent observations. `annualized_return_pct` is `null` when a valid, extreme
+short-window return cannot be represented as a finite annual rate. Volatility
+and Sharpe use one asset-aware observation
+frequency owned by the market-data coverage boundary: crypto uses continuous
+24/7 time, currency pairs use the current provider's continuous calendar, and
+equities use 252 sessions plus the real session durations supplied by the same
+market calendar, including early closes and provider-emitted partial final
+candles. Daily equity uses 252 observations per year.
+
+### Return basis
+
+Every performance block declares how its returns relate to capital under
+`return_basis`:
+
+- `"fixed_capital"`: one bankroll invested at the start. `total_return_pct`
+  is the time return on that starting capital.
+- `"contributions"`: a recurring plan (`dca_accumulation`) funded by dated
+  deposits. `total_return_pct` is a simple money-on-money ratio, ending
+  nominal equity divided by total contributed cash minus one, in percent.
+  Deposit dates and exposure time are deliberately not part of this number.
+
+The two bases are different economic quantities and must never share a
+comparison column: a surface that compares runs across templates must
+partition by `return_basis` (or by the result-card row key below) before
+placing values side by side. `benchmark_return_pct` and
+`delta_vs_benchmark_pct` always use the run's own basis; a contributions-basis
+benchmark receives the identical dated deposit stream, amounts, and modeled
+cost rates as the strategy, which is what keeps the delta valid within one
+run. Stored runs persisted before this field exists carry no `return_basis`;
+readers must treat a missing value on a `dca_accumulation` run as
+`"contributions"` and as `"fixed_capital"` otherwise.
+
+The result card states the basis in its row contract: a fixed-capital run's
+return row uses key `total_return_pct` and the "Total return" label, while a
+contributions run's return row uses key `contribution_return_pct` and the
+"Return on contributions" / "Retorno sobre aportes" label. Exactly one of the
+two rows exists per card, so a consumer keyed on either row cannot silently
+receive the other basis. Public excerpts freeze the same row keys.
+
+### Contributions-basis annual return and risk
+
+For `return_basis: "contributions"`, `annualized_return_pct` is the
+money-weighted annual rate (a dated-cash-flow IRR): the single rate `r`
+solving `sum(deposit_i * (1 + r) ** years_i) = ending nominal equity`, where
+`years_i` is the elapsed calendar time from each deposit's bar timestamp to
+the final bar timestamp at 365.2425 days per year. Deposits land on their
+entry bars; the day-one seed is a deposit on the first bar. The deposit
+stream followed by one terminal value has a single sign change, so the rate
+is unique when it exists. When no rate above -100% can reproduce the ending
+value the limit `-100.0` is reported, and a rate too large to carry meaning
+is `null`; consumers must hide a `null` annual rate, never substitute zero.
+For a single-deposit run this formula reduces exactly to the fixed-capital
+elapsed-time annualization above.
+
+Contributions-basis risk and efficiency statistics measure investment
+performance, never deposits. Period returns subtract each bar's external
+deposit before the ratio (`(equity[t] - deposit[t]) / equity[t-1] - 1`), and
+`max_drawdown_pct` reads the wealth index compounded from those
+flow-adjusted returns rather than the nominal equity curve. `volatility_pct`
+and `sharpe_ratio` consume the same flow-adjusted series. Nominal equity
+still owns `profit`, ending value, `portfolio_value_range`, and the chart:
+nominal dollars and performance returns are different series, and a deposit
+step in the chart is correct cash while a deposit-driven return would be a
+lie. `win_rate` and `profit_factor` are `null` for contributions runs
+because an accumulation plan never closes a position.
 
 ## Benchmark Defaults
 - **equity** -> `SPY`
@@ -1516,14 +1609,77 @@ The canonical backtest config used by the engine for execution and reproducibili
 - > [!NOTE]
   > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
 
-### DCA / Recurring-Buy Amount Semantics
-- **Current executable amount:** one recurring contribution amount.
-- **Supported cadences:** `daily`, `weekly`, `biweekly`, `monthly`, `quarterly`.
-- **Stored field:** `StrategySummary.capital_amount` continues to mean the recurring contribution for DCA / recurring-buy drafts.
-- **Not currently executable in DCA:** separate starting principal, total capital budget, contribution ceiling, or maximum invested cap.
-- If the user supplies both a recurring contribution and a starting/total capital amount, Argus must preserve the distinction conversationally, but must not show `Ready to run` as if both amounts will execute in the DCA engine.
-- The supported recovery path is to ask whether the user wants to run the recurring-buy simulation only, adjust the recurring contribution, or switch to a supported buy-and-hold style test using starting capital.
-- Deferred(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording. This is broader unsupported DCA engine capability work and is outside the Spanish canary/chart attribution fix.
+### DCA / Recurring-Buy Capital Semantics
+
+A recurring plan has exactly two money roles and they are peers, never each
+other's default. Both are declared together in one `DcaCapitalPlan`
+(`argus.domain.dca_capital`), and every layer that shows, edits, validates, or
+executes a plan reads that owner rather than deciding for itself.
+
+- **`starting_capital`** — the seed, invested on day one at the fill price
+  after modeled costs. **Default `0`**, because the common question ("what if I
+  had bought $200 of Coca-Cola every month") has no lump sum in it.
+- **`recurring_contribution`** — invested every period.
+- **`cadence`** — the contribution period: `daily`, `weekly`, `biweekly`,
+  `monthly`, `quarterly`. Wire and storage keep the name `cadence`; no user-facing
+  surface names the period as a standalone parameter (see the copy rule below).
+
+**Neither role may stand in for the other.** A DCA engine config carries the
+plan under `dca_capital` and carries **no** top-level `starting_capital`,
+`recurring_contribution`, or `starting_principal`, so a reader that reaches for
+the wrong role raises rather than silently reading the other one. Configs
+written before this shape existed are migrated at one named site: their
+`starting_capital` was the contribution and their seed was `0`.
+
+- `LaunchBacktestRequest` carries `starting_capital` and
+  `recurring_contribution` as named fields for DCA and refuses both for any
+  other strategy type. `capital_amount` remains the older spelling of the
+  contribution for stored cards; when both are present they must state the same
+  number (`dca_capital_role_conflict` otherwise), so neither spelling can
+  quietly override the other.
+- `StrategySummary.capital_amount` continues to mean the recurring contribution
+  for DCA drafts. The seed rides `optional_parameters.initial_capital` and only
+  counts when the user actually stated it, so the shared bankroll default never
+  becomes a seed.
+
+**The bankroll floor does not apply to a recurring plan.** `MIN_STARTING_CAPITAL`
+answers "is this a fundable one-time position", which a plan seeded at `$0` is
+not. A plan is refused by its own rule instead:
+
+| Condition | Refusal code |
+| :--- | :--- |
+| Both roles `0` | `dca_requires_starting_capital_or_contribution` |
+| Contribution `0` beside a seed | `dca_contribution_zero_is_buy_and_hold` |
+| Either role negative or above `MAX_STARTING_CAPITAL` | `invalid_starting_capital` / `invalid_recurring_contribution` |
+| Period that cannot fit the window once | `contribution_period_exceeds_window` |
+| Unsupported period value | `unsupported_dca_cadence` |
+
+**The period must fit the window at least once.** A three week window does not
+offer monthly. The card advertises the fitting set in
+`capabilities.edit_constraints.contribution.periods`, so the picker can never
+present a pair the engine would refuse, and narrowing the window narrows the
+choices. A typed or natural-language request for a period that cannot fit
+refuses immediately, naming the rule, with no round trip.
+
+**Fractional shares.** Every contribution is fully invested on its contribution
+date at the fill price after modeled costs. No cash accumulates waiting for a
+whole share and there is no cash drag, so total contributed is the plain sum of
+the two roles with no residual. The assumptions strip and the public receipt
+both disclose it (`fractional_shares`), as fine print rather than a sentence.
+
+**Non-trading days.** A contribution buys at the first available price in its
+period, so one falling on a weekend, a holiday, or a day the month does not
+have buys on the next trading day.
+
+**Still not executable in DCA:** a plan-wide budget, a contribution ceiling, or
+a maximum invested cap, because each would have to stop contributions partway
+through the window (`unsupported_dca_contribution_ceiling`). Starting principal
+is no longer among them.
+
+**Copy rule (user-facing):** the contribution renders as one phrase, `$200
+monthly` / `$200 cada mes`, with the period an inline choice on that field
+rather than a separately labeled parameter. No surface in any language labels
+the period on its own.
 
 ### Symbol Constraints
 - **Minimum:** 1 symbol
@@ -1564,10 +1720,16 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - email + password
 
 **Private-alpha access:**
-- Private-alpha signup and login are gated by the server-side Supabase `private_alpha_allowlist` table.
-- `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
-- `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
-- Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` is the one gate over permanent
+  signup, login, and authenticated requests, and it has been open in production
+  since 2026-08-12. Public registration is therefore open: the server-side
+  Supabase `private_alpha_allowlist` table admits any email and denies only a
+  row whose `disabled_at` is set. When that flag is off instead, the same table
+  becomes an admission list: only an email whose active row carries `admin`,
+  `developer`, or `user` may enter, so a `requested` row does not admit it.
+- `POST /auth/signup` must apply that gate before calling Supabase Auth signup, so denied emails do not create auth users or profiles.
+- `POST /auth/login` must also apply it before creating a browser session, so denied emails cannot enter the app.
+- Authenticated API requests must also reject users the gate denies, so an existing session cannot keep using access the gate would no longer grant.
 - `POST /api/v1/auth/access-requests` is public and sessionless. It accepts
   `{"email":"person@example.com","language":"en"}` where `language` is exactly
   `en` or `es-419`. Every syntactically valid new, duplicate, approved,
@@ -1580,7 +1742,9 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - An access request may insert only a missing `requested` row with normalized
   email and the requested language. It must never overwrite an existing
   requested, approved, privileged, or disabled row. `requested` and unknown
-  roles do not grant permanent access.
+  roles grant no role elevation. While public registration is open they also
+  withhold nothing, because admission needs only the absence of a disabled row;
+  when the public gate is closed instead, neither role admits the email.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
   method and path. For a new approval, it loads the requested language only to
@@ -1707,7 +1871,10 @@ Guest access is additive and server-authoritative.
 `ARGUS_GUEST_ACCESS_ENABLED` defaults to `true`; explicit `false` is the
 emergency bootstrap kill switch. `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also
 defaults to `true` and controls presentation only. The independent
-`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` policy remains false by default.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` policy has been open in production
+since 2026-08-12, so guests may create permanent accounts. That policy is the
+one flag here that fails closed when unset, so an environment omitting it denies
+permanent accounts rather than allowing them.
 
 - `POST /api/v1/auth/guest` creates or reuses one verified Supabase anonymous
   session. Origin, feature flag, bounded CAPTCHA input, and IP throttling are
@@ -1721,24 +1888,51 @@ defaults to `true` and controls presentation only. The independent
   `renewed_after_expiry=true`; the expired workspace is never revived.
   Disabling the flag stops new anonymous identities while already-verified
   guests remain usable until conversion, fixed expiry, or cleanup.
-- `POST /api/v1/auth/guest/link` uses the provider-supported authenticated-user
-  update to add verified email/password credentials to the current anonymous
-  identity. The browser supplies its current rotated session refresh token;
-  the original bootstrap cookie is only a backward-compatible fallback. The
-  route preserves the Auth UUID and uses `permanent_account_access_allowed` as
-  its sole permanent-account gate: when public account access is disabled,
-  only active allowlisted roles may link; when enabled, any email not explicitly
-  disabled may link.
+- `POST /api/v1/auth/guest/signup` creates a new permanent Supabase Auth user
+  through ordinary password signup. It never adds email/password credentials to
+  the anonymous Auth user. It requires a fresh CAPTCHA token, a prepared
+  `new_account_signup` handoff cookie, and
+  `permanent_account_access_allowed` as its permanent-account gate. When public
+  account access is disabled, only active allowlisted roles may register; when
+  enabled, any email not explicitly disabled may register.
+- The guest projection returned by `GET /api/v1/me` includes the active
+  workspace `conversation_id` alongside its expiry and allowances. The client
+  uses this server-owned id as the handoff source if conversation hydration has
+  not yet selected the route locally.
+- Before provider signup, the client calls `POST /api/v1/auth/guest/handoffs`
+  with `handoff_kind=new_account_signup`, the source conversation, and optional
+  typed pending action. That response first sets the HttpOnly claim cookies for
+  a handoff whose expiry equals the fixed guest workspace expiry. The signup
+  route validates that prepared handoff. A server-only proof in signup metadata
+  lets a database trigger bind the newly inserted Auth UUID to the handoff
+  atomically and remove the proof in the same transaction. If email
+  confirmation is required, the guest workspace remains active until first
+  verified login claims it. If signup returns a session immediately, the route
+  claims it before returning.
+- Retrying the same unconfirmed guest signup resends the signup confirmation
+  without changing the password or creating another Auth user. If the same
+  bound Auth user is already confirmed but its claim was interrupted, Argus
+  verifies the submitted password and resumes that exact handoff. This includes
+  replaying the committed claim when its response was lost; the claimed source
+  session is accepted only on this retry route and only the same bound
+  destination can receive the replay. An email owned by any other permanent
+  identity returns `409 account_exists_use_login` before provider mutation;
+  transfer to an existing account still requires login.
 - `POST /api/v1/auth/guest/handoffs` binds one active guest workspace,
   normalized destination-email hash, source conversation, and optional typed
-  pending action to a ten-minute handoff without resolving whether that account
-  exists. The response exposes only the handoff id and expiry; the id and opaque
-  secret used for reconciliation exist in Secure/SameSite/HttpOnly cookies.
+  pending action without resolving whether that account exists. Its optional
+  `handoff_kind` defaults to `existing_account`, which expires in ten minutes;
+  `new_account_signup` expires with the fixed guest workspace. The response
+  exposes only the handoff id and expiry; the id and opaque secret used for
+  reconciliation exist in Secure/SameSite/HttpOnly cookies before any signup
+  provider mutation.
 - `POST /api/v1/auth/login` consumes a cookie-bound handoff before returning
   the permanent session. Its optional `guest_claim` contains the original
   conversation id and verified typed pending action. Retrying the same login
   after an ambiguous response returns the same claim result without repeating
-  transfer; the explicit claim endpoint remains strict single-use.
+  transfer. If an ordinary signup committed before its profile write, this
+  login creates the missing permanent profile before claim. The explicit claim
+  endpoint remains strict single-use.
 - `POST /api/v1/auth/guest/handoffs/{handoff_id}/claim` verifies that cookie and
   the signed-in destination, then atomically transfers the complete mutable
   product graph. It is single-use and returns the original conversation id plus
@@ -1775,15 +1969,18 @@ expiry. The existing message settlement and backtest admission transactions
 own completed-turn and unique-simulation charges; feedback insert and charge
 are one transaction. Replays, failures, and interruptions add no unit.
 
-New-account linking preserves the owner UUID. An existing-account claim must
-move the complete conversation-owned product graph atomically.
+New-account signup creates a different Auth UUID. Both new-account signup and
+existing-account login use the same claim transaction to move the complete
+conversation-owned product graph atomically. The anonymous source remains the
+owner until that claim commits.
 `cost_ledger_entries`, security evidence, and route evidence are deliberately
 excluded from owner rewriting: they retain anonymous attribution or become
 null through their existing foreign-key behavior.
 
-While `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`, permanent signup and login
-remain allowlist-gated. When separately enabled, unlisted ordinary accounts may
-authenticate without role elevation; explicitly disabled rows remain blocked.
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` has been live in production since
+2026-08-12, so unlisted ordinary accounts may authenticate without role
+elevation while explicitly disabled rows stay blocked. When that flag is off
+instead, permanent signup and login admit active allowlist roles only.
 Before that flag may be enabled, founder-approved production-parity evidence
 must prove that every enabled permanent Auth provider supplies a verified email
 compatible with profile and allowlist-role rules. Phone, OAuth, or other
@@ -1836,9 +2033,10 @@ the existing localized check-your-email state and must not redirect to chat.
 
 **Private-alpha blocked response:** signup intentionally returns the same
 generic `400 auth_signup_failed` shape used for provider signup failures, while
-still checking the allowlist before calling Supabase Auth signup. Public signup
-attempts must not distinguish unlisted/disabled private-alpha emails from
-listed emails that fail provider signup.
+still checking the allowlist before calling Supabase Auth signup. A caller must
+not be able to tell a denied email from a listed email that failed provider
+signup. Denial means an explicitly disabled row while the public gate is open,
+and an unlisted email as well when it is closed.
 
 When an optional username is supplied, the server trims and case-folds it and
 serializes same-email and same-username signup attempts before checking profile
@@ -1860,6 +2058,80 @@ empty identity list never creates a profile.
   "request_id": "uuid"
 }
 ```
+
+## `POST /auth/guest/signup`
+
+Create a permanent account from an active guest workspace and preserve the
+workspace through the existing handoff transaction.
+
+**Request:**
+```json
+{
+  "email": "user@email.com",
+  "password": "string",
+  "captcha_token": "bounded-turnstile-token",
+  "display_name": "Alex",
+  "username": "alex",
+  "language": "es-419"
+}
+```
+
+The authenticated caller must be the active anonymous owner recorded by a
+prepared `new_account_signup` handoff. Its HttpOnly cookies must match the
+request's normalized email. The handoff preparation request owns
+`source_conversation_id` and the optional typed `pending_action`. CAPTCHA,
+language, username, and permanent-account access rules match ordinary signup.
+
+**Confirmation-required response:**
+```json
+{
+  "user": {},
+  "session": null
+}
+```
+
+The already prepared Secure/SameSite/HttpOnly handoff cookies remain valid
+through the guest workspace expiry. The response does not replace the active
+guest session. The client shows the localized check-your-email state and must
+not refresh registered-account surfaces until confirmation and login complete
+the claim.
+
+**Immediate-session response:**
+```json
+{
+  "user": {},
+  "session": {},
+  "guest_claim": {
+    "conversation_id": "uuid",
+    "pending_action": null
+  }
+}
+```
+
+The claim commits before the permanent session is returned. A retry that maps
+to the same already-bound unconfirmed Auth user resends the signup confirmation
+and returns the confirmation-required shape without calling signup again. If
+that same bound user is already confirmed but the claim was interrupted, the
+route verifies the submitted password through normal login and finishes the
+claim. A different Auth UUID or an invalid password never receives the guest
+workspace.
+
+An email bound to any other Auth user returns the existing explicit guest
+conversion response:
+
+```json
+{
+  "type": "https://api.argus.app/problems/account-exists-use-login",
+  "title": "Account Already Exists",
+  "status": 409,
+  "detail": "This email already has an Argus account. Sign in instead; your conversation comes with you.",
+  "code": "account_exists_use_login",
+  "request_id": "uuid"
+}
+```
+
+This route replaces `POST /api/v1/auth/guest/link`. No active guest registration
+path calls the authenticated Supabase user-update endpoint.
 
 ## `POST /auth/login`
 
@@ -1887,9 +2159,10 @@ Supabase Auth without logging or persistence.
 ```
 
 **Private-alpha blocked response:** login intentionally returns the same generic
-`401 unauthorized` shape used for invalid credentials, so public login attempts
-cannot distinguish unlisted/disabled private-alpha emails from listed emails
-with wrong passwords.
+`401 unauthorized` shape used for invalid credentials, so a caller cannot tell a
+denied email from a listed email with a wrong password. Denial means an
+explicitly disabled row while the public gate is open, and an unlisted email as
+well when it is closed.
 
 ```json
 {
@@ -2494,8 +2767,8 @@ stores nothing and makes no LLM, provider, or market-data call.
 - Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
 - Confirmation eligibility requires semantic conservation: explicit date, asset, cadence, and money-role constraints from the user must survive interpretation, normalization, and default application.
 - Defaults fill absent fields only. They do not override explicit user constraints.
-- For DCA/recurring-buy drafts, `capital_amount` means the recurring contribution. Starting or total capital may be understood as user intent, but current DCA execution does not support it as a separate executable input. It must not overwrite the recurring contribution or be silently treated as an investment ceiling.
-- A DCA draft that contains unsupported starting principal / total capital semantics must route to clarification or simplification, not to a confident `Ready to run` card for both amounts.
+- For DCA/recurring-buy drafts, `capital_amount` means the recurring contribution and `optional_parameters.initial_capital` means the starting capital that seeds the plan on day one. Both are executable and both are runnable together; neither may overwrite the other.
+- A plan-wide budget, contribution ceiling, or maximum invested cap is still not executable, because it would have to stop contributions partway through the window. A DCA draft carrying one must route to clarification or simplification rather than a confident `Ready to run` card that silently ignores the cap.
 - `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
 - `show_breakdown` requires canonical result run context. A stale
@@ -2937,8 +3210,7 @@ Example unsupported-recovery clarification payload:
       "strategy": {
         "asset_universe": ["TSLA"],
         "asset_class": "equity"
-      },
-      "raw_value": "ATR 14"
+      }
     },
     "options": [
       {
@@ -2957,6 +3229,43 @@ Example unsupported-recovery clarification payload:
   }
 }
 ```
+
+### Cause-aware unsupported recovery
+
+`unsupported_recovery` is an additive typed projection. Its cause determines
+both the recovery route and the facts available to deterministic fallback copy:
+
+- A surviving `unsupported_strategy_logic` capability constraint may use
+  `unsupported_recovery` with supported simplification options. Only this
+  capability route may say that Argus cannot run a strategy.
+- Incomplete or unparseable extraction is a normal clarification outcome. It
+  asks for the missing executable detail and must not be represented as a
+  strategy-capability refusal.
+- `unsupported_starting_capital` is a launch-validation range outcome, not a
+  strategy-capability refusal. It asks for a starting-capital amount before a
+  confirmation card or acknowledgement is emitted.
+- `capital_amount` remains role-sensitive at launch validation. For DCA it is
+  the recurring contribution, so an invalid DCA contribution routes to the
+  normal sizing clarification and never inherits the one-time bankroll floor.
+
+`raw_value` may remain in runtime records as opaque diagnostic or interpreter
+evidence. It is never a generic display subject and is not included in the
+generic clarifier voice input, `assistant_prompt`, or deterministic fallback
+copy. A generic capability recovery instead speaks about the typed capability
+and its supported options.
+
+For `unsupported_starting_capital`, `payload.minimum` is a typed finite number
+and `payload.maximum` is an optional typed finite number. A finite minimum
+alone is a valid floor projection. When a maximum is present, the projection
+emits both bounds only if both are finite and ordered with `minimum <= maximum`;
+missing minimum, malformed, non-finite, or reversed pairs fail closed by
+omitting the numeric bounds and using the generic starting-capital prompt.
+
+`unsupported_time_granularity` is the dedicated typed exception. Its typed bar
+size may be supplied to the clarifier and displayed in the bar-size recovery,
+because it names the specific timeframe field rather than a generic strategy
+or interpretation value. This exception does not permit other `raw_value`
+fields to become clarifier voice input or display text.
 
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
@@ -3351,7 +3660,11 @@ re-reads the current card and composes cleanly);
 the exact code, including `invalid_starting_capital`, `future_end_date`,
 `invalid_chronological_date_range`, `invalid_date_window`,
 `provider_history_start_unavailable`, `no_common_data_window`,
-`insufficient_common_data`, and `unsupported_cost_value`. Failures persist
+`insufficient_common_data`, `unsupported_cost_value`,
+`invalid_recurring_contribution`,
+`dca_requires_starting_capital_or_contribution`,
+`dca_contribution_zero_is_buy_and_hold`, `contribution_period_exceeds_window`,
+`capital_role_conflict`, and `capital_role_not_applicable`. Failures persist
 nothing.
 
 ### Confirmation card editing surface
@@ -3363,16 +3676,30 @@ nothing.
   behaviour.
 - The card also advertises `capabilities.edit_constraints`, the engine's own
   accepted-value envelope: `capital.min`/`capital.max` (the run-time
-  starting-capital band; `min` is absent on recurring cards because a
-  contribution is exempt from the bankroll floor), `fees.max` and
-  `slippage.max` (decimal rate caps), and `date_window.max_end` plus a
-  per-asset-class `date_window.min_start` provider history floor. The
-  client renders and pre-checks against these values and never restates
-  them; the confirm preflight enforces the same imported constants, so a
-  card whose `validation.status` is `ready_to_run` can never violate
-  run-time validation.
+  starting-capital band), `fees.max` and `slippage.max` (decimal rate caps),
+  and `date_window.max_end` plus a per-asset-class `date_window.min_start`
+  provider history floor. The client renders and pre-checks against these
+  values and never restates them; the confirm preflight enforces the same
+  imported constants, so a card whose `validation.status` is `ready_to_run`
+  can never violate run-time validation.
+- A recurring card advertises its two money roles instead of the shared
+  bankroll band: `starting_capital.min`/`.max` (floor `0`, because `$0` is the
+  seed's default) and `contribution.max` plus `contribution.periods`, the
+  periods that fit this card's own window at least once. Neither `capital.min`
+  nor `contribution.min` appears on a recurring card: the bankroll floor is not
+  the plan's rule, and the contribution's rule is "some money" rather than a
+  number a client could restate.
+- The direct-edit request names the roles it is editing. `capital` is the
+  one-time starting capital of a non-recurring plan; `starting_capital`,
+  `recurring_contribution`, and `contribution_period` belong to a recurring
+  plan. Sending `capital` alongside either plan role is `422
+  capital_role_conflict`; sending a role to a card that does not have it is
+  `422 capital_role_not_applicable`. Nothing is guessed at, so no value can
+  arrive in the wrong role.
 - `display_facts.capital` carries the typed number seeding the capital
-  editor; card rows remain display strings and are never parsed back.
+  editor. A recurring card seeds its editor from `display_facts.starting_capital`,
+  `display_facts.recurring_contribution`, and `display_facts.contribution_period`
+  instead. Card rows remain display strings and are never parsed back.
 - The card carries exactly three actions: `run_backtest` (when ready),
   `adjust_assumptions` (labelled "Change assumptions"), and
   `cancel_confirmation`. The `change_dates` and `change_asset` action types
@@ -4443,7 +4770,7 @@ Not in current contract:
 - advanced quota systems
 - cross-asset strategy runs
 - custom benchmarks (Alpha uses SPY/BTC defaults, or the tested pair for currency pairs)
-- DCA starting principal, total capital budgets, contribution ceilings, and recurring contribution combinations
+- DCA plan-wide budgets, contribution ceilings, and maximum invested caps (starting capital and the recurring contribution are both executable, together)
 
 ---
 

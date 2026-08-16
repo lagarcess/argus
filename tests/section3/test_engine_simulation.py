@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import ast
 import inspect
 import json
+import textwrap
 from datetime import date
 
 import pandas as pd
 import pytest
 from argus.domain import engine
+from argus.domain.backtesting import charts, runner
 from argus.domain.market_data.assets import ResolvedAsset
 
 
@@ -112,11 +115,79 @@ def _patch_market_data(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(engine, "fetch_price_series", fake_fetch_price_series)
 
 
-def test_compute_alpha_metrics_uses_vectorbt_path_not_sha_mock() -> None:
-    source = inspect.getsource(engine.compute_alpha_metrics)
-    assert "sha256" not in source
-    assert "hashlib" not in source
-    assert "Portfolio.from_signals" in source
+def _qualified_ast_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return f"{_qualified_ast_name(node.value)}.{node.attr}"
+    if isinstance(node, ast.Call):
+        return f"{_qualified_ast_name(node.func)}()"
+    return type(node).__name__
+
+
+def _assigned_names(node: ast.Assign | ast.AnnAssign) -> set[str]:
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    return {
+        child.id
+        for target in targets
+        for child in ast.walk(target)
+        if isinstance(child, ast.Name)
+    }
+
+
+def _assignment_producers(function: object, target_name: str) -> list[str]:
+    tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+    return sorted(
+        _qualified_ast_name(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Assign, ast.AnnAssign))
+        and node.value is not None
+        and not (isinstance(node.value, ast.Constant) and node.value.value is None)
+        and target_name in _assigned_names(node)
+    )
+
+
+def _called_functions(function: object) -> list[str]:
+    tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+    return [
+        _qualified_ast_name(node.func)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    ]
+
+
+def test_metric_and_chart_equity_assignments_share_execution_ledger() -> None:
+    wrapper_source = inspect.getsource(engine.compute_alpha_metrics)
+
+    assert "sha256" not in wrapper_source
+    assert "hashlib" not in wrapper_source
+    assert "_runner.compute_alpha_metrics" in wrapper_source
+    assert _assignment_producers(runner.compute_alpha_metrics, "symbol_execution") == [
+        "_execute_long_only_ledger()"
+    ]
+    assert _assignment_producers(
+        runner.compute_alpha_metrics, "gross_symbol_execution"
+    ) == ["_execute_long_only_ledger()"]
+    assert _assignment_producers(runner.compute_alpha_metrics, "dca_result") == [
+        "_dca_equity_curve()"
+    ]
+    assert _assignment_producers(runner.compute_alpha_metrics, "symbol_equity") == [
+        "dca_result.equity_curve",
+        "symbol_execution.equity_curve",
+    ]
+    assert _assignment_producers(charts.build_result_chart, "symbol_equity") == [
+        "_dca_equity_curve().equity_curve",
+        "_execute_long_only_ledger().equity_curve",
+    ]
+    assert "vbt.Portfolio.from_signals" not in _called_functions(
+        runner.compute_alpha_metrics
+    )
+    assert "vbt.Portfolio.from_signals" not in _called_functions(
+        charts.build_result_chart
+    )
+    assert _called_functions(runner._benchmark_buy_and_hold_equity).count(
+        "vbt.Portfolio.from_signals"
+    ) == 1
 
 
 @pytest.mark.parametrize(
@@ -1139,12 +1210,14 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
         "start_date": "2025-01-01",
         "end_date": "2025-12-31",
         "side": "long",
-        "starting_capital": 500,
         "allocation_method": "equal_weight",
         "benchmark_symbol": "SPY",
         "parameters": {"dca_cadence": "monthly"},
-        "recurring_contribution": 500,
-        "starting_principal": 0.0,
+        "dca_capital": {
+            "schema_version": "dca_capital_v1",
+            "starting_capital": 0.0,
+            "contribution": 500.0,
+        },
     }
     metrics = {
         "aggregate": {
@@ -1160,19 +1233,20 @@ def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None
 
     card = engine.build_result_card(config, metrics)
     assert card["assumptions"] == [
-        "Recurring contribution: $500 monthly",
-        "Starting principal: $0",
+        "Contribution: $500 monthly",
+        "Starting capital: $0",
+        "Fractional shares, nothing left as cash",
         "Long-only",
         "Equal weight",
         "No fees/slippage",
         "Benchmark: SPY",
     ]
-    assert not any("Starting capital" in item for item in card["assumptions"])
 
     spanish_card = engine.build_result_card(config, metrics, language="es-419")
     assert spanish_card["assumptions"] == [
-        "Aporte recurrente: $500 mensual",
+        "Aporte: $500 cada mes",
         "Capital inicial: $0",
+        "Fracciones de acciones, nada queda en efectivo",
         "Solo largo",
         "Peso igual",
         "Sin comisiones/deslizamiento",
@@ -1346,7 +1420,9 @@ def test_validate_template_parameters_rejects_invalid_value():
         "benchmark_symbol": "SPY",
         "parameters": {"dca_cadence": "hourly"},  # Only daily/weekly/monthly allowed
     }
-    with pytest.raises(ValueError, match="unsupported_parameter_value_dca_cadence"):
+    # One rule, one code: the capital plan owns which periods exist, so the
+    # registry's generic parameter refusal never fires for this field.
+    with pytest.raises(ValueError, match="unsupported_dca_cadence"):
         engine.validate_backtest_config(config)
 
 

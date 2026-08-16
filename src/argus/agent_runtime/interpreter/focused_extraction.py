@@ -4,6 +4,7 @@ Behavior-preserving relocation from llm_interpreter.py (issue #131)."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from copy import deepcopy
 from datetime import date
@@ -16,6 +17,7 @@ from langchain_core.messages import (
     SystemMessage,
 )
 
+from argus.agent_runtime.interpreter import provider_context_assets
 from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
@@ -45,7 +47,7 @@ ResolveAssetCandidate = Callable[..., Any]
 def _focused_strategy_extraction_messages(
     request: InterpretationRequest,
 ) -> list[BaseMessage]:
-    return [
+    messages: list[BaseMessage] = [
         SystemMessage(
             content=(
                 "Focused strategy extraction repair. The general interpreter under-filled "
@@ -150,9 +152,37 @@ def _focused_strategy_extraction_messages(
                 "date_range_intent when present. Do not route recurring fixed-amount "
                 "buys to unsupported recovery when those executable fields are stated."
             )
-        ),
-        HumanMessage(content=request.current_user_message),
+        )
     ]
+    snapshot = request.latest_task_snapshot
+    prior_strategy = (
+        snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+        if snapshot is not None
+        else None
+    )
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).strip()
+    if prior_strategy is not None and requested_field:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "The current turn answers one requested field for an existing "
+                    "strategy. Preserve the prior strategy family and unchanged "
+                    "facts as context, but do not claim they were stated again in "
+                    "the current message. Pending strategy context: "
+                    + json.dumps(
+                        {
+                            "requested_field": requested_field,
+                            "prior_strategy": prior_strategy.model_dump(mode="json"),
+                        },
+                        sort_keys=True,
+                    )
+                )
+            )
+        )
+    messages.append(HumanMessage(content=request.current_user_message))
+    return messages
 
 
 def _comparison_baseline_provenance(
@@ -168,6 +198,7 @@ def _focused_extraction_field_provenance(
     *,
     extraction: FocusedStrategyExtraction,
     current_message: str,
+    resolved_strategy_type: str | None,
 ) -> dict[str, str]:
     provenance = _comparison_baseline_provenance(
         extraction.comparison_baseline,
@@ -184,7 +215,7 @@ def _focused_extraction_field_provenance(
         provenance["recurring_contribution"] = "explicit_user"
         provenance["capital_amount"] = "recurring_contribution"
     elif extraction.capital_amount is not None:
-        if canonical_strategy_type(extraction.strategy_type) == "dca_accumulation":
+        if canonical_strategy_type(resolved_strategy_type) == "dca_accumulation":
             provenance["capital_amount"] = "recurring_contribution"
         else:
             provenance["capital_amount"] = "starting_capital"
@@ -233,8 +264,7 @@ def _merge_focused_repair_with_base(
             for key, value in getattr(base, channel).items()
             if not _llm_value_is_empty(value)
             and not (
-                channel == "extra_parameters"
-                and key in _REPAIR_MERGE_CLASSIFICATION_KEYS
+                channel == "extra_parameters" and key in _REPAIR_MERGE_CLASSIFICATION_KEYS
             )
         }
         for key, value in getattr(draft, channel).items():
@@ -249,6 +279,10 @@ def _merge_focused_repair_with_base(
             and draft.extra_parameters.get(field_name) == marker[0]
         ):
             draft._validated_execution_cost_evidence[field_name] = marker
+    assets_reconciled = _reconcile_repaired_assets_with_provider_grounding(
+        draft=draft,
+        base=base,
+    )
     if not repaired.user_goal_summary and base_response.user_goal_summary:
         repaired.user_goal_summary = base_response.user_goal_summary
     repaired.reason_codes = list(
@@ -258,6 +292,11 @@ def _merge_focused_repair_with_base(
                 *repaired.reason_codes,
                 "focused_repair_preserved_structured_context",
                 *(
+                    ["focused_repair_assets_reconciled_with_provider_context"]
+                    if assets_reconciled
+                    else []
+                ),
+                *(
                     ["focused_repair_from_unsupported_context"]
                     if _base_response_was_unsupported(base_response)
                     else []
@@ -266,6 +305,45 @@ def _merge_focused_repair_with_base(
         )
     )
     return repaired
+
+
+def _reconcile_repaired_assets_with_provider_grounding(
+    *,
+    draft: LLMStrategyDraft,
+    base: LLMStrategyDraft,
+) -> bool:
+    """A focused re-read never degrades a provider-grounded asset.
+
+    The repair's statements win field-general, but its asset list is a second
+    read of the same mentions the runtime preflight already resolved through
+    the provider catalog. An entry that matches one of those records is the
+    same mention, so it takes the record's canonical symbol; entries matching
+    no record are genuinely new statements and pass through untouched.
+    """
+    if not draft.asset_universe:
+        return False
+    reconciled: list[str] = []
+    changed = False
+    for value in draft.asset_universe:
+        raw_text = str(value or "").strip()
+        if not raw_text:
+            changed = True
+            continue
+        symbol = (
+            provider_context_assets.canonical_symbol_from_preflight_records(
+                base, raw_text
+            )
+            or raw_text
+        )
+        if symbol != raw_text:
+            changed = True
+        if symbol not in reconciled:
+            reconciled.append(symbol)
+        else:
+            changed = True
+    if changed:
+        draft.asset_universe = reconciled
+    return changed
 
 
 def _base_response_was_unsupported(response: LLMInterpretationResponse) -> bool:
@@ -397,9 +475,29 @@ def response_from_focused_strategy_extraction(
     base_response: LLMInterpretationResponse | None = None,
     resolve_asset_candidate: ResolveAssetCandidate,
 ) -> LLMInterpretationResponse:
+    snapshot = request.latest_task_snapshot
+    is_pending_strategy_answer = bool(
+        snapshot
+        and (
+            snapshot.pending_strategy_summary
+            or snapshot.confirmed_strategy_summary
+            or snapshot.active_confirmation_reference
+        )
+        and str(request.selected_thread_metadata.get("requested_field") or "").strip()
+    )
     strategy_type = executable_strategy_type_from_extracted_fields(
         extraction.model_dump(mode="python")
     )
+    if (
+        strategy_type is None
+        and is_pending_strategy_answer
+        and base_response is not None
+        and not base_response.unsupported_constraints
+        and _llm_value_is_empty(extraction.strategy_type)
+    ):
+        strategy_type = executable_strategy_type_from_extracted_fields(
+            base_response.candidate_strategy_draft.model_dump(mode="python")
+        )
     entry_logic = extraction.entry_logic or moving_average_crossover_text(
         extraction.entry_rule
     )
@@ -450,6 +548,7 @@ def response_from_focused_strategy_extraction(
                 field_provenance=_focused_extraction_field_provenance(
                     extraction=extraction,
                     current_message=request.current_user_message,
+                    resolved_strategy_type=strategy_type,
                 ),
                 extra_parameters={
                     "raw_strategy_type": extraction.strategy_type,
@@ -483,7 +582,7 @@ def response_from_focused_strategy_extraction(
         intent="strategy_drafting"
         if extraction.requires_clarification
         else "backtest_execution",
-        task_relation="new_task",
+        task_relation="continue" if is_pending_strategy_answer else "new_task",
         requires_clarification=extraction.requires_clarification,
         user_goal_summary=extraction.user_goal_summary,
         candidate_strategy_draft=LLMStrategyDraft(
@@ -514,13 +613,16 @@ def response_from_focused_strategy_extraction(
             field_provenance=_focused_extraction_field_provenance(
                 extraction=extraction,
                 current_message=request.current_user_message,
+                resolved_strategy_type=strategy_type,
             ),
         ),
         missing_required_fields=list(extraction.missing_required_fields),
         assistant_response=extraction.assistant_response,
         confidence=extraction.confidence,
         reason_codes=["focused_strategy_extraction_repair"],
-        semantic_turn_act="new_idea",
+        semantic_turn_act=(
+            "answer_pending_need" if is_pending_strategy_answer else "new_idea"
+        ),
     )
     response = _merge_focused_repair_with_base(
         response=response,
@@ -559,6 +661,13 @@ def strategy_extraction_repair_is_allowed(
     if response.semantic_turn_act == "retry_failed_action":
         return not has_failed_action_launch_payload(request)
     if response.semantic_turn_act == "unsupported_request":
+        has_active_context = has_active_strategy_context(request)
+        has_material_evidence = current_turn_has_material_execution_evidence(request)
+        if has_active_context and (
+            not str(request.selected_thread_metadata.get("requested_field") or "").strip()
+            or not has_material_evidence
+        ):
+            return False
         if noncanonical_text_needs_repair(response=response, request=request):
             return True
         if response.intent not in {
@@ -568,25 +677,21 @@ def strategy_extraction_repair_is_allowed(
         }:
             return False
         if not response.unsupported_constraints:
-            # Extraction must not invent a strategy frame for a turn whose own
-            # draft shows nothing to run (a statistics question naming an
-            # asset). A stated thesis or execution field is the model asserting
-            # there is an idea to extract; a verbatim echo of the message is not.
             draft = response.candidate_strategy_draft
             thesis = str(draft.strategy_thesis or "").strip()
-            return strategy_has_execution_evidence(draft) or (
-                bool(thesis)
-                and thesis != str(draft.raw_user_phrasing or "").strip()
-                and thesis != request.current_user_message.strip()
+            return (
+                has_material_evidence
+                or strategy_has_execution_evidence(draft)
+                or (
+                    bool(thesis)
+                    and thesis != str(draft.raw_user_phrasing or "").strip()
+                    and thesis != request.current_user_message.strip()
+                )
             )
         if not any(
             item.category == "unsupported_strategy_logic"
             for item in response.unsupported_constraints
         ):
-            return False
-        if has_active_strategy_context(
-            request
-        ) and not current_turn_has_material_execution_evidence(request):
             return False
         return bool(
             response.candidate_strategy_draft.raw_user_phrasing

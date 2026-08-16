@@ -421,8 +421,13 @@ Argus is **NOT**:
   the auth-first landing and stops new anonymous bootstrap.
 - Preserve the current landing implementation and centered auth modal for
   configuration rollback and later conversion.
-- While public permanent accounts remain disabled, guest chrome offers
-  **Sign in**, never a public **Create account** action.
+- Guest chrome reads the server-owned `public_account_access_enabled`
+  permission and never a remembered flag value. When the server permits
+  permanent accounts, guest chrome offers **Create account** alongside **Sign
+  in**. When it does not, the conversion surface offers an access request
+  instead, and no public **Create account** action appears. This design owns the
+  rule, not the current value; for what the gate is set to today, read
+  `docs/PRODUCT.md`.
 - Temporary status, fixed expiry, allowance boundaries, feedback, and errors
   must remain calm, accessible, and localized in English and Spanish.
 - The frontend flag selects presentation only; a server-denied guest session

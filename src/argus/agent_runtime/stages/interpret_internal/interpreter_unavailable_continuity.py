@@ -8,7 +8,9 @@ from typing import Any
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     _edit_plan_reshapes_non_recurring_strategy,
+    accepted_operations_partially_materialized,
     apply_edit_operations,
+    materialized_strategy_summary_targets,
 )
 from argus.agent_runtime.artifact_edit_planner import (
     plan_artifact_assumption_edit as _plan_artifact_assumption_edit,
@@ -472,6 +474,13 @@ async def _planned_artifact_edit_interpretation(
             allow_indicator_parameters=strategy_summary_uses_rsi(prior_strategy),
             latest_result_window=latest_result_window,
         )
+        if accepted_operations_partially_materialized(
+            resolved,
+            materialized_strategy_summary_targets(field_provenance),
+        ):
+            # A half-applied edit is worse than no edit; decline so the
+            # caller's ordinary recovery owns the turn (issue #498).
+            return None
     elif plan.asset_universe:
         operation = normalized_asset_universe_operation(plan.asset_universe_operation)
         if operation is None:

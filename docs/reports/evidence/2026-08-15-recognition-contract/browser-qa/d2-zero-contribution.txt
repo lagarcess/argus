@@ -1,0 +1,5 @@
+scenario: D2 "$5,000 to start and $0 each month on SPY for 2024"
+DOM: card SPY — Comprar y mantener — Listo para ejecutar — CAPITAL INICIAL $5,000 · 2 ene → 31 dic 2024
+verdict: PASS — the $0-contribution recurring plan resolved to buy-and-hold in ONE turn with the
+  seed's role intact (the exact dca_contribution_zero_is_buy_and_hold + seed-provenance behavior),
+  offered as the runnable card

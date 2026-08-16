@@ -194,7 +194,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/auth/guest/link:
+  /api/v1/auth/guest/signup:
     post:
       tags:
       - auth
@@ -202,7 +202,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GuestIdentityLinkRequest'
+              $ref: '#/components/schemas/GuestAccountSignupRequest'
         required: true
       responses:
         '200':
@@ -2525,6 +2525,21 @@ components:
           - type: number
             exclusiveMinimum: 0.0
           - type: 'null'
+        starting_capital:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+        recurring_contribution:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+        contribution_period:
+          anyOf:
+          - type: string
+            maxLength: 24
+          - type: 'null'
         date_window:
           anyOf:
           - $ref: '#/components/schemas/ConfirmationDirectEditWindow'
@@ -2543,15 +2558,19 @@ components:
       description: 'Edit the pending confirmation''s capital, dates, or costs without a turn.
 
 
-        At least one field is required. Capital is the starting capital, or the
+        At least one field is required. ``capital`` is the one-time starting
 
-        recurring contribution when the pending strategy is a recurring-buy plan,
+        capital of a non-recurring plan. A recurring plan names its two money roles
 
-        matching the money-role semantics of the conversational path. Costs are
+        separately, ``starting_capital`` and ``recurring_contribution``, because
 
-        decimal rates (0.002 is 0.2 percent); zero explicitly clears a cost. The
+        neither may ever stand in for the other; sending ``capital`` for one is
 
-        slippage cap is enforced by the shared edit resolver, not re-stated here.'
+        refused rather than guessed at. Costs are decimal rates (0.002 is 0.2
+
+        percent); zero explicitly clears a cost. The slippage cap is enforced by
+
+        the shared edit resolver, not re-stated here.'
     ConfirmationDirectEditResponse:
       properties:
         message:
@@ -2997,11 +3016,49 @@ components:
       required:
       - type
       - message
+    GuestAccountSignupRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 320
+          minLength: 3
+        password:
+          type: string
+          maxLength: 128
+          minLength: 8
+        captcha_token:
+          type: string
+          maxLength: 4096
+          minLength: 1
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+      - captcha_token
     GuestAccountSummary:
       properties:
         expires_at:
           type: string
           format: date-time
+        conversation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
         conversation_limit:
           type: integer
           maximum: 2147483647.0
@@ -3021,6 +3078,7 @@ components:
       type: object
       required:
       - expires_at
+      - conversation_id
       - conversation_limit
       - message_limit
       - simulation_limit
@@ -3101,6 +3159,12 @@ components:
       - conversation_id
     GuestHandoffCreateRequest:
       properties:
+        handoff_kind:
+          type: string
+          enum:
+          - existing_account
+          - new_account_signup
+          default: existing_account
         destination_email:
           type: string
           maxLength: 320
@@ -3129,27 +3193,6 @@ components:
       required:
       - handoff_id
       - expires_at
-    GuestIdentityLinkRequest:
-      properties:
-        email:
-          type: string
-          maxLength: 320
-          minLength: 3
-        password:
-          type: string
-          maxLength: 128
-          minLength: 8
-        refresh_token:
-          anyOf:
-          - type: string
-            maxLength: 4096
-            minLength: 1
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - email
-      - password
     GuestPendingAction:
       properties:
         reason:
@@ -4006,6 +4049,7 @@ components:
           - recurring_contribution
           - contribution_cadence
           - starting_principal
+          - fractional_shares
         value:
           anyOf:
           - type: string
@@ -4142,6 +4186,7 @@ components:
           enum:
           - cash_value
           - total_return_pct
+          - contribution_return_pct
           - max_drawdown_pct
           - win_rate
           - benchmark_return_pct

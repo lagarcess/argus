@@ -393,6 +393,7 @@ def _metrics_summary(value: object) -> dict[str, object]:
         return {}
     summary: dict[str, object] = {}
     for key in (
+        "return_basis",
         "total_return_pct",
         "benchmark_return_pct",
         "delta_vs_benchmark_pct",

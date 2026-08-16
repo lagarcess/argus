@@ -242,8 +242,8 @@ Server-owned policy record for one temporary anonymous identity.
 
 ## 5.2 guest_workspace_handoffs
 
-Server-owned, short-lived claim record for moving one anonymous workspace into
-one existing permanent account.
+Server-owned claim record for moving one anonymous workspace into one permanent
+account created by signup or verified by login.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -251,23 +251,35 @@ one existing permanent account.
 - `source_user_id`: `uuid` (References the anonymous `profiles.id`)
 - `destination_email_hash`: `text` (SHA-256 of the normalized destination
   email; required)
-- `destination_user_id`: `uuid` (Nullable until verified login resolves the
-  permanent `profiles.id`; cleared if that account is deleted)
+- `destination_user_id`: `uuid` (Nullable until a signup insert trigger or
+  verified login resolves the permanent `auth.users.id`; cleared if that Auth
+  user is deleted)
 - `source_conversation_id`: `uuid` (References the one guest conversation)
 - `pending_action`: `jsonb` (Nullable typed reason, conversation, action id, and
   decision artifact id when applicable)
+- `handoff_kind`: `existing_account` or `new_account_signup`
 - `status`: `pending`, `consumed`, or `revoked`
 - `created_at`: `timestamptz`
-- `expires_at`: `timestamptz` (Exactly ten minutes after creation)
+- `expires_at`: `timestamptz` (Exactly ten minutes after creation for an
+  existing-account handoff; the fixed guest workspace expiry for signup)
 - `consumed_at`: `timestamptz` (Nullable)
 
 ### Invariants
 - Browser roles cannot read or execute against this table. Only the service
   role may create or claim a handoff.
 - A pending source workspace has at most one handoff.
+- Preparing a signup handoff locks the source state, reuses the same pending row
+  for a same-email retry, rotates its opaque-secret hash, and refuses to change
+  the email after a destination Auth UUID is bound.
+- A server-only proof in password-signup metadata binds the newly inserted
+  non-anonymous Auth UUID in the same database transaction, then is removed
+  from Auth metadata. A signup handoff never outlives its source workspace.
 - Claim locks the handoff and complete source product graph, resolves the
   destination only from verified Auth email truth, verifies every foreign
   owner, and transfers all mutable product rows in one transaction.
+- A consumed handoff remains a read-only replay oracle for the same bound
+  destination when a signup or login response is lost. It never repeats the
+  transfer or accepts another destination.
 - Conversation, message, strategy, job/run, Idea/IdeaVersion, evidence,
   decision, and context ids do not change. Checkpoint rows keep
   `thread_id == conversation_id`.
@@ -300,7 +312,9 @@ and login; it should not be exposed as a frontend product surface.
 ### Notes
 - The public access-request endpoint may insert a missing `requested` row. It
   never updates an existing requested, approved, privileged, or disabled row.
-- `requested` and unknown roles never grant permanent account access.
+- `requested` and unknown roles never grant an elevated role. While public
+  account access is open they do not block signup either, because denial needs
+  `disabled_at`; when it is closed, neither role admits the email.
 - The ops approval action uses `claim_private_alpha_access_welcome` to lock and
   revalidate the active requested row before SMTP. It then sends the localized
   welcome and uses `complete_private_alpha_access_welcome` to consume the claim,
@@ -313,12 +327,15 @@ and login; it should not be exposed as a frontend product surface.
   pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
   `admin` or `developer` access. Use `disabled_at` to revoke access.
-- If an email is missing or `disabled_at` is set, `/auth/signup` and
-  `/auth/login` still check the allowlist before provider signup/session work,
-  but public auth responses are normalized to reduce invite enumeration:
-  signup returns `400 auth_signup_failed`, login returns `401 unauthorized`,
-  and authenticated API requests reject disabled/unlisted emails after token
-  validation with `403 private_alpha_access_required`.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` decides what this table denies, and
+  it has been open in production since 2026-08-12. Only a row with `disabled_at`
+  set is denied now; a missing email is admitted. When that flag is off instead,
+  a missing email is denied too.
+- For a denied email, `/auth/signup` and `/auth/login` check this table before
+  provider signup/session work, but public auth responses are normalized to
+  reduce invite enumeration: signup returns `400 auth_signup_failed`, login
+  returns `401 unauthorized`, and authenticated API requests reject the email
+  after token validation with `403 private_alpha_access_required`.
 - The table may contain emails for existing Supabase Auth users; seeding the
   allowlist must not create auth users by itself.
 ---
@@ -1187,10 +1204,13 @@ list models.
 
 `assumptions` keys are `long_only`, `equal_weight`, `no_costs`, `modeled_fee_bps`,
 `modeled_slippage_bps`, `benchmark`, `benchmark_same_modeled_costs`,
-`recurring_contribution`, `contribution_cadence`, and `starting_principal`. Costs
-are read from the frozen run config rather than through the live execution-realism
-flag, so a flag flipped after the run cannot rewrite what the receipt says the run
-assumed.
+`recurring_contribution`, `contribution_cadence`, `starting_principal`, and
+`fractional_shares`. The four recurring keys are read together from the run's
+declared capital plan, so the receipt states the same two money roles and the
+same fill model the engine executed; `starting_principal` keeps its frozen
+public name while the plan owns what that number is. Costs are read from the
+frozen run config rather than through the live execution-realism flag, so a flag
+flipped after the run cannot rewrite what the receipt says the run assumed.
 
 `MetricKey` is `cash_value`, `total_return_pct`, `max_drawdown_pct`, `win_rate`,
 `benchmark_return_pct`, and `delta_vs_benchmark_pct`. The first four are the result

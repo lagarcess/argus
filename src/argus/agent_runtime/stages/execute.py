@@ -13,7 +13,7 @@ from argus.agent_runtime.coverage_recovery import (
     safe_capability_context,
 )
 from argus.agent_runtime.recovery.policy import should_retry
-from argus.agent_runtime.recovery_messages import recovery_state
+from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     indicator_threshold_rule,
@@ -26,6 +26,14 @@ from argus.agent_runtime.stages.execution_failure_transport import (
     runtime_failure_classification,
 )
 from argus.agent_runtime.stages.interpret import StageResult
+from argus.agent_runtime.stages.launch_capital import (
+    _as_optional_float,
+    _resolve_capital_amount,
+    _resolve_dca_starting_capital,
+    _resolve_optional_value,
+    _resolve_position_size,
+    _resolve_sizing_mode,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     ConfirmationPayload,
@@ -103,6 +111,33 @@ def execute_stage(
         retryable = bool(envelope.get("retryable"))
         capability_context = dict(envelope.get("capability_context") or {})
         conversion_failure_code = public_failure_code(capability_context)
+        if _is_capacity_refusal(capability_context):
+            # Capacity refuses before a job exists, so nothing ran and nothing
+            # can be retried in-loop. The user is being asked to wait, which is
+            # a different fact from a failure, and carries its own typed code.
+            capacity_prompt = recovery_message(
+                "backtest_capacity_exceeded",
+                retryable=True,
+            )
+            return StageResult(
+                outcome="execution_failed_recoverably",
+                stage_patch={
+                    "tool_call_records": records,
+                    "failure_classification": failure_classification,
+                    "assistant_prompt": capacity_prompt,
+                    "final_response_payload": {"error": capacity_prompt},
+                    "recovery": recovery_state(
+                        "backtest_capacity_exceeded",
+                        retryable=True,
+                    ),
+                    **_failed_action_reference_patch(
+                        payload=payload,
+                        failure_classification=failure_classification,
+                        error=capacity_prompt,
+                        retryable=True,
+                    ),
+                },
+            )
         if is_approved_window_drift(capability_context):
             return StageResult(
                 outcome="ready_for_confirmation",
@@ -350,6 +385,14 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         ),
         "sizing_mode": sizing_mode,
         "capital_amount": capital_amount,
+        "starting_capital": (
+            _resolve_dca_starting_capital(optional_parameters)
+            if strategy_type == "dca_accumulation"
+            else None
+        ),
+        "recurring_contribution": (
+            capital_amount if strategy_type == "dca_accumulation" else None
+        ),
         "position_size": position_size if sizing_mode == "position_size" else None,
         "cadence": _resolve_cadence(strategy, optional_parameters, strategy_type),
         "parameters": _resolve_parameters(optional_parameters),
@@ -601,6 +644,14 @@ def _recoverable_execution_prompt(
         f"The {draft_label} setup is still here, but I could not get {data_label} "
         "for that run right now. Try again, change the dates, or choose a different "
         "supported asset."
+    )
+
+
+def _is_capacity_refusal(capability_context: dict[str, Any]) -> bool:
+    return (
+        str(capability_context.get("execution_status") or "").strip() == "rejected"
+        and str(capability_context.get("failure_code") or "").strip()
+        == "backtest_capacity_exceeded"
     )
 
 
@@ -999,49 +1050,10 @@ def _resolve_exit_rule(
     return indicator_threshold_rule(strategy, "exit")
 
 
-def _resolve_sizing_mode(optional_parameters: dict[str, Any]) -> str:
-    position_size = _resolve_position_size(optional_parameters)
-    if position_size is not None:
-        return "position_size"
-    return "capital_amount"
 
 
-def _resolve_capital_amount(
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, Any],
-    strategy_type: str,
-) -> float | None:
-    strategy_capital = _resolve_strategy_capital_amount(strategy)
-    if strategy_capital is not None:
-        return strategy_capital
-    if strategy_type == "dca_accumulation":
-        nested_capital = _resolve_nested_strategy_capital_amount(strategy)
-        if nested_capital is not None:
-            return nested_capital
-    value = _resolve_optional_value(optional_parameters, "initial_capital")
-    if value is None:
-        return 1000.0
-    return _as_optional_float(value)
 
 
-def _resolve_strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
-    return _as_optional_float(strategy.get("capital_amount"))
-
-
-def _resolve_nested_strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
-    extra_parameters = strategy.get("extra_parameters")
-    if not isinstance(extra_parameters, dict):
-        return None
-    for key in ("capital_amount", "recurring_amount", "contribution_amount"):
-        amount = _as_optional_float(extra_parameters.get(key))
-        if amount is not None:
-            return amount
-    return None
-
-
-def _resolve_position_size(optional_parameters: dict[str, Any]) -> float | None:
-    value = _resolve_optional_value(optional_parameters, "position_size")
-    return _as_optional_float(value)
 
 
 def _resolve_cadence(
@@ -1182,22 +1194,4 @@ def _compact_benchmark_symbol(symbol: str) -> str:
     return symbol.strip().upper().replace("/", "").replace("-", "").replace(" ", "")
 
 
-def _resolve_optional_value(
-    optional_parameters: dict[str, Any],
-    field_name: str,
-    *,
-    default: Any = None,
-) -> Any:
-    value = optional_parameters.get(field_name, default)
-    if isinstance(value, dict) and "value" in value:
-        return value.get("value")
-    return value
 
-
-def _as_optional_float(value: Any) -> float | None:
-    try:
-        if value is None or value == "":
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None

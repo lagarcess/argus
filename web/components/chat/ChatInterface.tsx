@@ -41,6 +41,7 @@ import {
 import {
   createConversation,
   deleteConversation,
+  postFeedback,
   getBacktestRun,
   listConversations,
   logoutFromApi,
@@ -90,6 +91,7 @@ import {
 } from "@/lib/chat-conversation-routing";
 import {
   conversationLoadFailureMessage,
+  shouldShowEmptyChatSurface,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
 import {
@@ -163,6 +165,7 @@ import ConversationRetrievalState, {
   ConversationRetrievalAnnouncement,
 } from "./ConversationRetrievalState";
 import FeedbackDialog from "../feedback/FeedbackDialog";
+import { feedbackContextForSubmission } from "@/lib/feedback-context";
 import {
   type ChatActionOption,
   type Message,
@@ -959,6 +962,44 @@ export default function ChatInterface() {
           })
         : action.label,
     [t],
+  );
+
+  const handleMessageFeedback = useCallback(
+    async (
+      type: "bug" | "feature" | "general" | "rating",
+      context: Record<string, unknown> | undefined,
+      rating?: "positive" | "negative",
+    ) => {
+      if (type === "rating" && rating) {
+        try {
+          await postFeedback({
+            type: "general",
+            message: t("feedback.rating_message_fallback", { rating }),
+            context: feedbackContextForSubmission(context, {
+              includeConversationContext: true,
+              rating,
+              tags: [],
+              attachmentCount: 0,
+            }),
+          });
+        } catch {
+          showToast(
+            t(
+              "feedback.error",
+              "We could not submit that yet. Please try again.",
+            ),
+            "error",
+          );
+        }
+        return;
+      }
+
+      setFeedbackState(
+        openFeedbackDialogState(type, context, rating, conversationId),
+      );
+      setIsSidebarOpen(false);
+    },
+    [conversationId, showToast, t],
   );
 
   // ── Send message ───────────────────────────────────────────────────────────
@@ -2038,12 +2079,18 @@ export default function ChatInterface() {
               : "chat.input_placeholder_prerail",
         )
       : t("chat.followup_placeholder", "Ask a follow-up...");
-  const showEmptyChatSurface = conversationId === null && messages.length === 0;
+  const hasConversationLoadFailure =
+    failedConversationId !== null && failedConversationId === conversationId;
+  const showEmptyChatSurface = shouldShowEmptyChatSurface({
+    messages,
+    isHydratingConversation,
+    hasConversationLoadFailure,
+  });
   const conversationComposerUnavailable =
     isStreamingResponse ||
     isHydratingConversation ||
     guestSubmissionPending ||
-    failedConversationId === conversationId;
+    hasConversationLoadFailure;
 
   const keyboardShortcuts = useChatKeyboardShortcuts({
     enabled: !mobileShell.isBelowTablet,
@@ -2264,7 +2311,8 @@ export default function ChatInterface() {
             {/* Title (left-aligned; truncates before the action cluster) */}
             <h1 className="font-display pointer-events-auto min-w-0 flex-1 truncate text-left text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 tablet:text-[18px]">
               {currentView === "chat" &&
-                (conversationId !== null || messages.length > 0) && (
+                (conversationId !== null || messages.length > 0) &&
+                !showEmptyChatSurface && (
                   <ChatHeaderTitle
                     conversationId={conversationId}
                     title={headerConversationTitle}
@@ -2352,7 +2400,7 @@ export default function ChatInterface() {
                       isHydratingConversation && (
                         <ConversationRetrievalState state="loading" />
                       )}
-                    {failedConversationId === conversationId && (
+                    {hasConversationLoadFailure && (
                       <ConversationRetrievalState
                         state="error"
                         onRetry={() => {
@@ -2382,10 +2430,7 @@ export default function ChatInterface() {
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
                             onFeedback={(type, context, rating) => {
-                              setFeedbackState(
-                                openFeedbackDialogState(type, context, rating, conversationId),
-                              );
-                              setIsSidebarOpen(false);
+                              void handleMessageFeedback(type, context, rating);
                             }}
                             onToast={showToast}
                             isLatest={isLatestAi}

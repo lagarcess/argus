@@ -86,8 +86,9 @@ mechanics through PR #319 (`1c3775aa`); one shared frontend failure vocabulary
 through PR #320 (`53c36d40`); auth copy, localized errors, and consistent card
 containment through PRs #323, #325, and #328 (`c1a13949`, `05fbef06`, and
 `403ea114`); and removal of the unavailable Release Notes row through PR #327
-(`22bec7da`). Public account access remains explicitly disabled and founder
-controlled despite the completed technical-readiness proof.
+(`22bec7da`). Public account access stayed founder controlled at that landing
+despite the completed technical-readiness proof. The founder opened it in
+production on 2026-08-12, so public registration is open now.
 
 PR #329 added the durable backend/data conversation-activity and read-state
 foundation as `8a5d621b`; PR #331 completed its chat/Recents frontend consumer
@@ -504,7 +505,8 @@ Do not reopen these as debt unless a new bug is reproduced:
   identity, one temporary owner-scoped workspace, fixed lifetime allowances,
   exact-once settlement, one simulation, conversion/claim, cleanup, Guest
   shell, capability gates, and privacy-safe funnel evidence. Guest defaults on
-  with explicit-off rollback; public-account access remains separately off.
+  with explicit-off rollback; public-account access is separately founder
+  controlled and has been open in production since 2026-08-12.
   Issue #293 is closed with no-defect evidence after one real guest session
   crossed the one-hour JWT boundary without losing its conversation or
   workspace. Hosted configuration, canary, and public traffic remain later
@@ -701,7 +703,9 @@ be present before Guest grounded discovery is exposed.
 
 The conversion contract has two owners:
 
-- provider-native anonymous-to-permanent linking keeps the same Auth UUID;
+- ordinary signup creates a different permanent Auth UUID, binds it to the
+  workspace-lifetime signup handoff, and claims the complete guest graph after
+  immediate session creation or first confirmed login;
 - an existing registered account claims the complete guest graph through the
   short-lived, email-hash-bound, single-use server handoff. Login completes
   the claim before returning its session and can reconcile one ambiguous
@@ -711,7 +715,8 @@ Neither path copies visible prose in the browser or merges guest lifetime
 counters into registered hour/day counters. Guest server/bootstrap and
 presentation flags default on as emergency kill switches. Rollback is flags
 first: explicitly disable the frontend guest presentation, then server guest
-bootstrap; keep public-account access false. Do not roll back by deleting guest
+bootstrap. Leave public-account access untouched, because guest rollback does
+not close public registration. Do not roll back by deleting guest
 rows or reverting already-applied migrations.
 The server guest flag is the creation gate: disabling it stops new anonymous
 sessions while existing verified guests drain to conversion, fixed expiry, or

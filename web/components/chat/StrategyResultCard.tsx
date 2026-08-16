@@ -31,7 +31,7 @@ import {
 } from "@/lib/result-card-display";
 import { degradedValueClass, inlineFailureTextClass } from "@/lib/failure-treatment";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
-import { cadenceDisplayLabel } from "@/lib/cadence-display";
+import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import {
@@ -628,6 +628,10 @@ function resultDisplayCopy(
   return {
     endingValueLabel: t("chat.result_card.ending_value", "Ending value"),
     totalReturnLabel: t("chat.result_card.total_return", "Total return"),
+    contributionReturnLabel: t(
+      "chat.result_card.contribution_return",
+      "Return on contributions",
+    ),
     comparedWithBenchmarkLabel: t(
       "chat.result_card.compared_with_benchmark",
       "Compared with benchmark",
@@ -651,6 +655,10 @@ function resultDisplayCopy(
     totalReturnSuffix: t(
       "chat.result_card.total_return_suffix",
       "total return",
+    ),
+    contributionReturnSuffix: t(
+      "chat.result_card.contribution_return_suffix",
+      "return on contributions",
     ),
     benchmarkUnavailable: t(
       "chat.result_card.benchmark_unavailable",
@@ -700,8 +708,7 @@ function resultDisplayCopy(
     sideLabel: t("chat.result_card.details.side", "Side"),
     allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
     benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
-    cadenceLabel: t("chat.result_card.details.cadence", "Cadence"),
-    cadenceValueLabel: (cadence) => cadenceDisplayLabel(cadence, t) ?? cadence,
+    contributionPhrase: (amount, period) => contributionPhrase(amount, period, t),
     contributionLabel: t(
       "chat.result_card.details.contribution",
       "Contribution",

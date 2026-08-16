@@ -766,14 +766,17 @@ Two server flags own separate policy boundaries:
 
 - `ARGUS_GUEST_ACCESS_ENABLED` defaults on; explicit `false` is the emergency
   bootstrap kill switch.
-- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` defaults off and separately controls
-  ordinary permanent-account access.
+- `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true` separately controls ordinary
+  permanent-account access. Unlike the guest flag it fails closed when unset, so
+  an environment that omits it denies public registration. The founder opened it
+  in production on 2026-08-12; explicit `false` closes it again.
 
 `NEXT_PUBLIC_GUEST_ACCESS_ENABLED` also defaults on and selects presentation
 only; explicit `false` restores the preserved auth-first landing. An explicit
-client/server disagreement fails closed. With public permanent accounts
-disabled, the current private-alpha allowlist continues to own signup/login and
-role elevation.
+client/server disagreement fails closed. With public permanent accounts open,
+the allowlist owns role elevation and explicit denial only: a disabled row still
+blocks signup and login, while an absent row no longer does. When the public
+gate is closed instead, that allowlist owns signup and login admission too.
 Turning the server guest flag off stops bootstrap only: active verified guests
 drain through their fixed expiry or conversion instead of being abruptly
 deauthorized.

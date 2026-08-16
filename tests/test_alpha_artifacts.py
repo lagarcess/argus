@@ -351,11 +351,14 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
 
     assert "Guest Entry (Default-On Kill Switch)" in product
     assert "`ARGUS_GUEST_ACCESS_ENABLED=true`" in product
-    assert "`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false`" in product
+    # The flag's value belongs to the release profile, asserted against every
+    # standing doc by test_private_alpha_release_docs.py. Pinning it here too
+    # is what let PRODUCT.md keep claiming `false` after production opened.
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in product
     assert "ARGUS_GUEST_ACCESS_ENABLED" in architecture
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in architecture
     assert "`POST /api/v1/auth/guest`" in api_contract
-    assert "`POST /api/v1/auth/guest/link`" in api_contract
+    assert "`POST /api/v1/auth/guest/signup`" in api_contract
     assert "`POST /api/v1/auth/guest/handoffs`" in api_contract
     assert "`POST /api/v1/auth/guest/handoffs/{handoff_id}/claim`" in api_contract
     assert "`guest_session`" in api_contract
@@ -365,6 +368,8 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
     assert "fixed seven-day" in data_model
     assert "centered auth modal" in design
     assert "/api/v1/auth/guest" in openapi["paths"]
+    assert "/api/v1/auth/guest/signup" in openapi["paths"]
+    assert "/api/v1/auth/guest/link" not in openapi["paths"]
     guest_bootstrap = openapi["paths"]["/api/v1/auth/guest"]["post"]
     assert guest_bootstrap["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/GuestBootstrapRequest"

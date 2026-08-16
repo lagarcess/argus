@@ -7,6 +7,7 @@ from argus.domain.backtesting.execution import _execution_realism_settings
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
+from argus.domain.dca_capital import dca_capital_plan_from_config
 from argus.domain.engine_launch.display import (
     format_benchmark_comparison_phrase,
     format_date_range_label,
@@ -32,13 +33,15 @@ def build_result_card(
     end = date.fromisoformat(config["end_date"])
     symbols = ", ".join(config["symbols"])
     is_dca = config["template"] == "dca_accumulation"
-    capital_basis = float(config["starting_capital"])
     if is_dca:
-        capital_basis = (
-            float(config["starting_capital"])
-            / max(len(config["symbols"]), 1)
-            * max(int(efficiency.get("total_trades", 0)), 1)
-        )
+        plan = dca_capital_plan_from_config(config)
+        # Contributions are already summed across symbols by the fill count;
+        # the seed is one whole-plan amount and joins the basis once.
+        capital_basis = plan.starting_capital + plan.contribution / max(
+            len(config["symbols"]), 1
+        ) * max(int(efficiency.get("total_trades", 0)), 1)
+    else:
+        capital_basis = float(config["starting_capital"])
     ending_capital = capital_basis + performance["profit"]
     realism = _execution_realism_settings(config)
 
@@ -95,9 +98,15 @@ def build_result_card(
             "label": "Valor final" if is_es else "Ending value",
             "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
         },
+        # A recurring plan's ratio is money-on-money over contributed cash,
+        # not a time return on one bankroll, so it carries its own key and name.
         {
-            "key": "total_return_pct",
-            "label": "Retorno total" if is_es else "Total return",
+            "key": "contribution_return_pct" if is_dca else "total_return_pct",
+            "label": (
+                ("Retorno sobre aportes" if is_es else "Return on contributions")
+                if is_dca
+                else ("Retorno total" if is_es else "Total return")
+            ),
             "value": f"{performance['total_return_pct']:+.1f}%",
         },
         {
@@ -193,7 +202,12 @@ def _execution_costs_payload(performance: dict[str, Any]) -> dict[str, Any] | No
 def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) -> bool:
     if config["template"] in {"buy_and_hold", "dca_accumulation"}:
         return False
-    return int(efficiency.get("total_trades", 0) or 0) > 1
+    win_rate = efficiency.get("win_rate")
+    return (
+        isinstance(win_rate, int | float)
+        and not isinstance(win_rate, bool)
+        and int(efficiency.get("total_trades", 0) or 0) > 1
+    )
 
 
 def _execution_realism_assumption(
@@ -245,36 +259,48 @@ def _format_bps(value: float) -> str:
 
 
 def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:
-    contribution = float(
-        config.get("recurring_contribution") or config["starting_capital"]
+    plan = dca_capital_plan_from_config(config)
+    contribution = format_contribution_phrase(
+        amount=plan.contribution,
+        period=plan.period,
+        is_es=is_es,
     )
-    principal = float(config.get("starting_principal") or 0.0)
-    cadence = _dca_cadence_label(config, is_es=is_es)
-    cadence_suffix = f" {cadence}" if cadence else ""
     if is_es:
         return [
-            f"Aporte recurrente: {_format_money(contribution)}{cadence_suffix}",
-            f"Capital inicial: {_format_money(principal)}",
+            f"Aporte: {contribution}",
+            f"Capital inicial: {_format_money(plan.starting_capital)}",
+            "Fracciones de acciones, nada queda en efectivo",
         ]
     return [
-        f"Recurring contribution: {_format_money(contribution)}{cadence_suffix}",
-        f"Starting principal: {_format_money(principal)}",
+        f"Contribution: {contribution}",
+        f"Starting capital: {_format_money(plan.starting_capital)}",
+        "Fractional shares, nothing left as cash",
     ]
 
 
-def _dca_cadence_label(config: dict[str, Any], *, is_es: bool) -> str:
-    parameters = (
-        config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
-    )
-    cadence = str(parameters.get("dca_cadence") or "").strip().lower()
-    if not cadence:
-        return ""
+def format_contribution_phrase(
+    *,
+    amount: float,
+    period: str,
+    is_es: bool,
+) -> str:
+    """One phrase, never a labelled amount beside a labelled period."""
+    return f"{_format_money(amount)} {_contribution_period_word(period, is_es=is_es)}"
+
+
+def _contribution_period_word(period: str, *, is_es: bool) -> str:
     if is_es:
         return {
-            "daily": "diario",
-            "weekly": "semanal",
-            "biweekly": "quincenal",
-            "monthly": "mensual",
-            "quarterly": "trimestral",
-        }.get(cadence, cadence.replace("_", " "))
-    return cadence.replace("_", " ")
+            "daily": "cada día",
+            "weekly": "cada semana",
+            "biweekly": "cada dos semanas",
+            "monthly": "cada mes",
+            "quarterly": "cada trimestre",
+        }[period]
+    return {
+        "daily": "daily",
+        "weekly": "weekly",
+        "biweekly": "every two weeks",
+        "monthly": "monthly",
+        "quarterly": "quarterly",
+    }[period]
