@@ -1,0 +1,30 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Compra recurrente de SPY
+DCA $500 monthly into SPY from 2024-01-01 to 2024-12-31
+SPY
+Compras recurrentes
+Listo para ejecutar
+APORTE
+$500 cada mes
+PERIODO
+2 ene 2024 → 31 dic 2024
+Capital inicial
+$0
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Editar montos
+Editar fechas
+Editar costos
+Ejecutar backtest
+Cambiar supuestos
+Cancelar
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

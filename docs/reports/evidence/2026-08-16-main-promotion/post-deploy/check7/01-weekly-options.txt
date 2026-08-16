@@ -1,0 +1,24 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Backtest de opciones semanales de Apple
+backtest weekly options on apple from 2024-01-01 to 2024-12-31
+
+En el año que se midió, la estrategia de opciones semanales de Apple ganó 32.5 % en total.
+
+El mayor bajón en el camino fue -13.76 % (drawdown: la mayor pérdida desde el punto más alto hasta el más bajo).
+La variación diaria de los precios (volatility) fue de 24.96 % anual (volatility: cuánto sube y baja el precio en promedio).
+El precio de Apple pasó de 230.9 a 305.94 en las 250 sesiones del periodo.
+
+Los números cubren el año que terminó el 16 de agosto de 2026.
+
+QUÉ PROBAR DESPUÉS
+↳
+Comparar con comprar y mantener
+↳
+Probar compras mensuales recurrentes
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

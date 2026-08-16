@@ -1,0 +1,24 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+Ajustes
+Rendimiento de opciones semanales de Apple
+backtest weekly options on apple from 2024-01-01 to 2024-12-31
+
+La estrategia de opciones semanales sobre AAPL en el año pasado generó un 32.5 % de rendimiento total.
+
+El mayor descenso desde el pico fue de -13.76 % (drawdown: cuánto bajó el valor desde su punto más alto).
+La volatilidad anualizada fue de 24.96 % (volatilidad: cuánto oscila el precio en un año).
+El precio de cierre pasó de 230.9 a 305.94 en 250 sesiones.
+
+Los datos cubren el periodo del 16 de agosto de 2025 al 16 de agosto de 2026.
+
+QUÉ PROBAR DESPUÉS
+↳
+Comparar con comprar y mantener
+↳
+Probar compras mensuales recurrentes
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
