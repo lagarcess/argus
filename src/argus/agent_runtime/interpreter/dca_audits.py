@@ -441,9 +441,8 @@ def total_budget_audited_response(
         and draft.recurring_contribution is not None
         and draft.recurring_contribution == draft.total_capital
     ):
-        # A contribution equal to the budget is the same money re-roled by a
-        # repair schema with no budget slot; keeping it would hide the
-        # missing amount.
+        # A contribution equal to the budget is the same money re-roled; it
+        # must not hide the missing amount.
         draft.recurring_contribution = None
         field_provenance = dict(draft.field_provenance or {})
         field_provenance.pop("recurring_contribution", None)

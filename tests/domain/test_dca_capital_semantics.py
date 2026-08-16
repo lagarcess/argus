@@ -967,9 +967,8 @@ def test_the_ceiling_refusal_has_one_identity_every_reader_derives_from() -> Non
     hearing about the cap. The contribution amount itself never defers it: the
     ceiling refusal is about that amount, and deferring it would ask for a
     number while hiding that the user's stated money was heard as a plan-wide
-    cap (the eval case `dca_capital_semantics_only_have_amount_is_ceiling`
-    was unreachable under the wider deferral). Renaming the category without
-    sweeping this predicate added an avoidable recovery round.
+    cap. Renaming the category without sweeping this predicate added an
+    avoidable recovery round.
     """
     from argus.agent_runtime.semantic_integrity import (
         UNSUPPORTED_DCA_CONTRIBUTION_CEILING,

@@ -1,13 +1,8 @@
 """The recognition contract: no layer downstream of the primary interpretation
 may silently discard a typed fact the model produced.
 
-Live traces (docs/reports/evidence/2026-08-15-recognition-contract/TRACES.md)
-showed correct primary reads destroyed by post-read layers: context asset
-injection manufacturing a universe/exclusion contradiction, the edit
-materializer refusing correct plans over it, the knowledge/research rail
-claiming typed unsupported_request turns, and a DCA sidecar audit re-typing an
-explicitly-provenance-tagged seed as a budget. Each lock here pins the guard
-that stops one drop site and the receipt it leaves behind.
+Each lock pins one guard and the receipt it leaves behind. Drop-site evidence:
+docs/reports/evidence/2026-08-15-recognition-contract/TRACES.md.
 """
 
 from __future__ import annotations
@@ -93,9 +88,9 @@ def _exclusion_response(**draft_overrides: Any) -> LLMInterpretationResponse:
 
 
 class TestContextInjectionRespectsTypedExclusions:
-    """Trace 1, step 2: 'remove AAPL' mentions AAPL, and the injection wrote
-    that mention into asset_universe, manufacturing the contradiction that
-    downstream coherence checks punished."""
+    """A typed exclusion outranks a mention: injecting the excluded symbol
+    into asset_universe manufactures a contradiction downstream coherence
+    checks punish."""
 
     def test_an_excluded_mention_is_never_injected_as_a_traded_asset(self) -> None:
         normalized = response_with_provider_context_assets(
@@ -143,8 +138,8 @@ def _card_request(message: str) -> InterpretationRequest:
 
 
 class TestExclusionsOutrankCarriedUniverseCopies:
-    """Trace 1, step 5: three correct model reads were refused because the
-    injected copy of the excluded symbol overlapped asset_universe."""
+    """A universe copy of an excluded symbol never refuses a correct plan;
+    only an inclusion-vs-exclusion overlap is a real contradiction."""
 
     def test_the_traced_remove_shape_is_materialized(self, monkeypatch) -> None:
         from argus.agent_runtime.interpreter import artifact_assumption_edit
@@ -277,9 +272,8 @@ def _run_knowledge(
 
 
 class TestTypedUnsupportedPayloadKeepsItsRecoveryRoute:
-    """Trace 2: the rail classifier answered a typed unsupported RUN request
-    with asset statistics, erasing the constraint, the assets, the window,
-    and the ready-made simplification options."""
+    """A typed unsupported payload owns its recovery route; the
+    knowledge/research rail may not answer the turn as a question."""
 
     @pytest.fixture(autouse=True)
     def _no_classifier(self, monkeypatch):
@@ -343,9 +337,8 @@ def test_an_unsupported_act_without_a_payload_still_reaches_the_classifier(
 
 @pytest.mark.asyncio
 async def test_dca_budget_audit_cannot_retype_an_explicit_seed(monkeypatch) -> None:
-    """Trace 3: the sidecar audit re-typed '$5,000 to start' (explicit
-    starting_capital provenance) into a total budget, and semantic integrity
-    then fabricated a ceiling refusal from it."""
+    """An explicit starting_capital seed keeps its role; a contrary sidecar
+    budget verdict cannot re-type it."""
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def fake_json_schema(
@@ -553,9 +546,8 @@ class TestBareAssetAnswerOperationLabel:
         )
 
     def test_a_bare_answer_typed_as_its_own_inclusion_is_still_bare(self) -> None:
-        """Live tip4 trace: the model sometimes types the bare answer as
-        asset_inclusions=["TSLA"] alongside the guessed replace label; an
-        inclusion naming exactly the answered symbol is the same bare shape."""
+        """An inclusion naming exactly the answered symbol is the same bare
+        shape as a flat universe copy."""
         from argus.agent_runtime.interpreter.readiness_helpers import (
             _bare_asset_answer_without_unevidenced_operation,
         )
@@ -571,9 +563,8 @@ class TestBareAssetAnswerOperationLabel:
     def test_an_empty_universe_bare_answer_is_typed_instead_of_requestioned(
         self,
     ) -> None:
-        """Live A/B mode: a truly bare draft (empty universe, no label) used
-        to fall into a second add-or-replace question; #190 says the answer
-        appends."""
+        """A truly bare draft (empty universe, no label) appends per #190
+        instead of triggering a second add-or-replace question."""
         from argus.agent_runtime.interpreter.readiness_helpers import (
             _bare_asset_answer_without_unevidenced_operation,
         )
@@ -620,9 +611,8 @@ class TestBareAssetAnswerOperationLabel:
 
 
 class TestBareAssetAnswerGatesArePinned:
-    """Review round 1, finding 4: every eligibility gate survived mutation.
-    One negative per gate, each asserting the response is returned unchanged
-    and no receipt is stamped, so deleting any gate fails a test."""
+    """One negative per eligibility gate, each asserting the response is
+    returned unchanged with no receipt, so deleting any gate fails a test."""
 
     _resolver = staticmethod(TestBareAssetAnswerOperationLabel._resolver)
     _response = staticmethod(TestBareAssetAnswerOperationLabel._response)
@@ -794,9 +784,8 @@ class TestBareAssetAnswerGatesArePinned:
 
 
 class TestRoleConstraintEvidenceBounds:
-    """Review round 1, findings 2/5/11: a materialized symbol needs typed
-    evidence, a requested addition must land, and the swap-over-whole-set
-    precedence is a written decision."""
+    """A materialized symbol needs typed evidence, a requested addition must
+    land, and the swap-over-whole-set precedence is a written decision."""
 
     @staticmethod
     def _satisfied(**overrides: Any) -> bool:
@@ -887,10 +876,9 @@ class TestRoleConstraintEvidenceBounds:
 
 @pytest.mark.asyncio
 async def test_dca_seed_with_a_differing_budget_moves_the_budget(monkeypatch) -> None:
-    """Review round 1, finding 1: '$20,000 to invest, starting with $5,000,
-    buying monthly' must not fund a $20,000 monthly contribution. The seed
-    keeps its role, the budget moves to total_capital, and the monthly
-    amount is asked for."""
+    """'$20,000 to invest, starting with $5,000, buying monthly' must not
+    fund a $20,000 monthly contribution: the seed keeps its role, the budget
+    moves to total_capital, and the monthly amount is asked for."""
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def fake_json_schema(
@@ -951,9 +939,8 @@ async def test_dca_seed_with_a_differing_budget_moves_the_budget(monkeypatch) ->
 
 
 def test_the_veto_routes_on_the_payload_alone(monkeypatch) -> None:
-    """Review round 1, finding 6: a typed refusal payload owns its recovery
-    route whatever act the model guessed; educational_question was one
-    relabel away from the Trace-2 stats hijack."""
+    """A typed refusal payload owns its recovery route whatever act the
+    model guessed; no single relabel may divert it to a stats answer."""
 
     async def _must_not_classify(**_kwargs: Any):
         raise AssertionError("a constraint-carrying turn must not be classified")
@@ -969,9 +956,8 @@ def test_the_veto_routes_on_the_payload_alone(monkeypatch) -> None:
 
 
 class TestContextExclusionMatchingAndReceipts:
-    """Review round 1, findings 3/7/8: exclusion matching uses the provider
-    record, the receipt asserts the outcome, and unsupported turns keep
-    their asset facts."""
+    """Exclusion matching uses the provider record, the receipt asserts the
+    outcome, and unsupported turns keep their asset facts."""
 
     APPLE_SPAN_ROW = {
         "raw_text": "Apple",
@@ -1077,9 +1063,9 @@ class TestContextExclusionMatchingAndReceipts:
 async def test_a_typed_contribution_survives_a_wrong_budget_verdict(
     monkeypatch, money
 ) -> None:
-    """Re-measurement regression: on 'start with $5,000 and add $200 monthly'
-    a wrong sidecar budget verdict must not re-role the typed contribution
-    into a total budget; both explicit money roles outrank the sidecar."""
+    """On 'start with $5,000 and add $200 monthly' a wrong sidecar budget
+    verdict must not re-role the typed contribution into a total budget;
+    both explicit money roles outrank the sidecar."""
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def fake_json_schema(

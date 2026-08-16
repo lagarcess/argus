@@ -935,9 +935,8 @@ def materialized_artifact_edit_targets(
         )
     )
     materialized_assets = set(normalized_asset_symbols(draft.asset_universe))
-    # The card-resolved carve-out must see the raw universe copy: deriving it
-    # after the exclusion override would let the model ground its own removal
-    # by echoing the symbol it excluded into asset_universe.
+    # The card-resolved carve-out sees the raw universe copy, so an echoed
+    # exclusion still needs message or card grounding.
     primary_assets_raw = set(normalized_asset_symbols(primary_draft.asset_universe))
     card_resolved_asset_exclusions = (
         (primary_asset_exclusions & current_assets) - primary_assets_raw
@@ -1518,8 +1517,7 @@ def _response_from_artifact_assumption_edit_plan(
             set(normalized_asset_symbols(primary_draft.asset_universe))
             & set(normalized_asset_symbols(primary_draft.asset_exclusions))
         ):
-            # The exclusions-outrank override fired during this plan's
-            # coverage check; the turn-correlated receipt rides the response.
+            # Turn-correlated receipt: the exclusions-outrank override fired.
             applied_reason_codes.append("asset_exclusions_outranked_universe_copy")
         return LLMInterpretationResponse(
             intent="backtest_execution",

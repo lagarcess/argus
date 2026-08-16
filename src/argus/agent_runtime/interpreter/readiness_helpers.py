@@ -134,10 +134,8 @@ def _asset_universe_operation_clarification_draft(
     return clarification
 
 
-# The only acts whose bare answers this guard may rewrite: the ones the
-# downstream routes are verified to serve (the provider-resolution append
-# corridor for answer_pending_need, the planner's stated-operation union for
-# refine_current_idea). A tenth act fails closed, not open.
+# The only acts whose bare answers this guard may rewrite; any other act
+# fails closed, not open.
 _BARE_ANSWER_ELIGIBLE_ACTS = frozenset({"answer_pending_need", "refine_current_idea"})
 
 
@@ -149,16 +147,13 @@ def _bare_asset_answer_without_unevidenced_operation(
 ) -> LLMInterpretationResponse:
     """Type a bare asset answer to the asset slot as that asset's inclusion (#190).
 
-    When the whole reply resolves as one asset, the turn carried no words that
-    could express an operation, so a guessed "replace" label (which would wipe
-    a multi-asset card) and an empty universe (which would trigger a second
-    add-or-replace question) are both unevidenced shapes of the same answer.
-    The product rule is append. Routing after the rewrite: an
-    answer_pending_need continue turn takes the deterministic
-    provider-resolution append corridor; a refine_current_idea turn reaches
-    the edit planner, whose stated-operation union injects the typed
-    inclusion as an add. A model-labelled "append" is already the product
-    rule and is deliberately left untouched.
+    A reply that resolves entirely as one asset carried no words that could
+    express an operation, so a guessed "replace" label and an empty universe
+    are both unevidenced shapes of the same answer, and the product rule is
+    append. answer_pending_need continue turns take the provider-resolution
+    append corridor; refine_current_idea turns reach the edit planner, whose
+    stated-operation union injects the inclusion as an add. A model-labelled
+    "append" is already the product rule and is left untouched.
     """
     draft = response.candidate_strategy_draft
     if _selected_requested_field_base(request) != "asset_universe":

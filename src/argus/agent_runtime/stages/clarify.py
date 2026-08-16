@@ -690,10 +690,9 @@ def _blocking_unsupported_constraints(
 ) -> tuple[list[dict[str, object]], list[str]]:
     """Return the constraints that block this turn and the categories deferred.
 
-    A deferral deletes a typed model fact from the user-facing turn, so it
-    must leave a turn-correlated receipt (AGENTS.md: an unmeasured
-    compensation layer hides model decay); the caller stamps the deferred
-    categories into the clarification sidecar.
+    A deferral deletes a typed model fact from the user-facing turn; the
+    caller stamps the deferred categories into the clarification sidecar as
+    the turn-correlated receipt.
     """
     if not unsupported_constraints:
         return [], []

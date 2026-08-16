@@ -1,21 +1,14 @@
 """Typed asset-role constraints for artifact edit materialization.
 
-The single-choice ``asset_universe_operation`` label cannot say whether
-"replace" meant "this is the whole new set" or "swap these members"; the
-typed inclusion/exclusion roles can. These helpers let roles outrank carried
-or context-injected ``asset_universe`` copies and prove a materialization
-satisfies the roles.
-
-Every symbol in an accepted materialization must trace to typed evidence: the
-current card, a typed inclusion, or a grounded member of the flat request. A
-mere message mention is never enough to add an asset, and a typed exclusion
-is never enough to remove one unless the message or the card grounds it
-(callers own that grounding gate). Overrides log here and the accepted plan's
-response carries ``asset_exclusions_outranked_universe_copy``; refusals fall
-through to the operation-clarification fallback, whose
-``asset_universe_operation_needs_clarification`` reason code is the
-turn-correlated receipt for this module's refusal (AGENTS.md: redundancy over
-a model read must be observable).
+The single-choice ``asset_universe_operation`` label cannot distinguish "this
+is the whole new set" from "swap these members"; the typed inclusion/exclusion
+roles can, so roles outrank carried or context-injected ``asset_universe``
+copies. Every symbol in an accepted materialization must trace to typed
+evidence: the current card, a typed inclusion, or a grounded member of the
+flat request — a mere message mention never adds an asset. Overrides log here
+and stamp ``asset_exclusions_outranked_universe_copy`` on the accepted plan's
+response; a refusal's turn-correlated receipt is the fallback clarification's
+``asset_universe_operation_needs_clarification`` code.
 """
 
 from __future__ import annotations
@@ -56,18 +49,15 @@ def asset_role_constraints_satisfied(
 ) -> bool:
     """Prove a materialization satisfies the typed asset roles.
 
-    When exclusions name current card members, the user said what leaves and
-    everything un-named stays, whatever the operation label says. This swap
-    reading deliberately outranks the whole-set reading of "replace": the two
-    are indistinguishable at the typed level ("drop AAPL, just use TSLA from
-    now on" and "remove AAPL and replace with TSLA and GOOGL" produce the
-    same role shape with opposite intents), the locked eval fixture
-    `action_chip_change_asset_compound_replace_issue_188` encodes the swap
-    reading, and the failure modes are asymmetric: swap-precedence worst-case
-    re-asks a whole-set turn, while replace-precedence worst-case silently
-    wipes card members the user never named. The label breaks ties only
-    where the roles are silent: a replace with pure keep-out exclusions
-    states the whole new set, and anything else licenses no drop at all.
+    Exclusions naming current card members license exactly those removals and
+    everything un-named stays, whatever the operation label says; this swap
+    reading deliberately outranks the whole-set reading of "replace" (the two
+    are indistinguishable at the typed level, the locked eval fixture
+    `action_chip_change_asset_compound_replace_issue_188` encodes the swap,
+    and a re-ask on a whole-set turn beats a silent wipe of un-named
+    members). The label breaks ties only where the roles are silent: a
+    replace with pure keep-out exclusions states the whole new set, and
+    anything else licenses no drop at all.
     """
 
     grounded_primary_requested = {
