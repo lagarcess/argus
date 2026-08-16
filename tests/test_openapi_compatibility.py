@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 import yaml
 from argus.api import openapi_compat
+from argus.api.main import app
 from argus.api.ops_contract import (
     ACCESS_REQUEST_APPROVE_PATH,
     REQUESTED_SIGNUP_DENIAL_PATH,
 )
-from argus.api.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = ROOT / "docs" / "api" / "openapi.yaml"
