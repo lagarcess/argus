@@ -207,11 +207,16 @@ def test_unsupported_run_request_is_never_answered_with_asset_stats(
     monkeypatch,
 ) -> None:
     # "Backtest weekly options on apple over 2024" arrives typed
-    # unsupported_request with AAPL restored by the audits. Declining must not
-    # depend on the classifier agreeing: a draw that reads the turn as
-    # market_stats is exactly how the underlying stock's statistics shipped as
-    # a fake options result, so the classifier is pinned to that wrong answer
-    # here and the turn must still decline on its typed facts alone.
+    # unsupported_request with AAPL restored by the audits. A draw that reads
+    # the turn as market_stats is exactly how the underlying stock's
+    # statistics shipped as a fake options result, so the classifier is pinned
+    # to that wrong answer here and the turn must still decline. The
+    # classifier is still consulted first, because the act label can be wrong
+    # too and a genuine question mislabelled unsupported_request must keep
+    # reaching it (test_recognition_contract_guards.py). Two reads that misfire
+    # in opposite directions: the classifier decides whether this is a
+    # question, the typed refusal decides that a claimed one is not answered
+    # from the underlying.
     calls: list[str] = []
 
     async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
@@ -237,9 +242,10 @@ def test_unsupported_run_request_is_never_answered_with_asset_stats(
     )
 
     assert result is None
-    # Decided on the typed refusal plus the described test, before any
-    # classification call, so a wrong draw cannot answer this turn.
-    assert calls == []
+    # Consulted, then overridden: the classifier keeps owning whether a turn
+    # is a question, and the typed refusal keeps a claimed one from being
+    # answered with the underlying's statistics.
+    assert calls == ["classified"]
 
 
 def test_unsupported_turn_with_unavailable_classifier_declines(

@@ -127,6 +127,10 @@ cases:
       offered:
         actionable: true
         min_discovery_rows: 1
+        # The founder-facing symptom: a reply that found real names, could
+        # not offer them, and said none of it. Naming the drop is the
+        # difference between a dead end and progress.
+        names_unavailable: true
     prose_judge:
       criteria: ["honesty", "no_raw_runtime_error"]
 

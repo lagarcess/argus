@@ -415,6 +415,11 @@ async def _legacy_kind_result(
     # must stay function-scoped.
     from argus.agent_runtime import knowledge_answer as ka
 
+    # The rail's classifier has already claimed this turn as answerable. A
+    # typed refusal that names an asset and the user's own window is still a
+    # refusal, and its recovery route outranks a readout of the underlying.
+    if ka.refusal_route_survives_classification(interpretation):
+        return None
     legacy = ka.KnowledgeQueryExtraction(
         question_kind=query.question_kind,  # type: ignore[arg-type]
         symbols=query.symbols,

@@ -233,23 +233,6 @@ async def knowledge_answer_stage_result(
             categories=[item.category for item in interpretation.unsupported_constraints],
         )
         return None
-    if _describes_a_test_it_cannot_run(interpretation):
-        # unsupported_request is a knowledge act so plain capability questions
-        # can be answered. A turn that already describes a test, a resolved
-        # asset plus a window the user named, is not asking a question: it is
-        # a refusal decision with recovery options. Whether the primary read
-        # also filled unsupported_constraints is a coin flip, so the typed
-        # facts of the turn decide the route rather than one classifier call.
-        if _UNSUPPORTED_PAYLOAD_REASON_CODE not in interpretation.reason_codes:
-            interpretation.reason_codes.append(_UNSUPPORTED_PAYLOAD_REASON_CODE)
-        logger.info(
-            "Knowledge claim stood down for an unsupported request that "
-            "describes a test assets={} date_range={}",
-            list(getattr(interpretation.candidate_strategy_draft, "asset_universe", [])),
-            getattr(interpretation.candidate_strategy_draft, "date_range", None),
-            failure_classification="unsupported_execution_kept_recovery_route",
-        )
-        return None
     rail_claim = _rail_may_claim_clarification(interpretation)
     if (
         strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
@@ -287,6 +270,8 @@ async def knowledge_answer_stage_result(
     )
     if query is None or query.question_kind in ("concept", "none"):
         return None
+    if refusal_route_survives_classification(interpretation):
+        return None
     answer: str | None = None
     reason_code = ""
     if query.question_kind == "market_stats":
@@ -314,6 +299,35 @@ async def knowledge_answer_stage_result(
         query=query,
         user=user,
     )
+
+
+def refusal_route_survives_classification(
+    interpretation: StructuredInterpretation,
+) -> bool:
+    """Whether a turn the classifier claimed must keep its refusal route.
+
+    Two independent reads can each misfire, in opposite directions, so
+    neither may decide alone. The act label can be wrong, which is why the
+    classifier is always consulted first and owns whether a turn is a
+    question at all. The classifier can also be wrong, and when it claims a
+    turn whose typed draft already names an asset and the window the user
+    gave, that turn is a refusal decision with recovery options rather than
+    a question. Answering it from the underlying's price history is how a
+    run request became a readout. Records itself whenever it fires.
+    """
+    if not _describes_a_test_it_cannot_run(interpretation):
+        return False
+    if _UNSUPPORTED_PAYLOAD_REASON_CODE not in interpretation.reason_codes:
+        interpretation.reason_codes.append(_UNSUPPORTED_PAYLOAD_REASON_CODE)
+    draft = interpretation.candidate_strategy_draft
+    logger.info(
+        "Knowledge claim stood down after classification for an unsupported "
+        "request that describes a test assets={} date_range={}",
+        list(getattr(draft, "asset_universe", None) or []),
+        getattr(draft, "date_range", None),
+        failure_classification="unsupported_execution_kept_recovery_route",
+    )
+    return True
 
 
 async def _classify_question(
