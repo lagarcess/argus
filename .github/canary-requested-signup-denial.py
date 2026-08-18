@@ -6,9 +6,15 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from argus.api.ops_contract import REQUESTED_SIGNUP_DENIAL_PATH  # noqa: E402
 
 PROBE = "disabled_signup_denial"
 ATTEMPTS = 2
@@ -38,15 +44,15 @@ def _response_payload(body: bytes) -> dict[str, Any]:
 
 
 def _policy_body(values: dict[str, str]) -> bytes:
-    return json.dumps(
-        {"email": values["CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL"]}
-    ).encode("utf-8")
+    return json.dumps({"email": values["CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL"]}).encode(
+        "utf-8"
+    )
 
 
 def _request_denial(values: dict[str, str]) -> tuple[int, dict[str, Any]]:
     api_url = values["CANARY_REQUESTED_SIGNUP_DENIAL_API_URL"].rstrip("/")
     request = Request(
-        f"{api_url}/api/v1/internal/canary/requested-signup-denial",
+        f"{api_url}{REQUESTED_SIGNUP_DENIAL_PATH}",
         data=_policy_body(values),
         headers={
             "Authorization": (

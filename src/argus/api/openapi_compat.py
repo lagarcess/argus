@@ -25,6 +25,11 @@ import copy
 import json
 from typing import Any
 
+from argus.api.ops_contract import (
+    ACCESS_REQUEST_APPROVE_PATH,
+    REQUESTED_SIGNUP_DENIAL_PATH,
+)
+
 API_PREFIX = "/api/v1"
 
 # The approved exclusion list. No public /api/v1 product route may hide
@@ -33,8 +38,8 @@ EXCLUDED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("get", "/health"),
         ("get", "/internal/readiness"),
-        ("post", "/internal/access-requests/approve"),
-        ("post", "/internal/canary/requested-signup-denial"),
+        ("post", ACCESS_REQUEST_APPROVE_PATH),
+        ("post", REQUESTED_SIGNUP_DENIAL_PATH),
         ("post", "/api/v1/dev/reset"),
     }
 )

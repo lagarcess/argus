@@ -118,30 +118,126 @@ def test_gateway_loads_only_active_requested_access() -> None:
     query.is_.assert_called_once_with("disabled_at", "null")
 
 
-@pytest.mark.parametrize(("updated_rows", "expected"), [([{"role": "user"}], True), ([], False)])
-def test_gateway_approval_is_requested_to_user_compare_and_set(
-    updated_rows: list[dict[str, str]],
-    expected: bool,
-) -> None:
+def test_gateway_loads_access_welcome_delivery_with_normalized_email() -> None:
     query = MagicMock()
-    query.update.return_value = query
+    query.select.return_value = query
     query.eq.return_value = query
-    query.is_.return_value = query
-    query.execute.return_value.data = updated_rows
+    query.limit.return_value = query
+    query.execute.return_value.data = [
+        {
+            "recipient_email": "person@example.com",
+            "language": "es-419",
+            "content_version": "private-alpha-access-welcome/v1",
+            "subject": "Bienvenido a Argus",
+            "provider_receipt": "synthetic-provider-receipt",
+            "sent_at": "2026-08-12T14:27:17Z",
+        }
+    ]
     gateway = SupabaseGateway(client=MagicMock())
     gateway.client.table.return_value = query
 
-    approved = gateway.approve_requested_private_alpha_access(
-        email=" Person@Example.COM "
+    row = gateway.get_private_alpha_access_welcome_delivery(" Person@Example.COM ")
+
+    assert row == query.execute.return_value.data[0]
+    gateway.client.table.assert_called_once_with(
+        "private_alpha_access_welcome_deliveries"
+    )
+    query.select.assert_called_once_with(
+        "recipient_email,language,content_version,subject,provider_receipt,sent_at"
+    )
+    query.eq.assert_called_once_with("recipient_email", "person@example.com")
+    query.limit.assert_called_once_with(1)
+
+
+@pytest.mark.parametrize("send_allowed", [True, False])
+def test_gateway_claims_access_welcome_before_send(
+    send_allowed: bool,
+) -> None:
+    claim = {
+        "recipient_email": "person@example.com",
+        "language": "es-419",
+        "content_version": "private-alpha-access-welcome/v1",
+        "subject": "Bienvenido a Argus",
+        "claim_token": "11111111-1111-4111-8111-111111111111",
+        "claimed_at": "2026-08-12T14:27:17Z",
+        "send_allowed": send_allowed,
+    }
+    rpc = MagicMock()
+    rpc.execute.return_value.data = [claim]
+    client = MagicMock()
+    client.rpc.return_value = rpc
+    gateway = SupabaseGateway(client=client)
+
+    result = gateway.claim_private_alpha_access_welcome(
+        email=" Person@Example.COM ",
+        language="es-419",
+        content_version="private-alpha-access-welcome/v1",
+        subject="Bienvenido a Argus",
     )
 
-    assert approved is expected
-    update_payload = query.update.call_args.args[0]
-    assert update_payload["role"] == "user"
-    assert "updated_at" in update_payload
-    assert query.eq.call_args_list[0].args == ("email", "person@example.com")
-    assert query.eq.call_args_list[1].args == ("role", "requested")
-    query.is_.assert_called_once_with("disabled_at", "null")
+    assert result == claim
+    client.rpc.assert_called_once_with(
+        "claim_private_alpha_access_welcome",
+        {
+            "p_email": "person@example.com",
+            "p_language": "es-419",
+            "p_content_version": "private-alpha-access-welcome/v1",
+            "p_subject": "Bienvenido a Argus",
+        },
+    )
+    rpc.execute.assert_called_once_with()
+
+
+@pytest.mark.parametrize(("database_result", "expected"), [(True, True), (False, False)])
+def test_gateway_completes_access_welcome_through_rpc(
+    database_result: bool,
+    expected: bool,
+) -> None:
+    rpc = MagicMock()
+    rpc.execute.return_value.data = database_result
+    client = MagicMock()
+    client.rpc.return_value = rpc
+    gateway = SupabaseGateway(client=client)
+
+    completed = gateway.complete_private_alpha_access_welcome(
+        email=" Person@Example.COM ",
+        language="es-419",
+        content_version="private-alpha-access-welcome/v1",
+        subject="Bienvenido a Argus",
+        provider_receipt="synthetic-provider-receipt",
+        claim_token="11111111-1111-4111-8111-111111111111",
+    )
+
+    assert completed is expected
+    client.rpc.assert_called_once_with(
+        "complete_private_alpha_access_welcome",
+        {
+            "p_email": "person@example.com",
+            "p_language": "es-419",
+            "p_content_version": "private-alpha-access-welcome/v1",
+            "p_subject": "Bienvenido a Argus",
+            "p_provider_receipt": "synthetic-provider-receipt",
+            "p_claim_token": "11111111-1111-4111-8111-111111111111",
+        },
+    )
+
+
+def test_gateway_releases_expired_access_welcome_claims_through_rpc() -> None:
+    rpc = MagicMock()
+    rpc.execute.return_value.data = 3
+    client = MagicMock()
+    client.rpc.return_value = rpc
+    gateway = SupabaseGateway(client=client)
+
+    released = gateway.release_expired_private_alpha_access_welcome_claims()
+
+    assert released == 3
+    client.rpc.assert_called_once_with(
+        "release_expired_private_alpha_access_welcome_claims",
+        {},
+    )
+
+    rpc.execute.assert_called_once_with()
 
 
 def test_public_access_request_normalizes_and_returns_non_enumerating_202(

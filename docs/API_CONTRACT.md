@@ -1747,13 +1747,40 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   when the public gate is closed instead, neither role admits the email.
 - `POST /internal/access-requests/approve` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
-  method and path. It loads one active requested row and its language, sends
-  one localized approval email linking to
-  `${ARGUS_APP_ORIGIN}/?auth=signup`, then compare-and-sets
-  `role=requested AND disabled_at IS NULL` to `role=user`. Missing
-  configuration, missing or disabled state, SMTP failure, and a compare-and-set
-  miss do not return success. Missing or invalid ops authorization returns
-  `404`.
+  method and path. For a new approval, it loads the requested language only to
+  prepare the candidate content, then calls the service-only claim RPC. The
+  claim RPC row-locks and revalidates the normalized active `requested` row and
+  durably stores the recipient, language, fixed content version, subject,
+  opaque claim token, and claim time before SMTP. Only an eligible claim inside
+  the provider's 24-hour idempotency window may send the localized welcome to
+  `${ARGUS_APP_ORIGIN}/?auth=signup`.
+- Compatible retries inside that window reuse the same durable claim token and
+  therefore the same SMTP idempotency key. An open claim at or beyond 24 hours
+  fails closed without SMTP; the operation does not create a fresh claim
+  automatically. The `release_expired_private_alpha_access_welcome_claims()`
+  RPC is the executable reconciliation path: `service_role` may call it, the
+  scheduled maintenance pass runs it daily, and it deletes claims older than
+  48 hours so the next approval mints a fresh claim. Editing an allowlist row
+  while a claim is open does not fail; the edited state simply makes that
+  claim fail closed at completion.
+- The completion RPC validates the claim, records the provider-accepted
+  delivery, deletes the claim, and promotes
+  `role=requested AND disabled_at IS NULL` to `role=user` in one transaction.
+  The protected operation plus its claim and completion RPCs are the sole
+  `requested`-to-`user` promotion boundary; operational callers must not patch
+  that role directly. The route path is owned by
+  `ACCESS_REQUEST_APPROVE_PATH` in `src/argus/api/ops_contract.py`.
+- The normalized recipient has at most one access-welcome delivery record,
+  describing the latest grant. A repeated approval of an already-active
+  `user` replays the recorded completion without calling SMTP and returns the
+  unchanged `{"approved":true}` response. A fresh `requested` row for an email
+  with an older delivery record is a new grant: the approval sends a new
+  localized welcome and the completion replaces the stored delivery. Delivery
+  existence alone
+  never grants access: the RPC still rejects missing, disabled, privileged, or
+  otherwise ineligible allowlist rows. Missing configuration, missing or
+  disabled state, SMTP failure, database failure, and a completion miss do not
+  return success. Missing or invalid ops authorization returns `404`.
 - `POST /internal/canary/requested-signup-denial` is an ops-token-protected,
   non-product operation excluded from the public OpenAPI artifact by exact
   method and path. It reports whether a supplied email would be denied by the
