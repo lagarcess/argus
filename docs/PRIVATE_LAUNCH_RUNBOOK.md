@@ -127,6 +127,21 @@ hash, ledger before and after, and affected-object readback in the release
 manifest. Then rerun the same gate. Do not deploy until the rerun reports
 `status=pass`, and attach its JSON as durable release evidence.
 
+**Migrations that create functions the shipping code calls must be applied
+before the deploy, not after.** A deploy that lands first runs new code against
+a schema that lacks the objects it calls, and the failure surfaces as production
+behavior rather than a gate result. The first promotion carrying PR #476 is the
+live case: `.github/canary-render.sh` and the ops approve route call five
+functions created by
+`20260816150000_scope_access_welcome_enforcement.sql` and its two predecessors,
+including `delete_private_alpha_access_welcome_artifacts`, which is how the
+daily canary tears down the allowlist and delivery rows it creates. Deploy
+before applying and the canary creates rows it cannot delete, on every run,
+in production.
+
+State the intended order explicitly in the manifest for any promotion carrying
+a migration, so the operator cannot get it backwards from the checklist alone.
+
 4. Land or read back the candidate on `main` without rewriting the gated
    commit. Keep the checkout on the gated candidate and rerun the same
    executable gate in landed-ref mode:
@@ -268,7 +283,8 @@ separate fail-red jobs, so one cannot hide or relabel a failure in the other.
 
 - **Release coherence** checks the exact deployed SHA across API, app, and
   `argus-backtests`; runs the release-config audit, warmup, and live-provider
-  workflow proof; and keeps the direct API signup-denial probe.
+  workflow proof; and keeps the direct API signup-denial probe plus the
+  access-approval welcome-email proof.
 - **Authenticated browser journey** starts from a private Playwright storage
   state, loads the Spanish chat directly, completes one real backtest, records
   the decision, reloads the result, and reopens it through Omnisearch. It never
@@ -279,19 +295,38 @@ separate fail-red jobs, so one cannot hide or relabel a failure in the other.
 
 The disabled-email denial check belongs only to release coherence. The runner
 creates a `user` allowlist row with `disabled_at` set, then
-`.github/canary-requested-signup-denial.py` calls the ops-authenticated
-`POST /api/v1/internal/canary/requested-signup-denial` policy endpoint and
-requires `200 {"denied": true}`. The probe never calls the signup provider or
-CAPTCHA. `verify_no_signup_auth_identity` confirms that it created no Auth user,
-and the exit trap removes the temporary allowlist row. Do not move this probe
+`.github/canary-requested-signup-denial.py` sends that address to the
+ops-authenticated route owned by `REQUESTED_SIGNUP_DENIAL_PATH` in
+`src/argus/api/ops_contract.py` and requires `200 {"denied": true}`. This proves
+the disabled row is blocked with public access on and with the allowlist-only
+emergency rollback. The probe never calls the signup provider or CAPTCHA, so it
+cannot create an auth identity. `verify_no_signup_auth_identity` asserts that
+none exists before the canary stages the same row as an active `requested` row
+and calls the protected access-approval operation. That operation sends the real
+localized welcome, records the provider-accepted delivery, and promotes the row
+to `user` atomically; the canary then reads the delivery row back and requires
+a provider receipt stamped inside this run, so a stopped-sending regression
+cannot score green. A unique generated address scoped to the run identity
+forces every canary attempt through the first-send path instead of delivery
+replay. The exit trap deletes any resulting auth identity and allowlist row,
+removes the run's claim and delivery rows through the service-reachable
+`delete_private_alpha_access_welcome_artifacts` cleanup, then reads back that
+no matching auth identity remains. If an approval fails after its claim is
+written, the claim blocks that address's SMTP for 24 hours and the daily
+maintenance pass releases it after 48; an operator can release immediately with
+`release_expired_private_alpha_access_welcome_claims()`. Do not move this probe
 into Playwright, enable its temporary identity for browser use, or weaken
 Turnstile anywhere deployed.
 
-For a local release-coherence run:
+For a local release-coherence run, generate a fresh non-secret nonce for every
+attempt. Local mode is available only when both GitHub run identity variables
+are absent. Do not combine the local nonce with GitHub identity variables or
+override the generated signup email.
 
 ```bash
 mkdir -p temp/release-evidence
 ARGUS_CANARY_SURFACE=release-coherence \
+ARGUS_CANARY_LOCAL_RUN_NONCE="$(poetry run python -c 'import secrets; print(secrets.token_hex(12))')" \
 ARGUS_CANARY_SHA="$(git rev-parse HEAD)" \
 ARGUS_CANARY_HARNESS_SHA="$(git rev-parse HEAD)" \
 ARGUS_CANARY_EVIDENCE_PATH=temp/release-evidence/release-coherence.json \
@@ -568,6 +603,84 @@ Supabase Authentication URL Configuration must set Site URL to
 `https://argus-app-suz5.onrender.com/auth/recovery`; keep the Render origin
 during the transition, because an unlisted redirect silently falls back to Site
 URL instead of returning an error.
+
+### Requested Access Promotion
+
+Promote an active `requested` row only through the ops route owned by
+`ACCESS_REQUEST_APPROVE_PATH` in `src/argus/api/ops_contract.py`,
+`POST /internal/access-requests/approve`. Never PATCH
+`private_alpha_allowlist.role` to `user` directly. The protected operation sends
+the localized access welcome, records the provider-accepted delivery, and then
+activates access through the database completion boundary. This is the only
+human promotion command:
+
+```bash
+(
+set -euo pipefail
+source .github/argus-env.sh
+argus_load_root_env >/dev/null || true
+REQUESTED_EMAIL="<requested email>"
+OPS_CURL_CONFIG="$(mktemp)"
+APPROVAL_REQUEST="$(mktemp)"
+APPROVAL_RESPONSE="$(mktemp)"
+trap 'rm -f "$OPS_CURL_CONFIG" "$APPROVAL_REQUEST" "$APPROVAL_RESPONSE"' EXIT
+chmod 600 "$OPS_CURL_CONFIG" "$APPROVAL_REQUEST" "$APPROVAL_RESPONSE"
+printf 'header = "Authorization: Bearer %s"\n' "$ARGUS_OPS_TOKEN" > "$OPS_CURL_CONFIG"
+REQUESTED_EMAIL="$REQUESTED_EMAIL" python3 - "$APPROVAL_REQUEST" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+email = os.environ["REQUESTED_EMAIL"].strip().casefold()
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps({"email": email}, separators=(",", ":")),
+    encoding="utf-8",
+)
+PY
+APPROVE_PATH="$(python3 -c 'import sys; sys.path.insert(0, "src"); from argus.api.ops_contract import ACCESS_REQUEST_APPROVE_PATH; print(ACCESS_REQUEST_APPROVE_PATH)')"
+curl -q --fail --silent --show-error \
+  --config "$OPS_CURL_CONFIG" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  --data-binary "@$APPROVAL_REQUEST" \
+  "${ARGUS_PRIVATE_LAUNCH_API_URL}${APPROVE_PATH}" \
+  > "$APPROVAL_RESPONSE"
+python3 - "$APPROVAL_RESPONSE" <<'PY'
+import json
+import pathlib
+import sys
+
+try:
+    payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    raise SystemExit("access request promotion returned an invalid response") from exc
+if (
+    not isinstance(payload, dict)
+    or set(payload) != {"approved"}
+    or payload["approved"] is not True
+):
+    raise SystemExit("access request promotion was not approved")
+PY
+)
+```
+
+Success is exactly `{"approved":true}`. Missing or invalid ops authorization
+remains route-indistinguishable `404`. Missing configuration, ineligible state,
+email-provider failure, delivery persistence failure, and completion failure
+remain generic errors. Do not expose provider detail or infer approval from an
+error response.
+
+Support may read only the private
+`private_alpha_access_welcome_deliveries` record through existing privileged
+operational access. Its support-readable fields are `recipient_email`,
+`language`, `content_version`, `subject`, `provider_receipt`, `sent_at`, and
+`created_at`. Browser roles have no access to this table. The record is delivery
+evidence; the guarded completion operation remains access truth.
+
+**Consent scope: transactional only.** The requested access grant does not
+authorize product updates, tips, re-engagement, follow-up mail, broadcasts,
+campaigns, onboarding sequences, or any other marketing email.
 
 Keep true secrets manual in Render:
 

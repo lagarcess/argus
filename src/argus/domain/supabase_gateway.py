@@ -386,17 +386,70 @@ class SupabaseGateway(
             return None
         return row
 
-    def approve_requested_private_alpha_access(self, *, email: str) -> bool:
-        updated = (
-            self.client.table("private_alpha_allowlist")
-            .update({"role": "user", "updated_at": _now_iso()})
-            .eq("email", _normalize_email(email))
-            .eq("role", "requested")
-            .is_("disabled_at", "null")
+    def get_private_alpha_access_welcome_delivery(
+        self,
+        email: str,
+    ) -> dict[str, Any] | None:
+        rows = (
+            self.client.table("private_alpha_access_welcome_deliveries")
+            .select(
+                "recipient_email,language,content_version,subject,"
+                "provider_receipt,sent_at"
+            )
+            .eq("recipient_email", _normalize_email(email))
+            .limit(1)
             .execute()
         )
-        row = _row_one(updated)
-        return bool(row and row.get("role") == "user")
+        return _row_one(rows)
+
+    def claim_private_alpha_access_welcome(
+        self,
+        *,
+        email: str,
+        language: Language,
+        content_version: str,
+        subject: str,
+    ) -> dict[str, Any] | None:
+        result = self.client.rpc(
+            "claim_private_alpha_access_welcome",
+            {
+                "p_email": _normalize_email(email),
+                "p_language": language,
+                "p_content_version": content_version,
+                "p_subject": subject,
+            },
+        ).execute()
+        return _row_one(result)
+
+    def complete_private_alpha_access_welcome(
+        self,
+        *,
+        email: str,
+        language: Language,
+        content_version: str,
+        subject: str,
+        provider_receipt: str,
+        claim_token: str | None,
+    ) -> bool:
+        result = self.client.rpc(
+            "complete_private_alpha_access_welcome",
+            {
+                "p_email": _normalize_email(email),
+                "p_language": language,
+                "p_content_version": content_version,
+                "p_subject": subject,
+                "p_provider_receipt": provider_receipt,
+                "p_claim_token": claim_token,
+            },
+        ).execute()
+        return result.data is True
+
+    def release_expired_private_alpha_access_welcome_claims(self) -> int:
+        result = self.client.rpc(
+            "release_expired_private_alpha_access_welcome_claims",
+            {},
+        ).execute()
+        return int(result.data or 0)
 
     def login(
         self,

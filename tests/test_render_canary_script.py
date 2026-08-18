@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts.ops.canary_capture_replay import replay_capture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,15 +18,35 @@ def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def _shell_function(source: str, name: str) -> str:
+    return source.split(f"{name}() {{", 1)[1].split("\n}", 1)[0]
+
+
+def _approval_validator_source(container: str, response_file: str) -> str:
+    marker = f"python3 - \"${response_file}\" <<'PY'"
+    return container.split(marker, 1)[1].split("\nPY", 1)[0]
+
+
+def _approval_validator_result(
+    validator_source: str, response_path: Path, payload: object
+) -> subprocess.CompletedProcess[str]:
+    response_path.write_text(json.dumps(payload), encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, "-c", validator_source, str(response_path)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def test_canary_defaults_to_private_launch_urls() -> None:
     source = _source(".github/canary-render.sh")
     env_source = _source(".github/argus-env.sh")
 
     assert 'APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"' in source
     assert 'API_URL="${ARGUS_CANARY_API_URL:-$ARGUS_PRIVATE_LAUNCH_API_URL}"' in source
-    assert (
-        'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
-    )
+    assert 'ARGUS_PRIVATE_LAUNCH_APP_URL="https://arguschat.ai"' in env_source
     assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"' in env_source
 
 
@@ -33,7 +55,11 @@ def test_canary_requires_surface_specific_inputs_without_echoing_secrets() -> No
 
     assert 'EMAIL="${ARGUS_CANARY_EMAIL:-${MOCK_USER_EMAIL:-}}"' in source
     assert 'PASSWORD="${ARGUS_CANARY_PASSWORD:-${MOCK_USER_PASSWORD:-}}"' in source
-    assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"' in source
+    assert 'SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"' in source
+    assert 'SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"' in source
+    assert 'SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"' in source
+    assert "resolve_signup_identity" in source
+    assert "ARGUS_CANARY_SIGNUP_EMAIL:-" not in source
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
     assert 'fail_canary "auth" "missing_canary_email"' in source
     assert 'fail_canary "auth" "missing_canary_password"' not in source
@@ -130,15 +156,17 @@ def test_browser_starts_authenticated_and_preserves_the_spanish_release_gate() -
     assert "page.waitForURL(/\\/chat" in browser_source
 
 
-def test_release_coherence_prepares_and_cleans_pinned_denial_identity() -> None:
+def test_release_coherence_prepares_and_cleans_a_unique_signup_identity() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
 
-    assert 'SIGNUP_EMAIL="${ARGUS_CANARY_SIGNUP_EMAIL:-delivered@resend.dev}"' in (
-        shell_source
-    )
+    assert 'SIGNUP_RUN_ID="${GITHUB_RUN_ID:-}"' in shell_source
+    assert 'SIGNUP_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-}"' in shell_source
+    assert 'SIGNUP_LOCAL_NONCE="${ARGUS_CANARY_LOCAL_RUN_NONCE:-}"' in shell_source
+    assert "resolve_signup_identity" in shell_source
     assert 'CANARY_REQUESTED_SIGNUP_DENIAL_EMAIL="$SIGNUP_EMAIL"' in shell_source
     assert "ARGUS_CANARY_BROWSER_SIGNUP_EMAIL" not in runner_source
+    assert "SIGNUP_EMAIL" not in runner_source
     assert "signup_identity_is_safe" in shell_source
     assert "prepare_signup_identity" in shell_source
     assert "delete_signup_auth_identity" in shell_source
@@ -146,22 +174,18 @@ def test_release_coherence_prepares_and_cleans_pinned_denial_identity() -> None:
     assert "cleanup_signup_identity" in shell_source
     assert "trap cleanup EXIT" in shell_source
 
-    prepare_body = shell_source.split("prepare_signup_identity() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    prepare_body = _shell_function(shell_source, "prepare_signup_identity")
     assert prepare_body.index("delete_signup_auth_identity") < prepare_body.index(
         "insert_disabled_signup_allowlist"
     )
 
-    cleanup_body = shell_source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
+    cleanup_body = _shell_function(shell_source, "cleanup")
     assert "cleanup_signup_identity" in cleanup_body
     assert cleanup_body.index("cleanup_signup_identity") < cleanup_body.index(
         'rm -f "$BROWSER_AUTH_CURL_CONFIG"'
     )
 
-    delete_body = shell_source.split("delete_signup_auth_identity() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    delete_body = _shell_function(shell_source, "delete_signup_auth_identity")
     assert delete_body.count("collect_signup_auth_user_ids") == 2
     assert '[ ! -s "$SIGNUP_AUTH_USER_IDS" ]' in delete_body
 
@@ -176,27 +200,65 @@ def test_release_coherence_prepares_and_cleans_pinned_denial_identity() -> None:
     )
 
 
-def test_release_coherence_denies_signup_without_browser_enablement() -> None:
+def test_release_coherence_denies_disabled_signup_before_welcome_approval() -> None:
     shell_source = _source(".github/canary-render.sh")
     runner_source = _source(".github/canary-browser.sh")
     release_body = shell_source.split("run_release_coherence_surface() {", 1)[1].split(
         "\n}", 1
     )[0]
+    staging_body = _shell_function(shell_source, "stage_requested_signup_allowlist")
+    approval_body = _shell_function(shell_source, "approve_requested_signup_allowlist")
 
     assert '"role": "user"' in shell_source
     assert '"disabled_at":' in shell_source
     assert "run_disabled_signup_denial_canary" in shell_source
     assert "verify_no_signup_auth_identity" in shell_source
+    assert "stage_requested_signup_allowlist" in shell_source
+    assert "approve_requested_signup_allowlist" in shell_source
     assert "enable_disabled_signup_allowlist" not in shell_source
-    assert "role=eq.user" not in shell_source
-    assert "disabled_at=not.is.null" not in shell_source
     assert "-d '{\"disabled_at\":null}'" not in shell_source
+    assert 'OPS_CURL_CONFIG="$(mktemp)"' in shell_source
+    assert 'SIGNUP_APPROVAL_REQUEST="$(mktemp)"' in shell_source
+    assert 'chmod 600 "$OPS_CURL_CONFIG"' in shell_source
+    assert 'chmod 600 "$SIGNUP_APPROVAL_REQUEST"' in shell_source
+    assert 'rm -f "$OPS_CURL_CONFIG"' in shell_source
+    assert 'rm -f "$SIGNUP_APPROVAL_REQUEST"' in shell_source
+    assert 'fail_canary "auth" "missing_ops_token"' in shell_source
+    assert 'header = "Authorization: Bearer %s"' in shell_source
+    assert '"$OPS_TOKEN"' in shell_source
+    approval_curl_line = next(
+        line.strip() for line in approval_body.splitlines() if "curl " in line
+    )
+    assert approval_curl_line.startswith("curl -q ")
+    assert '--config "$OPS_CURL_CONFIG"' in approval_body
+    assert '"${API_URL}${approve_path}"' in approval_body
+    assert "/internal/access-requests/approve" not in shell_source
+    resolver_body = _shell_function(shell_source, "resolve_approve_path")
+    assert "from argus.api.ops_contract import ACCESS_REQUEST_APPROVE_PATH" in (
+        resolver_body
+    )
+    assert 'approve_path="$(resolve_approve_path)"' in approval_body
+    assert 'CANARY_SIGNUP_EMAIL="$SIGNUP_EMAIL"' in approval_body
+    assert ".strip().casefold()" in approval_body
+    assert '--data-binary "@$SIGNUP_APPROVAL_REQUEST"' in approval_body
+    assert 'set(payload) != {"approved"}' in approval_body
+    assert 'payload["approved"] is not True' in approval_body
+    assert "service_role_curl" not in approval_body
+    assert "-X PATCH" not in approval_body
+    assert '-d \'{"role":"requested","disabled_at":null}\'' in staging_body
+    assert "role=eq.user" in staging_body
+    assert "disabled_at=not.is.null" in staging_body
+    assert "Authorization: Bearer ${ARGUS_OPS_TOKEN}" not in shell_source
 
     assert (
         release_body.index("prepare_signup_identity")
         < release_body.index("run_disabled_signup_denial_canary")
         < release_body.index("verify_no_signup_auth_identity")
+        < release_body.index("stage_requested_signup_allowlist")
+        < release_body.index("approve_requested_signup_allowlist")
+        < release_body.index("verify_welcome_delivery_recorded")
     )
+    assert "run_browser_canary" not in release_body
 
     assert "ARGUS_CANARY_BROWSER_STORAGE_STATE" in runner_source
     assert "-u SUPABASE_SERVICE_ROLE_KEY" in runner_source
@@ -207,11 +269,109 @@ def test_release_coherence_denies_signup_without_browser_enablement() -> None:
     assert "-u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in shell_source
 
 
-def test_disabled_signup_denial_probes_policy_instead_of_signup() -> None:
+def test_release_coherence_reads_the_delivery_back_and_cleans_artifacts() -> None:
     shell_source = _source(".github/canary-render.sh")
-    denial_body = shell_source.split("run_disabled_signup_denial_canary() {", 1)[1].split(
+    release_body = shell_source.split("run_release_coherence_surface() {", 1)[1].split(
         "\n}", 1
     )[0]
+    readback_body = _shell_function(shell_source, "verify_welcome_delivery_recorded")
+    artifacts_body = _shell_function(shell_source, "cleanup_welcome_artifacts")
+    cleanup_body = _shell_function(shell_source, "cleanup_signup_identity")
+    prepare_body = _shell_function(shell_source, "prepare_signup_identity")
+
+    # The HTTP 200 alone cannot distinguish a real send from a no-send
+    # replay; the canary must read the delivery row written by this run.
+    assert 'fail_canary "auth" "welcome_delivery_not_recorded"' in release_body
+    assert "private_alpha_access_welcome_deliveries" in readback_body
+    assert "provider_receipt" in readback_body
+    assert "sent_at" in readback_body
+    assert "CANARY_RUN_STARTED_AT" in readback_body
+    assert "sent < started" in readback_body
+    assert 'CANARY_RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"' in shell_source
+
+    # Every row the canary writes must be deletable by the canary itself.
+    assert "delete_private_alpha_access_welcome_artifacts" in artifacts_body
+    assert "service_role_curl" in artifacts_body
+    assert "welcome artifact cleanup was refused" in artifacts_body
+    assert cleanup_body.index("delete_signup_allowlist") < cleanup_body.index(
+        "cleanup_welcome_artifacts"
+    )
+    assert prepare_body.index("delete_signup_allowlist") < prepare_body.index(
+        "cleanup_welcome_artifacts"
+    )
+
+
+def test_approval_response_validators_require_exact_boolean_shape(
+    tmp_path: Path,
+) -> None:
+    shell_source = _source(".github/canary-render.sh")
+    approval_body = _shell_function(shell_source, "approve_requested_signup_allowlist")
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    promotion_section = runbook.split("### Requested Access Promotion", 1)[1]
+    validators = (
+        _approval_validator_source(
+            approval_body,
+            "SIGNUP_ALLOWLIST_RESPONSE",
+        ),
+        _approval_validator_source(promotion_section, "APPROVAL_RESPONSE"),
+    )
+    response_path = tmp_path / "approval-response.json"
+
+    for validator_source in validators:
+        assert (
+            _approval_validator_result(
+                validator_source,
+                response_path,
+                {"approved": True},
+            ).returncode
+            == 0
+        )
+        for invalid_payload in (
+            {"approved": 1},
+            {"approved": 1.0},
+            {"approved": True, "unexpected": "field"},
+            {"approved": False},
+            {},
+        ):
+            assert (
+                _approval_validator_result(
+                    validator_source,
+                    response_path,
+                    invalid_payload,
+                ).returncode
+                != 0
+            )
+
+
+def test_runbook_promotion_recipe_is_fail_fast_and_subshell_scoped() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    promotion_section = runbook.split("### Requested Access Promotion", 1)[1]
+    recipe = promotion_section.split("```bash", 1)[1].split("```", 1)[0].strip()
+    curl_line = next(line.strip() for line in recipe.splitlines() if "curl " in line)
+
+    assert recipe.startswith("(\nset -euo pipefail\n")
+    assert recipe.endswith("\n)")
+    assert curl_line.startswith("curl -q ")
+    assert (
+        'trap \'rm -f "$OPS_CURL_CONFIG" "$APPROVAL_REQUEST" '
+        '"$APPROVAL_RESPONSE"\' EXIT'
+    ) in recipe
+    assert 'set(payload) != {"approved"}' in recipe
+    assert 'payload["approved"] is not True' in recipe
+
+
+def test_runbook_generates_a_fresh_local_canary_nonce() -> None:
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    command = runbook.split("mkdir -p temp/release-evidence", 1)[1].split("```", 1)[0]
+
+    assert 'ARGUS_CANARY_LOCAL_RUN_NONCE="$(poetry run python -c' in command
+    assert "secrets.token_hex" in command
+    assert "ARGUS_CANARY_SIGNUP_EMAIL" not in command
+
+
+def test_disabled_signup_denial_probes_policy_instead_of_signup() -> None:
+    shell_source = _source(".github/canary-render.sh")
+    denial_body = _shell_function(shell_source, "run_disabled_signup_denial_canary")
 
     assert "canary-requested-signup-denial.py" in denial_body
     assert 'CANARY_REQUESTED_SIGNUP_DENIAL_API_URL="$API_URL"' in denial_body
@@ -227,18 +387,85 @@ def test_disabled_signup_denial_probes_policy_instead_of_signup() -> None:
     )
 
 
-def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None:
+@pytest.mark.parametrize(
+    ("run_id", "run_attempt", "local_nonce", "expected"),
+    [
+        ("123456", "2", "", "delivered+argus-123456-2@resend.dev"),
+        ("١٢٣", "2", "", None),
+        ("123", "٢", "", None),
+        ("", "", "review-abc123", "delivered+argus-local-review-abc123@resend.dev"),
+        ("", "", "a", None),
+        ("", "", "a" * 43, None),
+    ],
+)
+def test_canary_resolves_ci_and_local_signup_identities(
+    run_id: str, run_attempt: str, local_nonce: str, expected: str | None
+) -> None:
     shell_source = _source(".github/canary-render.sh")
-    function_body = shell_source.split("signup_identity_is_safe() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    function_body = _shell_function(shell_source, "resolve_signup_identity")
+    python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
+    result = subprocess.run(
+        [sys.executable, "-c", python_source],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "CANARY_SIGNUP_RUN_ID": run_id,
+            "CANARY_SIGNUP_RUN_ATTEMPT": run_attempt,
+            "CANARY_SIGNUP_LOCAL_NONCE": local_nonce,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == (0 if expected else 1)
+    assert result.stdout.strip() == (expected or "")
+
+
+@pytest.mark.parametrize(
+    ("run_id", "run_attempt", "local_nonce", "signup_email", "expected"),
+    [
+        ("123456", "2", "", "delivered+argus-123456-2@resend.dev", 0),
+        ("١٢٣", "2", "", "delivered+argus-١٢٣-2@resend.dev", 1),
+        ("123", "٢", "", "delivered+argus-123-٢@resend.dev", 1),
+        ("", "", "review-abc123", "delivered+argus-local-review-abc123@resend.dev", 0),
+        ("", "", "", "", 1),
+        ("123456", "", "", "", 1),
+        ("", "2", "", "", 1),
+        ("123456", "2", "review-abc123", "", 1),
+        ("", "", "Review", "", 1),
+        ("", "", "review_1", "", 1),
+        ("", "", "-review", "", 1),
+        ("", "", "review-", "", 1),
+        ("", "", "a", "delivered+argus-local-a@resend.dev", 1),
+        ("", "", "review-1", "arbitrary@example.com", 1),
+    ],
+)
+def test_canary_rejects_unsafe_signup_identity_modes_before_destructive_setup(
+    run_id: str,
+    run_attempt: str,
+    local_nonce: str,
+    signup_email: str,
+    expected: int,
+) -> None:
+    shell_source = _source(".github/canary-render.sh")
+    function_body = _shell_function(shell_source, "signup_identity_is_safe")
     python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
 
-    def run_safety_check(*, signup_email: str) -> int:
+    def run_safety_check(
+        *,
+        login_email: str,
+        signup_email: str,
+        local_nonce: str,
+    ) -> int:
         env = os.environ.copy()
         env.update(
             {
+                "CANARY_LOGIN_EMAIL": login_email,
                 "CANARY_SIGNUP_EMAIL": signup_email,
+                "CANARY_SIGNUP_RUN_ID": run_id,
+                "CANARY_SIGNUP_RUN_ATTEMPT": run_attempt,
+                "CANARY_SIGNUP_LOCAL_NONCE": local_nonce,
             }
         )
         return subprocess.run(
@@ -252,16 +479,38 @@ def test_canary_rejects_unpinned_signup_email_before_destructive_setup() -> None
 
     assert (
         run_safety_check(
-            signup_email=" delivered@RESEND.dev ",
+            login_email="confirmed@example.com",
+            signup_email=signup_email,
+            local_nonce=local_nonce,
         )
-        == 0
+        == expected
     )
+    if expected == 0:
+        assert (
+            run_safety_check(
+                login_email=signup_email,
+                signup_email=signup_email,
+                local_nonce=local_nonce,
+            )
+            == 1
+        )
+        assert (
+            run_safety_check(
+                login_email="",
+                signup_email=signup_email,
+                local_nonce=local_nonce,
+            )
+            == 0
+        )
     assert (
         run_safety_check(
+            login_email="confirmed@example.com",
             signup_email="arbitrary@example.com",
+            local_nonce=local_nonce,
         )
         != 0
     )
+
     release_body = shell_source.split("run_release_coherence_surface() {", 1)[1].split(
         "\n}", 1
     )[0]
@@ -432,9 +681,10 @@ def test_browser_matches_decision_state_inside_its_localized_template() -> None:
     browser_source = _source("web/e2e/private-alpha-release-canary.spec.ts")
 
     assert "function decisionStateLocator" in browser_source
-    assert "exact: false" in browser_source.split(
-        "function decisionStateLocator", 1
-    )[1].split("\n}", 1)[0]
+    assert (
+        "exact: false"
+        in browser_source.split("function decisionStateLocator", 1)[1].split("\n}", 1)[0]
+    )
     assert browser_source.count("decisionStateLocator(page, canaryDecisionState)") == 2
 
 
@@ -461,7 +711,9 @@ def test_browser_proves_reload_and_omnisearch_source_identity() -> None:
     assert "Omnisearch did not reopen the canonical source conversation" in browser_source
 
 
-def test_api_postcondition_derives_omnisearch_identity_from_conversation_dossier() -> None:
+def test_api_postcondition_derives_omnisearch_identity_from_conversation_dossier() -> (
+    None
+):
     source = _source(".github/canary-render.sh")
     postconditions = source.split("verify_api_postconditions() {", 1)[1].split(
         "\nservice_role_curl()", 1
@@ -697,9 +949,7 @@ def test_browser_failure_recovers_replay_inputs_before_writing_capture() -> None
     browser_failure = source.split("if ! run_browser_canary; then", 1)[1].split(
         "\nfi", 1
     )[0]
-    recovery_body = source.split("recover_browser_failure_capture_inputs() {", 1)[
-        1
-    ].split("\n}", 1)[0]
+    recovery_body = _shell_function(source, "recover_browser_failure_capture_inputs")
 
     assert "recover_browser_failure_capture_inputs" in browser_failure
     assert browser_failure.index("recover_browser_failure_capture_inputs") < (
@@ -744,7 +994,7 @@ def test_browser_failure_is_not_classified_as_a_captcha_failure() -> None:
 
 def test_cleanup_redacts_browser_artifacts_before_the_job_uploads_them() -> None:
     source = _source(".github/canary-render.sh")
-    cleanup_body = source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
+    cleanup_body = _shell_function(source, "cleanup")
 
     assert "redact_browser_artifacts || true" in cleanup_body
     assert cleanup_body.index("redact_browser_artifacts") < cleanup_body.index(
@@ -754,7 +1004,7 @@ def test_cleanup_redacts_browser_artifacts_before_the_job_uploads_them() -> None
 
 def test_browser_artifact_redaction_masks_canary_credentials(tmp_path: Path) -> None:
     source = _source(".github/canary-render.sh")
-    function_body = source.split("redact_browser_artifacts() {", 1)[1].split("\n}", 1)[0]
+    function_body = _shell_function(source, "redact_browser_artifacts")
     python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
     results = tmp_path / "playwright-results" / "case"
     results.mkdir(parents=True)
@@ -790,7 +1040,7 @@ def test_browser_artifact_redaction_masks_canary_credentials(tmp_path: Path) -> 
     assert "canary-password-value" not in redacted
     assert "operator@example.test" not in redacted
     assert redacted.count("<redacted>") == 2
-    # The pinned signup address is public and stays readable for triage.
+    # The Resend test recipient is non-secret and stays readable for triage.
     assert "delivered@resend.dev" in redacted
     assert not screenshot_path.exists()
     assert stat.S_IMODE(context_path.stat().st_mode) == 0o600
@@ -801,7 +1051,7 @@ def test_browser_artifact_redaction_leaves_no_marker_without_a_results_dir(
     tmp_path: Path,
 ) -> None:
     source = _source(".github/canary-render.sh")
-    function_body = source.split("redact_browser_artifacts() {", 1)[1].split("\n}", 1)[0]
+    function_body = _shell_function(source, "redact_browser_artifacts")
     python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
     results_dir = tmp_path / "playwright-results"
     results_dir.mkdir()
@@ -830,14 +1080,14 @@ def test_browser_artifact_redaction_leaves_no_marker_without_a_results_dir(
 
 def test_failed_browser_run_is_reported_as_failed_not_not_run() -> None:
     source = _source(".github/canary-render.sh")
-    runner_body = source.split("run_browser_canary() {", 1)[1].split("\n}", 1)[0]
+    runner_body = _shell_function(source, "run_browser_canary")
 
     assert 'BROWSER_CANARY_STATUS="failed"' in runner_body
 
 
 def test_canary_writes_privacy_safe_failure_evidence() -> None:
     source = _source(".github/canary-render.sh")
-    fail_body = source.split("fail_canary() {", 1)[1].split("\n}", 1)[0]
+    fail_body = _shell_function(source, "fail_canary")
 
     assert 'CANARY_STATUS="running"' in source
     assert 'CANARY_STATUS="failed"' in fail_body
@@ -851,9 +1101,7 @@ def test_canary_writes_privacy_safe_failure_evidence() -> None:
 
 def test_canary_requires_writable_capture_destination_before_browser_spend() -> None:
     source = _source(".github/canary-render.sh")
-    preflight_body = source.split("prepare_capture_destination() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    preflight_body = _shell_function(source, "prepare_capture_destination")
     browser_body = source.split("run_authenticated_browser_surface() {", 1)[1].split(
         "\n}", 1
     )[0]
@@ -875,7 +1123,7 @@ def test_canary_requires_writable_capture_destination_before_browser_spend() -> 
 
 def test_capture_write_failure_is_explicit_in_human_safe_evidence() -> None:
     source = _source(".github/canary-render.sh")
-    fail_body = source.split("fail_canary() {", 1)[1].split("\n}", 1)[0]
+    fail_body = _shell_function(source, "fail_canary")
 
     assert 'CANARY_CAPTURE_WRITE_STATUS="failed"' in fail_body
     assert 'CANARY_CAPTURE_WRITE_FAILURE_REASON="capture_write_failed"' in fail_body

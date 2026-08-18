@@ -4,6 +4,10 @@ import ast
 from pathlib import Path
 
 import yaml
+from argus.api.ops_contract import (
+    ACCESS_REQUEST_APPROVE_PATH,
+    REQUESTED_SIGNUP_DENIAL_PATH,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -202,8 +206,8 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
         "`docs/api/openapi.yaml` is the checked compatibility artifact",
         "`GET /health`",
         "`GET /internal/readiness`",
-        "`POST /internal/access-requests/approve`",
-        "`POST /internal/canary/requested-signup-denial`",
+        f"`POST {ACCESS_REQUEST_APPROVE_PATH}`",
+        f"`POST {REQUESTED_SIGNUP_DENIAL_PATH}`",
         "`POST /api/v1/dev/reset`",
         "`POST /api/v1/chat/stream` 200 `text/event-stream` response body",
         "`/api/v1` appears exactly once",
@@ -218,8 +222,8 @@ def test_reliability_contract_locks_openapi_authority_and_exclusions() -> None:
     assert excluded_operations == {
         "`GET /health`",
         "`GET /internal/readiness`",
-        "`POST /internal/access-requests/approve`",
-        "`POST /internal/canary/requested-signup-denial`",
+        f"`POST {ACCESS_REQUEST_APPROVE_PATH}`",
+        f"`POST {REQUESTED_SIGNUP_DENIAL_PATH}`",
         "`POST /api/v1/dev/reset`",
     }
 
@@ -403,12 +407,10 @@ def test_guest_identity_policy_contract_is_active_across_canon_and_openapi() -> 
     assert openapi["components"]["schemas"]["User"]["properties"]["email"] == {
         "anyOf": [{"type": "string"}, {"type": "null"}]
     }
-    assert "avatar_theme" in openapi["components"]["schemas"]["User"][
-        "properties"
-    ]
-    assert "avatar_theme" not in openapi["components"]["schemas"]["GuestUser"][
-        "properties"
-    ]
+    assert "avatar_theme" in openapi["components"]["schemas"]["User"]["properties"]
+    assert (
+        "avatar_theme" not in openapi["components"]["schemas"]["GuestUser"]["properties"]
+    )
 
 
 def test_backtests_run_openapi_requires_idempotency_key() -> None:
@@ -429,9 +431,9 @@ def test_by_action_backtest_job_lookup_is_declared_in_openapi() -> None:
     openapi = ROOT / "docs" / "api" / "openapi.yaml"
     contract = yaml.safe_load(openapi.read_text(encoding="utf-8"))
 
-    operation = contract["paths"][
-        "/api/v1/backtest-jobs/by-action/{confirmation_id}"
-    ]["get"]
+    operation = contract["paths"]["/api/v1/backtest-jobs/by-action/{confirmation_id}"][
+        "get"
+    ]
 
     assert operation["parameters"] == [
         {
@@ -441,9 +443,9 @@ def test_by_action_backtest_job_lookup_is_declared_in_openapi() -> None:
             "schema": {"type": "string"},
         }
     ]
-    assert operation["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ] == {"$ref": "#/components/schemas/BacktestJobResponse"}
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/BacktestJobResponse"
+    }
     assert {"404", "409", "500"}.issubset(operation["responses"])
 
 

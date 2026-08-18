@@ -35,6 +35,7 @@ Supabase Postgres is the canonical state store.
 Supabase owns:
 
 - private-alpha access allowlist
+- private-alpha access-welcome claims and delivery evidence
 - user profiles
 - preferences
 - conversations
@@ -58,6 +59,8 @@ Alpha MVP requires these primary entities:
 
 ```text
 private_alpha_allowlist
+private_alpha_access_welcome_claims
+private_alpha_access_welcome_deliveries
 profiles
 conversations
 messages
@@ -103,6 +106,9 @@ Optional or later:
 ```
 auth.users
    └── profiles
+private_alpha_allowlist
+   ├── private_alpha_access_welcome_claims      # logical email identity, no FK
+   └── private_alpha_access_welcome_deliveries  # logical email identity, no FK
 profiles
    ├── conversations
    │      ├── messages
@@ -309,9 +315,15 @@ and login; it should not be exposed as a frontend product surface.
 - `requested` and unknown roles never grant an elevated role. While public
   account access is open they do not block signup either, because denial needs
   `disabled_at`; when it is closed, neither role admits the email.
-- The ops approval action loads an active requested row and stored language,
-  sends the localized approval email first, and only then compare-and-sets
-  `requested` to `user` while `disabled_at` remains null.
+- The ops approval action uses `claim_private_alpha_access_welcome` to lock and
+  revalidate the active requested row before SMTP. It then sends the localized
+  welcome and uses `complete_private_alpha_access_welcome` to record the
+  accepted delivery, delete the claim, and promote `requested` to `user`
+  atomically while `disabled_at` remains null.
+- A before-update guard rejects only the direct `requested` to enabled `user`
+  promotion when no matching welcome-delivery row exists. Revoking with
+  `disabled_at`, re-enabling an existing `user`, language edits, inserts,
+  deletes, and admin/developer roles never touch it.
 - There is no invite dashboard, referral system, public invite-code flow,
   pre-created Auth user, or password-setup flow.
 - Add a new private-alpha user with only an `email`; set `role` only for
@@ -327,6 +339,88 @@ and login; it should not be exposed as a frontend product surface.
   after token validation with `403 private_alpha_access_required`.
 - The table may contain emails for existing Supabase Auth users; seeding the
   allowlist must not create auth users by itself.
+---
+
+## 6.1 private_alpha_access_welcome_deliveries
+
+Private evidence that Argus's access-welcome message for the recipient's
+latest grant was accepted by the transactional email provider. This is
+operational support truth, not a browser-facing notification or
+marketing-email ledger.
+
+### Fields
+- `recipient_email`: `text` (Primary Key, normalized with
+  `lower(btrim(recipient_email))`)
+- `language`: `text` (`en` or `es-419`)
+- `content_version`: `text` (Fixed to
+  `private-alpha-access-welcome/v1`)
+- `subject`: `text` (1 to 200 characters)
+- `provider_receipt`: `text` (1 to 256 characters)
+- `sent_at`: `timestamptz` (Provider acceptance time, default database time)
+- `created_at`: `timestamptz`
+
+### Invariants and access
+- `recipient_email` permits at most one access-welcome delivery record. It
+  records the latest grant: a fresh approval of a re-requested email replaces
+  the stored language, subject, provider receipt, and `sent_at` in the same
+  completion that sends the new welcome.
+- Writes belong to the RPCs. RLS is enabled with no policies. `PUBLIC`,
+  `anon`, and `authenticated` have no table privileges; `service_role`
+  receives only `SELECT` plus execute on the security-definer RPCs below.
+- `complete_private_alpha_access_welcome(email, language, content_version,
+  subject, provider_receipt, claim_token)` is the service-role-only,
+  security-definer completion boundary with an empty search path. A completion
+  with a claim token validates the matching claim, upserts the delivery,
+  deletes the claim, and promotes only an active `requested` row in the same
+  transaction. A replay with a null token returns success only for an active
+  `user` with no open claim and a matching delivery row; conflicting language,
+  content version, or subject is rejected.
+- `require_private_alpha_access_welcome_delivery` is a before-update trigger
+  on `private_alpha_allowlist` scoped to the promotion edge: only a
+  `requested` row becoming an enabled `user` must already have a matching
+  delivery record. No other lifecycle transition can fire it, so it needs no
+  backfill for rows that predate it.
+- `delete_private_alpha_access_welcome_artifacts(email)` is the
+  service-role-executable orphan cleanup: it removes claim and delivery rows
+  only when no allowlist row exists for the email. The canary teardown and
+  offboarding repairs use it; it refuses while the email is still listed.
+
+## 6.2 private_alpha_access_welcome_claims
+
+Private pre-send state for the single access-welcome operation. It closes the
+crash window between SMTP acceptance and immutable delivery evidence without a
+queue, scheduler, or general mail system.
+
+### Fields
+- `recipient_email`: `text` (Primary Key, normalized)
+- `language`: `text` (`en` or `es-419`)
+- `content_version`: `text` (Fixed to
+  `private-alpha-access-welcome/v1`)
+- `subject`: `text` (1 to 200 characters)
+- `claim_token`: `uuid` (Unique opaque send identity)
+- `claimed_at`: `timestamptz`
+
+### Invariants and access
+- A claim exists only between claim and completion; completion deletes it, so
+  the email's primary key is free for a later grant.
+- The claim RPC row-locks the allowlist row and accepts only the exact active
+  `requested` language and fixed content contract. A compatible retry before
+  24 hours reuses the same token. At or after 24 hours, an open claim cannot
+  authorize SMTP again; the approval returns 409 until the claim is released.
+- `release_expired_private_alpha_access_welcome_claims()` is the
+  service-role-executable release: it deletes claims older than 48 hours (a
+  full provider idempotency window plus one scheduled-maintenance day of
+  margin). `scripts/ops/scheduled_maintenance.py` runs it daily, and an
+  operator can call it directly to unstick an approval immediately. A release
+  can produce one duplicate welcome if the original send succeeded and only
+  its completion was lost; that trade replaces a permanent lockout.
+- Completion revalidates role, language, and disabled state under the row
+  lock, so an allowlist row edited while a claim is open makes that claim fail
+  closed at completion instead of freezing the row.
+- RLS is enabled with no policies. All table privileges are revoked from
+  browser and service API roles. `service_role` can reach claim state only
+  through the tightly granted security-definer RPCs.
+
 ---
 
 # 7. conversations
@@ -1723,7 +1817,9 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   owns those operations.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`,
+- `private_alpha_allowlist`, `private_alpha_access_welcome_claims`,
+  `private_alpha_access_welcome_deliveries`,
+  `profiles`, `conversations`, `messages`,
   `chat_turn_lifecycles`, `conversation_read_states`, `strategies`, `collections`,
   `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`,
   `usage_counters`, `guest_workspaces`, `memory_settings`,
@@ -1748,8 +1844,11 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - No `anon` or `authenticated` role access is required.
 - All privileges remain revoked from `public`, `anon`, and `authenticated`;
   no client policy permits direct requested-row access.
-- Backend service-role access owns request capture, approval transition, and
-  access checks before auth signup/login.
+- Backend service-role access owns request capture, welcome claim/completion,
+  and access checks before auth signup/login. The claim and delivery tables
+  have no client policies. Service role can select immutable delivery evidence
+  and execute the guarded claim/completion RPCs, but it has no direct claim
+  table access and cannot insert, update, or delete delivery records.
 
 ---
 

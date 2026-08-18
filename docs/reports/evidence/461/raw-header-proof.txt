@@ -1,0 +1,27 @@
+Authentication-Results: mx.google.com; dkim=pass header.i=@get-argus.com header.s=resend header.b=[redacted]; dkim=pass header.i=@amazonses.com header.s=224i4yxa5dv7c2xz3womw6peuasteono header.b=[redacted]; spf=pass (google.com: domain of [redacted]@send.get-argus.com designates 54.240.9.7 as permitted sender) smtp.mailfrom=[redacted]@send.get-argus.com; dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=get-argus.com
+Content-Type: multipart/alternative; boundary="[redacted]"
+Child Content-Type: text/plain; charset=utf-8
+Child Content-Type: text/html; charset=utf-8
+From: noreply@get-argus.com
+Subject: Welcome to Argus
+Date: Wed, 12 Aug 2026 15:54:22 +0000
+Message-ID: [redacted]
+
+Assertions:
+spf=pass
+dkim=pass
+dmarc=pass
+multipart/alternative=yes
+Inbox=yes
+Spam=no
+builder_plain_sha256=4185d5cfdf2075302f65f27ae1be57280e6a0736acdba85771d256e57f0ec742
+decoded_gmail_plain_sha256_after_crlf_to_lf=4185d5cfdf2075302f65f27ae1be57280e6a0736acdba85771d256e57f0ec742
+plain_equality=true
+plain_canonicalization=transport_crlf_to_lf_only
+builder_html_sha256=5454c6625dc8ca74e6d73f29b2acb18b23c9f7d4a4b68c45e4d458002bea7316
+decoded_gmail_html_sha256=5454c6625dc8ca74e6d73f29b2acb18b23c9f7d4a4b68c45e4d458002bea7316
+html_byte_equality=true
+connector_accepted_from=noreply@get-argus.com
+external_display_name_proof=unproven
+production_smtp_test_from=Argus <noreply@get-argus.com>
+hosted_application_smtp_proof=unproven
