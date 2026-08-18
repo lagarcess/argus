@@ -262,7 +262,7 @@ type HeroEvidence = {
   unavailable?: boolean;
 };
 
-type HeroDeltaEvidenceView = {
+export type HeroDeltaEvidenceView = {
   hero: HeroEvidence;
   benchmark: EvidenceMetric;
   worstDrop: EvidenceMetric;
