@@ -593,15 +593,16 @@ def _drop_reason_facts(
         facts += (
             " Names seen in sources but not verifiable as tradable: "
             + ", ".join(unverified_names)
-            + ". You may mention them only as unverified."
+            + ". Name them, and say they could not be confirmed as tradable "
+            "here. Never present them as testable."
         )
     if uncorroborated_names:
         facts += (
             " Names seen in sources that resolve to a real listing, but not one"
             " you could confirm is the asset the user meant: "
             + ", ".join(uncorroborated_names)
-            + ". Say only that you could not confirm the match; never say they"
-            " are untradable."
+            + ". Name them, and say only that you could not confirm the "
+            "match; never say they are untradable."
         )
     return facts
 
@@ -616,8 +617,10 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
         "from memory. The user can simply ask again in a moment."
     ),
     "discovery_no_verified_candidates": (
-        "No candidate could be verified as a tradable asset, so there is "
-        "nothing safe to offer."
+        "The search returned real names, but none could be verified as an "
+        "asset Argus can test, so there is nothing safe to offer. Naming what "
+        "came back is required: a reply that reports only failure leaves the "
+        "user with nothing to act on and nothing to react to."
     ),
     "discovery_suggestions_unavailable": (
         "Putting together suggestions failed temporarily. You will not guess "
@@ -698,8 +701,10 @@ async def _voiced_discovery_recovery(
                 "You are Argus, a chat-first investing experimentation "
                 "assistant. The user asked you to find or discover assets. "
                 f"Situation: {facts} {language_instruction} "
-                "Reply in at most two short plain sentences: state the "
-                f"situation honestly. {next_step_instruction} "
+                "Reply in at most three short plain sentences: state the "
+                "situation honestly, and when the facts name specific assets, "
+                "name them rather than only reporting that nothing worked. "
+                f"{next_step_instruction} "
                 "No reassurance boilerplate, no "
                 "tradable asset suggestions from memory, no providers or "
                 "internal tools, no investment advice."
