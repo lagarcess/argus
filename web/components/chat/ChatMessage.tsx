@@ -27,6 +27,12 @@ import {
 } from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
+import {
+  confirmationCardCopyText,
+  resultCardCopyText,
+} from "@/lib/chat-card-copy-text";
+import { confirmationCardViewModel } from "@/lib/confirmation-card-view-model";
+import { resultCardViewModel } from "@/lib/result-card-view-model";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
 import {
@@ -183,44 +189,26 @@ export default function ChatMessage({
         return normalizeCopyText(localizedRecovery);
       }
     }
-    if (message.copyText) {
-      return normalizeCopyText(message.copyText);
-    }
+    // Copy reads the card's own view model. Deriving it from the payload
+    // again is what put backend English on a Spanish workspace (#509).
+    const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
     if (message.kind === "strategy_result" && message.result) {
-      if (message.result.copyText) {
-        return normalizeCopyText(message.result.copyText);
-      }
-      const rows = message.result.metrics.map((metric) => `${metric.label}: ${metric.value}`);
-      const symbols = message.result.symbols?.length
-        ? `Symbols: ${message.result.symbols.join(", ")}`
-        : null;
-      const assumptions = message.result.assumptions?.length
-        ? `Assumptions: ${message.result.assumptions.join(" • ")}`
-        : null;
-      return normalizeCopyText([
-        message.result.strategyName,
-        symbols,
-        `Period: ${message.result.period}`,
-        rows.join("\n"),
-        message.result.benchmarkNote,
-        assumptions,
-        message.content ? `Assistant explanation:\n${normalizeAssistantDisplayText(message.content)}` : null,
-      ].filter(Boolean).join("\n"));
+      return normalizeCopyText(
+        resultCardCopyText(
+          resultCardViewModel(message.result, { t, locale }),
+          t,
+          message.content ? normalizeAssistantDisplayText(message.content) : null,
+        ),
+      );
     }
     if (message.kind === "strategy_confirmation" && message.confirmation) {
-      if (message.confirmation.copyText) {
-        return normalizeCopyText(message.confirmation.copyText);
-      }
-      const rows = message.confirmation.rows.map((row) => `${row.label}: ${row.value}`);
-      const assumptions = message.confirmation.assumptions?.length
-        ? `Assumptions: ${message.confirmation.assumptions.join(" • ")}`
-        : null;
-      return normalizeCopyText([
-        message.confirmation.title,
-        message.confirmation.summary,
-        rows.join("\n"),
-        assumptions,
-      ].filter(Boolean).join("\n"));
+      return normalizeCopyText(
+        confirmationCardCopyText(
+          confirmationCardViewModel(message.confirmation, t, locale),
+          t,
+          locale,
+        ),
+      );
     }
     return normalizeCopyText(message.content ?? "");
   };

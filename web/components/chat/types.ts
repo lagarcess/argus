@@ -102,7 +102,6 @@ export type ChatActionOption = {
   artifactType?: ArtifactType;
   artifactStatus?: string;
   savedStrategyId?: string | null;
-  copyText?: string;
 };
 
 export type ChatMention = {
@@ -148,7 +147,6 @@ export type StrategyResultPayload = {
   artifactStatus?: string;
   savedStrategyId?: string | null;
   savingStrategy?: boolean;
-  copyText?: string;
   actions?: ChatActionOption[];
   chart?: ResultChartPayload | null;
   executionCosts?: ExecutionCostEvidence | null;
@@ -223,7 +221,6 @@ export type StrategyConfirmationPayload = {
   artifactType?: ArtifactType;
   artifactStatus?: string;
   savedStrategyId?: string | null;
-  copyText?: string;
   title: string;
   status?: StrategyConfirmationStatus;
   statusLabel: string;
@@ -323,7 +320,6 @@ export type Message = {
   artifactType?: ArtifactType;
   artifactStatus?: string;
   savedStrategyId?: string | null;
-  copyText?: string;
   /** Canonical fact key for a latest-result fact answer; localized heading chrome. */
   resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */

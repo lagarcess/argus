@@ -909,7 +909,13 @@
       "proposal_error": "No se pudo actualizar la memoria. Intenta de nuevo.",
       "proposal_saved": "Guardado en memoria. Adminístralo en Controles de datos, en Personalización."
     },
-    "send_busy": "Argus todavía está terminando el mensaje anterior. Inténtalo en un momento."
+    "send_busy": "Argus todavía está terminando el mensaje anterior. Inténtalo en un momento.",
+    "copy_card": {
+      "assets": "Activos",
+      "period": "Periodo",
+      "assumptions": "Supuestos",
+      "assistant_explanation": "Explicación del asistente"
+    }
   },
   "settings": {
     "title": "Ajustes",
