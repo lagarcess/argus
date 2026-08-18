@@ -127,6 +127,21 @@ hash, ledger before and after, and affected-object readback in the release
 manifest. Then rerun the same gate. Do not deploy until the rerun reports
 `status=pass`, and attach its JSON as durable release evidence.
 
+**Migrations that create functions the shipping code calls must be applied
+before the deploy, not after.** A deploy that lands first runs new code against
+a schema that lacks the objects it calls, and the failure surfaces as production
+behavior rather than a gate result. The first promotion carrying PR #476 is the
+live case: `.github/canary-render.sh` and the ops approve route call five
+functions created by
+`20260816150000_scope_access_welcome_enforcement.sql` and its two predecessors,
+including `delete_private_alpha_access_welcome_artifacts`, which is how the
+daily canary tears down the allowlist and delivery rows it creates. Deploy
+before applying and the canary creates rows it cannot delete, on every run,
+in production.
+
+State the intended order explicitly in the manifest for any promotion carrying
+a migration, so the operator cannot get it backwards from the checklist alone.
+
 4. Land or read back the candidate on `main` without rewriting the gated
    commit. Keep the checkout on the gated candidate and rerun the same
    executable gate in landed-ref mode:
