@@ -23,25 +23,20 @@ import {
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
-import { confirmationAssumptionDisplay } from "@/lib/confirmation-assumptions-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
-import { contributionPhrase } from "@/lib/contribution-period-display";
-import { formatCurrency } from "@/lib/result-card-display";
+import {
+  confirmationCardViewModel,
+  type ConfirmationCardRow,
+} from "@/lib/confirmation-card-view-model";
 import {
   retestEffectiveDurationLabel,
-  retestPeriodFromValue,
   retestPeriodTransformationLabel,
   type RetestPeriod,
 } from "@/lib/chat-retest";
 import {
-  strategyDisplayLabel,
-  strategyTypeFromConfirmation,
-} from "@/lib/strategy-display";
-import {
   type ChatActionOption,
   type ConfirmationDirectEditPayload,
   type StrategyConfirmationPayload,
-  type StrategyConfirmationRowKey,
   type StrategyConfirmationStatus,
 } from "./types";
 import {
@@ -49,13 +44,11 @@ import {
   inlineEditControlClassName,
   inlineEditFieldClassName,
 } from "./ConfirmationDirectEdit";
-import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import { splitPeriodDisplay } from "./card-formatting";
 import { EntityToken } from "./entity-token";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
-  confirmationRowKey,
-  confirmationRowLabelKey,
   confirmationStatusAllowsActions,
   confirmationStatusFromPayload,
   confirmationStatusLabel,
@@ -66,10 +59,6 @@ type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
   onAction?: (action: ChatActionOption) => void;
   onDirectEdit?: (edit: ConfirmationDirectEditPayload) => Promise<void>;
-};
-
-type ConfirmationCardRow = StrategyConfirmationPayload["rows"][number] & {
-  fullValue?: string;
 };
 
 type ConfirmationStatusIconState = {
@@ -169,7 +158,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
               {viewModel.summaryRows.map((row) => (
                 <div key={row.label} className="min-w-0">
                   <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8d969e]">
-                    {displayConfirmationRowLabel(row, t)}
+                    {row.label}
                   </dt>
                   <ConfirmationValue row={row} variant="summary" />
                   {row.key === "period" && periodChangeNote ? (
@@ -197,9 +186,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction, onDir
             <dl className={`${viewModel.summaryRows.length > 0 ? "mt-4 border-t border-[#c9c9cd]/22 pt-4 dark:border-white/[0.04]" : ""} grid grid-cols-1 gap-3 sm:grid-cols-2`}>
               {viewModel.detailRows.map((row) => (
                 <div key={row.label} className="min-w-0">
-                  <dt className="text-[12px] text-[#8d969e]">
-                    {displayConfirmationRowLabel(row, t)}
-                  </dt>
+                  <dt className="text-[12px] text-[#8d969e]">{row.label}</dt>
                   <ConfirmationValue row={row} variant="detail" />
                 </div>
               ))}
@@ -261,7 +248,7 @@ function ConfirmationValue({
   row: ConfirmationCardRow;
   variant: "summary" | "detail";
 }) {
-  if (confirmationRowKey(row) === "period") {
+  if (row.key === "period") {
     const period = splitPeriodDisplay(row.value);
     return (
       <dd className={variant === "summary"
@@ -313,77 +300,6 @@ function confirmationStatusIcon(
   return CONFIRMATION_STATUS_ICON_STATE[status];
 }
 
-function confirmationCardViewModel(
-  confirmation: StrategyConfirmationPayload,
-  t: TFunction,
-  language: string,
-) {
-  const rows = confirmation.rows.map((row) => ({
-    key: confirmationRowKey(row),
-    row: displayConfirmationRowValue(row, confirmation, t, language),
-  }));
-  const assetRow = rowForKey(rows, "assets");
-  const strategyRow = rowForKey(rows, "strategy");
-  const periodRow = rowForKey(rows, "period");
-  const startingCapitalRow = rowForKey(rows, "starting_capital");
-  const contributionRow = rowForKey(rows, "contribution");
-  const assetSymbols = splitSymbolList(assetRow?.value ?? "");
-  // A recurring plan's headline money is what goes in every period; its
-  // starting capital, usually $0, reads as a detail beneath.
-  const primaryCapitalRow = contributionRow ?? startingCapitalRow;
-  const compactPeriod = compactDateRangeDisplay(confirmation.date_range, language);
-  const displayPeriodRow =
-    periodRow && compactPeriod
-      ? {
-          ...periodRow,
-          value: compactPeriod,
-          fullValue: confirmation.date_range?.display ?? periodRow.value,
-        }
-      : periodRow;
-  const summaryRows = [primaryCapitalRow, displayPeriodRow].filter(isConfirmationRow);
-  const promotedKeys = new Set<StrategyConfirmationRowKey>([
-    "assets",
-    "strategy",
-    ...summaryRows
-      .map((row) => confirmationRowKey(row))
-      .filter(isConfirmationRowKey),
-  ]);
-  if (primaryCapitalRow === contributionRow) {
-    promotedKeys.add("contribution");
-  }
-  const summaryRowSet = new Set(summaryRows);
-  const detailRows = rows
-    .filter(
-      ({ key, row }) =>
-        !summaryRowSet.has(row) && (key === null || !promotedKeys.has(key)),
-    )
-    .map(({ row }) => row);
-  const promotedValues = summaryRows.map((row) => row.value);
-  const localizedStrategyLabel = strategyDisplayLabel(
-    strategyTypeFromConfirmation(confirmation),
-    t,
-    strategyRow?.value,
-  );
-
-  return {
-    assetSymbols,
-    strategyLabel:
-      localizedStrategyLabel ??
-      confirmationAssetTitle(assetRow, confirmation.title, t),
-    summaryRows,
-    detailRows,
-    assumptions: confirmationAssumptionDisplay({
-      assetClass: confirmation.asset_class,
-      displayFacts: confirmation.display_facts,
-      fallbackAssumptions: confirmation.assumptions ?? [],
-      locale: language,
-      promotedValues,
-      t,
-    }),
-    retestPeriod: retestPeriodFromValue(confirmation.retest_period),
-  };
-}
-
 function RetestPeriodDisclosure({
   period,
   language,
@@ -412,72 +328,6 @@ function RetestPeriodDisclosure({
   );
 }
 
-/** Money rows are composed from typed facts, so the amount carries the
- * viewer's separators and the period reads in the viewer's language. Row
- * strings stay the fallback for cards persisted before the facts existed. */
-function displayConfirmationRowValue(
-  row: StrategyConfirmationPayload["rows"][number],
-  confirmation: StrategyConfirmationPayload,
-  t: TFunction,
-  language: string,
-): StrategyConfirmationPayload["rows"][number] {
-  const key = confirmationRowKey(row);
-  const facts = confirmation.display_facts;
-  if (key === "contribution" && typeof facts?.recurring_contribution === "number") {
-    return {
-      ...row,
-      value: contributionPhrase(
-        formatCurrency(facts.recurring_contribution, language),
-        facts.contribution_period,
-        t,
-      ),
-    };
-  }
-  if (key === "starting_capital" && typeof facts?.starting_capital === "number") {
-    return { ...row, value: formatCurrency(facts.starting_capital, language) };
-  }
-  return row;
-}
-
-function isConfirmationRow(
-  row: StrategyConfirmationPayload["rows"][number] | undefined,
-): row is StrategyConfirmationPayload["rows"][number] {
-  return Boolean(row);
-}
-
-function isConfirmationRowKey(
-  key: StrategyConfirmationRowKey | null,
-): key is StrategyConfirmationRowKey {
-  return key !== null;
-}
-
-function rowForKey(
-  rows: Array<{
-    key: StrategyConfirmationRowKey | null;
-    row: StrategyConfirmationPayload["rows"][number];
-  }>,
-  key: StrategyConfirmationRowKey,
-) {
-  return rows.find((entry) => entry.key === key)?.row;
-}
-
-function confirmationAssetTitle(
-  assetRow: StrategyConfirmationPayload["rows"][number] | undefined,
-  fallbackTitle: string,
-  t: TFunction,
-) {
-  const symbols = splitSymbolList(assetRow?.value ?? "");
-  if (symbols.length === 1 || symbols.length === 2) {
-    return null;
-  }
-  if (symbols.length > 2) {
-    return t("chat.confirmation.asset_count", "{{count}} assets", {
-      count: symbols.length,
-    });
-  }
-  return fallbackTitle.trim() || t("chat.confirmation.selected_asset", "Selected asset");
-}
-
 function AssetSymbols({
   symbols,
   animatedSymbols,
@@ -502,14 +352,6 @@ function AssetSymbols({
       ))}
     </span>
   );
-}
-
-function displayConfirmationRowLabel(
-  row: StrategyConfirmationPayload["rows"][number],
-  t: TFunction,
-) {
-  const key = confirmationRowLabelKey(row);
-  return key ? t(key, row.label) : row.label;
 }
 
 function displayConfirmationActionLabel(action: ChatActionOption, t: TFunction) {

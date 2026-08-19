@@ -706,6 +706,11 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
+    // Row localization moved into the view model the card and Copy share (#509).
+    const viewModel = readFileSync(
+      join(root, "lib/confirmation-card-view-model.ts"),
+      "utf-8",
+    );
 
     expect(types).toContain(
       'confirmation_state?: "active" | "superseded" | "cancelled"',
@@ -717,11 +722,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(artifactHistory).toContain("function isTerminalConfirmation");
     expect(card).toContain("confirmationStatusFromPayload");
     expect(card).toContain("confirmationStatusLabelKey");
-    expect(card).toContain("confirmationRowKey(row)");
+    expect(viewModel).toContain("confirmationRowKey(row)");
     expect(card).toContain("function confirmationDisplayState");
     expect(card).not.toContain("row.label.toLowerCase()");
+    expect(viewModel).not.toContain("row.label.toLowerCase()");
     expect(card).not.toContain('normalizedLabel === "running"');
-    expect(card).toContain(
+    expect(viewModel).toContain(
       't("chat.confirmation.selected_asset", "Selected asset")',
     );
   });

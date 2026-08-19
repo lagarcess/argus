@@ -24,20 +24,10 @@ import {
   decisionNoteCountIsVisible,
   nextDecisionNoteValue,
 } from "@/lib/decision-note";
-import {
-  type ResultCardDisplayCopy,
-  displayResultActionLabel,
-  heroDeltaEvidenceView,
-} from "@/lib/result-card-display";
+import { displayResultActionLabel } from "@/lib/result-card-display";
+import { resultCardViewModel } from "@/lib/result-card-view-model";
 import { degradedValueClass, inlineFailureTextClass } from "@/lib/failure-treatment";
-import { assetClassDisplayLabel } from "@/lib/asset-class-display";
-import { contributionPhrase } from "@/lib/contribution-period-display";
-import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
-import {
-  strategyDisplayLabel,
-  strategyTypeFromResult,
-} from "@/lib/strategy-display";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import ResultEquityChart from "./ResultEquityChart";
 import { EntityToken } from "./entity-token";
@@ -101,12 +91,8 @@ export default function StrategyResultCard({
       setSelectedDecisionState(result.decisionState);
     }
   }, [result.decisionState]);
-  const resultCardCopy = resultDisplayCopy(t);
-  const view = heroDeltaEvidenceView(result, {
-    copy: resultCardCopy,
-    locale: i18n.language,
-  });
-  const symbols = result.symbols ?? [];
+  const viewModel = resultCardViewModel(result, { t, locale: i18n.language });
+  const { copy: resultCardCopy, evidence: view, symbols } = viewModel;
   const resultActions = (result.actions ?? []).filter(isVisibleResultAction);
   const showBreakdownAction = resultActions.find(
     (action) => action.type === "show_breakdown",
@@ -156,16 +142,7 @@ export default function StrategyResultCard({
         ? "text-[#d66d75]"
         : "text-[#5a677d] dark:text-[#7da0ca]";
   const trustGroups = view.trustGroups;
-  const periodDisplay =
-    compactDateRangeDisplay(result.dateRange, i18n.language) ?? result.period;
-  const strategyLabel =
-    strategyDisplayLabel(
-      strategyTypeFromResult(result),
-      t,
-      result.strategyLabel,
-    ) ??
-    result.strategyLabel ??
-    result.strategyName;
+  const { periodDisplay, strategyLabel } = viewModel;
 
   return (
     <section
@@ -190,10 +167,7 @@ export default function StrategyResultCard({
           {/* Passive status, not an action: plain muted text so it cannot be
               mistaken for another clickable pill (kept readable at 4.5:1). */}
           <span className="text-[11px] font-medium tracking-[0.16px] text-[#505a63] dark:text-white/65">
-            {t(
-              "chat.simulation_complete",
-              result.statusLabel || "Simulation Complete",
-            )}
+            {viewModel.statusLabel}
           </span>
         </div>
       </div>
@@ -620,130 +594,4 @@ function AssetSymbols({ symbols }: { symbols: string[] }) {
       ))}
     </span>
   );
-}
-
-function resultDisplayCopy(
-  t: ReturnType<typeof useTranslation>["t"],
-): ResultCardDisplayCopy {
-  return {
-    endingValueLabel: t("chat.result_card.ending_value", "Ending value"),
-    totalReturnLabel: t("chat.result_card.total_return", "Total return"),
-    contributionReturnLabel: t(
-      "chat.result_card.contribution_return",
-      "Return on contributions",
-    ),
-    comparedWithBenchmarkLabel: t(
-      "chat.result_card.compared_with_benchmark",
-      "Compared with benchmark",
-    ),
-    comparedWithSymbolLabel: (symbol) =>
-      t("chat.result_card.compared_with_symbol", {
-        defaultValue: "Compared with {{symbol}}",
-        symbol,
-      }),
-    worstDropLabel: t("chat.result_card.worst_drop", "Worst drop"),
-    explainResultAction: t("chat.result_card.explain_result", "Explain result"),
-    refineIdeaAction: t("chat.result_card.refine_idea", "Refine idea"),
-    unavailable: t("chat.result_card.unavailable", "Unavailable"),
-    returnUnavailable: t(
-      "chat.result_card.return_unavailable",
-      "return unavailable",
-    ),
-    changeNoun: t("chat.result_card.change", "change"),
-    gainNoun: t("chat.result_card.gain", "gain"),
-    lossNoun: t("chat.result_card.loss", "loss"),
-    totalReturnSuffix: t(
-      "chat.result_card.total_return_suffix",
-      "total return",
-    ),
-    contributionReturnSuffix: t(
-      "chat.result_card.contribution_return_suffix",
-      "return on contributions",
-    ),
-    benchmarkUnavailable: t(
-      "chat.result_card.benchmark_unavailable",
-      "Benchmark unavailable",
-    ),
-    percentagePoints: (value) =>
-      t("chat.result_card.percentage_points", {
-        defaultValue: "{{value}} percentage points",
-        value,
-      }),
-    inLineWith: (symbol) =>
-      t("chat.result_card.in_line_with", {
-        defaultValue: "In line with {{symbol}}",
-        symbol,
-      }),
-    beatBy: (value) =>
-      t("chat.result_card.beat_by", {
-        defaultValue: "Beat by {{value}}",
-        value,
-      }),
-    laggedBy: (value) =>
-      t("chat.result_card.lagged_by", {
-        defaultValue: "Lagged by {{value}}",
-        value,
-      }),
-    assetClassLabel: (assetClass) =>
-      assetClassDisplayLabel(assetClass, t) ?? assetClass,
-    trustStrip: t(
-      "chat.result_trust_strip",
-      "Historical simulation · No fees/slippage · Not advice",
-    ),
-    startingCapitalLabel: t(
-      "chat.result_card.details.starting_capital",
-      "Starting capital",
-    ),
-    totalContributedLabel: t(
-      "chat.result_card.details.total_contributed",
-      "Total contributed",
-    ),
-    peakValueLabel: t("chat.result_card.details.peak_value", "Peak value"),
-    lowestValueLabel: t(
-      "chat.result_card.details.lowest_value",
-      "Lowest value",
-    ),
-    dateRangeLabel: t("chat.result_card.details.date_range", "Date range"),
-    timeframeLabel: t("chat.result_card.details.timeframe", "Timeframe"),
-    sideLabel: t("chat.result_card.details.side", "Side"),
-    allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
-    benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
-    contributionPhrase: (amount, period) => contributionPhrase(amount, period, t),
-    contributionLabel: t(
-      "chat.result_card.details.contribution",
-      "Contribution",
-    ),
-    entryRuleLabel: t("chat.result_card.details.entry_rule", "Entry rule"),
-    exitRuleLabel: t("chat.result_card.details.exit_rule", "Exit rule"),
-    grossReturnLabel: t("chat.result_card.details.gross_return", "Gross return"),
-    netReturnLabel: t("chat.result_card.details.net_return", "Net of costs"),
-    modeledCostsLabel: t(
-      "chat.result_card.details.modeled_costs",
-      "Costs modeled",
-    ),
-    modeledCostsValue: (feeBps, slippageBps) =>
-      t("chat.result_card.details.modeled_costs_value", {
-        defaultValue: "{{fee}} bps fee + {{slippage}} bps slippage",
-        fee: feeBps,
-        slippage: slippageBps,
-      }),
-    benchmarkSameCostsValue: (benchmark) =>
-      t("chat.result_card.details.benchmark_same_costs", {
-        defaultValue: "{{benchmark}} (same modeled costs)",
-        benchmark,
-      }),
-    dailyData: t("chat.result_card.timeframe.daily", "Daily data"),
-    hourlyData: t("chat.result_card.timeframe.hourly", "Hourly data"),
-    intervalData: (amount, unit) =>
-      t("chat.result_card.timeframe.interval", {
-        amount,
-        defaultValue: "{{amount}}-{{unit}} data",
-        unit,
-      }),
-    timeframeData: (value) =>
-      t("chat.result_card.timeframe.generic", {
-        defaultValue: "{{value}} data",
-        value,
-      }),
-  };
 }

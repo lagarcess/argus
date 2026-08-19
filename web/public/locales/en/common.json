@@ -909,7 +909,13 @@
       "proposal_error": "Could not update memory. Try again.",
       "proposal_saved": "Saved to memory. Manage it in Data Controls under Personalization."
     },
-    "send_busy": "Argus is still finishing the last message. Try again in a moment."
+    "send_busy": "Argus is still finishing the last message. Try again in a moment.",
+    "copy_card": {
+      "assets": "Assets",
+      "period": "Period",
+      "assumptions": "Assumptions",
+      "assistant_explanation": "Assistant explanation"
+    }
   },
   "settings": {
     "title": "Settings",
