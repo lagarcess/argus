@@ -10,6 +10,8 @@ SimplificationOptionKind = Literal[
     "rsi_threshold",
     "buy_and_hold",
     "moving_average_crossover",
+    "recurring_only",
+    "use_as_starting_capital",
 ]
 
 
@@ -31,6 +33,12 @@ def simplification_option_kind(
         return "buy_and_hold"
     if strategy_type == "moving_average_crossover":
         return "moving_average_crossover"
+    # The DCA ceiling recovery's money-role options: both must localize, so
+    # each carries a typed kind rather than only its compatibility label.
+    if replacement_values.get("ignore_initial_capital") is True:
+        return "recurring_only"
+    if replacement_values.get("initial_capital") is not None:
+        return "use_as_starting_capital"
     return None
 
 

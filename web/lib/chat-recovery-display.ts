@@ -893,6 +893,14 @@ function simplificationOptionKey(
   if (values.strategy_type === "buy_and_hold") {
     return "buy_and_hold";
   }
+  // The DCA ceiling recovery's money-role options, keyed like the backend's
+  // typed kinds so a Spanish reader never sees the English fallback labels.
+  if (values.ignore_initial_capital === true) {
+    return "recurring_only";
+  }
+  if (values.initial_capital !== undefined && values.initial_capital !== null) {
+    return "use_as_starting_capital";
+  }
   // The historical-period label belongs to future_performance recovery only;
   // ordinary date repair keeps its distinct backend-provided labels.
   if (

@@ -426,7 +426,9 @@
       "buy_and_hold": "Compare with buy and hold",
       "moving_average_crossover": "Use a supported moving-average crossover",
       "historical_period": "Test it over a historical period",
-      "supported_symbol": "Use a supported stock or crypto symbol"
+      "supported_symbol": "Use a supported stock or crypto symbol",
+      "recurring_only": "Run recurring buys only",
+      "use_as_starting_capital": "Use it as starting capital"
     },
     "retest": {
       "strategy_family": {
