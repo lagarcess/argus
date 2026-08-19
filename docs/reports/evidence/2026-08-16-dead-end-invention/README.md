@@ -1,78 +1,110 @@
 # Never dead-end, never invent: measurement evidence
 
-Lane base: `811dcbcb`. Reconciled one-way with integration `7707f6ab`.
-Candidate: `628747ce` (see `provenance.candidate_sha` in each scorecard).
-
-Comparison baseline:
+Lane base `811dcbcb`, reconciled one-way with integration `7707f6ab`.
+Candidate `577099f6`. Baseline for comparison:
 `docs/reports/evidence/2026-08-16-main-promotion/live-eval-scorecard.json`,
 **58 passed / 2 failed**.
 
-These two runs supersede an earlier pair taken at `bdb4529a`, before the
-contract-conflict resolution and the terminal-recovery fix. Those scorecards no
-longer describe any commit on this branch and were replaced rather than kept.
+These supersede the runs taken at `bdb4529a` and `628747ce`. Both earlier pairs
+are invalid as evidence for two separate reasons, recorded here rather than
+quietly replaced.
 
-## Live runs, both at `628747ce`
+## Why the earlier scorecards do not count
+
+The review found both `offered` gates were reading the wrong thing.
+`recovery_option_ids` looked for `options` inside `payload` where the runtime
+writes it as a sibling, so it was empty in all 60 blocks of every earlier run.
+`named_unavailable` read the sidecar's ungated drop list rather than the reply,
+so the trending-crypto case passed a naming assertion on this text:
+
+> Here are the trending cryptos I can help you test.
+
+Replaying the corrected projection over that exact record:
+
+```
+before: named_unavailable = ["peaq","Wiki Cat","Venice Token","Bitcoin"]  -> passed
+after : named_unavailable = [], dropped_not_named = [...]                -> fails
+```
+
+**This retracts a claim made in the previous round.** I reported that 8 of 9
+strengthened cases passing on base was draw dependence. It was not. The
+assertion never measured the prose, so the base run said nothing about it.
+
+## Live runs, both at `577099f6`
 
 | run | passed | failed | failures |
 | --- | --- | --- | --- |
-| 1 | 60 | 0 | none |
-| 2 | 57 | 3 | see below |
+| 1 | 59 | 1 | `asset_discovery_trending_crypto_exact_issue_344` (`offered.names_unavailable`) |
+| 2 | 58 | 2 | the same case, plus `asset_discovery_semantic_pharma_escalation_issue_344` (`prose_judge:honesty`) |
 
-Run 2's three failures, none of which overlap the baseline's two:
+The trending-crypto failure **reproduces in both runs**. It is not variance, and
+it is the newly-live assertion catching a real gap rather than a regression:
+on a turn that offers rows, the composer passes drop names through
+`_user_subject_drops`, which mentions a dropped name only if the user's own
+message echoed it. So a "find me trending cryptos" reply offers three rows and
+says nothing about dropping Bitcoin.
 
-1. `capability_honesty_options_straddle_tsla` — `prose_judge:honesty`
-2. `dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455` — typed
-   set: `capability_verdict` `unsupported` instead of `executable`,
-   `starting_capital` and `recurring_contribution` absent, outcome
-   `needs_clarification` instead of `ready_for_confirmation`
-3. `messy_english_post_result_fact_then_capital_edit_issue_160` — `intent`
-   `strategy_drafting` instead of `backtest_execution`
+**This is an open product decision, deliberately not resolved here.** Naming
+those drops collides with an existing contract, `TestDropDisclosures`:
+"absences the user can see are explained; internal filtering is silent", pinned
+by `test_pipeline_only_drops_stay_silent`. I tried the change, it turned that
+test red, and I reverted rather than flip an existing assertion unilaterally.
+The two coherent options are:
 
-## Interleaved A/B on those three cases
+1. Name search-surfaced drops on the success path too, on the grounds that a
+   name the search returned under the category the user asked for is the user's
+   subject by construction. This retires `test_pipeline_only_drops_stay_silent`.
+2. Require `names_unavailable` only when nothing actionable was offered, which
+   is the founder-facing symptom, and leave the silence contract intact.
 
-60/0 and 57/3 on the same commit is variance wide enough that neither run
-settles anything on its own, so the three cases were run head-against-base,
-alternating arms in one session, `argus` pinned per arm by `PYTHONPATH` to a
-detached `811dcbcb` worktree.
+## What is demonstrated, not read
 
-| case | head pass/fail | base pass/fail |
-| --- | --- | --- |
-| `capability_honesty_options_straddle_tsla` | 4/0 | 2/1 |
-| `dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455` | 3/1 | 2/1 |
-| `messy_english_post_result_fact_then_capital_edit_issue_160` | 4/0 | 3/0 |
+Finding 1, the rail override, executed against the real `_dispatch` with a
+typed `unsupported_request` carrying AAPL, the user's window, and no constraint
+payload:
 
-Two of the three reproduce on base at a comparable rate, and the third failed
-nowhere in the A/B. None is a regression this lane introduced. Sample is 3-4
-draws per arm, which is enough to show the failures are not head-only and not
-enough to estimate their rate.
+```
+company_lookup / live_quote / cross_company / etf_constituents /
+market_pulse / sector_radar / screening / market_stats / current_external
+  -> dispatch returns None for every kind
+allowance exhausted -> None (exhausted_result never reaches the stats answerer)
+```
 
-## The strengthened cases against base
+The browser could not force this draw: every live options turn had the
+interpreter emit `unsupported_constraints`, so the upstream veto caught it
+first. That is precisely why the gap was invisible to the previous round's
+browser evidence.
 
-The 9 cases carrying `offered` were run against `811dcbcb` with this branch's
-harness and fixtures overlaid. **8 of 9 passed on base.** By the standard this
-lane applied to itself, those 8 are not strengthened: a single live draw does
-not reliably reproduce a draw-dependent dead end. The 9th
-(`asset_discovery_spanish_generated_pharma_escalation_issue_344`) failed on
-`prose_judge:honesty`, not on an `offered` assertion, so it is not evidence
-either.
+Finding 2, one priceability owner, on live providers:
 
-What does hold deterministically is the unit layer. Six tests fail on base and
-pass on head:
+```
+PENGU -> no_history      WLD -> no_history
+AAPL  -> tradable        SOL -> tradable
+verified_peers offered: ['AAPL']
+```
 
-- `test_pair_named_crypto_is_not_treated_as_a_mismatch`
-- `test_a_listed_asset_we_cannot_price_is_not_offered`
-- `test_unsupported_run_request_is_never_answered_with_asset_stats`
-- `test_unsupported_request_describing_a_test_keeps_its_recovery_route`
-- `test_rail_claim_declines_a_draft_carrying_a_stated_window`
-- `test_typed_draft_window_outranks_classifier_prose` — base resolves the
-  user's `2024-02-01` window to `2025-08-18`, the trailing-year default
+## Browser acceptance at this head
+
+Forced all-unpriceable set, the case that started this lane:
+
+> Catecoin, 牛来, and Z500 appeared in the search but could not be confirmed as
+> tradable assets here; Captain TRON and World Water Reserve also appeared but
+> the match with what you intended is uncertain. To proceed, please request a
+> different category or provide a specific symbol or company name to test.
+
+Trending cryptos, 5 draws including Spanish: **5/5 offered actionable rows**
+(HYPE/USD, SOL/USD, Dogecoin, 2-3 rows per draw). The tightened corroboration
+cost no rows, because those turns carry `asset_class_hint="crypto"`.
+
+Weekly options, 5 draws: **0 fabricated readouts**, limit named 5/5, asset and
+window kept in the rendered prose 3/5 (the other two carry them in the typed
+options). Chips rendered in 4/5. The dangling "Which of these" with no options,
+seen once last round, did not recur.
 
 ## Model-facing text
 
-`tests/test_interpreter_prompt_freeze.py` passes unchanged. None of this lane's
-prose edits are inside the fingerprinted surface, which is itself the finding:
+`tests/test_interpreter_prompt_freeze.py` passes unchanged; no edit in this lane
+is inside the fingerprinted surface. That remains a finding in itself:
 `discovery/composer.py` builds its voicing prompts as plain `{"role": "system"}`
-dicts inside functions whose names do not end in
-`_prompt`/`_instructions`/`_directive`/`_clause`, so the Standard 12 gate cannot
-see text that steers every discovery turn. The fingerprint is unchanged and
-still names the scorecard it was last measured against.
+dicts inside functions whose names do not match the measured suffixes, so the
+Standard 12 gate cannot see text that steers every discovery turn.
