@@ -952,6 +952,7 @@ def _typed_outcome(
             final_patch=final_patch,
             interpret_patch=interpret_patch,
             launch_payload=launch_payload,
+            assistant_text=_assistant_text(final_patch),
         ),
     }
 

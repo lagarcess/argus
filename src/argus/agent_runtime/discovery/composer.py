@@ -204,22 +204,44 @@ async def discovery_operation_result(
         )
     emit_substage("discovery_verify")
     # Sync resolver lookups: off the loop, or the verify line above stalls.
-    validated, unverified, uncorroborated = await asyncio.to_thread(
+    outcome = await asyncio.to_thread(
         lambda: validated_candidates(
             extraction,
             packet=packet,
             resolve=resolve_asset,
             max_candidates=config.max_candidates,
             asset_class_hint=request.asset_class_hint,
-            is_priceable=_candidate_is_priceable,
+            history_verdict=_candidate_history,
         )
     )
+    validated = outcome.validated
+    unverified = outcome.unverified
+    uncorroborated = outcome.uncorroborated
     usage.update(
         extracted_count=len(extraction.candidates),
         validated_count=len(validated),
         unverified_count=len(unverified),
         uncorroborated_count=len(uncorroborated),
+        undetermined_count=len(outcome.undetermined),
     )
+    if not validated and outcome.undetermined:
+        # Every survivor failed on a price feed we could not reach. Naming
+        # them as untradable would report our outage as their property, so
+        # the turn takes the retryable route and says nothing about them.
+        usage["fallback_code"] = "priceability_undetermined"
+        logger.warning(
+            "Grounded discovery could not determine priceability",
+            undetermined_count=len(outcome.undetermined),
+            failure_classification="discovery_priceability_undetermined",
+        )
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_search_failed",
+            retryable=True,
+            current_user_message=current_user_message,
+            language=language,
+            usage=usage,
+        )
     if not validated:
         # The search found real names we cannot offer. Never dead-end here:
         # name what came back, then answer the same question from verified
@@ -344,7 +366,7 @@ async def _model_knowledge_result(
     packet = _model_knowledge_packet()
     # Sync resolver and price-probe lookups: off the loop, or naming rows
     # stalls every other stream on this worker.
-    validated, unverified, uncorroborated = await asyncio.to_thread(
+    outcome = await asyncio.to_thread(
         lambda: validated_candidates(
             extraction,
             packet=packet,
@@ -352,9 +374,12 @@ async def _model_knowledge_result(
             max_candidates=max_candidates,
             asset_class_hint=request.asset_class_hint,
             require_source_evidence=False,
-            is_priceable=_candidate_is_priceable,
+            history_verdict=_candidate_history,
         )
     )
+    validated = outcome.validated
+    unverified = outcome.unverified
+    uncorroborated = outcome.uncorroborated
     if not validated:
         if not recovery_on_empty:
             return None
@@ -429,31 +454,16 @@ async def _model_knowledge_result(
 _PRICEABILITY_PROBE_DAYS = 30
 
 
-def _candidate_is_priceable(symbol: str, asset_class: str) -> bool:
-    """Can Argus actually pull bars for this row?
+def _candidate_history(symbol: str, asset_class: str) -> str:
+    """Delegate to the one owner of "can Argus trade this history".
 
-    The catalog and the price feed do not agree: Kraken lists coins we have
-    no history for, and a row the user taps has to survive the backtest, not
-    just the resolver. One short recent window is the cheapest honest test.
+    Returns its verdict verbatim so validation can tell "no bars for this
+    coin" apart from "our provider is down", which must never be voiced as a
+    fact about the asset.
     """
-    from datetime import timedelta
+    from argus.domain.market_data import tradable_history
 
-    from argus.domain.market_data.provider import fetch_price_series
-
-    end = datetime.now(timezone.utc).date()
-    start = end - timedelta(days=_PRICEABILITY_PROBE_DAYS)
-    try:
-        series = fetch_price_series(symbol, asset_class, start, end, "1d")
-    except Exception as exc:  # noqa: BLE001
-        logger.debug(
-            "Discovery priceability probe failed",
-            symbol=symbol,
-            asset_class=asset_class,
-            error=str(exc),
-        )
-        return False
-    values = series.tolist() if hasattr(series, "tolist") else list(series or [])
-    return sum(1 for value in values if value is not None) >= 2
+    return tradable_history(symbol, asset_class).verdict
 
 
 def _model_knowledge_packet() -> SearchResultPacket:

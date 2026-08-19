@@ -12,6 +12,7 @@ from tests.evals.measurement_eval_harness import (
     load_eval_cases,
 )
 from tests.evals.measurement_eval_scorecard import measurement_fixture_case_ids
+from tests.evals.measurement_outcome import offered_to_user
 
 EXPECTED_LOCKED_CATEGORIES = {
     "messy_english",
@@ -295,9 +296,7 @@ def test_asset_discovery_expectations_compare_current_fact_requirement() -> None
         ),
     )
 
-    assert failures == [
-        "asset_discovery.needs_current_facts: expected True, got False"
-    ]
+    assert failures == ["asset_discovery.needs_current_facts: expected True, got False"]
 
 
 def test_typed_outcome_extracts_discovery_route_fields() -> None:
@@ -540,9 +539,7 @@ def test_modeled_cost_expectations_assert_canonical_and_launch_truth() -> None:
 def test_issue_271_cases_are_on_the_live_measurement_surface() -> None:
     cases = {case.id: case for case in load_eval_cases()}
     establishment = cases["natural_language_establishes_modeled_costs_issue_271"]
-    preservation = cases[
-        "action_chip_add_asset_preserves_modeled_costs_issue_271"
-    ]
+    preservation = cases["action_chip_add_asset_preserves_modeled_costs_issue_271"]
 
     for case in (establishment, preservation):
         assert case.expected.fee_rate == 0.001
@@ -750,9 +747,9 @@ def test_issue_339_compound_edit_materializes_complete_confirmation(
 
 
 def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> None:
-    case = {
-        case.id: case for case in load_eval_cases()
-    }["natural_language_establishes_modeled_costs_issue_271"]
+    case = {case.id: case for case in load_eval_cases()}[
+        "natural_language_establishes_modeled_costs_issue_271"
+    ]
     truthful = {
         "intent": "strategy_drafting",
         "capability_verdict": "executable",
@@ -781,9 +778,9 @@ def test_issue_271_establishment_accepts_truthful_strategy_drafting_route() -> N
 
 
 def test_issue_271_tolerant_intent_keeps_executable_contract_strict() -> None:
-    case = {
-        case.id: case for case in load_eval_cases()
-    }["natural_language_establishes_modeled_costs_issue_271"]
+    case = {case.id: case for case in load_eval_cases()}[
+        "natural_language_establishes_modeled_costs_issue_271"
+    ]
     truthful = {
         "intent": "strategy_drafting",
         "capability_verdict": "executable",
@@ -1296,3 +1293,54 @@ def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
     ]
     assert blocking[1]["status"] == "unexpected_pass"
     assert harness.expected_fail_issue_for_result(blocking[1]) == "#251"
+
+
+class TestOfferedReadsWhatTheUserSaw:
+    """Review #522: both offered gates were reading the wrong thing."""
+
+    def test_recovery_options_are_read_as_a_sibling_of_payload(self) -> None:
+        # typed_clarification_contract writes options beside payload, not
+        # inside it, so the old lookup made recovery_option_ids_include_any
+        # impossible to pass. All 60 blocks in the first live run were empty.
+        clarification = {
+            "kind": "unsupported_recovery",
+            "payload": {"raw_value": "options straddle", "strategy": {}},
+            "options": [
+                {"id": "rsi_threshold"},
+                {"id": "buy_and_hold"},
+            ],
+        }
+        offered = offered_to_user(
+            final_patch={"clarification": clarification},
+            interpret_patch={},
+            launch_payload={},
+        )
+        assert offered["recovery_option_ids"] == ["rsi_threshold", "buy_and_hold"]
+
+    def test_a_reply_that_names_nothing_does_not_pass_names_unavailable(self) -> None:
+        # The exact shape that shipped green: the sidecar listed four drops
+        # while the reply named none of them.
+        discovery = {
+            "candidates": [{"symbol": "SOL"}],
+            "unverified_names": ["Wiki Cat", "Venice Token", "Bitcoin"],
+        }
+        silent = offered_to_user(
+            final_patch={"discovery": discovery},
+            interpret_patch={},
+            launch_payload={},
+            assistant_text="Here are the trending cryptos I can help you test.",
+        )
+        assert silent["named_unavailable"] == []
+        assert silent["dropped_not_named"] == ["Wiki Cat", "Venice Token", "Bitcoin"]
+
+        naming = offered_to_user(
+            final_patch={"discovery": discovery},
+            interpret_patch={},
+            launch_payload={},
+            assistant_text=(
+                "Wiki Cat, Venice Token and Bitcoin came back but none could be "
+                "confirmed as tradable here."
+            ),
+        )
+        assert naming["named_unavailable"] == ["Wiki Cat", "Venice Token", "Bitcoin"]
+        assert naming["dropped_not_named"] == []

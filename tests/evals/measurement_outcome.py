@@ -16,6 +16,7 @@ def offered_to_user(
     final_patch: dict[str, Any],
     interpret_patch: dict[str, Any],
     launch_payload: dict[str, Any],
+    assistant_text: str = "",
 ) -> dict[str, Any]:
     """Project the turn's user-actionable surface out of the stage patch.
 
@@ -45,20 +46,24 @@ def offered_to_user(
 
     clarification = _patch_value("clarification")
     clarification = clarification if isinstance(clarification, dict) else {}
-    payload = clarification.get("payload")
-    payload = payload if isinstance(payload, dict) else {}
+    # typed_clarification_contract writes options as a sibling of payload;
+    # payload carries strategy, coverage and raw_value only.
     option_ids = [
         str(option.get("id") or "")
-        for option in (payload.get("options") or [])
+        for option in (clarification.get("options") or [])
         if isinstance(option, dict) and option.get("id")
     ]
 
     recovery = _patch_value("recovery")
     recovery = recovery if isinstance(recovery, dict) else {}
 
-    named_unavailable = [
-        str(name) for name in (discovery.get("unverified_names") or []) if str(name)
-    ]
+    # The sidecar's list is what the turn dropped; the assertion is about
+    # what the user was told. Reading the sidecar let a reply that named
+    # nothing pass a check written to require naming, so only drops that
+    # actually survive into the prose count here.
+    dropped = [str(name) for name in (discovery.get("unverified_names") or []) if str(name)]
+    haystack = _alnum(assistant_text)
+    named_unavailable = [name for name in dropped if _name_appears(name, haystack)]
 
     return {
         "discovery_symbols": discovery_symbols,
@@ -66,10 +71,25 @@ def offered_to_user(
         "recovery_option_ids": option_ids,
         "recovery_code": recovery.get("code"),
         "named_unavailable": named_unavailable,
+        "dropped_not_named": [name for name in dropped if name not in named_unavailable],
         "actionable": bool(
             discovery_symbols or experiment_kinds or option_ids or launch_payload
         ),
     }
+
+
+def _alnum(value: str) -> str:
+    return "".join(char for char in value.lower() if char.isalnum())
+
+
+def _name_appears(name: str, haystack: str) -> bool:
+    """Did the reply actually say this name, in any spelling the reader sees."""
+    whole = _alnum(name)
+    if whole and whole in haystack:
+        return True
+    first = name.split()[0] if name.split() else ""
+    compact = _alnum(first)
+    return len(compact) >= 4 and compact in haystack
 
 
 def compare_offered(

@@ -39,7 +39,10 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
-from argus.agent_runtime.strategy_contract import resolve_date_range
+from argus.agent_runtime.strategy_contract import (
+    resolve_date_range,
+    resolve_executable_date_range,
+)
 from argus.domain.research.config import research_rail_enabled
 from argus.domain.research.search.config import discovery_search_config
 from argus.domain.research.search.contracts import SearchUnavailableError
@@ -58,6 +61,10 @@ _KNOWLEDGE_ACTS = frozenset({"educational_question", "unsupported_request"})
 # carrying unsupported_constraints is a refusal decision with recovery options,
 # never a question the knowledge/research rail may answer with stats.
 _UNSUPPORTED_PAYLOAD_REASON_CODE = "unsupported_payload_kept_recovery_route"
+# A different stand-down from the one above: this one fires only when the
+# payload is empty and the draft itself describes a test, so it needs its
+# own name to stay distinguishable in reason_codes and eval traces.
+_UNSUPPORTED_EXECUTION_REASON_CODE = "unsupported_execution_kept_recovery_route"
 _SEARCH_MAX_RESULTS = 5
 
 
@@ -153,13 +160,14 @@ def _rail_may_claim_clarification(
         return False
     if not _execution_evidence_is_only_a_default(interpretation.candidate_strategy_draft):
         return False
-    if _draft_carries_a_stated_test_window(interpretation.candidate_strategy_draft):
-        # "Compare PLTR to LMT" states no window, which is what made it a
-        # question wearing a strategy's clothes. A user who names the period
-        # has described a test, so the turn keeps its strategy route and its
-        # unsupported-recovery contract instead of being answered with stats.
+    if _describes_a_test_it_cannot_run(interpretation):
+        # A window alone must not decline: "compare PLTR to LMT over the last
+        # 3 years" is the same question as without the period, and declining
+        # on specificity gives the more precise user the worse turn. Only an
+        # unsupported verdict over a window the user themselves stated is a
+        # described test, and that keeps its recovery contract.
         logger.info(
-            "Research rail claim declined: the draft carries a user-stated window",
+            "Research rail claim declined: unsupported request over a stated window",
             date_range=getattr(
                 interpretation.candidate_strategy_draft, "date_range", None
             ),
@@ -184,19 +192,32 @@ def _describes_a_test_it_cannot_run(
         str(symbol or "").strip()
         for symbol in (getattr(draft, "asset_universe", None) or [])
     )
-    return has_asset and _draft_carries_a_stated_test_window(draft)
+    if not has_asset:
+        return False
+    window = getattr(draft, "date_range", None)
+    if not (window.values() if isinstance(window, dict) else window):
+        return False
+    return _draft_carries_a_stated_test_window(draft)
 
 
 def _draft_carries_a_stated_test_window(strategy: Any) -> bool:
-    """Whether the draft carries a period the user named for a test.
+    """Whether the draft carries a window the user themselves stated.
 
-    Typed field only: the interpreter fills date_range from the user's own
-    words, so this reads a structured fact and never inspects the message.
+    Presence of date_range is not the fact. The runtime also writes it by
+    inheriting a previous result's window, and draft_shape documents
+    date_range as a reference field that must never pull a turn onto the
+    strategy route. What makes it a stated window is the interpreter's own
+    record that the user's message contained it: an evidence span, or
+    explicit_user provenance.
     """
-    value = getattr(strategy, "date_range", None)
-    if isinstance(value, dict):
-        return any(str(item or "").strip() for item in value.values())
-    return bool(str(value or "").strip())
+    extra = getattr(strategy, "extra_parameters", None) or {}
+    provenance = extra.get("field_provenance")
+    if isinstance(provenance, dict) and provenance.get("date_range") == "explicit_user":
+        return True
+    spans = extra.get("evidence_spans")
+    if isinstance(spans, dict) and str(spans.get("date_range") or "").strip():
+        return True
+    return bool(str(extra.get("date_range_raw_text") or "").strip())
 
 
 def _execution_evidence_is_only_a_default(strategy: Any) -> bool:
@@ -271,6 +292,7 @@ async def knowledge_answer_stage_result(
     if query is None or query.question_kind in ("concept", "none"):
         return None
     if refusal_route_survives_classification(interpretation):
+        note_refusal_route_kept(interpretation)
         return None
     answer: str | None = None
     reason_code = ""
@@ -306,19 +328,26 @@ def refusal_route_survives_classification(
 ) -> bool:
     """Whether a turn the classifier claimed must keep its refusal route.
 
+    Pure: asking this question changes nothing. The caller that acts on the
+    answer records it, because only the caller knows the turn was actually
+    diverted.
+
     Two independent reads can each misfire, in opposite directions, so
     neither may decide alone. The act label can be wrong, which is why the
     classifier is always consulted first and owns whether a turn is a
     question at all. The classifier can also be wrong, and when it claims a
-    turn whose typed draft already names an asset and the window the user
-    gave, that turn is a refusal decision with recovery options rather than
-    a question. Answering it from the underlying's price history is how a
-    run request became a readout. Records itself whenever it fires.
+    turn whose typed draft already names an asset and a window the user
+    themselves stated, that turn is a refusal decision with recovery options
+    rather than a question. Answering it from the underlying's price history
+    is how a run request became a readout.
     """
-    if not _describes_a_test_it_cannot_run(interpretation):
-        return False
-    if _UNSUPPORTED_PAYLOAD_REASON_CODE not in interpretation.reason_codes:
-        interpretation.reason_codes.append(_UNSUPPORTED_PAYLOAD_REASON_CODE)
+    return _describes_a_test_it_cannot_run(interpretation)
+
+
+def note_refusal_route_kept(interpretation: StructuredInterpretation) -> None:
+    """Record that a claimed turn was sent back to its refusal route."""
+    if _UNSUPPORTED_EXECUTION_REASON_CODE not in interpretation.reason_codes:
+        interpretation.reason_codes.append(_UNSUPPORTED_EXECUTION_REASON_CODE)
     draft = interpretation.candidate_strategy_draft
     logger.info(
         "Knowledge claim stood down after classification for an unsupported "
@@ -327,7 +356,6 @@ def refusal_route_survives_classification(
         getattr(draft, "date_range", None),
         failure_classification="unsupported_execution_kept_recovery_route",
     )
-    return True
 
 
 async def _classify_question(
@@ -380,12 +408,20 @@ async def _market_stats_answer(
     if not symbols:
         return None
     symbol = symbols[0]
-    # The interpreter's typed window is structured and already validated; the
-    # classifier's raw text is free prose that only parses in one shape, so
-    # letting it win silently loses windows like "from 2024-01-01 to
-    # 2024-12-31" to the trailing-year default.
+    # The executable-window owner, the same one execute and confirm use. It
+    # reads the typed range, then the interpreter's date_range_intent, so a
+    # one-endpoint dict does not silently become a trailing year just by
+    # being truthy. Only when it still has nothing does the classifier's raw
+    # prose get a turn.
     requested_period = str(query.date_range_raw_text or "").strip()
-    window = resolve_date_range(draft.date_range or query.date_range_raw_text or None)
+    window = resolve_executable_date_range(
+        draft.date_range,
+        extra_parameters=getattr(draft, "extra_parameters", None),
+    )
+    if window.used_default and requested_period:
+        from_classifier = resolve_date_range(requested_period)
+        if not from_classifier.used_default:
+            window = from_classifier
     if window.used_default and requested_period:
         # A substituted window is a deterministic compensation for a period
         # this layer could not parse, and the figures below are voiced as the

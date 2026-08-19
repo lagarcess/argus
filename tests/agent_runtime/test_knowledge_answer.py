@@ -234,6 +234,10 @@ def test_unsupported_run_request_is_never_answered_with_asset_stats(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            # The interpreter's record that the message carried the period.
+            extra_parameters={
+                "evidence_spans": {"date_range": "from 2024-01-01 to 2024-12-31"}
+            },
         )
     )
     result = _run(
@@ -295,6 +299,11 @@ def test_unsupported_request_describing_a_test_keeps_its_recovery_route(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            # The interpreter's own record that the message carried the
+            # period; a bare date_range can be an inherited window.
+            extra_parameters={
+                "evidence_spans": {"date_range": "from 2024-01-01 to 2024-12-31"}
+            },
         ),
     )
 
@@ -309,22 +318,34 @@ def test_unsupported_capability_question_still_reaches_the_answerer(
     assert _run(_interpretation()) is not None
 
 
-def test_rail_claim_declines_a_draft_carrying_a_stated_window(monkeypatch) -> None:
+def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
+    monkeypatch,
+) -> None:
+    """Review #522: a window alone must not decline the rail claim.
+
+    Declining on specificity gave the more precise user the worse turn:
+    "compare PLTR to LMT over the last 3 years" got the builder's capital
+    question while the same question without a period got an answer. Only an
+    unsupported verdict over a window the user themselves stated is a
+    described test.
+    """
     monkeypatch.setattr(ka, "research_rail_enabled", lambda: True)
-    windowed = _interpretation(
+    span = {"evidence_spans": {"date_range": "over the last 3 years"}}
+
+    supported_with_window = _interpretation(
         semantic_turn_act="new_idea",
         requires_clarification=True,
         candidate_strategy_draft=StrategySummary(
-            asset_universe=["AAPL"],
+            asset_universe=["PLTR", "LMT"],
             asset_class="equity",
             strategy_type="buy_and_hold",
-            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            date_range={"start": "2023-01-01", "end": "2026-01-01"},
+            extra_parameters=span,
         ),
     )
-    assert ka._rail_may_claim_clarification(windowed) is False
+    assert ka._rail_may_claim_clarification(supported_with_window) is True
 
-    # The documented widening survives: "compare PLTR to LMT" states no window.
-    windowless = _interpretation(
+    supported_without_window = _interpretation(
         semantic_turn_act="new_idea",
         requires_clarification=True,
         candidate_strategy_draft=StrategySummary(
@@ -333,7 +354,33 @@ def test_rail_claim_declines_a_draft_carrying_a_stated_window(monkeypatch) -> No
             strategy_type="buy_and_hold",
         ),
     )
-    assert ka._rail_may_claim_clarification(windowless) is True
+    assert ka._rail_may_claim_clarification(supported_without_window) is True
+
+    unsupported_with_window = _interpretation(
+        semantic_turn_act="unsupported_request",
+        requires_clarification=True,
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            extra_parameters=span,
+        ),
+    )
+    assert ka._rail_may_claim_clarification(unsupported_with_window) is False
+
+    # An inherited window is not a stated one: no evidence span, no decline.
+    inherited = _interpretation(
+        semantic_turn_act="unsupported_request",
+        requires_clarification=True,
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+    )
+    assert ka._rail_may_claim_clarification(inherited) is True
 
 
 def test_typed_draft_window_outranks_classifier_prose(monkeypatch) -> None:
