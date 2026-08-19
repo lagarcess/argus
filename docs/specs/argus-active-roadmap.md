@@ -588,6 +588,51 @@ profile and fall back to the nameless pool.
 
 ## Landed this cycle
 
+- **Production promotion** (PR #518, merged 2026-08-16 at `31343882`) — 100
+  commits, one theme: **Argus stops discarding what the user said**. Editing a
+  confirmation card applies every operation in all three shapes, category
+  discovery routes on its typed payload and reaches the search path that was
+  already built, DCA metrics measure performance instead of counting deposits,
+  and confirmation prose renders in the workspace language. Recorded in
+  [`2026-08-16-main-production-promotion.md`](../release-manifests/2026-08-16-main-production-promotion.md).
+
+  Measured against the deployed build rather than asserted: production failed
+  14 of 46 cases, the candidate failed 2 of 60, **zero candidate-only
+  failures**, and the compound-edit tier moved from 1 of 9 to 7 of 9.
+
+  Three lessons, each of which changed an outcome:
+
+  - **Lane reports did not survive independent re-measurement.** #514 claimed
+    ten fixes and two held after merge. #510 claimed an edit fix that a later
+    interleaved A/B measured at 2 of 10 on the very baseline containing it. The
+    working method is: re-derive every number from committed scorecards against
+    a baseline you ran yourself, and settle any changed case with an
+    interleaved A/B at frozen commits in one session.
+  - **The model was right and the code threw it away.** On "remove AAPL" three
+    independent model reads were correct and five deterministic layers
+    destroyed them. The case only ever passed when the model *disobeyed* the
+    schema. Two days were spent blaming the LLM for a defect that was never
+    there.
+  - **A green eval is necessary and never sufficient.** Discovery shipped with
+    its case passing, and a user typing "find me trending cryptos" got a dead
+    end, because the case asserted a routing tag and nothing the user receives.
+    Nothing is called working until it has been used as a user, in the app, in
+    both languages.
+
+- **Model-facing text is a measured surface** (PR #513). The interpreter's
+  system prompt and the response schema's field descriptions are fingerprinted
+  against a committed scorecard; changing either requires evidence and one lane
+  holds the surface at a time. This exists because #491 rewrote the shared
+  prompt for a DCA change, passed its own tests and CI, and silently regressed
+  asset extraction, date preservation, and discovery routing.
+
+- **Copy matches the card** (PR #521, closes #509). Clipboard text derives from
+  the same view model both card kinds render, so a Spanish user copying a
+  Spanish card no longer gets English. The English clipboard was broken too,
+  hiding behind a Spanish bug report. `confirmation.summary` is deliberately
+  dropped from copy, founder-approved 2026-08-16: the card never paints it and
+  it was unconditional backend English. The remaining backend half is #523.
+
 - **Production promotion** (PR #441, merged 2026-08-11 at `d67cef92`) — 451
   commits, the first promotion in a month, recorded in
   [`2026-08-11-main-production-promotion.md`](../release-manifests/2026-08-11-main-production-promotion.md).
