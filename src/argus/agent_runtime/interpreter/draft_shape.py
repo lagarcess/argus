@@ -373,6 +373,13 @@ def _material_strategy_updates_from_draft(
         "date_range",
         "sizing_mode",
         "capital_amount",
+        # Every money role counts: the DCA audits move an amount between
+        # capital_amount, recurring_contribution, initial_capital, and
+        # total_capital, and an answer whose only new fact is money in one of
+        # those roles is a current-turn update, not a replay.
+        "recurring_contribution",
+        "initial_capital",
+        "total_capital",
         "position_size",
         "risk_rules",
         "comparison_baseline",

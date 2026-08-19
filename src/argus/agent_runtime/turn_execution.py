@@ -67,6 +67,7 @@ class TurnExecutionContext:
     entry_fingerprint: str | None
     calls_reserved: int = 0
     routing_reserved: bool = False
+    last_resort_repair_reserved: bool = False
     terminal: ProgressOutcome | None = None
     terminal_reason: str | None = None
     exit_fingerprint: str | None = None
@@ -91,6 +92,23 @@ _ACTIVE_TURN_EXECUTION: ContextVar[TurnExecutionContext | None] = ContextVar(
     "active_turn_execution",
     default=None,
 )
+
+# The last-resort focused repair is the only rescue left once every
+# interpretation candidate has failed; like the routing slot, its first call
+# must not be starved by the audit calls that preceded it.
+_LAST_RESORT_REPAIR_SCOPE: ContextVar[bool] = ContextVar(
+    "last_resort_repair_scope",
+    default=False,
+)
+
+
+@contextmanager
+def last_resort_repair_scope() -> Iterator[None]:
+    token = _LAST_RESORT_REPAIR_SCOPE.set(True)
+    try:
+        yield
+    finally:
+        _LAST_RESORT_REPAIR_SCOPE.reset(token)
 
 
 def active_turn_execution() -> TurnExecutionContext | None:
@@ -156,6 +174,16 @@ def reserve_provider_call(
             if task_timeout_seconds is not None:
                 timeout_seconds = min(timeout_seconds, float(task_timeout_seconds))
             return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
+    if (
+        _LAST_RESORT_REPAIR_SCOPE.get()
+        and not execution.last_resort_repair_reserved
+        and execution.calls_reserved >= execution.call_allowance
+    ):
+        execution.last_resort_repair_reserved = True
+        timeout_seconds = remaining_seconds
+        if task_timeout_seconds is not None:
+            timeout_seconds = min(timeout_seconds, float(task_timeout_seconds))
+        return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
     if execution.calls_reserved >= execution.call_allowance:
         execution.call_allowance_exhausted = True
         execution.blocked_tasks.append(task_name)

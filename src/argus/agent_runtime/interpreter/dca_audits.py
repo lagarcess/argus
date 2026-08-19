@@ -355,6 +355,7 @@ def total_budget_audited_response(
     *,
     response: LLMInterpretationResponse,
     audit: Any,
+    answers_pending_sizing_question: bool = False,
 ) -> LLMInterpretationResponse:
     """Apply a total_budget_not_recurring verdict without re-roling typed money.
 
@@ -433,6 +434,29 @@ def total_budget_audited_response(
         draft.field_provenance = field_provenance
         return _budget_clarification_response(
             response=response, draft=draft, audit_reason_codes=audit_reason_codes
+        )
+    capital_provenance = str(
+        (draft.field_provenance or {}).get("capital_amount") or ""
+    ).casefold()
+    if answers_pending_sizing_question and capital_provenance in {
+        "recurring_contribution",
+        "explicit_recurring_contribution",
+    }:
+        # The runtime asked "how much per purchase?" and the primary typed the
+        # answer as the contribution: the question fixed the money role, so a
+        # budget claim cannot re-role it. A fresh message with budget wording
+        # ("$200,000 of capital") still demotes, whatever the provenance says.
+        return response.model_copy(
+            update={
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "dca_contribution_provenance_kept_over_budget_audit",
+                        ]
+                    )
+                ),
+            }
         )
     _move_dca_total_budget_out_of_recurring_amount(draft)
     audit_reason_codes = ["dca_total_budget_role_audited"]
