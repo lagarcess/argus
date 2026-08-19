@@ -1509,6 +1509,23 @@ export default function ChatInterface() {
             }
             return normalizeDurableRetryActionHistory(nextMessages);
           });
+        } else {
+          // A final frame with neither prose nor an artifact must still yield
+          // a visible assistant turn; an empty placeholder reads as the app
+          // dying silently. The generic turn-failure copy is the honest
+          // render, and it is localized in both bundles.
+          setMessages((prev) =>
+            normalizeDurableRetryActionHistory(
+              replaceOrAppendFinalAssistantMessage(prev, assistantId, {
+                id: finalMessageId ?? assistantId,
+                role: "ai",
+                kind: "text",
+                content: t("chat.error_backtest"),
+                actions:
+                  finalTextActions.length > 0 ? finalTextActions : undefined,
+              }),
+            ),
+          );
         }
         terminalReadiness.accept(event.data, identityAuthorized);
       }

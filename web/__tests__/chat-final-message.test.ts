@@ -106,3 +106,26 @@ describe("chat final message merge", () => {
     ).toBe(message);
   });
 });
+
+describe("chat final frame visibility", () => {
+  test("a final frame with no prose and no artifact still yields a visible turn", () => {
+    // Production 2026-08-11..13: a Spanish chip click got no assistant reply
+    // at all. The backend cannot end a turn silently by construction, so the
+    // last silent shape was a final frame carrying neither text nor an
+    // artifact; the handler must render the localized turn-failure copy
+    // instead of leaving the placeholder empty.
+    const { readFileSync } = require("node:fs");
+    const { join } = require("node:path");
+    const chat = readFileSync(
+      join(__dirname, "..", "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const finalHandler = chat.slice(
+      chat.indexOf("} else if (finalText) {"),
+      chat.indexOf("terminalReadiness.accept(event.data, identityAuthorized)"),
+    );
+    expect(finalHandler).toContain("} else {");
+    expect(finalHandler).toContain('content: t("chat.error_backtest")');
+    expect(finalHandler).toContain("replaceOrAppendFinalAssistantMessage");
+  });
+});
