@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { mergeFinalTextMessage } from "../lib/chat-final-message";
 
 describe("chat final message merge", () => {
@@ -114,8 +117,6 @@ describe("chat final frame visibility", () => {
     // last silent shape was a final frame carrying neither text nor an
     // artifact; the handler must render the localized turn-failure copy
     // instead of leaving the placeholder empty.
-    const { readFileSync } = require("node:fs");
-    const { join } = require("node:path");
     const chat = readFileSync(
       join(__dirname, "..", "components/chat/ChatInterface.tsx"),
       "utf-8",

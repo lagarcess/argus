@@ -377,14 +377,6 @@ export default function ChatInterface() {
   const reloadActiveTranscriptRef = useRef<(conversationId: string) => void>(
     () => {},
   );
-  useEffect(() => {
-    reloadActiveTranscriptRef.current = (targetConversationId) => {
-      // A locked (mid-stream) conversation reconciles through its own
-      // terminal path instead of a competing reload.
-      if (conversationActivity.isConversationLocked(targetConversationId)) return;
-      void navigateConversationTranscript(targetConversationId);
-    };
-  });
   const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
       const targetConversationId = response.job.conversation_id;
       invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
@@ -770,6 +762,14 @@ export default function ChatInterface() {
     });
     await handle.completion;
   }
+  useEffect(() => {
+    reloadActiveTranscriptRef.current = (targetConversationId) => {
+      // A locked (mid-stream) conversation reconciles through its own
+      // terminal path instead of a competing reload.
+      if (conversationActivity.isConversationLocked(targetConversationId)) return;
+      void navigateConversationTranscript(targetConversationId);
+    };
+  });
   function beginConversationActivityTerminalReadiness(getRequest: () => ChatRequestSession) { const terminalReadiness = createConversationActivityTerminalReadinessSession({ getRequest: () => ({ conversationId: getRequest().identity.conversationId, kind: getRequest().kind }), activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness, reconcileCanonical: (id) => void navigateConversationTranscript(id) }); terminalReadiness.stage(); return terminalReadiness; }
   // ── Init conversation ──────────────────────────────────────────────────────
 
