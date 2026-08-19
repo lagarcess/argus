@@ -131,13 +131,19 @@ def start_research_job(
             sync_spec = spec.model_copy(update={"timeout_seconds": 110.0})
             packet = client.run_research(prompt, sync_spec)
         except ResearchUnavailableError as exc:
-            logger.warning("Synchronous thorough research failed", reason=exc.reason)
+            logger.warning(
+                "Synchronous thorough research failed"
+                f" reason={exc.reason} detail={exc.detail or ''}"
+            )
             return None, None
         return None, packet
     try:
         background_id = client.submit_background(prompt, spec)
     except ResearchUnavailableError as exc:
-        logger.warning("Research background submission failed", reason=exc.reason)
+        logger.warning(
+            "Research background submission failed"
+            f" reason={exc.reason} detail={exc.detail or ''}"
+        )
         return None, None
     launch_payload = {
         "schema_version": "research_job_launch/v1",
@@ -221,9 +227,19 @@ async def _poll_and_finalize(
             try:
                 poll = await asyncio.to_thread(client.poll_background, background_id)
             except ResearchUnavailableError as exc:
-                if time.monotonic() > deadline:
+                # Deterministic reasons (a response we refuse to parse, an
+                # unpriced model, a bad key) never heal on re-poll; only
+                # transient transport failures earn the rest of the deadline.
+                deterministic = exc.reason in (
+                    "malformed_response",
+                    "unknown_model_rate",
+                    "not_configured",
+                )
+                if deterministic or time.monotonic() > deadline:
                     _fail_job(
-                        job_id=job_id, user_id=user_id, detail=f"poll: {exc.reason}"
+                        job_id=job_id,
+                        user_id=user_id,
+                        detail=f"poll: {exc.reason}: {exc.detail or ''}",
                     )
                     return
                 continue
