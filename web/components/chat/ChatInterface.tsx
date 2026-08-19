@@ -374,10 +374,27 @@ export default function ChatInterface() {
   );
   const isStreamingResponse = conversationActivity.isConversationLocked(conversationId);
   const visibleStreamStatus = visibleRequestStatus(streamStatus, isStreamingResponse);
+  const reloadActiveTranscriptRef = useRef<(conversationId: string) => void>(
+    () => {},
+  );
+  useEffect(() => {
+    reloadActiveTranscriptRef.current = (targetConversationId) => {
+      // A locked (mid-stream) conversation reconciles through its own
+      // terminal path instead of a competing reload.
+      if (conversationActivity.isConversationLocked(targetConversationId)) return;
+      void navigateConversationTranscript(targetConversationId);
+    };
+  });
   const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
       const targetConversationId = response.job.conversation_id;
       invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
-      promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+      const promoted = promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+      // A research job's answer arrives as a new assistant message, not a
+      // card update; the active view must refetch it or "the full answer is
+      // below" renders above nothing.
+      if (promoted && response.job.operation_scope === "chat.research") {
+        reloadActiveTranscriptRef.current(targetConversationId);
+      }
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
   useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages, handleDurableJobCompletion);
 
