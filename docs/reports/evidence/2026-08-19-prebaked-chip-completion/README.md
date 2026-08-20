@@ -159,3 +159,39 @@ matrix then.
   unconditionally re-adds `asset_universe` to `missing_required_fields`; not
   implicated in any of this lane's production traces (#483's upstream fix
   held: KO was carried in every run), left untouched.
+
+## Review round, 2026-08-20 (reconciled onto integration `e99af9a1`)
+
+Ten findings at `57d66d24`, all confirmed and fixed; dispositions live on
+the PR threads. Re-verification at the reconciled head, local stack with
+live providers (every prior browser result predated these fixes):
+
+- Cancel path (the round's regression): idea → card → Cancel settles to
+  "Draft canceled" / "Borrador cancelado" with zero turn-failure fallback
+  strings in either language, twice (before and after the modularity
+  extraction).
+- All six chip variants complete end to end in the browser: EN and ES
+  Netflix (grounded revenue answers), EN and ES Costco (inline comparison
+  with live market snapshot), EN KO with "200$" (card → run →
+  "Simulation Complete, $17,161, +40.7% return on contributions"), ES KO
+  with "13,000 pesos" (card → run → "Simulación completa, $1,115,485,
+  +40.7% retorno sobre aportes").
+- Both chip eval cases re-run live and pass with the re-pointed snapshots
+  (`pending_needs` removed everywhere; the shipping signal is
+  `requested_field` beside the `await_user_reply` outcome that set it).
+- PR #522 demonstrated by execution at this head: the refusal override
+  returns None for all twelve `question_kind` values with the research
+  allowance exhausted (route-kept receipt noted each time); the tradability
+  owner returns its three verdicts, an outage is never cached and re-probes
+  after healing, a decided negative stays cached; live PENGU and WLD resolve
+  but carry `no_history` and `verified_peers` offers neither; five live
+  draws of `graceful_recovery_weekly_options_aapl` all land `unsupported`
+  with typed recovery, zero fabricated readouts.
+- Suites: backend 2732 passed, web 1508 passed, modularity budget clean
+  (ChatInterface reduced back to its 2598 baseline by extracting the
+  fallback composition into chat-message-projection).
+
+Decision recorded (poller): no `ResearchUnavailableError` reason is treated
+as deterministic from one poll; the deadline alone owns giving up, so a
+future provider rate drift costs one 600 s deadline per job rather than
+taking the rail dark instantly, and the failure posts its note.
