@@ -48,7 +48,6 @@ def _request(message: str) -> InterpretationRequest:
         latest_task_snapshot=TaskSnapshot(
             latest_task_type="strategy_drafting",
             completed=False,
-            pending_needs=["sizing_amount"],
             last_unresolved_follow_up="How much should I use?",
             pending_strategy_summary=CHIP_PENDING_STRATEGY,
         ),

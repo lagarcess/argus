@@ -327,7 +327,6 @@ cases:
     snapshot:
       latest_task_type: strategy_drafting
       completed: false
-      pending_needs: ["sizing_amount"]
       last_unresolved_follow_up: "How much should I use?"
       pending_strategy:
         strategy_type: dca_accumulation
@@ -359,7 +358,6 @@ cases:
     snapshot:
       latest_task_type: strategy_drafting
       completed: false
-      pending_needs: ["sizing_amount"]
       last_unresolved_follow_up: "¿Cuánto debería usar?"
       pending_strategy:
         strategy_type: dca_accumulation

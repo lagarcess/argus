@@ -372,18 +372,21 @@ def total_budget_audited_response(
     seed_provenance = str(
         (draft.field_provenance or {}).get("initial_capital") or ""
     ).casefold()
+    capital_provenance = str(
+        (draft.field_provenance or {}).get("capital_amount") or ""
+    ).casefold()
+    # The one invariant, stated once: a typed contribution beats a heuristic
+    # budget verdict. A typed seed applies it; answering the runtime's own
+    # money question widens where it applies; neither narrows its definition.
+    capital_is_typed_contribution = (
+        draft.recurring_contribution is not None
+        or capital_provenance
+        in {"recurring_contribution", "explicit_recurring_contribution"}
+    )
     if draft.initial_capital is not None and seed_provenance in {
         "starting_capital",
         "explicit_user",
     }:
-        capital_provenance = str(
-            (draft.field_provenance or {}).get("capital_amount") or ""
-        ).casefold()
-        capital_is_typed_contribution = (
-            draft.recurring_contribution is not None
-            or capital_provenance
-            in {"recurring_contribution", "explicit_recurring_contribution"}
-        )
         if (
             draft.capital_amount is None
             or draft.capital_amount == draft.initial_capital
@@ -435,20 +438,11 @@ def total_budget_audited_response(
         return _budget_clarification_response(
             response=response, draft=draft, audit_reason_codes=audit_reason_codes
         )
-    capital_provenance = str(
-        (draft.field_provenance or {}).get("capital_amount") or ""
-    ).casefold()
-    capital_is_typed_contribution = (
-        draft.recurring_contribution is not None
-        or capital_provenance
-        in {"recurring_contribution", "explicit_recurring_contribution"}
-    )
     if answers_pending_sizing_question and capital_is_typed_contribution:
-        # The runtime asked "how much per purchase?" and the primary typed the
-        # answer as the contribution — the same definition the seeded branch
-        # above uses. The question fixed the money role, so a budget claim
-        # cannot re-role it. A fresh message with budget wording
-        # ("$200,000 of capital") still demotes, whatever the provenance says.
+        # The runtime asked for the money and the primary typed the answer as
+        # the contribution: the question fixed the money role, so a budget
+        # claim cannot re-role it. A fresh seedless message keeps the audit's
+        # verdict whatever the provenance says.
         return response.model_copy(
             update={
                 "reason_codes": list(
