@@ -614,7 +614,7 @@ profile and fall back to the nameless pool.
     offered nothing. Beside runnable rows it is noise, and the pipeline's
     deliberate silent-filtering contract stands.
 
-- **Front-page chips do not complete** (PR #524, open). Production data for
+- **Front-page chips now complete** (PR #524, merged `713b79d4`). Production data for
   2026-08-11 to 08-13 (37 real users, 42 sessions, **2 returning**) showed all
   three seeded chips failing: Netflix 0/3 in English, the Costco comparison
   complete server-side but invisible until reload, and Coca-Cola dying on
@@ -626,6 +626,18 @@ profile and fall back to the nameless pool.
   The lesson is where the constraint actually sits: **every lane run that week
   was invisible to those 37 people.** The product's front door was broken and
   the queue was full of work behind it.
+
+  Verified by the captain in a browser on the merged tree **before** merging,
+  after the lane's own report proved insufficient twice: Netflix returns a
+  grounded answer with sources and a backtest bridge, the Costco comparison
+  renders in the open view with no reload, and the chip plus "200$" reaches a
+  KO recurring-buys card. The live DOM was grepped for the exact production
+  death strings; zero hits.
+
+  One review finding was called critical and could not be reproduced on either
+  tree. The fix is harmless and stayed in, but the severity was repeated from a
+  code trace rather than tested, which is the same error as calling a feature
+  working because its eval case is green.
 
 - **Production promotion** (PR #518, merged 2026-08-16 at `31343882`) — 100
   commits, one theme: **Argus stops discarding what the user said**. Editing a
