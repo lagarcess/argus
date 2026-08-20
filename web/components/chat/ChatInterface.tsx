@@ -379,14 +379,21 @@ export default function ChatInterface() {
   );
   const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
       const targetConversationId = response.job.conversation_id;
-      invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
-      const promoted = promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
       // A research job's answer arrives as a new assistant message, not a
       // card update; the active view must refetch it or "the full answer is
-      // below" renders above nothing.
-      if (promoted && response.job.operation_scope === "chat.research") {
-        reloadActiveTranscriptRef.current(targetConversationId);
+      // below" renders above nothing. The reload runs with the cache entry
+      // intact so navigation takes the refreshing path — the stale snapshot
+      // keeps rendering while the canonical refetch brings the answer in;
+      // evicting first would force a cold retrieval that blanks the view.
+      if (response.job.operation_scope === "chat.research") {
+        const promoted = promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+        if (promoted) {
+          reloadActiveTranscriptRef.current(targetConversationId);
+          return;
+        }
       }
+      invalidateTranscriptForMutation(targetConversationId, "durable_job_completion");
+      promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
   useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages, handleDurableJobCompletion);
 
