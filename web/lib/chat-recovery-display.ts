@@ -882,16 +882,19 @@ function simplificationOptionKey(
   if (ruleType(values.exit_rule) === "rsi_threshold") {
     return "rsi_threshold";
   }
+  const strategyTypeToken = canonicalStrategyTypeToken(values.strategy_type);
   if (
     ruleType(values.entry_rule) === "moving_average_crossover" ||
     ruleType(values.exit_rule) === "moving_average_crossover" ||
     values.rule_family === "moving_average_crossover" ||
-    values.strategy_type === "moving_average_crossover"
+    strategyTypeToken === "moving_average_crossover"
   ) {
     return "moving_average_crossover";
   }
-  if (values.strategy_type === "buy_and_hold") {
-    return "buy_and_hold";
+  if (strategyTypeToken === "buy_and_hold") {
+    return values.initial_capital !== undefined && values.initial_capital !== null
+      ? "buy_and_hold_with_starting_capital"
+      : "buy_and_hold";
   }
   // The DCA ceiling recovery's money-role options, keyed like the backend's
   // typed kinds so a Spanish reader never sees the English fallback labels.
@@ -914,6 +917,20 @@ function simplificationOptionKey(
 
 function ruleType(value: unknown): string | null {
   return stringOrNull(recordOrNull(value)?.type);
+}
+
+// The backend derives kinds from canonical_strategy_type, which lowercases
+// and joins alphanumeric runs with underscores; this twin must not match
+// narrower than that or a payload the backend keys ("Buy and Hold") falls
+// back to the English compatibility label.
+function canonicalStrategyTypeToken(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const token = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return token || null;
 }
 
 function joinLocalizedOptions(values: string[], t: TFunction): string {

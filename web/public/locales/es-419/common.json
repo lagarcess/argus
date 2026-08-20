@@ -428,7 +428,8 @@
       "historical_period": "Probarlo en un período histórico",
       "supported_symbol": "Usar un símbolo de acción o cripto compatible",
       "recurring_only": "Ejecutar solo compras recurrentes",
-      "use_as_starting_capital": "Usarlo como capital inicial"
+      "use_as_starting_capital": "Usarlo como capital inicial",
+      "buy_and_hold_with_starting_capital": "Usar comprar y mantener con capital inicial"
     },
     "retest": {
       "strategy_family": {

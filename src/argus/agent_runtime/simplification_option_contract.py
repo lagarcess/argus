@@ -9,6 +9,7 @@ from argus.agent_runtime.strategy_contract import canonical_strategy_type
 SimplificationOptionKind = Literal[
     "rsi_threshold",
     "buy_and_hold",
+    "buy_and_hold_with_starting_capital",
     "moving_average_crossover",
     "recurring_only",
     "use_as_starting_capital",
@@ -29,6 +30,13 @@ def simplification_option_kind(
     if replacement_values.get("rule_family") == "moving_average_crossover":
         return "moving_average_crossover"
     strategy_type = canonical_strategy_type(replacement_values.get("strategy_type"))
+    if (
+        strategy_type == "buy_and_hold"
+        and replacement_values.get("initial_capital") is not None
+    ):
+        # The DCA ceiling recovery's strategy-switch option: the money funds
+        # the switched plan, which is a different offer than comparing.
+        return "buy_and_hold_with_starting_capital"
     if strategy_type == "buy_and_hold":
         return "buy_and_hold"
     if strategy_type == "moving_average_crossover":
