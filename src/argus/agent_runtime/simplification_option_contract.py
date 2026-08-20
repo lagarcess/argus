@@ -50,6 +50,23 @@ def simplification_option_kind(
     return None
 
 
+# Kinds that carry no value of their own. Only these may serve as an option
+# identity: a value-bearing kind (the starting-capital pair) names WHAT the
+# option does but not WHICH one it is — the amount is the point — so it must
+# never become an option id, a dedup key, or a selection short-circuit.
+_VALUE_FREE_KINDS: frozenset[str] = frozenset(
+    {"rsi_threshold", "buy_and_hold", "moving_average_crossover", "recurring_only"}
+)
+
+
+def simplification_option_identity(
+    replacement_values: Any,
+) -> SimplificationOptionKind | None:
+    """The kind, only where it can stand in for the whole option."""
+    kind = simplification_option_kind(replacement_values)
+    return kind if kind in _VALUE_FREE_KINDS else None
+
+
 def simplification_option_matches_selection(
     *,
     option_replacement_values: Any,
@@ -60,8 +77,8 @@ def simplification_option_matches_selection(
         dict,
     ):
         return False
-    selected_kind = simplification_option_kind(selected_replacement_values)
-    option_kind = simplification_option_kind(option_replacement_values)
+    selected_kind = simplification_option_identity(selected_replacement_values)
+    option_kind = simplification_option_identity(option_replacement_values)
     if selected_kind is not None or option_kind is not None:
         return selected_kind == option_kind
     if not selected_replacement_values:
