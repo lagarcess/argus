@@ -227,19 +227,19 @@ async def _poll_and_finalize(
             try:
                 poll = await asyncio.to_thread(client.poll_background, background_id)
             except ResearchUnavailableError as exc:
-                # Deterministic reasons (a response we refuse to parse, an
-                # unpriced model, a bad key) never heal on re-poll; only
-                # transient transport failures earn the rest of the deadline.
-                deterministic = exc.reason in (
-                    "malformed_response",
-                    "unknown_model_rate",
-                    "not_configured",
-                )
-                if deterministic or time.monotonic() > deadline:
+                # No reason class is provably deterministic from one poll: a
+                # 401/403 can be an edge or WAF in front of the provider and a
+                # malformed body can be a 200 interstitial, so every reason
+                # earns the rest of the deadline and the deadline alone owns
+                # giving up.
+                if time.monotonic() > deadline:
                     _fail_job(
                         job_id=job_id,
                         user_id=user_id,
                         detail=f"poll: {exc.reason}: {exc.detail or ''}",
+                        post_note=True,
+                        job_request=job_request,
+                        conversation_id=conversation_id,
                     )
                     return
                 continue
