@@ -1133,6 +1133,27 @@ describe("chat backtest jobs", () => {
     expect(chat).not.toContain('workflow_proof');
   });
 
+  test("a completed research job reloads the active transcript for its answer", () => {
+    // The research answer is a new assistant message, not a card update: a
+    // durable completion that only invalidates caches leaves the active view
+    // saying "the full answer is below" above nothing (production 2026-08-19,
+    // Costco comparison chip).
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const handler = chat.slice(
+      chat.indexOf("const handleDurableJobCompletion"),
+      chat.indexOf("useBacktestJobPolling(messages"),
+    );
+    expect(handler).toContain('response.job.operation_scope === "chat.research"');
+    expect(handler).toContain("reloadActiveTranscriptRef.current(targetConversationId)");
+    expect(handler).toContain("promoteCanonicalConversationActivityTranscript");
+    expect(chat).toContain(
+      "void navigateConversationTranscript(targetConversationId)",
+    );
+  });
+
   test("ChatInterface exits ambiguous Run checking through typed recovery", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),

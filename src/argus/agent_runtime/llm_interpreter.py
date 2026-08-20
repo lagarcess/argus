@@ -381,6 +381,10 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range,
     safe_conflict_strategy_type,
 )
+from argus.agent_runtime import turn_execution
+from argus.agent_runtime.semantic_integrity import (
+    UNSUPPORTED_DCA_CONTRIBUTION_CEILING,
+)
 from argus.agent_runtime.turn_execution_evidence import (
     current_turn_has_material_execution_evidence,
 )
@@ -2150,7 +2154,36 @@ async def _dca_contribution_role_audited_response(
                 ),
             }
         )
-    return total_budget_audited_response(response=response, audit=audit)
+    return total_budget_audited_response(
+        response=response,
+        audit=audit,
+        answers_pending_sizing_question=_turn_answers_pending_sizing_question(request),
+    )
+
+
+def _turn_answers_pending_sizing_question(request: InterpretationRequest) -> bool:
+    """Whether THIS turn answers the runtime's own money question.
+
+    ``requested_field`` alone is carried forward while a pending strategy
+    exists, so it only says a question was asked at some point. When the
+    previous turn's stage outcome is ``await_user_reply`` the metadata beside
+    it was set by that same clarify, which makes the pair current-turn
+    accurate. The DCA ceiling recovery asks for the money too, but through
+    ``simplification_choice`` with no requested field, so its reason code is
+    the second admissible shape.
+    """
+    metadata = request.selected_thread_metadata
+    if str(metadata.get("last_stage_outcome") or "") != "await_user_reply":
+        return False
+    if _selected_requested_field_base(request) == "capital_amount":
+        return True
+    clarification = metadata.get("clarification")
+    reason_code = (
+        str(clarification.get("reason_code") or "")
+        if isinstance(clarification, dict)
+        else ""
+    )
+    return reason_code == UNSUPPORTED_DCA_CONTRIBUTION_CEILING
 
 
 async def _pending_response_option_selected_response(
@@ -4805,12 +4838,15 @@ async def _focused_strategy_repair_after_candidate_failures(
         current_message_length=len(request.current_user_message),
         reason_codes=list(seed_response.reason_codes),
     ).info("Structured interpretation candidates failed; attempting focused repair")
-    return await _repair_incomplete_strategy_extraction(
-        failed_response=seed_response,
-        preferred_model=preferred_model,
-        request=request,
-        asset_resolution_context=asset_resolution_context,
-    )
+    # Candidates plus their audits may have spent the whole turn allowance;
+    # this is the only rescue left, so its first call holds a reserved slot.
+    with turn_execution.last_resort_repair_scope():
+        return await _repair_incomplete_strategy_extraction(
+            failed_response=seed_response,
+            preferred_model=preferred_model,
+            request=request,
+            asset_resolution_context=asset_resolution_context,
+        )
 
 
 def _response_from_focused_strategy_extraction(

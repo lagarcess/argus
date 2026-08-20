@@ -426,7 +426,10 @@
       "buy_and_hold": "Comparar con comprar y mantener",
       "moving_average_crossover": "Usar un cruce de medias móviles compatible",
       "historical_period": "Probarlo en un período histórico",
-      "supported_symbol": "Usar un símbolo de acción o cripto compatible"
+      "supported_symbol": "Usar un símbolo de acción o cripto compatible",
+      "recurring_only": "Ejecutar solo compras recurrentes",
+      "use_as_starting_capital": "Usarlo como capital inicial",
+      "buy_and_hold_with_starting_capital": "Usar comprar y mantener con capital inicial"
     },
     "retest": {
       "strategy_family": {

@@ -167,8 +167,11 @@ async def grounded_result(
         try:
             packet = await asyncio.to_thread(client.run_research, prompt, spec)
         except ResearchUnavailableError as exc:
+            # The deployed log sink drops structured extras, so the reason and
+            # detail must live in the message itself to be diagnosable.
             logger.warning(
-                "Research provider unavailable", reason=exc.reason, shape=shape
+                "Research provider unavailable"
+                f" reason={exc.reason} detail={exc.detail or ''} shape={shape}",
             )
             return unavailable_result(
                 query=query,
@@ -1219,9 +1222,7 @@ def carried_decision(
         return research_decision(interpretation, user, reason_code)
     return decision.model_copy(
         update={
-            "reason_codes": list(
-                dict.fromkeys([*decision.reason_codes, reason_code])
-            )
+            "reason_codes": list(dict.fromkeys([*decision.reason_codes, reason_code]))
         }
     )
 

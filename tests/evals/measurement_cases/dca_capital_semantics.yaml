@@ -311,3 +311,70 @@ cases:
       requested_field: cadence
       launch_validation_code: contribution_period_exceeds_window
       stage_outcomes: ["ready_for_confirmation", "needs_clarification"]
+
+  # The prebaked-chip contract (front-page chip q3): the chip carries the
+  # full ask (KO, monthly cadence, a five-year window) and the only follow-up
+  # is the amount. Any reasonable answer, including a trailing-currency
+  # "200$", must reach the confirmation card with every chip fact intact.
+  # Production 2026-08-19: this exact turn died in the no-progress fallback
+  # after the budget audit re-roled the amount and the replay detector
+  # discarded the audited turn as a replay.
+  - id: dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run
+    prompt: "What if I had bought Coca-Cola every month for five years?"
+    followup_prompt: "200$"
+    user_language: en
+    ui_language: en
+    snapshot:
+      latest_task_type: strategy_drafting
+      completed: false
+      last_unresolved_follow_up: "How much should I use?"
+      pending_strategy:
+        strategy_type: dca_accumulation
+        strategy_thesis: "Buy Coca-Cola every month for the last five years."
+        asset_universe: ["KO"]
+        asset_class: equity
+        cadence: monthly
+        date_range:
+          start: "2021-08-19"
+          end: "2026-08-19"
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["KO"]
+      asset_class: equity
+      strategy_type: dca_accumulation
+      capital_amount: 200
+      contribution_period: monthly
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  # The Spanish twin of the chip contract, answered the way the production
+  # user answered it. There is no FX layer; the number funds the plan as-is.
+  - id: dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run
+    prompt: "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?"
+    followup_prompt: "13,000 pesos"
+    user_language: es-419
+    ui_language: es-419
+    snapshot:
+      latest_task_type: strategy_drafting
+      completed: false
+      last_unresolved_follow_up: "¿Cuánto debería usar?"
+      pending_strategy:
+        strategy_type: dca_accumulation
+        strategy_thesis: "Comprar Coca-Cola cada mes durante los últimos cinco años."
+        asset_universe: ["KO"]
+        asset_class: equity
+        cadence: monthly
+        date_range:
+          start: "2021-08-19"
+          end: "2026-08-19"
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["KO"]
+      asset_class: equity
+      strategy_type: dca_accumulation
+      capital_amount: 13000
+      contribution_period: monthly
+      stage_outcomes:
+        ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
