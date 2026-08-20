@@ -138,6 +138,43 @@ class TestMoneyRoleAnswersAreCurrentTurnUpdates:
             request=_request("run the same thing"),
         )
 
+    @pytest.mark.parametrize(
+        ("money_field", "stored_key"),
+        [
+            ("recurring_contribution", "recurring_contribution"),
+            ("initial_capital", "initial_capital"),
+            ("total_capital", "total_capital"),
+            ("total_capital", "total_budget"),
+        ],
+    )
+    def test_restated_money_copy_is_still_a_replay(
+        self, money_field: str, stored_key: str
+    ) -> None:
+        # The comparison is against the summary's real storage
+        # (extra_parameters), so it is exercised, not vacuous: a draft that
+        # re-states the amount the prior already carries stays a replay.
+        prior = CHIP_PENDING_STRATEGY.model_copy(
+            update={"extra_parameters": {stored_key: 200.0}}
+        )
+        request = _request("run the same thing")
+        request.latest_task_snapshot.pending_strategy_summary = prior
+        draft = _pending_shaped_draft(**{money_field: 200.0})
+        assert _response_replays_prior_strategy_without_current_turn_update(
+            response=_response(draft),
+            request=request,
+        )
+
+    def test_money_only_draft_has_no_structural_execution_fields(self) -> None:
+        # The money-role comparison lives in the replay detector alone; the
+        # shared material-fields helper is unchanged, so a money-only draft
+        # still needs artifact context repair exactly as on base.
+        from argus.agent_runtime.interpreter.draft_shape import (
+            _llm_strategy_draft_has_structural_execution_fields,
+        )
+
+        money_only = LLMStrategyDraft.model_validate({"total_capital": 200.0})
+        assert not _llm_strategy_draft_has_structural_execution_fields(money_only)
+
 
 class TestSizingAnswerSurvivesBudgetAudit:
     """The runtime's own sizing question fixes the money role: an answer the

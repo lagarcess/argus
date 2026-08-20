@@ -341,10 +341,25 @@ def _response_replays_prior_strategy_without_current_turn_update(
     if prior is None:
         return False
     draft = response.candidate_strategy_draft
+    prior_payload = prior.model_dump(mode="python")
+    # The DCA audits move an amount between money roles the summary stores in
+    # extra_parameters, never as top-level fields. An amount that differs from
+    # the prior's stored copy is a current-turn update; a re-stated copy is
+    # not, so it still falls through to the ordinary replay comparison.
+    prior_extra = prior_payload.get("extra_parameters") or {}
+    for money_field, prior_twins in (
+        ("recurring_contribution", ("recurring_contribution",)),
+        ("initial_capital", ("initial_capital",)),
+        ("total_capital", ("total_capital", "total_budget")),
+    ):
+        value = getattr(draft, money_field, None)
+        if value is None:
+            continue
+        if all(prior_extra.get(twin) != value for twin in prior_twins):
+            return False
     material_updates = _material_strategy_updates_from_draft(draft)
     if not material_updates:
         return True
-    prior_payload = prior.model_dump(mode="python")
     for key, value in material_updates.items():
         if _normalized_material_strategy_value(key, prior_payload.get(key)) != value:
             return False
@@ -373,13 +388,6 @@ def _material_strategy_updates_from_draft(
         "date_range",
         "sizing_mode",
         "capital_amount",
-        # Every money role counts: the DCA audits move an amount between
-        # capital_amount, recurring_contribution, initial_capital, and
-        # total_capital, and an answer whose only new fact is money in one of
-        # those roles is a current-turn update, not a replay.
-        "recurring_contribution",
-        "initial_capital",
-        "total_capital",
         "position_size",
         "risk_rules",
         "comparison_baseline",
