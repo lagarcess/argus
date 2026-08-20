@@ -108,11 +108,7 @@ def test_pending_reply_and_execution_turns_are_left_alone(monkeypatch) -> None:
         is None
     )
     assert (
-        _run(
-            _interpretation(
-                intent="strategy_drafting", semantic_turn_act="new_idea"
-            )
-        )
+        _run(_interpretation(intent="strategy_drafting", semantic_turn_act="new_idea"))
         is None
     )
     assert (
@@ -211,14 +207,25 @@ def test_unsupported_run_request_is_never_answered_with_asset_stats(
     monkeypatch,
 ) -> None:
     # "Backtest weekly options on apple over 2024" arrives typed
-    # unsupported_request with AAPL restored by the audits. The classifier
-    # rules it a run request, so the knowledge answerer must decline instead
-    # of voicing the underlying stock's statistics as a fake options result.
+    # unsupported_request with AAPL restored by the audits. A draw that reads
+    # the turn as market_stats is exactly how the underlying stock's
+    # statistics shipped as a fake options result, so the classifier is pinned
+    # to that wrong answer here and the turn must still decline. The
+    # classifier is still consulted first, because the act label can be wrong
+    # too and a genuine question mislabelled unsupported_request must keep
+    # reaching it (test_recognition_contract_guards.py). Two reads that misfire
+    # in opposite directions: the classifier decides whether this is a
+    # question, the typed refusal decides that a claimed one is not answered
+    # from the underlying.
     calls: list[str] = []
 
     async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
         calls.append("classified")
-        return ka.KnowledgeQueryExtraction(question_kind="none")
+        return ka.KnowledgeQueryExtraction(
+            question_kind="market_stats",
+            symbols=["AAPL"],
+            date_range_raw_text="from 2024-01-01 to 2024-12-31",
+        )
 
     monkeypatch.setattr(ka, "_classify_question", classify)
 
@@ -227,6 +234,10 @@ def test_unsupported_run_request_is_never_answered_with_asset_stats(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            # The interpreter's record that the message carried the period.
+            extra_parameters={
+                "evidence_spans": {"date_range": "from 2024-01-01 to 2024-12-31"}
+            },
         )
     )
     result = _run(
@@ -235,7 +246,9 @@ def test_unsupported_run_request_is_never_answered_with_asset_stats(
     )
 
     assert result is None
-    # The asset shortcut is gone: the classifier always owns this boundary.
+    # Consulted, then overridden: the classifier keeps owning whether a turn
+    # is a question, and the typed refusal keeps a claimed one from being
+    # answered with the underlying's statistics.
     assert calls == ["classified"]
 
 
@@ -272,3 +285,136 @@ def test_educational_turn_with_enriched_asset_uses_the_classifier(
     )
     assert _run(educational, "¿Qué es SPY?") is None
     assert calls == ["classified"]
+
+
+def test_unsupported_request_describing_a_test_keeps_its_recovery_route(
+    market_stats_route,
+) -> None:
+    # "backtest weekly options on apple from 2024-01-01 to 2024-12-31": the
+    # interpreter typed a resolved asset and the user's own window, so the
+    # turn is a refusal with recovery options. Answering it from the
+    # underlying's price history is how a run request became a readout.
+    describes_a_test = _interpretation(
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            # The interpreter's own record that the message carried the
+            # period; a bare date_range can be an inherited window.
+            extra_parameters={
+                "evidence_spans": {"date_range": "from 2024-01-01 to 2024-12-31"}
+            },
+        ),
+    )
+
+    assert _run(describes_a_test, "backtest weekly options on apple") is None
+
+
+def test_unsupported_capability_question_still_reaches_the_answerer(
+    market_stats_route,
+) -> None:
+    # The stand-down is keyed on a described test, not on the act label: a
+    # plain capability question names no window and keeps its answer.
+    assert _run(_interpretation()) is not None
+
+
+def test_rail_claim_declines_only_an_unsupported_request_over_a_stated_window(
+    monkeypatch,
+) -> None:
+    """Review #522: a window alone must not decline the rail claim.
+
+    Declining on specificity gave the more precise user the worse turn:
+    "compare PLTR to LMT over the last 3 years" got the builder's capital
+    question while the same question without a period got an answer. Only an
+    unsupported verdict over a window the user themselves stated is a
+    described test.
+    """
+    monkeypatch.setattr(ka, "research_rail_enabled", lambda: True)
+    span = {"evidence_spans": {"date_range": "over the last 3 years"}}
+
+    supported_with_window = _interpretation(
+        semantic_turn_act="new_idea",
+        requires_clarification=True,
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["PLTR", "LMT"],
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2023-01-01", "end": "2026-01-01"},
+            extra_parameters=span,
+        ),
+    )
+    assert ka._rail_may_claim_clarification(supported_with_window) is True
+
+    supported_without_window = _interpretation(
+        semantic_turn_act="new_idea",
+        requires_clarification=True,
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["PLTR", "LMT"],
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+        ),
+    )
+    assert ka._rail_may_claim_clarification(supported_without_window) is True
+
+    unsupported_with_window = _interpretation(
+        semantic_turn_act="unsupported_request",
+        requires_clarification=True,
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            extra_parameters=span,
+        ),
+    )
+    assert ka._rail_may_claim_clarification(unsupported_with_window) is False
+
+    # An inherited window is not a stated one: no evidence span, no decline.
+    inherited = _interpretation(
+        semantic_turn_act="unsupported_request",
+        requires_clarification=True,
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            strategy_type="buy_and_hold",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        ),
+    )
+    assert ka._rail_may_claim_clarification(inherited) is True
+
+
+def test_typed_draft_window_outranks_classifier_prose(monkeypatch) -> None:
+    # The classifier hands back unparseable prose ("del ultimo año para aca")
+    # while the draft carries the user's typed window. Letting the prose win
+    # silently answers over a window nobody asked for.
+    captured: dict[str, Any] = {}
+
+    async def capture(*, message, language, facts, fallback, user=None):
+        captured.update(facts)
+        return fallback
+
+    monkeypatch.setattr(ka, "_voiced_answer", capture)
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    result = asyncio.run(
+        ka._market_stats_answer(
+            query=ka.KnowledgeQueryExtraction(
+                question_kind="market_stats",
+                symbols=["SPY"],
+                date_range_raw_text="del ultimo año para aca",
+            ),
+            interpretation=_interpretation(
+                candidate_strategy_draft=StrategySummary(
+                    asset_universe=["SPY"],
+                    asset_class="equity",
+                    date_range={"start": "2024-02-01", "end": "2024-06-30"},
+                ),
+            ),
+            message="stats",
+            language="es",
+            user=USER,
+        )
+    )
+
+    assert result is not None
+    assert captured["start"] == "2024-02-01"
+    assert captured["end"] == "2024-06-30"

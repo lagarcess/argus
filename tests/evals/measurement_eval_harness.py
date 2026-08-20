@@ -32,6 +32,7 @@ from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
     measurement_fixture_documents,
 )
+from tests.evals.measurement_outcome import compare_offered, offered_to_user
 from tests.evals.prose_evidence import judged_prose_evidence
 
 LOCKED_EVAL_CATEGORIES = {
@@ -112,6 +113,10 @@ class TypedExpectations:
     clarification: dict[str, Any] | None = None
     semantic_turn_act: str | None = None
     asset_discovery: dict[str, Any] | None = None
+    # What reached the user. Routing fields say a turn was understood; this
+    # says the turn went somewhere the user can act on, which is the only
+    # thing a green case is supposed to promise.
+    offered: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -263,9 +268,7 @@ def run_eval_case(
             finally:
                 route_receipts.extend(
                     receipt.as_dict()
-                    for receipt in end_openrouter_route_receipt_capture(
-                        judge_route_token
-                    )
+                    for receipt in end_openrouter_route_receipt_capture(judge_route_token)
                 )
             if not judge_result["pass"]:
                 failed_checks.extend(
@@ -448,6 +451,8 @@ def typed_expectation_failures(
             outcome.get("asset_discovery"),
             failures,
         )
+    if expected.offered is not None:
+        compare_offered(expected.offered, outcome.get("offered"), failures)
     return failures
 
 
@@ -681,9 +686,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             recurring_contribution=expected.get("recurring_contribution"),
             contribution_period=expected.get("contribution_period"),
             launch_validation_code=expected.get("launch_validation_code"),
-            missing_required_fields=tuple(
-                expected.get("missing_required_fields") or ()
-            ),
+            missing_required_fields=tuple(expected.get("missing_required_fields") or ()),
             fee_rate=expected.get("fee_rate"),
             slippage=expected.get("slippage"),
             cost_provenance=expected.get("cost_provenance"),
@@ -693,6 +696,7 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             clarification=expected.get("clarification"),
             semantic_turn_act=expected.get("semantic_turn_act"),
             asset_discovery=expected.get("asset_discovery"),
+            offered=expected.get("offered"),
         ),
         action=(
             None
@@ -921,9 +925,7 @@ def _typed_outcome(
         # a draft field that never became a fundable plan.
         "starting_capital": launch_payload.get("starting_capital"),
         "recurring_contribution": launch_payload.get("recurring_contribution"),
-        "contribution_period": (
-            launch_payload.get("cadence") or strategy.get("cadence")
-        ),
+        "contribution_period": (launch_payload.get("cadence") or strategy.get("cadence")),
         "launch_validation_code": final_patch.get("launch_validation_code"),
         "missing_required_fields": final_patch.get("missing_required_fields"),
         "fee_rate": extra_parameters.get("fee_rate"),
@@ -946,6 +948,12 @@ def _typed_outcome(
         "clarification": final_patch.get("clarification"),
         "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
         "asset_discovery": interpret_patch.get("asset_discovery"),
+        "offered": offered_to_user(
+            final_patch=final_patch,
+            interpret_patch=interpret_patch,
+            launch_payload=launch_payload,
+            assistant_text=_assistant_text(final_patch),
+        ),
     }
 
 

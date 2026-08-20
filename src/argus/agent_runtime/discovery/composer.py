@@ -204,22 +204,75 @@ async def discovery_operation_result(
         )
     emit_substage("discovery_verify")
     # Sync resolver lookups: off the loop, or the verify line above stalls.
-    validated, unverified, uncorroborated = await asyncio.to_thread(
+    outcome = await asyncio.to_thread(
         lambda: validated_candidates(
             extraction,
             packet=packet,
             resolve=resolve_asset,
             max_candidates=config.max_candidates,
             asset_class_hint=request.asset_class_hint,
+            history_verdict=_candidate_history,
         )
     )
+    validated = outcome.validated
+    unverified = outcome.unverified
+    uncorroborated = outcome.uncorroborated
     usage.update(
         extracted_count=len(extraction.candidates),
         validated_count=len(validated),
         unverified_count=len(unverified),
         uncorroborated_count=len(uncorroborated),
+        undetermined_count=len(outcome.undetermined),
     )
+    if not validated and outcome.undetermined:
+        # Every survivor failed on a price feed we could not reach. Naming
+        # them as untradable would report our outage as their property, so
+        # the turn takes the retryable route and says nothing about them.
+        usage["fallback_code"] = "priceability_undetermined"
+        logger.warning(
+            "Grounded discovery could not determine priceability",
+            undetermined_count=len(outcome.undetermined),
+            failure_classification="discovery_priceability_undetermined",
+        )
+        return await _recovery_result(
+            decision=decision,
+            code="discovery_search_failed",
+            retryable=True,
+            current_user_message=current_user_message,
+            language=language,
+            usage=usage,
+        )
     if not validated:
+        # The search found real names we cannot offer. Never dead-end here:
+        # name what came back, then answer the same question from verified
+        # rows the resolver does accept. Falling through spends one cheap
+        # naming call and no second search.
+        usage["zero_validated_fallback"] = "attempted"
+        logger.info(
+            "Grounded discovery found no offerable candidate; falling through "
+            "to resolver-verified rows",
+            extracted_count=len(extraction.candidates),
+            unverified_count=len(unverified),
+            uncorroborated_count=len(uncorroborated),
+        )
+        fallback = await _model_knowledge_result(
+            decision=decision,
+            request=request,
+            max_candidates=config.max_candidates,
+            current_user_message=current_user_message,
+            language=language,
+            can_request_search=False,
+            usage=usage,
+            # Only names we genuinely could not offer. A name dropped because
+            # it resolved to a different entity says nothing true about the
+            # asset the user meant, and calling it untestable would be false.
+            found_unusable_names=unverified,
+            recovery_on_empty=False,
+        )
+        if fallback is not None:
+            usage["zero_validated_fallback"] = "served"
+            return fallback
+        usage["zero_validated_fallback"] = "empty"
         return await _recovery_result(
             decision=decision,
             code="discovery_no_verified_candidates",
@@ -288,11 +341,21 @@ async def _model_knowledge_result(
     current_user_message: str,
     language: str,
     can_request_search: bool,
-) -> StageResult:
+    usage: dict[str, Any] | None = None,
+    found_unusable_names: list[str] | None = None,
+    recovery_on_empty: bool = True,
+) -> StageResult | None:
     """Model knowledge in, resolver-verified rows out; zero sources in the
-    sidecar is the ungrounded marker (derived, never asserted)."""
+    sidecar is the ungrounded marker (derived, never asserted).
+
+    ``recovery_on_empty=False`` makes this a fallback the caller can decline:
+    it returns None instead of owning the turn, so a grounded search that
+    found nothing offerable keeps its own recovery voice.
+    """
     extraction = await name_candidates(request=request, language=language)
     if extraction is None:
+        if not recovery_on_empty:
+            return None
         return await _recovery_result(
             decision=decision,
             code="discovery_suggestions_unavailable",
@@ -301,15 +364,25 @@ async def _model_knowledge_result(
             language=language,
         )
     packet = _model_knowledge_packet()
-    validated, unverified, uncorroborated = validated_candidates(
-        extraction,
-        packet=packet,
-        resolve=resolve_asset,
-        max_candidates=max_candidates,
-        asset_class_hint=request.asset_class_hint,
-        require_source_evidence=False,
+    # Sync resolver and price-probe lookups: off the loop, or naming rows
+    # stalls every other stream on this worker.
+    outcome = await asyncio.to_thread(
+        lambda: validated_candidates(
+            extraction,
+            packet=packet,
+            resolve=resolve_asset,
+            max_candidates=max_candidates,
+            asset_class_hint=request.asset_class_hint,
+            require_source_evidence=False,
+            history_verdict=_candidate_history,
+        )
     )
+    validated = outcome.validated
+    unverified = outcome.unverified
+    uncorroborated = outcome.uncorroborated
     if not validated:
+        if not recovery_on_empty:
+            return None
         return await _recovery_result(
             decision=decision,
             code="discovery_no_verified_candidates",
@@ -319,6 +392,10 @@ async def _model_knowledge_result(
             unverified_names=unverified,
             uncorroborated_names=uncorroborated,
         )
+    # A name the search surfaced is the user's own subject by construction:
+    # they asked for the category it came back under, so it is named without
+    # the message-echo gate the ordinary drop lists go through.
+    searched_names = list(found_unusable_names or [])
     voiced = await _voiced_discovery_response(
         request=request,
         candidates=validated,
@@ -332,8 +409,11 @@ async def _model_knowledge_result(
         current_user_message=current_user_message,
         language=language,
         grounded=False,
+        searched_names=searched_names,
     )
     if not voiced:
+        if not recovery_on_empty:
+            return None
         return await _recovery_result(
             decision=decision,
             code="discovery_suggestions_unavailable",
@@ -356,12 +436,34 @@ async def _model_knowledge_result(
         unverified_count=len(unverified),
         uncorroborated_count=len(uncorroborated),
         can_request_search=can_request_search,
+        searched_name_count=len(searched_names),
     )
+    stage_patch: dict[str, Any] = {
+        "assistant_response": voiced,
+        "discovery": sidecar,
+    }
+    if usage is not None:
+        stage_patch["discovery_usage"] = usage
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={"assistant_response": voiced, "discovery": sidecar},
+        stage_patch=stage_patch,
     )
+
+
+_PRICEABILITY_PROBE_DAYS = 30
+
+
+def _candidate_history(symbol: str, asset_class: str) -> str:
+    """Delegate to the one owner of "can Argus trade this history".
+
+    Returns its verdict verbatim so validation can tell "no bars for this
+    coin" apart from "our provider is down", which must never be voiced as a
+    fact about the asset.
+    """
+    from argus.domain.market_data import tradable_history
+
+    return tradable_history(symbol, asset_class).verdict
 
 
 def _model_knowledge_packet() -> SearchResultPacket:
@@ -501,15 +603,16 @@ def _drop_reason_facts(
         facts += (
             " Names seen in sources but not verifiable as tradable: "
             + ", ".join(unverified_names)
-            + ". You may mention them only as unverified."
+            + ". Name them, and say they could not be confirmed as tradable "
+            "here. Never present them as testable."
         )
     if uncorroborated_names:
         facts += (
             " Names seen in sources that resolve to a real listing, but not one"
             " you could confirm is the asset the user meant: "
             + ", ".join(uncorroborated_names)
-            + ". Say only that you could not confirm the match; never say they"
-            " are untradable."
+            + ". Name them, and say only that you could not confirm the "
+            "match; never say they are untradable."
         )
     return facts
 
@@ -524,8 +627,10 @@ _RECOVERY_VOICING_FACTS: dict[str, str] = {
         "from memory. The user can simply ask again in a moment."
     ),
     "discovery_no_verified_candidates": (
-        "No candidate could be verified as a tradable asset, so there is "
-        "nothing safe to offer."
+        "The search returned real names, but none could be verified as an "
+        "asset Argus can test, so there is nothing safe to offer. Naming what "
+        "came back is required: a reply that reports only failure leaves the "
+        "user with nothing to act on and nothing to react to."
     ),
     "discovery_suggestions_unavailable": (
         "Putting together suggestions failed temporarily. You will not guess "
@@ -606,8 +711,10 @@ async def _voiced_discovery_recovery(
                 "You are Argus, a chat-first investing experimentation "
                 "assistant. The user asked you to find or discover assets. "
                 f"Situation: {facts} {language_instruction} "
-                "Reply in at most two short plain sentences: state the "
-                f"situation honestly. {next_step_instruction} "
+                "Reply in at most three short plain sentences: state the "
+                "situation honestly, and when the facts name specific assets, "
+                "name them rather than only reporting that nothing worked. "
+                f"{next_step_instruction} "
                 "No reassurance boilerplate, no "
                 "tradable asset suggestions from memory, no providers or "
                 "internal tools, no investment advice."
@@ -636,6 +743,7 @@ async def _voiced_discovery_response(
     current_user_message: str,
     language: str,
     grounded: bool = True,
+    searched_names: list[str] | None = None,
 ) -> str | None:
     candidate_lines = "\n".join(
         f"- {item.symbol} ({item.name}, {item.asset_class}): {item.reason_text}"
@@ -646,6 +754,17 @@ async def _voiced_discovery_response(
         freshness = packet.retrieved_at.date().isoformat()
         facts.append(
             f"Sources were retrieved on {freshness} from {len(packet.results)} pages."
+        )
+    elif searched_names:
+        # Naming the search's own findings is the difference between a dead
+        # end and progress, so this fact is stated as required, not offered.
+        facts.append(
+            "A current-sources search for this request returned these names: "
+            + ", ".join(searched_names)
+            + ". None of them could be confirmed as an asset Argus can test, so "
+            "none are offered below. You MUST name them and say plainly that "
+            "they could not be confirmed as testable here. The candidates above "
+            "are a different, verified set from your general knowledge."
         )
     else:
         facts.append(
@@ -669,7 +788,11 @@ async def _voiced_discovery_response(
                 "answer came from current sources or general knowledge. Write "
                 "ONE short framing sentence answering the user's discovery "
                 "request; add one brief sentence about the dropped names only "
-                "if the facts mention any. Do not list or name the candidates, "
+                "if the facts mention any. When the facts say a search "
+                "returned names that could not be confirmed, name those names "
+                "first and say they are not testable here, then frame the "
+                "verified rows as what you can test instead. Do not list or "
+                "name the candidates, "
                 "do not restate where the answer came from, never add assets "
                 "beyond the verified list, never rank or recommend buying, "
                 "never mention providers or internal tools."

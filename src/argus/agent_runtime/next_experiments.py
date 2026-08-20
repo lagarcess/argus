@@ -495,6 +495,10 @@ def _peer_is_grounded(
         resolved = market_data.resolve_asset(peer)
         if resolved is None or resolved.canonical_symbol.upper() != peer:
             return False
+        # One owner decides whether a tap gets bars; this probe only adds the
+        # window-tail question on top of it.
+        if not market_data.tradable_history(peer, asset_class).is_tradable:
+            return False
         # Coverage probe over the window's tail; a mid-window gap surfaces
         # at run time through the ordinary coverage recovery.
         end_date = date.fromisoformat(end)
