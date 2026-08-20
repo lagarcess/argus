@@ -184,6 +184,7 @@ def reserve_provider_call(
             return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
     if (
         _LAST_RESORT_REPAIR_SCOPE.get()
+        and task_name == "interpretation_repair"
         and execution.calls_reserved >= execution.call_allowance
     ):
         if execution.last_resort_repair_calls_granted == 0:
@@ -361,6 +362,9 @@ def turn_execution_summary(
         "terminal_reason": execution.terminal_reason,
         "calls_reserved": execution.calls_reserved,
         "call_allowance": execution.call_allowance,
+        "routing_reserved": execution.routing_reserved,
+        "last_resort_repair_calls_granted": execution.last_resort_repair_calls_granted,
+        "last_resort_repair_grant_used": execution.last_resort_repair_grant_used,
         "deadline_seconds": execution.deadline_seconds,
         "elapsed_seconds": round(execution.elapsed_seconds(), 3),
         "deadline_exhausted": execution.deadline_exhausted,
