@@ -7,6 +7,11 @@ from .assets import (
     search_assets,
     warm_asset_universe,
 )
+from .tradability import (
+    TradableHistory,
+    clear_tradable_history_cache,
+    tradable_history,
+)
 
 
 def clear_market_data_cache() -> None:
@@ -37,5 +42,8 @@ __all__ = [
     "is_ticker_like_query",
     "resolve_asset",
     "search_assets",
+    "TradableHistory",
+    "clear_tradable_history_cache",
+    "tradable_history",
     "warm_asset_universe",
 ]

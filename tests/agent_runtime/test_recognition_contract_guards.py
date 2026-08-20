@@ -1120,3 +1120,51 @@ async def test_a_typed_contribution_survives_a_wrong_budget_verdict(
     assert draft.total_capital is None
     assert "capital_amount" not in audited.missing_required_fields
     assert "dca_seed_provenance_kept_over_budget_audit" in audited.reason_codes
+
+
+def test_a_windowed_stats_question_still_reaches_and_keeps_the_classifier(
+    monkeypatch,
+) -> None:
+    """Review #522: the sibling test only proved the easy direction.
+
+    Its stub answers "none", which exits before the refusal override, so the
+    #517 contract was never exercised where it actually bites. Both
+    directions are pinned here with a market_stats verdict.
+
+    A bare date_range is not evidence the user asked for a test: the runtime
+    also inherits windows from a previous result. Without the interpreter's
+    own record that the message carried the period, the classifier keeps the
+    turn and #517 holds. With that record, the refusal owns it, under its own
+    reason code.
+    """
+
+    async def classify(**_kwargs: Any):
+        calls.append("classified")
+        return ka.KnowledgeQueryExtraction(question_kind="market_stats", symbols=["AAPL"])
+
+    monkeypatch.setattr(ka, "_classify_question", classify)
+    monkeypatch.setattr(ka, "research_rail_enabled", lambda: False)
+
+    calls: list[str] = []
+    inherited = _unsupported_interpretation(unsupported_constraints=[])
+    _run_knowledge(inherited)
+    assert calls == ["classified"]
+    assert "unsupported_execution_kept_recovery_route" not in inherited.reason_codes
+    assert "unsupported_payload_kept_recovery_route" not in inherited.reason_codes
+
+    calls = []
+    stated = _unsupported_interpretation(
+        unsupported_constraints=[],
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            extra_parameters={
+                "evidence_spans": {"date_range": "from 2024-01-01 to 2024-12-31"}
+            },
+        ),
+    )
+    _run_knowledge(stated)
+    assert calls == ["classified"]
+    assert "unsupported_payload_kept_recovery_route" not in stated.reason_codes
+    assert "unsupported_execution_kept_recovery_route" in stated.reason_codes

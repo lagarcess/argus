@@ -95,9 +95,19 @@ def _resolve_bounded(
             return None
         if resolved.canonical_symbol.upper() != candidate:
             return None
+        symbol = resolved.canonical_symbol.upper()
+        # A peer row is an offer. The resolver says the catalog lists it; the
+        # tradable-history owner says a tap will actually get bars, which is
+        # the same gate discovery applies before offering a candidate.
+        if not market_data.tradable_history(symbol, resolved.asset_class).is_tradable:
+            logger.info(
+                "Peer dropped: catalog lists it but there is no tradable history",
+                symbol=symbol,
+            )
+            return None
         return {
-            "symbol": resolved.canonical_symbol.upper(),
-            "name": resolved.name or resolved.canonical_symbol.upper(),
+            "symbol": symbol,
+            "name": resolved.name or symbol,
             "asset_class": resolved.asset_class,
         }
 
@@ -135,11 +145,20 @@ class RowWindow:
 
 
 def _earliest_available(symbol: str, asset_class: str) -> date | None:
-    """First date the provider actually has bars for, inside the window."""
+    """First date the provider actually has bars for, inside the window.
+
+    The long lookback stays here because a row's window needs the true start,
+    not just whether history exists; the short existence question belongs to
+    the tradable-history owner and is asked first so an unofferable symbol
+    never reaches the expensive probe.
+    """
     from datetime import timedelta
 
+    from argus.domain.market_data import tradable_history
     from argus.domain.market_data.provider import fetch_price_series
 
+    if not tradable_history(symbol, asset_class).is_tradable:
+        return None
     end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=365 * TEST_WINDOW_YEARS)
     series = fetch_price_series(symbol, asset_class, start, end, "1d")

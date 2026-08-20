@@ -261,6 +261,29 @@ def text_corroborates_resolved_asset(phrase: str, asset: Any) -> bool:
     return _candidate_text_supports_resolved_asset(phrase, asset)
 
 
+def asset_name_is_pair_shorthand(asset: Any) -> bool:
+    """Whether the catalog name restates the pair instead of naming an entity.
+
+    Most crypto rows arrive named "ETH/USD" or "XBT/USD": two ticker codes and
+    a separator, carrying no independent evidence about the entity. Judging a
+    coin's proper name against that name can only ever fail, so callers treat
+    it as absent evidence rather than as a contradiction. Structural only, no
+    currency or coin table: a pair expression is a separator with a short
+    alphanumeric code on each side.
+    """
+    name = str(getattr(asset, "name", "") or "")
+    if "/" not in name:
+        return False
+    parts = [_compact_asset_candidate(part) for part in name.split("/")]
+    if len(parts) < 2 or not all(parts):
+        return False
+    return all(len(part) <= _MAX_TICKER_CODE_CHARS for part in parts)
+
+
+# A ticker code, not a word: the longest venue codes in the catalog fit here.
+_MAX_TICKER_CODE_CHARS = 5
+
+
 def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
     candidate = str(phrase or "").strip()
     if not candidate:
