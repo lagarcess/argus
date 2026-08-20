@@ -9,6 +9,8 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
+
 from argus.agent_runtime.turn_progress import (
     ProgressAssessment,
     ProgressOutcome,
@@ -67,7 +69,8 @@ class TurnExecutionContext:
     entry_fingerprint: str | None
     calls_reserved: int = 0
     routing_reserved: bool = False
-    last_resort_repair_reserved: bool = False
+    last_resort_repair_calls_granted: int = 0
+    last_resort_repair_grant_used: int = 0
     terminal: ProgressOutcome | None = None
     terminal_reason: str | None = None
     exit_fingerprint: str | None = None
@@ -94,12 +97,17 @@ _ACTIVE_TURN_EXECUTION: ContextVar[TurnExecutionContext | None] = ContextVar(
 )
 
 # The last-resort focused repair is the only rescue left once every
-# interpretation candidate has failed; like the routing slot, its first call
-# must not be starved by the audit calls that preceded it.
+# interpretation candidate has failed; the audit calls that preceded it must
+# not be able to starve it. The grant covers the repair's own model ladder
+# (primary plus fallback), activates only when the corridor is already
+# exhausted — so the extraction, the first in-scope call at that point, is
+# always the one it rescues — and both the activation and every granted call
+# land in the turn's records (a structured log line plus calls_reserved).
 _LAST_RESORT_REPAIR_SCOPE: ContextVar[bool] = ContextVar(
     "last_resort_repair_scope",
     default=False,
 )
+LAST_RESORT_REPAIR_CALL_GRANT = 2
 
 
 @contextmanager
@@ -176,14 +184,26 @@ def reserve_provider_call(
             return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
     if (
         _LAST_RESORT_REPAIR_SCOPE.get()
-        and not execution.last_resort_repair_reserved
         and execution.calls_reserved >= execution.call_allowance
     ):
-        execution.last_resort_repair_reserved = True
-        timeout_seconds = remaining_seconds
-        if task_timeout_seconds is not None:
-            timeout_seconds = min(timeout_seconds, float(task_timeout_seconds))
-        return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
+        if execution.last_resort_repair_calls_granted == 0:
+            execution.last_resort_repair_calls_granted = LAST_RESORT_REPAIR_CALL_GRANT
+            logger.bind(
+                llm_task=task_name,
+                calls_reserved=execution.calls_reserved,
+                call_allowance=execution.call_allowance,
+                grant=LAST_RESORT_REPAIR_CALL_GRANT,
+            ).info("Last-resort repair call grant activated")
+        if (
+            execution.last_resort_repair_grant_used
+            < execution.last_resort_repair_calls_granted
+        ):
+            execution.last_resort_repair_grant_used += 1
+            execution.calls_reserved += 1
+            timeout_seconds = remaining_seconds
+            if task_timeout_seconds is not None:
+                timeout_seconds = min(timeout_seconds, float(task_timeout_seconds))
+            return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
     if execution.calls_reserved >= execution.call_allowance:
         execution.call_allowance_exhausted = True
         execution.blocked_tasks.append(task_name)
