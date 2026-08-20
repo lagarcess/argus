@@ -174,6 +174,7 @@ import {
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
   chatActionRequestFromAction, chatHttpErrorDisplay,
+  applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
   hasActiveArtifactActionSet,
@@ -374,17 +375,12 @@ export default function ChatInterface() {
   );
   const isStreamingResponse = conversationActivity.isConversationLocked(conversationId);
   const visibleStreamStatus = visibleRequestStatus(streamStatus, isStreamingResponse);
-  const reloadActiveTranscriptRef = useRef<(conversationId: string) => void>(
-    () => {},
-  );
+  const reloadActiveTranscriptRef = useRef<(conversationId: string) => void>(() => {});
   const handleDurableJobCompletion = useCallback((response: BacktestJobResponse) => {
       const targetConversationId = response.job.conversation_id;
-      // A research job's answer arrives as a new assistant message, not a
-      // card update; the active view must refetch it or "the full answer is
-      // below" renders above nothing. The reload runs with the cache entry
-      // intact so navigation takes the refreshing path — the stale snapshot
-      // keeps rendering while the canonical refetch brings the answer in;
-      // evicting first would force a cold retrieval that blanks the view.
+      // A research answer is a new message, so the active view must refetch
+      // it — with the cache entry intact, so navigation takes the refreshing
+      // path instead of a cold retrieval that blanks the view.
       if (response.job.operation_scope === "chat.research") {
         const promoted = promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
         if (promoted) {
@@ -771,8 +767,7 @@ export default function ChatInterface() {
   }
   useEffect(() => {
     reloadActiveTranscriptRef.current = (targetConversationId) => {
-      // A locked (mid-stream) conversation reconciles through its own
-      // terminal path instead of a competing reload.
+      // A locked conversation reconciles through its own terminal path.
       if (conversationActivity.isConversationLocked(targetConversationId)) return;
       void navigateConversationTranscript(targetConversationId);
     };
@@ -1517,40 +1512,24 @@ export default function ChatInterface() {
             return normalizeDurableRetryActionHistory(nextMessages);
           });
         } else if (!chatFinalPayloadOwnsVisibleTerminalArtifact(finalPayload)) {
-          // A final frame that owns no visible terminal artifact must still
-          // yield a visible assistant turn; an empty placeholder reads as the
-          // app dying silently. Card-state settles (a cancelled confirmation,
-          // a persisted terminal outcome) own their artifact and render
-          // through their own paths, so the fallback never fires on them.
-          // The frame's sidecars still render here, and open confirmations
-          // settle exactly as they do on a prose-bearing final.
+          // A final that owns no visible artifact must still yield a visible
+          // turn; card-state settles (a cancelled confirmation, a persisted
+          // outcome) own theirs and never reach this fallback.
           setMessages((prev) =>
-            normalizeDurableRetryActionHistory(
-              settleOpenConfirmationsFromFinalPayload(
-                replaceOrAppendFinalAssistantMessage(prev, assistantId, {
-                  id: finalMessageId ?? assistantId,
-                  role: "ai",
-                  kind: "text",
-                  content: t("chat.error_backtest"),
-                  actions:
-                    finalTextActions.length > 0 ? finalTextActions : undefined,
-                  recoveryDisplay: finalRecoveryDisplay,
-                  strategyPathContext: finalStrategyPathContext,
-                  assistantRecoveryCode: finalAssistantRecoveryCode,
-                  discovery: finalDiscovery,
-                  memoryRecalls: finalMemoryRecalls,
-                  researchSources: researchSourcesForFinalPayload(finalPayload),
-                  nextExperiments:
-                    nextExperimentRowsFromMetadata(finalPayload) ?? undefined,
-                }),
-                finalPayload,
-                {
-                  action,
-                  finalActions: finalTextActions,
-                  hasFailedAction: finalHasFailedAction,
-                },
-              ),
-            ),
+            applyEmptyFinalFallback(prev, {
+              assistantId,
+              finalMessageId,
+              content: t("chat.error_backtest"),
+              finalActions: finalTextActions,
+              recoveryDisplay: finalRecoveryDisplay,
+              strategyPathContext: finalStrategyPathContext,
+              assistantRecoveryCode: finalAssistantRecoveryCode,
+              discovery: finalDiscovery,
+              memoryRecalls: finalMemoryRecalls,
+              finalPayload,
+              action,
+              hasFailedAction: finalHasFailedAction,
+            }),
           );
         }
         terminalReadiness.accept(event.data, identityAuthorized);

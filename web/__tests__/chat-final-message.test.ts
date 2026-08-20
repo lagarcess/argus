@@ -130,6 +130,18 @@ describe("chat final frame visibility", () => {
       "} else if (!chatFinalPayloadOwnsVisibleTerminalArtifact(finalPayload)) {",
     );
     expect(finalHandler).toContain('content: t("chat.error_backtest")');
-    expect(finalHandler).toContain("replaceOrAppendFinalAssistantMessage");
+    expect(finalHandler).toContain("applyEmptyFinalFallback");
+    const projection = readFileSync(
+      join(__dirname, "..", "components/chat/chat-message-projection.ts"),
+      "utf-8",
+    );
+    const fallback = projection.slice(
+      projection.indexOf("export function applyEmptyFinalFallback"),
+    );
+    // The fallback renders the frame's sidecars and settles confirmations
+    // exactly as a prose-bearing final does.
+    expect(fallback).toContain("settleOpenConfirmationsFromFinalPayload");
+    expect(fallback).toContain("recoveryDisplay: options.recoveryDisplay");
+    expect(fallback).toContain("researchSourcesForFinalPayload");
   });
 });
