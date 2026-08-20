@@ -114,9 +114,10 @@ describe("chat final frame visibility", () => {
   test("a final frame with no prose and no artifact still yields a visible turn", () => {
     // Production 2026-08-11..13: a Spanish chip click got no assistant reply
     // at all. The backend cannot end a turn silently by construction, so the
-    // last silent shape was a final frame carrying neither text nor an
-    // artifact; the handler must render the localized turn-failure copy
-    // instead of leaving the placeholder empty.
+    // last silent shape was a final frame owning no visible terminal
+    // artifact; the handler must render the localized turn-failure copy for
+    // that shape only. A confirmation-cancel success frame (empty text,
+    // confirmation_cancelled set) owns its artifact and must NOT trip it.
     const chat = readFileSync(
       join(__dirname, "..", "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -125,7 +126,9 @@ describe("chat final frame visibility", () => {
       chat.indexOf("} else if (finalText) {"),
       chat.indexOf("terminalReadiness.accept(event.data, identityAuthorized)"),
     );
-    expect(finalHandler).toContain("} else {");
+    expect(finalHandler).toContain(
+      "} else if (!chatFinalPayloadOwnsVisibleTerminalArtifact(finalPayload)) {",
+    );
     expect(finalHandler).toContain('content: t("chat.error_backtest")');
     expect(finalHandler).toContain("replaceOrAppendFinalAssistantMessage");
   });

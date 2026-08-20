@@ -29,7 +29,7 @@ import { useArchiveActiveConversation } from "@/components/chat/useArchiveActive
 import { toggleConversationUnread } from "@/components/chat/toggleConversationUnread";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { conversationActivityMutationNoticeDescriptor, useConversationActivity } from "@/components/chat/useConversationActivity";
-import { clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
+import { chatFinalPayloadOwnsVisibleTerminalArtifact, clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
 import ExpiredGuestSession from "@/components/guest/ExpiredGuestSession";
@@ -1509,11 +1509,12 @@ export default function ChatInterface() {
             }
             return normalizeDurableRetryActionHistory(nextMessages);
           });
-        } else {
-          // A final frame with neither prose nor an artifact must still yield
-          // a visible assistant turn; an empty placeholder reads as the app
-          // dying silently. The generic turn-failure copy is the honest
-          // render, and it is localized in both bundles.
+        } else if (!chatFinalPayloadOwnsVisibleTerminalArtifact(finalPayload)) {
+          // A final frame that owns no visible terminal artifact must still
+          // yield a visible assistant turn; an empty placeholder reads as the
+          // app dying silently. Card-state settles (a cancelled confirmation,
+          // a persisted terminal outcome) own their artifact and render
+          // through their own paths, so the fallback never fires on them.
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               replaceOrAppendFinalAssistantMessage(prev, assistantId, {
