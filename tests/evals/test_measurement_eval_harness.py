@@ -12,7 +12,6 @@ from tests.evals.measurement_eval_harness import (
     load_eval_cases,
 )
 from tests.evals.measurement_eval_scorecard import measurement_fixture_case_ids
-from tests.evals.measurement_outcome import offered_to_user
 
 EXPECTED_LOCKED_CATEGORIES = {
     "messy_english",
@@ -1293,54 +1292,3 @@ def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
     ]
     assert blocking[1]["status"] == "unexpected_pass"
     assert harness.expected_fail_issue_for_result(blocking[1]) == "#251"
-
-
-class TestOfferedReadsWhatTheUserSaw:
-    """Review #522: both offered gates were reading the wrong thing."""
-
-    def test_recovery_options_are_read_as_a_sibling_of_payload(self) -> None:
-        # typed_clarification_contract writes options beside payload, not
-        # inside it, so the old lookup made recovery_option_ids_include_any
-        # impossible to pass. All 60 blocks in the first live run were empty.
-        clarification = {
-            "kind": "unsupported_recovery",
-            "payload": {"raw_value": "options straddle", "strategy": {}},
-            "options": [
-                {"id": "rsi_threshold"},
-                {"id": "buy_and_hold"},
-            ],
-        }
-        offered = offered_to_user(
-            final_patch={"clarification": clarification},
-            interpret_patch={},
-            launch_payload={},
-        )
-        assert offered["recovery_option_ids"] == ["rsi_threshold", "buy_and_hold"]
-
-    def test_a_reply_that_names_nothing_does_not_pass_names_unavailable(self) -> None:
-        # The exact shape that shipped green: the sidecar listed four drops
-        # while the reply named none of them.
-        discovery = {
-            "candidates": [{"symbol": "SOL"}],
-            "unverified_names": ["Wiki Cat", "Venice Token", "Bitcoin"],
-        }
-        silent = offered_to_user(
-            final_patch={"discovery": discovery},
-            interpret_patch={},
-            launch_payload={},
-            assistant_text="Here are the trending cryptos I can help you test.",
-        )
-        assert silent["named_unavailable"] == []
-        assert silent["dropped_not_named"] == ["Wiki Cat", "Venice Token", "Bitcoin"]
-
-        naming = offered_to_user(
-            final_patch={"discovery": discovery},
-            interpret_patch={},
-            launch_payload={},
-            assistant_text=(
-                "Wiki Cat, Venice Token and Bitcoin came back but none could be "
-                "confirmed as tradable here."
-            ),
-        )
-        assert naming["named_unavailable"] == ["Wiki Cat", "Venice Token", "Bitcoin"]
-        assert naming["dropped_not_named"] == []

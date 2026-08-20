@@ -119,12 +119,20 @@ def compare_offered(
                 f"offered.min_discovery_rows: expected at least {minimum_rows}, "
                 f"got {len(rows)} ({rows!r})"
             )
-    if expected.get("names_unavailable") is True and not (
-        actual.get("named_unavailable") or []
+    # A turn that hands the user nothing owes an account of what it found and
+    # could not use; that empty turn is the dead end this guards. A turn that
+    # hands over something runnable owes no such account, because listing
+    # discards beside usable rows is noise to the reader. Founder-locked
+    # 2026-08-19, and it is why the pipeline's silent-filtering contract in
+    # `TestDropDisclosures` survives unchanged.
+    if (
+        expected.get("names_unavailable") is True
+        and not actual.get("actionable")
+        and not (actual.get("named_unavailable") or [])
     ):
         failures.append(
-            "offered.names_unavailable: the turn dropped candidates without "
-            "naming any of them"
+            "offered.names_unavailable: the turn offered nothing the user can "
+            "act on and did not name what it found and could not use"
         )
     expected_options = expected.get("recovery_option_ids_include_any")
     if expected_options:
